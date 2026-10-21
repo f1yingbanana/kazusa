@@ -297,11 +297,13 @@ on my quartet exposition.
 ```json
 {
   "agents": {
+    "ownership": "explicit",
     "defaults": {
       "model": "anthropic/claude-3-7-sonnet",
       "plugins": ["sim-harness", "sim-context-engine"]
     },
     "entries": {
+      "main": {},
       "alice": {
         "workspace": "workspaces/alice"
       },
@@ -311,8 +313,19 @@ on my quartet exposition.
     }
   },
   "plugins": {
+    "load": {
+      "paths": ["./plugins/sim-harness", "./plugins/sim-context-engine"]
+    },
     "slots": {
       "contextEngine": "sim-context-engine"
+    },
+    "entries": {
+      "sim-harness": {
+        "enabled": true
+      },
+      "sim-context-engine": {
+        "enabled": true
+      }
     }
   }
 }
@@ -320,3 +333,49 @@ on my quartet exposition.
 
 - Note: Per-agent `AGENTS.md` files are deliberately omitted so all characters
   run on the unified simulation harness.
+- Local developer overrides and test rosters are defined in
+  `openclaw.local.json` via `"$include": ["./openclaw.json"]` and kept
+  git-ignored.
+
+---
+
+## 7. Plugin Manifest & Configuration Contracts (`plugins/*`)
+
+All simulation functionality is implemented as native OpenClaw plugins located
+directly in `plugins/`.
+
+### 7.1 Plugin Manifest (`openclaw.plugin.json`)
+
+Each plugin folder contains an `openclaw.plugin.json` file declaring its plugin
+metadata, dependencies, and optional configuration schema:
+
+```json
+{
+  "id": "sim-harness",
+  "name": "Kazusa Simulation Harness",
+  "description": "Simulation tools, frontmatter state, desires, tasks, and encounter scheduler"
+}
+```
+
+### 7.2 Plugin Package Manifest (`package.json`)
+
+Each plugin includes a lightweight `package.json` configuring its direct
+TypeScript runtime entry point:
+
+```json
+{
+  "name": "@kazusa/sim-harness",
+  "version": "0.1.0",
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./src/index.ts"]
+  }
+}
+```
+
+> [!NOTE] **Zero-Build Runtime Contract**: OpenClaw evaluates TypeScript files
+> directly via its embedded Jiti/tsx loader when `openclaw.extensions` points to
+> `./src/index.ts`. Local plugins require no build step (`tsc`, `tsup`, or
+> `dist/` folders) during development. The official documentation note
+> ("Published external plugins should point runtime entries at built JavaScript
+> files") applies strictly to published npm packages distributed externally.

@@ -2,7 +2,8 @@
 
 This document outlines the six implementation phases of Kazusa (Phase 0 through
 Phase 5), detailed engineering deliverables, and exact automated test
-specifications.
+specifications. All plugins are built in **TypeScript under `plugins/`**
+executed directly by OpenClaw at runtime with **zero build step**.
 
 ---
 
@@ -11,78 +12,80 @@ specifications.
 ```text
 apps/kazusa/ (or repository root)
 ├── openclaw.json
+├── openclaw.local.json               # Local overlay for test agents & dev settings (GIT-IGNORED)
 ├── package.json
 ├── tsconfig.json
+├── plugins/                          # Direct TypeScript plugins (ZERO BUILD STEP)
+│   ├── sim-harness/                  # Phase 0, 1, 3, 4: File state, math, tools, scheduler & encounters
+│   │   ├── openclaw.plugin.json
+│   │   ├── package.json              # "openclaw": { "extensions": ["./src/index.ts"] }
+│   │   ├── src/
+│   │   │   ├── clock.ts              # SimClock interface
+│   │   │   ├── frontmatter.ts        # Atomic YAML frontmatter + Markdown reader/writer
+│   │   │   ├── desires.ts            # Passive decay math & D2A qualitative rubric
+│   │   │   ├── world-index.ts        # In-memory location presence index derived from MEMORY.md
+│   │   │   ├── tasks-and-transit.ts  # Task leases, LLM transit judgment, pause/resume hooks
+│   │   │   ├── social-tools.ts       # conclude_conversation & relationship mutators
+│   │   │   ├── scheduler-wake.ts     # Dynamic heartbeat pacing & session wake triggers
+│   │   │   ├── encounter-gate.ts     # Zero-LLM encounter probability roll
+│   │   │   └── index.ts              # Plugin registration entry point
+│   │   └── test/
+│   │       ├── phase0-files.test.ts
+│   │       ├── phase1-desires.test.ts
+│   │       ├── phase3-tasks.test.ts
+│   │       └── phase4-interrupts.test.ts
+│   └── sim-context-engine/           # Phase 2: Custom ContextEngine (plugins.slots.contextEngine)
+│       ├── openclaw.plugin.json
+│       ├── package.json              # "openclaw": { "extensions": ["./src/index.ts"] }
+│       ├── src/
+│       │   └── index.ts              # Merges actions, thoughts, chat tails, location & social graph
+│       └── test/
+│           └── phase2-context.test.ts
 ├── shared/
-│   ├── locations/                    # Shared objective world facts
+│   ├── locations/                    # Shared objective world facts (GIT-IGNORED test data)
 │   │   ├── dorm_a.md
 │   │   ├── grocery_store.md
 │   │   ├── school.md
 │   │   └── cafe.md
-│   └── skills/                       # Shared OpenClaw skills
+│   ├── lore/                         # Shared world lore & setting docs (GIT-IGNORED test data)
+│   └── skills/                       # Shared OpenClaw skills across all agents
 │       ├── sim-heartbeat-planner/
 │       │   └── SKILL.md
 │       ├── sim-social-interaction/
 │       │   └── SKILL.md
 │       └── sim-nightly-reflection/
 │           └── SKILL.md
-├── workspaces/                       # Per-agent OpenClaw workspaces (no AGENTS.md)
-│   ├── alice/
-│   │   ├── SOUL.md
-│   │   ├── IDENTITY.md               # Traits & desire decay configuration
-│   │   ├── MEMORY.md                 # Single source of truth hot state
-│   │   └── memory/
-│   │       ├── 2026-10-20.md         # Cold daily distilled summaries
-│   │       └── relationships/
-│   │           ├── bob.md            # Impression & interaction log
-│   │           └── clara.md
-│   └── bob/
-│       └── ...
-├── packages/
-│   └── sim-file-state/               # Phase 0 & 1: Parser, atomic file locks, clock & desire math
-│       ├── src/
-│       │   ├── clock.ts
-│       │   ├── frontmatter.ts        # Atomic YAML frontmatter + Markdown reader/writer
-│       │   ├── world-index.ts        # In-memory location presence index derived from files
-│       │   └── desires.ts            # Passive decay math & D2A qualitative rubric renderer
-│       └── test/
-│           ├── phase0-files.test.ts
-│           └── phase1-desires.test.ts
-└── plugins/
-    ├── sim-context-engine/           # Phase 2: Custom ContextEngine (plugins.slots.contextEngine)
-    │   ├── openclaw.plugin.json
-    │   ├── index.ts                  # Merges actions, thoughts, chat tails, location & social graph
-    │   └── test/
-    │       └── phase2-context.test.ts
-    └── sim-harness/                  # Phase 3 & 4: Simulation tools, scheduler & interrupt hooks
-        ├── openclaw.plugin.json
-        ├── src/
-        │   ├── tasks-and-transit.ts  # Task leases, LLM transit judgment, pause/resume hooks
-        │   ├── social-tools.ts       # conclude_conversation & relationship file updates
-        │   ├── scheduler-wake.ts     # Dynamic heartbeat pacing & session wake triggers
-        │   ├── encounter-gate.ts     # Zero-LLM encounter probability roll
-        │   └── index.ts
-        └── test/
-            ├── phase3-tasks.test.ts
-            └── phase4-interrupts.test.ts
+└── workspaces/                       # Per-agent OpenClaw workspaces (GIT-IGNORED test data)
+    ├── alice/
+    │   ├── SOUL.md
+    │   ├── IDENTITY.md               # Traits & desire decay configuration
+    │   ├── MEMORY.md                 # Single source of truth hot state
+    │   └── memory/
+    │       ├── 2026-10-20.md         # Cold daily distilled summaries
+    │       └── relationships/
+    │           ├── bob.md            # Impression & interaction log
+    │           └── clara.md
+    └── bob/
+        └── ...
 ```
 
 ---
 
-## Phase 0: Markdown Frontmatter Engine, File Schemas & In-Memory World Index (`packages/sim-file-state`)
+## Phase 0: Markdown Frontmatter Engine, File Schemas & In-Memory World Index (`plugins/sim-harness`)
 
 ### Deliverables
 
-- `frontmatter.ts`: Atomic YAML frontmatter + Markdown reader/writer using
-  write-then-rename (`writeFile(tmp) -> rename(tmp, target)`) to prevent file
-  corruption during concurrent operations.
-- `clock.ts`: `SimClock` interface supporting both wall-clock time and
-  accelerated simulation time.
-- `world-index.ts`: In-memory presence cache
-  `{ agentId -> { location, transit_state, active_task } }` updated by file
-  watchers on `MEMORY.md`. Provides `getAgentsAtLocation(locationId)`.
+- `plugins/sim-harness/src/frontmatter.ts`: Atomic YAML frontmatter + Markdown
+  reader/writer using write-then-rename
+  (`writeFile(tmp) -> rename(tmp, target)`) to prevent file corruption during
+  concurrent operations.
+- `plugins/sim-harness/src/clock.ts`: `SimClock` interface supporting both
+  wall-clock time and accelerated simulation time.
+- `plugins/sim-harness/src/world-index.ts`: In-memory presence cache
+  `{ agentId -> { location, transit_state, active_task } }` updated by watching
+  `MEMORY.md`. Provides `getAgentsAtLocation(locationId)`.
 
-### Test Specifications (`packages/sim-file-state/test/phase0-files.test.ts`)
+### Test Specifications (`plugins/sim-harness/test/phase0-files.test.ts`)
 
 - **Test 0.1 (Round-Trip Frontmatter + Body Preservation)**:
   - Parse `MEMORY.md`, mutate `desires.hunger` and `active_task.status`,
@@ -96,11 +99,11 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 1: Desire & Homeostasis Engine (`packages/sim-file-state`)
+## Phase 1: Desire & Homeostasis Engine (`plugins/sim-harness`)
 
 ### Deliverables
 
-- `desires.ts`:
+- `plugins/sim-harness/src/desires.ts`:
   - `syncAndDecayDesires(agentWorkspaceDir, clock)`: Computes time delta $\Delta
     t_{\text{hours}}$, applies decay formula with circadian $M_{\text{tod}}$,
     tracks `sleep_debt_min`, computes squared urgency $U_d$, maps to D2A natural
@@ -109,7 +112,7 @@ apps/kazusa/ (or repository root)
     Rewards completed tasks scaled by actual elapsed time, clamping deltas to
     `[-3.0, +3.0]`.
 
-### Test Specifications (`packages/sim-file-state/test/phase1-desires.test.ts`)
+### Test Specifications (`plugins/sim-harness/test/phase1-desires.test.ts`)
 
 - **Test 1.1 (In-Place `MEMORY.md` Decay & Qualitative Rendering)**:
   - Advance `SimClock` by 5 hours for `alice`, run `syncAndDecayDesires()`.

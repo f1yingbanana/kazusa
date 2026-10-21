@@ -98,3 +98,56 @@ When an external stimulus occurs:
 - Wakes the agent's session instantly.
 - Pre-turn hook reconciles the interrupted task (pausing exclusive tasks,
   updating elapsed minutes) before invoking the LLM.
+
+---
+
+## 5. Plugin Architecture & Direct TypeScript Execution
+
+### 5.1 Why the `plugins/` Directory (Zero-Build Workflow)
+
+Monorepo setups that require external build steps (`npm run build`,
+`tsc --watch`, `tsup`) introduce latency, file-watcher overhead, and
+synchronization issues during development.
+
+Kazusa adopts **direct native TypeScript plugins** located under
+`apps/kazusa/plugins/`:
+
+- **Direct Runtime Evaluation**: OpenClaw evaluates TypeScript files
+  (`./src/index.ts`) directly at runtime via its embedded loader (Jiti/tsx).
+- **Instant Hot-Reload**: Changes to simulation tools, desire decay formulas, or
+  context engine hooks take effect immediately on the next execution without
+  compilation artifacts.
+- **Local Workspace Registration**: Plugins are registered directly in
+  `openclaw.json` under
+  `plugins.load.paths: ["./plugins/sim-harness", "./plugins/sim-context-engine"]`.
+- **Packaging Scope**: Published external plugins require pre-built JavaScript
+  entries per the OpenClaw SDK contract, but local workspace plugins operate
+  directly on TypeScript sources.
+
+### 5.2 Plugin Separation of Concerns
+
+1. **`plugins/sim-harness`**:
+   - **File State Engine**: Atomic YAML frontmatter + Markdown parser and writer
+     (`frontmatter.ts`).
+   - **Simulation Clock**: `SimClock` interface supporting real and accelerated
+     time (`clock.ts`).
+   - **Presence Tracker**: In-memory `WorldIndex` tracking agent locations by
+     watching `MEMORY.md` headers (`world-index.ts`).
+   - **Desire & Homeostasis Engine**: Passive decay math, circadian multipliers
+     ($M_{\\text{tod}}$), sleep debt accumulation, squared urgency ranking, and
+     D2A qualitative rubric renderer (`desires.ts`).
+   - **Simulation Tools**: Registered agent tools (`start_activity`,
+     `start_transit`, `conclude_activity`, `record_thought`,
+     `conclude_conversation`).
+   - **Scheduler & Encounter Gate**: Dynamic heartbeat pacing hook
+     (`next_check`), auto-arrival on transit expiration, and zero-LLM encounter
+     probability rolls (`encounter-gate.ts`, `scheduler-wake.ts`).
+
+2. **`plugins/sim-context-engine`**:
+   - Custom `ContextEngine` registered via
+     `api.registerContextEngine("sim-context-engine", ...)`.
+   - Bound in configuration to
+     `plugins.slots.contextEngine = "sim-context-engine"`.
+   - Orchestrates multi-stream context assembly (`assemble(ctx)`) prior to LLM
+     generation, combining location affordances, stream tails, and adaptive
+     relationship impressions.

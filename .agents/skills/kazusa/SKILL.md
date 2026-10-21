@@ -4,9 +4,9 @@ description:
   Master architectural guide for developing the Kazusa multi-agent society
   simulation framework on top of OpenClaw. Always trigger this skill whenever
   designing, building, modifying, or testing Kazusa plugins (sim-harness,
-  sim-context-engine, sim-file-state), simulation tools, desire homeostasis
-  engines, multi-stream context engines, shared agent skills, world state
-  schemas, presence indexes, or multi-agent event/pacing lifecycles.
+  sim-context-engine), simulation tools, desire homeostasis engines,
+  multi-stream context engines, shared agent skills, world state schemas,
+  presence indexes, or multi-agent event/pacing lifecycles.
 ---
 
 # Kazusa: OpenClaw Society Simulation Framework
@@ -92,16 +92,39 @@ cancel.
 
 ## 3. Storage Map & Folder Structure
 
-All paths are relative to `apps/kazusa/` (or monorepo root):
+All paths are relative to `apps/kazusa/` (or repository root):
 
 ```text
 apps/kazusa/
-├── openclaw.json                       # Gateway config (omits per-agent AGENTS.md)
+├── openclaw.json                       # Clean committed framework configuration
+├── openclaw.local.json                 # Local overlay for test agents & dev settings (GIT-IGNORED)
 ├── package.json                        # @openrp-ai/kazusa with local openclaw dependency
+├── plugins/                            # Native OpenClaw TypeScript plugins (ZERO BUILD STEP)
+│   ├── sim-harness/                    # Simulation tools, file state, math & scheduler
+│   │   ├── openclaw.plugin.json        # Plugin manifest & config schema
+│   │   ├── package.json                # Declares "openclaw": { "extensions": ["./src/index.ts"] }
+│   │   ├── src/                        # Direct TypeScript source executed at runtime
+│   │   │   ├── clock.ts                # SimClock (real-time and accelerated time)
+│   │   │   ├── frontmatter.ts          # Atomic YAML frontmatter + Markdown reader/writer
+│   │   │   ├── desires.ts              # Deterministic decay & D2A qualitative rubric
+│   │   │   ├── world-index.ts          # In-memory location presence index derived from files
+│   │   │   ├── tasks-and-transit.ts    # Task leases, LLM transit judgment, pause/resume
+│   │   │   ├── social-tools.ts         # conclude_conversation & relationship mutators
+│   │   │   ├── scheduler-wake.ts       # Dynamic heartbeat pacing & session wake triggers
+│   │   │   ├── encounter-gate.ts       # Zero-LLM encounter probability roll
+│   │   │   └── index.ts                # Main plugin registration entry point
+│   │   └── test/                       # Vitest unit test suites
+│   └── sim-context-engine/             # Custom Context Engine (plugins.slots.contextEngine)
+│       ├── openclaw.plugin.json
+│       ├── package.json
+│       ├── src/
+│       │   └── index.ts                # Assembles actions, thoughts, chat tails, location & social graph
+│       └── test/
 ├── shared/
-│   ├── locations/<location_id>.md      # Read-only world locations, connections & distances
+│   ├── locations/<location_id>.md      # Read-only world locations (GIT-IGNORED test data)
+│   ├── lore/<file>.md                  # World setting lore (GIT-IGNORED test data)
 │   └── skills/<skill_name>/SKILL.md    # Shared behavioral workflows across all agents
-├── workspaces/<agent_id>/
+├── workspaces/<agent_id>/              # Local agent workspaces (GIT-IGNORED test data)
 │   ├── SOUL.md                         # Static personality, voice, and core values
 │   ├── IDENTITY.md                     # Static bio + YAML desire targets & decay rates
 │   ├── MEMORY.md                       # Always-injected hot state (frontmatter + body)
@@ -113,38 +136,57 @@ apps/kazusa/
 
 ---
 
-## 4. Key Deliverables Architecture
+## 4. Key Deliverables Architecture (Zero-Build Plugins)
 
-The Kazusa implementation is divided into modular packages and plugins:
+Kazusa is built entirely as **direct TypeScript plugins** loaded via OpenClaw's
+native `plugins.load.paths` mechanism:
 
-1. **`packages/sim-file-state`**:
-   - Atomic YAML frontmatter + Markdown parser and writer (`write-then-rename`).
-   - `WorldIndex`: In-memory presence tracker derived by watching `MEMORY.md`
-     files.
-   - Deterministic desire decay engine, circadian math, sleep debt, and D2A
-     qualitative rubric renderer.
+1. **`plugins/sim-harness`**:
+   - **File State Engine**: Atomic YAML frontmatter + Markdown parser and writer
+     (`write-then-rename`) in `frontmatter.ts`.
+   - **Presence Tracker**: In-memory `WorldIndex` tracking agent locations by
+     watching `MEMORY.md` headers.
+   - **Desire & Homeostasis Engine**: Passive decay math, circadian multipliers
+     ($M_{\text{tod}}$), sleep debt accumulation, squared urgency ranking, and
+     D2A qualitative rubric renderer in `desires.ts`.
+   - **Simulation Tools**: Registered agent tools (`start_activity`,
+     `start_transit`, `conclude_activity`, `record_thought`,
+     `conclude_conversation`).
+   - **Scheduler & Encounter Gate**: Dynamic heartbeat pacing hook
+     (`next_check`), auto-arrival on transit expiration, and the zero-LLM
+     encounter probability roll.
 2. **`plugins/sim-context-engine`**:
    - Custom OpenClaw Context Engine (`plugins.slots.contextEngine`).
-   - Merges recent `:actions` and `:thoughts` session tails, current location
-     setting facts, co-present agents, and adaptive relationship impressions
-     into each prompt.
-3. **`plugins/sim-harness`**:
-   - Task & transit lease tools (`start_activity`, `start_transit`,
-     `conclude_activity`, `record_thought`).
-   - Dynamic heartbeat pacing (`next_check`) and immediate interrupt triggers
-     (`openclaw system event --mode now`).
-   - Zero-LLM Encounter Gate evaluating encounter rolls between co-located or
-     co-commuting agents.
-4. **Shared Behavioral Skills (`shared/skills/`)**:
+   - Hooks into `assemble()` before model turns to merge the tails of `:actions`
+     and `:thoughts` sessions with current location facts, co-present agents,
+     and adaptive relationship impressions.
+3. **Shared Behavioral Skills (`shared/skills/`)**:
    - `sim-heartbeat-planner`: Settle $\rightarrow$ Orient $\rightarrow$ 3-Option
      Pre-Imagine $\rightarrow$ Commit cycle.
    - `sim-social-interaction`: Natural dialogue management, quick impressions,
      and clean conversational exits.
    - `sim-nightly-reflection`: Nightly sleep distillation, memory archiving, and
      plan generation.
-5. **World Importer Script**:
-   - CLI script bootstrapping `workspaces/`, `shared/locations/`, and
-     `openclaw.json` directly from OpenRP world definitions.
+4. **World Importer Script (`scripts/import-world.ts`)**:
+   - CLI script bootstrapping workspaces, locations, and roster from OpenRP
+     world definitions.
+
+### 4.1 The `plugins/` Folder Zero-Build Philosophy
+
+In contrast to monorepo architectures requiring compilation pipelines
+(`tsc --build`, `tsup`) that delay developer iteration, Kazusa places all engine
+logic directly in `plugins/`:
+
+- **Direct TypeScript Execution**: OpenClaw executes `./src/index.ts` directly
+  via its runtime TypeScript loader (Jiti/tsx) declared in `package.json`
+  (`"openclaw": { "extensions": ["./src/index.ts"] }`).
+- **Clean Configuration**: Registered in `openclaw.json` via
+  `plugins.load.paths: ["./plugins/sim-harness", "./plugins/sim-context-engine"]`.
+- **Zero-Build Editing**: Any code edit to a TypeScript file takes effect
+  immediately on the next heartbeat or event without compilation artifacts,
+  watch daemons, or stale build caches.
+- **Direct Vitest Testing**: All unit and integration tests execute directly
+  against TypeScript files in milliseconds.
 
 ---
 
@@ -176,6 +218,10 @@ appropriate reference document as needed:
 
 ## 6. Development & Coding Rules
 
+- **Zero-Build Local Plugins**: Engine plugins live directly under `plugins/` in
+  TypeScript. OpenClaw loads `src/index.ts` natively via its Jiti runtime loader
+  (`openclaw.extensions: ["./src/index.ts"]`). **Never introduce a manual
+  compilation or `npm run build` step during local development.**
 - **Strict TypeScript**: Never use `any` or loose type assertions
   (`as unknown as T` without documented justification).
 - **Atomic File Writes**: Never write directly to live Markdown state files.
@@ -183,5 +229,7 @@ appropriate reference document as needed:
   atomically rename (`rename(tmp, target)`) to prevent corruption.
 - **Zero Database Migrations**: State lives in Markdown frontmatter and session
   JSONL streams. Do not introduce SQL tables or migration files.
+- **Automated Testing**: Test all state parsers, desire decay math, and
+  scheduler logic directly with Vitest against `.ts` files in milliseconds.
 - **Formatting**: Run `npm run format` (prettier) and `npm run lint` on all code
   and skill files before committing.
