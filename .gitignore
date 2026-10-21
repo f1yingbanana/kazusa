@@ -16,6 +16,21 @@ node_modules/
 *.sqlite-shm
 *.bak*
 
+# Local OpenClaw config overrides
+*.local.json
+apps/kazusa/openclaw.local.json
+
+# Local agent workspaces (untracked test data)
+apps/kazusa/workspaces/*
+!apps/kazusa/workspaces/.gitkeep
+!apps/kazusa/workspaces/.template/
+
+# Local simulation world data (untracked test locations & lore)
+apps/kazusa/shared/locations/*
+!apps/kazusa/shared/locations/.gitkeep
+apps/kazusa/shared/lore/*
+!apps/kazusa/shared/lore/.gitkeep
+
 # Build outputs
 dist/
 build/

@@ -1,17 +1,11 @@
 {
   "agents": {
+    "ownership": "explicit",
     "entries": {
-      "main": {
-        "name": "main",
-        "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/workspaces/main",
-        "agentDir": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/.state/agents/main/agent",
-        "identity": {
-          "name": "main"
-        }
-      }
+      "main": {}
     },
     "defaults": {
-      "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/workspaces/main",
+      "workspace": "./workspaces",
       "models": {
         "zai/glm-5.2": {
           "alias": "GLM"
