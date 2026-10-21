@@ -11,6 +11,14 @@
     "openclaw": "npm run --workspace=@openrp-ai/kazusa openclaw",
     "gateway": "npm run --workspace=@openrp-ai/kazusa gateway",
     "status": "npm run --workspace=@openrp-ai/kazusa status",
-    "doctor": "npm run --workspace=@openrp-ai/kazusa doctor"
+    "doctor": "npm run --workspace=@openrp-ai/kazusa doctor",
+    "fix": "pretty-quick --branch main",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "prettier-plugin-jsdoc": "^1.8.1",
+    "pretty-quick": "^4.2.2"
   }
 }

@@ -1,0 +1,5 @@
+{
+  "endOfLine": "auto",
+  "plugins": ["prettier-plugin-jsdoc"],
+  "proseWrap": "always"
+}
