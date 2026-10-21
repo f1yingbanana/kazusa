@@ -1,0 +1,14 @@
+{
+  "name": "@kazusa/openclaw",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "openclaw": "OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw",
+    "gateway": "OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw gateway",
+    "status": "OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw models status",
+    "doctor": "OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw doctor"
+  },
+  "dependencies": {
+    "openclaw": "^2026.10.5"
+  }
+}

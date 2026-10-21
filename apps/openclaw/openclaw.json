@@ -1,0 +1,106 @@
+{
+  "agents": {
+    "entries": {
+      "main": {
+        "name": "main",
+        "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/workspaces/main",
+        "agentDir": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/.state/agents/main/agent",
+        "identity": {
+          "name": "main"
+        }
+      }
+    },
+    "defaults": {
+      "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/workspaces/main",
+      "models": {
+        "zai/glm-5.2": {
+          "alias": "GLM"
+        }
+      },
+      "model": {
+        "primary": "zai/glm-5.2"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "anthropic": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "codex": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "zai": {
+        "enabled": true
+      }
+    }
+  },
+  "meta": {
+    "migrations": {
+      "modelPolicyAllowlist": true,
+      "utilityModelSeparation": true
+    },
+    "lastTouchedVersion": "2026.10.5"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "d56ff266487ec941aef9d488b28fb3899517754b7cbb182d"
+    },
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off"
+    }
+  },
+  "tools": {
+    "profile": "full"
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm"
+    }
+  },
+  "auth": {
+    "profiles": {
+      "zai:default": {
+        "provider": "zai",
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "zai": {
+        "baseUrl": "https://api.z.ai/api/paas/v4",
+        "api": "openai-completions",
+        "models": []
+      }
+    }
+  },
+  "hooks": {
+    "internal": {
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "wizard": {
+    "lastRunAt": "2026-10-21T07:59:47.007Z",
+    "lastRunVersion": "2026.10.5",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  }
+}

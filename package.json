@@ -1,0 +1,15 @@
+{
+  "name": "kazusa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kazusa agent monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "openclaw": "npm run --workspace=apps/openclaw",
+    "gateway": "npm run --workspace=apps/openclaw gateway",
+    "status": "npm run --workspace=apps/openclaw status"
+  }
+}
