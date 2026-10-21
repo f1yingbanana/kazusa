@@ -13,6 +13,9 @@
       },
       "model": {
         "primary": "zai/glm-5.2"
+      },
+      "memorySearch": {
+        "extraPaths": ["../../shared/wiki"]
       }
     }
   },

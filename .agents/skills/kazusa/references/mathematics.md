@@ -112,9 +112,9 @@ $$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\
 - $F_{AB} \in [0, 100]$: Familiarity between $A$ and $B$ from
   `<workspace>/memory/relationships/<peer>.md` frontmatter. (If no file exists,
   $F_{AB} = 0$).
-- $M_L \in [0.0, 1.0]$: `encounter_modifier` from `shared/locations/<loc>.md`
-  (e.g. `0.85` in a crowded cafe, `0.20` in a quiet library stack, `0.0` in
-  private dorm room).
+- $M_L \in [0.0, 1.0]$: `encounter_modifier` from
+  `shared/wiki/entities/places/<loc>.md` (e.g. `0.85` in a crowded cafe, `0.20`
+  in a quiet library stack, `0.0` in private dorm room).
 - $\text{shield}_A, \text{shield}_B \in [0.0, 1.0]$: `focus_shield` of current
   `active_task` (e.g. `0.9` for studying or sleeping, `0.1` for casual
   strolling).

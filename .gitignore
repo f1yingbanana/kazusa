@@ -25,11 +25,13 @@ apps/kazusa/workspaces/*
 !apps/kazusa/workspaces/.gitkeep
 !apps/kazusa/workspaces/.template/
 
-# Local simulation world data (untracked test locations & lore)
+# Local simulation world data (untracked test locations, lore & world wiki)
 apps/kazusa/shared/locations/*
 !apps/kazusa/shared/locations/.gitkeep
 apps/kazusa/shared/lore/*
 !apps/kazusa/shared/lore/.gitkeep
+apps/kazusa/shared/wiki/*
+!apps/kazusa/shared/wiki/.gitkeep
 
 # Build outputs
 dist/

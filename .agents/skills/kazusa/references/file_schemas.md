@@ -160,18 +160,29 @@ alarms:
 
 ---
 
-## 3. Shared Objective World Map (`shared/locations/<location_id>.md`)
+## 3. Shared Objective World Wiki (`shared/wiki/`)
 
-- **Location**: `shared/locations/<location_id>.md`
-- **Purpose**: Shared, read-only objective physical setting facts, affordances,
-  and connection topology.
-- **Access**: Read by all agents via Context Engine.
+The World Wiki acts as the canonical encyclopedia and physical ground truth of
+the simulation.
+
+### 3.1 Objective Places (`shared/wiki/entities/places/<place_id>.md`)
+
+- **Location**: `shared/wiki/entities/places/<place_id>.md`
+- **Purpose**: Shared, objective physical setting facts, affordances, and
+  connection topology. Mutated only via in-world events or completed task
+  leases.
+- **Access**: Read by all agents via Context Engine (Tier 1 Spatial Perception &
+  Tier 3 Lazy Retrieval).
 
 ```markdown
 ---
-location_id: grocery_store
+pageType: entity
+entityType: place
+id: entity.place.grocery_store
+place_id: grocery_store
 name: Willow Market & Grocery
 category: commercial
+status: OPERATIONAL # or DESTROYED, CLOSED, UNDER_RENOVATION
 encounter_modifier: 0.65
 allowed_activities: [shop_groceries, browse_items, work_cashier, talk]
 connections:
@@ -196,31 +207,92 @@ softly overhead. Fresh fruit crates line the front entryway, and the aroma of
 roasted coffee drifts from the bakery aisle.
 ```
 
-### Frontmatter Specifications
+### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)
 
-- `location_id` (string, required): Unique location slug.
-- `name` (string, required): Human-readable name.
-- `category` (string, required): E.g. `commercial`, `residential`, `academic`,
-  `recreational`.
-- `encounter_modifier` (number, float `0.0..1.0`): Spatial density factor used
-  by Encounter Gate.
-- `allowed_activities` (string array): Canonical list of activity types
-  supported here.
-- `connections` (array): Reachable adjacent locations with human-readable
-  distance and terrain context so the LLM can deduce travel duration.
-
----
-
-## 4. Social Graph & Relationship Cards (`<workspace>/memory/relationships/<peer_id>.md`)
-
-- **Location**: `<workspace>/memory/relationships/<peer_id>.md`
-- **Purpose**: Two-tier memory model of a single relationship: Tier 1 eager
-  summary (`## Quick Impression`) and Tier 2 lazy logs (`## Interaction Log`).
-- **Access**: Context Engine injects `## Quick Impression`; OpenClaw
-  `memory-core` searches `## Interaction Log`.
+- **Location**: `shared/wiki/entities/characters/<character_id>.md`
+- **Purpose**: Canonical definition of all characters in the world (e.g. 100+
+  students, citizens, shopkeepers).
+- **Simulation Mapping**:
+  - **Active Simulated Agents**: Have a workspace in `workspaces/<id>/` and an
+    entry in `openclaw.json`.
+  - **Background NPCs**: Exist only as World Wiki entity cards. Active agents
+    can search for them, talk about them, and reference their canonical bio
+    without spawning runner processes.
 
 ```markdown
 ---
+pageType: entity
+entityType: person
+id: entity.character.hifumi
+character_id: hifumi
+name: Hifumi Ajitani
+canonicalId: trinity.hifumi
+aliases: [Faust, Leader]
+affiliation: Trinity General School
+role: Student / Library Committee
+personality_traits: [earnest, timid, resilient, peroro_enthusiast]
+status: ACTIVE_IN_WORLD
+is_simulated_agent: true # true if workspace exists in openclaw.json; false if background NPC
+---
+
+# Character Bio
+
+An ordinary student at Trinity who finds herself pulled into extraordinary
+incidents. Passionate about cute character merchandise, especially the Momo
+Friends franchise.
+```
+
+### 3.3 Canonical World Concepts & Lore (`shared/wiki/concepts/<topic_id>.md`)
+
+- **Location**: `shared/wiki/concepts/<topic_id>.md` (e.g.
+  `concepts/kivotos_halos.md`, `concepts/town_charter.md`)
+- **Purpose**: Objective canonical lore, rules of the world, institutional
+  bylaws, and public historical records.
+- **Access**: Queried via `wiki_search` / `wiki_get` when agents consult world
+  facts or canon rules.
+
+```markdown
+---
+pageType: concept
+conceptType: lore
+id: concept.kivotos_halos
+title: Halos of Kivotos
+aliases: [Halo, Angelic Rings]
+lastRefreshedAt: "2026-10-20T00:00:00Z"
+claims:
+  - id: claim.halo.sleep
+    text:
+      "Halos disappear when students fall completely unconscious or fall asleep."
+    status: supported
+    confidence: 1.0
+---
+
+# Overview
+
+In Kivotos, all students possess halos above their heads that manifest when
+conscious. Halos vary widely in geometric shape, color, and size.
+```
+
+---
+
+## 4. Subjective Personal Wiki (`workspaces/<agent_id>/wiki/`)
+
+Each active simulated agent maintains their own subjective worldview, isolated
+from other agents.
+
+### 4.1 Subjective Relationship Cards (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`)
+
+- **Location**: `workspaces/<id>/wiki/entities/characters/<peer_id>.md`
+- **Purpose**: Two-tier memory model: Tier 1 eager summary
+  (`## Quick Impression`) and Tier 2 lazy interaction logs, structured with
+  `memory-wiki` edge metadata.
+- **Access**: Injected into prompt by Context Engine (Tier 2 Social Salience).
+
+```markdown
+---
+pageType: entity
+entityType: person
+id: entity.peer.bob
 peer_id: bob
 name: Bob Moreno
 relation_type: close_friend
@@ -228,6 +300,12 @@ familiarity: 75
 affinity: 62
 trust: 70
 last_interaction_iso: "2026-10-19T19:45:00Z"
+relationships:
+  - targetId: entity.character.bob
+    targetTitle: Bob Moreno
+    kind: close_friend
+    weight: 0.75
+    confidence: 0.9
 ---
 
 ## Quick Impression
@@ -246,17 +324,39 @@ talkative, though he procrastinates on assignments.
   hours.
 ```
 
-### Frontmatter Specifications
+### 4.2 Subjective Beliefs & Concepts (`workspaces/<id>/wiki/concepts/<concept_id>.md`)
 
-- `peer_id` (string, required): Peer's agent ID.
-- `name` (string, required): Peer's display name.
-- `relation_type` (string): E.g. `stranger`, `acquaintance`, `friend`,
-  `close_friend`, `rival`.
-- `familiarity` (number, integer `0..100`): Crucial input for Zero-LLM Encounter
-  Gate ($F_{AB}$).
-- `affinity` (number, integer `0..100`): Liking/warmth score.
-- `trust` (number, integer `0..100`): Reliability/confidence score.
-- `last_interaction_iso` (ISO 8601 string): Timestamp of last conversation.
+- **Location**: `workspaces/<id>/wiki/concepts/<concept_id>.md` (e.g.
+  `concepts/market_vandalism.md`)
+- **Purpose**: Tracks unverified personal beliefs, theories, and subjective
+  claims with evidence directly under `concepts/`. Evaluated by
+  `reports/contradictions.md` when conflicting claims are recorded.
+
+```markdown
+---
+pageType: concept
+conceptType: belief
+id: claim.alice.market_vandalism
+title: Willow Market Vandalism Theory
+status: contested # supported, contested, verified, debunked
+confidence: 0.65
+claims:
+  - id: claim.market.destroyed
+    text: "The supermarket was destroyed by a rogue demolition crew last night."
+    status: contested
+    confidence: 0.65
+    evidence:
+      - kind: overheard_dialogue
+        sourceId: source.chat.bob
+        note: "Bob told me he heard sirens near Willow Ave at midnight."
+        confidence: 0.7
+---
+
+# Reflection Notes
+
+Bob seemed genuinely rattled when he brought it up. Need to walk past Willow Ave
+to see if it's true.
+```
 
 ---
 
@@ -300,7 +400,10 @@ on my quartet exposition.
     "ownership": "explicit",
     "defaults": {
       "model": "anthropic/claude-3-7-sonnet",
-      "plugins": ["sim-harness", "sim-context-engine"]
+      "plugins": ["sim-harness", "sim-context-engine"],
+      "memorySearch": {
+        "extraPaths": ["../../shared/wiki"]
+      }
     },
     "entries": {
       "main": {},

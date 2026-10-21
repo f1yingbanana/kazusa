@@ -42,12 +42,19 @@ apps/kazusa/ (or repository root)
 │       └── test/
 │           └── phase2-context.test.ts
 ├── shared/
-│   ├── locations/                    # Shared objective world facts (GIT-IGNORED test data)
-│   │   ├── dorm_a.md
-│   │   ├── grocery_store.md
-│   │   ├── school.md
-│   │   └── cafe.md
-│   ├── lore/                         # Shared world lore & setting docs (GIT-IGNORED test data)
+│   ├── wiki/                         # 1. WORLD WIKI: Canonical facts & world ground truth
+│   │   ├── entities/
+│   │   │   ├── places/               # Places, connections, status (replaces shared/locations/)
+│   │   │   │   ├── dorm_a.md
+│   │   │   │   ├── grocery_store.md
+│   │   │   │   ├── school.md
+│   │   │   │   └── cafe.md
+│   │   │   └── characters/           # Complete 100+ character roster (active + background NPCs)
+│   │   │       ├── alice.md
+│   │   │       ├── bob.md
+│   │   │       └── hifumi.md
+│   │   ├── concepts/                 # Canonical history & town laws (e.g. history.md, town_laws.md)
+│   │   └── reports/                  # Global compiled dashboards (directory, social graph)
 │   └── skills/                       # Shared OpenClaw skills across all agents
 │       ├── sim-heartbeat-planner/
 │       │   └── SKILL.md
@@ -55,16 +62,20 @@ apps/kazusa/ (or repository root)
 │       │   └── SKILL.md
 │       └── sim-nightly-reflection/
 │           └── SKILL.md
-└── workspaces/                       # Per-agent OpenClaw workspaces (GIT-IGNORED test data)
+└── workspaces/                       # Active simulated agents (active subset of world roster)
     ├── alice/
     │   ├── SOUL.md
     │   ├── IDENTITY.md               # Traits & desire decay configuration
     │   ├── MEMORY.md                 # Single source of truth hot state
-    │   └── memory/
-    │       ├── 2026-10-20.md         # Cold daily distilled summaries
-    │       └── relationships/
-    │           ├── bob.md            # Impression & interaction log
-    │           └── clara.md
+    │   ├── memory/
+    │   │   └── 2026-10-20.md         # Cold daily distilled summaries (memory-core indexed)
+    │   └── wiki/                     # 2. PERSONAL WIKI: Subjective beliefs & impressions
+    │       ├── entities/
+    │       │   ├── characters/       # Subjective relationship cards (bob.md, clara.md)
+    │       │   └── places/           # Subjective place memories (grocery_store.md)
+    │       ├── concepts/             # Subjective beliefs & claims with evidence (market_vandalism.md)
+    │       ├── syntheses/            # Character arc rollups
+    │       └── reports/              # Personal contradiction detection & open questions
     └── bob/
         └── ...
 ```
@@ -131,15 +142,19 @@ apps/kazusa/ (or repository root)
 
 - Implement `api.registerContextEngine("sim-context-engine", ...)` using the
   OpenClaw `ContextEngine` interface.
-- Implements `assemble(ctx)`:
+- Implements `assemble(ctx)` with the **3-Tier Retrieval Pipeline**:
   1. Calls `syncAndDecayDesires()`.
-  2. Injects current `shared/locations/<loc>.md` setting facts and reachable
-     connections.
-  3. Queries `WorldIndex` for present agents.
-  4. Injects adaptive relationship cards (full `## Quick Impression` for 1-on-1
-     chats; Top-3 salience ranking for groups/crowded areas).
-  5. Tail-slices recent events from `agent:<id>:actions` and
-     `agent:<id>:thoughts`.
+  2. **Tier 1 (Spatial Perception & Sensory Shock)**: Reads current place from
+     `shared/wiki/entities/places/<loc>.md`. Compares against agent's
+     `workspaces/<id>/wiki/entities/places/<loc>.md`. If physical state changed
+     while absent (e.g. `DESTROYED` vs `OPERATIONAL`), automatically injects a
+     `[Sensory Observation]` notice.
+  3. Queries `WorldIndex` for co-present agents.
+  4. **Tier 2 (Social Salience)**: Injects adaptive relationship cards from
+     `workspaces/<id>/wiki/entities/characters/<peer>.md` (full
+     `## Quick Impression` for 1-on-1; Top-3 salience ranking for crowds).
+  5. **Tier 3 (Session Stream Tails)**: Tail-slices recent events from
+     `agent:<id>:actions` and `agent:<id>:thoughts`.
 
 ### Test Specifications (`plugins/sim-context-engine/test/phase2-context.test.ts`)
 
@@ -153,10 +168,17 @@ apps/kazusa/ (or repository root)
     injected.
   - In a group session with 5 agents, assert only Top-3 highest
     familiarity/affinity impressions are injected.
+- **Test 2.3 (Sensory Shock Perception on World State Mismatch)**:
+  - Set `grocery_store.md` in World Wiki to `status: DESTROYED`.
+  - Leave `alice/wiki/entities/places/grocery_store.md` as
+    `status: OPERATIONAL`.
+  - Run `assemble()` for Alice at `grocery_store`.
+  - Assert prompt contains `[Sensory Observation]` detailing the destroyed
+    store.
 
 ---
 
-## Phase 3: Task Leases, Transit Engine & Social Tools (`plugins/sim-harness`)
+## Phase 3: Task Leases, Transit Engine, Social Tools & Wiki Tools (`plugins/sim-harness`)
 
 ### Deliverables
 
@@ -165,14 +187,20 @@ apps/kazusa/ (or repository root)
     Creates `IN_PROGRESS` lease in `MEMORY.md`, returns
     `{ next_check: "${duration_min}m" }`.
   - `start_transit({ to_location, estimated_duration_min })`: Verifies
-    connection in `shared/locations/<loc>.md`, sets `transit_state`, logs to
-    `:actions`, returns `{ next_check: "${estimated_duration_min}m" }`.
+    connection in `shared/wiki/entities/places/<loc>.md`, sets `transit_state`,
+    logs to `:actions`, returns `{ next_check: "${estimated_duration_min}m" }`.
   - `conclude_activity()`: Settles lease, calculates $\Delta t_{\text{elapsed}}
     / \Delta t_{\text{planned}}$, applies scaled desire rewards.
   - `record_thought({ thought, candidate_options })`: Appends monologue and D2A
     3-option pre-imagination to `:thoughts` session.
   - `conclude_conversation({ peer_id, impression_updates, log_entry })`: Updates
-    `<workspace>/memory/relationships/<peer>.md` frontmatter and logs.
+    `<workspace>/wiki/entities/characters/<peer>.md` frontmatter and logs.
+  - `wiki_search({ query, scope, mode })`: Dual-scope search querying Personal
+    Wiki first (beliefs/concepts) and World Wiki second (objective canon lore),
+    tagging results with epistemic provenance.
+  - `wiki_get({ lookup })`: Reads specific wiki entity or concept card.
+  - `wiki_apply({ mutation })`: Applies structured claim, synthesis, or metadata
+    mutation to personal wiki.
 
 ### Test Specifications (`plugins/sim-harness/test/phase3-tasks.test.ts`)
 
@@ -183,9 +211,13 @@ apps/kazusa/ (or repository root)
   - Attempt transit to unconnected location; assert tool returns descriptive
     error listing valid connections.
 - **Test 3.3 (Conclude Conversation & Relationship Mutator)**:
-  - Call `conclude_conversation()`. Assert `memory/relationships/<peer>.md`
-    frontmatter increments `familiarity` and appends interaction entry under
-    `## Interaction Log`.
+  - Call `conclude_conversation()`. Assert
+    `workspaces/<id>/wiki/entities/characters/<peer>.md` frontmatter increments
+    `familiarity` and appends interaction entry under `## Interaction Log`.
+- **Test 3.4 (Dual-Scope Wiki Retrieval with Epistemic Hierarchy)**:
+  - Execute `wiki_search("supermarket", scope="auto")`.
+  - Assert returned results contain personal belief tagged `[Personal Memory]`
+    followed by canonical world setting facts tagged `[Public Town Fact]`.
 
 ---
 

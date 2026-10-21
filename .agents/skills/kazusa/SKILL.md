@@ -100,16 +100,17 @@ apps/kazusa/
 ├── openclaw.local.json                 # Local overlay for test agents & dev settings (GIT-IGNORED)
 ├── package.json                        # @openrp-ai/kazusa with local openclaw dependency
 ├── plugins/                            # Native OpenClaw TypeScript plugins (ZERO BUILD STEP)
-│   ├── sim-harness/                    # Simulation tools, file state, math & scheduler
-│   │   ├── openclaw.plugin.json        # Plugin manifest & config schema
+│   ├── sim-harness/                    # Simulation tools, file state, math, scheduler & encounter gate
+│   │   ├── openclaw.plugin.json
 │   │   ├── package.json                # Declares "openclaw": { "extensions": ["./src/index.ts"] }
-│   │   ├── src/                        # Direct TypeScript source executed at runtime
+│   │   ├── src/
 │   │   │   ├── clock.ts                # SimClock (real-time and accelerated time)
 │   │   │   ├── frontmatter.ts          # Atomic YAML frontmatter + Markdown reader/writer
 │   │   │   ├── desires.ts              # Deterministic decay & D2A qualitative rubric
-│   │   │   ├── world-index.ts          # In-memory location presence index derived from files
+│   │   │   ├── world-index.ts          # In-memory location presence index derived from MEMORY.md
 │   │   │   ├── tasks-and-transit.ts    # Task leases, LLM transit judgment, pause/resume
 │   │   │   ├── social-tools.ts         # conclude_conversation & relationship mutators
+│   │   │   ├── wiki-tools.ts           # Dual-scope wiki_search, wiki_get, wiki_apply tools
 │   │   │   ├── scheduler-wake.ts       # Dynamic heartbeat pacing & session wake triggers
 │   │   │   ├── encounter-gate.ts       # Zero-LLM encounter probability roll
 │   │   │   └── index.ts                # Main plugin registration entry point
@@ -118,19 +119,29 @@ apps/kazusa/
 │       ├── openclaw.plugin.json
 │       ├── package.json
 │       ├── src/
-│       │   └── index.ts                # Assembles actions, thoughts, chat tails, location & social graph
+│       │   └── index.ts                # 3-tier retrieval (sensory shock, social salience, stream tails)
 │       └── test/
 ├── shared/
-│   ├── locations/<location_id>.md      # Read-only world locations (GIT-IGNORED test data)
-│   ├── lore/<file>.md                  # World setting lore (GIT-IGNORED test data)
+│   ├── wiki/                           # 1. WORLD WIKI: Objective ground truth & canon facts
+│   │   ├── entities/
+│   │   │   ├── places/<place_id>.md    # Locations, connections, distances, status, amenities
+│   │   │   └── characters/<char_id>.md # Complete world character roster (100+ canon characters/NPCs)
+│   │   ├── concepts/<topic>.md         # Canonical history, world rules, town laws, public records
+│   │   └── reports/                    # Global compiled dashboards (relationship graph, directory)
 │   └── skills/<skill_name>/SKILL.md    # Shared behavioral workflows across all agents
-├── workspaces/<agent_id>/              # Local agent workspaces (GIT-IGNORED test data)
+├── workspaces/<agent_id>/              # Local active agent workspaces (active simulated subset)
 │   ├── SOUL.md                         # Static personality, voice, and core values
 │   ├── IDENTITY.md                     # Static bio + YAML desire targets & decay rates
 │   ├── MEMORY.md                       # Always-injected hot state (frontmatter + body)
-│   └── memory/
-│       ├── YYYY-MM-DD.md               # Cold daily distilled summaries (vector indexed)
-│       └── relationships/<peer_id>.md  # Per-person social graph (Impression + Log)
+│   ├── memory/
+│   │   └── YYYY-MM-DD.md               # Cold daily distilled summaries (vector indexed by memory-core)
+│   └── wiki/                           # 2. PERSONAL WIKI: Subjective beliefs & impressions
+│       ├── entities/
+│       │   ├── characters/<peer_id>.md # Subjective impressions, trust, familiarity, secrets
+│       │   └── places/<place_id>.md    # Subjective memory of places (favorite spots, observed state)
+│       ├── concepts/<concept_id>.md    # Subjective beliefs, theories, claims with evidence
+│       ├── syntheses/                  # Long-term character arc summaries
+│       └── reports/                    # Personal contradiction detection & open questions
 └── .state/                             # Runtime cache (GIT-IGNORED)
 ```
 
@@ -139,7 +150,8 @@ apps/kazusa/
 ## 4. Key Deliverables Architecture (Zero-Build Plugins)
 
 Kazusa is built entirely as **direct TypeScript plugins** loaded via OpenClaw's
-native `plugins.load.paths` mechanism:
+native `plugins.load.paths` mechanism, structured around the **Dual-Wiki
+Model**:
 
 1. **`plugins/sim-harness`**:
    - **File State Engine**: Atomic YAML frontmatter + Markdown parser and writer
@@ -152,24 +164,46 @@ native `plugins.load.paths` mechanism:
    - **Simulation Tools**: Registered agent tools (`start_activity`,
      `start_transit`, `conclude_activity`, `record_thought`,
      `conclude_conversation`).
+   - **Dual-Scope Wiki Tools**: Registered agent tools (`wiki_search`,
+     `wiki_get`, `wiki_apply`) operating under the Epistemic Hierarchy (Personal
+     Subjective Beliefs $\rightarrow$ World Objective Facts).
    - **Scheduler & Encounter Gate**: Dynamic heartbeat pacing hook
      (`next_check`), auto-arrival on transit expiration, and the zero-LLM
      encounter probability roll.
 2. **`plugins/sim-context-engine`**:
    - Custom OpenClaw Context Engine (`plugins.slots.contextEngine`).
-   - Hooks into `assemble()` before model turns to merge the tails of `:actions`
-     and `:thoughts` sessions with current location facts, co-present agents,
-     and adaptive relationship impressions.
-3. **Shared Behavioral Skills (`shared/skills/`)**:
+   - Hooks into `assemble()` before model turns implementing the **3-Tier
+     Retrieval Pipeline**:
+     - **Tier 1 (Eager Spatial Perception & Sensory Shock)**: Compares current
+       location in `World Wiki` (`shared/wiki/entities/places/`) with the
+       agent's `Personal Wiki` memory of that location. Automatically injects
+       sensory perception notes when world state changed while the agent was
+       absent (e.g. destroyed supermarket, closed school).
+     - **Tier 2 (Eager Social Salience)**: Injects `## Quick Impression` from
+       `workspaces/<id>/wiki/entities/characters/<peer>.md` for co-present
+       characters (top-3 salience ranking in crowds).
+     - **Tier 3 (Session Stream Tails)**: Merges recent events from
+       `agent:<id>:actions` and `agent:<id>:thoughts`.
+3. **The Dual-Wiki Epistemic System**:
+   - **Objective World Wiki (`shared/wiki/`)**: Ground truth seeded by content
+     creators. Holds all places, characters (the entire 100+ roster), and
+     canonical concepts (lore, world rules, history). Characters that are not
+     active simulated agents exist here as canonical background NPCs. Physical
+     changes occur only via deterministic world events or completed tool leases.
+   - **Subjective Personal Wiki (`workspaces/<agent_id>/wiki/`)**: Owned by
+     active simulated agents. Tracks subjective impressions of characters and
+     places, personal concepts as claims with evidence, contradictions, and arc
+     syntheses.
+4. **Shared Behavioral Skills (`shared/skills/`)**:
    - `sim-heartbeat-planner`: Settle $\rightarrow$ Orient $\rightarrow$ 3-Option
      Pre-Imagine $\rightarrow$ Commit cycle.
    - `sim-social-interaction`: Natural dialogue management, quick impressions,
      and clean conversational exits.
    - `sim-nightly-reflection`: Nightly sleep distillation, memory archiving, and
-     plan generation.
-4. **World Importer Script (`scripts/import-world.ts`)**:
-   - CLI script bootstrapping workspaces, locations, and roster from OpenRP
-     world definitions.
+     subjective wiki claim consolidation.
+5. **World Importer Script (`scripts/import-world.ts`)**:
+   - CLI script bootstrapping `shared/wiki/` (places, characters, concepts) and
+     active agent `workspaces/` from OpenRP world definitions.
 
 ### 4.1 The `plugins/` Folder Zero-Build Philosophy
 
