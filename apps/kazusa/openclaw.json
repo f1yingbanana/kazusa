@@ -3,15 +3,15 @@
     "entries": {
       "main": {
         "name": "main",
-        "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/workspaces/main",
-        "agentDir": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/.state/agents/main/agent",
+        "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/workspaces/main",
+        "agentDir": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/.state/agents/main/agent",
         "identity": {
           "name": "main"
         }
       }
     },
     "defaults": {
-      "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/openclaw/workspaces/main",
+      "workspace": "/Users/f1yingbanana/Documents/GitHub/kazusa/apps/kazusa/workspaces/main",
       "models": {
         "zai/glm-5.2": {
           "alias": "GLM"
