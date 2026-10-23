@@ -173,13 +173,16 @@ apps/kazusa/ (or repository root)
 ### Deliverables
 
 - Consolidated Tools in `plugins/kazusa/src/taskman/taskman.ts`:
-  - `start_task({ type, description, duration, summary?, metadata? })`: Creates
-    an initial lease or replaces the active one in OpenClaw's plugin state
-    database (`tasks`), clamps duration to `minDuration`, sets `startedAt` and
-    `endAt`, and appends the transition to `agent:<agentId>:tasks`.
-  - `delay_task({ additionalDuration, reason? })`: Extends active task lease
-    duration, recalculates `endAt`, updates database record, and dispatches
-    delay notice to `agent:<agentId>:tasks`.
+  - `start_task({ type, description, duration, summary?, monologue?, metadata? })`:
+    Creates an initial lease or replaces the active one in OpenClaw's plugin
+    state database (`tasks`), clamps duration to `minDuration`, sets `startedAt`
+    and `endAt`, and appends the transition to `agent:<agentId>:tasks`.
+  - `delay_task({ additionalDuration, reason?, monologue? })`: Extends active
+    task lease duration, recalculates `endAt`, updates database record, and
+    dispatches delay notice to `agent:<agentId>:tasks`.
+  - Both tools accept an optional one- or two-sentence in-character monologue.
+    Format it below the factual summary as an italic blockquote in the native
+    ledger message text, without extending OpenClaw's message schema.
 - Subsystem Decoupling:
   - Taskman is strictly scoped to task lease management and pacing.
   - Location/transit routing belongs to the spatial navigation subsystem.
@@ -199,6 +202,10 @@ apps/kazusa/ (or repository root)
 - **Test 3.4 (Task Transition)**:
   - Replace a task with `start_task`; assert the new lease replaces the old one
     atomically and one transition notice is logged to `agent:<id>:tasks`.
+- **Test 3.5 (Task Monologue)**:
+  - Transitions and delays append plain-text monologues as italic blockquotes
+    below their factual summaries in the same ledger message text. Omitted or
+    blank monologues preserve summary-only ledger output.
 
 ---
 

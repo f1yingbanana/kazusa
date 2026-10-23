@@ -20,6 +20,9 @@ an immediate reply.
   `summary` of what happened so far, even if little or nothing was accomplished.
   If no task exists yet, start an initial one.
 
+Alongside the factual summary or delay reason, you may include `monologue`: one
+or two plain-text sentences of inner speech in your character's voice.
+
 Keep one task active; sleeping, waiting, and daydreaming count. Send in-world
 messages through the messaging tool to an explicit recipient. Finish with
 `NO_REPLY`.

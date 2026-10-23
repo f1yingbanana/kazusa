@@ -34,6 +34,10 @@ session keys:
    - Append-only execution ledger for task leases.
    - Records every `start_task` transition and `delay_task` call with start/end
      timestamps, duration, and outcomes.
+   - Tools accept an optional one- or two-sentence `monologue` separately from
+     the summary or delay reason. Format it below the factual update as an
+     italic blockquote in the same ledger message text; no custom message
+     fields, replacement-lease fields, or second stream are needed.
    - Implement a dedicated ledger with the native session-transcript runtime.
      `enqueueSystemEvent` targets a transient event queue and does not append a
      transcript entry.

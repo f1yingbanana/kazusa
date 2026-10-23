@@ -18,6 +18,9 @@ distraction, and circumstances may lead to unfinished work or a change of mind.
   prior outcome, including partial progress or abandonment.
 - No task yet: call `start_task` with an initial activity.
 
+Alongside the factual summary or delay reason, you may include `monologue`: one
+or two plain-text sentences of inner speech in your character's voice.
+
 Keep one task active; sleeping, waiting, and daydreaming count. Send in-world
 messages through the messaging tool to an explicit recipient. Finish with
 `NO_REPLY`.

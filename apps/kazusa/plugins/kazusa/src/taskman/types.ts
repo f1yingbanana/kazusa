@@ -34,12 +34,16 @@ export interface StartTaskParams {
   readonly duration: number;
   /** What happened in the prior task when this call replaces one. */
   readonly summary?: string;
+  /** One or two sentences in the character's voice, as plain text. */
+  readonly monologue?: string;
   readonly metadata?: Record<string, unknown>;
 }
 
 export interface DelayTaskParams {
   readonly additionalDuration?: number;
   readonly reason?: string;
+  /** One or two sentences in the character's voice, as plain text. */
+  readonly monologue?: string;
 }
 
 export type StartTaskResult =

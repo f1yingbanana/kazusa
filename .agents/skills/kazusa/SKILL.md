@@ -176,6 +176,9 @@ native `plugins.load.paths` mechanism with **colocated tests inside `src/`**:
      successful task transition appends to the dedicated ledger through the
      native session-transcript runtime and publishes its update.
      `enqueueSystemEvent` is transient and must not be used as a task ledger.
+     Transitions and delays may include a short in-character `monologue`; format
+     it below the factual summary as an italic blockquote in the same ledger
+     message text. Do not extend OpenClaw's message schema for this.
    - Taskman uses a native cron `declarationKey` equal to the agent ID: normal
      task changes atomically upsert one visible wake job. Full fleet
      reconciliation occurs only at `cron_reconciled` and explicit clock edits.

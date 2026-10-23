@@ -7,6 +7,16 @@ import type {
   ToolExecutionContext,
 } from "./types.ts";
 
+/** Append character voice as a separate italic blockquote in the ledger text. */
+function formatTaskLedgerEntry(summary: string, monologue?: string): string {
+  const speech = monologue?.trim();
+  if (!speech) return summary;
+  // Keep plain character speech in one quoted paragraph, even when it contains
+  // line breaks or Markdown punctuation.
+  const quoted = speech.replace(/\s+/gu, " ").replace(/[\\`*_<>[\]]/gu, "\\$&");
+  return `${summary}\n\n> *${quoted}*`;
+}
+
 export async function executeStartTask(
   params: StartTaskParams,
   ctx: ToolExecutionContext,
@@ -34,7 +44,9 @@ export async function executeStartTask(
   const message = priorTask
     ? `Concluded ${priorTask.type} task.${priorSummary ? ` Summary: "${priorSummary}".` : ""} Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`
     : `Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`;
-  await ctx.appendTaskLedgerEntry(message);
+  await ctx.appendTaskLedgerEntry(
+    formatTaskLedgerEntry(message, params.monologue),
+  );
   return { success: true, task, message };
 }
 
@@ -62,6 +74,8 @@ export async function executeDelayTask(
 
   const reason = params.reason ? ` Reason: ${params.reason}.` : "";
   const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${task.endAt}.${reason}`;
-  await ctx.appendTaskLedgerEntry(message);
+  await ctx.appendTaskLedgerEntry(
+    formatTaskLedgerEntry(message, params.monologue),
+  );
   return { success: true, task, message };
 }

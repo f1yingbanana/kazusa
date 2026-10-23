@@ -259,6 +259,11 @@ export function registerTaskman(
           description:
             "What happened in the task being replaced, when applicable",
         },
+        monologue: {
+          type: "string",
+          description:
+            "Optional one or two sentences of inner monologue in your character's voice, as plain text, alongside the factual summary.",
+        },
         metadata: {
           type: "object",
           description: "Optional task-specific metadata",
@@ -296,6 +301,11 @@ export function registerTaskman(
           description: "Additional minutes",
         },
         reason: { type: "string", description: "Optional reason" },
+        monologue: {
+          type: "string",
+          description:
+            "Optional one or two sentences of inner monologue in your character's voice, as plain text, alongside the reason for the delay.",
+        },
       },
       additionalProperties: false,
     },
