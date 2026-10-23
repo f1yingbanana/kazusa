@@ -3,10 +3,9 @@ name: kazusa
 description:
   Master architectural guide for developing the Kazusa multi-agent society
   simulation framework on top of OpenClaw. Always trigger this skill whenever
-  designing, building, modifying, or testing Kazusa plugins (sim-harness,
-  sim-context-engine), simulation tools, desire homeostasis engines,
-  multi-stream context engines, shared agent skills, world state schemas,
-  presence indexes, or multi-agent event/pacing lifecycles.
+  designing, building, modifying, or testing Kazusa plugins, simulation tools,
+  desire homeostasis engines, multi-stream context engines, shared agent skills,
+  world state schemas, presence indexes, or multi-agent event/pacing lifecycles.
 ---
 
 # Kazusa: OpenClaw Society Simulation Framework
@@ -30,20 +29,22 @@ architectural shifts:
 1. **Variable-Horizon Event-Driven Autonomy (Task-Based Heartbeats)**:
    - Agents commit to coarse tasks or travel options of duration $D$ (e.g.
      _sleep for 8 hours_, _study for 60 minutes_, _walk 15 minutes to the
-     market_) and dynamically schedule their next heartbeat for
-     $t_{\text{now}} + D$ via OpenClaw automation dynamic pacing (`next_check`).
+     market_) and Taskman autonomously schedules the agent's wake-up heartbeat
+     for $t_{\text{now}} + D$.
    - The agent is not invoked again until that task concludes—_unless_
-     pre-empted by an external interrupt (alarm, inbound message, or spatial
-     encounter).
+     pre-empted by an external interrupt (inbound message or spatial encounter).
+     Agents reason about their sleep and wake schedule natively.
 2. **Grounded World State ("Prose is Never a Fact")**:
    - Characters cannot hallucinate completing tasks, moving across town, or
      altering relationship scores simply by generating prose.
-   - Every movement, activity lease, and social update must be committed via
+   - Every movement, task lease, and social update must be committed via
      deterministic tool calls.
 3. **100% File- & Session-Native Transparency**:
-   - All state—desires, locations, leases, goals, impressions, and world
+   - All state—working desires, locations, leases, goals, impressions, and world
      maps—lives in human-readable Markdown files with YAML frontmatter or native
-     OpenClaw Sessions. Zero custom SQLite tables or hidden database mirrors.
+     OpenClaw Sessions. Zero custom database mirrors for agent state. Simulation
+     clock time and speed persist in OpenClaw's native plugin state
+     (`api.runtime.state.openKeyedStore`).
 
 ---
 
@@ -52,41 +53,61 @@ architectural shifts:
 Every plugin, tool, skill, and script in Kazusa must strictly adhere to these
 five invariants:
 
-### 2.1 Zero Storage Redundancy (File- & Session-First)
+### 2.1 Clean Separation of Machine State & Qualitative Memory
 
-Never store state in two places. No SQLite databases mirroring Markdown files.
-Structured state lives in file **YAML frontmatter** (`--- ... ---`); qualitative
-context lives in Markdown bodies; chronological logs live in **OpenClaw
-Sessions**.
+Never store high-frequency working state inside long-term memory files.
+
+- **OpenClaw Plugin State Stores (`api.runtime.state.openKeyedStore`)**: Machine
+  working state (simulation clock in `"clock"` and active task leases in
+  `"tasks"`) stored directly in OpenClaw's native state database with zero file
+  parsing churn.
+- **`<workspace>/MEMORY.md`**: Qualitative reflections, narrative summaries, and
+  goals, kept clean of high-churn mechanical diffs.
+- **OpenClaw Sessions**: Chronological actions, tasks (`agent:<id>:tasks`),
+  thoughts (`agent:<id>:thoughts`), and dialogues.
 
 ### 2.2 Prose is Never a World Fact
 
 Prose output changes nothing in the world simulation. Only tool calls
-(`start_activity`, `start_transit`, `set_alarm`, `conclude_conversation`) mutate
-`MEMORY.md` frontmatter or append to stream sessions.
+(`start_task`, `delay_task`, `conclude_conversation`) mutate state in plugin
+databases or append to stream sessions.
 
 ### 2.3 Start-Then-Settle Task Leases
 
-Starting an activity only creates an `IN_PROGRESS` lease in `MEMORY.md`
-frontmatter and schedules the next wake-up. Desire rewards and outcomes are
-settled **only** when the task concludes or is interrupted, scaled strictly by
-actual elapsed time: $\Delta t_{\text{elapsed}} / \Delta t_{\text{planned}}$.
+`start_task` creates an initial lease or concludes and replaces the current
+lease in one character turn. It records the transition in the canonical
+execution stream (`agent:<id>:tasks`) and schedules the next wake-up. Characters
+are never idle: sleep, waiting, and reflection are tasks too.
 
 ### 2.4 Deterministic Math in Code, Semantics in the LLM
 
-- **In Code (0 tokens, < 1 ms)**: Passive desire decay over time, circadian
-  multipliers, sleep debt accumulation, squared urgency ranking, presence
-  tracking, and zero-LLM encounter probability rolls.
+- **In Code (0 tokens, < 1 ms)**: Simulation clock advance and formula
+  calculations ($\text{sim\_time} + \Delta t \times \text{speed}$), sleep
+  detection, passive desire decay, presence tracking, and zero-LLM encounter
+  probability rolls.
 - **In the LLM**: Deducing goals from qualitative feelings, judging travel time
   from terrain/distance descriptions, pre-imagining candidate options, and
-  generating authentic dialogue.
+  evaluating emotional satisfaction.
 
 ### 2.5 Variable-Horizon Event-Driven Pacing
 
 Agents never poll on fixed intervals. Every task or transit schedules the next
 heartbeat at $t_{\text{now}} + D$. When interrupted, agents receive full context
-regarding the interrupted task to decide whether to resume, reschedule, or
-cancel.
+regarding the active task to decide whether to delay, conclude, or switch tasks.
+
+### 2.6 One Brain Queue Per Character
+
+Every task wake and external interrupt for a character is routed to the single
+OpenClaw session `agent:<id>:brain`. Its queue mode is `steer`: a new stimulus
+is made visible during the current cognitive turn, rather than creating a
+competing turn in another chat session. The character remains single-threaded
+even when events originate from different conversations or the world.
+
+The context engine owns this routing and all prompt assembly. It reads the
+active task, resolves trusted `kazusa:skill` markers to shared skills, and
+instructs the model to preserve its prior intention unless the new observation
+actually invalidates it. Taskman emits only the marker and schedules wakes; it
+must not inject prompts, read skills, or interpret interrupts.
 
 ---
 
@@ -96,31 +117,19 @@ All paths are relative to `apps/kazusa/` (or repository root):
 
 ```text
 apps/kazusa/
-├── openclaw.json                       # Clean committed framework configuration
+├── openclaw.json                       # Framework configuration with plugins loaded
 ├── openclaw.local.json                 # Local overlay for test agents & dev settings (GIT-IGNORED)
-├── package.json                        # @openrp-ai/kazusa with local openclaw dependency
+├── package.json                        # @openrp-ai/kazusa with direct openclaw dependency
 ├── plugins/                            # Native OpenClaw TypeScript plugins (ZERO BUILD STEP)
-│   ├── sim-harness/                    # Simulation tools, file state, math, scheduler & encounter gate
+│   ├── kazusa/                         # Unified simulation kernel
 │   │   ├── openclaw.plugin.json
-│   │   ├── package.json                # Declares "openclaw": { "extensions": ["./src/index.ts"] }
-│   │   ├── src/
-│   │   │   ├── clock.ts                # SimClock (real-time and accelerated time)
-│   │   │   ├── frontmatter.ts          # Atomic YAML frontmatter + Markdown reader/writer
-│   │   │   ├── desires.ts              # Deterministic decay & D2A qualitative rubric
-│   │   │   ├── world-index.ts          # In-memory location presence index derived from MEMORY.md
-│   │   │   ├── tasks-and-transit.ts    # Task leases, LLM transit judgment, pause/resume
-│   │   │   ├── social-tools.ts         # conclude_conversation & relationship mutators
-│   │   │   ├── wiki-tools.ts           # Dual-scope wiki_search, wiki_get, wiki_apply tools
-│   │   │   ├── scheduler-wake.ts       # Dynamic heartbeat pacing & session wake triggers
-│   │   │   ├── encounter-gate.ts       # Zero-LLM encounter probability roll
-│   │   │   └── index.ts                # Main plugin registration entry point
-│   │   └── test/                       # Vitest unit test suites
-│   └── sim-context-engine/             # Custom Context Engine (plugins.slots.contextEngine)
-│       ├── openclaw.plugin.json
-│       ├── package.json
-│       ├── src/
-│       │   └── index.ts                # 3-tier retrieval (sensory shock, social salience, stream tails)
-│       └── test/
+│   │   ├── package.json                # @kazusa/plugin; direct TypeScript entry
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts                # Registers Clock, then Taskman with that Clock
+│   │       ├── clock/                  # Virtual formula clock, persistence, tools/RPC, tests
+│   │       └── taskman/                # Task leases, automations, tools/RPC, tests
+│   │       └── context-engine/         # Context assembly and brain routing
 ├── shared/
 │   ├── wiki/                           # 1. WORLD WIKI: Objective ground truth & canon facts
 │   │   ├── entities/
@@ -129,20 +138,22 @@ apps/kazusa/
 │   │   ├── concepts/<topic>.md         # Canonical history, world rules, town laws, public records
 │   │   └── reports/                    # Global compiled dashboards (relationship graph, directory)
 │   └── skills/<skill_name>/SKILL.md    # Shared behavioral workflows across all agents
-├── workspaces/<agent_id>/              # Local active agent workspaces (active simulated subset)
+├── workspaces/<agent_id>/              # Local active agent workspaces
 │   ├── SOUL.md                         # Static personality, voice, and core values
 │   ├── IDENTITY.md                     # Static bio + YAML desire targets & decay rates
-│   ├── MEMORY.md                       # Always-injected hot state (frontmatter + body)
+│   ├── MEMORY.md                       # Qualitative reflections, ongoing thoughts, and goals
 │   ├── memory/
 │   │   └── YYYY-MM-DD.md               # Cold daily distilled summaries (vector indexed by memory-core)
 │   └── wiki/                           # 2. PERSONAL WIKI: Subjective beliefs & impressions
 │       ├── entities/
 │       │   ├── characters/<peer_id>.md # Subjective impressions, trust, familiarity, secrets
-│       │   └── places/<place_id>.md    # Subjective memory of places (favorite spots, observed state)
+│       │   └── places/<place_id>.md    # Subjective memory of places
 │       ├── concepts/<concept_id>.md    # Subjective beliefs, theories, claims with evidence
 │       ├── syntheses/                  # Long-term character arc summaries
 │       └── reports/                    # Personal contradiction detection & open questions
-└── .state/                             # Runtime cache (GIT-IGNORED)
+└── .state/
+    ├── clock.sqlite                    # Simulation clock state & speed
+    └── ...
 ```
 
 ---
@@ -150,60 +161,55 @@ apps/kazusa/
 ## 4. Key Deliverables Architecture (Zero-Build Plugins)
 
 Kazusa is built entirely as **direct TypeScript plugins** loaded via OpenClaw's
-native `plugins.load.paths` mechanism, structured around the **Dual-Wiki
-Model**:
+native `plugins.load.paths` mechanism with **colocated tests inside `src/`**:
 
-1. **`plugins/sim-harness`**:
-   - **File State Engine**: Atomic YAML frontmatter + Markdown parser and writer
-     (`write-then-rename`) in `frontmatter.ts`.
-   - **Presence Tracker**: In-memory `WorldIndex` tracking agent locations by
-     watching `MEMORY.md` headers.
-   - **Desire & Homeostasis Engine**: Passive decay math, circadian multipliers
-     ($M_{\text{tod}}$), sleep debt accumulation, squared urgency ranking, and
-     D2A qualitative rubric renderer in `desires.ts`.
-   - **Simulation Tools**: Registered agent tools (`start_activity`,
-     `start_transit`, `conclude_activity`, `record_thought`,
-     `conclude_conversation`).
-   - **Dual-Scope Wiki Tools**: Registered agent tools (`wiki_search`,
-     `wiki_get`, `wiki_apply`) operating under the Epistemic Hierarchy (Personal
-     Subjective Beliefs $\rightarrow$ World Objective Facts).
-   - **Scheduler & Encounter Gate**: Dynamic heartbeat pacing hook
-     (`next_check`), auto-arrival on transit expiration, and the zero-LLM
-     encounter probability roll.
-2. **`plugins/sim-context-engine`**:
-   - Custom OpenClaw Context Engine (`plugins.slots.contextEngine`).
-   - Hooks into `assemble()` before model turns implementing the **3-Tier
-     Retrieval Pipeline**:
+1. **`plugins/kazusa` (`@kazusa/plugin`)**:
+   - Kazusa's single native runtime plugin. Its entry composes Clock, Taskman,
+     and the context engine directly; do not recreate a plugin service boundary
+     or package dependency between these internal modules.
+   - **`src/clock/`** owns forward-only formula time, persisted `"clock"` state,
+     clock tools (`clock_now`, `clock_set_speed`, `clock_advance`), matching
+     `clock.*` Gateway RPC methods, and lifecycle persistence.
+   - **`src/taskman/`** owns active task leases in persisted `"tasks"` state,
+     task tools and the native `agent:<agentId>:tasks` transcript ledger, and
+     the OpenClaw automation projection used for dashboard-visible wakes. Each
+     successful task transition appends to the dedicated ledger through the
+     native session-transcript runtime and publishes its update.
+     `enqueueSystemEvent` is transient and must not be used as a task ledger.
+   - Taskman uses a native cron `declarationKey` equal to the agent ID: normal
+     task changes atomically upsert one visible wake job. Full fleet
+     reconciliation occurs only at `cron_reconciled` and explicit clock edits.
+     Kazusa may clear the complete cron list because it currently owns all
+     Gateway automations; revisit this assumption before another owner exists.
+     Wakes target `agent:<id>:brain`, never the task ledger or an isolated
+     execution session.
+   - Colocate focused unit tests with their module. Test-only in-memory stores
+     belong in `*.test.ts`, never production source.
+   - Parse plugin configuration and Gateway RPC parameters with Zod schemas; do
+     not use hand-written `typeof` chains or casts for unknown inputs. Scope
+     component configuration under its module name, e.g.
+     `plugins.entries.kazusa.config.taskman.minDuration`.
+
+2. **`plugins/kazusa/src/context-engine/`**:
+   - The context engine remains inside the Kazusa plugin and composes directly
+     with Clock and Taskman rather than crossing a plugin boundary.
+   - It owns character brain routing and hooks into `assemble()` before model
+     turns implementing the **3-Tier Retrieval Pipeline**:
      - **Tier 1 (Eager Spatial Perception & Sensory Shock)**: Compares current
-       location in `World Wiki` (`shared/wiki/entities/places/`) with the
-       agent's `Personal Wiki` memory of that location. Automatically injects
-       sensory perception notes when world state changed while the agent was
-       absent (e.g. destroyed supermarket, closed school).
-     - **Tier 2 (Eager Social Salience)**: Injects `## Quick Impression` from
-       `workspaces/<id>/wiki/entities/characters/<peer>.md` for co-present
-       characters (top-3 salience ranking in crowds).
-     - **Tier 3 (Session Stream Tails)**: Merges recent events from
-       `agent:<id>:actions` and `agent:<id>:thoughts`.
-3. **The Dual-Wiki Epistemic System**:
-   - **Objective World Wiki (`shared/wiki/`)**: Ground truth seeded by content
-     creators. Holds all places, characters (the entire 100+ roster), and
-     canonical concepts (lore, world rules, history). Characters that are not
-     active simulated agents exist here as canonical background NPCs. Physical
-     changes occur only via deterministic world events or completed tool leases.
-   - **Subjective Personal Wiki (`workspaces/<agent_id>/wiki/`)**: Owned by
-     active simulated agents. Tracks subjective impressions of characters and
-     places, personal concepts as claims with evidence, contradictions, and arc
-     syntheses.
-4. **Shared Behavioral Skills (`shared/skills/`)**:
-   - `sim-heartbeat-planner`: Settle $\rightarrow$ Orient $\rightarrow$ 3-Option
-     Pre-Imagine $\rightarrow$ Commit cycle.
-   - `sim-social-interaction`: Natural dialogue management, quick impressions,
-     and clean conversational exits.
-   - `sim-nightly-reflection`: Nightly sleep distillation, memory archiving, and
-     subjective wiki claim consolidation.
-5. **World Importer Script (`scripts/import-world.ts`)**:
-   - CLI script bootstrapping `shared/wiki/` (places, characters, concepts) and
-     active agent `workspaces/` from OpenRP world definitions.
+       location in `World Wiki` with agent's `Personal Wiki`.
+     - **Tier 2 (Eager Social Salience)**: Injects `## Quick Impression` for
+       co-present characters.
+     - **Tier 3 (Session Stream Tails)**: Merges recent events from task and
+       thought streams.
+   - It alone resolves skill markers and injects task, world, and stream
+     context; Taskman contains no prompt hook or skill-file loader.
+   - Colocate tests in `src/context-engine/`.
+
+3. **Testing & Typecheck Standard**:
+   - All tests use Vitest runner: `npm test` (`vitest run`).
+   - All tests are colocated alongside their modules inside `src/` (e.g.
+     `src/*.test.ts`) matching OpenClaw monorepo conventions.
+   - Typechecking runs with zero emit: `npm run typecheck` (`tsc --noEmit`).
 
 ### 4.1 The `plugins/` Folder Zero-Build Philosophy
 
@@ -212,12 +218,12 @@ In contrast to monorepo architectures requiring compilation pipelines
 logic directly in `plugins/`:
 
 - **Direct TypeScript Execution**: OpenClaw executes `./src/index.ts` directly
-  via its runtime TypeScript loader (Jiti/tsx) declared in `package.json`
+  via its runtime TypeScript loader declared in `package.json`
   (`"openclaw": { "extensions": ["./src/index.ts"] }`).
 - **Clean Configuration**: Registered in `openclaw.json` via
-  `plugins.load.paths: ["./plugins/sim-harness", "./plugins/sim-context-engine"]`.
+  `plugins.load.paths: ["./plugins/kazusa", ...]`.
 - **Zero-Build Editing**: Any code edit to a TypeScript file takes effect
-  immediately on the next heartbeat or event without compilation artifacts,
+  immediately on the next heartbeat or event without compilation artifacts.
   watch daemons, or stale build caches.
 - **Direct Vitest Testing**: All unit and integration tests execute directly
   against TypeScript files in milliseconds.
@@ -240,9 +246,9 @@ appropriate reference document as needed:
   zero-LLM encounter probability rolls, or task settlement ratios._
 
 - **OpenClaw Primitives Mapping**: `references/primitives_mapping.md` _Read when
-  working with OpenClaw sessions (`:actions`, `:thoughts`, `:chat:*`),
-  automations (`next_check`), context engine hooks (`assemble`), or
-  `memory-core` integrations._
+  working with OpenClaw sessions (`:tasks`, `:thoughts`, `:chat:*`), Taskman
+  autonomous scheduling, context engine hooks (`assemble`), or `memory-core`
+  integrations._
 
 - **Implementation Phases & Automated Testing Specifications**:
   `references/phases_and_testing.md` _Read when building deliverables across

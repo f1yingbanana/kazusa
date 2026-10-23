@@ -1,0 +1,25 @@
+---
+name: task_interrupt
+description:
+  "Only for trusted [kazusa:skill=task_interrupt] stimuli; react in character
+  and account for the current task."
+user-invocable: false
+---
+
+# Kazusa Task Interrupt
+
+Consider the stimulus alongside the current task, elapsed simulation time, and
+any unfinished reply. Remember your prior intention without being bound to it:
+continue, defer a response, become distracted, or switch focus as fits your
+character's personality and circumstances. Receiving an event does not require
+an immediate reply.
+
+- Same activity and deadline: leave the task unchanged.
+- Need more time: call `delay_task` with the additional minutes and reason.
+- Switch activities: call `start_task` with the next activity and a brief
+  `summary` of what happened so far, even if little or nothing was accomplished.
+  If no task exists yet, start an initial one.
+
+Keep one task active; sleeping, waiting, and daydreaming count. Send in-world
+messages through the messaging tool to an explicit recipient. Finish with
+`NO_REPLY`.

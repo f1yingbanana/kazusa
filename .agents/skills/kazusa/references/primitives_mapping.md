@@ -8,20 +8,20 @@ explains how every simulation requirement maps to OpenClaw.
 
 ## 1. Primitives Overview Table
 
-| Simulation Component                    | OpenClaw Native Primitive                                       | Implementation Mechanism                                                                                                                                                                                                                     |
-| :-------------------------------------- | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shared Multi-Agent Harness**          | Gateway & Multi-Agent Roster (`agents.entries.*`)               | Active simulated characters have an entry in `openclaw.json` mapped to `workspaces/<agent_id>/`. Non-simulated background NPCs remain stored in the World Wiki without consuming runner processes.                                           |
-| **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                             | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio). YAML frontmatter in `IDENTITY.md` holds desire targets and decay constants.                                                                             |
-| **Hot Working State**                   | Workspace `MEMORY.md`                                           | OpenClaw always injects `MEMORY.md`. YAML frontmatter holds machine state (`location`, `desires`, `active_task`, `alarms`); body holds qualitative desires, goals, and today's plan.                                                         |
-| **Action & Thought Streams**            | OpenClaw Sessions (`agent:<id>:actions`, `agent:<id>:thoughts`) | Separate chronological append-only session transcripts for tool lease lifecycles and internal monologues/pre-imaginations.                                                                                                                   |
-| **Inter-Agent Chat Streams**            | OpenClaw Sessions (`agent:<id>:chat:<peerOrGroup>`)             | 1-on-1 and group communication channels with isolated conversational history. Dispatched via `sessions_send`.                                                                                                                                |
-| **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                      | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                           |
-| **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)            | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                         |
-| **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)             | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`). |
-| **3-Tier Context Assembly**             | Custom Context Engine (`plugins.slots.contextEngine`)           | Custom plugin executing: Tier 1 Spatial Perception & Sensory Shock; Tier 2 Social Salience Top-3; Tier 3 Stream Tails. Lazy cognitive queries resolve via `wiki_search`/`wiki_get`.                                                          |
-| **Variable-Horizon Heartbeats**         | OpenClaw Automations (`next_check` dynamic pacing)              | Paced automation jobs (`--pacing-min 1m --pacing-max 16h`) let tools set next heartbeat duration dynamically via `next_check` based on task lease duration.                                                                                  |
-| **Pre-Emptive Interrupts**              | `openclaw system event --mode now`                              | Alarms and spatial encounter rolls interrupt sleeping or working agents immediately without waiting for scheduled heartbeats.                                                                                                                |
-| **Behavioral Workflows**                | Shared OpenClaw Skills (`shared/skills/*/SKILL.md`)             | Shared reusable skill folders teaching characters how to plan heartbeats, converse socially, and distill memories before sleep.                                                                                                              |
+| Simulation Component                    | OpenClaw Native Primitive                                     | Implementation Mechanism                                                                                                                                                                                                                                                                                   |
+| :-------------------------------------- | :------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shared Multi-Agent Harness**          | Gateway & Multi-Agent Roster (`agents.entries.*`)             | Active simulated characters have an entry in `openclaw.json` mapped to `workspaces/<agent_id>/`. Non-simulated background NPCs remain stored in the World Wiki without consuming runner processes.                                                                                                         |
+| **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                           | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio). YAML frontmatter in `IDENTITY.md` holds desire targets and decay constants.                                                                                                                                           |
+| **Hot Working State**                   | OpenClaw Keyed Plugin State & `MEMORY.md`                     | OpenClaw Keyed Store (`"tasks"`) stores the active task execution lease (`activeTask`, `agentId`, `updatedAt`) directly in the database. Location is held in spatial subsystem / World Wiki; desires in `IDENTITY.md` / homeostasis engine. `MEMORY.md` holds qualitative narrative reflections and goals. |
+| **Task Execution & Thought Streams**    | OpenClaw Sessions (`agent:<id>:tasks`, `agent:<id>:thoughts`) | Separate chronological append-only session transcripts for task lease lifecycles and internal monologues/pre-imaginations.                                                                                                                                                                                 |
+| **Inter-Agent Chat Streams**            | OpenClaw Sessions (`agent:<id>:chat:<peerOrGroup>`)           | 1-on-1 and group communication channels with isolated conversational history. Dispatched via `sessions_send`.                                                                                                                                                                                              |
+| **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                    | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                         |
+| **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)          | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                       |
+| **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)           | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                               |
+| **3-Tier Context Assembly & Brain**     | `plugins/kazusa/src/context-engine/`                          | The Kazusa context engine routes each character's task wakes and interrupts to `agent:<id>:brain`, resolves trusted skill markers, and executes Tier 1 Spatial Perception, Tier 2 Social Salience, and Tier 3 Stream Tails.                                                                                |
+| **Variable-Horizon Heartbeats**         | Taskman Autonomous Scheduling                                 | Taskman automatically schedules the agent's wake-up heartbeat when the active task lease elapses, consuming zero tokens during active tasks.                                                                                                                                                               |
+| **Pre-Emptive Interrupts**              | `openclaw system event --mode now`                            | Spatial encounter rolls and incoming chats interrupt working agents immediately without waiting for scheduled heartbeats.                                                                                                                                                                                  |
+| **Behavioral Workflows**                | Shared OpenClaw Skills (`shared/skills/*/SKILL.md`)           | Shared reusable skill folders teaching characters how to plan heartbeats, converse socially, and distill memories before sleep.                                                                                                                                                                            |
 
 ---
 
@@ -30,10 +30,13 @@ explains how every simulation requirement maps to OpenClaw.
 Instead of custom SQLite message/event tables, Kazusa uses native OpenClaw
 session keys:
 
-1. **`agent:<id>:actions`**:
-   - Append-only execution ledger.
-   - Records every `start_activity`, `start_transit`, `pause_activity`, and
-     `conclude_activity` call with start/end timestamps and outcomes.
+1. **`agent:<id>:tasks`**:
+   - Append-only execution ledger for task leases.
+   - Records every `start_task` transition and `delay_task` call with start/end
+     timestamps, duration, and outcomes.
+   - Implement a dedicated ledger with the native session-transcript runtime.
+     `enqueueSystemEvent` targets a transient event queue and does not append a
+     transcript entry.
 2. **`agent:<id>:thoughts`**:
    - Append-only internal cognitive ledger.
    - Records D2A 3-option pre-imaginations, plan reconciliations, and private
@@ -45,11 +48,13 @@ session keys:
 
 ---
 
-## 3. Custom Context Engine Lifecycle & 3-Tier Retrieval
+## 3. Context Engine Lifecycle, Brain Routing & 3-Tier Retrieval
 
-OpenClaw allows overriding the default context engine via
-`plugins.slots.contextEngine = "sim-context-engine"`. The custom engine executes
-the following pipeline before every LLM call:
+Kazusa's internal `src/context-engine/` module owns one persistent brain session
+per character (`agent:<id>:brain`). It routes all task wakes and external
+interrupts there using OpenClaw `steer`, then assembles the following pipeline
+before each LLM call. It has direct access to Clock and Taskman because all
+three live in the same plugin:
 
 ```mermaid
 flowchart TD
@@ -60,7 +65,7 @@ flowchart TD
     D -->|Match| F[Inject Standard Location Affordances]
     E --> G[Tier 2: Query WorldIndex & Inject Top-3 Salient Social Impressions]
     F --> G
-    G --> H[Tier 3: Pull Recent Tails from :actions and :thoughts Sessions]
+    G --> H[Tier 3: Pull Recent Tails from :tasks and :thoughts Sessions]
     H --> I[Assemble Unified Context Frame into Model Prompt]
     I --> J[Agent Cognitive Turn: Optional wiki_search / wiki_get Lazy Retrieval]
 ```
@@ -70,7 +75,7 @@ flowchart TD
 Characters never suffer from omniscience leaks; they only learn about physical
 world changes when they physically arrive or hear about them:
 
-1. `sim-context-engine` reads the current location's objective facts from
+1. The Kazusa context module reads the current location's objective facts from
    `shared/wiki/entities/places/<location_id>.md`.
 2. It inspects the agent's personal memory of that location from
    `workspaces/<id>/wiki/entities/places/<location_id>.md`.
@@ -114,26 +119,36 @@ When planning, conversing, or investigating theories, agents call
 
 ## 4. Automation Pacing & Interrupt Handling
 
-### 4.1 Paced Automations (`next_check`)
+### 4.1 Task Lease Scheduling & Autonomous Wakeups
 
-Each agent runs an automation heartbeat configured with dynamic pacing:
+Taskman autonomously owns the lifecycle and wake-up scheduling for active tasks:
 
-- Command: `openclaw run --agent <id>`
-- Pacing flags: `--pacing-min 1m --pacing-max 16h`
-- When an agent calls `start_activity(duration_min=45)`, the tool returns
-  `{ next_check: "45m" }`.
-- OpenClaw schedules the next execution exactly 45 minutes in the future,
-  consuming **zero CPU and zero tokens** during the wait.
+- When an agent calls `start_task(type="...", description="...", duration=45)`,
+  Taskman stores the active task lease in plugin state and calculates
+  $\text{delayMs} = (\text{duration} \times 60\,000) / \text{speed}$.
+- Taskman projects the lease into a native one-shot OpenClaw `at` automation,
+  keeping the next wake visible in the dashboard without a process-local timer.
+- Each wake targets the character's `agent:<id>:brain` session and has
+  `delivery: { mode: "none" }`. The task ledger is never an execution session.
+- At startup or scheduler reload, `cron_reconciled` reconciles the projection
+  from retained task state before wakes can run. A normal task transition
+  atomically upserts only its own job using the agent ID as the native cron
+  `declarationKey`. The startup gate blocks cron execution only until this
+  lifecycle reconciliation completes; a single brain session eliminates normal
+  competing task transitions.
+- Consumes **zero CPU and zero tokens** during the wait, without requiring the
+  agent to manage dynamic pacing flags.
 
 ### 4.2 Immediate Wake Events
 
 When an external stimulus occurs:
 
 - Command:
-  `openclaw system event --session-key agent:<id>:main --mode now --payload "<event_json>"`
-- Wakes the agent's session instantly.
-- Pre-turn hook reconciles the interrupted task (pausing exclusive tasks,
-  updating elapsed minutes) before invoking the LLM.
+  `openclaw system event --session-key agent:<id>:brain --mode now --payload "<event_json>"`
+- Steers the character's single brain session instantly.
+- The context engine routes the event to `agent:<id>:brain`, injects active task
+  state and the matching shared skill, and tells the agent to preserve its prior
+  intention unless the new observation changes it materially.
 
 ---
 
@@ -153,37 +168,34 @@ Kazusa adopts **direct native TypeScript plugins** located under
 - **Instant Hot-Reload**: Changes to simulation tools, desire decay formulas, or
   context engine hooks take effect immediately on the next execution without
   compilation artifacts.
-- **Local Workspace Registration**: Plugins are registered directly in
-  `openclaw.json` under
-  `plugins.load.paths: ["./plugins/sim-harness", "./plugins/sim-context-engine"]`.
+- **Local Workspace Registration**: Kazusa is registered directly in
+  `openclaw.json` under `plugins.load.paths: ["./plugins/kazusa"]`.
 - **Packaging Scope**: Published external plugins require pre-built JavaScript
   entries per the OpenClaw SDK contract, but local workspace plugins operate
   directly on TypeScript sources.
 
 ### 5.2 Plugin Separation of Concerns
 
-1. **`plugins/sim-harness`**:
-   - **File State Engine**: Atomic YAML frontmatter + Markdown parser and writer
-     (`frontmatter.ts`).
-   - **Simulation Clock**: `SimClock` interface supporting real and accelerated
-     time (`clock.ts`).
-   - **Presence Tracker**: In-memory `WorldIndex` tracking agent locations by
-     watching `MEMORY.md` headers (`world-index.ts`).
-   - **Desire & Homeostasis Engine**: Passive decay math, circadian multipliers
-     ($M_{\\text{tod}}$), sleep debt accumulation, squared urgency ranking, and
-     D2A qualitative rubric renderer (`desires.ts`).
-   - **Simulation Tools**: Registered agent tools (`start_activity`,
-     `start_transit`, `conclude_activity`, `record_thought`,
-     `conclude_conversation`).
-   - **Scheduler & Encounter Gate**: Dynamic heartbeat pacing hook
-     (`next_check`), auto-arrival on transit expiration, and zero-LLM encounter
-     probability rolls (`encounter-gate.ts`, `scheduler-wake.ts`).
+1. **`plugins/kazusa` (`@kazusa/plugin`)**:
+   - **One runtime, three internal modules**: `src/clock/` provides virtual
+     time, `src/taskman/` owns leases and their automation projection, and
+     `src/context-engine/` owns brain routing and context assembly. The root
+     `src/index.ts` composes them.
+   - **Persistence**: `"clock"` and `"tasks"` remain separate retained native
+     keyed-store namespaces, while sharing the `kazusa` plugin identity.
+   - **Agent Tools & RPC**: Clock exposes `clock_now`, `clock_set_speed`,
+     `clock_advance`, and matching `clock.*` RPC methods; Taskman exposes
+     `start_task` and `delay_task`. The context engine injects task context from
+     the character's task stream when it assembles a turn.
+   - **Scope boundary**: Taskman must not acquire location, transit, desires, or
+     social-state responsibilities. It currently owns all Gateway cron jobs; add
+     an explicit job family before a second automation owner is introduced. An
+     event queue is not a task ledger; keep those roles separate.
+   - **Colocated Tests**: `src/clock/clock.test.ts` and
+     `src/taskman/taskman.test.ts`.
 
-2. **`plugins/sim-context-engine`**:
-   - Custom `ContextEngine` registered via
-     `api.registerContextEngine("sim-context-engine", ...)`.
-   - Bound in configuration to
-     `plugins.slots.contextEngine = "sim-context-engine"`.
+2. **`plugins/kazusa/src/context-engine/`**:
    - Orchestrates multi-stream context assembly (`assemble(ctx)`) prior to LLM
      generation, combining location affordances, stream tails, and adaptive
-     relationship impressions.
+     relationship impressions without a cross-plugin API.
+   - **Colocated Tests**: `src/context-engine/*.test.ts`.

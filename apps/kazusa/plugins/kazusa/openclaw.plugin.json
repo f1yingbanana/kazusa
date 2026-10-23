@@ -1,0 +1,31 @@
+{
+  "id": "kazusa",
+  "name": "Kazusa",
+  "description": "Multi-agent world simulation for roleplay.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "taskman": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minDuration": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Minimum task duration in simulated minutes (default: 10)."
+          }
+        }
+      }
+    }
+  },
+  "contracts": {
+    "tools": [
+      "clock_now",
+      "clock_set_speed",
+      "clock_advance",
+      "start_task",
+      "delay_task"
+    ]
+  }
+}

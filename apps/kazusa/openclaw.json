@@ -13,14 +13,20 @@
       },
       "model": {
         "primary": "zai/glm-5.2"
-      },
-      "memorySearch": {
-        "extraPaths": ["../../shared/wiki"]
       }
     }
   },
   "plugins": {
+    "load": {
+      "paths": ["./plugins/kazusa"]
+    },
     "entries": {
+      "kazusa": {
+        "enabled": true,
+        "hooks": {
+          "allowConversationAccess": true
+        }
+      },
       "anthropic": {
         "config": {
           "sessionCatalog": {
@@ -50,8 +56,8 @@
   "gateway": {
     "mode": "local",
     "auth": {
-      "mode": "token",
-      "token": "d56ff266487ec941aef9d488b28fb3899517754b7cbb182d"
+      "$include": "./openclaw.local.json",
+      "mode": "token"
     },
     "port": 18789,
     "bind": "loopback",
@@ -62,7 +68,15 @@
   "tools": {
     "profile": "full"
   },
+  "messages": {
+    "queue": {
+      "mode": "steer"
+    }
+  },
   "skills": {
+    "load": {
+      "extraDirs": ["./shared/skills"]
+    },
     "install": {
       "nodeManager": "npm"
     }

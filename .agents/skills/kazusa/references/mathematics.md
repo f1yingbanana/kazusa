@@ -134,8 +134,7 @@ $$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\
 
 ## 5. Start-Then-Settle Task Lease Mathematics
 
-When an agent initiates a task via `start_activity()` or transit via
-`start_transit()`:
+When an agent initiates a task via `start_task()`:
 
 ### 5.1 Settlement Ratio
 
@@ -145,7 +144,7 @@ $$\text{Ratio} = \text{clamp}\left(\frac{\Delta t_{\text{elapsed}}}{t_{\text{pla
 
 ### 5.2 Desire Reward Settle Formula
 
-For any activity targeting desire recovery $\Delta D_{\text{target}}$:
+For any task targeting desire recovery $\Delta D_{\text{target}}$:
 $$\Delta D_{\text{awarded}} = \text{clamp}\big(\Delta D_{\text{target}},\; -3.0,\; +3.0\big) \times \text{Ratio}$$
 
 - If an agent planned a 60-minute study session to gain $+2.0$ Purpose, but was
@@ -153,13 +152,21 @@ $$\Delta D_{\text{awarded}} = \text{clamp}\big(\Delta D_{\text{target}},\; -3.0,
   $+0.5$ Purpose.
 - Hallucinated instant claims are mathematically impossible.
 
-### 5.3 Channel Distinction
+### 5.3 Interruption & Agent Task Autonomy
 
-- **`EXCLUSIVE` (Venue Task)**:
-  - On interrupt: `status = "PAUSED"`, `remaining_min = planned - elapsed`.
-  - Timer freezes. Upon resuming, next heartbeat is set to $t_{\text{now}} +
-    \text{remaining\_min}$.
-- **`KINEMATIC_PARALLEL` (Transit)**:
-  - On interrupt: Physical movement timer continues ticking in background.
-  - Arrival flip occurs at fixed $t_{\text{arrival\_iso}}$ regardless of how
-    many chat turns take place during the walk.
+- **Agent Autonomous Decision**:
+  - When interrupted by an external stimulus (encounter or message), the agent
+    is informed with the active task's full status (description, started time,
+    planned end time, elapsed minutes, and remaining duration).
+  - The framework does not force rigid machine-level pause/resume locks. The
+    agent autonomously evaluates its priorities to decide whether to:
+    1. **Delay/Extend** the task lease via `delay_task` (e.g. extending study
+       time after chatting with a friend).
+    2. **Transition** via `start_task`, recording the current task's outcome in
+       `summary` and naming the next task (e.g. stopping study to hang out).
+    3. **Ignore** the stimulus or continue uninterrupted (e.g. sleeping through
+       a minor ambient encounter).
+- **Physical Transit Invariant**:
+  - For physical movement/travel, arrival flips occur deterministically at the
+    scheduled arrival time based on the spatial corridor distance, regardless of
+    conversational dialogue turns along the way.

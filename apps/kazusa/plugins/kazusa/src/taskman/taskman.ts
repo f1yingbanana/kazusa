@@ -1,0 +1,67 @@
+import type {
+  ActiveTask,
+  DelayTaskParams,
+  DelayTaskResult,
+  StartTaskParams,
+  StartTaskResult,
+  ToolExecutionContext,
+} from "./types.ts";
+
+export async function executeStartTask(
+  params: StartTaskParams,
+  ctx: ToolExecutionContext,
+): Promise<StartTaskResult> {
+  const duration = Math.max(
+    ctx.minDuration,
+    Math.round(params.duration || ctx.minDuration),
+  );
+  const startedAt = new Date(ctx.clock.time()).toISOString();
+  const endAt = new Date(
+    new Date(startedAt).getTime() + duration * 60_000,
+  ).toISOString();
+  const task: ActiveTask = {
+    type: params.type,
+    description: params.description,
+    startedAt,
+    endAt,
+    duration,
+    ...(params.metadata === undefined ? {} : { metadata: params.metadata }),
+  };
+
+  const priorTask = await ctx.store.lookup(ctx.agentId);
+  await ctx.store.register(ctx.agentId, task);
+  const priorSummary = params.summary?.trim();
+  const message = priorTask
+    ? `Concluded ${priorTask.type} task.${priorSummary ? ` Summary: "${priorSummary}".` : ""} Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`
+    : `Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`;
+  await ctx.appendTaskLedgerEntry(message);
+  return { success: true, task, message };
+}
+
+export async function executeDelayTask(
+  params: DelayTaskParams,
+  ctx: ToolExecutionContext,
+): Promise<DelayTaskResult> {
+  const current = await ctx.store.lookup(ctx.agentId);
+  if (!current) {
+    return { success: false, message: "No active task in progress to delay." };
+  }
+
+  const additionalDuration = Math.max(
+    1,
+    Math.round(params.additionalDuration ?? 5),
+  );
+  const task: ActiveTask = {
+    ...current,
+    duration: current.duration + additionalDuration,
+    endAt: new Date(
+      new Date(current.endAt).getTime() + additionalDuration * 60_000,
+    ).toISOString(),
+  };
+  await ctx.store.register(ctx.agentId, task);
+
+  const reason = params.reason ? ` Reason: ${params.reason}.` : "";
+  const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${task.endAt}.${reason}`;
+  await ctx.appendTaskLedgerEntry(message);
+  return { success: true, task, message };
+}

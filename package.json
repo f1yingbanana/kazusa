@@ -2,9 +2,11 @@
   "name": "kazusa",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Kazusa agent monorepo",
   "workspaces": [
     "apps/*",
+    "apps/kazusa/plugins/*",
     "packages/*"
   ],
   "scripts": {
@@ -12,13 +14,25 @@
     "gateway": "npm run --workspace=@openrp-ai/kazusa gateway",
     "status": "npm run --workspace=@openrp-ai/kazusa status",
     "doctor": "npm run --workspace=@openrp-ai/kazusa doctor",
+    "typecheck": "tsc -p apps/kazusa/plugins/kazusa",
+    "test": "vitest run --config ./vitest.config.ts",
+    "lint": "eslint . --fix",
     "fix": "pretty-quick --branch main",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.5",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
     "prettier": "^3.9.10",
     "prettier-plugin-jsdoc": "^1.8.1",
-    "pretty-quick": "^4.2.2"
+    "pretty-quick": "^4.2.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
   }
 }

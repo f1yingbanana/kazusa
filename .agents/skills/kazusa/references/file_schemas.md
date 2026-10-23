@@ -48,61 +48,76 @@ manuscript writing that she forgets to eat.
 
 ---
 
-## 2. Hot Working State (`<workspace>/MEMORY.md`)
+## 2. Working Machine State (OpenClaw Plugin State Stores)
+
+- **Mechanism**: `api.runtime.state.openKeyedStore<T>`
+- **Purpose**: High-frequency mechanical state tracking the simulation clock and
+  active agent task leases directly in OpenClaw's native state database with
+  zero markdown file parsing churn.
+- **Namespaces**:
+  - `namespace: "clock"` (`ClockPersistedRecord`): Stores simulation clock
+    timestamp (`simTime`), speed multiplier (`speed`), and `updatedAt`.
+  - `namespace: "tasks"` (`ActiveTask | null`): Stores current active task
+    indexed by `agentId`.
+- **Decoupling Architecture**:
+  - Active tasks are stored directly in the plugin database and streamed to
+    `agent:<agentId>:tasks`.
+  - Spatial location is managed by the spatial subsystem (`LOCATION.md` / World
+    Wiki places).
+  - Biological/psychological drives are managed by the homeostasis engine
+    (`IDENTITY.md` decay rates / hunger / energy).
+  - No `STATE.md` or `TASK.md` file parsing is required.
+
+### Active Task Schema
+
+```typescript
+export const activeTaskSchema = z.object({
+  /** Unique identifier for the task. */
+  id: z.string(),
+  /** Task category or type (e.g. 'study', 'reading', 'nap'). */
+  type: z.string(),
+  /** Natural-language description of what the character is doing. */
+  description: z.string(),
+  /** Start timestamp in ISO 8601 format. */
+  startedAt: z.string(),
+  /** Scheduled completion timestamp in ISO 8601 format. */
+  endAt: z.string(),
+  /** Planned duration in minutes. */
+  duration: z.number(),
+  /** Optional task-specific metadata. */
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type ActiveTask = z.infer<typeof activeTaskSchema>;
+```
+
+### Field Specifications
+
+- `id` (string, required): Unique task execution lease identifier (e.g.
+  `task_1729500000000`).
+- `type` (string, required): Task category or routine (e.g. `study`, `reading`,
+  `nap`).
+- `description` (string, required): Natural-language description of current
+  task.
+- `startedAt` (ISO 8601 string): Timestamp when task began.
+- `endAt` (ISO 8601 string): Scheduled completion timestamp.
+- `duration` (number): Planned duration in minutes (enforces configured
+  `minDuration`).
+- `metadata` (object, optional): Arbitrary task metadata dictionary.
+
+---
+
+## 3. Qualitative Reflection & Goals (`<workspace>/MEMORY.md`)
 
 - **Location**: `<workspace>/MEMORY.md`
-- **Purpose**: Always injected into LLM context by OpenClaw. **Single Source of
-  Truth** for location, desires, active lease, alarms, and goals.
-- **Access**: Mutated atomically in-place by simulation tools and pre-turn decay
-  hooks.
+- **Purpose**: Injected into LLM context by OpenClaw. Contains qualitative
+  goals, reflections, and ongoing thoughts—free of high-frequency mechanical
+  state churn.
+- **Access**: Maintained and updated by the LLM during nightly sleep
+  distillation or milestone moments.
 
 ```markdown
----
-agent_id: alice
-last_updated_iso: "2026-10-20T14:10:00Z"
-location: "grocery_store"
-transit_state: null
-sleep_debt_min: 45
-desires:
-  sleep_energy: 6.8
-  hunger: 3.2
-  social_connection: 4.8
-  curiosity: 7.1
-  recognition: 5.4
-  purpose_progress: 4.0
-active_task:
-  id: "task_20261020_1400"
-  type: "shop_groceries"
-  description: "Buying pasta, tomatoes, and coffee beans for the week"
-  channel: "EXCLUSIVE"
-  location: "grocery_store"
-  started_iso: "2026-10-20T14:00:00Z"
-  planned_duration_min: 25
-  elapsed_min: 10
-  remaining_min: 15
-  focus_shield: 0.2
-  status: "PAUSED"
-paused_task: null
-alarms:
-  - id: "alm_01"
-    fire_at_iso: "2026-10-21T08:00:00Z"
-    label: "Wake up for 9 AM Counterpoint lecture"
-    status: "ARMED"
----
-
-## Current State & Desires
-
-- **Location**: Willow Market & Grocery (`grocery_store`)
-- **Active Task**: Shopping for groceries (PAUSED — 10 min completed, 15 min
-  remaining)
-- **[HIGH URGENCY] Hunger**: Hungry; your stomach is growling and you want a
-  proper meal soon.
-- **[MODERATE URGENCY] Purpose & Progress**: Falling behind; you haven't worked
-  on your composition assignment yet today.
-- **Sleep & Energy**: Rested enough to focus, though carrying 45 minutes of
-  lingering sleep debt.
-- **Social Connection**: Content; your recent chat satisfied your need for
-  company.
+# Alice's Goals & Reflections
 
 ## Long-Term Goals
 
@@ -112,51 +127,10 @@ alarms:
 ## Today's Plan
 
 - **[HARD_BLOCK] 16:00 - 17:30**: Counterpoint Seminar at `school`
-- **[SOFT_GOAL]**: Finish buying groceries at `grocery_store` (15 min remaining)
-- **[SOFT_GOAL]**: Draft 16 bars of the quartet second movement at `dorm_a`
+- **[SOFT_GOAL]**: Practice bass guitar in the music club room
+- **[SOFT_GOAL]**: Draft 16 bars of the quartet second movement at
+  `trinity_dorm`
 ```
-
-### Frontmatter Specifications
-
-- `agent_id` (string, required): Agent ID.
-- `last_updated_iso` (ISO 8601 string): Timestamp of last desire decay / state
-  mutation.
-- `location` (string, required): ID of current location (matches
-  `shared/locations/<id>.md`).
-- `transit_state` (object | null): If actively in transit,
-  `{ from, to, corridor, started_iso, arrival_iso, duration_min }`. When `null`,
-  agent is static at `location`.
-- `sleep_debt_min` (number, integer): Accumulated sleep debt in minutes.
-- `desires` (object, required): Current numerical meters (`0.0..10.0`).
-- `active_task` (object | null):
-  - `id`: Unique task lease identifier.
-  - `type`: Short category string (e.g. `shop_groceries`, `study_counterpoint`,
-    `sleep`).
-  - `description`: Qualitative summary of what character is doing.
-  - `channel`: `"EXCLUSIVE"` (venue task; pauses on chat) or
-    `"KINEMATIC_PARALLEL"` (transit; allows parallel chat while movement timer
-    runs).
-  - `location`: Location ID where task occurs.
-  - `started_iso`: Timestamp task began.
-  - `planned_duration_min`: Total planned duration.
-  - `elapsed_min`: Minutes completed so far.
-  - `remaining_min`: Minutes remaining.
-  - `focus_shield`: Float `0.0..1.0` indicating resistance to interruptions
-    (e.g., 0.9 for sleeping/exam, 0.1 for lounging).
-  - `status`: `"IN_PROGRESS" | "PAUSED" | "COMPLETED" | "CANCELLED"`.
-- `paused_task` (object | null): Stores previous task when interrupted by a
-  higher-priority task.
-- `alarms` (array): List of
-  `{ id, fire_at_iso, label, status: "ARMED" | "FIRED" | "DISARMED" }`.
-
-### Markdown Body Specifications
-
-- `## Current State & Desires`: Automatically regenerated by the desire engine
-  on every decay/mutation. Formatted in first-person sorted by urgency.
-- `## Long-Term Goals`: Maintained and updated by the LLM during nightly sleep
-  distillation or milestone moments.
-- `## Today's Plan`: Structured schedule containing `[HARD_BLOCK]` (inflexible
-  commitments) and `[SOFT_GOAL]` (flexible desires/intentions).
 
 ---
 
@@ -400,10 +374,7 @@ on my quartet exposition.
     "ownership": "explicit",
     "defaults": {
       "model": "anthropic/claude-3-7-sonnet",
-      "plugins": ["sim-harness", "sim-context-engine"],
-      "memorySearch": {
-        "extraPaths": ["../../shared/wiki"]
-      }
+      "plugins": ["kazusa"]
     },
     "entries": {
       "main": {},
@@ -417,18 +388,20 @@ on my quartet exposition.
   },
   "plugins": {
     "load": {
-      "paths": ["./plugins/sim-harness", "./plugins/sim-context-engine"]
-    },
-    "slots": {
-      "contextEngine": "sim-context-engine"
+      "paths": ["./plugins/kazusa"]
     },
     "entries": {
-      "sim-harness": {
-        "enabled": true
-      },
-      "sim-context-engine": {
-        "enabled": true
+      "kazusa": {
+        "enabled": true,
+        "hooks": {
+          "allowConversationAccess": true
+        }
       }
+    }
+  },
+  "messages": {
+    "queue": {
+      "mode": "steer"
     }
   }
 }
@@ -454,9 +427,9 @@ metadata, dependencies, and optional configuration schema:
 
 ```json
 {
-  "id": "sim-harness",
-  "name": "Kazusa Simulation Harness",
-  "description": "Simulation tools, frontmatter state, desires, tasks, and encounter scheduler"
+  "id": "kazusa",
+  "name": "Kazusa Simulation",
+  "description": "Simulated time and task scheduling for Kazusa roleplay agents"
 }
 ```
 
@@ -467,7 +440,7 @@ TypeScript runtime entry point:
 
 ```json
 {
-  "name": "@kazusa/sim-harness",
+  "name": "@kazusa/plugin",
   "version": "0.1.0",
   "type": "module",
   "openclaw": {

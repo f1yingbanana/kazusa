@@ -16,31 +16,15 @@ apps/kazusa/ (or repository root)
 ├── package.json
 ├── tsconfig.json
 ├── plugins/                          # Direct TypeScript plugins (ZERO BUILD STEP)
-│   ├── sim-harness/                  # Phase 0, 1, 3, 4: File state, math, tools, scheduler & encounters
+│   ├── kazusa/                       # Unified simulation kernel
 │   │   ├── openclaw.plugin.json
-│   │   ├── package.json              # "openclaw": { "extensions": ["./src/index.ts"] }
-│   │   ├── src/
-│   │   │   ├── clock.ts              # SimClock interface
-│   │   │   ├── frontmatter.ts        # Atomic YAML frontmatter + Markdown reader/writer
-│   │   │   ├── desires.ts            # Passive decay math & D2A qualitative rubric
-│   │   │   ├── world-index.ts        # In-memory location presence index derived from MEMORY.md
-│   │   │   ├── tasks-and-transit.ts  # Task leases, LLM transit judgment, pause/resume hooks
-│   │   │   ├── social-tools.ts       # conclude_conversation & relationship mutators
-│   │   │   ├── scheduler-wake.ts     # Dynamic heartbeat pacing & session wake triggers
-│   │   │   ├── encounter-gate.ts     # Zero-LLM encounter probability roll
-│   │   │   └── index.ts              # Plugin registration entry point
-│   │   └── test/
-│   │       ├── phase0-files.test.ts
-│   │       ├── phase1-desires.test.ts
-│   │       ├── phase3-tasks.test.ts
-│   │       └── phase4-interrupts.test.ts
-│   └── sim-context-engine/           # Phase 2: Custom ContextEngine (plugins.slots.contextEngine)
-│       ├── openclaw.plugin.json
-│       ├── package.json              # "openclaw": { "extensions": ["./src/index.ts"] }
-│       ├── src/
-│       │   └── index.ts              # Merges actions, thoughts, chat tails, location & social graph
-│       └── test/
-│           └── phase2-context.test.ts
+│   │   ├── package.json              # @kazusa/plugin; direct TypeScript entry
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts              # Builds Clock and injects it into Taskman
+│   │       ├── clock/                # Formula clock, OpenClaw state, tools/RPC, tests
+│   │       └── taskman/              # Task leases, automations, tools/RPC, tests
+│   │       └── context-engine/       # Phase 2: Context assembly and brain routing
 ├── shared/
 │   ├── wiki/                         # 1. WORLD WIKI: Canonical facts & world ground truth
 │   │   ├── entities/
@@ -66,7 +50,7 @@ apps/kazusa/ (or repository root)
     ├── alice/
     │   ├── SOUL.md
     │   ├── IDENTITY.md               # Traits & desire decay configuration
-    │   ├── MEMORY.md                 # Single source of truth hot state
+    │   ├── MEMORY.md                 # Qualitative reflections, ongoing thoughts, goals
     │   ├── memory/
     │   │   └── 2026-10-20.md         # Cold daily distilled summaries (memory-core indexed)
     │   └── wiki/                     # 2. PERSONAL WIKI: Subjective beliefs & impressions
@@ -82,39 +66,43 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 0: Markdown Frontmatter Engine, File Schemas & In-Memory World Index (`plugins/sim-harness`)
+## Phase 0: Clock & Taskman Kernel (`plugins/kazusa`)
 
 ### Deliverables
 
-- `plugins/sim-harness/src/frontmatter.ts`: Atomic YAML frontmatter + Markdown
-  reader/writer using write-then-rename
-  (`writeFile(tmp) -> rename(tmp, target)`) to prevent file corruption during
-  concurrent operations.
-- `plugins/sim-harness/src/clock.ts`: `SimClock` interface supporting both
-  wall-clock time and accelerated simulation time.
-- `plugins/sim-harness/src/world-index.ts`: In-memory presence cache
-  `{ agentId -> { location, transit_state, active_task } }` updated by watching
-  `MEMORY.md`. Provides `getAgentsAtLocation(locationId)`.
+- `plugins/kazusa/src/clock/clock.ts` and
+  `plugins/kazusa/src/clock/register.ts`:
+  - `Clock` implementation of formula clock ($t_{\text{sim}} =
+    t_{\text{anchor}} + (t_{\text{real}} - t_{\text{real,anchor}}) \times
+    \text{speed}$).
+  - Persistence via OpenClaw plugin state (`api.runtime.state.openKeyedStore`
+    namespace `"clock"`). A restart resumes the stored simulated instant and
+    intentionally does not advance time for Gateway downtime.
+  - Registered tools `clock_now`, `clock_set_speed`, and `clock_advance`, with
+    matching Gateway RPC endpoints. Time may only move forward.
+  - Colocated tests in `plugins/kazusa/src/clock/clock.test.ts`.
+- `plugins/kazusa/src/taskman/`:
+  - Task state persistence directly via OpenClaw plugin state
+    (`api.runtime.state.openKeyedStore` namespace `"tasks"`).
+  - Dashboard-visible wake automations rebuilt from retained state on
+    `cron_reconciled`; no `setTimeout` scheduler.
+  - Colocated tests in `plugins/kazusa/src/taskman/taskman.test.ts`.
 
-### Test Specifications (`plugins/sim-harness/test/phase0-files.test.ts`)
+### Test Specifications
 
-- **Test 0.1 (Round-Trip Frontmatter + Body Preservation)**:
-  - Parse `MEMORY.md`, mutate `desires.hunger` and `active_task.status`,
-    re-serialize atomically.
-  - Assert `## Long-Term Goals` and `## Today's Plan` Markdown sections remain
-    byte-for-byte identical.
-- **Test 0.2 (Derived World Index Accuracy)**:
-  - Update `alice/MEMORY.md` and `bob/MEMORY.md` to `location: "grocery_store"`.
-  - Assert `worldIndex.getAgentsAtLocation("grocery_store")` returns
-    `["alice", "bob"]` with zero database tables.
+- **Test 0.1 (`plugins/kazusa/src/clock/clock.test.ts`)**:
+  - Validates default initialization, manual advance, time stop (speed=0), and
+    persistence across service restarts.
+- **Test 0.2 (`plugins/kazusa/src/taskman/taskman.test.ts`)**:
+  - Validates in-memory and database task store state persistence and retrieval.
 
 ---
 
-## Phase 1: Desire & Homeostasis Engine (`plugins/sim-harness`)
+## Phase 1: Desire & Homeostasis Engine (`plugins/kazusa/src/homeostasis`)
 
 ### Deliverables
 
-- `plugins/sim-harness/src/desires.ts`:
+- `plugins/kazusa/src/homeostasis/desires.ts`:
   - `syncAndDecayDesires(agentWorkspaceDir, clock)`: Computes time delta $\Delta
     t_{\text{hours}}$, applies decay formula with circadian $M_{\text{tod}}$,
     tracks `sleep_debt_min`, computes squared urgency $U_d$, maps to D2A natural
@@ -123,7 +111,7 @@ apps/kazusa/ (or repository root)
     Rewards completed tasks scaled by actual elapsed time, clamping deltas to
     `[-3.0, +3.0]`.
 
-### Test Specifications (`plugins/sim-harness/test/phase1-desires.test.ts`)
+### Test Specifications (`plugins/kazusa/src/homeostasis/desires.test.ts`)
 
 - **Test 1.1 (In-Place `MEMORY.md` Decay & Qualitative Rendering)**:
   - Advance `SimClock` by 5 hours for `alice`, run `syncAndDecayDesires()`.
@@ -136,12 +124,14 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 2: Custom Multi-Stream Context Engine (`plugins/sim-context-engine`)
+## Phase 2: Multi-Stream Context Engine (`plugins/kazusa/src/context-engine`)
 
 ### Deliverables
 
-- Implement `api.registerContextEngine("sim-context-engine", ...)` using the
-  OpenClaw `ContextEngine` interface.
+- Implement the context engine within the Kazusa plugin using OpenClaw's
+  `ContextEngine` interface. It owns the single `agent:<id>:brain` session,
+  routes all task wakes and interrupts there with steering, and resolves trusted
+  skill markers before prompt assembly.
 - Implements `assemble(ctx)` with the **3-Tier Retrieval Pipeline**:
   1. Calls `syncAndDecayDesires()`.
   2. **Tier 1 (Spatial Perception & Sensory Shock)**: Reads current place from
@@ -154,12 +144,12 @@ apps/kazusa/ (or repository root)
      `workspaces/<id>/wiki/entities/characters/<peer>.md` (full
      `## Quick Impression` for 1-on-1; Top-3 salience ranking for crowds).
   5. **Tier 3 (Session Stream Tails)**: Tail-slices recent events from
-     `agent:<id>:actions` and `agent:<id>:thoughts`.
+     `agent:<id>:tasks` and `agent:<id>:thoughts`.
 
-### Test Specifications (`plugins/sim-context-engine/test/phase2-context.test.ts`)
+### Test Specifications (`plugins/kazusa/src/context-engine/context-engine.test.ts`)
 
 - **Test 2.1 (Cross-Stream Context Assembly)**:
-  - Append 5 actions to `:actions` and 3 monologues to `:thoughts`. Run
+  - Append 5 task events to `:tasks` and 3 monologues to `:thoughts`. Run
     `assemble()`.
   - Assert prompt contains recent actions, thoughts, and location affordances in
     structured sections.
@@ -178,68 +168,59 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 3: Task Leases, Transit Engine, Social Tools & Wiki Tools (`plugins/sim-harness`)
+## Phase 3: Task Scheduler & Pacing Engine (`plugins/kazusa/src/taskman`)
 
 ### Deliverables
 
-- Tools:
-  - `start_activity({ type, description, duration_min, channel, focus_shield, expected_desire_deltas })`:
-    Creates `IN_PROGRESS` lease in `MEMORY.md`, returns
-    `{ next_check: "${duration_min}m" }`.
-  - `start_transit({ to_location, estimated_duration_min })`: Verifies
-    connection in `shared/wiki/entities/places/<loc>.md`, sets `transit_state`,
-    logs to `:actions`, returns `{ next_check: "${estimated_duration_min}m" }`.
-  - `conclude_activity()`: Settles lease, calculates $\Delta t_{\text{elapsed}}
-    / \Delta t_{\text{planned}}$, applies scaled desire rewards.
-  - `record_thought({ thought, candidate_options })`: Appends monologue and D2A
-    3-option pre-imagination to `:thoughts` session.
-  - `conclude_conversation({ peer_id, impression_updates, log_entry })`: Updates
-    `<workspace>/wiki/entities/characters/<peer>.md` frontmatter and logs.
-  - `wiki_search({ query, scope, mode })`: Dual-scope search querying Personal
-    Wiki first (beliefs/concepts) and World Wiki second (objective canon lore),
-    tagging results with epistemic provenance.
-  - `wiki_get({ lookup })`: Reads specific wiki entity or concept card.
-  - `wiki_apply({ mutation })`: Applies structured claim, synthesis, or metadata
-    mutation to personal wiki.
+- Consolidated Tools in `plugins/kazusa/src/taskman/taskman.ts`:
+  - `start_task({ type, description, duration, summary?, metadata? })`: Creates
+    an initial lease or replaces the active one in OpenClaw's plugin state
+    database (`tasks`), clamps duration to `minDuration`, sets `startedAt` and
+    `endAt`, and appends the transition to `agent:<agentId>:tasks`.
+  - `delay_task({ additionalDuration, reason? })`: Extends active task lease
+    duration, recalculates `endAt`, updates database record, and dispatches
+    delay notice to `agent:<agentId>:tasks`.
+- Subsystem Decoupling:
+  - Taskman is strictly scoped to task lease management and pacing.
+  - Location/transit routing belongs to the spatial navigation subsystem.
+  - Desire satisfaction and homeostasis decay belong to the desire engine.
 
-### Test Specifications (`plugins/sim-harness/test/phase3-tasks.test.ts`)
+### Test Specifications (`plugins/kazusa/src/taskman/taskman.test.ts`)
 
-- **Test 3.1 (Start-Then-Settle Task Lease)**:
-  - Start 60-min task for $+2.0$ hunger. Conclude after 30 min. Assert hunger
-    increases by exactly $+1.0$ ($0.5 \times 2.0$).
-- **Test 3.2 (LLM Travel Judgment & Validation)**:
-  - Attempt transit to unconnected location; assert tool returns descriptive
-    error listing valid connections.
-- **Test 3.3 (Conclude Conversation & Relationship Mutator)**:
-  - Call `conclude_conversation()`. Assert
-    `workspaces/<id>/wiki/entities/characters/<peer>.md` frontmatter increments
-    `familiarity` and appends interaction entry under `## Interaction Log`.
-- **Test 3.4 (Dual-Scope Wiki Retrieval with Epistemic Hierarchy)**:
-  - Execute `wiki_search("supermarket", scope="auto")`.
-  - Assert returned results contain personal belief tagged `[Personal Memory]`
-    followed by canonical world setting facts tagged `[Public Town Fact]`.
+- **Test 3.1 (Start Task & Lease Scheduling)**:
+  - Call `start_task` with duration; assert database record stores `startedAt`
+    and `endAt` matching clock, and sends notice to `agent:<id>:tasks`.
+- **Test 3.2 (Min Duration Enforcement)**:
+  - Call `start_task` with duration below `minDuration`; assert duration is
+    clamped to `minDuration`.
+- **Test 3.3 (Delay Task Extension)**:
+  - Call `delay_task` with additional duration; assert `endAt` is extended by N
+    minutes and notice is dispatched to `agent:<id>:tasks`.
+- **Test 3.4 (Task Transition)**:
+  - Replace a task with `start_task`; assert the new lease replaces the old one
+    atomically and one transition notice is logged to `agent:<id>:tasks`.
 
 ---
 
-## Phase 4: Dynamic Scheduler, Interrupt Engine & Zero-LLM Encounter Gate (`plugins/sim-harness`)
+## Phase 4: Dynamic Scheduler, Interrupt Engine & Zero-LLM Encounter Gate (`plugins/kazusa/src/interrupts`)
 
 ### Deliverables
 
-- Dynamic Pacing Hook: Maps task/transit lease durations directly to
-  `next_check`.
+- Autonomous Pacing: Taskman maps task/transit lease durations directly to
+  autonomous wake timers.
 - Auto-Arrival on Transit Completion: When clock reaches
   `transit_state.arrival_iso`, automatically flips `location`, clears transit,
   and runs Encounter Gate at new location.
 - `encounter-gate.ts`: Zero-LLM encounter probability roll:
   $$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\big) \times M_{\text{loc}} \times (1 - \text{shield}_A)(1 - \text{shield}_B),\; 0.0,\; 0.95\Big)$$
 - Interrupt Handler: On encounter or incoming message:
-  - If task is `EXCLUSIVE`, sets `status = "PAUSED"` and computes
-    `remaining_min`.
-  - If task is `KINEMATIC_PARALLEL`, transit timer keeps running.
+  - Supplies active task context (elapsed time, scheduled completion,
+    description).
   - Triggers immediate session wake event via
     `openclaw system event --mode now`.
+  - Agent autonomously decides whether to delay, conclude, or maintain the task.
 
-### Test Specifications (`plugins/sim-harness/test/phase4-interrupts.test.ts`)
+### Test Specifications (`plugins/kazusa/src/interrupts/interrupts.test.ts`)
 
 - **Test 4.1 (Stranger 1% vs. Friend 75% Gate)**:
   - 1,000 rolls with $F=0$: assert $\approx 1\%$ encounters.
@@ -275,8 +256,8 @@ Run a 24-hour simulation across 3 agents (`alice`, `bob`, `clara`):
 
 - **Invariant 1 Verification**: 100% of state inspectable in Markdown files;
   zero uncommitted SQLite tables.
-- **Invariant 2 Verification**: Zero hallucinated actions; every activity
-  reflected in `:actions` and `MEMORY.md`.
+- **Invariant 2 Verification**: Zero hallucinated actions; every task reflected
+  in `:tasks` and `MEMORY.md`.
 - **Invariant 3 Verification**: All rewards settled proportionally on task
   conclusion or interrupt.
 - **Nightly Distillation**: Verify `memory/YYYY-MM-DD.md` is generated and

@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "openclaw": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-$([ -f ./openclaw.local.json ] && echo ./openclaw.local.json || echo ./openclaw.json)}\" OPENCLAW_STATE_DIR=./.state openclaw",
-    "gateway": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-$([ -f ./openclaw.local.json ] && echo ./openclaw.local.json || echo ./openclaw.json)}\" OPENCLAW_STATE_DIR=./.state openclaw gateway",
-    "status": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-$([ -f ./openclaw.local.json ] && echo ./openclaw.local.json || echo ./openclaw.json)}\" OPENCLAW_STATE_DIR=./.state openclaw models status",
-    "doctor": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-$([ -f ./openclaw.local.json ] && echo ./openclaw.local.json || echo ./openclaw.json)}\" OPENCLAW_STATE_DIR=./.state openclaw doctor"
+    "openclaw": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-./openclaw.json}\" OPENCLAW_STATE_DIR=./.state openclaw",
+    "gateway": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-./openclaw.json}\" OPENCLAW_STATE_DIR=./.state openclaw gateway",
+    "status": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-./openclaw.json}\" OPENCLAW_STATE_DIR=./.state openclaw models status",
+    "doctor": "OPENCLAW_CONFIG_PATH=\"${OPENCLAW_CONFIG_PATH:-./openclaw.json}\" OPENCLAW_STATE_DIR=./.state openclaw doctor",
+    "typecheck": "tsc -p plugins/kazusa",
+    "test": "vitest run",
+    "lint": "eslint . --fix"
   },
   "dependencies": {
     "openclaw": "^2026.10.5"

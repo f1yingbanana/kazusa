@@ -1,0 +1,13 @@
+{
+  "name": "@kazusa/plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
