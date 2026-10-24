@@ -25,7 +25,8 @@ export async function executeStartTask(
     ctx.minDuration,
     Math.round(params.duration || ctx.minDuration),
   );
-  const startedAt = new Date(ctx.clock.time()).toISOString();
+  const timestamp = ctx.clock.time();
+  const startedAt = new Date(timestamp).toISOString();
   const endAt = new Date(
     new Date(startedAt).getTime() + duration * 60_000,
   ).toISOString();
@@ -46,6 +47,7 @@ export async function executeStartTask(
     : `Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`;
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
+    timestamp,
   );
   return { success: true, task, message };
 }
@@ -54,6 +56,7 @@ export async function executeDelayTask(
   params: DelayTaskParams,
   ctx: ToolExecutionContext,
 ): Promise<DelayTaskResult> {
+  const timestamp = ctx.clock.time();
   const current = await ctx.store.lookup(ctx.agentId);
   if (!current) {
     return { success: false, message: "No active task in progress to delay." };
@@ -76,6 +79,7 @@ export async function executeDelayTask(
   const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${task.endAt}.${reason}`;
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
+    timestamp,
   );
   return { success: true, task, message };
 }

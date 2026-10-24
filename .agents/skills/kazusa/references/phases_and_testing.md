@@ -23,8 +23,9 @@ apps/kazusa/ (or repository root)
 │   │   └── src/
 │   │       ├── index.ts              # Builds Clock and injects it into Taskman
 │   │       ├── clock/                # Formula clock, OpenClaw state, tools/RPC, tests
-│   │       └── taskman/              # Task leases, automations, tools/RPC, tests
-│   │       └── context-engine/       # Phase 2: Context assembly and brain routing
+│   │       ├── taskman/              # Task leases, automations, tools, tests
+│   │       ├── context-engine/       # Context assembly, not routing
+│   │       └── perception/           # PLANNED: stimulus routing and attention admission
 ├── shared/
 │   ├── wiki/                         # 1. WORLD WIKI: Canonical facts & world ground truth
 │   │   ├── entities/
@@ -129,10 +130,15 @@ apps/kazusa/ (or repository root)
 ### Deliverables
 
 - Implement the context engine within the Kazusa plugin using OpenClaw's
-  `ContextEngine` interface. It owns the single `agent:<id>:brain` session,
-  routes all task wakes and interrupts there with steering, and resolves trusted
-  skill markers before prompt assembly.
-- Implements `assemble(ctx)` with the **3-Tier Retrieval Pipeline**:
+  `ContextEngine` interface. It assembles the single `agent:<id>:brain`
+  session's context and resolves trusted skill markers. Routing/admission
+  belongs to planned Perception, not context assembly.
+- Current implementation assembles whole task/chat records from the last 24
+  simulated hours under one budget, grouped by session; adds current simulation
+  time, recent complete brain turns, and packaged skills; no active-task pull.
+  Native workspace bootstrap supplies long-term memory. See
+  [context-engine conventions](context_engine.md) for settings and chat naming.
+- Future extensions add the **3-Tier Retrieval Pipeline**:
   1. Calls `syncAndDecayDesires()`.
   2. **Tier 1 (Spatial Perception & Sensory Shock)**: Reads current place from
      `shared/wiki/entities/places/<loc>.md`. Compares against agent's
@@ -144,21 +150,25 @@ apps/kazusa/ (or repository root)
      `workspaces/<id>/wiki/entities/characters/<peer>.md` (full
      `## Quick Impression` for 1-on-1; Top-3 salience ranking for crowds).
   5. **Tier 3 (Session Stream Tails)**: Tail-slices recent events from
-     `agent:<id>:tasks` and `agent:<id>:thoughts`.
+     `agent:<id>:tasks`, `:chat:direct:*`, and `:chat:group:*` (implemented).
 
 ### Test Specifications (`plugins/kazusa/src/context-engine/context-engine.test.ts`)
 
 - **Test 2.1 (Cross-Stream Context Assembly)**:
-  - Append 5 task events to `:tasks` and 3 monologues to `:thoughts`. Run
-    `assemble()`.
-  - Assert prompt contains recent actions, thoughts, and location affordances in
-    structured sections.
-- **Test 2.2 (Adaptive Social Graph Injection)**:
+  - Merge task experiences/monologues and direct/group chat events in timestamp
+    order for selection, then regroup by session. Verify ownership, one shared
+    token budget, complete messages, a strict simulation-time cutoff (24 hours
+    by default), and intact tool pairs across steering boundaries.
+  - Verify simulation timestamps survive native transcript persistence and use
+    the native token estimate. Do not assume transcript envelope time is
+    simulation time.
+  - Test the native registration contract and known skill loading separately.
+- **Test 2.2 (Future Adaptive Social Graph Injection)**:
   - In a 1-on-1 session with `bob`, assert `bob.md` `## Quick Impression` is
     injected.
   - In a group session with 5 agents, assert only Top-3 highest
     familiarity/affinity impressions are injected.
-- **Test 2.3 (Sensory Shock Perception on World State Mismatch)**:
+- **Test 2.3 (Future Sensory Shock Perception on World State Mismatch)**:
   - Set `grocery_store.md` in World Wiki to `status: DESTROYED`.
   - Leave `alice/wiki/entities/places/grocery_store.md` as
     `status: OPERATIONAL`.
@@ -198,7 +208,8 @@ apps/kazusa/ (or repository root)
     clamped to `minDuration`.
 - **Test 3.3 (Delay Task Extension)**:
   - Call `delay_task` with additional duration; assert `endAt` is extended by N
-    minutes and notice is dispatched to `agent:<id>:tasks`.
+    minutes and notice is appended to `agent:<id>:tasks` with the simulated
+    update timestamp, new deadline, and remaining minutes at that update.
 - **Test 3.4 (Task Transition)**:
   - Replace a task with `start_task`; assert the new lease replaces the old one
     atomically and one transition notice is logged to `agent:<id>:tasks`.
@@ -209,38 +220,35 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 4: Dynamic Scheduler, Interrupt Engine & Zero-LLM Encounter Gate (`plugins/kazusa/src/interrupts`)
+## Phase 4: Perception and Attention Admission (Design Only)
 
 ### Deliverables
 
-- Autonomous Pacing: Taskman maps task/transit lease durations directly to
-  autonomous wake timers.
-- Auto-Arrival on Transit Completion: When clock reaches
-  `transit_state.arrival_iso`, automatically flips `location`, clears transit,
-  and runs Encounter Gate at new location.
-- `encounter-gate.ts`: Zero-LLM encounter probability roll:
-  $$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\big) \times M_{\text{loc}} \times (1 - \text{shield}_A)(1 - \text{shield}_B),\; 0.0,\; 0.95\Big)$$
-- Interrupt Handler: On encounter or incoming message:
-  - Supplies active task context (elapsed time, scheduled completion,
-    description).
-  - Triggers immediate session wake event via
-    `openclaw system event --mode now`.
-  - Agent autonomously decides whether to delay, conclude, or maintain the task.
+- `plugins/kazusa/src/perception/`: separate responsibility inside the unified
+  plugin. Classify chat, physical encounter, world-event, and task-due stimuli;
+  route records to their appropriate ledgers and admitted input to `:brain`.
+- Secondary pending-stimulus queue: inspect brain busy/idle state, then decide
+  wake, steer/distraction, or defer. Drain eligible pending input at appropriate
+  lifecycle boundaries. Preserve original simulation occurrence timestamps.
+- Taskman submits task-due stimuli rather than owning brain routing, while
+  retaining native cron scheduling. Revalidate deferred deadlines before
+  delivery. No Perception code exists yet.
+- Keep spatial encounter generation/navigation outside Taskman. Perception
+  receives such stimuli; it does not auto-pause tasks or manufacture outcomes.
+- See [Perception design](perception.md) for native integration constraints and
+  open admission/fairness decisions.
 
-### Test Specifications (`plugins/kazusa/src/interrupts/interrupts.test.ts`)
+### Future Test Specifications
 
-- **Test 4.1 (Stranger 1% vs. Friend 75% Gate)**:
-  - 1,000 rolls with $F=0$: assert $\approx 1\%$ encounters.
-  - 1,000 rolls with $F=80$: assert $>70\%$ encounters.
-- **Test 4.2 (Shopping Interrupt & Heartbeat Rescheduling)**:
-  - Alice starts 25-min shopping at 14:00. Bob arrives at 14:10, triggering
-    encounter.
-  - Assert Alice's task is `PAUSED` with `remaining_min: 15`. Chat wraps at
-    14:16; Alice resumes shopping; next heartbeat rescheduled to 14:31.
-- **Test 4.3 (Commuting Together Without Pausing Arrival)**:
-  - Alice and Bob start 15-min walk at 08:40. Encounter triggered at 08:42; 3
-    chat turns exchanged.
-  - At 08:55, assert both agents automatically arrive at `school` on time.
+- Busy vs. idle admission; meaningful distraction vs. deferred attention;
+  completion/error recovery; single brain ordering across different chats.
+- No duplicate admission on retries, no stale task-due stimulus after a
+  transition/delay, and bounded progress during stimulus bursts.
+- Shopping interruption: elapsed/remaining time is inferable from timestamped
+  ledger entries. The lease stays unchanged unless the character calls
+  `delay_task` or `start_task`; no automatic `PAUSED` state.
+- Physical encounters differ from chat messages and respect perceptibility.
+  Spatial arrival updates remain the navigation subsystem's responsibility.
 
 ---
 

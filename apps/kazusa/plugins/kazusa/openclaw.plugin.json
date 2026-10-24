@@ -1,11 +1,28 @@
 {
   "id": "kazusa",
+  "kind": "context-engine",
   "name": "Kazusa",
   "description": "Multi-agent world simulation for roleplay.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "contextEngine": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "brainMaxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Prior brain-turn continuity budget; keeps whole turns (default: 2000)."
+          },
+          "shortTermHours": {
+            "type": "number",
+            "minimum": 24,
+            "description": "Strict simulated-time lookback for task and chat records, in hours (default and minimum: 24). Whole messages share all remaining context space."
+          }
+        }
+      },
       "taskman": {
         "type": "object",
         "additionalProperties": false,

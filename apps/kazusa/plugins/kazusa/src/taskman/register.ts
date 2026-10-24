@@ -23,7 +23,7 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
 });
 
 /** Tells the context engine which shared skill belongs to a task wake. */
-const TASK_WAKE_MARKER = "[kazusa:skill=task_lifecycle]";
+const TASK_WAKE_MARKER = "[kazusa:skill=task-lifecycle]";
 
 /** Registers task leases, their visible cron projection, and ledger. */
 export function registerTaskman(
@@ -120,7 +120,7 @@ export function registerTaskman(
         wakeMode: "now" as const,
         payload: {
           kind: "agentTurn" as const,
-          message: `Task wake. ${TASK_WAKE_MARKER}`,
+          message: `${TASK_WAKE_MARKER}\nScheduled ${task.type} task deadline reached at ${task.endAt}.`,
         },
         // The task session is a ledger. A wake is not a chat reply.
         delivery: { mode: "none" as const },
@@ -186,6 +186,7 @@ export function registerTaskman(
   const appendTaskLedgerEntry = async (
     agentId: string,
     message: string,
+    timestamp: number,
   ): Promise<void> => {
     const sessionKey = `agent:${agentId}:tasks`;
     const now = Date.now();
@@ -212,6 +213,9 @@ export function registerTaskman(
       message: {
         role: "assistant",
         content: [{ type: "text", text: message }],
+        // Character experience uses simulation time. Native entry/envelope
+        // bookkeeping remains wall-clock for OpenClaw's lifecycle machinery.
+        timestamp,
       },
     });
     if (!appended) {
@@ -232,8 +236,8 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
-      appendTaskLedgerEntry: (message: string): Promise<void> =>
-        appendTaskLedgerEntry(agentId, message),
+      appendTaskLedgerEntry: (message, timestamp): Promise<void> =>
+        appendTaskLedgerEntry(agentId, message, timestamp),
     };
   };
 

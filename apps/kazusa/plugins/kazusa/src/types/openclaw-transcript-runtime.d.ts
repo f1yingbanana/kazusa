@@ -15,6 +15,7 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
       message: {
         role: "assistant";
         content: ReadonlyArray<{ type: "text"; text: string }>;
+        timestamp: number;
       };
     },
   ): Promise<{ messageId: string } | undefined>;

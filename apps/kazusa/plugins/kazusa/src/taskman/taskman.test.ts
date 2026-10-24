@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  executeDelayTask,
-  executeStartTask,
-  formatTaskLedgerEntry,
-} from "./taskman.ts";
+import { executeDelayTask, executeStartTask } from "./taskman.ts";
 import type { ActiveTask, TaskStore, ToolExecutionContext } from "./types.ts";
 
 function createInMemoryTaskStore(): TaskStore {
@@ -26,10 +22,13 @@ function createInMemoryTaskStore(): TaskStore {
 function makeContext(): {
   readonly context: ToolExecutionContext;
   readonly messages: string[];
+  readonly timestamps: number[];
 } {
   const messages: string[] = [];
+  const timestamps: number[] = [];
   return {
     messages,
+    timestamps,
     context: {
       agentId: "alice",
       store: createInMemoryTaskStore(),
@@ -37,8 +36,12 @@ function makeContext(): {
         time: (): number => new Date("2026-10-21T08:00:00.000Z").getTime(),
       },
       minDuration: 15,
-      async appendTaskLedgerEntry(message: string): Promise<void> {
+      async appendTaskLedgerEntry(
+        message: string,
+        timestamp: number,
+      ): Promise<void> {
         messages.push(message);
+        timestamps.push(timestamp);
       },
     },
   };
@@ -46,7 +49,7 @@ function makeContext(): {
 
 describe("Taskman", () => {
   it("creates one durable task lease", async () => {
-    const { context, messages } = makeContext();
+    const { context, messages, timestamps } = makeContext();
     const result = await executeStartTask(
       {
         type: "eat_breakfast",
@@ -64,6 +67,7 @@ describe("Taskman", () => {
       endAt: "2026-10-21T08:15:00.000Z",
     });
     expect(messages).toEqual([result.message]);
+    expect(timestamps).toEqual([Date.parse(result.task.startedAt)]);
   });
 
   it("replaces the active task and appends a monologue below its summary", async () => {
@@ -143,34 +147,48 @@ describe("Taskman", () => {
 });
 
 describe("Task ledger formatting", () => {
-  it("renders a monologue in its own italicized blockquote", () => {
-    expect(
-      formatTaskLedgerEntry(
-        "Finished reading.",
-        "What an ending. I need to tell Mira about it.",
-      ),
-    ).toBe(
-      "Finished reading.\n\n> *What an ending. I need to tell Mira about it.*",
+  it("renders a monologue in its own italicized blockquote", async () => {
+    const { context, messages } = makeContext();
+    const result = await executeStartTask(
+      {
+        type: "reading",
+        description: "Reading",
+        duration: 30,
+        monologue: "What an ending. I need to tell Mira about it.",
+      },
+      context,
+    );
+    expect(messages[0]).toBe(
+      `${result.message}\n\n> *What an ending. I need to tell Mira about it.*`,
     );
   });
 
   it.each([undefined, "", " \n "])(
     "omits an empty monologue (%j)",
-    (monologue) => {
-      expect(formatTaskLedgerEntry("Still reading.", monologue)).toBe(
-        "Still reading.",
+    async (monologue) => {
+      const { context, messages } = makeContext();
+      const result = await executeStartTask(
+        { type: "reading", description: "Reading", duration: 30, monologue },
+        context,
       );
+      expect(messages).toEqual([result.message]);
     },
   );
 
-  it("keeps multiline text and Markdown punctuation inside the italic quote", () => {
-    expect(
-      formatTaskLedgerEntry(
-        "Kept reading.",
-        "I *must* finish.\n\n> The note says [wait](later) and <stop>.",
-      ),
-    ).toBe(
-      "Kept reading.\n\n> *I \\*must\\* finish. \\> The note says \\[wait\\](later) and \\<stop\\>.*",
+  it("keeps multiline text and Markdown punctuation inside the italic quote", async () => {
+    const { context, messages } = makeContext();
+    const result = await executeStartTask(
+      {
+        type: "reading",
+        description: "Reading",
+        duration: 30,
+        monologue:
+          "I *must* finish.\n\n> The note says [wait](later) and <stop>.",
+      },
+      context,
+    );
+    expect(messages[0]).toBe(
+      `${result.message}\n\n> *I \\*must\\* finish. \\> The note says \\[wait\\](later) and \\<stop\\>.*`,
     );
   });
 });

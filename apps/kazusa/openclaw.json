@@ -6,6 +6,9 @@
     },
     "defaults": {
       "workspace": "./workspaces",
+      "compaction": {
+        "enabled": false
+      },
       "models": {
         "zai/glm-5.2": {
           "alias": "GLM"
@@ -17,6 +20,9 @@
     }
   },
   "plugins": {
+    "slots": {
+      "contextEngine": "kazusa"
+    },
     "load": {
       "paths": ["./plugins/kazusa"]
     },
@@ -66,11 +72,23 @@
     }
   },
   "tools": {
-    "profile": "full"
+    "profile": "full",
+    "sessions": {
+      "visibility": "agent"
+    }
   },
   "messages": {
     "queue": {
       "mode": "steer"
+    }
+  },
+  "memory": {
+    "search": {
+      "provider": "openai",
+      "experimental": {
+        "sessionMemory": true
+      },
+      "sources": ["memory", "sessions"]
     }
   },
   "skills": {

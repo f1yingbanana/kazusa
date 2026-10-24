@@ -1,0 +1,308 @@
+# Character Context Engine
+
+Implemented in `plugins/kazusa/src/context-engine/`, registered through native
+`api.registerContextEngine("kazusa", ...)`, selected by
+`plugins.slots.contextEngine: "kazusa"`. It assembles context; it does not route
+stimuli or own brain admission. See [planned Perception](perception.md).
+
+## Memory layers and session convention
+
+| Purpose                                      | Session key                           |
+| -------------------------------------------- | ------------------------------------- |
+| Single execution lane                        | `agent:<owner>:brain`                 |
+| Task experiences and in-character monologues | `agent:<owner>:tasks`                 |
+| Direct conversation                          | `agent:<owner>:chat:direct:<peer-id>` |
+| Group conversation                           | `agent:<owner>:chat:group:<group-id>` |
+
+IDs are stable lowercase `[a-z0-9][a-z0-9_-]*`, not display names. Use
+`chatSessionKey`; do not guess ambiguous legacy `:chat:<id>` keys. Alice and Bob
+own separate views of their dialogue; a group's stable ID is shared across its
+members' private views. Only record events a character could perceive.
+
+Outgoing chat records use `assistant`, incoming records `user`. Both direct and
+group text must begin with `[speaker:<sender-id>]`, for incoming and outgoing
+messages alike. Writers stamp the authenticated sender, not an LLM-supplied
+identity. These writers are not implemented yet; tags currently exist in tests
+and this contract, not a channel configuration switch. Do not add fields just
+for authorship. Task monologues already represent thoughts; no `:thoughts`
+stream. Every ledger message must contain exactly one text block containing all
+readable content, sender attribution, and media summaries. The native
+recent-text reader does not expose structured sender fields and reads only the
+first user block. The renderer preserves this prefix unchanged, using self/other
+only for role. It does not reconstruct authorship from a direct-chat peer or
+group ID. Chat/task ledgers are not execution sessions. `sessions_send` to a
+ledger would start an unwanted run. Current Taskman cron explicitly targets
+`:brain`; future chat delivery and Perception are not implemented. OpenClaw
+2026.10.5 ignores `session.mainKey`, so it cannot rename the default `main`
+session into `brain`.
+
+- `SOUL.md`, `IDENTITY.md`, `MEMORY.md`: native workspace bootstrap. Do not
+  inject them twice. `MEMORY.md` is curated long-term memory.
+- `memory/`: tool-recalled archive, not another eagerly loaded context stream.
+  Native `/new` and `/reset` may load daily notes; we do not override that.
+  Shared recall configuration lives under `memory.search`.
+- Taskman's `tasks` keyed store: scheduling truth, not a context-engine source.
+  No active-task snapshot or metadata injection. Task starts, due times, delay
+  updates, outcomes, and monologues come from the task ledger.
+- Prior complete brain turns (`recentBrainHistory`): A bounded continuity
+  allowance (`brainMaxTokens`, default 2000; can be set to `0` for pure
+  stateless ledger-driven runs). Retaining prior turns serves three functions:
+  1. **Tool-Loop Atomicity & Error Recovery**: When a tool call errors or fails
+     validation, the error is recorded only in `:brain`; ledgers record only
+     settled successes. Without brain history, the agent would suffer amnesia
+     regarding failed attempts.
+  2. **In-Flight Steering Boundaries**: When an urgent stimulus interrupts an
+     ongoing turn (`queue.mode = "steer"`), prior brain messages preserve
+     in-flight cognitive intent across the steering boundary.
+  3. **Reasoning Continuity**: Retains provider-level thinking/CoT blocks for
+     models supporting extended reasoning. Settled actions and monologues are
+     already recorded in `:tasks` and `:chat:*`; setting `brainMaxTokens: 0`
+     eliminates duplicate tool-call text when pure ledger-driven operation is
+     preferred.
+
+## Time convention
+
+All Kazusa experience/chat **message timestamps are simulation milliseconds**.
+Capture `clock.time()` when the event occurs and pass it as the native
+`message.timestamp`. Task transitions/delays implement this now; future chat
+writers must follow the same contract. Deferring admission must not change an
+event's occurrence time.
+
+OpenClaw session `updatedAt`, transcript envelope creation time, and cron `at`
+schedules remain wall-clock. Do not replace `Date.now()` globally or alter host
+bookkeeping. Read the inner message timestamp, not the envelope timestamp. There
+is no reliable conversion of old wall-clock messages using today's clock speed:
+pauses, speed changes, and advances destroy that assumption. Existing
+untimestamped records are omitted; old wall-clock records are not migrated or
+silently retimed. A real migration requires historical clock mapping.
+
+Native brain-run transcript timestamps remain operational host data; the
+simulation timestamp contract applies to the character's experience/chat
+ledgers, not a global rewrite of every OpenClaw-generated message.
+
+At assembly, capture one simulation instant. Include only records with
+`now - shortTermHours * 3_600_000 <= timestamp <= now`. Default/minimum is 24
+simulated hours; configure more if desired. Pausing the world freezes this
+window; an explicit clock advance moves it. Gateway downtime does not advance
+the saved simulation clock.
+
+Each selected record displays its compact simulation timestamp in UTC format
+`ddd YYYY-MM-DD HH:mm` (e.g. `Fri 2026-10-23 08:00`). Dropping ISO seconds, `T`,
+and `Z` saves token budget across dozens of historical records. A start entry's
+timestamp supplies the start time; its text supplies duration and deadline.
+Delay text supplies the new deadline and remaining simulated minutes **at that
+update**. Subtract elapsed simulation time to infer what remains now. A delay
+extends the prior deadline; it is not a duration starting from the update.
+
+A task can outlive the window, or its start can lose the token-budget selection.
+Then that start is absent from context; absence is not proof of no task. Do not
+quietly restore an active-task pull to conceal this tradeoff. No metadata
+reconstruction or special pinned task section is implemented.
+
+## Selection and token budgets
+
+Settings under `plugins.entries.kazusa.config.contextEngine`:
+
+| Setting          | Default | Meaning                                                           |
+| ---------------- | ------- | ----------------------------------------------------------------- |
+| `brainMaxTokens` | 2000    | Maximum recent complete brain turns; unused space goes to ledgers |
+| `shortTermHours` | 24      | Strict simulated-time window; may be increased                    |
+
+1. Require `runtimeContext.sessionTarget.agentId`; throw if absent rather than
+   guessing ownership. Check ownership against the key and classify the Kazusa
+   `:brain` suffix; other sessions receive no private ledger injection.
+2. Discover only that owner's task/direct/group ledgers. Use native
+   `readRecentUserAssistantTextForSession`, which reads backward in 250-message
+   pages and filters inner message timestamps. It does not stop at the cutoff;
+   scanning old history is an accepted tradeoff to avoid custom pagination. Pass
+   `limit: Number.MAX_SAFE_INTEGER` because omission defaults to ten and the SDK
+   has no unbounded flag. Retain the native result shape plus session identity
+   as the dictionary key, preserving native result arrays unchanged.
+   `sourceChannel` is provenance, not a session key. Skip undated entries; never
+   substitute the current time. The reader extracts only the first user content
+   block, so future chat writers must normalize ledger text into one block or
+   revisit this reader.
+3. Filter the simulated-time window. Keep visible text, including authored
+   monologues; exclude tool internals, hidden reasoning, and `NO_REPLY`.
+4. Budget foundational conventions (`context-conventions` loaded unconditionally
+   at the top of `systemPromptAddition`), current simulation time, and
+   dynamically resolved skills (from `[kazusa:skill=...]` tags in the incoming
+   stimulus), followed by memory guidance and recent whole brain turns. Preserve
+   tool-call/result pairs across steering boundaries and native recovery
+   summaries. Fail clearly if the budget cannot fit system prompt additions;
+   never silently cut instructions halfway through.
+5. Pool task and chat messages, newest-first. Include a whole record if it fits
+   the remaining shared budget; otherwise skip it and try older records. Count
+   session labels and timestamp/role wrappers too. No quotas, message clipping,
+   extra short-term cap, or busy-chat sampling.
+6. Regroup selected records by session ID; display each group chronologically.
+   This is recency-first packing, not a smallest-message-first knapsack that
+   maximizes count at the expense of recent experience.
+
+The engine calls OpenClaw's public `agent-core.estimateTokens` directly. It is a
+character-weighted heuristic (including non-Latin text), not a downloaded
+model-specific tokenizer. The installed 2026.10.5 runtime omits declarations for
+this public export and the transcript runtime; narrowly scoped `.d.ts` shims
+describe only the used surfaces and should go when upstream fixes them. Do not
+import hashed internal bundles or copy their estimation algorithm.
+
+The host's `tokenBudget` supplies the authoritative assembly budget and performs
+final request admission, factoring in model context windows, completion
+reserves, prompt overhead, and provider usage. Keep native
+`agents.defaults.contextTokens`, `bootstrapMaxChars`, and
+`bootstrapTotalMaxChars` for their respective limits. Kazusa does not impose an
+artificial token ceiling; it partitions the host-provided `tokenBudget` across
+mandatory system additions, recent brain continuity (`brainMaxTokens`), and
+multi-session experience ledgers. New tool results can grow the active turn
+after initial assembly; this is not a hard per-request token guarantee.
+
+## Dynamic skill resolution (SkillLoader)
+
+When an incoming stimulus contains `[kazusa:skill=<name>]` tags (e.g. emitted by
+Taskman on task deadlines or Perception on interrupts), the Context Engine
+dynamically resolves and loads the corresponding `SKILL.md` documents on-demand.
+
+- **Tag Matching**: Scans `run.prompt` for
+  `/\[kazusa:skill=([a-zA-Z0-9_-]+)\]/g`. Multiple tags in the same prompt are
+  deduplicated.
+- **Zero Hardcoding**: If no `[kazusa:skill=...]` tag is present in the prompt,
+  no skills are loaded into `systemPromptAddition`. There is no forced or
+  default fallback (e.g. `task-interrupt` is loaded only when explicitly
+  tagged).
+- **Frontmatter Parsing & Stripping**: Skills use standard YAML frontmatter
+  delimited by `--- ... ---`. The loader parses frontmatter using the `yaml`
+  library and strips it from the injected body so that the LLM receives only
+  clean Markdown instructions.
+- **Name Normalization**: Hyphens and underscores are treated interchangeably
+  (`task-lifecycle` matches folder `task_lifecycle` or frontmatter
+  `name: task_lifecycle`).
+- **OpenClaw 1:1 Precedence Hierarchy**: Skills are loaded exactly like OpenClaw
+  does.
+- **Grouped Layout Discovery**: Discovers skills up to 6 levels deep
+  (`MAX_GROUPED_SKILL_SCAN_DEPTH = 6`). When a directory contains `SKILL.md`,
+  traversal stops below that directory per OpenClaw specification. Resolves
+  based on `frontmatter.name` with fallback to directory basename.
+- **Resolution Caching**: Resolves and caches skill paths and parsed Markdown
+  bodies in memory; `clearCache()` invalidates for tests.
+
+## Transcript envelope & speaker attribution
+
+The Context Engine packages selected experience records into a single synthetic
+user message containing the stream groups directly (e.g. `### tasks`,
+`### chat:direct:bob`). Because `context-conventions` already defines the
+temporal and operational rules in `systemPromptAddition`, the engine avoids
+hardcoding prose or warning banners in TypeScript.
+
+Stream keys are formatted via `formatSessionHeader(sessionKey)` by stripping
+`agent:<id>:` (e.g. `agent:alice:tasks` becomes `tasks`,
+`agent:alice:chat:direct:bob` becomes `chat:direct:bob`).
+
+Each record inside a session group is formatted by `formatEnvelopeRecord` using
+the following precedence:
+
+1. **Tasks Stream**: Output is `\n\n[<time>] <text>` (pure factual record, no
+   speaker prefix).
+2. **Assistant (Self) Role**: Output is `\n\n[(self) <time>] <text>`.
+3. **Explicit Speaker Tag**: If the message text starts with
+   `^[speaker:<id>]\s*(.*)$`, extracts `<id>` and outputs
+   `\n\n[<id> <time>] <text>`.
+4. **Direct Chat Stream**: If session is `chat:direct:<peer>`, extracts any
+   leading `<peer>:\s*(.*)` prefix or outputs `\n\n[<peer> <time>] <text>`.
+5. **Generic Colon Prefix**: If text starts with `^([a-zA-Z0-9_-]+):\s*(.*)$`,
+   outputs `\n\n[<name> <time>] <text>`.
+6. **Fallback**: Output is `\n\n[other <time>] <text>`.
+
+Records within each group are rendered in strict chronological order, even
+though they were greedily selected in recency-first order to maximize the
+preservation of newest experiences.
+
+## Tier 3 memory guidance (`buildMemorySystemPromptAddition`)
+
+`buildMemorySystemPromptAddition` from `openclaw/plugin-sdk/core` is included in
+`systemPromptAddition`. It does **not** inject raw memory entries. Instead, it
+injects procedural tool-use instructions for OpenClaw's native Tier 3 archival
+retrieval tools (`memory_search`, `memory_get`). If these tools are not present
+in `run.availableTools`, the helper evaluates to `undefined` and costs 0 tokens.
+
+## Multi-media and visual perception architecture
+
+OpenClaw supports native multi-media understanding (`tools.media`) and image
+inspection (`view_image`). In Kazusa's multi-agent simulation, multi-media
+operates under a **grounded semantic preflight + on-demand inspection** model:
+
+1. **Context-Engine Informed Preflight**:
+   - When an incoming chat or environmental stimulus contains multi-media (e.g.
+     an image attachment `[attachment: id=<uuid> type=image/jpeg]`), the media
+     understanding processor must receive the full context assembled by the
+     Context Engine (current simulation time, participant identities, spatial
+     location, and recent conversation thread).
+   - Grounding the vision prompt in the agent's situation ensures semantic
+     descriptions capture narrative-relevant details (e.g. "A map of Kivotos
+     District 7 with a red marker on Abydos High" rather than generic OCR "A map
+     with text").
+2. **Text-Only Ledger Representation**:
+   - The resulting semantic summary is stored directly in the recipient's
+     `:chat:*` ledger as an inline block: `[Image: <description>]` along with
+     the attachment identifier/file path, preserving any accompanying user text.
+   - Raw image bytes/vision tokens are **never** injected into the character's
+     `:brain` context during normal turn assembly. This saves ~1,600–2,000
+     tokens per image and keeps context assembly within token budgets.
+3. **On-Demand Re-Examination via `view_image`**:
+   - If an agent or interlocutor later refers back to the image (e.g. "Wait,
+     zoom in on that marker" or "Look at the image again!"), the agent's system
+     prompt and available tools provide OpenClaw's canonical
+     `view_image(path, prompt)` tool.
+   - The agent invokes `view_image` with the cached image path and a specific
+     query prompt to inspect the high-resolution image on demand, paying vision
+     tokens only during active examination turns.
+
+This is not yet implemented and is planned for future work.
+
+## Compaction and lifecycle
+
+Windowing selects context without modifying stored history. It does not need an
+LLM summary pass. World config sets `agents.defaults.compaction.enabled: false`
+to disable proactive threshold compaction and optional maintenance. Native
+manual `/compact` and overflow recovery remain available via
+`ownsCompaction: false` and `delegateCompactionToRuntime`.
+
+Short cognitive turns should normally fit. A huge tool result, long active turn,
+or oversized prompt can still need recovery; disabling all recovery would turn
+these into context-overflow failures. Brain compaction does not compact the
+separate task/chat ledgers, and disabling it does not stop raw transcripts
+growing on disk. Memory consolidation into `MEMORY.md` is a separate future
+workflow, not a compaction side effect we rely on.
+
+OpenClaw persists canonical transcripts; Kazusa creates no secondary context
+database or mirror. `ingest`/`commitTurn` have no side effects. Declare the
+native current-turn fence and idempotent advancement contract; the host appends
+the pending turn after assembled history. Never persist synthetic memory views
+back into the source ledgers.
+
+## Skill expansion and future scope
+
+Load only the packaged `task_lifecycle` skill for its known wake marker in the
+current prompt, otherwise `task_interrupt` for brain stimuli. Never expand paths
+or markers from historical conversation text. Native tool schemas remain tools,
+not `kazusa:tool` prose substitutions.
+
+Behavioral prose lives in the skills rather than TypeScript prompt constants.
+The packaged file reader is transitional and bypasses native skill precedence.
+The desired resolver uses the current run's eligible catalog and native resource
+reader by exact skill name. The installed context-engine SDK does not expose
+that capability; `skills_read({ name })` is available to the agent, not directly
+to `assemble()`. Do not import hashed internals or rebuild skill hierarchy here.
+
+No incognito feature or external chat adapters. Location, desires, sensory and
+social context, read-receipt sampling, and perception admission are later work.
+Keep routing and stimulus production outside context assembly.
+
+## SDK references
+
+- [Context-engine contract](https://docs.openclaw.ai/concepts/context-engine)
+- [Compaction configuration and recovery](https://docs.openclaw.ai/concepts/compaction)
+- [Native memory layers](https://docs.openclaw.ai/concepts/memory)
+- [Session runtime](https://docs.openclaw.ai/plugins/sdk-runtime/agent)
+- [Media overview](https://docs.openclaw.ai/tools/media-overview)
+- [Media understanding](https://docs.openclaw.ai/nodes/media-understanding)
+- [Chat History RPC](https://docs.openclaw.ai/gateway/protocol/rpc-session-control)

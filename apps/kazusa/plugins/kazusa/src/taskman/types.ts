@@ -25,7 +25,10 @@ export interface ToolExecutionContext {
   readonly store: TaskStore;
   readonly clock: Pick<Clock, "time">;
   readonly minDuration: number;
-  readonly appendTaskLedgerEntry: (message: string) => Promise<void>;
+  readonly appendTaskLedgerEntry: (
+    message: string,
+    timestamp: number,
+  ) => Promise<void>;
 }
 
 export interface StartTaskParams {

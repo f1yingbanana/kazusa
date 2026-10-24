@@ -3,6 +3,7 @@ import {
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
 import { registerClock } from "./clock/register.ts";
+import { registerContextEngine } from "./context-engine/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 
 export default definePluginEntry({
@@ -12,5 +13,6 @@ export default definePluginEntry({
   register(api: OpenClawPluginApi): void {
     const clock = registerClock(api);
     registerTaskman(api, { clock });
+    registerContextEngine(api, { clock });
   },
 });
