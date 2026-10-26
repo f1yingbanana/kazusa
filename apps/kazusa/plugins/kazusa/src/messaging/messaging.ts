@@ -3,7 +3,6 @@ import type { Clock } from "../clock/clock.ts";
 import type { StateStore } from "../state.ts";
 import type { Stimulus } from "../stimulus.ts";
 import {
-  AGENT_ID,
   DELIVERY_REQUEST,
   LIST_CHATS,
   MANAGE_CHAT,
@@ -301,9 +300,9 @@ export class Messaging {
   }
 
   /**
-   * Return subjective, cursor-paginated chat history for a participant.
-   * Only messages accepted while the participant was in the frozen audience
-   * are returned, strictly respecting join and leave timeline boundaries.
+   * Return subjective, cursor-paginated chat history for a participant. Only
+   * messages accepted while the participant was in the frozen audience are
+   * returned, strictly respecting join and leave timeline boundaries.
    */
   async getChatHistory(
     input: GetChatHistoryInput,

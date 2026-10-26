@@ -779,8 +779,9 @@ describe("conversation routing and management", () => {
       members: ["bob"],
       text: "Secret message 1 before Sensei joined",
     });
-    const chatId = h.chats.get(grp.sessionKey)?.id ?? grp.sessionKey.replace(/^agent:[^:]+:chat:/, "").replace(/^direct:/, "direct:").replace(/^group:/, "group:");
-    const actualChatId = [...h.chats.values()].find((c) => c.title === "Secret Strategy")!.id;
+    const actualChatId = [...h.chats.values()].find(
+      (c) => c.title === "Secret Strategy",
+    )!.id;
 
     await h.send({
       requestId: "msg-2",
@@ -810,28 +811,30 @@ describe("conversation routing and management", () => {
     });
 
     // 4. Sensei sends message 4
-    const senseiSend = await h.messaging.send(
-      "user:sensei",
-      "Sensei",
-      {
-        sessionKey: `chat:group:${actualChatId.replace("group:", "")}`,
-        text: "Thanks Alice! Glad to be here.",
-        requestId: "sensei-msg-4",
-      },
-    );
+    const senseiSend = await h.messaging.send("user:sensei", "Sensei", {
+      sessionKey: `chat:group:${actualChatId.replace("group:", "")}`,
+      text: "Thanks Alice! Glad to be here.",
+      requestId: "sensei-msg-4",
+    });
     expect(senseiSend.status).toBe("delivered");
     expect(senseiSend.recipients).toEqual(["alice", "bob"]);
 
     // Both Alice and Bob receive native copies and Perception stimuli from Sensei's message
     await vi.waitFor(() => {
-      expect(h.receive).toHaveBeenCalledWith("alice", expect.objectContaining({
-        sender: "user:sensei",
-        text: "Thanks Alice! Glad to be here.",
-      }));
-      expect(h.receive).toHaveBeenCalledWith("bob", expect.objectContaining({
-        sender: "user:sensei",
-        text: "Thanks Alice! Glad to be here.",
-      }));
+      expect(h.receive).toHaveBeenCalledWith(
+        "alice",
+        expect.objectContaining({
+          sender: "user:sensei",
+          text: "Thanks Alice! Glad to be here.",
+        }),
+      );
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({
+          sender: "user:sensei",
+          text: "Thanks Alice! Glad to be here.",
+        }),
+      );
     });
 
     // 5. Query Sensei's history: Sensei sees ONLY messages 3 and 4, NOT 1 or 2!
@@ -840,8 +843,12 @@ describe("conversation routing and management", () => {
       userId: "user:sensei",
     });
     expect(senseiHistory.messages).toHaveLength(2);
-    expect(senseiHistory.messages[0].text).toBe("Hello Sensei! Welcome to the group.");
-    expect(senseiHistory.messages[1].text).toBe("Thanks Alice! Glad to be here.");
+    expect(senseiHistory.messages[0].text).toBe(
+      "Hello Sensei! Welcome to the group.",
+    );
+    expect(senseiHistory.messages[1].text).toBe(
+      "Thanks Alice! Glad to be here.",
+    );
 
     // Alice sees all 4 messages
     const aliceHistory = await h.messaging.getChatHistory({
@@ -874,7 +881,8 @@ describe("conversation routing and management", () => {
     const senseiChats = await h.messaging.listChats("user:sensei");
     expect(senseiChats).toHaveLength(1);
     expect(senseiChats[0].title).toBe("Secret Strategy");
-    expect(senseiChats[0].sessionKey).toBe(`chat:group:${actualChatId.replace("group:", "")}`);
+    expect(senseiChats[0].sessionKey).toBe(
+      `chat:group:${actualChatId.replace("group:", "")}`,
+    );
   });
 });
-
