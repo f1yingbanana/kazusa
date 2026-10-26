@@ -24,7 +24,7 @@ separate views of their dialogue; a group's stable ID is shared across its
 members' private views. Only record events a character could perceive.
 
 Outgoing chat records use `assistant`, incoming records `user`, including
-messages sent by another LLM character. Planned `send_message` owns these writes
+messages sent by another LLM character. `send_message` owns these writes
 and native `__openclaw` sender attribution, derived from the tool caller. See
 [the messaging contract](messaging.md) for the exact metadata shape. Perception
 and its claiming hook never write chat transcripts.
@@ -70,7 +70,7 @@ rename the default `main` session into `brain`.
 
 All Kazusa experience/chat **message timestamps are simulation milliseconds**.
 Capture `clock.time()` when the event occurs and pass it as the native
-`message.timestamp`. Task transitions/delays and planned `send_message` follow
+`message.timestamp`. Task transitions/delays and `send_message` follow
 this contract. Deferring admission must not
 change an event's occurrence time.
 
@@ -260,6 +260,46 @@ operates under a **grounded semantic preflight + on-demand inspection** model:
      tokens only during active examination turns.
 
 This is not yet implemented and is planned for future work.
+
+## Tier 2 Social Salience and Eager Contact Roster
+
+In addition to Tier 3 session stream tails (`:tasks`, `:chat:direct:*`, `:chat:group:*`),
+the target context engine design incorporates Tier 2 social salience:
+
+1. **Eager Compact Contact Roster (Working Social Cache)**:
+   - **Discovery**: Automatically identifies the most recent $K$ unique individuals
+     (configurable via `contextEngine.contactRosterLimit`, default `20`) with whom
+     the character has sent or received messages across their private direct and
+     group ledgers, or had recorded encounters.
+   - **Personal Wiki Resolution**: For each identified peer, looks up the subjective
+     card at `workspaces/<agentId>/wiki/entities/characters/<peerId>.md`.
+   - **Extraction**: Reads YAML frontmatter `name`, `peer_id`, `relation_type`, and
+     the concise 1-line `summary` (e.g., `"Music student at Oak Hill Dorm and fellow composer."`).
+   - **Context Section**: Injects a compact, high-density roster into the prompt:
+     ```markdown
+     ### Known Contacts (Recent)
+     - Bob Moreno (@bob, close_friend): Music student at Oak Hill Dorm. [chat:direct:bob]
+     - Hifumi Ajitani (@hifumi, acquaintance): Trinity library committee member. [chat:direct:hifumi]
+     - Sensei (@user:sensei, mentor): SCHALE Advisor who guides students across Kivotos. [chat:direct:user:sensei]
+     ```
+   - Supports both agent peers and human players (`user:` prefix).
+   - **Economics & Performance**: A 20-contact list costs only ~150 tokens. This
+     completely eliminates the double-turn latency penalty of an agent calling
+     `list_chats` or `wiki_search` before sending a message, avoids ID hallucinations,
+     and stimulates spontaneous in-character outreach.
+   - **Strict Epistemic Isolation**: Contacts are resolved exclusively from the
+     agent's **Personal Wiki**, never the omniscient World Wiki (`shared/wiki/`),
+     guaranteeing agents never leak awareness of strangers they have never met.
+
+2. **Active Peer Impressions**:
+   - For the active interlocutor in a 1-on-1 direct chat, the context engine eagerly
+     injects their full `## Quick Impression` block (emotional sentiment, open
+     conversational threads).
+   - In group chats or crowded rooms, the engine calculates salience
+     ($S = \text{affinity} + \text{familiarity} + \text{recency}$) and injects
+     `## Quick Impression` for only the Top-3 members.
+   - Full historical entries (`## Interaction Log`) remain lazy and are retrieved
+     only on demand via agent wiki tools.
 
 ## Compaction and lifecycle
 

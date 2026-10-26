@@ -129,6 +129,23 @@
             "description": "Minimum task duration in simulated minutes (default: 10)."
           }
         }
+      },
+      "user": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "default": "user:sensei",
+            "pattern": "^user:[a-z0-9][a-z0-9_-]*$",
+            "description": "Default human player identity for single-user MVP."
+          },
+          "name": {
+            "type": "string",
+            "default": "Sensei",
+            "description": "Display name of the human player."
+          }
+        }
       }
     }
   },
@@ -138,7 +155,10 @@
       "clock_set_speed",
       "clock_advance",
       "start_task",
-      "delay_task"
+      "delay_task",
+      "send_message",
+      "list_chats",
+      "manage_chat"
     ]
   }
 }

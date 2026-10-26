@@ -211,7 +211,7 @@ export function parsePerceptionSkill(
     typeof input === "string"
       ? parseSkillMarkdown(input).frontmatter
       : input.frontmatter;
-  const rawRubric = (frontmatter as Record<string, unknown> | null)?.rubric;
+  const rawRubric = frontmatter?.rubric;
   return PerceptionRubricSchema.parse(rawRubric);
 }
 
@@ -244,9 +244,8 @@ export function assembleDecisionBatch(
   const state = assembleDecisionContext(params);
   const rubric =
     typeof params.rubric === "object" && "instructions" in params.rubric
-      ? (params.rubric as PerceptionSkillRubric)
+      ? params.rubric
       : parsePerceptionSkill(params.rubric);
   const questions = buildDecisionQuestions(params.brainStatus, rubric);
   return { state, questions };
 }
-

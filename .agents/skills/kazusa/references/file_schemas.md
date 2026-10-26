@@ -189,6 +189,9 @@ roasted coffee drifts from the bakery aisle.
 - **Simulation Mapping**:
   - **Active Simulated Agents**: Have a workspace in `workspaces/<id>/` and an
     entry in `openclaw.json`.
+  - **Human Players (`user:`)**: Represented with `character_id: user:<id>` (e.g.
+    `user:sensei`) and `is_simulated_agent: false`. They participate directly in
+    in-world chats through client interfaces without consuming runner processes.
   - **Background NPCs**: Exist only as World Wiki entity cards. Active agents
     can search for them, talk about them, and reference their canonical bio
     without spawning runner processes.
@@ -197,23 +200,22 @@ roasted coffee drifts from the bakery aisle.
 ---
 pageType: entity
 entityType: person
-id: entity.character.hifumi
-character_id: hifumi
-name: Hifumi Ajitani
-canonicalId: trinity.hifumi
-aliases: [Faust, Leader]
-affiliation: Trinity General School
-role: Student / Library Committee
-personality_traits: [earnest, timid, resilient, peroro_enthusiast]
+id: entity.character.sensei
+character_id: user:sensei
+name: Sensei
+canonicalId: schale.sensei
+aliases: [Teacher, Advisor]
+affiliation: Federal Investigation Club SCHALE
+role: SCHALE Advisor / Teacher
+personality_traits: [patient, empathetic, observant, dedicated]
 status: ACTIVE_IN_WORLD
-is_simulated_agent: true # true if workspace exists in openclaw.json; false if background NPC
+is_simulated_agent: false # Human player
 ---
 
-# Character Bio
+# Sensei
 
-An ordinary student at Trinity who finds herself pulled into extraordinary
-incidents. Passionate about cute character merchandise, especially the Momo
-Friends franchise.
+The advisor appointed to lead the Federal Investigation Club SCHALE and mentor to
+students across Kivotos. Stationed at the SCHALE Central Office.
 ```
 
 ### 3.3 Canonical World Concepts & Lore (`shared/wiki/concepts/<topic_id>.md`)
@@ -270,6 +272,7 @@ id: entity.peer.bob
 peer_id: bob
 name: Bob Moreno
 relation_type: close_friend
+summary: "Music student at Oak Hill Dorm and fellow composer."
 familiarity: 75
 affinity: 62
 trust: 70
@@ -297,6 +300,39 @@ talkative, though he procrastinates on assignments.
 - **2026-10-17**: Collaborated on harmony exercises in the dorm lounge for two
   hours.
 ```
+
+### Field Specifications
+
+- `peer_id` (string, required): Canonical peer identifier matching an agent ID
+  (e.g. `bob`) or a human player identifier with the `user:` prefix (e.g. `user:sensei`).
+- `name` (string, required): Full display name (e.g. `Bob Moreno`).
+- `relation_type` (string, required): Qualitative relationship label
+  (`close_friend`, `friend`, `classmate`, `acquaintance`, `rival`, `mentor`,
+  `stranger`).
+- `summary` (string, required): A concise, 1-line description of who this peer is
+  to this character (under 120 characters). The Context Engine extracts this
+  directly to build the **Eager Compact Contact Roster** in the prompt:
+  `- <name> (@<peer_id>, <relation_type>): <summary> [chat:direct:<peer_id>]`.
+- `familiarity` (number 0..100): Quantitative depth of shared history.
+- `affinity` (number 0..100): Emotional warmth / liking.
+- `trust` (number 0..100): Perceived reliability and honesty.
+- `last_interaction_iso` (ISO 8601 string): Timestamp of latest interaction.
+
+### Agent Personal Wiki Maintenance Contract
+
+Characters own and update their own subjective Personal Wiki:
+1. **First Encounters**: When an agent meets an unfamiliar character or exchanges
+   contact info, they initialize a new card at
+   `workspaces/<id>/wiki/entities/characters/<peer_id>.md` with initial `summary`,
+   `relation_type: acquaintance`, and an initial `## Quick Impression`.
+2. **Social Evolution & Reflection**: During conversations or during nightly sleep
+   reflection, agents update the card:
+   - Adjust `summary` and `relation_type` as their dynamic evolves.
+   - Re-calibrate `affinity`, `trust`, and `familiarity`.
+   - Update `## Quick Impression` to reflect current sentiment and open conversational threads.
+   - Append date-stamped summaries to `## Interaction Log`.
+3. **Tool Grounding**: Agents perform these updates via deterministic wiki tools
+   (`wiki_update_entity` / `wiki_patch`), maintaining markdown integrity.
 
 ### 4.2 Subjective Beliefs & Concepts (`workspaces/<id>/wiki/concepts/<concept_id>.md`)
 

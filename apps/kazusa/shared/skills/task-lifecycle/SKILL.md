@@ -29,5 +29,8 @@ Alongside the factual summary or delay reason, you may include `monologue`: one
 or two plain-text sentences of inner speech in your character's voice.
 
 Keep one task active; sleeping, waiting, and daydreaming count. Send in-world
-messages through the messaging tool to an explicit recipient. Finish with
+messages through `send_message` using the chat's `sessionKey` and message
+`text`. Use `list_chats` if you need its address, or `members` and an optional
+`title` to start a chat with the first message. Follow the sending, group
+management, and retry rules in Context & Stream Conventions. Finish with
 `NO_REPLY`.

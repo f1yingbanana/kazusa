@@ -458,21 +458,23 @@ We explicitly choose to store separate subjective transcripts per character:
      manages session entries for chat ledgers.
 
 2. **`send_message` Tool (Egress & Mutual Ledger Writer)**:
-   - Planned tool; follow [the messaging contract](messaging.md), including
-     native `__openclaw` sender metadata, simulation timestamps, ordered writes,
-     and idempotency. Perception never supplies missing attribution by writing
-     to the transcript.
+   - Implemented in `src/messaging/`; follow
+     [the messaging contract](messaging.md), including native `__openclaw`
+     sender metadata, simulation timestamps, ordered writes, and idempotency.
+     Perception never supplies missing attribution by writing to the transcript.
    - When Agent Alice sends a message to Agent Bob via `send_message`:
      - Writes outbound record to Alice's ledger (`agent:alice:chat:direct:bob`,
        `role: "assistant"`).
      - Writes inbound record to Bob's ledger (`agent:bob:chat:direct:alice`,
        `role: "user"`).
-     - Dispatches the message via OpenClaw Gateway to Bob's session key.
-     - `send_message` does **not** need to call `perception.receive()` directly.
+     - After the recipient copy commits, calls `perception.receive()` directly
+       with its original simulation timestamp and stable message ID.
+       Notification runs outside the ledger write queue; no turn runs in the
+       chat session.
 
 3. **`before_dispatch` Hook (Universal Ingress Interceptor)**:
-   - Catches inbound messages targeting `agent:*:chat:*` (both from
-     `send_message` and external platforms like Discord/Telegram).
+   - Catches external inbound messages targeting `agent:*:chat:*`. Internal
+     `send_message` delivery calls Perception directly after ledger persistence.
    - Returns `{ handled: true }` to silence OpenClaw's raw, unmanaged auto-reply
      turn.
    - Extracts the clean message text and forwards the `Stimulus` into
@@ -675,3 +677,20 @@ discrete categorical attention decisions directly:
   `:brain`. Assembly is strictly read-only and idempotent.
 - **Brain (`agent:<id>:brain`) owns**: Qualitative consciousness, tool execution
   (`start_task`, `delay_task`, `send_message`), and narrative reasoning.
+
+### 11.1 Development Human Player Ingress (`before_dispatch`)
+
+Default WebChat is a development bridge, not the production UI. Its hook only
+notifies the selected session owner; it does not provide human group fan-out or
+guarantee a simulation-timestamped ledger commit before attention. A different
+frontend using the same native `chat.send` RPC retains those backend semantics.
+See [messaging](messaging.md#production-human-conversations-required-not-implemented)
+for the required conversation-level production ingress and persistence caveat.
+Perception remains responsible only for attention; chat producers own writes.
+
+When a development input arrives on `agent:<id>:chat:direct:user:<userId>`:
+
+1. `before_dispatch` claims the message (`{ handled: true }`), preventing default unmanaged LLM auto-replies.
+2. Identifies the sender as `user:<userId>` (resolving the direct-chat peer or plugin config `user.id`), stamps in-world simulation time from Clock, and builds a deterministic SHA-256 deduplication ID.
+3. Forwards the stimulus to `perception.receive(agentId, stimulus)` for attention evaluation against the character's active task.
+4. If admitted, the character's decision model and brain evaluate the human's message in the context of their relationship card in the Personal Wiki (`workspaces/<id>/wiki/entities/characters/sensei.md`).

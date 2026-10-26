@@ -6,7 +6,7 @@ export const STIMULUS = z.object({
   sessionKey: z
     .string()
     .regex(
-      /^agent:[a-z0-9][a-z0-9_-]*:(tasks|chat:(direct|group):[a-z0-9][a-z0-9_-]*)$/,
+      /^agent:[a-z0-9][a-z0-9_-]*:(tasks|chat:(direct|group):(?:user:)?[a-z0-9][a-z0-9_-]*)$/,
     ),
   sender: z.string().min(1).max(256),
   text: z.string().min(1).max(32_000),

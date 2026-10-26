@@ -23,6 +23,33 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
     },
   ): Promise<{ messageId: string } | undefined>;
 
+  export function appendSessionTranscriptMessageByIdentityStrict(
+    params: SessionIdentity & {
+      preparation?: { source?: () => void };
+      message: {
+        role: "assistant" | "user";
+        content: ReadonlyArray<{ type: "text"; text: string }>;
+        timestamp: number;
+        idempotencyKey: string;
+        __openclaw: {
+          senderId: string;
+          senderName: string;
+          senderIdentity: {
+            type: "observation";
+            id: string;
+            pluginId: string;
+            accountId: null;
+            senderKind: "bot";
+          };
+        };
+      };
+    },
+  ): Promise<
+    | { kind: "result"; result: { messageId: string } }
+    | { kind: "suppressed" }
+    | { kind: "rejected"; reason: string }
+  >;
+
   export function publishSessionTranscriptUpdateByIdentity(
     params: SessionIdentity & { update: { messageId: string } },
   ): Promise<void>;

@@ -7,4 +7,12 @@ declare const openKeyedStore: OpenClawPluginApi["runtime"]["state"]["openKeyedSt
 export type StateStore<T> = Pick<
   ReturnType<typeof openKeyedStore<T>>,
   "lookup" | "register" | "entries"
->;
+> & {
+  readonly entriesInKeyRange?: (options: {
+    readonly keyStartInclusive: string;
+    readonly keyEndExclusive: string;
+    readonly limit: number;
+    readonly order?: "asc" | "desc";
+  }) => Promise<Array<{ readonly key: string; readonly value: T }>>;
+};
+

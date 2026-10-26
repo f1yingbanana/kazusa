@@ -62,6 +62,7 @@ const WIKI_LABELS = z.object({
   name: z.string().optional(),
   title: z.string().optional(),
   aliases: z.array(z.string()).optional(),
+  peer_id: z.string().optional(),
 });
 
 /**
@@ -107,9 +108,16 @@ export async function readPersonalWiki(
       path.basename(filename, ".md").replace(/[_-]/g, " "),
       labels.name,
       labels.title,
+      labels.peer_id,
+      labels.peer_id?.startsWith("user:")
+        ? labels.peer_id.slice("user:".length)
+        : undefined,
       ...(labels.aliases ?? []),
     ].filter((label): label is string => Boolean(label));
-    const score = sender
+    const isSenderMatch =
+      sender ||
+      Boolean(labels.peer_id && senders.includes(labels.peer_id));
+    const score = isSenderMatch
       ? 100
       : aliases.filter((label) => {
           const phrase = label.trim();
@@ -130,8 +138,11 @@ export async function readPersonalWiki(
   };
   const senderPaths = new Set(
     senders
-      .filter((id) => /^[a-z0-9][a-z0-9_-]*$/.test(id))
-      .map((id) => path.join(root, "entities", "characters", `${id}.md`)),
+      .filter((id) => /^(?:user:)?[a-z0-9][a-z0-9_-]*$/.test(id))
+      .map((id) => {
+        const fileId = id.startsWith("user:") ? id.slice("user:".length) : id;
+        return path.join(root, "entities", "characters", `${fileId}.md`);
+      }),
   );
   // Exact sender lookup must not be crowded out by the general scan cap.
   try {

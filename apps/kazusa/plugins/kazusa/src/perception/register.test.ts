@@ -394,4 +394,15 @@ describe("Perception host integration", () => {
     });
     generation.resolve();
   });
+
+  it("resolves human sender on direct chat session when senderId is generic or missing", async () => {
+    const h = setup();
+    await h.dispatch("Hello Alice from Sensei", {
+      sessionKey: "agent:alice:chat:direct:user:sensei",
+      senderId: "user",
+    });
+    expect(h.dispatchBrain).toHaveBeenCalledTimes(1);
+    const { ctx } = h.dispatchBrain.mock.calls[0][0];
+    expect(ctx.Body).toContain("user:sensei");
+  });
 });

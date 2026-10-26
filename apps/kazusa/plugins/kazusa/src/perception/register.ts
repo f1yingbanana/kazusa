@@ -64,8 +64,17 @@ export function registerPerception(
     const owner = parseAgentSessionKey(sessionKey);
     if (!owner?.rest.startsWith("chat:")) return;
     try {
-      await deps.clock.init();
-      const sender = ctx.senderId ?? event.senderId ?? "unknown";
+      let sender = ctx.senderId ?? event.senderId;
+      if (!sender || sender === "unknown" || sender === "user") {
+        if (owner.rest.startsWith("chat:direct:")) {
+          const directPeer = owner.rest.slice("chat:direct:".length);
+          if (directPeer) sender = directPeer;
+        } else if (api.pluginConfig && "user" in api.pluginConfig) {
+          const configuredUser = api.pluginConfig.user as { id?: string } | undefined;
+          if (configuredUser?.id) sender = configuredUser.id;
+        }
+      }
+      sender = sender ?? "unknown";
       if (sender === owner.agentId) return { handled: true };
       const text = event.content || event.body;
       if (!text) {

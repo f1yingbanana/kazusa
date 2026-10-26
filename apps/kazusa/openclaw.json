@@ -54,6 +54,10 @@
             "maxBatchSize": 16,
             "maxBatchChars": 48000,
             "decisionTimeoutMs": 10000
+          },
+          "user": {
+            "id": "user:sensei",
+            "name": "Sensei"
           }
         }
       },
@@ -107,6 +111,7 @@
   },
   "tools": {
     "profile": "full",
+    "deny": ["group:sessions"],
     "sessions": {
       "visibility": "agent"
     }

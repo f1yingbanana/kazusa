@@ -105,10 +105,10 @@ file-parsing overhead.
 | :-------------------------- | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Machine Working State**   | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`)                                  | High-frequency virtual clock state/speed and active task leases. Never store in Markdown.                                                                                          |
 | **Cognitive Brain Queue**   | OpenClaw Session `agent:<id>:brain`                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                        |
-| **Attention Admission**     | Native keyed store `"perception"`; Decision Model `api.runtime.decisions.evaluate`; host wake/steer transport under review | Retained pending stimuli and attention decisions. Perception is strictly an attention classifier and **never writes to chat ledgers or transcripts**. Private run registries and deprecated SDK queue helpers are not the target transport contract. |
-| **Stream Ledgers**          | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. **Design Decision:** Egress tools (`send_message`, `start_task`) and channel adapters own transcript writes. `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`, `"messages"`) | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
+| **Stream Ledgers**          | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
 | **Agent Identity & Memory** | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                    | Static voice/values (`SOUL.md`), bio & YAML desire parameters (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). |
-| **Objective Canon**         | `shared/wiki/`                                                                             | Ground-truth places, character roster, world rules, and compiled global reports.                                                                                                   |
+| **Objective Canon**         | `shared/wiki/`                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                             |
 | **Subjective Beliefs**      | `workspaces/<id>/wiki/`                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports.                                                                               |
 
 ### Directory Map (`apps/kazusa/`)
@@ -127,7 +127,8 @@ apps/kazusa/
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
 │       ├── taskman/                    # "tasks" leases, :tasks ledger, cron projection, tools
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
-│       └── perception/                 # Text ingress, retained inbox, bounded attention admission
+│       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
+│       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/
 │   ├── wiki/                           # WORLD WIKI (objective truth)
 │   │   ├── entities/{places,characters}/<id>.md
@@ -214,7 +215,7 @@ direct references connect these modules in process.
   count cap. Skip undated/invalid timestamps; empty pages with a continuation
   cursor must still be followed. Ledger writers preserve simulation-time order.
 - **Ledger writer contract**: Every task/chat message must contain one text
-  block with all readable content and media summaries. Planned `send_message`
+  block with all readable content and media summaries. `send_message`
   writes native `__openclaw.senderId`, `senderName`, and `senderIdentity`
   metadata; see [the messaging contract](references/messaging.md). The context
   engine uses the catalog's structured sender for all incoming direct/group
@@ -253,16 +254,37 @@ direct references connect these modules in process.
   additional `<name>` skills via a dedicated `SkillLoader` following OpenClaw's
   precedence hierarchy. Frontmatter is stripped using a YAML parser so the LLM
   receives only clean Markdown.
+- Messaging owns retained `"chats"` routing metadata and `"messaging"` delivery
+  receipts. `send_message` targets an existing session or creates a chat with
+  its first message; `list_chats` discovers current memberships; `manage_chat`
+  lets any current member edit a group. Human players (`user:` prefix) have no
+  brain sessions. Agent sends support human recipients; production human group
+  ingress must fan out to all agent members and is not implemented yet. Default
+  WebChat is a development bridge, not the production UI. Raw session tools
+  are denied via `tools.deny: ["group:sessions"]`. See [messaging](references/messaging.md)
+  for role projection, local recovery rationale, and the open storage decision.
 - Behavioral instructions belong in skills, not TypeScript prompt constants.
 - See [context-engine conventions](references/context_engine.md) for budgets,
-  timestamps, SDK lifecycle requirements, and the future messaging contract.
+  timestamps, SDK lifecycle requirements, and the messaging contract.
 - Future additions extend this into the **3-Tier Retrieval Pipeline**:
 
 1. **Tier 1 (Eager Spatial Perception & Sensory Shock)**: Diffs the current
    location in `shared/wiki/` against the agent's `workspaces/<id>/wiki/` to
    surface environmental changes or unfamiliar surroundings.
-2. **Tier 2 (Eager Social Salience)**: Injects `## Quick Impression` blocks from
-   the agent's Personal Wiki for all co-present characters.
+2. **Tier 2 (Eager Social Salience & Compact Contact Roster)**:
+   - **Eager Compact Contact Roster (Working Cache)**: Automatically discovers the
+     latest $K$ unique individuals (configurable `contactRosterLimit`, default 20)
+     with whom the agent has recently exchanged messages (sent or received) or
+     interacted. Pulls each peer's relationship card from the character's Personal
+     Wiki (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`) to extract
+     display name, handle, relationship type, short summary, and direct chat address
+     (`- Name (@handle, relation): summary [chat:direct:<peer_id>]`). At ~150 tokens
+     for 20 contacts, this eliminates redundant `wiki_search`/`list_chats` tool
+     round-trips, grounds spontaneous social agency, and prevents hallucinations.
+   - **Active Peer Impressions**: Eagerly injects full `## Quick Impression` blocks
+     from the Personal Wiki for the active interlocutor in direct chats and Top-3
+     salient co-present characters in groups/crowds. Deep historical interaction
+     logs remain lazy (Tier 3 cognitive retrieval).
 3. **Tier 3 (Session Stream Tails)**: Merges recent entries from the agent's
    `:tasks`, `:chat:direct:*`, and `:chat:group:*` streams (implemented).
 

@@ -19,7 +19,9 @@ explains how every simulation requirement maps to OpenClaw.
 | **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                                                  | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio). YAML frontmatter in `IDENTITY.md` holds desire targets and decay constants.                                                                                                                                           |
 | **Hot Working State**                   | OpenClaw Keyed Plugin State & `MEMORY.md`                                            | OpenClaw Keyed Store (`"tasks"`) stores the active task execution lease (`activeTask`, `agentId`, `updatedAt`) directly in the database. Location is held in spatial subsystem / World Wiki; desires in `IDENTITY.md` / homeostasis engine. `MEMORY.md` holds qualitative narrative reflections and goals. |
 | **Task Experiences & Thoughts**         | OpenClaw Session (`agent:<id>:tasks`)                                                | One append-only ledger of task lifecycles, outcomes, and in-character monologues.                                                                                                                                                                                                                          |
-| **Inter-Agent Chat Streams**            | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes.                                                                                                                                                                          |
+| **Inter-Agent & Human Chat Streams**    | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes. Supports both agent peers and human players (`user:` prefix). |
+| **Human Player (Sensei / User)**       | WebChat / Client Channel + Plugin Config (`pluginConfig.user`)                      | Human players participate in-world without consuming an agent runner process or brain session. They read and send via the character's ledger `agent:<id>:chat:direct:user:<userId>`. `before_dispatch` attributes stimuli and routes to Perception. |
+| **Chat Group Metadata & Delivery**     | OpenClaw Retained Keyed Stores (`"chats"`, `"messaging"`)                           | Retained stores track group memberships, titles, and per-copy delivery settlement receipts. Transcripts remain 100% native in OpenClaw sessions. All session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
 | **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                                           | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                         |
 | **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)                                 | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                       |
 | **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)                                  | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                               |
@@ -51,7 +53,16 @@ session keys:
    - Each owner's private view preserves only dialogue they participated in.
      Direct and group messages use native `__openclaw` sender metadata, not
      dialogue prefixes. See [the messaging contract](messaging.md).
-   - Messaging must append these ledgers and submit stimuli to Perception; never
+   - Supports both agent peers (`bob`) and human players (`user:sensei`). For
+     human recipients, deliveries settle immediately without spinning up agent
+     sessions or waking brains.
+   - Shared group routing metadata (members, titles, creation fingerprints) is
+     maintained in the retained `"chats"` keyed store, while per-copy delivery
+     state is tracked in the retained `"messaging"` keyed store.
+   - Transcripts remain native OpenClaw session files. All session orchestration
+     tools (`sessions_*`) are denied to characters via `tools.deny: ["group:sessions"]`,
+     ensuring safe operation while `memory_search` handles session recall.
+   - Messaging appends these ledgers and submits stimuli to Perception; never
      dispatch an agent turn to a ledger via `sessions_send`.
 
 Task monologues already capture character thoughts and experiences; do not add a
@@ -104,8 +115,18 @@ world changes when they physically arrive or hear about them:
 4. The agent is immediately grounded in physical reality without requiring any
    manual vector recall or tool calls.
 
-### 3.2 Tier 2: Eager Social Salience Rules
+### 3.2 Tier 2: Eager Social Salience & Compact Contact Roster
 
+- **Eager Compact Contact Roster (Working Cache)**:
+  - Discovers the latest $K$ unique individuals (configurable `contactRosterLimit`,
+    default 20) with whom the agent has recently exchanged messages or interacted.
+  - Pulls each contact's `name`, `peer_id`, `relation_type`, and 1-line `summary` from
+    their Personal Wiki card (`<workspace>/wiki/entities/characters/<peer_id>.md`).
+  - Injects a compact address book section:
+    `- Bob Moreno (@bob, close_friend): Music student at Oak Hill Dorm. [chat:direct:bob]`
+  - Costs ~150 tokens total for 20 contacts, avoiding the $2\times$ round-trip penalty
+    of querying `list_chats` or `wiki_search` before messaging someone, and
+    eliminating handle hallucinations.
 - **1-on-1 Chat Ledger (`agent:<a>:chat:direct:<b>`)**:
   - Eagerly injects full `## Quick Impression` from
     `<workspace>/wiki/entities/characters/<b>.md`.

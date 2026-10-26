@@ -7,6 +7,7 @@ import { registerClock } from "./clock/register.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerPerception } from "./perception/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
+import { registerMessaging } from "./messaging/register.ts";
 
 export default definePluginEntry({
   id: "kazusa",
@@ -19,6 +20,10 @@ export default definePluginEntry({
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
     });
-    registerPerception(api, { clock, assembleDecisionContext });
+    const perception = registerPerception(api, {
+      clock,
+      assembleDecisionContext,
+    });
+    registerMessaging(api, { clock, perception });
   },
 });

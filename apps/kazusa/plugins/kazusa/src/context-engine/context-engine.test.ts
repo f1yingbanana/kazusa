@@ -129,11 +129,13 @@ describe("Context assembly", () => {
       sessionsContext: {
         "agent:alice:chat:direct:bob": [
           incoming("Hello Alice", "bob"),
-          event("Hello Bob"),
+          { ...incoming("Hello Bob", "alice"), type: "agentMessage" },
         ],
         "agent:alice:chat:group:club": [
           incoming("Hello everyone", "carol"),
           incoming("Welcome", "bob"),
+          { ...incoming("Role is not identity", "bob"), type: "agentMessage" },
+          incoming("Metadata identifies self", "alice"),
         ],
       },
     });
@@ -142,6 +144,10 @@ describe("Context assembly", () => {
     expect(text).toContain("[(self) Fri 2026-10-23 12:00] Hello Bob");
     expect(text).toContain("[carol Fri 2026-10-23 12:00] Hello everyone");
     expect(text).toContain("[bob Fri 2026-10-23 12:00] Welcome");
+    expect(text).toContain("[bob Fri 2026-10-23 12:00] Role is not identity");
+    expect(text).toContain(
+      "[(self) Fri 2026-10-23 12:00] Metadata identifies self",
+    );
   });
 
   it("uses metadata in both chat kinds, never names or speaker tags in dialogue", async () => {
@@ -169,6 +175,7 @@ describe("Context assembly", () => {
         ],
         "agent:alice:chat:group:club": [
           { ...event("carol: Legacy message"), type: "userMessage" },
+          event("Outgoing without projected metadata"),
         ],
       },
     });
@@ -178,6 +185,9 @@ describe("Context assembly", () => {
     );
     expect(text).toContain(
       "[unknown Fri 2026-10-23 12:00] carol: Legacy message",
+    );
+    expect(text).toContain(
+      "[unknown Fri 2026-10-23 12:00] Outgoing without projected metadata",
     );
   });
 

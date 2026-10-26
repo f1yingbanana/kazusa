@@ -41,11 +41,10 @@ export function formatEnvelopeRecord(params: {
     return `\n\n[${time}] ${text}`;
   }
 
-  if (params.message.type === "agentMessage") {
-    return `\n\n[(self) ${time}] ${text}`;
-  }
   // The catalog projects __openclaw.senderIdentity into sender.identity.
-  // Never infer authorship from dialogue, display names, or a chat's peer key.
-  const speaker = params.message.sender?.identity.id ?? "unknown";
+  // Roles, dialogue, display names and peer keys are never author evidence.
+  const sender = params.message.sender?.identity.id;
+  const owner = params.sessionKey.split(":")[1];
+  const speaker = sender ? (sender === owner ? "(self)" : sender) : "unknown";
   return `\n\n[${speaker} ${time}] ${text}`;
 }

@@ -147,4 +147,23 @@ describe("Decision context sources", () => {
       readPersonalWiki(workspace, ["bob"], "Bob", 4, AbortSignal.abort()),
     ).rejects.toThrow();
   });
+
+  it("matches user:* human senders and peer_id in personal wiki cards", async () => {
+    const workspace = await fixture();
+    await put(
+      workspace,
+      "wiki/entities/characters/sensei.md",
+      "---\npeer_id: user:sensei\nname: Sensei\n---\n## Quick Impression\nReliable club advisor.\n\n## Interaction Log\nHelped with baking.",
+    );
+    const found = await readPersonalWiki(
+      workspace,
+      ["user:sensei"],
+      "Did you see Sensei?",
+      2,
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("Reliable club advisor.");
+    expect(found[0]).not.toContain("Helped with baking.");
+  });
 });
+
