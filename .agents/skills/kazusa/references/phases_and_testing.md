@@ -1,5 +1,11 @@
 # Kazusa Implementation Roadmap & Testing Specifications
 
+**Current integration blocker:** Perception core/context/tests are drafted, but
+its Gateway methods require bundled/trusted-official status unavailable to local
+Kazusa. It is not registered; Taskman's existing wake path is preserved. Phase 4
+routing descriptions below remain the target until a supported, authorized
+transport is selected. See [Perception](perception.md).
+
 This document outlines the six implementation phases of Kazusa (Phase 0 through
 Phase 5), detailed engineering deliverables, and exact automated test
 specifications. All plugins are built in **TypeScript under `plugins/`**
@@ -21,11 +27,11 @@ apps/kazusa/ (or repository root)
 │   │   ├── package.json              # @kazusa/plugin; direct TypeScript entry
 │   │   ├── tsconfig.json
 │   │   └── src/
-│   │       ├── index.ts              # Builds Clock and injects it into Taskman
+│   │       ├── index.ts              # Composes Clock, Taskman, Perception, ContextEngine
 │   │       ├── clock/                # Formula clock, OpenClaw state, tools/RPC, tests
 │   │       ├── taskman/              # Task leases, automations, tools, tests
 │   │       ├── context-engine/       # Context assembly, not routing
-│   │       └── perception/           # PLANNED: stimulus routing and attention admission
+│   │       └── perception/           # Explicit text ingress and bounded attention admission
 ├── shared/
 │   ├── wiki/                         # 1. WORLD WIKI: Canonical facts & world ground truth
 │   │   ├── entities/
@@ -132,7 +138,8 @@ apps/kazusa/ (or repository root)
 - Implement the context engine within the Kazusa plugin using OpenClaw's
   `ContextEngine` interface. It assembles the single `agent:<id>:brain`
   session's context and resolves trusted skill markers. Routing/admission
-  belongs to planned Perception, not context assembly.
+  belongs to Perception, not context assembly. A separate lightweight assembly
+  profile supports the tool-free `:perception` classifier.
 - Current implementation assembles whole task/chat records from the last 24
   simulated hours under one budget, grouped by session; adds current simulation
   time, recent complete brain turns, and packaged skills; no active-task pull.
@@ -220,35 +227,44 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 4: Perception and Attention Admission (Design Only)
+## Phase 4: Perception and Attention Admission (Jev Decision Model)
 
 ### Deliverables
 
-- `plugins/kazusa/src/perception/`: separate responsibility inside the unified
-  plugin. Classify chat, physical encounter, world-event, and task-due stimuli;
-  route records to their appropriate ledgers and admitted input to `:brain`.
-- Secondary pending-stimulus queue: inspect brain busy/idle state, then decide
-  wake, steer/distraction, or defer. Drain eligible pending input at appropriate
-  lifecycle boundaries. Preserve original simulation occurrence timestamps.
-- Taskman submits task-due stimuli rather than owning brain routing, while
-  retaining native cron scheduling. Revalidate deferred deadlines before
-  delivery. No Perception code exists yet.
-- Keep spatial encounter generation/navigation outside Taskman. Perception
-  receives such stimuli; it does not auto-pause tasks or manufacture outcomes.
-- See [Perception design](perception.md) for native integration constraints and
-  open admission/fairness decisions.
+- `plugins/kazusa/src/perception/`: In-process sensory nervous system.
+  - Intercepts incoming direct/group messages via `api.on("before_dispatch")`,
+    persists them to the owner's subjective ledger (`agent:<id>:chat:*`) with
+    `[speaker:<id>]` prefix, and registers the stimulus.
+  - **Jev Decision Model Evaluation**: Calls `api.runtime.decisions.evaluate`
+    using TypeSafe AI's Jev (`typesafe/jev-latest` or local Kev) to evaluate
+    incoming stimuli in a single sub-100ms forward pass without output tokens.
+  - **Universal Gate (Both Idle & Busy)**:
+    - *Idle*: Evaluates `["WAKE", "IGNORE"]` against the character's active task
+      (e.g., sleeping, reading). Casual chatter while sleeping is ignored,
+      saving expensive frontier LLM turns. Wakes brain when $P(\text{WAKE}) \ge T_{\text{wake}}$.
+    - *Busy*: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` with task-dependent
+      hysteresis ($T_{\text{steer}} \in \{0.45, 0.75, 0.90\}$).
+  - **In-Process Integration**: Tracks brain state via lifecycle events
+    (`api.agent.events.registerAgentEventSubscription`), wakes idle brain via
+    native cron automations, and steers ongoing turns via native `mode: "steer"`
+    session queue. Completely resolves the OpenClaw 2026.10.5 Gateway RPC blocker.
+  - **Task Deadlines**: Coalesced flag checks active task lease against
+    `clock.time()`. Deadlines bypass the decision model and wake deterministically.
+- Verbatim stimulus preservation: Admitted stimuli pass through without lossy
+  generative summarization.
 
-### Future Test Specifications
+### Test Coverage and Verification
 
-- Busy vs. idle admission; meaningful distraction vs. deferred attention;
-  completion/error recovery; single brain ordering across different chats.
-- No duplicate admission on retries, no stale task-due stimulus after a
-  transition/delay, and bounded progress during stimulus bursts.
-- Shopping interruption: elapsed/remaining time is inferable from timestamped
-  ledger entries. The lease stays unchanged unless the character calls
-  `delay_task` or `start_task`; no automatic `PAUSED` state.
-- Physical encounters differ from chat messages and respect perceptibility.
-  Spatial arrival updates remain the navigation subsystem's responsibility.
+- Unit & state-machine coverage:
+  - Sleep filtering: Routine chatter during `sleep` task evaluates to `IGNORE`;
+    brain stays asleep with zero LLM turns.
+  - Emergency wake: Critical alert during sleep outputs $P(\text{WAKE}) \ge 0.85$;
+    wakes brain immediately with raw stimulus.
+  - Busy-brain hysteresis: Low-focus tasks steer easily ($T_{\text{steer}} = 0.45$);
+    high-focus tasks resist steering ($T_{\text{steer}} = 0.90$) and defer to `QUEUE_NEXT`.
+  - Queue draining: Completed brain turn automatically consumes pending queued stimuli.
+  - Task deadline re-validation: Expired lease triggers wake; delayed lease drops check.
+  - Process restart: Retained stimuli in `"perception"` store survive and re-evaluate.
 
 ---
 

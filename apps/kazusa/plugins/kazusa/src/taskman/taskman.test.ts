@@ -11,10 +11,12 @@ function createInMemoryTaskStore(): TaskStore {
     async register(key: string, value: ActiveTask): Promise<void> {
       tasks.set(key, value);
     },
-    async entries(): Promise<
-      ReadonlyArray<{ readonly key: string; readonly value: ActiveTask }>
-    > {
-      return [...tasks.entries()].map(([key, value]) => ({ key, value }));
+    async entries() {
+      return [...tasks.entries()].map(([key, value]) => ({
+        key,
+        value,
+        createdAt: 0,
+      }));
     },
   };
 }
@@ -48,6 +50,26 @@ function makeContext(): {
 }
 
 describe("Taskman", () => {
+  it("assigns distinct IDs at the same simulation instant and preserves identity on delay", async () => {
+    const { context } = makeContext();
+    const first = await executeStartTask(
+      { type: "read", description: "Book", duration: 20 },
+      context,
+    );
+    const next = await executeStartTask(
+      { type: "read", description: "Book", duration: 20 },
+      context,
+    );
+    if (!first.success || !next.success)
+      throw new Error("Expected task starts");
+    expect(first.task.startedAt).toBe(next.task.startedAt);
+    expect(first.task.id).not.toBe(next.task.id);
+    expect(first.task.id).toMatch(/^[\da-f-]{36}$/);
+    const delayed = await executeDelayTask({ additionalDuration: 5 }, context);
+    expect(delayed.task?.id).toBe(next.task.id);
+    expect(delayed.task?.endAt).not.toBe(next.task.endAt);
+  });
+
   it("creates one durable task lease", async () => {
     const { context, messages, timestamps } = makeContext();
     const result = await executeStartTask(

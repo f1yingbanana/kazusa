@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   ActiveTask,
   DelayTaskParams,
@@ -31,6 +32,7 @@ export async function executeStartTask(
     new Date(startedAt).getTime() + duration * 60_000,
   ).toISOString();
   const task: ActiveTask = {
+    id: randomUUID(),
     type: params.type,
     description: params.description,
     startedAt,
@@ -68,6 +70,7 @@ export async function executeDelayTask(
   );
   const task: ActiveTask = {
     ...current,
+    id: current.id ?? randomUUID(),
     duration: current.duration + additionalDuration,
     endAt: new Date(
       new Date(current.endAt).getTime() + additionalDuration * 60_000,

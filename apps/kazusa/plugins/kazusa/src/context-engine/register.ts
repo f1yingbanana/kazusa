@@ -4,14 +4,14 @@ import {
   delegateCompactionToRuntime,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-import {
-  readRecentUserAssistantTextForSession,
-  type SessionRecentConversationText,
-} from "openclaw/plugin-sdk/session-store-runtime";
+import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import type { Clock } from "../clock/clock.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
-import { assembleContext, type ContextEngine } from "./context-engine.ts";
-import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
+import {
+  assembleContext,
+  readSessionStreams,
+  type ContextEngine,
+} from "./context-engine.ts";
 import { createSkillLoader } from "./skill-loader.ts";
 
 /**
@@ -116,19 +116,14 @@ function createContextEngine(
             key.rest.startsWith("chat:group:"))
         );
       });
-      const sessionsContext: Record<string, SessionRecentConversationText[]> =
-        {};
-      for (const { sessionKey } of streams) {
-        sessionsContext[sessionKey] =
-          await readRecentUserAssistantTextForSession({
-            agentId,
-            sessionKey,
-            storePath,
-            minTimestampMs: cutoff,
-            beforeTimestampMs: now + 1,
-            limit: Number.MAX_SAFE_INTEGER,
-          });
-      }
+      const sessionsContext = await readSessionStreams({
+        agentId,
+        streams,
+        storePath,
+        pluginId: api.id,
+        now,
+        cutoff,
+      });
       return assembleContext({
         run: params,
         sessionsContext,

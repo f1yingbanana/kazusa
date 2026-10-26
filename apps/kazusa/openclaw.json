@@ -16,7 +16,8 @@
       },
       "model": {
         "primary": "zai/glm-5.2"
-      }
+      },
+      "decisionModel": "typesafe/jev-latest"
     }
   },
   "plugins": {
@@ -31,6 +32,29 @@
         "enabled": true,
         "hooks": {
           "allowConversationAccess": true
+        },
+        "config": {
+          "contextEngine": {
+            "brainMaxTokens": 2000,
+            "shortTermHours": 24,
+            "decisionMaxTokens": 8000,
+            "decisionShortTermHours": 4,
+            "decisionIdentityMaxTokens": 600,
+            "decisionSoulMaxTokens": 1000,
+            "decisionMemoryMaxTokens": 1000,
+            "decisionBrainMaxTokens": 800,
+            "decisionHistoryMaxTokens": 1600,
+            "decisionWikiMaxTokens": 800,
+            "decisionStimulusMaxTokens": 512,
+            "decisionHistoryItems": 60,
+            "decisionWikiMaxArticles": 4
+          },
+          "perception": {
+            "coalesceWindowMs": 500,
+            "maxBatchSize": 16,
+            "maxBatchChars": 48000,
+            "decisionTimeoutMs": 10000
+          }
         }
       },
       "anthropic": {
@@ -49,6 +73,16 @@
       },
       "zai": {
         "enabled": true
+      },
+      "typesafe": {
+        "enabled": true,
+        "config": {
+          "apiKey": {
+            "source": "env",
+            "provider": "default",
+            "id": "TYPESAFE_API_KEY"
+          }
+        }
       }
     }
   },

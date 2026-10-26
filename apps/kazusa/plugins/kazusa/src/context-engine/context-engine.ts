@@ -1,88 +1,18 @@
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
-import {
-  buildMemorySystemPromptAddition,
-  type OpenClawPluginApi,
-} from "openclaw/plugin-sdk/core";
-import type { SessionRecentConversationText } from "openclaw/plugin-sdk/session-store-runtime";
+import { buildMemorySystemPromptAddition } from "openclaw/plugin-sdk/core";
+import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
+import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 
-dayjs.extend(utc);
-
-export type ContextEngine = Awaited<
-  ReturnType<Parameters<OpenClawPluginApi["registerContextEngine"]>[1]>
->;
+export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
+import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
+import {
+  formatSimTime,
+  formatSessionHeader,
+  formatEnvelopeRecord,
+} from "./format.ts";
 type Message = Parameters<ContextEngine["assemble"]>[0]["messages"][number];
-
-/**
- * Format a simulation timestamp as UTC `ddd YYYY-MM-DD HH:mm` (e.g. `Fri
- * 2026-10-23 08:00`). Dropping seconds, 'T', and 'Z' saves significant token
- * budget across large histories.
- */
-export function formatSimTime(timestamp: number): string {
-  return dayjs.utc(timestamp).format("ddd YYYY-MM-DD HH:mm");
-}
-
-/**
- * Strips internal prefix `agent:<agentId>:` to yield clean stream headers (e.g.
- * `tasks`, `chat:direct:bob`).
- */
-export function formatSessionHeader(sessionKey: string): string {
-  const parts = sessionKey.split(":");
-  if (parts.length >= 3 && parts[0] === "agent") {
-    return parts.slice(2).join(":");
-  }
-  return sessionKey;
-}
-
-/**
- * Format a single transcript entry with the compact envelope `[<speaker>
- * <time>] <text>`.
- */
-export function formatEnvelopeRecord(params: {
-  sessionKey: string;
-  message: SessionRecentConversationText;
-  timestamp: number;
-}): string {
-  const time = formatSimTime(params.timestamp);
-  let text = params.message.text.trim();
-  let explicitSpeaker: string | undefined;
-
-  const speakerTagMatch = text.match(/^\[speaker:([^\]]+)\]\s*(.*)$/s);
-  if (speakerTagMatch) {
-    explicitSpeaker = speakerTagMatch[1];
-    text = speakerTagMatch[2];
-  }
-
-  const stream = formatSessionHeader(params.sessionKey);
-  if (stream === "tasks") {
-    return `\n\n[${time}] ${text}`;
-  }
-
-  if (params.message.role === "assistant") {
-    return `\n\n[(self) ${time}] ${text}`;
-  }
-
-  if (explicitSpeaker) {
-    return `\n\n[${explicitSpeaker} ${time}] ${text}`;
-  }
-
-  if (stream.startsWith("chat:direct:")) {
-    const peer = stream.slice("chat:direct:".length);
-    const peerPrefixMatch = text.match(new RegExp(`^${peer}:\\s*(.*)$`, "s"));
-    const body = peerPrefixMatch ? peerPrefixMatch[1] : text;
-    return `\n\n[${peer} ${time}] ${body}`;
-  }
-
-  const colonMatch = text.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/s);
-  if (colonMatch) {
-    return `\n\n[${colonMatch[1]} ${time}] ${colonMatch[2]}`;
-  }
-
-  return `\n\n[other ${time}] ${text}`;
-}
 
 /** Keep whole prior turns so trimming cannot orphan a tool call or result. */
 function recentBrainHistory(messages: Message[], budget: number): Message[] {
@@ -132,7 +62,7 @@ export async function assembleContext(params: {
    */
   readonly run: Parameters<ContextEngine["assemble"]>[0];
   readonly sessionsContext: Readonly<
-    Record<string, readonly SessionRecentConversationText[]>
+    Record<string, readonly SessionCatalogTranscriptItem[]>
   >;
   readonly simTime: number;
   readonly config: ContextEngineConfig;
@@ -159,9 +89,22 @@ export async function assembleContext(params: {
   );
   const loadedSkills: string[] = [];
   for (const skillName of uniqueSkillNames) {
-    loadedSkills.push(
-      await skillLoader.loadSkill(skillName, resolutionContext),
-    );
+    if (await skillLoader.resolveSkillPath(skillName, resolutionContext)) {
+      try {
+        loadedSkills.push(
+          await skillLoader.loadSkill(skillName, resolutionContext),
+        );
+      } catch (error) {
+        // An optional file can disappear after resolution (including a cached
+        // path). Other read errors should remain visible.
+        if (!(
+          error instanceof Error &&
+          "code" in error &&
+          error.code === "ENOENT"
+        ))
+          throw error;
+      }
+    }
   }
 
   const systemPromptAddition = [
@@ -198,17 +141,64 @@ export async function assembleContext(params: {
     0,
   );
 
-  // No source quotas or per-message clipping. A large record that cannot fit
-  // is skipped so smaller, older records can still use the remaining space.
+  // No source quotas or additional clipping beyond the native catalog's display
+  // projection. Skip records that cannot fit rather than cutting their text.
   const cutoff = params.simTime - config.shortTermHours * 3_600_000;
-  const records = Object.entries(params.sessionsContext)
+  const selected = packLedgerRecords({
+    sessionsContext: params.sessionsContext,
+    simTime: params.simTime,
+    cutoff,
+    tokenBudget: remaining,
+  });
+
+  const context: Message[] = [];
+  if (selected.size) {
+    context.push({
+      role: "user",
+      content: [...selected]
+        .map(
+          ([key, records]) =>
+            `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
+        )
+        .join("\n\n"),
+      timestamp: params.simTime,
+    });
+  }
+  // The host appends the pending turn after this history. Never replay ledger
+  // records as assistant/tool messages or persist these synthetic context views.
+  const messages = [...context, ...history];
+  return {
+    messages,
+    estimatedTokens:
+      messages.reduce((sum, message) => sum + estimateTokens(message), 0) +
+      systemPromptTokens,
+    systemPromptAddition,
+  };
+}
+
+/**
+ * Pack historical ledger records newest-first within a simulation cutoff and
+ * token budget.
+ */
+export function packLedgerRecords(params: {
+  readonly sessionsContext: Readonly<
+    Record<string, readonly SessionCatalogTranscriptItem[]>
+  >;
+  readonly simTime: number;
+  readonly cutoff: number;
+  readonly tokenBudget: number;
+}): Map<string, string[]> {
+  const { sessionsContext, simTime, cutoff, tokenBudget } = params;
+  const records = Object.entries(sessionsContext)
     .flatMap(([sessionKey, messages]) =>
       messages.flatMap((message) => {
-        const timestamp = message.timestamp;
-        return timestamp !== undefined &&
+        const timestamp = Date.parse(message.timestamp ?? "");
+        return (message.type === "userMessage" ||
+          message.type === "agentMessage") &&
+          message.text?.trim() &&
           Number.isFinite(timestamp) &&
           timestamp >= cutoff &&
-          timestamp <= params.simTime
+          timestamp <= simTime
           ? [{ sessionKey, message, timestamp }]
           : [];
       }),
@@ -236,32 +226,59 @@ export async function assembleContext(params: {
             content: `\n\n${streamHeader}`,
             timestamp: event.timestamp,
           }));
-    if (used + cost > remaining) continue;
+    if (used + cost > tokenBudget) continue;
     if (group) group.push(record);
     else selected.set(event.sessionKey, [record]);
     used += cost;
   }
-  const context: Message[] = [];
-  if (selected.size) {
-    context.push({
-      role: "user",
-      content: [...selected]
-        .map(
-          ([key, records]) =>
-            `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
-        )
-        .join("\n\n"),
-      timestamp: params.simTime,
-    });
+  return selected;
+}
+
+/**
+ * Read session catalog transcripts for the brain context within the simulation
+ * time window.
+ */
+export async function readSessionStreams(params: {
+  agentId: string;
+  streams: readonly { sessionKey: string }[];
+  storePath?: string;
+  pluginId: string;
+  now: number;
+  cutoff: number;
+}): Promise<Record<string, SessionCatalogTranscriptItem[]>> {
+  const { agentId, streams, storePath, pluginId, now, cutoff } = params;
+  const sessionsContext: Record<string, SessionCatalogTranscriptItem[]> = {};
+
+  for (const { sessionKey } of streams) {
+    const messages: SessionCatalogTranscriptItem[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await readSessionTranscriptCatalogPage({
+        agentId,
+        sessionKey,
+        storePath,
+        pluginId,
+        sourceDomain: "kazusa",
+        limit: 200, // Native catalog page maximum, not a history cap.
+        cursor,
+      });
+      let reachedCutoff = false;
+      for (const message of page.items) {
+        const timestamp = message.timestamp
+          ? Date.parse(message.timestamp)
+          : Number.NaN;
+        if (Number.isNaN(timestamp)) continue;
+        if (timestamp > now) continue;
+        if (timestamp < cutoff) {
+          reachedCutoff = true;
+          break;
+        }
+        messages.push(message);
+      }
+      if (reachedCutoff || !page.nextCursor) break;
+      cursor = page.nextCursor;
+    } while (cursor);
+    sessionsContext[sessionKey] = messages.reverse();
   }
-  // The host appends the pending turn after this history. Never replay ledger
-  // records as assistant/tool messages or persist these synthetic context views.
-  const messages = [...context, ...history];
-  return {
-    messages,
-    estimatedTokens:
-      messages.reduce((sum, message) => sum + estimateTokens(message), 0) +
-      systemPromptTokens,
-    systemPromptAddition,
-  };
+  return sessionsContext;
 }

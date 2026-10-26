@@ -1,5 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { readRecentUserAssistantTextForSession } from "openclaw/plugin-sdk/session-store-runtime";
+import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
@@ -14,23 +14,26 @@ vi.mock("openclaw/plugin-sdk/core", () => ({
   })),
 }));
 
-vi.mock("openclaw/plugin-sdk/session-store-runtime", () => ({
-  readRecentUserAssistantTextForSession: vi.fn(),
+vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
+  readSessionTranscriptCatalogPage: vi.fn(),
 }));
 
 const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
 
 async function setup(contextEngine = {}) {
   const register = vi.fn<OpenClawPluginApi["registerContextEngine"]>();
-  const readHistory = vi.mocked(readRecentUserAssistantTextForSession);
+  const on = vi.fn();
+  const readHistory = vi.mocked(readSessionTranscriptCatalogPage);
   readHistory.mockReset();
-  readHistory.mockImplementation(async ({ sessionKey }) => [
-    {
-      role: "assistant",
-      timestamp: SIM_TIME - 1_000,
-      text: `experience from ${sessionKey}`,
-    },
-  ]);
+  readHistory.mockImplementation(async ({ sessionKey }) => ({
+    items: [
+      {
+        type: "agentMessage",
+        timestamp: new Date(SIM_TIME - 1_000).toISOString(),
+        text: `experience from ${sessionKey}`,
+      },
+    ],
+  }));
   const assertCurrent = vi.fn();
   const sessionKeys = [
     "agent:alice:tasks",
@@ -44,9 +47,11 @@ async function setup(contextEngine = {}) {
   // This partial host test double cannot satisfy the entire SDK structurally.
   // The assertion is confined to tests; production uses the actual SDK types.
   const api = {
+    id: "kazusa",
     config: {},
     pluginConfig: { contextEngine },
     registerContextEngine: register,
+    on,
     runtime: {
       agent: {
         session: {
@@ -72,7 +77,7 @@ async function setup(contextEngine = {}) {
   });
   registerContextEngine(api, { clock });
   const engine = await register.mock.calls[0][1]({});
-  return { engine, register, readHistory, assertCurrent };
+  return { engine, register, readHistory, assertCurrent, on };
 }
 
 describe("Native context-engine registration", () => {
@@ -147,9 +152,9 @@ describe("Native context-engine registration", () => {
       agentId: "alice",
       sessionKey: "agent:alice:tasks",
       storePath: "/test/store",
-      minTimestampMs: SIM_TIME - 24 * 3_600_000,
-      beforeTimestampMs: SIM_TIME + 1,
-      limit: Number.MAX_SAFE_INTEGER,
+      pluginId: "kazusa",
+      sourceDomain: "kazusa",
+      limit: 200,
     });
     expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
     expect(result.systemPromptAddition).toContain("memory_search");
@@ -182,10 +187,16 @@ describe("Native context-engine registration", () => {
 
   it("does not fabricate a simulation timestamp for undated records", async () => {
     const { engine, readHistory } = await setup();
-    readHistory.mockResolvedValue([
-      { role: "user", text: "undated memory" },
-      { role: "assistant", text: "dated memory", timestamp: SIM_TIME },
-    ]);
+    readHistory.mockResolvedValue({
+      items: [
+        { type: "userMessage", text: "undated memory" },
+        {
+          type: "agentMessage",
+          text: "dated memory",
+          timestamp: new Date(SIM_TIME).toISOString(),
+        },
+      ],
+    });
     const result = await engine.assemble({
       runtimeContext: { sessionTarget: { agentId: "alice" } },
       sessionId: "brain",
@@ -201,20 +212,124 @@ describe("Native context-engine registration", () => {
     async (shortTermHours) => {
       const { engine, readHistory } = await setup({ shortTermHours });
       const cutoff = SIM_TIME - shortTermHours * 3_600_000;
-      await engine.assemble({
+      readHistory.mockResolvedValue({
+        items: [
+          {
+            type: "agentMessage",
+            text: "future",
+            timestamp: new Date(SIM_TIME + 1).toISOString(),
+          },
+          {
+            type: "agentMessage",
+            text: "now boundary",
+            timestamp: new Date(SIM_TIME).toISOString(),
+          },
+          {
+            type: "agentMessage",
+            text: "cutoff boundary",
+            timestamp: new Date(cutoff).toISOString(),
+          },
+          {
+            type: "agentMessage",
+            text: "too old",
+            timestamp: new Date(cutoff - 1).toISOString(),
+          },
+        ],
+        nextCursor: "older-history",
+      });
+      const result = await engine.assemble({
         runtimeContext: { sessionTarget: { agentId: "alice" } },
         sessionId: "brain",
         sessionKey: "agent:alice:brain",
         messages: [],
       });
-      expect(readHistory).toHaveBeenCalledWith(
-        expect.objectContaining({
-          minTimestampMs: cutoff,
-          beforeTimestampMs: SIM_TIME + 1,
-        }),
-      );
+      const text = JSON.stringify(result.messages);
+      expect(text).toContain("now boundary");
+      expect(text).toContain("cutoff boundary");
+      expect(text).not.toMatch(/future|too old/);
+      expect(readHistory).toHaveBeenCalledTimes(3);
+      expect(
+        readHistory.mock.calls.every(([params]) => params.cursor === undefined),
+      ).toBe(true);
     },
   );
+
+  it("pages beyond 200 records and empty pages, preserving same-time append order", async () => {
+    const { engine, readHistory } = await setup();
+    readHistory.mockImplementation(async ({ sessionKey, cursor }) => {
+      if (sessionKey !== "agent:alice:tasks") return { items: [] };
+      if (!cursor) return { items: [], nextCursor: "visible" };
+      if (cursor === "visible")
+        return {
+          items: Array.from({ length: 200 }, (_, index) => ({
+            type: "agentMessage" as const,
+            text: `record-${200 - index}!`,
+            timestamp: new Date(SIM_TIME).toISOString(),
+          })),
+          nextCursor: "older",
+        };
+      return {
+        items: [
+          {
+            type: "agentMessage",
+            text: "oldest record",
+            timestamp: new Date(SIM_TIME).toISOString(),
+          },
+        ],
+      };
+    });
+    const result = await engine.assemble({
+      runtimeContext: { sessionTarget: { agentId: "alice" } },
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(
+      readHistory.mock.calls
+        .filter(([params]) => params.sessionKey.endsWith(":tasks"))
+        .map(([params]) => params.cursor),
+    ).toEqual([undefined, "visible", "older"]);
+    const text = JSON.stringify(result.messages);
+    expect(text.indexOf("oldest record")).toBeLessThan(
+      text.indexOf("record-1!"),
+    );
+    expect(text.indexOf("record-1!")).toBeLessThan(text.indexOf("record-200!"));
+  });
+
+  it("renders the catalog sender without reconstructing a different identity", async () => {
+    const { engine, readHistory } = await setup();
+    readHistory.mockImplementation(async ({ sessionKey }) => ({
+      items: sessionKey.includes(":chat:")
+        ? [
+            {
+              type: "userMessage",
+              text: "[speaker:alice] Hello",
+              timestamp: new Date(SIM_TIME).toISOString(),
+              sender: {
+                identity: {
+                  type: "observation",
+                  id: "carol",
+                  pluginId: "kazusa",
+                  accountId: null,
+                  senderKind: "bot",
+                },
+              },
+            },
+          ]
+        : [],
+    }));
+    const result = await engine.assemble({
+      runtimeContext: { sessionTarget: { agentId: "alice" } },
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(
+      JSON.stringify(result.messages).match(
+        /\[carol Fri 2026-10-23 08:00\] \[speaker:alice\] Hello/g,
+      ),
+    ).toHaveLength(2);
+  });
 
   it("resolves task-interrupt when tagged and ignores invalid marker paths", async () => {
     const { engine } = await setup();

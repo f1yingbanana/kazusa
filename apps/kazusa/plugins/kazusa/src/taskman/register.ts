@@ -14,7 +14,6 @@ import type {
   ActiveTask,
   DelayTaskParams,
   StartTaskParams,
-  TaskStore,
   ToolExecutionContext,
 } from "./types.ts";
 
@@ -22,23 +21,15 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
   minDuration: z.number().positive().default(10),
 });
 
-/** Tells the context engine which shared skill belongs to a task wake. */
-const TASK_WAKE_MARKER = "[kazusa:skill=task-lifecycle]";
-
 /** Registers task leases, their visible cron projection, and ledger. */
 export function registerTaskman(
   api: OpenClawPluginApi,
   { clock }: { readonly clock: Clock },
 ): void {
-  const stateStore = api.runtime.state.openKeyedStore<ActiveTask>({
+  const store = api.runtime.state.openKeyedStore<ActiveTask>({
     namespace: "tasks",
     retention: "retained",
   });
-  const store: TaskStore = {
-    lookup: (key) => stateStore.lookup(key),
-    register: (key, value) => stateStore.register(key, value),
-    entries: () => stateStore.entries(),
-  };
   const config = TASKMAN_CONFIG_SCHEMA.parse(api.pluginConfig?.taskman ?? {});
   let automationsReady = false;
   let synchronizeAgentAutomation:
@@ -114,13 +105,17 @@ export function registerTaskman(
           // the OpenClaw host discards it for an `at` schedule.
           expr: "",
         },
-        // Every Kazusa stimulus targets one character-level brain session.
-        // OpenClaw serializes turns and applies steering there.
-        sessionTarget: `session:agent:${agentId}:brain`,
+        // Taskman deadline automation projection:
+        // Uses sessionTarget: "isolated" (ephemeral session) rather than targeting
+        // "session:agent:<id>:brain" directly. OpenClaw serializes runs per session
+        // lane; an isolated session avoids lane contention when :brain is busy,
+        // allowing before_agent_reply to fire immediately and steer in-flight turns.
+        sessionTarget: "isolated" as const,
         wakeMode: "now" as const,
+        deleteAfterRun: true,
         payload: {
           kind: "agentTurn" as const,
-          message: `${TASK_WAKE_MARKER}\nScheduled ${task.type} task deadline reached at ${task.endAt}.`,
+          message: `Scheduled ${task.type} task deadline reached at ${task.endAt}.`,
         },
         // The task session is a ledger. A wake is not a chat reply.
         delivery: { mode: "none" as const },
@@ -128,7 +123,13 @@ export function registerTaskman(
     };
 
     const synchronize = async (agentId: string): Promise<void> => {
-      const task = await store.lookup(agentId);
+      let task = await store.lookup(agentId);
+      // One-time migration of leases retained before task IDs existed. Cron
+      // reconciliation completes before the scheduled deadline is admitted.
+      if (task && !task.id) {
+        task = { ...task, id: generateSecureUuid() };
+        await store.register(agentId, task, { assertCurrent });
+      }
       const snapshot = clock.now();
       if (!task || snapshot.speed <= 0) {
         await removeAgentAutomation(agentId);

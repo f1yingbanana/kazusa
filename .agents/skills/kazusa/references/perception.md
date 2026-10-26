@@ -1,90 +1,677 @@
-# Perception — Stimulus Routing and Attention Admission
+# Perception — Universal Attention Gate & Stimulus Router (Jev Decision Model)
 
-Design only. Planned as `plugins/kazusa/src/perception/` in the unified Kazusa
-plugin. No Perception routing or queue implementation exists yet.
+Drafted under `src/perception/` inside the unified Kazusa plugin
+(`@kazusa/plugin`). Perception acts as the sensory nervous system for each
+autonomous character, gating environmental stimuli, direct chats, group
+messages, and task deadlines before they reach the agent's single cognitive
+execution lane: `agent:<id>:brain`.
 
-## Responsibility boundary
+---
 
-Perception decides **what happened to this character, where to record it, and
-when it should reach their brain**. The context engine decides what historical
-context to show once a run has been admitted. Taskman owns leases, their task
-ledger, and dashboard-visible cron projection—not the brain session.
+## 1. Core Architectural Paradigm: Jev Decision Model
 
-`producer → Perception pending stimuli → admission → agent:<id>:brain`
+Earlier designs routed stimuli through a secondary generative LLM chat session
+(`agent:<id>:perception`). That approach suffered from high latency (2–5s),
+significant token costs ($0.015+ per check), output JSON parsing fragility,
+prompt-injection vulnerabilities from untrusted incoming text, and lossy
+generative summarization.
 
-Ledger writes and cognitive delivery are distinct. Never start character runs on
-chat/task ledgers. One brain remains the sole execution lane even while
-different conversations or physical events compete for attention.
+Kazusa refactors Perception to use OpenClaw's native **Decision Model API**:
+`api.runtime.decisions.evaluate({ state, questions }, { agentId, purpose: "perception" })`.
 
-## Stimulus kinds
+### Why Decision Models for System 1 Attention
 
-| Kind                                    | Record / destination                                                                    | Cognitive meaning                                                                                                                                      |
-| --------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Incoming direct/group chat (with media) | Owner's `:chat:direct:<peer>` / `:chat:group:<group>` view                              | Someone said/shared something; media is preflighted with Context Engine background and stored as `[Image: <summary>]`. Replying is a character choice. |
-| Physical encounter                      | Perceivable in-world observation; exact record convention to be designed                | Meeting a person is not receiving a chat message.                                                                                                      |
-| World event                             | Only affected characters' perceivable observations                                      | No omniscient broadcast of hidden world state.                                                                                                         |
-| Task due                                | Taskman supplies the deadline stimulus; existing `:tasks` ledger describes the activity | Cue to assess progress, not automatic completion or a forced transition.                                                                               |
+- **Sub-100ms Latency**: A single forward pass evaluates categorical choices in
+  ~70–200ms without iterative auto-regressive token generation.
+- **Calibrated Softmax Probabilities**: Directly outputs exact probabilities
+  ($P(\text{STEER})$, $P(\text{QUEUE\_NEXT})$, $P(\text{IGNORE})$), enabling
+  rigorous mathematical hysteresis.
+- **Zero Generated Output Tokens**: $0.042 per million input tokens (compared to
+  ~$15.00/1M for frontier generative LLMs).
+- **Zero Prompt Injections**: Incoming chat text cannot inject instructions to
+  hijack tools or escape the prompt, because the decision model only predicts
+  categorical logits.
+- **Verbatim Stimulus Preservation**: Stimuli admitted to the brain pass through
+  completely intact. No hallucinations, omissions, or generative paraphrasing.
+- **Supported Providers**: TypeSafe AI Jev (`typesafe/jev-latest`,
+  `typesafe/jev-1.13.0`), local Kev (ONNX/GGUF), or OpenClaw-hosted decision
+  endpoints.
 
-Reuse native message text and timestamps. No speculative event metadata schema,
-new experience stream, external-channel adapter, or additional database yet.
+---
 
-## Secondary queue and admission
+## 2. Resolution of OpenClaw 2026.10.5 Runtime Constraints
 
-- Keep pending stimuli separate from OpenClaw's execution/steering queue.
-- **Multimodal Preflight & Grounding**: When an incoming stimulus contains
-  images or media attachments, Perception coordinates with OpenClaw's Media
-  Understanding pipeline (`tools.media`) or a vision model. It provides the full
-  narrative background from the Context Engine (location, speaker identity,
-  recent conversation thread) to ground the visual description. The resulting
-  semantic summary is written into the recipient's `:chat:*` ledger as an inline
-  `[Image: <summary>]` block with an attachment reference. High-resolution
-  re-inspection is performed on demand by the brain via
-  `view_image(path, prompt)`.
-- Observe native run lifecycle/activity for each brain. A busy check is not a
-  lock: checking and admitting must preserve single-session ordering.
-- If the brain is idle, admit eligible input to wake it. If busy, evaluate
-  whether an event merits immediate attention/distraction through steering or
-  should wait until a useful boundary. Event type alone need not determine
-  urgency; character and situation matter.
-- Deferred events remain pending, not silently dropped. Re-evaluate when the
-  active run completes, errors, or is interrupted. Busy detection must recover
-  after restart; exact queue persistence and acknowledgement rules are TBD.
-- Steering is additional perception, not a command to abandon the prior
-  stimulus. Skills teach reassessment while preserving unfinished intentions;
-  personality may still lead to distraction or a switch of focus.
-- The gate prevents automatic steering floods but does not by itself prove
-  starvation freedom. Choose and test a bounded admission/fairness policy when
-  implementing it; do not claim prompt wording alone solves starvation.
+In OpenClaw 2026.10.5, `api.runtime.gateway.request(...)` and
+`api.runtime.gateway.readSessionFacts(...)` are restricted by
+`canTrustedOfficialPluginRequestScopes` to bundled or trusted-official plugins.
+Local plugins cannot call those Gateway RPCs.
 
-Do not pause, extend, or conclude a task merely because an interrupt arrived.
-The character must use `start_task` or `delay_task` if their activity changes.
-Before delivering a deferred task-due stimulus, revalidate it against the lease
-so a replaced/delayed task does not trigger a stale completion reaction.
+Perception's policy operates in-process; this does not by itself solve the
+supported delivery/steering transport:
 
-## Native integration constraints to verify during implementation
+1. **Inbound Message Interception**: The native `api.on("before_dispatch")` hook
+   claims incoming direct/group messages (`return { handled: true }`), stopping
+   unmanaged auto-replies and registering the stimulus. The producer owns prior
+   ledger persistence.
+2. **In-Process Lifecycle Tracking**: Brain busy/idle state is tracked in
+   real-time via
+   `api.agent.events.registerAgentEventSubscription({ streams: ["lifecycle"] })`,
+   monitoring `agent_start` and `agent_end` events for `agent:<id>:brain`.
+3. **Idle Brain Wake Scheduling**: Idle brain runs are scheduled using
+   OpenClaw's native Cron Automations (`ctx.getCron().add(...)`) or direct turn
+   invocation targeting `agent:<id>:brain`, identical to Taskman.
+4. **Active Brain Steering**: The target is host-owned `steer` admission. The
+   current private handle adapter is transitional, not a supported API.
+5. **No Ghost Sessions**: Deletes `agent:<id>:perception`, eliminating
+   tool-stripping hacks (`toolsAllow: []`), prompt overrides, and cross-session
+   fact reads.
 
-- Route/admit before the native run pipeline. `assemble()` is too late and may
-  run again on retry. Message observation hooks are not automatically routing
-  hooks, and a plain subagent run is not proof of steering support.
-- Media attachments must never store raw base64 or heavy vision tokens into chat
-  ledgers; store only lightweight `[Image: <summary>]` text descriptions and
-  local attachment paths. Re-inspection occurs explicitly via `view_image`.
-- Verify the chosen native dispatch surface preserves agent ID, brain session,
-  queue mode, delivery suppression, requester authority, and cancellation.
-- Taskman's current cron payload directly targets `:brain`. This bypasses the
-  planned gate until an explicit integration is implemented; changing a skill or
-  naming a module does not intercept cron execution.
-- Persist simulation occurrence time at ingestion via `clock.time()`, not the
-  later admission time. Deferred events keep their original event timestamp.
-- The task ledger is written by Taskman; Perception must not duplicate it. Chat
-  producers/Perception will write each participant's permitted view with native
-  `message.timestamp` in simulation time. Operational session metadata,
-  transcript envelope creation times, and cron deadlines remain real-time.
+### Session controller and SDK boundary (verified 2026-10-25)
 
-## Acceptance tests for the future implementation
+Rolling docs describe a host-owned session controller: it owns the current turn,
+waiting inputs, lifecycle barriers, and exact-target steering. It is not a
+plugin-created queue or an agent runtime handle. Upstream `main` routes the
+deprecated `queueAgentHarnessMessage` through internal
+`resolveActiveReplyOperationForSessionId` and `steerSessionControllerOperation`.
+Those helpers are not public plugin SDK exports. The installed 2026.10.5 and
+stable 2026.10.7 helper still use the older native-run queue; both already have
+`onQueueAccepted` and both deprecate the public queue helper.
 
-Route different stimulus kinds without leaking another character's records; wake
-an idle brain; steer or defer a busy brain; admit deferred input after
-completion/error; preserve earlier intentions; reject stale task wakes; avoid
-duplicate delivery across retries; and demonstrate bounded progress under a
-burst of stimuli. No test should assume interrupts automatically pause tasks.
+Do not introduce that deprecated helper, import private controller modules,
+manufacture host admission, or treat a raw transcript append as steering. Public
+`dispatchGatewayMethod` can call `chat.send` with steering only inside an
+authorized plugin request scope; it is not a background-worker capability. A
+supported autonomous transport needs an authorized Gateway client or an upstream
+public host-admission surface. Do not clear pending stimuli based only on
+initial queue eligibility; acceptance and transcript commitment differ.
+
+- [Session controller](https://docs.openclaw.ai/concepts/session-controller)
+- [Harness admission](https://docs.openclaw.ai/plugins/sdk-agent-harness/attempt-runtime)
+
+---
+
+## 3. Universal Attention Gate: Idle & Busy Brain Evaluation
+
+Characters are never truly "idle" in Kazusa—sleeping, reading, meditating,
+eating, and resting are active tasks in `tasks`. Therefore, **every incoming
+stimulus is evaluated through Jev against the agent's current activity and
+state**, regardless of whether the brain LLM lane is currently executing.
+
+```text
+Incoming Stimulus / Coalesced Bundle (Chat / Physical Event / World Notice)
+                               │
+                               ▼
+        Producer persists chat ledger before Perception intake
+                               │
+                               ▼
+       Compile State Prefill (Task, Focus, Desires, Context)
+                               │
+                               ▼
+              Jev Decision Model Evaluation
+            (`api.runtime.decisions.evaluate`)
+                               │
+         ┌─────────────────────┴─────────────────────┐
+         ▼                                           ▼
+   [Brain is IDLE]                            [Brain is BUSY]
+         │                                           │
+ Choices: WAKE vs IGNORE                     Choices: STEER vs QUEUE vs IGNORE
+         │                                           │
+  P(WAKE) ≥ T_wake?                           P(STEER) ≥ T_steer(focus)?
+  ├── Yes ➔ Wake :brain                       ├── Yes ➔ Steer active :brain run
+  └── No  ➔ IGNORE (Stay quiet)               ├── No & P(QUEUE) ≥ 0.5 ➔ Hold in queue
+                                              └── No ➔ IGNORE (Stay focused)
+```
+
+### 3.1 Idle Brain Evaluation (`WAKE` vs `IGNORE`)
+
+Characters in Kazusa are never truly inactive: sleeping, reading, meditating,
+and resting are distinct active tasks tracked in `tasks`. When incoming stimuli
+arrive while the LLM brain lane is idle, Perception evaluates whether the
+stimuli warrant waking the character from their current activity.
+
+#### 1. Activity Context Resolution
+
+Perception retrieves the character's active task via
+`taskStore.getActiveTask(agentId)`. If no task is currently active, it defaults
+gracefully:
+
+```typescript
+const defaultActivity = {
+  type: "resting",
+  description: "Lounging and reflecting",
+  startedAt: null,
+  endAt: null,
+  focusLevel: 0.1,
+};
+```
+
+Focus level is computed dynamically using `resolveTaskFocus(task)` (e.g. low for
+resting, medium for chores, high for studying/combat).
+
+#### 2. Pure Semantic Evaluation (No Hardcoded Heuristics)
+
+Unlike brittle heuristic architectures, Perception uses **no hardcoded keyword
+matching or focus threshold overrides**:
+
+- Activity context (e.g. sleep, meditation, intense combat, casual lounging) is
+  provided directly to the Jev Decision Model in
+  `DecisionEntry.currentActivity`.
+- Jev evaluates semantic salience directly and returns categorical decisions
+  (`choice: "WAKE"` vs `"SLEEP"`, or `"STEER"` vs `"QUEUE_NEXT"` vs `"IGNORE"`).
+- This keeps the codebase minimal and eliminates stray assumptions or arbitrary
+  magic numbers.
+
+#### 3. Queue-Next Fast-Path Bypass (`allQueued`)
+
+When a character was previously busy thinking, stimuli evaluated as `QUEUE_NEXT`
+were **already explicitly approved** for attention once the active thought
+completes.
+
+- When the brain finishes its turn and becomes idle, Perception inspects the
+  bundle:
+  ```typescript
+  const allQueued =
+    bundle.length > 0 && bundle.every((item) => item.action === "QUEUE_NEXT");
+  let shouldWake = allQueued || !evaluateDecision;
+  ```
+- If `allQueued === true`: Perception **bypasses Jev re-evaluation entirely**
+  and delivers the bundle immediately (`shouldWake = true`). This prevents
+  redundant decision-model latency and guarantees instant delivery.
+- If no decision model is configured (`!evaluateDecision`): Perception fails
+  open to deliver, ensuring no events are dropped.
+
+#### 4. Context Assembly (`DecisionBatch`)
+
+When Jev evaluation is required, the Context Engine's dedicated decision assembler
+compiles the full `DecisionBatch` (`{ state, questions }`) containing the state
+data and the rubrics resolved from `shared/skills/perception/SKILL.md`:
+
+```typescript
+const batch: DecisionBatch = await this.assembleDecisionContext(agentId, {
+  activeTask: task,
+  brainStatus,
+  brainContext: state.brainContext,
+  incomingBundle: bundle,
+  pendingQueue: state.pending,
+  signal: this.lifetime.signal,
+});
+```
+
+#### 5. Jev Evaluation & Outcome Handling
+
+Perception submits a choice evaluation query to Jev
+(`api.runtime.decisions.evaluate`):
+
+- **Question**: `wake_decision`
+- **Instructions**:
+  `"Should the character be woken up from '${task?.description}' to respond to this incoming sensory bundle?"`
+- **Criteria**:
+  - `WAKE`: The incoming stimuli are relevant, direct, or urgent enough to wake
+    the character from their current activity.
+  - `IGNORE`: The stimuli are ambient chatter, background noise, or negligible
+    while engaged in this activity (e.g. sleep/rest).
+- **Outcome**:
+  - $P(\text{WAKE}) \ge T_{\text{wake}}$ ➔ **WAKE**: Consolidated single-turn
+    presentation delivered to `agent:<id>:brain` via `followup` turn with
+    `[INTERRUPT]\nIncoming chats: [...]` containing all bundle IDs.
+  - $P(\text{WAKE}) < T_{\text{wake}}$ ➔ **IGNORE**: Stimuli are dropped from
+    `state.pending` attention queue, but **safely retained in the subjective
+    ledger** (`agent:<id>:chat:*`) for permanent memory and historical recall.
+  - **Error Safety**: If `evaluateDecision` throws or encounters a network
+    error, the catch block retains all items in `state.pending` without dropping
+    them. Zero message loss.
+
+### 3.2 Busy Brain Evaluation (`STEER` vs `QUEUE_NEXT` vs `IGNORE`)
+
+- When the brain is already actively executing a cognitive turn, incoming
+  stimuli compete for working memory.
+- Jev evaluates categorical choices:
+  - _Question_:
+    `"Given the character is actively thinking and engaged in '${task?.description ?? "active reasoning"}', how should the character allocate attention to this incoming bundle (considering its combination and context)?"`
+  - _Choices_: `["STEER", "QUEUE_NEXT", "IGNORE"]`
+- **Semantic Focus Rather Than Ad-Hoc Numbers**:
+  Instead of fragile hardcoded probability thresholds, the character's active task description (e.g. low-focus lounging vs high-focus studying/combat) and context are provided directly to Jev in `currentActivity`. Jev semantically weighs whether the stimuli warrant immediate mid-thought steering.
+- **Routing Rules**:
+  1. **STEER**: Injects immediately into the active brain execution lane via OpenClaw's `mode: "steer"` session queue (`InboundEventKind: "user_request"`).
+  2. **QUEUE_NEXT**: Retained in the pending attention queue to be delivered automatically when the current brain run finishes.
+  3. **IGNORE**: Dropped from pending attention. The message remains permanently recorded in the subjective chat ledger.
+  4. **Attention Floor for Deadlines**: Task deadlines can never be dropped into `IGNORE`; if evaluated as `IGNORE`, they clamp to `QUEUE_NEXT`.
+  5. **Fail-Open Policy**: If Jev is unavailable or throws, Perception fails open to `STEER`, ensuring stimuli are never dropped or stalled when the decision service is down.
+
+---
+
+## 4. Multi-Stimulus Arrival & Emergent Salience (Combination Effects)
+
+In real conversational environments, messages frequently arrive in fragments or
+rapid succession (e.g., `"Hey"`, `"are you there?"`,
+`"quick emergency in the kitchen"`). Furthermore, two individually routine
+messages from different peers can combine to create an urgent situation.
+
+If stimuli were evaluated in isolated silos:
+
+1. Fragmented messages would be discarded as `IGNORE` before the punchline
+   arrives.
+2. An earlier clue (e.g., `"Do you smell smoke?"`) discarded as `IGNORE` would
+   lose its context when a subsequent message
+   (`"The building alarm is ringing!"`) arrives.
+
+To guarantee context integrity and capture **emergent combination salience**,
+Perception employs three mechanisms:
+
+### 4.1 Ingestion Debouncing & Coalescing Window
+
+- When a stimulus arrives, Perception initiates a brief perceptual coalescing
+  window (`coalesceWindowMs = 500ms`).
+- Any additional stimuli arriving within this window are grouped into a single
+  **incoming bundle**.
+- This guarantees multi-line chat bursts (common on Discord/Telegram) are
+  evaluated as a coherent whole rather than piecemeal.
+
+### 4.2 Cumulative Context in State Compilation
+
+When Jev evaluates an incoming bundle, `state` provides:
+
+- **`recentChannelContext`**: The last 3–5 messages from that channel ledger,
+  ensuring continuous conversational flow even across intervals.
+- **`pendingQueue`**: Any stimuli currently waiting in the attention queue from
+  earlier arrivals.
+- **`incomingBundle`**: The newly arrived stimuli to be evaluated.
+
+### 4.3 Collective Salience & Priority Escalation
+
+- Jev evaluates the **entire bundle** collectively against the character's
+  active task:
+  - _Example_: Stimulus A (`"Did you smell smoke?"`) alone has $P(\text{STEER})
+    = 0.20$ (low urgency).
+  - Stimulus B (`"The toaster is flaming!"`) arrives.
+  - When evaluated together with A and recent channel context, the combined
+    bundle yields $P(\text{STEER}) = 0.98$!
+- **Escalation of Previously Queued Items**:
+  - If Stimulus A was already sitting in `QUEUE_NEXT`, and newly arrived
+    Stimulus B elevates the overall situation to `STEER`, **both A and B are
+    admitted and steered into the brain together**.
+  - Context is never severed or evaluated in an amnesiac vacuum.
+
+---
+
+## 5. Consolidated Queue Draining (Single-Turn Batch Presentation)
+
+When an agent is busy or asleep, stimuli evaluated as `QUEUE_NEXT` accumulate in
+the pending attention queue.
+
+### The Anti-Pattern: Serial Ping-Pong Turns
+
+In naive queue implementations, when the brain finishes its current run, the
+queue pops items one-by-one:
+
+- Brain finishes Turn 1 $\to$ wakes for Message 1 (Turn 2) $\to$ finishes $\to$
+  wakes for Message 2 (Turn 3) $\to$ finishes $\to$ wakes for Message 3 (Turn
+  4).
+- This produces severe conversational lag, burns unnecessary LLM turns, and
+  forces the character into robotic, fragmented single-line replies.
+
+### The Kazusa Pattern: Consolidated Single-Turn Presentation
+
+1. **Batch Drain on Turn Completion**: When the active brain run completes
+   (`agent_end` lifecycle event on `agent:<id>:brain`), Perception drains **all
+   eligible pending stimuli in one single batch** (up to `maxBatchSize`).
+2. **Simultaneous Admission**: All drained stimulus IDs are atomically removed
+   from `pending` and marked admitted.
+3. **Single Wake Signal**: Perception issues a single wake signal to
+   `agent:<id>:brain`.
+4. **Context Engine Synthesis**: When `agent:<id>:brain` awakens, the Context
+   Engine's `assemble()` pipeline pulls recent stream ledgers with native
+   structured sender attribution and renders chronological speaker/time
+   envelopes.
+5. **Holistic Response**: The agent synthesizes all incoming messages in a
+   **single, unified, coherent LLM turn** (e.g., addressing Bob's questions and
+   Clara's updates simultaneously in one natural response).
+
+---
+
+## 6. Context Assembly & Decision Schema
+
+When stimuli arrive, the Context Engine compiles a structured, bounded `DecisionBatch`
+(`{ state, questions }`) passed directly into `api.runtime.decisions.evaluate`.
+
+### State Payload Schema (`DecisionBatch.state`)
+
+```typescript
+interface DecisionStatePayload {
+  character: {
+    id: string;
+  };
+  currentActivity: {
+    type: string;
+    description: string;
+    startedAt: number | null;
+    endAt: number | null;
+    focusLevel: number; // 0..1 numerical scalar from resolveTaskFocus
+  };
+  brainStatus: "idle" | "busy_thinking";
+  recentChannelContext: Array<{
+    role: string;
+    text: string;
+    timestamp?: number;
+  }>; // Trailing messages from session store runtime
+  pendingQueue: Array<{
+    id: string;
+    sender: string;
+    text: string;
+    timestamp: number;
+  }>; // Stimuli already deferred in the attention queue
+  incomingBundle: Array<{
+    id: string;
+    sender: string;
+    text: string;
+    timestamp: number;
+  }>; // Newly arrived stimuli to be evaluated
+}
+```
+
+### Decision Request Format: Idle Brain (`WAKE` vs `IGNORE`)
+
+```typescript
+const outcome = await api.runtime.decisions.evaluate(
+  {
+    state: stateData, // brainStatus: "idle", pendingQueue: []
+    questions: {
+      wake_decision: {
+        type: "choice",
+        instructions: `Should the character be woken up from '${task?.description ?? "resting"}' to respond to this incoming sensory bundle?`,
+        criteria: {
+          WAKE: "The incoming stimuli are relevant, direct, or urgent enough to wake the character from their current activity.",
+          IGNORE:
+            "The stimuli are ambient chatter, background noise, or negligible while engaged in this activity (e.g. sleep/rest).",
+        },
+      },
+    },
+  },
+  {
+    agentId,
+    purpose: "perception.idle_salience",
+    rubricVersion: "2",
+  },
+);
+```
+
+### Decision Request Format: Busy Brain (`STEER` vs `QUEUE_NEXT` vs `IGNORE`)
+
+```typescript
+const outcome = await api.runtime.decisions.evaluate(
+  {
+    state: stateData, // brainStatus: "busy_thinking", pendingQueue: [...]
+    questions: {
+      attention_allocation: {
+        type: "choice",
+        instructions: `Given the character is actively thinking and engaged in '${task?.description ?? "active reasoning"}', how should the character allocate attention to this incoming bundle (considering its combination and context)?`,
+        criteria: {
+          STEER:
+            "The incoming stimuli (individually or combined) are urgent, dangerous, or important enough to immediately interrupt current thoughts.",
+          QUEUE_NEXT:
+            "The stimuli are relevant and should be addressed, but can wait until the current thought/action concludes.",
+          IGNORE:
+            "The stimuli are routine chatter, ambient background noise, or irrelevant to the character's current activity and should not draw attention.",
+        },
+      },
+    },
+  },
+  {
+    agentId,
+    purpose: "perception.salience",
+    rubricVersion: "2",
+  },
+);
+```
+
+---
+
+## 7. Ledger Persistence & Per-Agent Subjective Storage
+
+### Design Decision: Per-Agent Subjective Ledgers
+
+We explicitly choose to store separate subjective transcripts per character:
+
+- Direct: `agent:<id>:chat:direct:<peer>`
+- Group: `agent:<id>:chat:group:<group>`
+
+**Rationale**:
+
+1. **Dual-Wiki Subjective Epistemology**: Characters only possess knowledge of
+   events they personally perceived.
+2. **Native OpenClaw Compatibility**: Standard channel adapters (Discord,
+   Telegram, WhatsApp, Web UI) write and read native agent transcripts without
+   custom reverse-proxies or dummy observer agents.
+3. **Negligible Storage Cost**: A text chat message averages ~1 KB. 10,000 group
+   messages across a 5-member simulation consume only ~50 MB of local SQLite
+   disk space. The engineering complexity of a shared observer agent far exceeds
+   the disk cost.
+
+### Ledger Writer Contract & Separation of Responsibilities
+
+1. **Perception Never Writes to Ledgers**:
+   - Perception is strictly an **Attention / Salience Gate**, not a database or
+     transcript writer.
+   - Perception takes pure in-memory `Stimulus` objects, evaluates salience via
+     Jev, and delivers cognitive prompts to `agent:<id>:brain`.
+   - Perception never calls `appendSessionTranscriptMessageByIdentity` or
+     manages session entries for chat ledgers.
+
+2. **`send_message` Tool (Egress & Mutual Ledger Writer)**:
+   - Planned tool; follow [the messaging contract](messaging.md), including
+     native `__openclaw` sender metadata, simulation timestamps, ordered writes,
+     and idempotency. Perception never supplies missing attribution by writing
+     to the transcript.
+   - When Agent Alice sends a message to Agent Bob via `send_message`:
+     - Writes outbound record to Alice's ledger (`agent:alice:chat:direct:bob`,
+       `role: "assistant"`).
+     - Writes inbound record to Bob's ledger (`agent:bob:chat:direct:alice`,
+       `role: "user"`).
+     - Dispatches the message via OpenClaw Gateway to Bob's session key.
+     - `send_message` does **not** need to call `perception.receive()` directly.
+
+3. **`before_dispatch` Hook (Universal Ingress Interceptor)**:
+   - Catches inbound messages targeting `agent:*:chat:*` (both from
+     `send_message` and external platforms like Discord/Telegram).
+   - Returns `{ handled: true }` to silence OpenClaw's raw, unmanaged auto-reply
+     turn.
+   - Extracts the clean message text and forwards the `Stimulus` into
+     `perception.receive(recipient, stimulus)`.
+   - Does not perform duplicate ledger writes; transcript persistence was
+     already completed prior to attention admission.
+
+---
+
+## 8. Task Deadlines as First-Class Sensory Stimuli & Ephemeral Cron Projection
+
+In earlier drafts, task deadlines were treated as an out-of-band procedural boolean (`state.deadline`). That approach had major conceptual and practical drawbacks:
+1. Deadlines could never interrupt or steer an ongoing thought, even for dangerous or urgent countdowns (e.g. food burning on a stove).
+2. Deadlines bypassed the Jev attention allocation gate.
+3. Procedural timestamp math (`Date.parse(task.endAt) <= simNow`) suffered from sub-second timer scheduling jitter.
+
+Kazusa unifies task deadlines under the **universal sensory stimulus model**: in biological cognition, a kitchen timer ringing or a clock striking the hour is simply an **internal auditory/temporal sensory stimulus (`Stimulus`)**.
+
+### 8.1 The Stimulus Contract for Deadlines
+
+When Taskman's cron deadline fires, Perception receives it as a first-class `Stimulus`:
+
+```typescript
+const stimulus: Stimulus = {
+  id: `task-deadline:${task.id}`,
+  sessionKey: `agent:${agentId}:tasks`,
+  sender: "kazusa:clock",
+  text: `[kazusa:skill=task-lifecycle]\nScheduled ${task.type} task deadline reached at ${task.endAt}.`,
+  timestamp: clock.time(),
+};
+await perception.receive(agentId, stimulus);
+```
+
+### 8.2 Ephemeral Session Architecture (`sessionTarget: "isolated"`)
+
+In OpenClaw, `withCronSessionPreparation` enforces single-threaded session lane serialization (`beginSessionWorkAdmission` on `resolveSessionLane(sessionKey)`).
+
+- If Taskman scheduled a cron directly targeting `session:agent:<id>:brain`:
+  - When `:brain` is actively executing (busy thinking), the cron job blocks in OpenClaw's lane queue.
+  - `before_agent_reply` cannot fire while `:brain` is in-flight, which would lock out mid-turn steering and delay deadline delivery.
+- By targeting `"isolated"`, the cron job executes in its own uncontended ephemeral lane (`cron:<jobId>`).
+- When the cron fires, `before_agent_reply` intercepts the turn:
+  1. Claims the turn with `{ handled: true }` (silent reply).
+  2. Forwards the deadline stimulus into `perception.receive(agentId, stimulus)`.
+  3. OpenClaw records the cron run as `status: "ok"` (success) on the dashboard without LLM inference or transcript writes, then deletes the ephemeral session (`deleteAfterRun: true`).
+
+### 8.3 The Cognitive Attention Gate & Attention Floor
+
+Because the deadline enters `state.pending` as a standard stimulus, it passes through the unified cognitive attention gate, with one fundamental cognitive invariant: **the passage of time cannot be un-elapsed, and characters are never taskless**. Therefore, task deadlines possess an **attention floor of `QUEUE_NEXT`**:
+
+1. **When Brain is Idle**:
+   - The deadline stimulus unconditionally wakes the character (`WAKE`) so they can reflect, transition activities, or extend the lease via `start_task` or `delay_task`. Jev's `wake_decision` is bypassed (`hasDeadline === true`).
+2. **When Brain is Busy (Interruption in Progress)**:
+   - Jev evaluates the incoming sensory bundle against the ongoing thought and active task:
+     - **STEER**: If the task deadline is urgent, hazardous, or time-critical (e.g. boiling soup, bomb defusal countdown), Jev evaluates `STEER`. The character is immediately steered mid-turn.
+     - **QUEUE_NEXT**: If the task deadline is routine (e.g. reading a book, resting), Jev evaluates `QUEUE_NEXT`. The stimulus waits in `state.pending` until the current thought/reply concludes, and then drains as a wake turn.
+     - **Safety Clamp on IGNORE**: While ambient chat stimuli can be dropped if Jev evaluates `IGNORE`, Perception enforces that task deadlines **can never be dropped into non-existence**. Any `task-deadline:*` stimulus in an `IGNORE` bundle is automatically clamped to **`QUEUE_NEXT`**. This completely prevents "zombie characters" (where an agent would be left taskless without a future cron wake).
+
+### 8.4 Retiring the Alarm: Preemption and Task Transitions
+
+In human cognition, when an agent consciously abandons or switches tasks early, they **cancel the alarm**:
+
+- If during an interruption turn the agent decides to stop studying early and help Bob, the agent calls `start_task("helping_bob", 45)`.
+- Calling `start_task` immediately runs `synchronizeAgentAutomation(agentId)`. Because `declarationKey: agentId` is the unique job key, OpenClaw's `cron.add` **atomically replaces** the previous scheduled wake job with the new one. The old alarm is wiped from the scheduler.
+- **Race Condition Defense**: If a millisecond race occurred where an old cron fired just before `cron.add` committed, Perception inspects the stimulus `taskId` against `taskStore.lookup(agentId)`:
+  ```typescript
+  if (currentTask.id !== deadlineTaskId) {
+    // Stale timer for a retired/replaced task; discard silently
+    return;
+  }
+  ```
+  The stale deadline is dropped silently without touching an LLM or distracting the character.
+
+---
+
+### 8.5 Interleaving Examples (Collision Scenarios)
+
+The following scenarios illustrate how task deadlines and interruptions interleave naturally in Kazusa:
+
+#### Example 1: Routine Task Deadline During Conversation (`QUEUE_NEXT`)
+* **Scenario**: Alice is reading a book (scheduled until 14:00).
+* **13:55**: Bob sends a direct chat: *"Did you see the announcement about the election?"*
+* **13:56**: Alice's brain starts an LLM turn on `agent:alice:brain` to reply to Bob.
+* **14:00**: While Alice is still generating her response, the reading deadline cron fires.
+* **Attention Gate**: Jev evaluates the reading deadline against her active thought. Routine reading completion is not an emergency: Jev marks it **`QUEUE_NEXT`**.
+* **14:01**: Alice completes her message to Bob. Her brain turn ends.
+* **Drain**: Perception detects turn completion and drains pending `QUEUE_NEXT` items.
+* **Outcome**: Alice's brain awakens with the deadline percept. Having just replied to Bob, Alice now decides what to do next with full working memory: calls `start_task("writing_notes", 30)`.
+
+#### Example 2: Urgent Task Deadline / Hazard During Conversation (`STEER`)
+* **Scenario**: Alice is simmering soup on high heat (scheduled for 10 minutes until 12:10).
+* **12:08**: Bob asks a deep, complex philosophical question. Alice begins an extensive cognitive turn.
+* **12:10**: The 10-minute soup timer deadline fires.
+* **Attention Gate**: Jev evaluates the soup deadline against her active thought. Unattended boiling soup is an active hazard: Jev evaluates **`STEER`**!
+* **Outcome**: Alice's active turn is immediately steered mid-thought. She generates: *"Hold on Bob, my soup is boiling over, let me take it off the stove!"*, invokes `start_task("eating", 20)`, and avoids burning down the kitchen.
+
+#### Example 3: Task Preemption / Switching (`Canceling the Alarm`)
+* **Scenario**: Alice is studying in her room (scheduled until 17:00).
+* **16:30**: Bob bursts in with an emergency: *"Clara fell down the stairs, I need your help carrying her!"*
+* **16:31**: Alice starts an interruption turn. She decides to immediately abandon studying:
+  `start_task("helping_clara", 60)`
+* **Task Transition**: `start_task` replaces the active task in SQLite and atomically updates OpenClaw's cron with Clara's deadline (17:31).
+* **Outcome**: The 17:00 study alarm is wiped from the scheduler. If a sub-second race had caused the 17:00 study timer to pop in transit, Perception checks `currentTask.id !== "study_task_id"` and silently discards it. Alice is never distracted by a study alarm while bandaging Clara.
+
+#### Example 4: Coalesced Arrival (Simultaneous External and Internal Stimuli)
+* **Scenario**: Alice is meditating quietly in her room (brain is idle).
+* **09:00:00.100**: Her 30-minute meditation task deadline fires.
+* **09:00:00.250**: Within the 500ms coalescing window, Bob sends a message: *"Good morning! Are you free for coffee?"*
+* **Coalescing**: Perception bundles both stimuli into a single sensory intake:
+  ```text
+  [kazusa:skill=task-interrupt]
+  Incoming chats: [{"sender":"bob","text":"Good morning! Are you free for coffee?"}]
+  [kazusa:skill=task-lifecycle]
+  Scheduled meditating task deadline reached at 09:00:00.000Z.
+  ```
+* **Outcome**: Alice wakes up in a **single LLM turn** perceiving both that her meditation ended and that Bob reached out. She responds naturally: *"Good morning Bob! I just finished meditating, so I'd love to grab coffee."* and calls `start_task("coffee_with_bob", 45)`. Zero split-brain, zero redundant LLM turns.
+
+---
+
+### 8.6 Future Architecture: Regular-Interval Overdue Nudges (Zombie Defense)
+
+#### The Problem: Omission of `start_task`
+When a task deadline is delivered to the LLM, the model might produce narrative thoughts or chat responses but forget to call `start_task` or `delay_task`. If unhandled:
+- The previous task in SQLite remains expired (`endAt <= simulationNow`).
+- The one-shot cron job has already fired and deleted itself (`deleteAfterRun: true`).
+- No future wake alarm is scheduled, creating a "zombie character" frozen in an unanchored state.
+
+#### Why Synthetic "Resting" is Rejected (Out of Character)
+A naive fix is to fabricate an autonomous fallback lease (e.g. `type: "resting", duration: 15`). However, forcing an agent to "rest" when they just jumped out of an airplane (where the next task must be pulling the parachute), are defusing a bomb, or are performing emergency medical triage is completely immersion-breaking and OOC. In physical reality, if an action ends and you haven't switched, you are **still in that situation**.
+
+#### Why Linear / Regular Intervals over Exponential Backoff
+Exponential backoff is a network protocol mechanism designed for collision and congestion control on a shared bus. In physical time and cognitive psychology, time flows linearly. If an unresolved alarm sounds, a physical timer or snooze bell rings at a **regular pacing interval** (e.g. every 2 simulation minutes).
+
+#### Planned Overdue Nudge Mechanism (Roadmap)
+1. **Periodic Projection**: When an agent's task is overdue (`task.endAt <= simulationNow`) and no new task was scheduled, Taskman projects an overdue reminder cron for `simulationNow + overdueNudgeIntervalMinutes` (e.g. 2 simulation minutes).
+2. **Prompt Payload**:
+   ```text
+   [kazusa:skill=task-lifecycle]
+   Overdue task reminder: Your current ${task.type} task reached its deadline at ${task.endAt}. You are still engaged in this task. Conclude it and begin your next activity via start_task, or extend it via delay_task.
+   ```
+3. **In-Character Resolution**: The character reads the reminder in the context of their ongoing situation (*"Wait, I'm still freefalling, I must pull the ripcord!"*) and invokes `start_task` or `delay_task`.
+4. **Atomic Cancellation**: The moment `start_task` or `delay_task` is executed, `declarationKey: agentId` atomically overwrites the overdue reminder cron with the new task's scheduled deadline. The reminder loop cleanly terminates.
+5. **Runaway Circuit Breaker**: If a misconfigured model ignores $N$ consecutive overdue nudges (e.g. `maxOverdueNudges: 5`), Taskman logs a high-priority warning (`api.logger.warn`) and backs off the interval (e.g. every 15 minutes) to protect token budgets while alerting operators.
+
+---
+
+## 9. Configuration & Gate Thresholds
+
+### 9.1 User Configuration (`plugins.entries.kazusa.config.perception`)
+
+| Setting            | Default | Scope                                                                               |
+| :----------------- | :------ | :---------------------------------------------------------------------------------- |
+| `coalesceWindowMs` | `500`   | Milliseconds to debounce incoming rapid-fire messages into a single sensory bundle. |
+| `maxBatchSize`     | `16`    | Maximum stimuli consolidated and admitted together into a single brain turn.        |
+
+_Note_: The decision model provider and routing are configured centrally via
+OpenClaw's model runtime (`openclaw.json`), not duplicated in plugin
+configuration.
+
+### 9.2 Categorical Attention Decisions
+
+Instead of arbitrary numerical hysteresis bands, Perception respects Jev's
+discrete categorical attention decisions directly:
+
+- **Idle State**: `WAKE` (deliver immediately) vs `IGNORE` (drop from attention).
+- **Busy State**: `STEER` (immediate mid-turn injection via `mode: "steer"`),
+  `QUEUE_NEXT` (accumulate for single consolidated batch wake upon turn
+  completion), or `IGNORE` (drop from attention).
+
+---
+
+## 10. Required Interleavings & State Machine Verification
+
+| Interleaving                            | Expected Outcome                                                                                   |
+| :-------------------------------------- | :------------------------------------------------------------------------------------------------- |
+| Arrival while character is sleeping     | Jev evaluates against `sleep` task; routine chatter returns `IGNORE`; brain remains asleep.        |
+| Urgent emergency while sleeping         | Jev evaluates `WAKE`; wakes brain immediately with raw stimulus.                                   |
+| Two individually minor arrivals (A+B)   | Coalesced into a bundle; evaluated collectively; combination elevates salience to `STEER`/`WAKE`.  |
+| Arrival during low-focus task           | Jev evaluates `STEER`; easily steers ongoing run.                                                  |
+| Arrival during high-focus task          | Jev evaluates `QUEUE_NEXT`; resists distraction; deferred to `QUEUE_NEXT` instead.                  |
+| Multiple stimuli in `QUEUE_NEXT`        | When brain run completes, all queued items drained in a **single consolidated wake turn**.         |
+| Urgent B arrives while routine A queued | Collective evaluation promotes both A and B to steer the active turn together.                     |
+| Task deadline arrives while busy        | Coalesced flag set; delivered together with queued chats on next brain turn.                       |
+| Task extended during active turn        | If `delay_task` was called, stale deadline check is dropped when turn finishes.                    |
+| Decision model unavailable / error      | Fails open to `WAKE` (if idle) or `STEER` (if busy); never silently drops or stalls stimuli.       |
+| Process restart                         | Retained stimuli in `"perception"` store recovered; re-evaluates against live clock and task.      |
+| Explicit operator stop                  | Retains pending stimuli in store without immediately triggering an auto-wake.                      |
+
+---
+
+## 11. Architectural Boundaries
+
+- **Perception owns**: Stimulus intake, debouncing/coalescing, Jev decision
+  evaluation, collective salience, consolidated queue draining, and `:brain`
+  wake/steer triggering. Chat producers own ledger persistence and sender
+  attribution.
+- **Taskman owns**: Lease state (`tasks`), task duration clamping, and cron
+  projection.
+- **ContextEngine owns**: Assembling admitted context and stream tails for
+  `:brain`. Assembly is strictly read-only and idempotent.
+- **Brain (`agent:<id>:brain`) owns**: Qualitative consciousness, tool execution
+  (`start_task`, `delay_task`, `send_message`), and narrative reasoning.

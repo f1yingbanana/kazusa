@@ -1,9 +1,13 @@
 # Character Context Engine
 
+Perception is a separate in-process attention gate using the Decision Model
+API, not a second generative session or a context-engine profile. Its steering
+transport still needs a supported host entry point. See [Perception](perception.md).
+
 Implemented in `plugins/kazusa/src/context-engine/`, registered through native
 `api.registerContextEngine("kazusa", ...)`, selected by
 `plugins.slots.contextEngine: "kazusa"`. It assembles context; it does not route
-stimuli or own brain admission. See [planned Perception](perception.md).
+stimuli or own brain admission. See [Perception](perception.md).
 
 ## Memory layers and session convention
 
@@ -14,36 +18,38 @@ stimuli or own brain admission. See [planned Perception](perception.md).
 | Direct conversation                          | `agent:<owner>:chat:direct:<peer-id>` |
 | Group conversation                           | `agent:<owner>:chat:group:<group-id>` |
 
-IDs are stable lowercase `[a-z0-9][a-z0-9_-]*`, not display names. Use
-`chatSessionKey`; do not guess ambiguous legacy `:chat:<id>` keys. Alice and Bob
-own separate views of their dialogue; a group's stable ID is shared across its
+IDs are stable lowercase `[a-z0-9][a-z0-9_-]*`, not display names. Use canonical
+keys; do not guess ambiguous legacy `:chat:<id>` keys. Alice and Bob own
+separate views of their dialogue; a group's stable ID is shared across its
 members' private views. Only record events a character could perceive.
 
-Outgoing chat records use `assistant`, incoming records `user`. Both direct and
-group text must begin with `[speaker:<sender-id>]`, for incoming and outgoing
-messages alike. Writers stamp the authenticated sender, not an LLM-supplied
-identity. These writers are not implemented yet; tags currently exist in tests
-and this contract, not a channel configuration switch. Do not add fields just
-for authorship. Task monologues already represent thoughts; no `:thoughts`
-stream. Every ledger message must contain exactly one text block containing all
-readable content, sender attribution, and media summaries. The native
-recent-text reader does not expose structured sender fields and reads only the
-first user block. The renderer preserves this prefix unchanged, using self/other
-only for role. It does not reconstruct authorship from a direct-chat peer or
-group ID. Chat/task ledgers are not execution sessions. `sessions_send` to a
-ledger would start an unwanted run. Current Taskman cron explicitly targets
-`:brain`; future chat delivery and Perception are not implemented. OpenClaw
-2026.10.5 ignores `session.mainKey`, so it cannot rename the default `main`
-session into `brain`.
+Outgoing chat records use `assistant`, incoming records `user`, including
+messages sent by another LLM character. Planned `send_message` owns these writes
+and native `__openclaw` sender attribution, derived from the tool caller. See
+[the messaging contract](messaging.md) for the exact metadata shape. Perception
+and its claiming hook never write chat transcripts.
+
+Every ledger message contains one text block with all readable content and media
+summaries, so one native catalog text item equals one experience. Incoming
+authorship comes exclusively from the projected `sender.identity.id`; outgoing
+`agentMessage` items are self. Missing attribution is `unknown`. Body prefixes
+and direct-chat keys never establish authorship. Task monologues already
+represent thoughts; no `:thoughts` stream. Chat/task ledgers are not execution
+sessions. `sessions_send` to a ledger would start an unwanted run. Perception
+targets `:brain` when appropriate; inbound chat notifications enter through the
+claiming hook after their producer has persisted the chat.
+OpenClaw 2026.10.5 ignores `session.mainKey`, so it cannot
+rename the default `main` session into `brain`.
 
 - `SOUL.md`, `IDENTITY.md`, `MEMORY.md`: native workspace bootstrap. Do not
   inject them twice. `MEMORY.md` is curated long-term memory.
 - `memory/`: tool-recalled archive, not another eagerly loaded context stream.
   Native `/new` and `/reset` may load daily notes; we do not override that.
   Shared recall configuration lives under `memory.search`.
-- Taskman's `tasks` keyed store: scheduling truth, not a context-engine source.
+- Taskman's `tasks` keyed store: scheduling truth, not a brain-context source.
   No active-task snapshot or metadata injection. Task starts, due times, delay
-  updates, outcomes, and monologues come from the task ledger.
+  updates, outcomes, and monologues come from the task ledger. The separate
+  lightweight Perception profile may read the active task to judge urgency.
 - Prior complete brain turns (`recentBrainHistory`): A bounded continuity
   allowance (`brainMaxTokens`, default 2000; can be set to `0` for pure
   stateless ledger-driven runs). Retaining prior turns serves three functions:
@@ -64,9 +70,9 @@ session into `brain`.
 
 All Kazusa experience/chat **message timestamps are simulation milliseconds**.
 Capture `clock.time()` when the event occurs and pass it as the native
-`message.timestamp`. Task transitions/delays implement this now; future chat
-writers must follow the same contract. Deferring admission must not change an
-event's occurrence time.
+`message.timestamp`. Task transitions/delays and planned `send_message` follow
+this contract. Deferring admission must not
+change an event's occurrence time.
 
 OpenClaw session `updatedAt`, transcript envelope creation time, and cron `at`
 schedules remain wall-clock. Do not replace `Date.now()` globally or alter host
@@ -111,17 +117,17 @@ Settings under `plugins.entries.kazusa.config.contextEngine`:
 1. Require `runtimeContext.sessionTarget.agentId`; throw if absent rather than
    guessing ownership. Check ownership against the key and classify the Kazusa
    `:brain` suffix; other sessions receive no private ledger injection.
-2. Discover only that owner's task/direct/group ledgers. Use native
-   `readRecentUserAssistantTextForSession`, which reads backward in 250-message
-   pages and filters inner message timestamps. It does not stop at the cutoff;
-   scanning old history is an accepted tradeoff to avoid custom pagination. Pass
-   `limit: Number.MAX_SAFE_INTEGER` because omission defaults to ten and the SDK
-   has no unbounded flag. Retain the native result shape plus session identity
-   as the dictionary key, preserving native result arrays unchanged.
-   `sourceChannel` is provenance, not a session key. Skip undated entries; never
-   substitute the current time. The reader extracts only the first user content
-   block, so future chat writers must normalize ledger text into one block or
-   revisit this reader.
+2. Discover only that owner's task/direct/group ledgers. Read native
+   `readSessionTranscriptCatalogPage` pages (`limit: 200`, the host's page
+   maximum) newest-first; there is no total history count cap. Follow opaque
+   cursors, including across empty pages containing only omitted activity.
+   Stop when a dated entry is older than the cutoff. This requires writers to
+   append in nondecreasing simulation-time order; backdated imports require a
+   different retrieval policy. The reader has no SQL timestamp-bound option.
+   It returns ISO timestamps projected from native `message.timestamp`, not
+   envelope creation times. Skip undated/invalid timestamps and future items.
+   Retain native `SessionCatalogTranscriptItem` objects, keyed by session;
+   reverse each stream into append order so equal-time records remain ordered.
 3. Filter the simulated-time window. Keep visible text, including authored
    monologues; exclude tool internals, hidden reasoning, and `NO_REPLY`.
 4. Budget foundational conventions (`context-conventions` loaded unconditionally
@@ -133,7 +139,9 @@ Settings under `plugins.entries.kazusa.config.contextEngine`:
    never silently cut instructions halfway through.
 5. Pool task and chat messages, newest-first. Include a whole record if it fits
    the remaining shared budget; otherwise skip it and try older records. Count
-   session labels and timestamp/role wrappers too. No quotas, message clipping,
+   session labels and timestamp/sender wrappers too. Accept the native catalog's
+   display normalization/redaction and 6,000-character per-item clipping. Add no
+   quotas or further message clipping,
    extra short-term cap, or busy-chat sampling.
 6. Regroup selected records by session ID; display each group chronologically.
    This is recency-first packing, not a smallest-message-first knapsack that
@@ -159,16 +167,15 @@ after initial assembly; this is not a hard per-request token guarantee.
 ## Dynamic skill resolution (SkillLoader)
 
 When an incoming stimulus contains `[kazusa:skill=<name>]` tags (e.g. emitted by
-Taskman on task deadlines or Perception on interrupts), the Context Engine
-dynamically resolves and loads the corresponding `SKILL.md` documents on-demand.
+Perception on task deadlines or interrupts), the Context Engine dynamically
+resolves and loads the corresponding `SKILL.md` documents on-demand.
 
 - **Tag Matching**: Scans `run.prompt` for
   `/\[kazusa:skill=([a-zA-Z0-9_-]+)\]/g`. Multiple tags in the same prompt are
   deduplicated.
-- **Zero Hardcoding**: If no `[kazusa:skill=...]` tag is present in the prompt,
-  no skills are loaded into `systemPromptAddition`. There is no forced or
-  default fallback (e.g. `task-interrupt` is loaded only when explicitly
-  tagged).
+- **Foundational Skill**: `context-conventions` is always loaded for brain
+  assembly. Other skills load only for explicit markers in the current prompt,
+  never by scanning historical dialogue.
 - **Frontmatter Parsing & Stripping**: Skills use standard YAML frontmatter
   delimited by `--- ... ---`. The loader parses frontmatter using the `yaml`
   library and strips it from the injected body so that the LLM receives only
@@ -197,20 +204,16 @@ Stream keys are formatted via `formatSessionHeader(sessionKey)` by stripping
 `agent:<id>:` (e.g. `agent:alice:tasks` becomes `tasks`,
 `agent:alice:chat:direct:bob` becomes `chat:direct:bob`).
 
-Each record inside a session group is formatted by `formatEnvelopeRecord` using
-the following precedence:
+Each record inside a session group is formatted by `formatEnvelopeRecord`:
 
 1. **Tasks Stream**: Output is `\n\n[<time>] <text>` (pure factual record, no
    speaker prefix).
-2. **Assistant (Self) Role**: Output is `\n\n[(self) <time>] <text>`.
-3. **Explicit Speaker Tag**: If the message text starts with
-   `^[speaker:<id>]\s*(.*)$`, extracts `<id>` and outputs
-   `\n\n[<id> <time>] <text>`.
-4. **Direct Chat Stream**: If session is `chat:direct:<peer>`, extracts any
-   leading `<peer>:\s*(.*)` prefix or outputs `\n\n[<peer> <time>] <text>`.
-5. **Generic Colon Prefix**: If text starts with `^([a-zA-Z0-9_-]+):\s*(.*)$`,
-   outputs `\n\n[<name> <time>] <text>`.
-6. **Fallback**: Output is `\n\n[other <time>] <text>`.
+2. **Outgoing `agentMessage`**: Output is `\n\n[(self) <time>] <text>`.
+3. **Incoming `userMessage`**: Use native `sender.identity.id` for both direct
+   and group chats: `\n\n[<id> <time>] <text>`. The catalog derives this from
+   persisted `__openclaw.senderIdentity`; a display label is not a stable ID.
+4. **Missing attribution**: Output is `\n\n[unknown <time>] <text>`; never infer
+   identity from text or the session key. Legacy tags remain ordinary text.
 
 Records within each group are rendered in strict chronological order, even
 though they were greedily selected in recency-first order to maximize the
@@ -281,21 +284,19 @@ back into the source ledgers.
 
 ## Skill expansion and future scope
 
-Load only the packaged `task_lifecycle` skill for its known wake marker in the
-current prompt, otherwise `task_interrupt` for brain stimuli. Never expand paths
-or markers from historical conversation text. Native tool schemas remain tools,
-not `kazusa:tool` prose substitutions.
+Use the existing `SkillLoader` for names, not ad-hoc paths in routing code.
+Behavioral prose belongs in shared skills. Native tool schemas remain tools, not
+`kazusa:tool` prose substitutions. Never expand historical conversation markers.
+Perception sends trusted task markers; classifier-generated summary text escapes
+marker syntax before joining a trusted wake.
 
-Behavioral prose lives in the skills rather than TypeScript prompt constants.
-The packaged file reader is transitional and bypasses native skill precedence.
-The desired resolver uses the current run's eligible catalog and native resource
-reader by exact skill name. The installed context-engine SDK does not expose
-that capability; `skills_read({ name })` is available to the agent, not directly
-to `assemble()`. Do not import hashed internals or rebuild skill hierarchy here.
+Perception compiles its own Decision Model inputs, including current task and
+relevant stimuli. It does not use a second context-engine assembly branch.
+See [Perception](perception.md) for admission and configuration.
 
-No incognito feature or external chat adapters. Location, desires, sensory and
-social context, read-receipt sampling, and perception admission are later work.
-Keep routing and stimulus production outside context assembly.
+No incognito feature or external chat adapters. Location, desires, grounded
+media, social context, and read-receipt sampling remain future work. Keep
+routing and stimulus production outside context assembly.
 
 ## SDK references
 

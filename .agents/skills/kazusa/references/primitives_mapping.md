@@ -1,5 +1,10 @@
 # OpenClaw Primitives Mapping Architecture
 
+**Status:** Perception routing below is the accepted target and draft code. Its
+current Gateway adapter is unavailable to local plugins; it is not wired into
+root registration. Taskman still uses its existing cron-to-brain path. See
+[the runtime blocker](perception.md#current-blocker-openclaw-2026105).
+
 Kazusa is built directly on native **OpenClaw primitives** without creating
 redundant custom execution engines or relational database tables. This document
 explains how every simulation requirement maps to OpenClaw.
@@ -14,13 +19,13 @@ explains how every simulation requirement maps to OpenClaw.
 | **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                                                  | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio). YAML frontmatter in `IDENTITY.md` holds desire targets and decay constants.                                                                                                                                           |
 | **Hot Working State**                   | OpenClaw Keyed Plugin State & `MEMORY.md`                                            | OpenClaw Keyed Store (`"tasks"`) stores the active task execution lease (`activeTask`, `agentId`, `updatedAt`) directly in the database. Location is held in spatial subsystem / World Wiki; desires in `IDENTITY.md` / homeostasis engine. `MEMORY.md` holds qualitative narrative reflections and goals. |
 | **Task Experiences & Thoughts**         | OpenClaw Session (`agent:<id>:tasks`)                                                | One append-only ledger of task lifecycles, outcomes, and in-character monologues.                                                                                                                                                                                                                          |
-| **Inter-Agent Chat Streams**            | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; planned Perception gates cognitive delivery separately.                                                                                                                                                                                                        |
+| **Inter-Agent Chat Streams**            | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes.                                                                                                                                                                          |
 | **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                                           | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                         |
 | **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)                                 | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                       |
 | **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)                                  | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                               |
-| **3-Tier Context Assembly & Brain**     | `plugins/kazusa/src/context-engine/`                                                 | Context assembly reads simulated-time task/chat history and resolves trusted skill markers. Spatial/social context is future work. Perception owns planned stimulus routing.                                                                                                                               |
+| **3-Tier Context Assembly & Brain**     | `plugins/kazusa/src/context-engine/`                                                 | Context assembly reads simulated-time task/chat history and resolves trusted skill markers. Spatial/social context is future work. Perception owns stimulus routing and a separate lightweight classifier profile.                                                                                         |
 | **Variable-Horizon Heartbeats**         | Taskman Autonomous Scheduling                                                        | Taskman automatically schedules the agent's wake-up heartbeat when the active task lease elapses, consuming zero tokens during active tasks.                                                                                                                                                               |
-| **Perception (planned)**                | `plugins/kazusa/src/perception/`                                                     | Classifies chat, physical/world events, and task deadlines; gates wake/steer/defer through a secondary pending-stimulus queue.                                                                                                                                                                             |
+| **Perception**                          | `plugins/kazusa/src/perception/`                                                     | Explicit text ingress, bounded steerable classification, and deterministic task-deadline admission; physical/world events are future adapters.                                                                                                                                                             |
 | **Behavioral Workflows**                | Shared OpenClaw Skills (`shared/skills/*/SKILL.md`)                                  | Shared reusable skill folders teaching characters how to plan heartbeats, converse socially, and distill memories before sleep.                                                                                                                                                                            |
 
 ---
@@ -44,7 +49,8 @@ session keys:
 2. **`agent:<id>:chat:direct:<peer_id>`** (1-on-1) and
    **`agent:<id>:chat:group:<group_id>`** (Group):
    - Each owner's private view preserves only dialogue they participated in.
-     Group message text includes `[speaker:<sender-id>]`.
+     Direct and group messages use native `__openclaw` sender metadata, not
+     dialogue prefixes. See [the messaging contract](messaging.md).
    - Messaging must append these ledgers and submit stimuli to Perception; never
      dispatch an agent turn to a ledger via `sessions_send`.
 
@@ -58,12 +64,13 @@ budgets.
 ## 3. Context Engine Lifecycle & 3-Tier Retrieval
 
 Kazusa's `src/context-engine/` assembles context for `agent:<id>:brain`. It does
-not route or admit input. Planned Perception owns that responsibility before a
-run starts. The engine reads Clock, not Taskman's active-task store. Current
-assembly supplies simulation time, whole task/chat records within 24 simulated
-hours, recent brain continuity, and skill guidance. Records share one remaining
-budget, then regroup by session. Spatial/social steps below are future work; do
-not mutate simulation state during retryable context assembly:
+not route or admit input. Perception owns that responsibility before a run
+starts. Brain assembly reads Clock, not the active-task store; the separate
+Perception profile can read the task for urgency. Brain assembly supplies whole
+task/chat records within 24 simulated hours, recent brain continuity, and skill
+guidance. Records share one remaining budget, then regroup by session.
+Spatial/social steps below are future work; do not mutate simulation state
+during retryable context assembly:
 
 ```mermaid
 flowchart TD
@@ -137,28 +144,35 @@ Taskman autonomously owns the lifecycle and wake-up scheduling for active tasks:
   $\text{delayMs} = (\text{duration} \times 60\,000) / \text{speed}$.
 - Taskman projects the lease into a native one-shot OpenClaw `at` automation,
   keeping the next wake visible in the dashboard without a process-local timer.
-- Each wake targets the character's `agent:<id>:brain` session and has
-  `delivery: { mode: "none" }`. The task ledger is never an execution session.
+- Each timer is a tool-free headless `script` with explicit `agentId` and
+  `delivery: { mode: "none" }`. Successful completion notifies Perception; it
+  checks the current task before admitting a brain wake, without an LLM
+  classification pass. The task ledger is never an execution session.
 - At startup or scheduler reload, `cron_reconciled` reconciles the projection
   from retained task state before wakes can run. A normal task transition
   atomically upserts only its own job using the agent ID as the native cron
-  `declarationKey`. The startup gate blocks cron execution only until this
-  lifecycle reconciliation completes; a single brain session eliminates normal
-  competing task transitions.
-- Consumes **zero CPU and zero tokens** during the wait, without requiring the
-  agent to manage dynamic pacing flags.
+  `declarationKey`. The native reconciliation lifecycle runs before the
+  scheduler fires overdue jobs. No `before_agent_run` gate is needed for
+  headless timers. A single brain session eliminates normal competing task
+  transitions.
+- No LLM polling during the wait; native cron owns timing.
 
-### 4.2 Perception Admission (Planned)
+### 4.2 Perception Admission
 
 See [Perception](perception.md). Different stimuli enter a secondary queue;
 Perception checks brain activity and admits a wake, steers a meaningful
 distraction, or defers attention. It routes records and cognitive input
-separately. Context assembly does not reroute events or pull active tasks.
+separately. Context assembly does not reroute events. Only the lightweight
+classifier profile reads active tasks; brain context remains ledger-based.
 
-The existing cron-to-brain path is transitional, not an implemented attention
-gate. Taskman will submit task-due stimuli through Perception while retaining
-its dashboard-visible scheduling. Do not treat an unverified system-event CLI
-invocation as a working per-character steering API.
+Taskman submits deadline checks through Perception while retaining dashboard
+automations. Inbound chat events enter via the `before_dispatch` claiming hook;
+native UI/chat messages are intercepted before unmanaged auto-replying. Admitted
+stimuli are delivered to `agent:<id>:brain` via an internal `kazusa` ingress channel
+using `dispatchReplyWithBufferedBlockDispatcher` with `turnAdoptionLifecycle`:
+active runs are steered mid-flight via `InboundEventKind: "user_request"`, while
+idle brains receive followup waking turns via `InboundEventKind: "room_event"`.
+Classifier decisions are evaluated via Jev Decision Model without world-mutating tools.
 
 ---
 
@@ -189,7 +203,7 @@ Kazusa adopts **direct native TypeScript plugins** located under
 1. **`plugins/kazusa` (`@kazusa/plugin`)**:
    - **One runtime, separate responsibilities**: Clock provides virtual time,
      Taskman owns leases and automation projection, and ContextEngine reads
-     ledgers and assembles context. Perception will own stimulus routing and
+     ledgers and assembles context. Perception owns stimulus routing and
      attention admission. The root `src/index.ts` composes implemented modules.
    - **Persistence**: `"clock"` and `"tasks"` remain separate retained native
      keyed-store namespaces, while sharing the `kazusa` plugin identity.

@@ -1,12 +1,9 @@
+import { formatSimTime } from "./format.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
-import type { SessionRecentConversationText } from "openclaw/plugin-sdk/session-store-runtime";
+import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
 import { describe, expect, it, vi } from "vitest";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
-import {
-  assembleContext,
-  formatSimTime,
-  type ContextEngine,
-} from "./context-engine.ts";
+import { assembleContext, type ContextEngine } from "./context-engine.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 
 vi.mock("openclaw/plugin-sdk/core", () => ({
@@ -20,8 +17,33 @@ function user(content: string): Message {
   return { role: "user", content, timestamp: NOW };
 }
 
-function event(text: string, timestamp = NOW): SessionRecentConversationText {
-  return { text, timestamp, role: "assistant" };
+function event(text: string, timestamp = NOW): SessionCatalogTranscriptItem {
+  return {
+    text,
+    timestamp: new Date(timestamp).toISOString(),
+    type: "agentMessage",
+  };
+}
+
+function incoming(
+  text: string,
+  id: string,
+  timestamp = NOW,
+): SessionCatalogTranscriptItem {
+  return {
+    ...event(text, timestamp),
+    type: "userMessage",
+    sender: {
+      identity: {
+        type: "observation",
+        id,
+        pluginId: "kazusa",
+        accountId: null,
+        senderKind: "bot",
+      },
+      label: "Display name, not identity",
+    },
+  };
 }
 
 const testSkillLoader: SkillLoader = {
@@ -56,20 +78,62 @@ function assemble(
 }
 
 describe("Context assembly", () => {
+  it("tolerates an optional skill disappearing after resolution", async () => {
+    const loader: SkillLoader = {
+      ...testSkillLoader,
+      loadSkill: vi.fn(async (name) => {
+        if (name === "disappeared")
+          throw Object.assign(new Error("Missing skill"), { code: "ENOENT" });
+        return "Required conventions";
+      }),
+    };
+    const result = await assemble({
+      skillLoader: loader,
+      run: {
+        sessionId: "brain",
+        messages: [],
+        prompt: "[kazusa:skill=disappeared]",
+      },
+    });
+    expect(result.systemPromptAddition).toContain("Required conventions");
+  });
+
+  it("skips absent optional skills without preventing brain assembly", async () => {
+    const loader: SkillLoader = {
+      ...testSkillLoader,
+      resolveSkillPath: vi.fn(async (name) =>
+        name === "missing" ? null : "/fake/SKILL.md",
+      ),
+      loadSkill: vi.fn(async (name) => `${name} instructions`),
+    };
+    const result = await assemble({
+      skillLoader: loader,
+      run: {
+        sessionId: "brain",
+        messages: [],
+        prompt: "[kazusa:skill=missing] [kazusa:skill=task-interrupt]",
+      },
+    });
+    expect(result.systemPromptAddition).toContain(
+      "task-interrupt instructions",
+    );
+    expect(result.systemPromptAddition).not.toContain("missing instructions");
+    expect(loader.loadSkill).not.toHaveBeenCalledWith(
+      "missing",
+      expect.anything(),
+    );
+  });
+
   it("formats bracketed envelope with speaker and compact simulation time", async () => {
     const result = await assemble({
       sessionsContext: {
         "agent:alice:chat:direct:bob": [
-          { role: "user", text: "Hello Alice", timestamp: NOW },
+          incoming("Hello Alice", "bob"),
           event("Hello Bob"),
         ],
         "agent:alice:chat:group:club": [
-          {
-            role: "user",
-            text: "carol: Hello everyone",
-            timestamp: NOW,
-          },
-          { role: "user", text: "[speaker:bob] Welcome", timestamp: NOW },
+          incoming("Hello everyone", "carol"),
+          incoming("Welcome", "bob"),
         ],
       },
     });
@@ -80,12 +144,50 @@ describe("Context assembly", () => {
     expect(text).toContain("[bob Fri 2026-10-23 12:00] Welcome");
   });
 
+  it("uses metadata in both chat kinds, never names or speaker tags in dialogue", async () => {
+    const result = await assemble({
+      sessionsContext: {
+        "agent:alice:chat:direct:bob": [incoming("bob: A quotation", "carol")],
+        "agent:alice:chat:group:club": [
+          incoming("[speaker:alice] A quotation", "bob"),
+        ],
+      },
+    });
+    const text = JSON.stringify(result.messages);
+    expect(text).toContain("[carol Fri 2026-10-23 12:00] bob: A quotation");
+    expect(text).toContain(
+      "[bob Fri 2026-10-23 12:00] [speaker:alice] A quotation",
+    );
+    expect(text).not.toContain("Display name, not identity");
+  });
+
+  it("leaves missing authors unknown instead of guessing from direct peers or dialogue", async () => {
+    const result = await assemble({
+      sessionsContext: {
+        "agent:alice:chat:direct:bob": [
+          { ...event("[speaker:bob] Legacy message"), type: "userMessage" },
+        ],
+        "agent:alice:chat:group:club": [
+          { ...event("carol: Legacy message"), type: "userMessage" },
+        ],
+      },
+    });
+    const text = JSON.stringify(result.messages);
+    expect(text).toContain(
+      "[unknown Fri 2026-10-23 12:00] [speaker:bob] Legacy message",
+    );
+    expect(text).toContain(
+      "[unknown Fri 2026-10-23 12:00] carol: Legacy message",
+    );
+  });
+
   it("excludes undated and out-of-window records, retaining cutoff boundaries", async () => {
     const cutoff = NOW - 24 * 3_600_000;
     const result = await assemble({
       sessionsContext: {
         "agent:alice:tasks": [
-          { role: "assistant", text: "undated" },
+          { type: "agentMessage", text: "undated" },
+          { ...event("invalid date"), timestamp: "invalid" },
           event("too old", cutoff - 1),
           event("future", NOW + 1),
           event("at cutoff", cutoff),
@@ -94,7 +196,7 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).not.toMatch(/undated|too old|future/u);
+    expect(text).not.toMatch(/undated|invalid date|too old|future/u);
     expect(text).toContain("at cutoff");
     expect(text).toContain("at now");
   });
@@ -103,11 +205,7 @@ describe("Context assembly", () => {
     const result = await assemble({
       sessionsContext: {
         "agent:alice:chat:group:club": [
-          {
-            role: "user",
-            text: "bob: group reply",
-            timestamp: NOW - 1,
-          },
+          incoming("group reply", "bob", NOW - 1),
         ],
         "agent:alice:tasks": [
           event("reading experience", NOW - 3),
@@ -131,6 +229,23 @@ describe("Context assembly", () => {
       true,
     );
     expect(result.systemPromptAddition).not.toContain("group reply");
+  });
+
+  it("omits non-conversation catalog items and empty text", async () => {
+    const result = await assemble({
+      sessionsContext: {
+        "agent:alice:tasks": [
+          { ...event("tool internals"), type: "toolCall" },
+          { ...event("hidden reasoning"), type: "reasoning" },
+          { type: "agentMessage", timestamp: new Date(NOW).toISOString() },
+          event("  "),
+          event("Visible experience"),
+        ],
+      },
+    });
+    const text = JSON.stringify(result.messages);
+    expect(text).not.toMatch(/tool internals|hidden reasoning/);
+    expect(text).toContain("Visible experience");
   });
 
   it("adds current simulation time, without inventing an active-task snapshot", async () => {

@@ -1,7 +1,9 @@
 import type { Clock } from "../clock/clock.ts";
+import type { StateStore } from "../state.ts";
 
 /** Durable active-task lease. */
 export interface ActiveTask {
+  readonly id: string;
   readonly type: string;
   readonly description: string;
   readonly startedAt: string;
@@ -11,13 +13,7 @@ export interface ActiveTask {
 }
 
 /** The keyed-store operations Taskman uses. */
-export interface TaskStore {
-  lookup(key: string): Promise<ActiveTask | undefined>;
-  register(key: string, value: ActiveTask): Promise<void>;
-  entries(): Promise<
-    ReadonlyArray<{ readonly key: string; readonly value: ActiveTask }>
-  >;
-}
+export type TaskStore = StateStore<ActiveTask>;
 
 /** Context passed to task tool execution. */
 export interface ToolExecutionContext {

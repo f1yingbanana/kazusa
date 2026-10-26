@@ -4,6 +4,8 @@
  * types.
  */
 declare module "openclaw/plugin-sdk/session-transcript-runtime" {
+  import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
+
   type SessionIdentity = {
     agentId: string;
     sessionKey: string;
@@ -13,9 +15,10 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
   export function appendSessionTranscriptMessageByIdentity(
     params: SessionIdentity & {
       message: {
-        role: "assistant";
+        role: "assistant" | "user";
         content: ReadonlyArray<{ type: "text"; text: string }>;
         timestamp: number;
+        idempotencyKey?: string;
       };
     },
   ): Promise<{ messageId: string } | undefined>;
@@ -23,4 +26,14 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
   export function publishSessionTranscriptUpdateByIdentity(
     params: SessionIdentity & { update: { messageId: string } },
   ): Promise<void>;
+
+  export function readSessionTranscriptCatalogPage(params: {
+    agentId: string;
+    sessionKey: string;
+    storePath?: string;
+    limit: number;
+    cursor?: string;
+    sourceDomain: string;
+    pluginId: string;
+  }): Promise<{ items: SessionCatalogTranscriptItem[]; nextCursor?: string }>;
 }
