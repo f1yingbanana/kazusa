@@ -401,6 +401,8 @@ Load these reference files on demand when working on their specific subsystem:
   attribution, or direct/group ledger writes.
 - `references/client.md` — Read when reviewing or building `apps/web`, human
   chat APIs, authentication, live updates, or end-to-end messaging tests.
+  The client's overall architecture (shell, views, registries, read-model
+  routes, world journal) lives in the separate `kazusa-client` skill.
 - `references/perception.md` — Read when designing stimulus routing, busy-brain
   admission, steering, deferred attention, or moving task wakes behind the gate.
 - `references/phases_and_testing.md` — Read when planning milestone deliverables
