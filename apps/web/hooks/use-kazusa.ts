@@ -24,11 +24,16 @@ import type { Chat } from "@/lib/kazusa/types";
 import type { KazusaConfig } from "@/lib/kazusa/config-store";
 
 export function agentsKey(config: KazusaConfig) {
-  return ["kazusa/agents", config.baseUrl] as const;
+  return ["kazusa/agents", config.baseUrl, config.token ?? ""] as const;
 }
 
 export function chatsKey(config: KazusaConfig) {
-  return ["kazusa/chats", config.baseUrl, config.userId] as const;
+  return [
+    "kazusa/chats",
+    config.baseUrl,
+    config.userId,
+    config.token ?? "",
+  ] as const;
 }
 
 export function messagesCacheKey(config: KazusaConfig, chatId: string) {
@@ -47,7 +52,7 @@ export function useAgents() {
     AgentsResponse,
     Error,
     ReturnType<typeof agentsKey>
-  >(agentsKey(config), ([, baseUrl]) => fetchAgents(baseUrl), {
+  >(agentsKey(config), ([, baseUrl]) => fetchAgents(baseUrl, config.token), {
     revalidateOnFocus: false,
   });
 
@@ -72,7 +77,7 @@ export function useChats() {
     ChatsResponse,
     Error,
     ReturnType<typeof chatsKey>
-  >(chatsKey(config), ([, baseUrl]) => fetchChats(baseUrl));
+  >(chatsKey(config), ([, baseUrl]) => fetchChats(baseUrl, config.token));
 
   useEffect(() => {
     if (
@@ -103,7 +108,7 @@ export function useMessages(chatId: string | null) {
     >(
       messagesKeyGetter(config, chatId),
       ([, baseUrl, , id, before]) =>
-        fetchMessages(baseUrl, { chatId: id, before }),
+        fetchMessages(baseUrl, { chatId: id, before }, config.token),
       { revalidateFirstPage: true, revalidateOnFocus: false },
     );
 
@@ -183,6 +188,7 @@ export function useChatActions() {
             ...(chat.type === "group" ? { title: chat.name } : {}),
           }
         : { requestId, text, sessionKey: chat.sessionKey },
+      config.token,
     );
   }
 
@@ -218,11 +224,15 @@ export function useChatActions() {
     action: "add_members" | "remove_members",
     members: string[],
   ) {
-    const response = await manageChat(config.baseUrl, {
-      sessionKey,
-      action,
-      members,
-    });
+    const response = await manageChat(
+      config.baseUrl,
+      {
+        sessionKey,
+        action,
+        members,
+      },
+      config.token,
+    );
     await mutate(
       chatsKey(config),
       (current?: ChatsResponse) =>

@@ -1,8 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+
 export type KazusaConfig = {
   baseUrl: string;
+  token?: string;
   userId: string;
   userName: string;
 };
@@ -11,6 +13,7 @@ const STORAGE_KEY = "kazusa:connection";
 
 export const DEFAULT_CONFIG: KazusaConfig = {
   baseUrl: process.env.NEXT_PUBLIC_KAZUSA_API_URL ?? "",
+  token: process.env.NEXT_PUBLIC_KAZUSA_TOKEN ?? "",
   userId: "user:sensei",
   userName: "Sensei",
 };
@@ -28,7 +31,14 @@ function read(): KazusaConfig {
       typeof saved === "object" &&
       "baseUrl" in saved &&
       typeof saved.baseUrl === "string"
-        ? { ...DEFAULT_CONFIG, baseUrl: saved.baseUrl }
+        ? {
+            ...DEFAULT_CONFIG,
+            baseUrl: saved.baseUrl,
+            token:
+              "token" in saved && typeof saved.token === "string"
+                ? saved.token
+                : undefined,
+          }
         : DEFAULT_CONFIG;
   } catch {
     cached = DEFAULT_CONFIG;
@@ -46,7 +56,10 @@ export function saveConfig(next: KazusaConfig) {
   try {
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ baseUrl: next.baseUrl }),
+      JSON.stringify({
+        baseUrl: next.baseUrl,
+        token: next.token ?? "",
+      }),
     );
   } catch {
     // Storage can be unavailable (private mode, sandboxed iframes); keep in memory.

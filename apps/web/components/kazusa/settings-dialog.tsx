@@ -68,6 +68,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
     if (!isValidUrl(draft.baseUrl.trim())) return
     saveConfig({
       baseUrl: draft.baseUrl.trim().replace(/\/+$/, ''),
+      token: draft.token?.trim() || undefined,
       userId: config.userId,
       userName: config.userName,
     })
@@ -101,6 +102,21 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
           ) : (
             <FieldDescription>Leave blank to use this app’s Gateway connection.</FieldDescription>
           )}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="gateway-token">Gateway Token</FieldLabel>
+          <Input
+            id="gateway-token"
+            type="password"
+            className="font-mono"
+            value={draft.token ?? ''}
+            onChange={(event) => update('token', event.target.value)}
+            placeholder="Bearer token (optional for localhost)"
+            autoComplete="off"
+          />
+          <FieldDescription>
+            Required when connecting to a remote or tunneled OpenClaw Gateway.
+          </FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="user-id">User ID</FieldLabel>

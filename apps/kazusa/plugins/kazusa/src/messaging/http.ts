@@ -47,8 +47,44 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 function sendJson(res: ServerResponse, status: number, data: unknown): void {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
   res.end(JSON.stringify(data));
+}
+
+function resolveAuthToken(api: OpenClawPluginApi): string | undefined {
+  const auth = (
+    api.config as {
+      gateway?: {
+        auth?: {
+          token?: string;
+        };
+      };
+    }
+  )?.gateway?.auth;
+  if (typeof auth?.token === "string" && auth.token.trim().length > 0) {
+    return auth.token.trim();
+  }
+  return undefined;
+}
+
+function checkAuth(req: IncomingMessage, expectedToken?: string): boolean {
+  if (!expectedToken) return true;
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+    if (match && match[1] === expectedToken) return true;
+  }
+  try {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const queryToken = url.searchParams.get("token");
+    if (queryToken && queryToken === expectedToken) return true;
+  } catch {
+    // Ignore URL parse errors
+  }
+  return false;
 }
 
 function clientChat(summary: ChatSummary, viewer: string): Chat {
@@ -69,6 +105,7 @@ export function registerMessagingHttp(
 ): void {
   const user = USER.parse(api.pluginConfig?.user ?? {});
   const roster = (): ReadonlySet<string> => new Set(listAgentIds(api.config));
+  const expectedToken = resolveAuthToken(api);
   const route = (
     path: string,
     method: "GET" | "POST",
@@ -79,8 +116,25 @@ export function registerMessagingHttp(
       auth: "plugin",
       match: "exact",
       handler: async (req, res) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", `${method}, OPTIONS`);
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization",
+        );
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.end();
+          return true;
+        }
+        if (!checkAuth(req, expectedToken)) {
+          sendJson(res, 401, {
+            error: "Unauthorized: Invalid or missing gateway token.",
+          });
+          return true;
+        }
         if (req.method !== method) {
-          res.setHeader("Allow", method);
+          res.setHeader("Allow", `${method}, OPTIONS`);
           sendJson(res, 405, { error: `Use ${method}.` });
           return true;
         }
@@ -229,6 +283,7 @@ export function registerMessagingHttp(
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
       });
       ready = true;
       write({ type: "connected", typing });

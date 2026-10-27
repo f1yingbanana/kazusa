@@ -112,12 +112,16 @@ export function ChatView({
   const handleTyping = useCallback(
     (isTyping: boolean) => {
       if (!chat.draft)
-        void setTyping(config.baseUrl, {
-          sessionKey: chat.sessionKey,
-          isTyping,
-        }).catch(() => {});
+        void setTyping(
+          config.baseUrl,
+          {
+            sessionKey: chat.sessionKey,
+            isTyping,
+          },
+          config.token,
+        ).catch(() => {});
     },
-    [chat.draft, chat.sessionKey, config.baseUrl],
+    [chat.draft, chat.sessionKey, config.baseUrl, config.token],
   );
 
   const otherMembers = chat.members.filter((id) => id !== config.userId);

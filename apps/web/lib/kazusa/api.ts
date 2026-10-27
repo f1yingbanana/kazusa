@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   AgentsResponseSchema,
   ChatsResponseSchema,
@@ -14,6 +13,7 @@ import {
   type SendResponse,
   type TypingPayload,
 } from "@kazusa/client";
+import { z } from "zod";
 
 export const MESSAGE_PAGE_SIZE = 50;
 
@@ -46,10 +46,19 @@ export function buildUrl(
   return url.toString();
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  url: string,
+  init?: RequestInit,
+  token?: string,
+): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = await fetch(url, { ...init, headers });
   } catch {
     throw new KazusaApiError(
       `Could not reach the Kazusa server at ${new URL(url).origin}.`,
@@ -78,27 +87,46 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-function postJson<T>(url: string, body: unknown) {
-  return request<T>(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+function postJson<T>(url: string, body: unknown, token?: string) {
+  return request<T>(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    token,
+  );
 }
 
-export async function fetchAgents(baseUrl: string): Promise<AgentsResponse> {
-  const data = await request<unknown>(buildUrl(baseUrl, "/kazusa/agents"));
+export async function fetchAgents(
+  baseUrl: string,
+  token?: string,
+): Promise<AgentsResponse> {
+  const data = await request<unknown>(
+    buildUrl(baseUrl, "/kazusa/agents"),
+    undefined,
+    token,
+  );
   return AgentsResponseSchema.parse(data);
 }
 
-export async function fetchChats(baseUrl: string): Promise<ChatsResponse> {
-  const data = await request<unknown>(buildUrl(baseUrl, "/kazusa/chats"));
+export async function fetchChats(
+  baseUrl: string,
+  token?: string,
+): Promise<ChatsResponse> {
+  const data = await request<unknown>(
+    buildUrl(baseUrl, "/kazusa/chats"),
+    undefined,
+    token,
+  );
   return ChatsResponseSchema.parse(data);
 }
 
 export async function fetchMessages(
   baseUrl: string,
   params: { chatId: string; before?: number | null },
+  token?: string,
 ): Promise<MessagesResponse> {
   const data = await request<unknown>(
     buildUrl(baseUrl, "/kazusa/messages", {
@@ -106,6 +134,8 @@ export async function fetchMessages(
       limit: MESSAGE_PAGE_SIZE,
       before: params.before,
     }),
+    undefined,
+    token,
   );
   return MessagesResponseSchema.parse(data);
 }
@@ -113,10 +143,12 @@ export async function fetchMessages(
 export async function sendMessage(
   baseUrl: string,
   payload: SendPayload,
+  token?: string,
 ): Promise<SendResponse> {
   const data = await postJson<unknown>(
     buildUrl(baseUrl, "/kazusa/send"),
     payload,
+    token,
   );
   return SendResponseSchema.parse(data);
 }
@@ -124,21 +156,32 @@ export async function sendMessage(
 export async function manageChat(
   baseUrl: string,
   payload: ManageChatPayload,
+  token?: string,
 ): Promise<ManageChatResponse> {
   const data = await postJson<unknown>(
     buildUrl(baseUrl, "/kazusa/chats/manage"),
     payload,
+    token,
   );
   return ManageChatResponseSchema.parse(data);
 }
 
-export function eventsUrl(baseUrl: string) {
-  return buildUrl(baseUrl, "/kazusa/events");
+export function eventsUrl(baseUrl: string, token?: string) {
+  return buildUrl(
+    baseUrl,
+    "/kazusa/events",
+    token ? { token } : undefined,
+  );
 }
 
-export function setTyping(baseUrl: string, payload: TypingPayload) {
+export async function setTyping(
+  baseUrl: string,
+  payload: TypingPayload,
+  token?: string,
+) {
   return postJson<{ success: boolean }>(
     buildUrl(baseUrl, "/kazusa/typing"),
     payload,
+    token,
   );
 }

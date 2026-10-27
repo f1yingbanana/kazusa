@@ -71,10 +71,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const { baseUrl, userId } = config;
+    const { baseUrl, userId, token } = config;
     let source: EventSource;
     try {
-      source = new EventSource(eventsUrl(baseUrl));
+      source = new EventSource(eventsUrl(baseUrl, token));
     } catch {
       setStatus("error");
       return;
