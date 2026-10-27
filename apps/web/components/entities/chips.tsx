@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { PresenceAvatar } from './presence-avatar'
 
 const chipClass =
-  'inline-flex max-w-48 min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 align-middle text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring'
+  'inline-flex max-w-40 min-w-0 items-center sm:max-w-48 gap-1.5 rounded-md px-1 py-0.5 align-middle text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring'
 
 export function CharacterChip({ id, className }: { id: string; className?: string }) {
   const character = useCharacter(id)

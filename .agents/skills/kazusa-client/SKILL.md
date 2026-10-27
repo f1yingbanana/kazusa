@@ -46,6 +46,65 @@ Related skills and references:
 | Status bar | Slot registry: connection, data sources, activity summary, new events | Storyteller ticker, cost meter, next wakes |
 | Social, Wiki views | **Not built.** Registry slots reserved | Relationship graph, asymmetry, belief board |
 
+### 1.1 Implementation status
+
+Keep this table current: update it in the same change that builds, wires or
+removes a piece. **Live** means real backend data. **Mock** means it is served
+by `lib/source/mock/*` behind a `Mock` tag (D10). **Planned** means it is not
+built yet.
+
+**Foundations (built)**
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| Read-model schemas | `packages/client/src/index.ts` | `WorldResponse`, `ClockState`, `ClockActionPayload`, `CharacterSummary`/`Detail`, `CharacterStatus`, `TaskSummary`, `JournalEvent` (7 kinds), `TimelineQuery`/`Response`/`Histogram`, observer SSE events, `parseStreamEvent`. All marked PROPOSED until the plugin serves them. |
+| Directory layout (§6) | `apps/web` | The atomic move is done. `components/kazusa/*`, `lib/kazusa/*` and `hooks/use-kazusa.ts` no longer exist. |
+| Capability resolution (D10) | `lib/source/capabilities.ts` | Resolves each domain on its own, with mock modes `auto`/`all`/`off` (Settings). Capabilities come from `LEGACY_CAPABILITIES` (`characters`, `chats` = live) because `/kazusa/world` doesn't exist yet. |
+| Mock world | `lib/source/mock/{world,timeline,clock}.ts` | Seeded, about 150 characters. Merges live agents in by id. Produces journal history, statuses and chats, and keeps ticking (task rollovers, brain flips, messages). |
+| Live store | `lib/live/{store,state,journal}.ts` | Keyed external store (`useSyncExternalStore`). Status/clock/journal-tail singletons. Journal seq gap detection. |
+| Registries | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}` | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock` through `registry/live.ts`. |
+| URL state | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts` | `view`, `sel`, `world.group`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`. |
+| Sim time | `lib/time/sim.ts`, `hooks/use-clock.ts` | Anchor interpolation, formatting, speed labels. |
+| Tests | `lib/**/*.test.ts` | Sim time, EntityRef, capabilities, live store, journal gaps, grouping, mock determinism, pagination. |
+
+**Surfaces**
+
+| Surface | Status | Data |
+| --- | --- | --- |
+| Shell (top bar, rail, stage tabs, inspector, status bar) | Built. Responsive: rail and inspector become sheets below `xl`. | — |
+| Top bar: clock, pause/speed presets, advance menu, lens badge | Built | `clock`: **Mock** (`POST /kazusa/clock` planned) |
+| Top bar: global search | **Planned** | — |
+| Roster rail: virtualized, search, kind filter, group-by, watchlist stars | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
+| Presence ring (thinking / composing / on-task / idle) | Built | `status`: **Mock** |
+| World view: group-by tree (affiliation / activity / brain) | Built | `characters` + `status` |
+| World view: place tree, map renderer | **Planned** (shows a NeedsLine) | Needs `places`, `location` |
+| Chats view: my chats, composer, groups, members | Built (existing UI rehoused) | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down |
+| Chats view: DM subtitle shows partner's current task | Built | `status`: **Mock** |
+| Chats view: observed (read-only) chats | **Planned** (shows a NeedsLine) | Needs `observe` |
+| Timeline: virtualized stream, day separators, kind/actor/watchlist filters, held-back "N new events" | Built | `timeline`: **Mock** |
+| Timeline: overview strip (histogram), compare lanes, collapse runs (`collapseKey` is declared but not applied), scrub/replay | **Planned** | Needs `/kazusa/timeline/histogram` for the strip |
+| Inspector: character Header, Now, Recent, Conversations, Profile | Built | Header/Profile: `characters` (Profile body is a Mock placeholder). Now: `status` **Mock**. Recent: `timeline` **Mock**. Conversations: `chats` |
+| Inspector: chat summary | Built | `chats` / mock chats |
+| Inspector: Needs, Attention, Relationships | **Planned** (roadmap) | — |
+| Status bar: connection, data sources (per-domain Live/Mock/Unavailable), activity summary | Built | — |
+| Status bar: new-events jump, storyteller ticker, next wakes, cost meter | **Planned** | — |
+| Entity hover cards | **Planned** (chips navigate on click only) | — |
+| `lib/lens/` selectors, Player lens | **Planned** (the top bar shows a fixed "Observer" badge) | — |
+
+**Backend wiring still to do (client side)**, in the same order as
+`references/backend-contract.md` §8. For each step: add the route to the
+allowlist in `app/kazusa/[...path]/route.ts` (today it only lists the
+messaging routes), add an http adapter under `lib/source/<domain>/`, and
+remove the domain from the mock fallback.
+
+1. `GET /kazusa/world`: replace `LEGACY_CAPABILITIES` in `lib/source/provider.tsx` with the response's `capabilities`. Seed `clockStore` from `clock`.
+2. `POST /kazusa/clock` + SSE `clock`: point the top-bar actions at it instead of `lib/source/mock/clock.ts`.
+3. `GET /kazusa/characters`, `GET /kazusa/character`: swap `lib/source/characters/http.ts` off `/kazusa/agents`. Profile reads `bodyMarkdown`.
+4. SSE `status` (Perception brain state + taskman): the live handler already writes `statusStore`.
+5. `GET /kazusa/timeline` (+ histogram) + SSE `journal`: `lib/source/timeline/http.ts` already exists but isn't routed yet.
+6. `/kazusa/observe/*` + `scope=observer`: fill the Observed section in Chats.
+7. `/kazusa/places`: place tree in the World view.
+
 ## 2. Fixed decisions
 
 Each decision includes its reason. Keep the reason in mind when a new case
@@ -319,8 +378,12 @@ lib/
 hooks/                             # SWR + live-store hooks
 ```
 
-The existing `components/kazusa/*` chat components and `lib/kazusa/*` move into
-this layout in one atomic refactor. Don't keep parallel old and new paths.
+The old `components/kazusa/*` and `lib/kazusa/*` paths have been moved into
+this layout and deleted. Don't bring back parallel old paths. `lib/lens/`
+hasn't been created yet (§1.1).
+
+Pure modules under `lib/` (anything with a colocated test) use **relative
+imports**, not `@/`. The root vitest config has no path alias.
 
 ## 7. Visual language (summary)
 
@@ -340,7 +403,9 @@ this layout in one atomic refactor. Don't keep parallel old and new paths.
 - `npm test` (vitest): pure logic is colocated in `lib/**/*.test.ts`. That
   covers sim-clock interpolation, time bucketing, EntityRef serialization,
   journal gap detection, collapse rules, capability resolution and mock-world
-  determinism.
+  determinism. If root dev dependencies aren't installed (as in the v0
+  sandbox), run vitest from an isolated temp install with
+  `--root <repo> --config <temp config including apps/web/lib/**/*.test.ts>`.
 - `npm run typecheck` and
   `npx tsc --noEmit --incremental false -p apps/web/tsconfig.json`. A build
   that ignores TypeScript errors doesn't count.

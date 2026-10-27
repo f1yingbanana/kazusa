@@ -50,15 +50,16 @@ export const TimelineRow = memo(function TimelineRow({
       </time>
       <Icon aria-label={kind.label} className="mt-1.5 size-3.5 shrink-0 text-muted-foreground" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm leading-relaxed">
-          {actors.slice(0, MAX_CHIPS).map((id) => (
-            <CharacterChip key={id} id={id} className="-ml-1" />
+        {/* Inline flow, not flex-wrap, so chips and fact text read as one sentence when they wrap. */}
+        <p className="min-w-0 text-pretty text-sm leading-relaxed">
+          {actors.slice(0, MAX_CHIPS).map((id, index) => (
+            <CharacterChip key={id} id={id} className={index === 0 ? '-ml-1 mr-1' : 'mr-1'} />
           ))}
           {actors.length > MAX_CHIPS ? (
-            <span className="font-mono text-xs text-muted-foreground">{`+${actors.length - MAX_CHIPS}`}</span>
+            <span className="mr-1 font-mono text-xs text-muted-foreground">{`+${actors.length - MAX_CHIPS}`}</span>
           ) : null}
-          <span className="min-w-0">{kind.fact(event)}</span>
-        </div>
+          {kind.fact(event)}
+        </p>
         {thought && !compact ? <ThoughtAttribution by={thought.by} text={thought.text} /> : null}
       </div>
       {link && !compact ? (
