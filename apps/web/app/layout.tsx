@@ -9,9 +9,9 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'Kazusa — Multi-agent chat',
+  title: 'Kazusa — Observer client',
   description:
-    'Chat 1-on-1 with AI agents or bring several into a shared group conversation, with real-time replies and typing indicators.',
+    'Watch and take part in a simulated society: live roster, world tree, chats and a timeline of everything that happens.',
   generator: 'v0.app',
   icons: {
     icon: [

@@ -1,0 +1,167 @@
+'use client'
+
+import {
+  ClockIcon,
+  MessageSquareTextIcon,
+  PencilLineIcon,
+  PlayIcon,
+  TimerResetIcon,
+  UserCogIcon,
+  UsersRoundIcon,
+} from 'lucide-react'
+import type { JournalEvent, JournalKind } from '@kazusa/client'
+import { CharacterChip, ChatChip } from '@/components/entities/chips'
+import { formatSimDuration, formatSpeed, MINUTE } from '@/lib/time/sim'
+import type { TimelineKind } from './types'
+
+type KindMap = { [K in JournalKind]: TimelineKind<K> }
+
+export const TIMELINE_KINDS: KindMap = {
+  'task.started': {
+    kind: 'task.started',
+    label: 'Task started',
+    icon: PlayIcon,
+    facet: 'task',
+    salience: 'low',
+    fact: (event) => (
+      <>
+        <span>{event.payload.description}</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          {' · '}
+          {formatSimDuration(event.payload.duration * MINUTE)}
+        </span>
+      </>
+    ),
+    thought: (event) =>
+      event.payload.monologue ? { by: event.actors[0], text: event.payload.monologue } : undefined,
+    collapseKey: (event) => `task.started:${event.payload.type}`,
+    target: (event) => ({ kind: 'character', id: event.actors[0] }),
+  },
+  'task.delayed': {
+    kind: 'task.delayed',
+    label: 'Task extended',
+    icon: TimerResetIcon,
+    facet: 'task',
+    salience: 'normal',
+    fact: (event) => (
+      <>
+        Extended the current task by{' '}
+        <span className="font-mono">{formatSimDuration(event.payload.additionalMinutes * MINUTE)}</span>
+      </>
+    ),
+    thought: (event) => {
+      const text = [event.payload.reason, event.payload.monologue].filter(Boolean).join(' ')
+      return text ? { by: event.actors[0], text } : undefined
+    },
+    target: (event) => ({ kind: 'character', id: event.actors[0] }),
+  },
+  'message.sent': {
+    kind: 'message.sent',
+    label: 'Message',
+    icon: MessageSquareTextIcon,
+    facet: 'chat',
+    salience: 'normal',
+    actors: (event) => [event.payload.senderId],
+    fact: (event) => (
+      <>
+        in {event.chatId ? <ChatChip id={event.chatId} /> : 'a chat'}
+        <span className="text-muted-foreground">{': '}</span>
+        <span>{`“${event.payload.preview}”`}</span>
+      </>
+    ),
+    target: (event) =>
+      event.chatId
+        ? {
+            view: 'chats',
+            params: { 'chats.id': event.chatId, 'chats.msg': event.payload.messageId },
+            label: 'Open chat',
+          }
+        : undefined,
+  },
+  'chat.created': {
+    kind: 'chat.created',
+    label: 'Chat created',
+    icon: UsersRoundIcon,
+    facet: 'chat',
+    salience: 'normal',
+    actors: (event) => event.actors.slice(0, 1),
+    fact: (event) => (
+      <>
+        Created {event.payload.type === 'group' ? 'group' : 'chat'}{' '}
+        <span className="font-medium">{event.payload.title}</span>
+        <span className="font-mono text-xs text-muted-foreground">{` · ${event.payload.members.length} members`}</span>
+      </>
+    ),
+    target: (event) => (event.chatId ? { kind: 'chat', id: event.chatId } : undefined),
+  },
+  'chat.renamed': {
+    kind: 'chat.renamed',
+    label: 'Chat renamed',
+    icon: PencilLineIcon,
+    facet: 'chat',
+    salience: 'low',
+    actors: (event) => event.actors.slice(0, 1),
+    fact: (event) => (
+      <>
+        Renamed {event.chatId ? <ChatChip id={event.chatId} /> : 'a chat'} to{' '}
+        <span className="font-medium">{event.payload.title}</span>
+      </>
+    ),
+  },
+  'chat.members_changed': {
+    kind: 'chat.members_changed',
+    label: 'Members changed',
+    icon: UserCogIcon,
+    facet: 'chat',
+    salience: 'normal',
+    actors: (event) => event.actors.slice(0, 1),
+    fact: (event) => (
+      <>
+        {event.payload.added.length ? (
+          <>
+            Added{' '}
+            {event.payload.added.slice(0, 3).map((id) => (
+              <CharacterChip key={id} id={id} />
+            ))}
+          </>
+        ) : null}
+        {event.payload.removed.length ? (
+          <>
+            {' '}Removed{' '}
+            {event.payload.removed.slice(0, 3).map((id) => (
+              <CharacterChip key={id} id={id} />
+            ))}
+          </>
+        ) : null}
+        {event.chatId ? (
+          <>
+            {' '}in <ChatChip id={event.chatId} />
+          </>
+        ) : null}
+      </>
+    ),
+  },
+  'clock.changed': {
+    kind: 'clock.changed',
+    label: 'Clock',
+    icon: ClockIcon,
+    facet: 'world',
+    salience: 'high',
+    fact: (event) =>
+      event.payload.advancedMinutes !== undefined
+        ? `Clock advanced ${formatSimDuration(event.payload.advancedMinutes * MINUTE)}`
+        : `Speed set to ${formatSpeed(event.payload.speed ?? 0)}`,
+  },
+}
+
+export const TIMELINE_KIND_LIST = Object.values(TIMELINE_KINDS) as TimelineKind[]
+
+/** Typed accessor: TS can't correlate `event.kind` with the map entry on its own. */
+export function kindOf<E extends JournalEvent>(event: E) {
+  return TIMELINE_KINDS[event.kind] as unknown as TimelineKind<E['kind']> & {
+    fact: (event: E) => React.ReactNode
+    thought?: (event: E) => ReturnType<NonNullable<TimelineKind['thought']>>
+    actors?: (event: E) => readonly string[]
+    target?: (event: E) => ReturnType<NonNullable<TimelineKind['target']>>
+  }
+}
