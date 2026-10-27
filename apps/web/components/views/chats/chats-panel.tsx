@@ -9,16 +9,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useCharacters } from '@/hooks/use-characters'
 import { useChats } from '@/hooks/use-chats'
 import { useNavigate, useParam } from '@/hooks/use-url-state'
+import type { SectionSidebarProps } from '@/lib/registry/types'
 import { setDraftChat } from '@/lib/state/chat-draft'
 import { useKazusaConfig } from '@/lib/state/config-store'
 import { ChatList } from './chat-list'
 import { NewGroupDialog } from './new-group-dialog'
 
 /**
- * The player's conversations. Lives in the sidebar's Chats tab, and inline in
- * the Chats view on narrow screens where the sidebar is a sheet.
+ * The player's conversations: the Chats section's sidebar, and the Chats
+ * view's first screen on narrow screens.
  */
-export function ChatsPanel({ onOpened }: { onOpened?: () => void }) {
+export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const config = useKazusaConfig()
   const { chats, error, isLoading, reload } = useChats()
   const { byId } = useCharacters()

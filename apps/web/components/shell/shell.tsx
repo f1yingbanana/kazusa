@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useActiveView } from '@/hooks/use-active-view'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useParam, useSelection } from '@/hooks/use-url-state'
 import { RealtimeProvider } from '@/lib/live/realtime-provider'
 import { SourcesProvider } from '@/lib/source/provider'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
 import { onInspectorRequest } from '@/lib/state/inspector-request'
+import { onSidebarRequest } from '@/lib/state/sidebar-request'
+import { CommandPalette } from './command-palette'
 import { Inspector } from './inspector'
-import { Navigator, type NavigatorTab } from './navigator'
+import { SectionRail, SectionTabs } from './section-nav'
 import { SettingsDialog } from './settings-dialog'
 import { Stage } from './stage'
 import { StatusBar } from './status-bar'
@@ -26,22 +29,20 @@ export function Shell() {
   )
 }
 
+/**
+ * rail (where) → section sidebar (which) → stage (what) → inspector (details).
+ * Below `lg` the sidebar isn't docked: sections show it as their first screen,
+ * or open it as a sheet on request. Below `md` the rail becomes a bottom tab bar.
+ */
 function Layout() {
-  const [navOpen, setNavOpen] = useState(false)
-  const [navTab, setNavTab] = useState<NavigatorTab>('chats')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [selection, select] = useSelection()
+  const active = useActiveView()
   const view = useParam('view')
-  const chatId = useParam('chats.id')
   const wide = useMediaQuery('(min-width: 1280px)')
-
-  // Opening a chat from anywhere (inspector "Message", a chip) brings the
-  // sidebar to Chats so the open conversation is highlighted.
-  const [seenChatId, setSeenChatId] = useState(chatId)
-  if (seenChatId !== chatId) {
-    setSeenChatId(chatId)
-    if (chatId) setNavTab('chats')
-  }
+  const Sidebar = active.sidebar
 
   // Narrow screens: the inspector sheet opens on a new selection, closes when a
   // link changes the view (keeping the selection), and dismissing it clears it.
@@ -53,14 +54,18 @@ function Layout() {
     setSheetOpen(seen.selKey !== selKey ? Boolean(selKey) : false)
   }
   useEffect(() => onInspectorRequest(() => setSheetOpen(true)), [])
+  useEffect(() => onSidebarRequest(() => setSidebarOpen(true)), [])
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <TopBar onOpenRoster={() => setNavOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar onOpenPalette={() => setPaletteOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
       <div className="flex min-h-0 flex-1">
-        <aside aria-label="Sidebar" className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
-          <Navigator tab={navTab} onTabChange={setNavTab} />
-        </aside>
+        <SectionRail onOpenPalette={() => setPaletteOpen(true)} />
+        {Sidebar ? (
+          <aside aria-label={`${active.label} sidebar`} className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
+            <Sidebar key={active.id} />
+          </aside>
+        ) : null}
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage />
         </main>
@@ -68,17 +73,20 @@ function Layout() {
           <Inspector />
         </aside>
       </div>
+      <SectionTabs />
       <StatusBar />
 
-      <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent side="left" className="w-80 gap-0 bg-sidebar p-0 lg:hidden" showCloseButton={false}>
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Your chats and every character in the world.</SheetDescription>
-          </SheetHeader>
-          <Navigator tab={navTab} onTabChange={setNavTab} onNavigated={() => setNavOpen(false)} />
-        </SheetContent>
-      </Sheet>
+      {Sidebar ? (
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="w-80 gap-0 bg-sidebar p-0 lg:hidden" showCloseButton={false}>
+            <SheetHeader className="sr-only">
+              <SheetTitle>{`${active.label} sidebar`}</SheetTitle>
+              <SheetDescription>{`Narrow what the ${active.label} section shows.`}</SheetDescription>
+            </SheetHeader>
+            <Sidebar key={active.id} onNavigated={() => setSidebarOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      ) : null}
 
       <Sheet
         open={!wide && selection !== null && sheetOpen}
@@ -95,6 +103,7 @@ function Layout() {
         </SheetContent>
       </Sheet>
 
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
@@ -108,6 +117,11 @@ function ShellSkeleton() {
         <Skeleton className="mx-auto h-4 w-40" />
       </div>
       <div className="flex flex-1">
+        <div className="hidden w-14 flex-col items-center gap-2 border-r py-2 md:flex">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="size-10 rounded-lg" />
+          ))}
+        </div>
         <div className="hidden w-72 flex-col gap-3 border-r bg-sidebar p-3 lg:flex">
           {Array.from({ length: 10 }).map((_, index) => (
             <Skeleton key={index} className="h-9" />

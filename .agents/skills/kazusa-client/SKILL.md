@@ -63,7 +63,7 @@ built yet.
 | Mock world | `lib/source/mock/{world,timeline,clock}.ts` | Seeded, about 150 characters. Merges live agents in by id. Produces journal history, statuses and chats, and keeps ticking (task rollovers, brain flips, messages). |
 | Live store | `lib/live/{store,state,journal}.ts` | Keyed external store (`useSyncExternalStore`). Status/clock/journal-tail singletons. Journal seq gap detection. |
 | Registries | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}` | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock` through `registry/live.ts`. |
-| URL state | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts` | `view`, `sel`, `world.group`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`. |
+| URL state | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts` | `view`, `sel`, `world.by`, `world.in`, `world.kind`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`. |
 | Sim time | `lib/time/sim.ts`, `hooks/use-clock.ts` | Anchor interpolation, formatting, speed labels. |
 | Tests | `lib/**/*.test.ts` | Sim time, EntityRef, capabilities, live store, journal gaps, grouping, mock determinism, pagination. |
 
@@ -71,12 +71,12 @@ built yet.
 
 | Surface | Status | Data |
 | --- | --- | --- |
-| Shell (top bar, rail, stage tabs, inspector, status bar) | Built. Responsive: rail and inspector become sheets below `xl`. | — |
+| Shell (top bar, section rail, per-section sidebar, inspector, status bar) | Built. Rail becomes a bottom tab bar below `md`; sidebar undocks below `lg`; inspector becomes a sheet below `xl`. | — |
 | Top bar: clock, pause/speed presets, advance menu, lens badge | Built | `clock`: **Mock** (`POST /kazusa/clock` planned) |
-| Top bar: global search | **Planned** | — |
-| Sidebar Characters tab (roster): virtualized, search, kind filter, group-by, watchlist stars | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
+| ⌘K palette: sections, chats, characters | Built (places once they exist) | `characters`, `chats` |
+| World sidebar: Watchlist / Everyone / dimension folders with live busy hints, character search, kind filter | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
 | Presence ring (thinking / composing / on-task / idle) | Built | `status`: **Mock** |
-| World view: group-by tree (affiliation / activity / brain) | Built | `characters` + `status` |
+| World view: open folder as virtualized character rows | Built | `characters` + `status` |
 | World view: place tree, map renderer | **Planned** (shows a NeedsLine) | Needs `places`, `location` |
 | Chats view: my chats, composer, groups, members | Built (existing UI rehoused) | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down |
 | Chats view: presence-aware header (DM: partner ring + task + time left; group: member stack + names). Tapping it opens the inspector (character / chat with member activity rows) | Built | `status`: **Mock** |
@@ -217,27 +217,28 @@ fact.**
 
 ```text
 ┌ TopBar ─────────────────────────────────────────────────────────────────────┐
-│ World title │ Day 3 · 14:32 · Afternoon  ⏸ 1× 10× 60× +1h │ ⌘K │ Observer │
-├ Sidebar ─────┬ Stage  [World | Chats | Timeline]  ← registry ┬ Inspector ───┤
-│ Chats|Charac.│                                               │ entity-      │
-│ search  [⚙/+]│   active StageView component                  │ polymorphic  │
-│ ★ watchlist  │   (owns its own URL params, e.g. tl.*)        │ sections     │
-│ virtual rows │                                               │ ← registry   │
-├ StatusBar ───┴───────────────────────────────────────────────┴──────────────┤
+│ World title │ Day 3 · 14:32 · Afternoon  ⏸ 1× 10× 60× +1h │     Observer │
+├Rail┬ Section sidebar ┬ Stage ─────────────────────────────┬ Inspector ─────┤
+│ Wd │ view.sidebar    │ view.component                     │ entity-        │
+│ Ch │ search  [⚙/+]   │ (owns its URL params, e.g. tl.*)   │ polymorphic    │
+│ Tl │ folders / chats │                                    │ sections       │
+│ ⌘K │ / filters       │                                    │ ← registry     │
+├────┴─────────────────┴────────────────────────────────────┴────────────────┤
 │ ● Live │ 2 domains mocked │ 12 thinking · 3 composing │ 4 new events    ⌘K? │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **TopBar** is global time and navigation only. No per-feature controls.
-- **Sidebar** (`shell/navigator.tsx`) is one tabbed rail: **Chats** (the
-  player's conversations; opening one navigates to `view=chats`) and
-  **Characters** (the roster; selecting a row sets `sel` and never navigates).
-  Each tab renders the same `PanelToolbar`: search (count in the placeholder)
-  plus its own trailing action (New group / filter menu). Both panels stay
-  mounted. The Chats stage view has no list of its own; below `lg` it renders
-  the Chats panel inline when no chat is open.
+- **TopBar** is global time and settings only. No per-feature controls.
+- **Rail** (`shell/section-nav.tsx`) lists registered `StageView`s as icons
+  (bottom tab bar below `md`), with an optional `badge` per view and the ⌘K
+  palette (`shell/command-palette.tsx`) at the bottom.
+- **Section sidebar** is the active view's `sidebar` component (World:
+  folders, Chats: chat list, Timeline: filters). No sidebar tabs. Each uses
+  `PanelToolbar` (search + one trailing action). Below `lg` it isn't docked:
+  views show it as their first screen, or call `requestSidebar()` to open it
+  as a sheet.
 - **Stage** renders exactly one registered view. A view owns its URL params,
-  namespaced like `tl.kinds` and `world.group`.
+  namespaced like `tl.kinds` and `world.by`.
 - **Inspector** shows the selected `EntityRef` using the sections registered
   for that entity kind. It stays put when the view changes. Keep it slim:
   depth belongs in stage views, reached through filtered links like "Open in
@@ -367,7 +368,7 @@ app/
   page.tsx                         # <Shell/>
   kazusa/[...path]/route.ts        # allowlisted proxy (add new routes here)
 components/
-  shell/                           # top-bar, navigator (+ roster-panel), stage, inspector, status-bar (iterate registries)
+  shell/                           # top-bar, section-nav (rail + tabs), command-palette, stage, inspector, status-bar (iterate registries)
   views/{world,chats,timeline}/    # stage view implementations (existing chat UI moves to views/chats)
   inspector/sections/              # registered inspector sections
   status/                          # registered status items

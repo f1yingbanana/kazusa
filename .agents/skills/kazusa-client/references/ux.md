@@ -5,7 +5,7 @@
 1. Principles
 2. Visual language
 3. Top bar
-4. Roster rail
+4. Section rail and sidebars
 5. Stage: World
 6. Stage: Chats
 7. Stage: Timeline
@@ -80,61 +80,72 @@ From left to right:
   "Advance" popover (+15m, +1h, +custom). Forward only. Observer lens only.
   Each control is an action on `POST /kazusa/clock`. Show an optimistic value,
   then reconcile.
-- **Search (⌘K):** a command palette over characters (all 300, fuzzy match on
-  name and aliases), chats, places and views. Selecting an entity sets the
-  selection; selecting a view navigates.
+- **Search (⌘K):** a command palette over characters (fuzzy match on name,
+  aliases and affiliation), chats, places (later) and sections. Selecting an
+  entity sets the selection without leaving the current section; selecting a
+  section navigates. Triggered from the rail's search icon, the top bar on
+  phones, or ⌘K / Ctrl+K anywhere.
 - **Lens indicator:** "Observer" (a disabled select until the Player lens
   exists).
 
 The top bar never hosts feature-specific controls. Those belong inside their
 stage view.
 
-## 4. Sidebar: Chats | Characters
+## 4. Section rail and sidebars
 
-One left rail with two tabs, so "who" and "my conversations" never compete
-for width. The tab row carries the Chats unread total and the Characters
-MockTag; nothing else. Each tab has one toolbar row: search (the count lives
-in the placeholder, e.g. "Search 140 characters") and a single trailing
-action, New group for Chats and a filter menu for Characters (a dot marks
-non-default filters). Opening a chat from anywhere switches the tab to Chats.
+Each column narrows the one before it: **rail** (where) → **section sidebar**
+(which) → **stage** (what) → **inspector** (details).
 
-**Chats tab:** rows show a presence avatar for DMs (so you see who is
+- **Rail** (`md` and up): one icon per registered `StageView`, a tooltip with
+  its label, an accent bar on the current section, and an optional count
+  badge (Chats unread). The ⌘K search icon sits at the bottom. Below `md` the
+  same entries render as a bottom tab bar.
+- **Section sidebar:** each `StageView` registers its own `sidebar`. There are
+  no sidebar tabs, and a sidebar never shows another section's content.
+  Sidebars share one toolbar shape: search (the count lives in the
+  placeholder) and a single trailing action. A dot marks non-default filters.
+- **Below `lg`** the sidebar isn't docked. World and Chats show it as the
+  section's first screen until something is opened (with a back button on the
+  stage). Timeline opens it as a sheet from a Filters button.
+
+**Chats sidebar:** rows show a presence avatar for DMs (so you see who is
 thinking about a reply), last message or a typing shimmer, time, unread.
-Observed chats will appear below as a section (needs `observe`).
+Trailing action: New group. Observed chats will appear below as a section
+(needs `observe`).
 
-**Characters tab (roster):**
+**World sidebar (folders):**
 
-- **Virtualized** list of characters from `/kazusa/characters`, with live
-  status from the live store.
-- **Filter menu:** a kind filter (Simulated by default, NPCs, Everyone),
-  group-by (None, Affiliation, Activity type, Brain state; Place once location
-  exists) and, later, sort (Recently active, Name, Ending soon).
-- **Watchlist:** starred characters pinned in a section at the top. Stored in
-  local preferences (a UI preference, not simulation data).
-- **Row anatomy (≈ 44px):** presence avatar, name, one-line activity
-  (`task.description` truncated; `type` as an icon tooltip), and remaining time
-  in mono (`34m`). A composing indicator appears when composing.
-- **Group headers** show counts ("Library · 12") and collapse.
-- **Collapsed mode:** an avatar strip with presence rings. Tooltips show name
-  and activity.
-- **Keyboard:** ↑↓ move, Enter selects, `s` stars, `/` focuses search.
-- Selecting a row sets `sel=character:<id>`. It never changes the stage view.
+- **Fixed folders:** Watchlist (starred characters, a local UI preference) and
+  Everyone.
+- **Dimension folders:** one per group of the chosen dimension (Affiliation by
+  default, Activity, Brain state; Place once location exists). Activity
+  folders use the task icon. Each folder shows its count and a live busy hint
+  ("2 thinking · 1 composing").
+- **Filter menu:** "Folders by" dimension and a kind filter (Simulated by
+  default, NPCs, Everyone).
+- **Search** lists matching characters directly, so jumping to someone never
+  needs a folder. Selecting a row sets `sel=character:<id>`.
+
+**Timeline sidebar (filters):** Following (Everyone / Watchlist, plus any
+specific characters from "Open in Timeline" as removable chips) and Show (one
+checkbox per registered timeline kind; all checked means no `tl.kinds` param).
+Clear resets everything.
 
 ## 5. Stage: World
 
-A first-draft **tree renderer**. Later, a map renderer registers as an
+The folder opened in the World sidebar. Later, a map renderer registers as an
 alternative inside the same view (a renderer toggle), not as a separate view.
 
-- **Group-by dimension**, owned by the view (`world.group`): Place hierarchy
-  once places and location exist; until then, Affiliation or Activity type.
-  The same tree component renders any dimension.
-- **Node anatomy:** name, kind icon, occupant count, and (for places) a
-  structured status chip (`OPERATIONAL`, `CLOSED`, …). Expanding a node lists
-  occupants with the roster row component.
-- **Buckets:** "Unplaced" (no structured location) and, later, "In transit".
-  These are honest buckets, not hidden rows.
-- Selecting a place node sets `sel=place:<id>`. Selecting an occupant sets
-  `sel=character:<id>`.
+- **URL params:** `world.by` (dimension), `world.in` (open folder: `all`,
+  `watch`, or a group key; absent means "nothing opened", which is `all` on
+  desktop and the folder list on narrow screens), `world.kind`.
+- **Header:** folder name, then a mono summary ("15 simulated · 2 thinking").
+  The place/map NeedsLine sits on the right until `places` exists.
+- **Rows:** the shared ≈44px character row (presence avatar, name, one-line
+  activity with task icon, remaining time in mono, star). Virtualized.
+- **Buckets:** "No affiliation" and similar (no structured field) and, later,
+  "Unplaced" and "In transit". These are honest buckets, not hidden rows.
+- Once places exist, place folders set `sel=place:<id>` from the stage header.
 - Before the places and location domains are live, the view still works with
   non-spatial groupings, so it's useful on day one.
 
@@ -152,8 +163,8 @@ rehoused as a stage view.
 - **List controls:** search, a participant filter (multi-select characters),
   "Live now" (activity in the last N sim minutes), sorted by latest sequence.
   The list is virtualized, since observed chats can number in the thousands.
-- **The list lives in the sidebar's Chats tab**, not in the view. Below `lg`
-  the view shows that panel inline until a chat is open.
+- **The list is the Chats section's sidebar**, not part of the view. Below
+  `lg` the view shows it as the first screen until a chat is open.
 - **Presence-aware header:** a DM shows the partner's presence ring and
   current activity (task icon, "Reading · 34m left"; typing overrides it). A group
   shows up to three stacked presence avatars and member first names

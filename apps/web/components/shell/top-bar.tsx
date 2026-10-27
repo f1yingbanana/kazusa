@@ -1,6 +1,6 @@
 'use client'
 
-import { FastForwardIcon, PanelLeftIcon, PauseIcon, Settings2Icon } from 'lucide-react'
+import { FastForwardIcon, PauseIcon, SearchIcon, Settings2Icon } from 'lucide-react'
 import { MockTag } from '@/components/entities/source-state'
 import { Button } from '@/components/ui/button'
 import {
@@ -95,20 +95,19 @@ function SpeedControls() {
   )
 }
 
-/** Global time and navigation only. Feature controls live inside their stage view. */
+/**
+ * Global time and settings only. Sections live on the rail (or the bottom tab
+ * bar on phones); feature controls live inside their section.
+ */
 export function TopBar({
-  onOpenRoster,
+  onOpenPalette,
   onOpenSettings,
 }: {
-  onOpenRoster: () => void
+  onOpenPalette: () => void
   onOpenSettings: () => void
 }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-sidebar px-3">
-      <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onOpenRoster}>
-        <PanelLeftIcon />
-        <span className="sr-only">Open sidebar</span>
-      </Button>
       {/* World title comes from GET /kazusa/world once it exists (D1). */}
       <h1 className="text-sm font-semibold tracking-tight">Kazusa</h1>
 
@@ -119,6 +118,10 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon-sm" className="md:hidden" onClick={onOpenPalette}>
+          <SearchIcon />
+          <span className="sr-only">Jump to anything</span>
+        </Button>
         <Tooltip>
           <TooltipTrigger
             render={<span />}

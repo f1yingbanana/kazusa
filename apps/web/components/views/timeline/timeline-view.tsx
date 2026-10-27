@@ -2,19 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowUpIcon, FilterIcon, StarIcon, XIcon } from 'lucide-react'
+import { ArrowUpIcon, ListFilterIcon } from 'lucide-react'
 import type { JournalEvent, JournalKind } from '@kazusa/client'
-import { CharacterChip } from '@/components/entities/chips'
-import { MockTag } from '@/components/entities/source-state'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Empty,
   EmptyContent,
@@ -24,12 +14,13 @@ import {
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
+import { useCharacters } from '@/hooks/use-characters'
 import { useTimeline } from '@/hooks/use-timeline'
 import { useListParam, useNavigate, useParam } from '@/hooks/use-url-state'
 import { TIMELINE_KIND_LIST } from '@/lib/registry/timeline-kinds'
+import { requestSidebar } from '@/lib/state/sidebar-request'
 import { useWatchlist } from '@/lib/state/watchlist'
 import { formatSimDateLong, simDayStart } from '@/lib/time/sim'
-import { cn } from '@/lib/utils'
 import { TimelineRow } from './timeline-row'
 
 type Row =
@@ -56,6 +47,7 @@ export function TimelineView() {
   const kindParam = useListParam('tl.kinds') as JournalKind[]
   const watchOnly = useParam('tl.watch') === '1'
   const watchlist = useWatchlist()
+  const { byId } = useCharacters()
 
   const actors = watchOnly ? watchlist : actorParam
   const filters = useMemo(() => ({ actors, kinds: kindParam }), [actors, kindParam])
@@ -98,81 +90,29 @@ export function TimelineView() {
     setAtTop(top)
   }
 
-  function setKinds(next: JournalKind[]) {
-    navigate({ 'tl.kinds': next.join(',') || null }, 'replace')
-  }
+  const following = watchOnly
+    ? 'Watchlist'
+    : actorParam.length === 1
+      ? (byId.get(actorParam[0])?.name ?? actorParam[0])
+      : actorParam.length > 1
+        ? `${actorParam.length} characters`
+        : 'Everyone'
+  const kindsLabel = kindParam.length ? `${kindParam.length} of ${TIMELINE_KIND_LIST.length} kinds` : 'all kinds'
 
   return (
     <section aria-label="Timeline" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-            <FilterIcon data-icon="inline-start" />
-            Kinds
-            {kindParam.length ? (
-              <span className="font-mono text-xs text-muted-foreground tabular-nums">{kindParam.length}</span>
-            ) : null}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Event kinds</DropdownMenuLabel>
-              {TIMELINE_KIND_LIST.map((kind) => (
-                <DropdownMenuCheckboxItem
-                  key={kind.kind}
-                  checked={kindParam.includes(kind.kind)}
-                  onCheckedChange={(checked) =>
-                    setKinds(
-                      checked ? [...kindParam, kind.kind] : kindParam.filter((k) => k !== kind.kind),
-                    )
-                  }
-                >
-                  <kind.icon />
-                  {kind.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          variant={watchOnly ? 'secondary' : 'outline'}
-          size="sm"
-          aria-pressed={watchOnly}
-          onClick={() => navigate({ 'tl.watch': watchOnly ? null : '1' }, 'replace')}
-        >
-          <StarIcon data-icon="inline-start" className={cn(watchOnly && 'fill-current')} />
-          Watchlist only
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h2 className="text-sm font-semibold">Timeline</h2>
+          <p className="truncate font-mono text-[11px] text-muted-foreground">{`${following} · ${kindsLabel}`}</p>
+        </div>
+        <Button variant="outline" size="sm" className="relative lg:hidden" onClick={requestSidebar}>
+          <ListFilterIcon data-icon="inline-start" />
+          Filters
+          {hasFilters ? <span aria-hidden className="size-1.5 rounded-full bg-primary" /> : null}
+          {hasFilters ? <span className="sr-only">(changed)</span> : null}
         </Button>
-
-        {!watchOnly
-          ? actorParam.map((id) => (
-              <span key={id} className="inline-flex items-center rounded-md border pr-0.5">
-                <CharacterChip id={id} />
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() =>
-                    navigate({ 'tl.actors': actorParam.filter((a) => a !== id).join(',') || null }, 'replace')
-                  }
-                >
-                  <XIcon />
-                  <span className="sr-only">Remove filter</span>
-                </Button>
-              </span>
-            ))
-          : null}
-
-        {hasFilters ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ 'tl.actors': null, 'tl.kinds': null, 'tl.watch': null }, 'replace')}
-          >
-            Clear
-          </Button>
-        ) : null}
-        <MockTag requires={['timeline']} className="ml-auto" />
-      </div>
+      </header>
 
       <div className="relative min-h-0 flex-1">
         {timeline.isLoading ? (
@@ -190,7 +130,7 @@ export function TimelineView() {
               <EmptyTitle>No events match these filters</EmptyTitle>
               <EmptyDescription>
                 {watchOnly && watchlist.length === 0
-                  ? 'Your watchlist is empty. Star characters in the roster to follow them here.'
+                  ? 'Your watchlist is empty. Star characters in World to follow them here.'
                   : 'Try fewer kinds or characters.'}
               </EmptyDescription>
             </EmptyHeader>

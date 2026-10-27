@@ -13,7 +13,7 @@ import { taskIcon } from './task-icon'
 
 const KIND_LABEL = { agent: 'Simulated', npc: 'NPC', player: 'Player' } as const
 
-/** ≈44px roster row, reused by the roster rail and the World tree. */
+/** ≈44px character row, used by the World folder list, World search, and anywhere else a roster is shown. */
 export const CharacterRow = memo(function CharacterRow({
   character,
   selected,

@@ -19,8 +19,8 @@ import { ChatView } from './chat-view'
 import { ChatsPanel } from './chats-panel'
 
 /**
- * The open conversation. The chat list lives in the sidebar's Chats tab; on
- * narrow screens (sidebar is a sheet) it renders inline here instead.
+ * The open conversation. The chat list is this section's sidebar; on narrow
+ * screens (no docked sidebar) it is this screen until a chat is opened.
  *
  * Params: `chats.id` (open chat), `chats.dm` (start/open a direct chat with a
  * character, then replaced by `chats.id`). `chats.msg` deep-link highlighting
@@ -102,8 +102,8 @@ export function ChatsView() {
           </EmptyMedia>
           <EmptyTitle>Pick a conversation</EmptyTitle>
           <EmptyDescription>
-            Choose one from Chats, or open a character and choose Message. A group lets several characters
-            answer side by side.
+            Choose one from the list, or open a character and choose Message. A group lets several
+            characters answer side by side.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
