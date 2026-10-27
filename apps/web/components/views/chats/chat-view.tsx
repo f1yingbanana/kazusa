@@ -1,37 +1,17 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ChevronLeftIcon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { useCharacterStatus, useCharacters } from "@/hooks/use-characters";
+import { useCharacters } from "@/hooks/use-characters";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
-import { useSimNow } from "@/hooks/use-clock";
-import { formatSimDuration } from "@/lib/time/sim";
-import { formatTypingLabel } from "@/lib/format";
 import { setTyping } from "@/lib/source/chats/http";
 import type { Chat, PendingMessage } from "@/lib/source/chats/types";
-import { ChatAvatar, resolveParticipant } from "./chat-avatar";
+import { resolveParticipant } from "./chat-avatar";
+import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
 import { MembersSheet } from "./members-sheet";
 import { MessageList } from "./message-list";
 import { useRealtime } from "@/lib/live/realtime-provider";
-
-/** Gives a reply that hasn't come yet visible context ("Reading · 34m left"). */
-function MemberActivity({ id }: { id: string }) {
-  const status = useCharacterStatus(id);
-  const now = useSimNow();
-  const task = status?.task;
-  if (!task) return <>{id}</>;
-  return (
-    <>
-      {task.description}
-      {now > 0 && task.endAt > now
-        ? ` · ${formatSimDuration(task.endAt - now)} left`
-        : null}
-    </>
-  );
-}
 
 export function ChatView({
   chat,
@@ -144,65 +124,18 @@ export function ChatView({
     [chat.draft, chat.sessionKey, config.baseUrl, config.token],
   );
 
-  const otherMembers = chat.members.filter((id) => id !== config.userId);
-  const agentCount = otherMembers.filter((id) => agentsById.has(id)).length;
-  const subtitle =
-    typists.length > 0 ? (
-      formatTypingLabel(typists.map((t) => t.senderName))
-    ) : isGroup ? (
-      `${chat.members.length} members · ${agentCount} ${agentCount === 1 ? "agent" : "agents"}`
-    ) : otherMembers[0] ? (
-      <MemberActivity id={otherMembers[0]} />
-    ) : (
-      "Direct message"
-    );
-
   return (
     <section
       aria-label={chat.name}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b px-2 md:px-4">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="md:hidden"
-          onClick={onBack}
-        >
-          <ChevronLeftIcon />
-          <span className="sr-only">Back to conversations</span>
-        </Button>
-        <ChatAvatar
-          chat={chat}
-          agentsById={agentsById}
-          userId={config.userId}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="truncate text-sm font-semibold">{chat.name}</h2>
-          <p
-            className={
-              typists.length > 0
-                ? "shimmer truncate text-xs text-primary"
-                : "truncate font-mono text-xs text-muted-foreground"
-            }
-          >
-            {subtitle}
-          </p>
-        </div>
-        {isGroup && !chat.draft ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMembersOpen(true)}
-          >
-            <UsersIcon data-icon="inline-start" />
-            <span className="hidden sm:inline">Members</span>
-            <span className="font-mono text-xs text-muted-foreground tabular-nums">
-              {chat.members.length}
-            </span>
-          </Button>
-        ) : null}
-      </header>
+      <ChatHeader
+        chat={chat}
+        userId={config.userId}
+        typists={typists}
+        onBack={onBack}
+        onOpenMembers={() => setMembersOpen(true)}
+      />
 
       <MessageList
         chat={chat}

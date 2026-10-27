@@ -89,13 +89,26 @@ From left to right:
 The top bar never hosts feature-specific controls. Those belong inside their
 stage view.
 
-## 4. Roster rail
+## 4. Sidebar: Chats | Characters
+
+One left rail with two tabs, so "who" and "my conversations" never compete
+for width. The tab row carries the Chats unread total and the Characters
+MockTag; nothing else. Each tab has one toolbar row: search (the count lives
+in the placeholder, e.g. "Search 140 characters") and a single trailing
+action, New group for Chats and a filter menu for Characters (a dot marks
+non-default filters). Opening a chat from anywhere switches the tab to Chats.
+
+**Chats tab:** rows show a presence avatar for DMs (so you see who is
+thinking about a reply), last message or a typing shimmer, time, unread.
+Observed chats will appear below as a section (needs `observe`).
+
+**Characters tab (roster):**
 
 - **Virtualized** list of characters from `/kazusa/characters`, with live
   status from the live store.
-- **Header controls:** search, a kind filter (Simulated by default, NPCs,
-  Everyone), group-by (None, Affiliation, Activity type, Brain state; Place
-  once location exists) and sort (Recently active, Name, Ending soon).
+- **Filter menu:** a kind filter (Simulated by default, NPCs, Everyone),
+  group-by (None, Affiliation, Activity type, Brain state; Place once location
+  exists) and, later, sort (Recently active, Name, Ending soon).
 - **Watchlist:** starred characters pinned in a section at the top. Stored in
   local preferences (a UI preference, not simulation data).
 - **Row anatomy (≈ 44px):** presence avatar, name, one-line activity
@@ -139,9 +152,15 @@ rehoused as a stage view.
 - **List controls:** search, a participant filter (multi-select characters),
   "Live now" (activity in the last N sim minutes), sorted by latest sequence.
   The list is virtualized, since observed chats can number in the thousands.
-- **Presence-aware header:** members as presence avatars, plus each member's
-  current activity ("Reading · 34m left") as fact chips. A reply that hasn't
-  come yet then has visible context.
+- **The list lives in the sidebar's Chats tab**, not in the view. Below `lg`
+  the view shows that panel inline until a chat is open.
+- **Presence-aware header:** a DM shows the partner's presence ring and
+  current activity (task icon, "Reading · 34m left"; typing overrides it). A group
+  shows up to three stacked presence avatars and member first names
+  ("Sana, Ren, Mio +2"). A reply that hasn't come yet then has visible
+  context. Tapping the header opens the inspector: the character for a DM,
+  the chat for a group (members as roster rows with their activity). Member
+  management stays a separate icon button.
 - Deep links: `view=chats&chat=<chatId>&msg=<messageId>` scrolls to the message
   and highlights it. Timeline rows link here.
 

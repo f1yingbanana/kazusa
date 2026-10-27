@@ -107,7 +107,7 @@ export function TopBar({
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-sidebar px-3">
       <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onOpenRoster}>
         <PanelLeftIcon />
-        <span className="sr-only">Open roster</span>
+        <span className="sr-only">Open sidebar</span>
       </Button>
       {/* World title comes from GET /kazusa/world once it exists (D1). */}
       <h1 className="text-sm font-semibold tracking-tight">Kazusa</h1>

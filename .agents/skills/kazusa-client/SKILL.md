@@ -74,12 +74,12 @@ built yet.
 | Shell (top bar, rail, stage tabs, inspector, status bar) | Built. Responsive: rail and inspector become sheets below `xl`. | — |
 | Top bar: clock, pause/speed presets, advance menu, lens badge | Built | `clock`: **Mock** (`POST /kazusa/clock` planned) |
 | Top bar: global search | **Planned** | — |
-| Roster rail: virtualized, search, kind filter, group-by, watchlist stars | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
+| Sidebar Characters tab (roster): virtualized, search, kind filter, group-by, watchlist stars | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
 | Presence ring (thinking / composing / on-task / idle) | Built | `status`: **Mock** |
 | World view: group-by tree (affiliation / activity / brain) | Built | `characters` + `status` |
 | World view: place tree, map renderer | **Planned** (shows a NeedsLine) | Needs `places`, `location` |
 | Chats view: my chats, composer, groups, members | Built (existing UI rehoused) | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down |
-| Chats view: DM subtitle shows partner's current task | Built | `status`: **Mock** |
+| Chats view: presence-aware header (DM: partner ring + task + time left; group: member stack + names). Tapping it opens the inspector (character / chat with member activity rows) | Built | `status`: **Mock** |
 | Chats view: observed (read-only) chats | **Planned** (shows a NeedsLine) | Needs `observe` |
 | Timeline: virtualized stream, day separators, kind/actor/watchlist filters, held-back "N new events" | Built | `timeline`: **Mock** |
 | Timeline: overview strip (histogram), compare lanes, collapse runs (`collapseKey` is declared but not applied), scrub/replay | **Planned** | Needs `/kazusa/timeline/histogram` for the strip |
@@ -218,19 +218,24 @@ fact.**
 ```text
 ┌ TopBar ─────────────────────────────────────────────────────────────────────┐
 │ World title │ Day 3 · 14:32 · Afternoon  ⏸ 1× 10× 60× +1h │ ⌘K │ Observer │
-├ Roster ──────┬ Stage  [World | Chats | Timeline]  ← registry ┬ Inspector ───┤
-│ search/group │                                               │ entity-      │
-│ ★ watchlist  │   active StageView component                  │ polymorphic  │
-│ virtual rows │   (owns its own URL params, e.g. tl.*)        │ sections     │
-│              │                                               │ ← registry   │
+├ Sidebar ─────┬ Stage  [World | Chats | Timeline]  ← registry ┬ Inspector ───┤
+│ Chats|Charac.│                                               │ entity-      │
+│ search  [⚙/+]│   active StageView component                  │ polymorphic  │
+│ ★ watchlist  │   (owns its own URL params, e.g. tl.*)        │ sections     │
+│ virtual rows │                                               │ ← registry   │
 ├ StatusBar ───┴───────────────────────────────────────────────┴──────────────┤
 │ ● Live │ 2 domains mocked │ 12 thinking · 3 composing │ 4 new events    ⌘K? │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **TopBar** is global time and navigation only. No per-feature controls.
-- **Roster rail** is the always-visible "who's who". It can collapse to an
-  avatar strip. Selecting a row sets the selection; it does not navigate.
+- **Sidebar** (`shell/navigator.tsx`) is one tabbed rail: **Chats** (the
+  player's conversations; opening one navigates to `view=chats`) and
+  **Characters** (the roster; selecting a row sets `sel` and never navigates).
+  Each tab renders the same `PanelToolbar`: search (count in the placeholder)
+  plus its own trailing action (New group / filter menu). Both panels stay
+  mounted. The Chats stage view has no list of its own; below `lg` it renders
+  the Chats panel inline when no chat is open.
 - **Stage** renders exactly one registered view. A view owns its URL params,
   namespaced like `tl.kinds` and `world.group`.
 - **Inspector** shows the selected `EntityRef` using the sections registered
@@ -239,7 +244,7 @@ fact.**
   Timeline".
 - **StatusBar** is a slot registry for small, global, glanceable signals.
   Anything bigger than a chip belongs elsewhere.
-- **Mobile:** the stage is full-screen, the roster and inspector become sheets,
+- **Mobile:** the stage is full-screen, the sidebar and inspector become sheets,
   and status items fold into a top-bar menu.
 
 UX details for each surface are in `references/ux.md`.
@@ -362,7 +367,7 @@ app/
   page.tsx                         # <Shell/>
   kazusa/[...path]/route.ts        # allowlisted proxy (add new routes here)
 components/
-  shell/                           # top-bar, roster-rail, stage, inspector, status-bar (iterate registries)
+  shell/                           # top-bar, navigator (+ roster-panel), stage, inspector, status-bar (iterate registries)
   views/{world,chats,timeline}/    # stage view implementations (existing chat UI moves to views/chats)
   inspector/sections/              # registered inspector sections
   status/                          # registered status items

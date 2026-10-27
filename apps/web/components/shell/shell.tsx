@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useMediaQuery } from '@/hooks/use-media-query'
@@ -8,8 +8,9 @@ import { useParam, useSelection } from '@/hooks/use-url-state'
 import { RealtimeProvider } from '@/lib/live/realtime-provider'
 import { SourcesProvider } from '@/lib/source/provider'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
+import { onInspectorRequest } from '@/lib/state/inspector-request'
 import { Inspector } from './inspector'
-import { RosterRail } from './roster-rail'
+import { Navigator, type NavigatorTab } from './navigator'
 import { SettingsDialog } from './settings-dialog'
 import { Stage } from './stage'
 import { StatusBar } from './status-bar'
@@ -26,11 +27,21 @@ export function Shell() {
 }
 
 function Layout() {
-  const [rosterOpen, setRosterOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [navTab, setNavTab] = useState<NavigatorTab>('chats')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [selection, select] = useSelection()
   const view = useParam('view')
+  const chatId = useParam('chats.id')
   const wide = useMediaQuery('(min-width: 1280px)')
+
+  // Opening a chat from anywhere (inspector "Message", a chip) brings the
+  // sidebar to Chats so the open conversation is highlighted.
+  const [seenChatId, setSeenChatId] = useState(chatId)
+  if (seenChatId !== chatId) {
+    setSeenChatId(chatId)
+    if (chatId) setNavTab('chats')
+  }
 
   // Narrow screens: the inspector sheet opens on a new selection, closes when a
   // link changes the view (keeping the selection), and dismissing it clears it.
@@ -41,13 +52,14 @@ function Layout() {
     setSeen({ selKey, view })
     setSheetOpen(seen.selKey !== selKey ? Boolean(selKey) : false)
   }
+  useEffect(() => onInspectorRequest(() => setSheetOpen(true)), [])
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <TopBar onOpenRoster={() => setRosterOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar onOpenRoster={() => setNavOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
       <div className="flex min-h-0 flex-1">
-        <aside aria-label="Roster" className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
-          <RosterRail />
+        <aside aria-label="Sidebar" className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
+          <Navigator tab={navTab} onTabChange={setNavTab} />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage />
@@ -58,13 +70,13 @@ function Layout() {
       </div>
       <StatusBar />
 
-      <Sheet open={rosterOpen} onOpenChange={setRosterOpen}>
-        <SheetContent side="left" className="w-80 gap-0 p-0 lg:hidden" showCloseButton={false}>
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent side="left" className="w-80 gap-0 bg-sidebar p-0 lg:hidden" showCloseButton={false}>
           <SheetHeader className="sr-only">
-            <SheetTitle>Roster</SheetTitle>
-            <SheetDescription>Every character in the world.</SheetDescription>
+            <SheetTitle>Sidebar</SheetTitle>
+            <SheetDescription>Your chats and every character in the world.</SheetDescription>
           </SheetHeader>
-          <RosterRail onSelected={() => setRosterOpen(false)} />
+          <Navigator tab={navTab} onTabChange={setNavTab} onNavigated={() => setNavOpen(false)} />
         </SheetContent>
       </Sheet>
 

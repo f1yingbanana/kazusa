@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { initials } from '@/lib/format'
-import type { Agent } from '@kazusa/client'
+import { PresenceAvatar } from '@/components/entities/presence-avatar'
+import type { Agent, CharacterKind } from '@kazusa/client'
 import type { Chat } from '@/lib/source/chats/types'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +47,10 @@ export function ParticipantAvatar({
   )
 }
 
+/**
+ * DMs get the partner's presence ring, so the list shows who is thinking
+ * about a reply. Groups show two overlapping faces.
+ */
 export function ChatAvatar({
   chat,
   agentsById,
@@ -53,7 +58,7 @@ export function ChatAvatar({
   className,
 }: {
   chat: Chat
-  agentsById: ReadonlyMap<string, Agent>
+  agentsById: ReadonlyMap<string, Agent & { kind?: CharacterKind }>
   userId: string
   className?: string
 }) {
@@ -61,25 +66,32 @@ export function ChatAvatar({
   const self = { userId, userName: 'You' }
 
   if (chat.type === 'direct' || others.length <= 1) {
-    const participant = others[0]
-      ? resolveParticipant(others[0], agentsById, self)
-      : { name: chat.name }
-    return <ParticipantAvatar participant={participant} size="lg" className={className} />
+    const partner = others[0] ? agentsById.get(others[0]) : undefined
+    return (
+      <PresenceAvatar
+        id={others[0] ?? chat.id}
+        name={partner?.name ?? chat.name}
+        avatarUrl={partner?.avatarUrl}
+        kind={partner?.kind}
+        size="md"
+        className={className}
+      />
+    )
   }
 
   const [first, second] = others.map((id) => resolveParticipant(id, agentsById, self))
 
   return (
-    <div aria-hidden className={cn('relative size-10 shrink-0', className)}>
+    <div aria-hidden className={cn('relative size-9 shrink-0', className)}>
       <ParticipantAvatar
         participant={first}
         size="sm"
-        className="absolute top-0 left-0 size-7"
+        className="absolute top-0 left-0 size-6"
       />
       <ParticipantAvatar
         participant={second}
         size="sm"
-        className="absolute right-0 bottom-0 size-7 ring-2 ring-sidebar"
+        className="absolute right-0 bottom-0 size-6 ring-2 ring-sidebar"
       />
     </div>
   )
