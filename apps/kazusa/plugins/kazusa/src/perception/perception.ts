@@ -49,6 +49,7 @@ export interface PerceptionDelivery {
   message: string;
   ids: string[];
   keys: string[];
+  sessionKeys?: string[];
 }
 
 export interface PerceptionDeps {
@@ -111,6 +112,9 @@ export class Perception {
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
+  private readonly adoptedListeners = new Set<
+    (delivery: PerceptionDelivery) => void | Promise<void>
+  >();
 
   constructor(deps: PerceptionDeps) {
     this.deps = deps;
@@ -299,6 +303,15 @@ export class Perception {
         state.stopped = stopped;
       } else return;
     });
+  }
+
+  onAdopted(
+    listener: (delivery: PerceptionDelivery) => void | Promise<void>,
+  ): () => void {
+    this.adoptedListeners.add(listener);
+    return () => {
+      this.adoptedListeners.delete(listener);
+    };
   }
 
   /**
@@ -551,6 +564,13 @@ export class Perception {
     mode: PerceptionDelivery["mode"],
   ): Promise<PerceptionDelivery> {
     const keys = bundle.map(stimulusKey);
+    const sessionKeys = [
+      ...new Set(
+        bundle
+          .filter((item) => !item.deadline && item.sessionKey.includes(":chat:"))
+          .map((item) => item.sessionKey),
+      ),
+    ];
     const delivery: PerceptionDelivery = {
       id: createHash("sha256")
         .update(JSON.stringify([agentId, [...keys].sort()]))
@@ -559,6 +579,7 @@ export class Perception {
       mode,
       keys,
       ids: bundle.map((item) => item.id),
+      sessionKeys,
       message: formatDeliveryMessage(bundle, mode),
     };
     state.deliveries = [...(state.deliveries ?? []), delivery];
@@ -635,6 +656,13 @@ export class Perception {
           );
           adopted = true;
           resolve();
+          for (const listener of this.adoptedListeners) {
+            try {
+              await listener(delivery);
+            } catch (err: unknown) {
+              this.warn(err);
+            }
+          }
           // Inputs can arrive while this reservation waits for adoption. Let
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
@@ -686,6 +714,7 @@ export class Perception {
 
   dispose(): void {
     this.lifetime.abort();
+    this.adoptedListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();
   }

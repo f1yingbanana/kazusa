@@ -157,7 +157,6 @@
       "start_task",
       "delay_task",
       "send_message",
-      "set_typing",
       "list_chats",
       "manage_chat"
     ]

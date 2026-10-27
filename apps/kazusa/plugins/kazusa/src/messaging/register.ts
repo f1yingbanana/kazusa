@@ -24,7 +24,6 @@ import {
   SEND_MESSAGE,
   LIST_CHATS,
   MANAGE_CHAT,
-  TYPING,
   isUser,
   messagingId,
   type ChatConversation,
@@ -105,7 +104,8 @@ export function registerMessaging(
   api: OpenClawPluginApi,
   deps: {
     readonly clock: Pick<Clock, "init" | "time">;
-    readonly perception: Pick<Perception, "receive">;
+    readonly perception: Pick<Perception, "receive"> &
+      Partial<Pick<Perception, "onAdopted">>;
   },
 ): Messaging {
   const messaging = new Messaging({
@@ -231,6 +231,25 @@ export function registerMessaging(
     return { agentId, config, agents };
   };
 
+  deps.perception.onAdopted?.(async (delivery) => {
+    if (!delivery.sessionKeys?.length) return;
+    try {
+      const config = api.config;
+      const name = await senderName(api, config, delivery.agentId);
+      for (const sessionKey of delivery.sessionKeys) {
+        await messaging.setTyping(
+          delivery.agentId,
+          name,
+          sessionKey,
+          true,
+          delivery.id,
+        );
+      }
+    } catch (err: unknown) {
+      api.logger.warn(`Messaging auto-typing error: ${String(err)}`);
+    }
+  });
+
   const activeRuns = new Map<string, string>();
   api.agent.events.registerAgentEventSubscription({
     id: "messaging-typing",
@@ -242,8 +261,8 @@ export function registerMessaging(
         .safeParse(event.data);
       if (!owner || owner.rest !== "brain" || !data.success) return;
       if (data.data.phase === "start") {
-        messaging.clearTyping(owner.agentId);
         activeRuns.set(owner.agentId, event.runId);
+        messaging.clearTyping(owner.agentId, undefined, undefined, event.runId);
       } else {
         messaging.clearTyping(owner.agentId, event.runId);
         if (activeRuns.get(owner.agentId) === event.runId)
@@ -257,41 +276,10 @@ export function registerMessaging(
       contextVersion: 2,
       create: (context) => [
         {
-          name: "set_typing",
-          label: "Set Typing",
-          description:
-            "Call with isTyping true only when you have decided to compose a reply in an existing chat, before drafting it. Never signal typing just for reading or thinking. Sending or ending your turn clears it automatically; use false if you abandon the reply.",
-          parameters: z.toJSONSchema(TYPING),
-          async execute(_id, input: unknown) {
-            const { agentId, config } = caller(context);
-            const params = TYPING.parse(input);
-            const runId = activeRuns.get(agentId);
-            if (!runId)
-              throw new Error("Typing requires an active brain turn.");
-            await messaging.setTyping(
-              agentId,
-              await senderName(api, config, agentId),
-              params.sessionKey,
-              params.isTyping,
-              runId,
-              context.assertInvocationCurrent,
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({ isTyping: params.isTyping }),
-                },
-              ],
-              details: { isTyping: params.isTyping },
-            };
-          },
-        },
-        {
           name: "send_message",
           label: "Send Message",
           description:
-            "Send dialogue to an existing chat with sessionKey. Once you decide to reply, call set_typing with isTyping true before composing the text. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Delivery retries automatically; another tool call sends another message. Use list_chats when the address is unknown.",
+            "Send dialogue to an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Delivery retries automatically; another tool call sends another message. Use list_chats when the address is unknown.",
           parameters: z.toJSONSchema(SEND_MESSAGE),
           async execute(toolCallId, input: unknown) {
             const { agentId, config, agents } = caller(context);
@@ -382,7 +370,7 @@ export function registerMessaging(
         },
       ],
     },
-    { names: ["send_message", "list_chats", "manage_chat", "set_typing"] },
+    { names: ["send_message", "list_chats", "manage_chat"] },
   );
 
   registerMessagingHttp(api, messaging, (id) => rosterAgent(api, id));

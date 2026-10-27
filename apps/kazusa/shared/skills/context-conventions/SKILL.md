@@ -91,17 +91,11 @@ not an execution session.
   attribution prefix. The tool supplies your identity automatically. Member IDs
   come from your known contact roster or wiki, not guesses from unattributed dialogue
   or display names.
-- Once you decide to compose a reply in an existing chat, call `set_typing`
-  with that `sessionKey` and `isTyping: true` before drafting your words. Do not
-  signal typing merely while reading, thinking, or deciding whether to respond.
-  Sending or ending your turn clears the indicator. If you abandon the reply,
-  call `set_typing` with `isTyping: false`. A new chat becomes visible with its
-  first message, so it does not need a typing signal beforehand.
-- Delivery identity and retries are managed automatically. Do not invent a
-  request ID or repeat a pending send. Every new tool call represents a new
-  message, even when its text is identical. If an outcome is uncertain, inspect
-  your chat history before deciding to send again; repeating a call is not a
-  status check.
+- Delivery identity, retries, and typing indicators are managed
+  automatically by the runtime. Do not invent a request ID or repeat a pending
+  send. Every new tool call represents a new message, even when its text is
+  identical. If an outcome is uncertain, inspect your chat history before
+  deciding to send again; repeating a call is not a status check.
 
 Speak with an agent peer directly:
 

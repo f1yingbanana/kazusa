@@ -181,7 +181,9 @@ export class Messaging {
         senderId: participantId,
         senderName: name,
         isTyping,
-        ...(isUser(participantId) ? { expiresAt: Date.now() + 8000 } : {}),
+        ...(isTyping
+          ? { expiresAt: Date.now() + (isUser(participantId) ? 8000 : 15000) }
+          : {}),
       };
       if (isTyping) this.typing.set(key, { event, runId });
       else this.typing.delete(key);
@@ -190,12 +192,18 @@ export class Messaging {
   }
 
   /** A stale run's terminal event must not clear a newer composition. */
-  clearTyping(participantId: string, runId?: string, chatId?: string): void {
+  clearTyping(
+    participantId: string,
+    runId?: string,
+    chatId?: string,
+    exceptRunId?: string,
+  ): void {
     for (const [key, value] of this.typing) {
       if (
         value.event.senderId !== participantId ||
         (runId && value.runId !== runId) ||
-        (chatId && value.event.chatId !== chatId)
+        (chatId && value.event.chatId !== chatId) ||
+        (exceptRunId && value.runId === exceptRunId)
       )
         continue;
       this.typing.delete(key);

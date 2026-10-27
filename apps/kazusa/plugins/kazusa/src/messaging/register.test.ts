@@ -113,9 +113,24 @@ async function setup() {
     },
   } as unknown as OpenClawPluginApi;
   const receive = vi.fn(async () => {});
+  let adoptedListener:
+    | ((delivery: {
+        id: string;
+        agentId: string;
+        mode: "steer" | "followup";
+        message: string;
+        ids: string[];
+        keys: string[];
+        sessionKeys?: string[];
+      }) => void | Promise<void>)
+    | undefined;
+  const onAdopted = vi.fn((listener) => {
+    adoptedListener = listener;
+    return () => {};
+  });
   const messaging = registerMessaging(api, {
     clock: { init: async () => {}, time: () => 123456 },
-    perception: { receive },
+    perception: { receive, onAdopted },
   });
   instances.push(messaging);
   const context: OpenClawPluginToolContext<2> = {
@@ -158,6 +173,9 @@ async function setup() {
     patchSessionEntry,
     registerTool,
     routes,
+    adopt: async (
+      delivery: Parameters<NonNullable<typeof adoptedListener>>[0],
+    ) => adoptedListener?.(delivery),
   };
 }
 
@@ -217,7 +235,7 @@ describe("send_message SDK integration", () => {
   it("registers discovery, send and group management as guarded tools", async () => {
     const h = await setup();
     expect(h.registerTool.mock.calls[0][1]).toEqual({
-      names: ["send_message", "list_chats", "manage_chat", "set_typing"],
+      names: ["send_message", "list_chats", "manage_chat"],
     });
     const first = await h.execute({
       title: "Tea",
@@ -420,7 +438,7 @@ describe("send_message SDK integration", () => {
     expect(append).not.toHaveBeenCalled();
   });
 
-  it("signals typing only on explicit composition and clears it for its owning turn", async () => {
+  it("signals typing automatically on turn adoption and clears it on turn end or send", async () => {
     const h = await setup();
     await h.execute();
     const lifecycle = h.registerAgentEventSubscription.mock.calls[0][0];
@@ -431,23 +449,23 @@ describe("send_message SDK integration", () => {
         runId,
         data: { phase },
       });
-    event("start", "run-1");
     expect(await h.messaging.getTyping("bob")).toEqual([]);
-    await h.executeTool("set_typing", {
-      sessionKey: "chat:direct:bob",
-      isTyping: true,
+    await h.adopt({
+      id: "run-1",
+      agentId: "alice",
+      mode: "followup",
+      message: "Hello",
+      ids: ["msg-1"],
+      keys: ["key-1"],
+      sessionKeys: ["agent:alice:chat:direct:bob"],
     });
+    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
+    event("start", "run-1");
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     event("end", "old-run");
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     event("error", "run-1");
     expect(await h.messaging.getTyping("bob")).toEqual([]);
-    await expect(
-      h.executeTool("set_typing", {
-        sessionKey: "chat:direct:bob",
-        isTyping: true,
-      }),
-    ).rejects.toThrow("active brain turn");
   });
 
   it("registers Gateway HTTP routes and handles chats, messages, and send", async () => {

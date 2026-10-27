@@ -1605,6 +1605,21 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       // No raw JSON stringification
       expect(h.deliveries[0].message).not.toContain("[kazusa\\u003a");
       expect(h.deliveries[0].message).not.toContain('{"id":');
+      expect(h.deliveries[0].sessionKeys).toEqual(["agent:alice:chat:direct:bob"]);
+    });
+
+    it("notifies onAdopted listeners with delivery session keys upon host adoption", async () => {
+      const h = setup();
+      const adopted: string[] = [];
+      h.router.onAdopted((delivery) => {
+        adopted.push(...(delivery.sessionKeys ?? []));
+      });
+      await h.router.receive(
+        "alice",
+        stimulus("chat-msg-2", "alice", "Testing auto typing"),
+      );
+      expect(h.deliver).toHaveBeenCalledTimes(1);
+      expect(adopted).toEqual(["agent:alice:chat:direct:bob"]);
     });
   });
 });

@@ -45,11 +45,9 @@ context. You have full freedom to choose from natural human behaviors:
 - **Monologue:** Alongside a factual summary or delay reason, you may include
   `monologue`: one or two plain-text sentences of inner monologue in your
   character's voice.
-- **In-world speech:** Once you decide to reply to an existing chat, call
-  `set_typing` with its `sessionKey` and `isTyping: true` before composing your
-  words. Then send them through `send_message`, which clears typing. Do not
-  signal typing while deciding whether to respond; use `isTyping: false` if
-  you abandon the reply. Use
+- **In-world speech:** When replying to an existing chat, send your words through
+  `send_message` with its `sessionKey`. The typing indicator is signaled
+  automatically by the runtime during your turn. Use
   `sessionKey: "chat:direct:<peer-id>"` for any peer or human player directly
   (e.g. `chat:direct:bob` or `chat:direct:user:sensei`), or `list_chats`
   if looking for a group address.
