@@ -1,6 +1,16 @@
 {
   "id": "kazusa",
   "channels": ["kazusa"],
+  "channelConfigs": {
+    "kazusa": {
+      "label": "Kazusa Brain",
+      "description": "In-process admission of perceived stimuli to character brains.",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
   "kind": "context-engine",
   "name": "Kazusa",
   "description": "Multi-agent world simulation for roleplay.",
@@ -45,6 +55,18 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "personalWikiMaxTokens": {
+            "default": 1200,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32000
+          },
+          "personalWikiMaxArticles": {
+            "default": 3,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
           },
           "shortTermHours": {
             "default": 24,
@@ -115,6 +137,17 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 20
+          },
+          "skills": {
+            "type": "object",
+            "properties": {
+              "conventions": {
+                "type": "string",
+                "default": "context-conventions"
+              },
+              "lifecycle": { "type": "string", "default": "task-lifecycle" },
+              "interrupt": { "type": "string", "default": "task-interrupt" }
+            }
           }
         },
         "additionalProperties": false
@@ -127,6 +160,23 @@
             "type": "number",
             "minimum": 1,
             "description": "Minimum task duration in simulated minutes (default: 10)."
+          },
+          "categories": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Allowed task categories presented to the LLM in start_task tool schema."
+          },
+          "supervisor": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean", "default": true },
+              "intervalMs": { "type": "number", "default": 60000 },
+              "maxAgentsPerTick": { "type": "integer", "default": 2 },
+              "idleText": {
+                "type": "string",
+                "default": "Activity check-in: no scheduled activity."
+              }
+            }
           }
         }
       },

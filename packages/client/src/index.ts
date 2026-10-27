@@ -245,7 +245,7 @@ export type ClockResponse = z.infer<typeof ClockResponseSchema>;
 /* Read model: characters (PROPOSED — replaces GET /kazusa/agents)            */
 /* ========================================================================== */
 
-/** agent = has a workspace + roster entry; npc = World Wiki card only. */
+/** Agent = has a workspace + roster entry; npc = World Wiki card only. */
 export const CharacterKindSchema = z.enum(["agent", "player", "npc"]);
 export type CharacterKind = z.infer<typeof CharacterKindSchema>;
 
@@ -412,9 +412,9 @@ export type JournalEventOf<K extends JournalKind> = Extract<
   JournalEvent,
   { kind: K }
 >;
-export const JOURNAL_KINDS = JournalEventSchema.options.map(
+export const JOURNAL_KINDS = JournalEventSchema.options.map<JournalKind>(
   (option) => option.shape.kind.value,
-) as JournalKind[];
+);
 
 /**
  * GET /kazusa/timeline. List params are comma-separated on the wire. `before`
@@ -425,7 +425,9 @@ export const TimelineQuerySchema = z.object({
   after: z.number().int().optional(),
   limit: z.number().int().positive().max(500).optional(),
   actors: z.array(z.string()).optional(),
-  kinds: z.array(z.enum(JOURNAL_KINDS as [JournalKind, ...JournalKind[]])).optional(),
+  kinds: z
+    .array(z.enum(JOURNAL_KINDS as [JournalKind, ...JournalKind[]]))
+    .optional(),
   chats: z.array(z.string()).optional(),
 });
 export type TimelineQuery = z.infer<typeof TimelineQuerySchema>;
@@ -477,7 +479,10 @@ export const ClockStreamEventSchema = z.object({
 });
 export type ClockStreamEvent = z.infer<typeof ClockStreamEventSchema>;
 
-/** `connected` with the observer-scope additions (journal high-water, status seed). */
+/**
+ * `connected` with the observer-scope additions (journal high-water, status
+ * seed).
+ */
 export const ObserverConnectedEventSchema = ConnectedEventSchema.extend({
   journalSeq: z.number().int().optional(),
   statuses: z.record(z.string(), CharacterStatusSchema).optional(),

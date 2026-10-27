@@ -1,16 +1,16 @@
 ---
 name: kazusa-client
 description:
-  Architecture guide for the Kazusa observer/player web client (`apps/web`),
-  its wire contract (`packages/client`, `@kazusa/client`), and the plugin
-  read-model routes it consumes (`/kazusa/*` HTTP + SSE). Always use this skill
-  when building, reviewing, or extending anything a human sees in Kazusa — the
-  app shell, top bar, roster rail, stage views (World tree/map, Chats,
-  Timeline, and later Social/Wiki), inspector, status bar, entity chips, live
-  updates, mock data, or the Next.js `/kazusa/[...path]` proxy — and whenever a
-  backend change needs to be exposed to the UI (new endpoints, SSE events,
-  journal kinds, frontmatter fields), even if the user only mentions one
-  component, one panel, or "show X in the frontend".
+  Architecture guide for the Kazusa observer/player web client (`apps/web`), its
+  wire contract (`packages/client`, `@kazusa/client`), and the plugin read-model
+  routes it consumes (`/kazusa/*` HTTP + SSE). Always use this skill when
+  building, reviewing, or extending anything a human sees in Kazusa — the app
+  shell, top bar, roster rail, stage views (World tree/map, Chats, Timeline, and
+  later Social/Wiki), inspector, status bar, entity chips, live updates, mock
+  data, or the Next.js `/kazusa/[...path]` proxy — and whenever a backend change
+  needs to be exposed to the UI (new endpoints, SSE events, journal kinds,
+  frontmatter fields), even if the user only mentions one component, one panel,
+  or "show X in the frontend".
 ---
 
 # Kazusa Client
@@ -28,23 +28,23 @@ Related skills and references:
 
 - The `kazusa` skill covers the backend (plugin modules, stores, ledgers,
   Perception). Load it alongside this one for any backend work.
-- `kazusa/references/client.md` is the authoritative messaging contract
-  (send, typing, audience, pagination). This skill builds on it and does not
-  restate it.
+- `kazusa/references/client.md` is the authoritative messaging contract (send,
+  typing, audience, pagination). This skill builds on it and does not restate
+  it.
 - Reference files in this skill are listed in §9.
 
 ## 1. Scope of the first draft
 
-| Surface | First draft | Later (see `references/roadmap.md`) |
-| --- | --- | --- |
-| Top bar | World title, sim clock, speed controls, search, lens indicator | Notifications, Player-lens switch |
-| Roster rail | Virtualized, searchable, groupable roster with live status | "Wants" icons, location chips |
-| Stage: **World** | Group-by **tree** renderer | Map renderer for the same view |
-| Stage: **Chats** | My chats + observed (read-only) chats | In-person conversations |
-| Stage: **Timeline** | World journal stream, overview strip, facets, compare lanes | Replay / scrub-to-time, chronicle |
-| Inspector | Slim, entity-polymorphic: Header, Now, Recent, Conversations, Profile | Needs, Attention, Relationships sections |
-| Status bar | Slot registry: connection, data sources, activity summary, new events | Storyteller ticker, cost meter, next wakes |
-| Social, Wiki views | **Not built.** Registry slots reserved | Relationship graph, asymmetry, belief board |
+| Surface             | First draft                                                           | Later (see `references/roadmap.md`)         |
+| ------------------- | --------------------------------------------------------------------- | ------------------------------------------- |
+| Top bar             | World title, sim clock, speed controls, search, lens indicator        | Notifications, Player-lens switch           |
+| Roster rail         | Virtualized, searchable, groupable roster with live status            | "Wants" icons, location chips               |
+| Stage: **World**    | Group-by **tree** renderer                                            | Map renderer for the same view              |
+| Stage: **Chats**    | My chats + observed (read-only) chats                                 | In-person conversations                     |
+| Stage: **Timeline** | World journal stream, overview strip, facets, compare lanes           | Replay / scrub-to-time, chronicle           |
+| Inspector           | Slim, entity-polymorphic: Header, Now, Recent, Conversations, Profile | Needs, Attention, Relationships sections    |
+| Status bar          | Slot registry: connection, data sources, activity summary, new events | Storyteller ticker, cost meter, next wakes  |
+| Social, Wiki views  | **Not built.** Registry slots reserved                                | Relationship graph, asymmetry, belief board |
 
 ### 1.1 Implementation status
 
@@ -55,53 +55,58 @@ built yet.
 
 **Foundations (built)**
 
-| Piece | Where | Notes |
-| --- | --- | --- |
-| Read-model schemas | `packages/client/src/index.ts` | `WorldResponse`, `ClockState`, `ClockActionPayload`, `CharacterSummary`/`Detail`, `CharacterStatus`, `TaskSummary`, `JournalEvent` (7 kinds), `TimelineQuery`/`Response`/`Histogram`, observer SSE events, `parseStreamEvent`. All marked PROPOSED until the plugin serves them. |
-| Directory layout (§6) | `apps/web` | The atomic move is done. `components/kazusa/*`, `lib/kazusa/*` and `hooks/use-kazusa.ts` no longer exist. |
-| Capability resolution (D10) | `lib/source/capabilities.ts` | Resolves each domain on its own, with mock modes `auto`/`all`/`off` (Settings). Capabilities come from `LEGACY_CAPABILITIES` (`characters`, `chats` = live) because `/kazusa/world` doesn't exist yet. |
-| Mock world | `lib/source/mock/{world,timeline,clock}.ts` | Seeded, about 150 characters. Merges live agents in by id. Produces journal history, statuses and chats, and keeps ticking (task rollovers, brain flips, messages). |
-| Live store | `lib/live/{store,state,journal}.ts` | Keyed external store (`useSyncExternalStore`). Status/clock/journal-tail singletons. Journal seq gap detection. |
-| Registries | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}` | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock` through `registry/live.ts`. |
-| URL state | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts` | `view`, `sel`, `world.by`, `world.in`, `world.kind`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`. |
-| Sim time | `lib/time/sim.ts`, `hooks/use-clock.ts` | Anchor interpolation, formatting, speed labels. |
-| Tests | `lib/**/*.test.ts` | Sim time, EntityRef, capabilities, live store, journal gaps, grouping, mock determinism, pagination. |
+| Piece                       | Where                                                                | Notes                                                                                                                                                                                                                                                                            |
+| --------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read-model schemas          | `packages/client/src/index.ts`                                       | `WorldResponse`, `ClockState`, `ClockActionPayload`, `CharacterSummary`/`Detail`, `CharacterStatus`, `TaskSummary`, `JournalEvent` (7 kinds), `TimelineQuery`/`Response`/`Histogram`, observer SSE events, `parseStreamEvent`. All marked PROPOSED until the plugin serves them. |
+| Directory layout (§6)       | `apps/web`                                                           | The atomic move is done. `components/kazusa/*`, `lib/kazusa/*` and `hooks/use-kazusa.ts` no longer exist.                                                                                                                                                                        |
+| Capability resolution (D10) | `lib/source/capabilities.ts`                                         | Resolves each domain on its own, with mock modes `auto`/`all`/`off` (Settings). Capabilities come from `LEGACY_CAPABILITIES` (`characters`, `chats` = live) because `/kazusa/world` doesn't exist yet.                                                                           |
+| Mock world                  | `lib/source/mock/{world,timeline,clock}.ts`                          | Seeded, about 150 characters. Merges live agents in by id. Produces journal history, statuses and chats, and keeps ticking (task rollovers, brain flips, messages).                                                                                                              |
+| Live store                  | `lib/live/{store,state,journal}.ts`                                  | Keyed external store (`useSyncExternalStore`). Status/clock/journal-tail singletons. Journal seq gap detection.                                                                                                                                                                  |
+| Registries                  | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}` | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock` through `registry/live.ts`.                                                                                                                                                           |
+| URL state                   | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts`                  | `view`, `sel`, `world.by`, `world.in`, `world.kind`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`.                                                                                                                                                                            |
+| Sim time                    | `lib/time/sim.ts`, `hooks/use-clock.ts`                              | Anchor interpolation, formatting, speed labels.                                                                                                                                                                                                                                  |
+| Tests                       | `lib/**/*.test.ts`                                                   | Sim time, EntityRef, capabilities, live store, journal gaps, grouping, mock determinism, pagination.                                                                                                                                                                             |
 
 **Surfaces**
 
-| Surface | Status | Data |
-| --- | --- | --- |
-| Shell (top bar, section rail, per-section sidebar, inspector, status bar) | Built. Rail becomes a bottom tab bar below `md`; sidebar undocks below `lg`; inspector becomes a sheet below `xl`. | — |
-| Top bar: clock, pause/speed presets, advance menu, lens badge | Built | `clock`: **Mock** (`POST /kazusa/clock` planned) |
-| ⌘K palette: sections, chats, characters | Built (places once they exist) | `characters`, `chats` |
-| World sidebar: Watchlist / Everyone / dimension folders with live busy hints, character search, kind filter | Built | `characters`: **Live** (via `/kazusa/agents`) merged with **Mock** NPCs. `status`: **Mock** |
-| Presence ring (thinking / composing / on-task / idle) | Built | `status`: **Mock** |
-| World view: open folder as virtualized character rows | Built | `characters` + `status` |
-| World view: place tree, map renderer | **Planned** (shows a NeedsLine) | Needs `places`, `location` |
-| Chats view: my chats, composer, groups, members | Built (existing UI rehoused) | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down |
-| Chats view: presence-aware header (DM: partner ring + task + time left; group: member stack + names). Tapping it opens the inspector (character / chat with member activity rows) | Built | `status`: **Mock** |
-| Chats view: observed (read-only) chats | **Planned** (shows a NeedsLine) | Needs `observe` |
-| Timeline: virtualized stream, day separators, kind/actor/watchlist filters, held-back "N new events" | Built | `timeline`: **Mock** |
-| Timeline: overview strip (histogram), compare lanes, collapse runs (`collapseKey` is declared but not applied), scrub/replay | **Planned** | Needs `/kazusa/timeline/histogram` for the strip |
-| Inspector: character Header, Now, Recent, Conversations, Profile | Built | Header/Profile: `characters` (Profile body is a Mock placeholder). Now: `status` **Mock**. Recent: `timeline` **Mock**. Conversations: `chats` |
-| Inspector: chat summary | Built | `chats` / mock chats |
-| Inspector: Needs, Attention, Relationships | **Planned** (roadmap) | — |
-| Status bar: connection, data sources (per-domain Live/Mock/Unavailable), activity summary | Built | — |
-| Status bar: new-events jump, storyteller ticker, next wakes, cost meter | **Planned** | — |
-| Entity hover cards | **Planned** (chips navigate on click only) | — |
-| `lib/lens/` selectors, Player lens | **Planned** (the top bar shows a fixed "Observer" badge) | — |
+| Surface                                                                                                                                                                           | Status                                                                                                             | Data                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell (top bar, section rail, per-section sidebar, inspector, status bar)                                                                                                         | Built. Rail becomes a bottom tab bar below `md`; sidebar undocks below `lg`; inspector becomes a sheet below `xl`. | —                                                                                                                                                     |
+| Top bar: clock, pause/speed presets, advance menu, lens badge                                                                                                                     | Built                                                                                                              | `clock`: **Live** (`GET /kazusa/world`, `POST /kazusa/clock`, SSE `clock`)                                                                            |
+| ⌘K palette: sections, chats, characters                                                                                                                                           | Built (places once they exist)                                                                                     | `characters`, `chats`                                                                                                                                 |
+| World sidebar: Watchlist / Everyone / dimension folders with live busy hints, character search, kind filter                                                                       | Built                                                                                                              | `characters`: **Live** (via `/kazusa/characters`) merged with **Mock** NPCs. `status`: **Live** (Perception brain + Taskman + typing)                 |
+| Presence ring (thinking / composing / on-task / idle)                                                                                                                             | Built                                                                                                              | `status`: **Live**                                                                                                                                    |
+| World view: open folder as virtualized character rows                                                                                                                             | Built                                                                                                              | `characters` + `status`: **Live**                                                                                                                     |
+| World view: place tree, map renderer                                                                                                                                              | **Planned** (shows a NeedsLine)                                                                                    | Needs `places`, `location`                                                                                                                            |
+| Chats view: my chats, composer, groups, members                                                                                                                                   | Built (existing UI rehoused)                                                                                       | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down                                                             |
+| Chats view: presence-aware header (DM: partner ring + task + time left; group: member stack + names). Tapping it opens the inspector (character / chat with member activity rows) | Built                                                                                                              | `status`: **Live**                                                                                                                                    |
+| Chats view: observed (read-only) chats                                                                                                                                            | **Planned** (shows a NeedsLine)                                                                                    | Needs `observe`                                                                                                                                       |
+| Timeline: virtualized stream, day separators, kind/actor/watchlist filters, held-back "N new events"                                                                              | Built                                                                                                              | `timeline`: **Mock**                                                                                                                                  |
+| Timeline: overview strip (histogram), compare lanes, collapse runs (`collapseKey` is declared but not applied), scrub/replay                                                      | **Planned**                                                                                                        | Needs `/kazusa/timeline/histogram` for the strip                                                                                                      |
+| Inspector: character Header, Now, Recent, Conversations, Profile                                                                                                                  | Built                                                                                                              | Header/Profile: `characters` **Live** (`GET /kazusa/character`). Now: `status` **Live**. Recent: `timeline` **Mock**. Conversations: `chats` **Live** |
+| Inspector: chat summary                                                                                                                                                           | Built                                                                                                              | `chats` / mock chats                                                                                                                                  |
+| Inspector: Needs, Attention, Relationships                                                                                                                                        | **Planned** (roadmap)                                                                                              | —                                                                                                                                                     |
+| Status bar: connection, data sources (per-domain Live/Mock/Unavailable), activity summary                                                                                         | Built                                                                                                              | —                                                                                                                                                     |
+| Status bar: new-events jump, storyteller ticker, next wakes, cost meter                                                                                                           | **Planned**                                                                                                        | —                                                                                                                                                     |
+| Entity hover cards                                                                                                                                                                | **Planned** (chips navigate on click only)                                                                         | —                                                                                                                                                     |
+| `lib/lens/` selectors, Player lens                                                                                                                                                | **Planned** (the top bar shows a fixed "Observer" badge)                                                           | —                                                                                                                                                     |
 
 **Backend wiring still to do (client side)**, in the same order as
 `references/backend-contract.md` §8. For each step: add the route to the
-allowlist in `app/kazusa/[...path]/route.ts` (today it only lists the
-messaging routes), add an http adapter under `lib/source/<domain>/`, and
-remove the domain from the mock fallback.
+allowlist in `app/kazusa/[...path]/route.ts` (today it lists messaging, clock,
+world, characters, character), add an http adapter under `lib/source/<domain>/`,
+and remove the domain from the mock fallback.
 
-1. `GET /kazusa/world`: replace `LEGACY_CAPABILITIES` in `lib/source/provider.tsx` with the response's `capabilities`. Seed `clockStore` from `clock`.
-2. `POST /kazusa/clock` + SSE `clock`: point the top-bar actions at it instead of `lib/source/mock/clock.ts`.
-3. `GET /kazusa/characters`, `GET /kazusa/character`: swap `lib/source/characters/http.ts` off `/kazusa/agents`. Profile reads `bodyMarkdown`.
-4. SSE `status` (Perception brain state + taskman): the live handler already writes `statusStore`.
-5. `GET /kazusa/timeline` (+ histogram) + SSE `journal`: `lib/source/timeline/http.ts` already exists but isn't routed yet.
+1. `GET /kazusa/world`: **Done.** Replaced `LEGACY_CAPABILITIES` with live
+   capabilities; seeds `clockStore` from `clock`.
+2. `POST /kazusa/clock` + SSE `clock`: **Done.** Top-bar actions execute
+   `POST /kazusa/clock`, and SSE updates `clockStore`.
+3. `GET /kazusa/characters`, `GET /kazusa/character`: **Done.** Roster and
+   Profile read real frontmatter and bodies.
+4. SSE `status` (Perception brain state + taskman + typing): **Done.** Realtime
+   presence and task tracking live.
+5. `GET /kazusa/timeline` (+ histogram) + SSE `journal`:
+   `lib/source/timeline/http.ts` already exists but isn't routed yet.
 6. `/kazusa/observe/*` + `scope=observer`: fill the Observed section in Chats.
 7. `/kazusa/places`: place tree in the World view.
 
@@ -121,8 +126,8 @@ components would need a fork for each franchise.
 **D2. The browser's only backend is the plugin read model.** Browser →
 same-origin Next proxy `app/kazusa/[...path]/route.ts` (a fixed allowlist, with
 the Gateway token kept server-side) → plugin `registerHttpRoute` handlers under
-`/kazusa/*`. Neither the browser nor the proxy uses the native Gateway
-WebSocket (`sessions.*`, `chat.history`, `cron.*`, `agent` events). Reasons:
+`/kazusa/*`. Neither the browser nor the proxy uses the native Gateway WebSocket
+(`sessions.*`, `chat.history`, `cron.*`, `agent` events). Reasons:
 
 - The native WebSocket needs device pairing and a signed challenge.
 - An authenticated WebSocket client is trusted at full Gateway scope.
@@ -136,28 +141,28 @@ SDK. That is how the client "reads OpenClaw via the Gateway". Details are in
 `references/backend-contract.md` §1.
 
 **D3. Contracts come first, in `@kazusa/client`.** Every request, response and
-SSE payload is a Zod schema in `packages/client/src`. The plugin's HTTP
-adapters `satisfies` the inferred types. The web app parses with the schemas at
-the fetch boundary. A feature starts by adding or changing its schema, so that
-the schema becomes the spec handed to the backend.
+SSE payload is a Zod schema in `packages/client/src`. The plugin's HTTP adapters
+`satisfies` the inferred types. The web app parses with the schemas at the fetch
+boundary. A feature starts by adding or changing its schema, so that the schema
+becomes the spec handed to the backend.
 
 **D4. Use structured data only. Never regex Markdown.** The UI reads YAML
-frontmatter (parsed in the plugin with a real YAML parser and validated by a
-Zod schema for each document type) and keyed-store records. Markdown bodies are
+frontmatter (parsed in the plugin with a real YAML parser and validated by a Zod
+schema for each document type) and keyed-store records. Markdown bodies are
 rendered verbatim as `bodyMarkdown` and never mined for fields. Ledger text is
 never parsed either: for example, task monologues come from structured journal
 payloads, not from the italic blockquote in `:tasks` text. If the UI needs a
 value that exists only in a body, the fix is a frontmatter schema change. See
-`references/backend-contract.md` §5 for the current proposals. The web app
-never reads files.
+`references/backend-contract.md` §5 for the current proposals. The web app never
+reads files.
 
 **D5. Design for 300 characters.** Nothing gets a fixed row, lane or column per
 character.
 
 - Every list is virtualized (`@tanstack/react-virtual`), searchable, groupable
   and filterable.
-- Filtering and aggregation that could touch the full history run on the
-  server (query params, histogram endpoint).
+- Filtering and aggregation that could touch the full history run on the server
+  (query params, histogram endpoint).
 - Per-character detail is opt-in through focus sets: the watchlist, compare
   lanes (≤ 8), and the inspector.
 - The mock world generates ~150 characters, so scale problems show up in
@@ -167,17 +172,16 @@ character.
 
 - The wire uses epoch-ms simulation timestamps. Ordering uses server
   `sequence`/`seq`, never timestamps, because the clock can be frozen.
-- The client interpolates "now" from
-  `{ simTime, speed, updatedAt, serverNow }`, so it doesn't poll the clock.
-- Components subscribe through a shared `useSimNow(resolution)` ticker at
-  minute (or coarser) resolution. 300 rows must not re-render every second.
+- The client interpolates "now" from `{ simTime, speed, updatedAt, serverNow }`,
+  so it doesn't poll the clock.
+- Components subscribe through a shared `useSimNow(resolution)` ticker at minute
+  (or coarser) resolution. 300 rows must not re-render every second.
 - Real time appears only in debug affordances.
 
-**D7. Facts and thoughts look different. Free text is never treated as a
-fact.**
+**D7. Facts and thoughts look different. Free text is never treated as a fact.**
 
-- Tool-grounded state (task, membership, clock, location) renders with
-  `<Fact>` styling: solid, iconified chips.
+- Tool-grounded state (task, membership, clock, location) renders with `<Fact>`
+  styling: solid, iconified chips.
 - Subjective content (monologues, impressions, beliefs) renders with
   `<Thought by=…>` styling: italic, attributed, with confidence shown when one
   exists.
@@ -199,15 +203,14 @@ fact.**
 - Every read of private or subjective data goes through selectors in
   `lib/lens/`, so a later **Player** lens can redact in one place instead of
   through scattered `if`s.
-- Components never check the lens themselves. They render what selectors
-  return.
+- Components never check the lens themselves. They render what selectors return.
 
 **D10. Data sources are resolved per domain, from capabilities.**
 
-- `GET /kazusa/world` returns `capabilities: Record<Domain, "live" |
-  "unavailable">`.
-- Each domain resolves independently to `live`, `mock` (development override
-  or unavailable domain, when mocks are enabled) or `unavailable`.
+- `GET /kazusa/world` returns
+  `capabilities: Record<Domain, "live" | "unavailable">`.
+- Each domain resolves independently to `live`, `mock` (development override or
+  unavailable domain, when mocks are enabled) or `unavailable`.
 - Mocked panels show a visible `Mock` tag. Unavailable panels show an honest
   empty state.
 - Nobody should mistake a concept for backend behavior, and each panel turns
@@ -232,16 +235,16 @@ fact.**
 - **Rail** (`shell/section-nav.tsx`) lists registered `StageView`s as icons
   (bottom tab bar below `md`), with an optional `badge` per view and the ⌘K
   palette (`shell/command-palette.tsx`) at the bottom.
-- **Section sidebar** is the active view's `sidebar` component (World:
-  folders, Chats: chat list, Timeline: filters). No sidebar tabs. Each uses
+- **Section sidebar** is the active view's `sidebar` component (World: folders,
+  Chats: chat list, Timeline: filters). No sidebar tabs. Each uses
   `PanelToolbar` (search + one trailing action). Below `lg` it isn't docked:
-  views show it as their first screen, or call `requestSidebar()` to open it
-  as a sheet.
+  views show it as their first screen, or call `requestSidebar()` to open it as
+  a sheet.
 - **Stage** renders exactly one registered view. A view owns its URL params,
   namespaced like `tl.kinds` and `world.by`.
-- **Inspector** shows the selected `EntityRef` using the sections registered
-  for that entity kind. It stays put when the view changes. Keep it slim:
-  depth belongs in stage views, reached through filtered links like "Open in
+- **Inspector** shows the selected `EntityRef` using the sections registered for
+  that entity kind. It stays put when the view changes. Keep it slim: depth
+  belongs in stage views, reached through filtered links like "Open in
   Timeline".
 - **StatusBar** is a slot registry for small, global, glanceable signals.
   Anything bigger than a chip belongs elsewhere.
@@ -257,20 +260,35 @@ or map, filtered by the capabilities the entry `requires`.
 
 ```ts
 type Domain =
-  | "clock" | "characters" | "status" | "chats" | "observe" | "timeline"
-  | "places" | "location" | "relationships" | "attention" | "desires";
+  | "clock"
+  | "characters"
+  | "status"
+  | "chats"
+  | "observe"
+  | "timeline"
+  | "places"
+  | "location"
+  | "relationships"
+  | "attention"
+  | "desires";
 
 type EntityKind = "character" | "chat" | "place";
-/** Serialized as `kind:id`, split on the FIRST colon (ids like `user:you` contain colons). */
-interface EntityRef { readonly kind: EntityKind; readonly id: string }
+/**
+ * Serialized as `kind:id`, split on the FIRST colon (ids like `user:you`
+ * contain colons).
+ */
+interface EntityRef {
+  readonly kind: EntityKind;
+  readonly id: string;
+}
 
 interface StageView {
-  readonly id: string;                 // "world" | "chats" | "timeline" | later "social" | "wiki"
+  readonly id: string; // "world" | "chats" | "timeline" | later "social" | "wiki"
   readonly label: string;
   readonly icon: LucideIcon;
   readonly order: number;
   readonly requires: readonly Domain[];
-  readonly component: ComponentType;   // reads its own namespaced URL params
+  readonly component: ComponentType; // reads its own namespaced URL params
 }
 
 interface InspectorSection {
@@ -291,20 +309,24 @@ interface StatusItem {
 }
 
 interface TimelineKind<K extends JournalKind = JournalKind> {
-  readonly kind: K;                    // must exist in the @kazusa/client JournalEvent union
+  readonly kind: K; // must exist in the @kazusa/client JournalEvent union
   readonly label: string;
   readonly icon: LucideIcon;
   readonly facet: "task" | "chat" | "world" | "social" | "mind";
   readonly salience: "low" | "normal" | "high";
-  readonly fact: (event: JournalEventOf<K>) => ReactNode;          // <Fact> line
+  readonly fact: (event: JournalEventOf<K>) => ReactNode; // <Fact> line
   readonly thought?: (event: JournalEventOf<K>) => ThoughtLine | undefined;
   readonly collapseKey?: (event: JournalEventOf<K>) => string | undefined; // merge runs
-  readonly target?: (event: JournalEventOf<K>) => EntityRef | StageLink | undefined;
+  readonly target?: (
+    event: JournalEventOf<K>,
+  ) => EntityRef | StageLink | undefined;
 }
 
 /** Applies one SSE event type to client state. */
-type LiveHandler<T extends StreamEvent["type"]> =
-  (event: StreamEventOf<T>, ctx: LiveContext) => void;
+type LiveHandler<T extends StreamEvent["type"]> = (
+  event: StreamEventOf<T>,
+  ctx: LiveContext,
+) => void;
 ```
 
 The renderers for an entity kind (chip, hover card, inspector header) are also
@@ -313,8 +335,8 @@ timeline rows, chat headers and inspector sections.
 
 To add a feature:
 
-1. Add or extend the schemas in `@kazusa/client`. Include a new journal kind
-   or SSE event if the feature has live data.
+1. Add or extend the schemas in `@kazusa/client`. Include a new journal kind or
+   SSE event if the feature has live data.
 2. Add a source domain in `lib/source/` with `http` and `mock` implementations
    behind the same interface. Declare it in `Domain`.
 3. Add hooks in `hooks/` (SWR for resources, the live store for high-frequency
@@ -343,21 +365,20 @@ registered components
 ```
 
 - **One SSE connection per scope.** `GET /kazusa/events?scope=observer` carries
-  player events plus `journal` and `status` events. A registry of
-  `LiveHandler`s dispatches each event type. No component opens its own
-  `EventSource`.
+  player events plus `journal` and `status` events. A registry of `LiveHandler`s
+  dispatches each event type. No component opens its own `EventSource`.
 - **Gap-safe journal.** Journal events carry `seq`, and the `connected` event
-  reports the server's high-water `journalSeq`. On reconnect, or when the
-  client sees a gap, it catches up with `GET /kazusa/timeline?after=<lastSeq>`.
-  SSE is a notification channel; history is the durable log. This matches the
-  messaging rule.
+  reports the server's high-water `journalSeq`. On reconnect, or when the client
+  sees a gap, it catches up with `GET /kazusa/timeline?after=<lastSeq>`. SSE is
+  a notification channel; history is the durable log. This matches the messaging
+  rule.
 - **Live status doesn't go through SWR arrays.** A status delta for one of 300
   characters must not re-render the roster. The live store is seeded from the
   `/kazusa/characters` snapshot and updated per id.
 - **URL is the navigation state.** It holds `view`, `sel` (EntityRef), and each
-  view's namespaced params, so deep links and back/forward work and the
-  Timeline → Chats → Inspector hops stay shareable. Ephemeral UI state (hover,
-  open popovers) stays in components.
+  view's namespaced params, so deep links and back/forward work and the Timeline
+  → Chats → Inspector hops stay shareable. Ephemeral UI state (hover, open
+  popovers) stays in components.
 - **No fetching in `useEffect`.** Use SWR or the live store.
 
 ## 6. Target directory layout (`apps/web`)
@@ -384,17 +405,17 @@ lib/
 hooks/                             # SWR + live-store hooks
 ```
 
-The old `components/kazusa/*` and `lib/kazusa/*` paths have been moved into
-this layout and deleted. Don't bring back parallel old paths. `lib/lens/`
-hasn't been created yet (§1.1).
+The old `components/kazusa/*` and `lib/kazusa/*` paths have been moved into this
+layout and deleted. Don't bring back parallel old paths. `lib/lens/` hasn't been
+created yet (§1.1).
 
 Pure modules under `lib/` (anything with a colocated test) use **relative
 imports**, not `@/`. The root vitest config has no path alias.
 
 ## 7. Visual language (summary)
 
-- The look is a neutral, dense, legible "instrument panel". This app is
-  readable before it is decorative.
+- The look is a neutral, dense, legible "instrument panel". This app is readable
+  before it is decorative.
 - Use 3–5 tokens: background, surface, foreground, muted, and one accent. The
   accent can be overridden by world metadata. Don't use purple or violet, and
   don't use gradients.
@@ -409,16 +430,16 @@ imports**, not `@/`. The root vitest config has no path alias.
 - `npm test` (vitest): pure logic is colocated in `lib/**/*.test.ts`. That
   covers sim-clock interpolation, time bucketing, EntityRef serialization,
   journal gap detection, collapse rules, capability resolution and mock-world
-  determinism. If root dev dependencies aren't installed (as in the v0
-  sandbox), run vitest from an isolated temp install with
+  determinism. If root dev dependencies aren't installed (as in the v0 sandbox),
+  run vitest from an isolated temp install with
   `--root <repo> --config <temp config including apps/web/lib/**/*.test.ts>`.
 - `npm run typecheck` and
-  `npx tsc --noEmit --incremental false -p apps/web/tsconfig.json`. A build
-  that ignores TypeScript errors doesn't count.
+  `npx tsc --noEmit --incremental false -p apps/web/tsconfig.json`. A build that
+  ignores TypeScript errors doesn't count.
 - Run targeted `prettier --check` / `eslint` on touched files.
 - Browser check: open the preview with the mock world (~150 characters). Then
-  scroll the roster and timeline, switch views, select entities, and confirm
-  the URL updates and the `Mock` tags show.
+  scroll the roster and timeline, switch views, select entities, and confirm the
+  URL updates and the `Mock` tags show.
 - Run plugin route changes through the plugin test suite (`http.ts` handler
   tests) as the `kazusa` skill describes.
 
@@ -427,10 +448,9 @@ imports**, not `@/`. The root vitest config has no path alias.
 - `references/ux.md`: read when designing or building any surface (top bar,
   roster, World tree, Chats, Timeline, inspector, status bar), scale patterns,
   empty, loading and mock states, or the presence ring and fact/thought styles.
-- `references/backend-contract.md`: read when wiring data. It covers the
-  Gateway decision, existing and proposed `/kazusa/*` routes, SSE scopes, the
-  world journal, the capability matrix, frontmatter rules and schema-change
-  proposals.
+- `references/backend-contract.md`: read when wiring data. It covers the Gateway
+  decision, existing and proposed `/kazusa/*` routes, SSE scopes, the world
+  journal, the capability matrix, frontmatter rules and schema-change proposals.
 - `references/roadmap.md`: read before building any deferred feature (map,
   social, wiki, needs, beliefs, attention log, Player lens, replay). It lists
   which slot each feature plugs into and what it depends on.

@@ -11,9 +11,12 @@ import type {
 } from "openclaw/plugin-sdk/decisions";
 import type { GetReplyOptions } from "openclaw/plugin-sdk/reply-runtime";
 import type { Clock } from "../clock/clock.ts";
-import { formatSessionHeader } from "../context-engine/format.ts";
+import {
+  formatSessionHeader,
+  formatSimTime,
+} from "../context-engine/format.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
-import { escapeSkillMarkers, stimulusKey } from "../stimulus.ts";
+import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
@@ -67,31 +70,35 @@ export interface PerceptionDeps {
   readonly assembleDecisionContext?: DecisionContextAssembler;
 }
 
-const INTERRUPT = "[kazusa:skill=task-interrupt]";
-const DEADLINE = "[kazusa:skill=task-lifecycle]";
-
 function formatDeliveryMessage(
   bundle: PendingItem[],
   mode: "steer" | "followup",
 ): string {
-  const chatItems = bundle.filter((item) => !item.deadline);
+  const chatItems = bundle.filter((item) => !item.deadline && !item.idle);
   const deadlineItems = bundle.filter((item) => Boolean(item.deadline));
+  const idleItems = bundle.filter((item) => Boolean(item.idle));
 
   const parts: string[] = [];
 
   if (chatItems.length) {
     const header =
-      mode === "steer" ? "Incoming urgent stimuli:" : "Incoming chats:";
+      mode === "steer" ? "Messages noticed while thinking:" : "Incoming chats:";
     const formattedChats = chatItems.map((item) => {
       const channel = formatSessionHeader(item.sessionKey);
-      return `- [${escapeSkillMarkers(item.sender)} ${new Date(item.timestamp).toISOString()}] (${channel}): ${escapeSkillMarkers(item.text)}`;
+      return `- [${item.sender} ${formatSimTime(item.timestamp)}] (${channel}): ${item.text}`;
     });
-    parts.push(`${INTERRUPT}\n${header}\n${formattedChats.join("\n")}`);
+    parts.push(`${header}\n${formattedChats.join("\n")}`);
   }
 
   for (const deadline of deadlineItems) {
     parts.push(
-      `${DEADLINE}\n[${new Date(deadline.timestamp).toISOString()}] ${escapeSkillMarkers(deadline.text)}`,
+      `Activity check-in [${formatSimTime(deadline.timestamp)}]: ${deadline.text}`,
+    );
+  }
+
+  for (const idle of idleItems) {
+    parts.push(
+      `Activity check-in [${formatSimTime(idle.timestamp)}]: ${idle.text}`,
     );
   }
 
@@ -114,6 +121,9 @@ export class Perception {
   private readonly debounceTimers = new Map<string, () => void>();
   private readonly adoptedListeners = new Set<
     (delivery: PerceptionDelivery) => void | Promise<void>
+  >();
+  private readonly brainStateListeners = new Set<
+    (agentId: string, brain: "idle" | "thinking", queued: number) => void
   >();
 
   constructor(deps: PerceptionDeps) {
@@ -258,9 +268,30 @@ export class Perception {
       id: `task-deadline:${task.id}:${task.endAt}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:clock",
-      text: `Current ${task.type} task deadline reached at ${task.endAt}.`,
+      text: `The planned check-in for your ${task.type} activity was ${formatSimTime(Date.parse(task.endAt))}. Reassess your progress.`,
       deadline: { taskId: task.id, endAt: task.endAt },
       timestamp: Date.parse(task.endAt),
+    };
+    await this.receive(agentId, stimulus);
+  }
+
+  async idleWake(agentId: string, text?: string): Promise<void> {
+    const task = await this.taskStore.lookup(agentId);
+    const simNow = this.deps.clock.time();
+    if (
+      task &&
+      Number.isFinite(Date.parse(task.endAt)) &&
+      Date.parse(task.endAt) > simNow
+    ) {
+      return;
+    }
+    const stimulus: Stimulus = {
+      id: `task-idle:${agentId}:${simNow}`,
+      sessionKey: `agent:${agentId}:tasks`,
+      sender: "kazusa:taskman",
+      text: text ?? "Activity check-in: no scheduled activity.",
+      idle: true,
+      timestamp: simNow,
     };
     await this.receive(agentId, stimulus);
   }
@@ -284,25 +315,73 @@ export class Perception {
     );
   }
 
+  private notifyBrainState(
+    agentId: string,
+    brain: "idle" | "thinking",
+    queued: number,
+  ): void {
+    for (const listener of this.brainStateListeners) {
+      try {
+        listener(agentId, brain, queued);
+      } catch (err: unknown) {
+        this.warn(err);
+      }
+    }
+  }
+
+  onBrainStateChange(
+    listener: (
+      agentId: string,
+      brain: "idle" | "thinking",
+      queued: number,
+    ) => void,
+  ): () => void {
+    this.brainStateListeners.add(listener);
+    return () => {
+      this.brainStateListeners.delete(listener);
+    };
+  }
+
+  async getBrainState(agentId: string): Promise<{
+    brain: "idle" | "thinking";
+    queued: number;
+  }> {
+    const state = await this.store.lookup(agentId);
+    return {
+      brain: state?.brainRun ? "thinking" : "idle",
+      queued: state?.pending?.length ?? 0,
+    };
+  }
+
   async started(agentId: string, runId: string): Promise<void> {
+    let queued = 0;
     await this.change(
       agentId,
       (state) => {
         if (state.brainRun === runId) return;
         state.brainRun = runId;
+        queued = state.pending.length;
       },
       false,
     );
+    this.notifyBrainState(agentId, "thinking", queued);
   }
 
   async ended(agentId: string, runId: string, stopped: boolean): Promise<void> {
+    let queued = 0;
+    let changed = false;
     await this.change(agentId, (state) => {
       if (state.brainRun === runId || state.brainRun === "external") {
         delete state.brainRun;
         delete state.brainContext;
         state.stopped = stopped;
+        queued = state.pending.length;
+        changed = true;
       } else return;
     });
+    if (changed) {
+      this.notifyBrainState(agentId, "idle", queued);
+    }
   }
 
   onAdopted(
@@ -389,6 +468,9 @@ export class Perception {
   }
 
   private isCurrent(item: Stimulus, task?: ActiveTask): boolean {
+    if (item.idle) {
+      return !task || Date.parse(task.endAt) <= this.deps.clock.time();
+    }
     if (!item.deadline) return true;
     return (
       item.deadline.taskId === task?.id &&
@@ -422,7 +504,7 @@ export class Perception {
         return this.reserve(agentId, state, this.batch(available), "followup");
       }
       const action =
-        !busy && fresh.every((item) => item.deadline)
+        !busy && fresh.every((item) => item.deadline || item.idle)
           ? "STEER"
           : await this.classify(agentId, state, task, fresh, busy);
       this.assertCurrent();
@@ -457,7 +539,7 @@ export class Perception {
       }
       const ignored = new Set<string>();
       for (const item of current) {
-        if (action === "QUEUE_NEXT" || item.deadline)
+        if (action === "QUEUE_NEXT" || item.deadline || item.idle)
           item.action = "QUEUE_NEXT";
         else ignored.add(stimulusKey(item));
       }
@@ -567,7 +649,9 @@ export class Perception {
     const sessionKeys = [
       ...new Set(
         bundle
-          .filter((item) => !item.deadline && item.sessionKey.includes(":chat:"))
+          .filter(
+            (item) => !item.deadline && item.sessionKey.includes(":chat:"),
+          )
           .map((item) => item.sessionKey),
       ),
     ];
@@ -715,6 +799,7 @@ export class Perception {
   dispose(): void {
     this.lifetime.abort();
     this.adoptedListeners.clear();
+    this.brainStateListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();
   }

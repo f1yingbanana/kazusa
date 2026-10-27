@@ -49,9 +49,14 @@ export function registerBrainChannel(
         SenderId: "perception",
         SenderIsBot: true,
         ChatType: "direct",
-        MessageSid: delivery.id,
+        // The delivery ID is custody metadata, not an in-world message ID.
+        // MessageSid is rendered into both the host room-event envelope and
+        // its model context. Retain identity in runId/ownerKey and provider
+        // metadata instead; Perception owns stimulus deduplication.
+        ProviderUpdateId: delivery.id,
         Body: delivery.message,
         BodyForAgent: delivery.message,
+        AmbientTranscriptBody: delivery.message,
         CommandAuthorized: false,
         // A routine notification is an ambient event, not a request to interrupt.
         // Native room_event admission always queues behind a busy turn, even if

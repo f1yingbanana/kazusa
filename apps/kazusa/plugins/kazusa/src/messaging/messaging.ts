@@ -215,6 +215,18 @@ export class Messaging {
     }
   }
 
+  getComposingChats(participantId: string): string[] {
+    const chatIds: string[] = [];
+    const now = Date.now();
+    for (const [, value] of this.typing) {
+      if (value.event.senderId === participantId && value.event.isTyping) {
+        if (value.event.expiresAt && value.event.expiresAt <= now) continue;
+        chatIds.push(value.event.chatId);
+      }
+    }
+    return chatIds;
+  }
+
   /** Reconnecting clients recover only current, visible composition signals. */
   async getTyping(viewer: string): Promise<TypingStreamEvent[]> {
     return this.serial.enqueue("messages", async () => {

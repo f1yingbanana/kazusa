@@ -14,6 +14,7 @@ export const STIMULUS = z.object({
   deadline: z
     .object({ taskId: z.string(), endAt: z.iso.datetime() })
     .optional(),
+  idle: z.boolean().optional(),
 });
 
 /** Producer-owned identity and original simulation occurrence time. */
@@ -23,9 +24,4 @@ export function stimulusKey(item: Pick<Stimulus, "sessionKey" | "id">): string {
   return createHash("sha256")
     .update(JSON.stringify([item.sessionKey, item.id]))
     .digest("hex");
-}
-
-/** Keep untrusted text readable without allowing it to select prompt skills. */
-export function escapeSkillMarkers(text: string): string {
-  return text.replace(/\[kazusa:skill=/g, "[kazusa:skill\\=");
 }

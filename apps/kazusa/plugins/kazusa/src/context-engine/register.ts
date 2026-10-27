@@ -13,6 +13,8 @@ import {
   type ContextEngine,
 } from "./context-engine.ts";
 import { createSkillLoader } from "./skill-loader.ts";
+import { readPersonalWiki } from "./decision-sources.ts";
+import type { ActiveTask } from "../taskman/types.ts";
 
 /**
  * Wire host lifecycle and session I/O; selection and skill expansion stay in
@@ -35,6 +37,10 @@ function createContextEngine(
   const skillLoader = createSkillLoader({
     config: api.config,
     pluginRootDir: api.rootDir,
+  });
+  const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
+    namespace: "tasks",
+    retention: "retained",
   });
   return {
     info: {
@@ -104,22 +110,34 @@ function createContextEngine(
             key.rest.startsWith("chat:group:"))
         );
       });
-      const sessionsContext = await readSessionStreams({
-        agentId: brainAgentId,
-        streams,
-        storePath,
-        pluginId: api.id,
-        now,
-        cutoff,
-      });
+      const workspaceDir = api.runtime.agent.resolveAgentWorkspaceDir(
+        api.config,
+        brainAgentId,
+      );
+      const [sessionsContext, activeTask, personalWiki] = await Promise.all([
+        readSessionStreams({
+          agentId: brainAgentId,
+          streams,
+          storePath,
+          pluginId: api.id,
+          now,
+          cutoff,
+        }),
+        tasks.lookup(brainAgentId),
+        readPersonalWiki(
+          workspaceDir,
+          [],
+          params.prompt ?? "",
+          config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
+        ),
+      ]);
       return assembleContext({
         run: params,
         agentId: brainAgentId,
-        workspaceDir: api.runtime.agent.resolveAgentWorkspaceDir(
-          api.config,
-          brainAgentId,
-        ),
+        workspaceDir,
         sessionsContext,
+        activeTask: activeTask ?? null,
+        personalWiki,
         simTime: now,
         config,
         skillLoader,

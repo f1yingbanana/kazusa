@@ -21,7 +21,7 @@ const HISTORY = 36 * HOUR;
 
 export type Rng = () => number;
 
-/** mulberry32: small, fast, seedable. */
+/** Mulberry32: small, fast, seedable. */
 export function createRng(seed: number): Rng {
   let state = seed >>> 0;
   return () => {
@@ -39,38 +39,141 @@ const pick = <T>(rng: Rng, items: readonly T[]) =>
   items[Math.floor(rng() * items.length)];
 const chance = (rng: Rng, p: number) => rng() < p;
 const slug = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 const AFFILIATIONS = [
-  { name: "Archive Society", occupations: ["Archivist", "Cataloguer", "Restorer"] },
-  { name: "Harbor Watch", occupations: ["Watch officer", "Lookout", "Dock clerk"] },
-  { name: "Botanical Circle", occupations: ["Gardener", "Herbalist", "Seed keeper"] },
-  { name: "Clocktower Workshop", occupations: ["Machinist", "Apprentice", "Tinkerer"] },
+  {
+    name: "Archive Society",
+    occupations: ["Archivist", "Cataloguer", "Restorer"],
+  },
+  {
+    name: "Harbor Watch",
+    occupations: ["Watch officer", "Lookout", "Dock clerk"],
+  },
+  {
+    name: "Botanical Circle",
+    occupations: ["Gardener", "Herbalist", "Seed keeper"],
+  },
+  {
+    name: "Clocktower Workshop",
+    occupations: ["Machinist", "Apprentice", "Tinkerer"],
+  },
   { name: "River Clinic", occupations: ["Nurse", "Physician", "Orderly"] },
-  { name: "Lantern Theatre", occupations: ["Actor", "Stagehand", "Playwright"] },
-  { name: "Observatory", occupations: ["Astronomer", "Instrument maker", "Calculator"] },
+  {
+    name: "Lantern Theatre",
+    occupations: ["Actor", "Stagehand", "Playwright"],
+  },
+  {
+    name: "Observatory",
+    occupations: ["Astronomer", "Instrument maker", "Calculator"],
+  },
   { name: "Night Market", occupations: ["Vendor", "Cook", "Bookkeeper"] },
   { name: "Courier Office", occupations: ["Courier", "Sorter", "Dispatcher"] },
   { name: "Academy", occupations: ["Student", "Lecturer", "Tutor"] },
 ] as const;
 
 const FIRST = [
-  "Ada", "Bram", "Cleo", "Dario", "Edda", "Felix", "Greta", "Hugo", "Ines",
-  "Jonah", "Kira", "Leon", "Mira", "Nils", "Oona", "Pavel", "Quinn", "Rosa",
-  "Silas", "Tova", "Uma", "Viktor", "Wren", "Xavi", "Yara", "Zeno", "Aiko",
-  "Bea", "Cyrus", "Dahlia", "Emil", "Farah", "Gideon", "Hana", "Ivo", "Juno",
-  "Kofi", "Lena", "Mateo", "Noor", "Otto", "Priya", "Rafe", "Sana", "Theo",
-  "Ulla", "Vera", "Wim", "Yusuf", "Zora",
+  "Ada",
+  "Bram",
+  "Cleo",
+  "Dario",
+  "Edda",
+  "Felix",
+  "Greta",
+  "Hugo",
+  "Ines",
+  "Jonah",
+  "Kira",
+  "Leon",
+  "Mira",
+  "Nils",
+  "Oona",
+  "Pavel",
+  "Quinn",
+  "Rosa",
+  "Silas",
+  "Tova",
+  "Uma",
+  "Viktor",
+  "Wren",
+  "Xavi",
+  "Yara",
+  "Zeno",
+  "Aiko",
+  "Bea",
+  "Cyrus",
+  "Dahlia",
+  "Emil",
+  "Farah",
+  "Gideon",
+  "Hana",
+  "Ivo",
+  "Juno",
+  "Kofi",
+  "Lena",
+  "Mateo",
+  "Noor",
+  "Otto",
+  "Priya",
+  "Rafe",
+  "Sana",
+  "Theo",
+  "Ulla",
+  "Vera",
+  "Wim",
+  "Yusuf",
+  "Zora",
 ];
 const LAST = [
-  "Abara", "Brandt", "Castell", "Dorn", "Eklund", "Faro", "Grieve", "Holm",
-  "Ishida", "Jansen", "Kovac", "Lind", "Marlow", "Novak", "Okafor", "Pell",
-  "Quist", "Rook", "Sato", "Thorne", "Ueda", "Vance", "Weller", "Yoon",
-  "Zeller", "Amari", "Bishop", "Crane", "Delacroix", "Ferris",
+  "Abara",
+  "Brandt",
+  "Castell",
+  "Dorn",
+  "Eklund",
+  "Faro",
+  "Grieve",
+  "Holm",
+  "Ishida",
+  "Jansen",
+  "Kovac",
+  "Lind",
+  "Marlow",
+  "Novak",
+  "Okafor",
+  "Pell",
+  "Quist",
+  "Rook",
+  "Sato",
+  "Thorne",
+  "Ueda",
+  "Vance",
+  "Weller",
+  "Yoon",
+  "Zeller",
+  "Amari",
+  "Bishop",
+  "Crane",
+  "Delacroix",
+  "Ferris",
 ];
 const TRAITS = [
-  "curious", "patient", "stubborn", "warm", "guarded", "meticulous", "restless",
-  "playful", "earnest", "dry-humored", "ambitious", "gentle", "blunt", "dreamy",
+  "curious",
+  "patient",
+  "stubborn",
+  "warm",
+  "guarded",
+  "meticulous",
+  "restless",
+  "playful",
+  "earnest",
+  "dry-humored",
+  "ambitious",
+  "gentle",
+  "blunt",
+  "dreamy",
 ];
 
 type TaskTemplate = {
@@ -80,15 +183,79 @@ type TaskTemplate = {
 };
 
 const DAY_TASKS: readonly TaskTemplate[] = [
-  { type: "read", descriptions: ["Reading a field journal", "Reading old letters", "Skimming the morning paper"], minutes: [20, 90] },
-  { type: "work", descriptions: ["Sorting the day's intake", "Repairing a worn mechanism", "Drafting a report"], minutes: [45, 180] },
-  { type: "eat", descriptions: ["Having lunch", "Grabbing a quick snack", "Sharing tea"], minutes: [15, 45] },
-  { type: "walk", descriptions: ["Walking along the river", "Running an errand", "Taking the long way back"], minutes: [15, 60] },
-  { type: "study", descriptions: ["Studying for an exam", "Practicing notation", "Reviewing notes"], minutes: [30, 120] },
-  { type: "talk", descriptions: ["Catching up with a friend", "Arguing about a plan", "Listening to a story"], minutes: [15, 60] },
-  { type: "rest", descriptions: ["Resting on a bench", "Staring out the window", "Taking a short break"], minutes: [10, 40] },
-  { type: "cook", descriptions: ["Cooking dinner", "Baking bread", "Prepping ingredients"], minutes: [30, 90] },
-  { type: "write", descriptions: ["Writing in a diary", "Composing a letter", "Editing a draft"], minutes: [20, 90] },
+  {
+    type: "read",
+    descriptions: [
+      "Reading a field journal",
+      "Reading old letters",
+      "Skimming the morning paper",
+    ],
+    minutes: [20, 90],
+  },
+  {
+    type: "work",
+    descriptions: [
+      "Sorting the day's intake",
+      "Repairing a worn mechanism",
+      "Drafting a report",
+    ],
+    minutes: [45, 180],
+  },
+  {
+    type: "eat",
+    descriptions: ["Having lunch", "Grabbing a quick snack", "Sharing tea"],
+    minutes: [15, 45],
+  },
+  {
+    type: "walk",
+    descriptions: [
+      "Walking along the river",
+      "Running an errand",
+      "Taking the long way back",
+    ],
+    minutes: [15, 60],
+  },
+  {
+    type: "study",
+    descriptions: [
+      "Studying for an exam",
+      "Practicing notation",
+      "Reviewing notes",
+    ],
+    minutes: [30, 120],
+  },
+  {
+    type: "talk",
+    descriptions: [
+      "Catching up with a friend",
+      "Arguing about a plan",
+      "Listening to a story",
+    ],
+    minutes: [15, 60],
+  },
+  {
+    type: "rest",
+    descriptions: [
+      "Resting on a bench",
+      "Staring out the window",
+      "Taking a short break",
+    ],
+    minutes: [10, 40],
+  },
+  {
+    type: "cook",
+    descriptions: ["Cooking dinner", "Baking bread", "Prepping ingredients"],
+    minutes: [30, 90],
+  },
+  {
+    type: "write",
+    descriptions: [
+      "Writing in a diary",
+      "Composing a letter",
+      "Editing a draft",
+    ],
+    minutes: [20, 90],
+  },
 ];
 const NIGHT_TASK: TaskTemplate = {
   type: "sleep",
@@ -135,7 +302,10 @@ export interface MockChat {
 let worldCounter = 0;
 
 export interface MockWorld {
-  /** Instance id, used in cache keys so a regenerated world never serves stale pages. */
+  /**
+   * Instance id, used in cache keys so a regenerated world never serves stale
+   * pages.
+   */
   readonly id: number;
   readonly title: string;
   readonly characters: CharacterSummary[];
@@ -189,7 +359,7 @@ function startTask(
         monologue: chance(rng, 0.35) ? pick(rng, MONOLOGUES) : undefined,
         replacedTaskId,
       },
-    } as Draft,
+    },
   };
 }
 
@@ -198,7 +368,7 @@ function generateCharacters(rng: Rng, count: number) {
   const details = new Map<string, CharacterDetail>();
   const used = new Set<string>();
   for (let index = 0; index < count; index += 1) {
-    let name = "";
+    let name: string;
     do name = `${pick(rng, FIRST)} ${pick(rng, LAST)}`;
     while (used.has(name));
     used.add(name);
@@ -213,7 +383,9 @@ function generateCharacters(rng: Rng, count: number) {
       affiliation: affiliation.name,
       aliases: chance(rng, 0.3) ? [name.split(" ")[0].slice(0, 3)] : [],
     };
-    const traits = [...new Set([pick(rng, TRAITS), pick(rng, TRAITS), pick(rng, TRAITS)])];
+    const traits = [
+      ...new Set([pick(rng, TRAITS), pick(rng, TRAITS), pick(rng, TRAITS)]),
+    ];
     characters.push(summary);
     details.set(summary.id, {
       ...summary,
@@ -246,7 +418,12 @@ function generateChats(rng: Rng, agents: CharacterSummary[]): MockChat[] {
     if (a.id === b.id) continue;
     const id = `direct:${[a.id, b.id].sort().join("+")}`;
     if (chats.some((chat) => chat.id === id)) continue;
-    chats.push({ id, type: "direct", title: `${a.name} · ${b.name}`, members: [a.id, b.id] });
+    chats.push({
+      id,
+      type: "direct",
+      title: `${a.name} · ${b.name}`,
+      members: [a.id, b.id],
+    });
   }
   return chats;
 }
@@ -268,23 +445,31 @@ function initialStatus(
 }
 
 /**
- * Builds the world. When `characters` is given (the characters domain is
- * live), only statuses, chats and journal history are invented around them.
+ * Builds the world. When `characters` is given (the characters domain is live),
+ * only statuses, chats and journal history are invented around them.
  */
-export function createMockWorld(options: {
-  seed?: number;
-  count?: number;
-  characters?: CharacterSummary[];
-  now?: number;
-} = {}): MockWorld {
+export function createMockWorld(
+  options: {
+    seed?: number;
+    count?: number;
+    characters?: CharacterSummary[];
+    now?: number;
+  } = {},
+): MockWorld {
   const rng = createRng(options.seed ?? 7);
   const now = options.now ?? MOCK_WORLD_START;
   const generated = options.characters
-    ? { characters: options.characters, details: new Map<string, CharacterDetail>() }
+    ? {
+        characters: options.characters,
+        details: new Map<string, CharacterDetail>(),
+      }
     : generateCharacters(rng, options.count ?? 150);
   const characters = options.characters
     ? generated.characters
-    : [...generated.characters, { ...MOCK_PLAYER, kind: "player" as const, aliases: [] }];
+    : [
+        ...generated.characters,
+        { ...MOCK_PLAYER, kind: "player" as const, aliases: [] },
+      ];
   const agents = characters.filter((c) => c.kind === "agent");
   const chats = generateChats(rng, agents);
 
@@ -300,7 +485,8 @@ export function createMockWorld(options: {
       let end = task.endAt;
       if (task.type !== "sleep" && chance(rng, 0.12)) {
         const extra = int(rng, 10, 40);
-        const delayAt = task.startedAt + Math.floor((task.endAt - task.startedAt) * 0.7);
+        const delayAt =
+          task.startedAt + Math.floor((task.endAt - task.startedAt) * 0.7);
         end += extra * MINUTE;
         drafts.push({
           kind: "task.delayed",
@@ -313,7 +499,7 @@ export function createMockWorld(options: {
             reason: pick(rng, DELAY_REASONS),
             monologue: chance(rng, 0.3) ? pick(rng, MONOLOGUES) : undefined,
           },
-        } as Draft);
+        });
       }
       current.set(agent.id, { ...task, endAt: end });
       at = end;
@@ -336,7 +522,7 @@ export function createMockWorld(options: {
           senderId,
           preview: pick(rng, MESSAGE_LINES),
         },
-      } as Draft);
+      });
     }
   }
 
@@ -347,21 +533,26 @@ export function createMockWorld(options: {
       actors: chat.members,
       chatId: chat.id,
       payload: { type: "group", title: chat.title, members: chat.members },
-    } as Draft);
+    });
   }
   drafts.push({
     kind: "clock.changed",
     simTime: now - 6 * HOUR,
     actors: [],
     payload: { speed: 10 },
-  } as Draft);
+  });
 
   drafts.sort((a, b) => a.simTime - b.simTime);
-  const journal = drafts.map((draft, index) => ({ ...draft, seq: index + 1 }) as JournalEvent);
+  const journal = drafts.map(
+    (draft, index) => ({ ...draft, seq: index + 1 }) as JournalEvent,
+  );
 
   const statuses = new Map<string, CharacterStatus>();
   for (const agent of agents) {
-    statuses.set(agent.id, initialStatus(rng, current.get(agent.id), chats, agent.id));
+    statuses.set(
+      agent.id,
+      initialStatus(rng, current.get(agent.id), chats, agent.id),
+    );
   }
 
   return {
@@ -385,7 +576,11 @@ export function createMockWorld(options: {
  * task has ended, flips a few brain states, and sometimes posts a message.
  * Returns the SSE-shaped events a real observer stream would send.
  */
-export function advanceMockWorld(world: MockWorld, now: number, maxStarts = 12) {
+export function advanceMockWorld(
+  world: MockWorld,
+  now: number,
+  maxStarts = 12,
+) {
   const { rng } = world;
   const events: StreamEvent[] = [];
   const changed = new Set<string>();
@@ -420,7 +615,9 @@ export function advanceMockWorld(world: MockWorld, now: number, maxStarts = 12) 
       ...status,
       brain: wakes ? "thinking" : "idle",
       composingIn:
-        wakes && memberOf.length > 0 && chance(rng, 0.25) ? [pick(rng, memberOf).id] : [],
+        wakes && memberOf.length > 0 && chance(rng, 0.25)
+          ? [pick(rng, memberOf).id]
+          : [],
     });
     changed.add(id);
   }
@@ -439,7 +636,7 @@ export function advanceMockWorld(world: MockWorld, now: number, maxStarts = 12) 
         senderId,
         preview: pick(rng, MESSAGE_LINES),
       },
-    } as Draft);
+    });
   }
 
   for (const id of changed) {

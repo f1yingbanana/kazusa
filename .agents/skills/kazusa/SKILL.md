@@ -17,11 +17,11 @@ description:
 # Kazusa: Real-time multi-agent AI world simulator framework for role-play
 
 **Perception implementation status:** Uses OpenClaw's native Decision Model API
-(`api.runtime.decisions.evaluate`). Attention policy is in-process. Brain handoff uses the public channel reply
-dispatcher and native turn-adoption lifecycle. Detached host work owns the
-coalescing wait and full dispatch lifetime. Do not use deprecated
-`queueAgentHarnessMessage` or private controller imports.
-See `references/perception.md` for routing and transport constraints.
+(`api.runtime.decisions.evaluate`). Attention policy is in-process. Brain
+handoff uses the public channel reply dispatcher and native turn-adoption
+lifecycle. Detached host work owns the coalescing wait and full dispatch
+lifetime. Do not use deprecated `queueAgentHarnessMessage` or private controller
+imports. See `references/perception.md` for routing and transport constraints.
 
 Kazusa is a real-time, multi-agent society simulation framework built natively
 on the **OpenClaw** runtime. Each character is an autonomous OpenClaw agent with
@@ -47,6 +47,21 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      `delay_task`), which replaces any prior lease, logs the transition to
      `agent:<id>:tasks`, and schedules a wake-up at $t_{\text{now}} + D$ unless
      pre-empted by an interrupt.
+   - **Configurable Task Categories (`taskman.categories`)**: Every task
+     declares a category `type` chosen from the allowed categories configured in
+     Taskman (defaulting to `sleeping`, `traveling`, `eating`, `studying`,
+     `working`, `socializing`, `having fun`, `miscellaneous`), paired with
+     freeform natural language in `description`. Categories are injected
+     dynamically into the `start_task` tool schema so worlds/games can define
+     their own genres without code modifications. Future specialized subsystems
+     (e.g. perception sleep gates or spatial travel routing) will map through
+     their own configurable settings rather than hardcoding category strings.
+   - **Top-Down Human Simulation Planning**: Avoids rigid Stanford-style "plan
+     the day at dawn" routines. Real humans plan opportunistically through
+     temporal orientation on waking/cold-start, anchoring to institutional fixed
+     blocks (`[HARD_BLOCK]`), recording social promises made in conversation
+     into day plans, and rolling reassessments at natural task completion
+     boundaries.
 3. **Dual-Wiki Epistemology (Objective World vs. Subjective Beliefs)**:
    - **World Wiki (`shared/wiki/`)** stores objective canon facts (locations,
      connections, character roster, public rules).
@@ -64,9 +79,10 @@ hallucinations. Kazusa addresses these through six architectural pillars:
    - The LLM handles qualitative reasoning: deducing goals from feelings,
      estimating travel durations from terrain descriptions, imagining candidate
      actions, and evaluating emotional outcomes.
-6. **Perception (Stimulus Routing & Attention Admission with Jev Decision Model)**:
-   - Evaluates incoming stimuli (chats, physical events, world notices)
-     through a fast System 1 Decision Model (`api.runtime.decisions.evaluate` via
+6. **Perception (Stimulus Routing & Attention Admission with Jev Decision
+   Model)**:
+   - Evaluates incoming stimuli (chats, physical events, world notices) through
+     a fast System 1 Decision Model (`api.runtime.decisions.evaluate` via
      TypeSafe AI's Jev) against the agent's current task/activity and cognitive
      state.
    - **Universal Gate (Both Idle & Busy)**: Characters are never truly inactive
@@ -76,18 +92,23 @@ hallucinations. Kazusa addresses these through six architectural pillars:
    - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid-fire messages
      coalesce within a short window (`coalesceWindowMs = 500ms`). Jev evaluates
      the combined bundle with recent channel context so two individually minor
-     stimuli can combine into an urgent `STEER` or `WAKE` without context severance.
-   - **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When a busy
-     brain finishes its active turn, all queued stimuli are drained in a single
-     consolidated wake turn (not one-by-one ping-pong turns). The agent synthesizes
-     and addresses all accumulated events in one holistic LLM thought.
-   - **Quantitative Hysteresis Math**: When the brain is busy, Jev outputs
-     calibrated probabilities across `STEER`, `QUEUE_NEXT`, and `IGNORE`. We
-     apply task-dependent hysteresis thresholds ($T_{\text{steer}} \in \{0.45,
-     0.75, 0.90\}$) so deep-focus tasks are not easily interrupted.
+     stimuli can combine into an urgent `STEER` or `WAKE` without context
+     severance.
+   - **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When a
+     busy brain finishes its active turn, all queued stimuli are drained in a
+     single consolidated wake turn (not one-by-one ping-pong turns). The agent
+     synthesizes and addresses all accumulated events in one holistic LLM
+     thought.
+   - **Context-Aware Semantic Admission (Zero Numeric Thresholds)**: When the
+     brain is busy, Jev classifies stimuli categorically across `STEER`,
+     `QUEUE_NEXT`, and `IGNORE` (or `WAKE` vs. `IGNORE` when idle). Decision
+     policies rely on contextual understanding of the ongoing activity
+     description and relationship stakes, not arbitrary probability or wake
+     thresholds.
    - **No Generative Rewriting & Zero Prompt Injections**: Jev is a
      non-generative classifier with categorical choices. Admitted stimuli pass
-     through verbatim to the `:brain` session without hallucination or distortion.
+     through verbatim to the `:brain` session without hallucination or
+     distortion.
    - **Single-Threaded Consciousness Without Ghost Sessions**: Eliminates the
      previous `agent:<id>:perception` chat session. Perception runs entirely
      in-process as a fast (<100ms) decision gate.
@@ -101,15 +122,15 @@ High-frequency machine state is strictly separated from qualitative Markdown
 files so `<workspace>/MEMORY.md` never suffers from mechanical diff churn or
 file-parsing overhead.
 
-| State Category              | Canonical Storage Location                                                                 | Purpose & Mutation Rule                                                                                                                                                            |
-| :-------------------------- | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Machine Working State**   | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`)                                  | High-frequency virtual clock state/speed and active task leases. Never store in Markdown.                                                                                          |
-| **Cognitive Brain Queue**   | OpenClaw Session `agent:<id>:brain`                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                        |
-| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`) | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`). |
-| **Stream Ledgers**          | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
-| **Agent Identity & Memory** | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                    | Static voice/values (`SOUL.md`), bio & YAML desire parameters (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). |
-| **Objective Canon**         | `shared/wiki/`                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                             |
-| **Subjective Beliefs**      | `workspaces/<id>/wiki/`                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports.                                                                               |
+| State Category                        | Canonical Storage Location                                                                  | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :------------------------------------ | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`)                                   | High-frequency virtual clock state/speed and active task leases. Never store in Markdown.                                                                                                                                                                                                                                                                                                                                                          |
+| **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                         | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`)                               | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                     |
+| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
+| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                     | Static voice/values (`SOUL.md`), bio & YAML desire parameters (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                  |
+| **Objective Canon**                   | `shared/wiki/`                                                                              | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
+| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                     | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports.                                                                                                                                                                                                                                                                                                                                               |
 
 ### Directory Map (`apps/kazusa/`)
 
@@ -148,10 +169,10 @@ apps/kazusa/
 ## 3. Unified Plugin Architecture & Module Boundaries
 
 `plugins/kazusa` (`@kazusa/plugin`) is a single native OpenClaw plugin whose
-`src/index.ts` composes `Clock`, `Taskman`, `ContextEngine`, and `Perception` directly in
-process. Do not introduce cross-plugin service boundaries or split these into
-separate packages. Keep their internal responsibilities decoupled; callbacks and
-direct references connect these modules in process.
+`src/index.ts` composes `Clock`, `Taskman`, `ContextEngine`, and `Perception`
+directly in process. Do not introduce cross-plugin service boundaries or split
+these into separate packages. Keep their internal responsibilities decoupled;
+callbacks and direct references connect these modules in process.
 
 ### 3.1 `src/clock/` — Virtual Formula Clock
 
@@ -167,6 +188,30 @@ direct references connect these modules in process.
   delay appends to the native `agent:<agentId>:tasks` session transcript and
   publishes its update. Because `enqueueSystemEvent` is transient, never use it
   as a task ledger.
+- **Configurable Task Categories (`taskman.categories`)**: Categories default to
+  `TASK_CATEGORIES` (`sleeping`, `traveling`, `eating`, `studying`, `working`,
+  `socializing`, `having fun`, `miscellaneous`) but can be customized per-world
+  via `plugins.entries.kazusa.config.taskman.categories`. Taskman binds these
+  directly to the `start_task` tool parameter schema
+  (`enum: config.categories`), allowing different simulation genres to supply
+  custom activity palettes to the LLM.
+- **Future Special Handling Decoupling**: Subsystems that require special
+  handling (e.g. sleep attention suppression or location transit routing) are
+  not hardcoded to fixed strings in Taskman. When implemented, those subsystems
+  will expose their own configuration mapping (e.g. designating which configured
+  category maps to sleep or travel).
+- **Fixed Categories vs. Freeform Semantics (Hybrid Architecture)**: Pure
+  freeform strings prevent deterministic TypeScript logic from branching on
+  critical mechanics (attention gate suppression, transit arrivals, desire
+  settlement). Pure rigid enums destroy character expressiveness. Kazusa
+  standardizes on configurable category `type` + rich natural language
+  `description`.
+- **Desire Homeostasis Integration**: Task execution directly interfaces with
+  the homeostatic desire math (`references/mathematics.md`). Settlement ratio
+  $\text{Ratio} = \text{clamp}(\Delta t_{\text{elapsed}} /
+  t_{\text{planned\_min}},\; 0.0,\; 1.0)$ scales desire rewards $\Delta
+  D_{\text{awarded}} = \Delta D_{\text{target}} \times \text{Ratio}$ upon
+  completion.
 - **In-Character Monologues**: Transitions and delays may include a brief
   in-character `monologue`. Format it as an italic blockquote directly below the
   factual summary inside the same ledger message text rather than extending
@@ -183,15 +228,16 @@ direct references connect these modules in process.
   single-threaded session lane serialization (`beginSessionWorkAdmission` on
   `resolveSessionLane(sessionKey)`). If a cron job directly targets `:brain`, an
   active (busy thinking) brain run holds the lane lock, forcing the cron job to
-  block in OpenClaw's lane queue. This locks out `before_agent_reply`, preventing
-  Perception from receiving the deadline stimulus mid-flight and eliminating the
-  possibility of mid-turn steering. By targeting `"isolated"`, the cron job runs
-  in its own uncontended lane, immediately fires `before_agent_reply` on schedule,
-  passes the deadline stimulus to `perception.receive()`, and claims the turn
-  with `{ handled: true }`. Returning `{ handled: true }` silences LLM inference
-  (zero tokens used), avoids writing any prompt/reply to transcripts, and marks
-  the cron run as `status: "ok"` (success) on OpenClaw's dashboard, after which
-  OpenClaw deletes the ephemeral session (`deleteAfterRun: true`).
+  block in OpenClaw's lane queue. This locks out `before_agent_reply`,
+  preventing Perception from receiving the deadline stimulus mid-flight and
+  eliminating the possibility of mid-turn steering. By targeting `"isolated"`,
+  the cron job runs in its own uncontended lane, immediately fires
+  `before_agent_reply` on schedule, passes the deadline stimulus to
+  `perception.receive()`, and claims the turn with `{ handled: true }`.
+  Returning `{ handled: true }` silences LLM inference (zero tokens used),
+  avoids writing any prompt/reply to transcripts, and marks the cron run as
+  `status: "ok"` (success) on OpenClaw's dashboard, after which OpenClaw deletes
+  the ephemeral session (`deleteAfterRun: true`).
 - In the target design, Perception owns brain admission and selects cognitive
   skill markers. The existing Taskman wake marker is transitional.
 - **Strict Boundary**: Taskman schedules wakes and owns task state/ledgers. It
@@ -206,6 +252,16 @@ direct references connect these modules in process.
 - Reuses native workspace injection for `SOUL.md`, `IDENTITY.md`, and
   `MEMORY.md`; `memory/` remains tool-recalled archive, subject to OpenClaw's
   native new/reset note-loading behavior.
+- **Strict Invariant: No `AGENTS.md` in Character Workspaces**: Never create or
+  copy `AGENTS.md` into character workspaces (`workspaces/<agent_id>/`). In
+  OpenClaw, any `AGENTS.md` in an agent's workspace is statically injected into
+  the system prompt. In Kazusa, all behavioral logic (time conventions, task
+  lifecycle, interrupt protocols) is injected dynamically by the Context Engine
+  via shared skills (`shared/skills/*`). Placing `AGENTS.md` in character
+  workspaces causes duplicate instructions, prompt drift across characters, and
+  token bloat. Character workspaces must strictly contain only identity
+  (`SOUL.md`, `IDENTITY.md`), qualitative memory (`MEMORY.md`), and subjective
+  wiki entries (`wiki/`).
 - Retains recent complete brain turns (`recentBrainHistory`, bounded by
   `brainMaxTokens`, default 2000; can be set to 0 for pure ledger runs) to
   guarantee tool-call/result atomicity & error recovery, in-flight steering
@@ -215,47 +271,55 @@ direct references connect these modules in process.
   count cap. Skip undated/invalid timestamps; empty pages with a continuation
   cursor must still be followed. Ledger writers preserve simulation-time order.
 - **Ledger writer contract**: Every task/chat message must contain one text
-  block with all readable content and media summaries. `send_message`
-  writes native `__openclaw.senderId`, `senderName`, and `senderIdentity`
-  metadata; see [the messaging contract](references/messaging.md). The context
-  engine uses only sender metadata projected from `__openclaw` for every chat
-  record. Self requires an explicit ID matching the owner; missing attribution
-  is unknown, including outgoing records omitted by the installed catalog. Task
-  records need no speaker.
-  Never infer authorship from text prefixes, display names, or peer keys.
+  block with all readable content and media summaries. `send_message` writes
+  native `__openclaw.senderId`, `senderName`, and `senderIdentity` metadata; see
+  [the messaging contract](references/messaging.md). The context engine uses
+  only sender metadata projected from `__openclaw` for every chat record. Self
+  requires an explicit ID matching the owner; missing attribution is unknown,
+  including outgoing records omitted by the installed catalog. Task records need
+  no speaker. Never infer authorship from text prefixes, display names, or peer
+  keys.
 - Derive ownership only from the native assembly `params.sessionKey`. The
-  harness may omit `runtimeContext.sessionTarget`; it is not an alternate source. `register.ts` owns SDK
-  lifecycle, configuration, and session I/O. `context-engine.ts` owns selection,
-  rendering, and skill expansion.
+  harness may omit `runtimeContext.sessionTarget`; it is not an alternate
+  source. `register.ts` owns SDK lifecycle, configuration, and session I/O.
+  `context-engine.ts` owns selection, rendering, and skill expansion.
 - Adds current simulation time and reads task and chat records from the last 24
   simulated hours (configurable upward), selects whole messages newest-first
   under one shared remaining token budget, then groups them by session with
   chronological, timestamped entries. Accept native catalog display clipping;
-  add no source quotas or further per-message clipping,
-  incognito feature, or external-channel adapter.
+  add no source quotas or further per-message clipping, incognito feature, or
+  external-channel adapter.
 - **Multi-Media Architecture**: Grounded preflight + on-demand inspection. Media
   processors receive the Context Engine's assembled background (location,
   identities, conversation thread) to produce situation-aware descriptions.
   Ledgers record only lightweight `[Image: <summary>]` text blocks with
   attachment references, excluding heavy raw image tokens from context assembly.
   Agents re-inspect images on demand via `view_image(path, prompt)`.
-- The brain profile does not read active-task state. The task ledger supplies
-  experiences and monologues; no separate `:thoughts`. A start outside the
-  window/budget can be absent, which is not proof of having no task. No task
-  metadata injection yet.
+- The brain reads Taskman's retained `tasks` store for a pinned current-activity
+  view: type, description, start, check-in, and ongoing/overdue status. Exclude
+  internal task UUIDs and metadata. This survives a start outside the ledger
+  window/budget. The ledger still supplies experiences and monologues; no
+  separate `:thoughts`. Later successful tool results supersede the snapshot.
+- Relevant personal-wiki impressions are injected as dated beliefs, not world
+  facts (default maximum three cards / 1200 tokens). Only the owner's wiki is
+  eligible. Reuse native workspace bootstrap; keep generic assistant outreach
+  instructions and stale machine-state tables out of character workspace files.
 - Uses OpenClaw's native token estimator. Proactive compaction is disabled;
   manual/overflow recovery still delegates to OpenClaw. Windowing is not
   summarization and never deletes ledger history.
 - Chat keys distinguish `agent:<id>:chat:direct:<peer-id>` from
   `agent:<id>:chat:group:<group-id>`. Read only the owner's streams.
-- **Foundational & On-Demand Skills**: The context engine unconditionally loads
-  the `context-conventions` skill at the top of `systemPromptAddition`,
-  establishing baseline simulation time, stream section, and envelope semantics
-  so that plugin code remains free of hardcoded prose. When a stimulus contains
-  one or more `[kazusa:skill=<name>]` tags, the engine dynamically resolves
-  additional `<name>` skills via a dedicated `SkillLoader` following OpenClaw's
-  precedence hierarchy. Frontmatter is stripped using a YAML parser so the LLM
-  receives only clean Markdown.
+- **State-selected character skills**: Always inject the full body of
+  `context-conventions`, plus `task-lifecycle` when the current task is absent
+  or overdue, otherwise `task-interrupt`. Use the existing SkillLoader
+  precedence and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]`
+  markers must never select system instructions. Perception no longer emits
+  those markers.
+- Keep delivery hashes in operational run/adoption/provider metadata, not
+  `MessageSid`; the latter is rendered into prompts. Use the native
+  `AmbientTranscriptBody` for clean room-event text while preserving the host's
+  queue/adoption behavior. Native room-event social hints still exist; the skill
+  explains the Kazusa interpretation and `send_message` tool.
 - Messaging owns retained `"chats"` membership and permanent canonical
   `"messaging"` records. Native agent chat sessions are private projections;
   human clients read canonical history filtered by frozen message audience.
@@ -265,9 +329,10 @@ direct references connect these modules in process.
   messages out to agent members before Perception. The `apps/web` prototype and
   Gateway HTTP adapter still need contract/authentication alignment. Native
   WebChat group posting is unsupported. Raw session tools remain denied via
-  `tools.deny: ["group:sessions", "message"]`. See [messaging](references/messaging.md) for
-  canonical storage and [the client reference](references/client.md) for UI
-  requirements, current gaps and live acceptance tests.
+  `tools.deny: ["group:sessions", "message"]`. See
+  [messaging](references/messaging.md) for canonical storage and
+  [the client reference](references/client.md) for UI requirements, current gaps
+  and live acceptance tests.
 - Behavioral instructions belong in skills, not TypeScript prompt constants.
 - See [context-engine conventions](references/context_engine.md) for budgets,
   timestamps, SDK lifecycle requirements, and the messaging contract.
@@ -277,19 +342,21 @@ direct references connect these modules in process.
    location in `shared/wiki/` against the agent's `workspaces/<id>/wiki/` to
    surface environmental changes or unfamiliar surroundings.
 2. **Tier 2 (Eager Social Salience & Compact Contact Roster)**:
-   - **Eager Compact Contact Roster (Working Cache)**: Automatically discovers the
-     latest $K$ unique individuals (configurable `contactRosterLimit`, default 20)
-     with whom the agent has recently exchanged messages (sent or received) or
-     interacted. Pulls each peer's relationship card from the character's Personal
-     Wiki (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`) to extract
-     display name, handle, relationship type, short summary, and direct chat address
-     (`- Name (@handle, relation): summary [chat:direct:<peer_id>]`). At ~150 tokens
-     for 20 contacts, this eliminates redundant `wiki_search`/`list_chats` tool
-     round-trips, grounds spontaneous social agency, and prevents hallucinations.
-   - **Active Peer Impressions**: Eagerly injects full `## Quick Impression` blocks
-     from the Personal Wiki for the active interlocutor in direct chats and Top-3
-     salient co-present characters in groups/crowds. Deep historical interaction
-     logs remain lazy (Tier 3 cognitive retrieval).
+   - **Eager Compact Contact Roster (Working Cache)**: Automatically discovers
+     the latest $K$ unique individuals (configurable `contactRosterLimit`,
+     default 20) with whom the agent has recently exchanged messages (sent or
+     received) or interacted. Pulls each peer's relationship card from the
+     character's Personal Wiki
+     (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`) to extract
+     display name, handle, relationship type, short summary, and direct chat
+     address (`- Name (@handle, relation): summary [chat:direct:<peer_id>]`). At
+     ~150 tokens for 20 contacts, this eliminates redundant
+     `wiki_search`/`list_chats` tool round-trips, grounds spontaneous social
+     agency, and prevents hallucinations.
+   - **Active Peer Impressions**: Eagerly injects full `## Quick Impression`
+     blocks from the Personal Wiki for the active interlocutor in direct chats
+     and Top-3 salient co-present characters in groups/crowds. Deep historical
+     interaction logs remain lazy (Tier 3 cognitive retrieval).
 3. **Tier 3 (Session Stream Tails)**: Merges recent entries from the agent's
    `:tasks`, `:chat:direct:*`, and `:chat:group:*` streams (implemented).
 
@@ -302,33 +369,34 @@ direct references connect these modules in process.
   powered by TypeSafe AI's Jev (`typesafe/jev-latest`, local Kev, or ONNX).
   Evaluates categorical choices in a single forward pass (~70–200ms latency,
   zero generated output tokens, $0.042/1M input tokens).
-- **Universal Gate (Both Idle & Busy Brains)**: All incoming stimuli are evaluated
-  against the character's active task and cognitive state:
+- **Universal Gate (Both Idle & Busy Brains)**: All incoming stimuli are
+  evaluated against the character's active task and cognitive state:
   - **Idle Brain**: Characters are never truly inactive (sleep, reading, and
     waiting are active tasks, defaulting to "resting" when unset). Jev evaluates
-    `["WAKE", "IGNORE"]`. Ambient noise during deep sleep or meditation faces an
-    elevated threshold ($T_{\text{wake}} = 0.85$ vs. $0.50$). Bundles where all
-    items were already approved as `QUEUE_NEXT` during a busy turn bypass Jev
-    re-evaluation and wake immediately on turn completion. Ignored stimuli
-    remain in the subjective ledger without invoking an LLM turn.
-  - **Busy Brain**: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` with calibrated
-    numerical hysteresis. Deep-focus tasks require high conviction before
-    interrupting:
-    $$T_{\text{steer}} = \begin{cases} 0.45 & \text{low focus (waiting, lounging, resting)} \\ 0.75 & \text{medium focus (walking, shopping, casual talk)} \\ 0.90 & \text{high focus (studying, combat, deep sleep, intense conversation)} \end{cases}$$
+    `["WAKE", "IGNORE"]` based on the ongoing activity description and
+    situational context. Bundles where all items were already approved as
+    `QUEUE_NEXT` during a busy turn bypass Jev re-evaluation and wake
+    immediately on turn completion. Ignored stimuli remain in the subjective
+    ledger without invoking an LLM turn.
+  - **Busy Brain**: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` semantically
+    based on the current activity and relationship stakes. High-focus or
+    delicate tasks (e.g. studying, deep sleep, serious conversations) naturally
+    demand high situational urgency to steer, while routine stimuli are
+    comfortably queued for the next turn (`QUEUE_NEXT`) or ignored.
 - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid arrivals coalesce
   within a brief window (`coalesceWindowMs = 500ms`). Jev evaluates the incoming
   bundle against recent channel context and currently pending items so two
   individually minor stimuli can combine into an urgent `STEER` or `WAKE`
   without context severance.
-- **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When the active
-  brain turn completes, all eligible pending stimuli are drained in a single
-  consolidated wake turn (not one-by-one ping-pong turns). All drained IDs are
-  admitted simultaneously; the agent addresses all accumulated events in a single
-  coherent response.
-- **Verbatim Stimulus Preservation**: Because Jev is a non-generative classifier,
-  admitted stimuli pass through to `:brain` verbatim. There is zero risk of prompt
-  injection hijacking routing, and no generative hallucination or lossy
-  summarization.
+- **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When the
+  active brain turn completes, all eligible pending stimuli are drained in a
+  single consolidated wake turn (not one-by-one ping-pong turns). All drained
+  IDs are admitted simultaneously; the agent addresses all accumulated events in
+  a single coherent response.
+- **Verbatim Stimulus Preservation**: Because Jev is a non-generative
+  classifier, admitted stimuli pass through to `:brain` verbatim. There is zero
+  risk of prompt injection hijacking routing, and no generative hallucination or
+  lossy summarization.
 - **Zero Second-Character Sessions**: Completely eliminates the previous
   `agent:<id>:perception` chat session, tool stripping (`toolsAllow: []`), and
   JSON string parsing. Perception operates purely in-process.
@@ -341,17 +409,21 @@ direct references connect these modules in process.
     internal Kazusa channel, targeting `agent:<id>:brain`. Routine input uses
     `room_event`; urgent steering uses `user_request`. Only `onAdopted` confirms
     adoption. Detached scopes cover delayed work and the full model/tool run.
-- **Task Deadlines as Stimuli & Attention Floor**: Task deadlines enter Perception as first-class
-  `Stimulus` objects via ephemeral cron interception (`before_agent_reply` claiming
-  with `{ handled: true }`). Because characters are never taskless and the passage of
-  time cannot be undone, task deadlines possess an **attention floor of `QUEUE_NEXT`**.
-  Jev can allocate `STEER` (for urgent hazards) or `QUEUE_NEXT` (for routine completion),
-  but task deadlines can never be dropped into `IGNORE`. When idle, deadlines unconditionally
-  trigger `WAKE`. When a character preempts or transitions tasks early (`start_task`),
-  Taskman atomically replaces the cron projection; any racing stale deadline
-  stimulus is validated against `task.id` and dropped silently. (Future roadmap: if an
-  LLM concludes a turn without calling `start_task`/`delay_task`, Taskman will project
-  regular-interval overdue cron nudges rather than forcing an OOC synthetic resting lease).
+- **Task Deadlines as Stimuli & Attention Floor**: Task deadlines enter
+  Perception as first-class `Stimulus` objects via ephemeral cron interception
+  (`before_agent_reply` claiming with `{ handled: true }`). Because characters
+  are never taskless and the passage of time cannot be undone, task deadlines
+  possess an **attention floor of `QUEUE_NEXT`**. Jev can allocate `STEER` (for
+  urgent hazards) or `QUEUE_NEXT` (for routine completion), but task deadlines
+  can never be dropped into `IGNORE`. When idle, deadlines unconditionally
+  trigger `WAKE`. When a character preempts or transitions tasks early
+  (`start_task`), Taskman atomically replaces the cron projection; any racing
+  stale deadline stimulus is validated against `task.id` and dropped silently.
+  (Future roadmap: if an LLM concludes a turn without calling
+  `start_task`/`delay_task`, Taskman will project a unified 60-real-second
+  taskless/overdue state scan rather than forcing an OOC synthetic resting
+  lease). This scan is proposed, not implemented; see
+  [the concrete design](../../../apps/kazusa/docs/brain-context.md).
 - Context assembly only reads and renders admitted context; it never reroutes
   input or drains a queue. Admission must happen before a run starts, not in
   `assemble()`, which may be retried.
@@ -365,12 +437,13 @@ direct references connect these modules in process.
   (scoped under `plugins.entries.kazusa.config.<module>.*`) and Gateway RPC
   inputs with **Zod** schemas. Never use `any`, hand-rolled `typeof` chains, or
   unverified `as unknown as T` casts.
-- **Zero Legacy Tech Debt & Greenfield Purity**: Kazusa is an unreleased, greenfield
-  framework. Never introduce transitional backward-compatibility shims, dual-type
-  unions (`T | LegacyT`), deprecated migration fallbacks, or temporary adapter branches.
-  When an architectural contract or signature evolves (e.g., standardizing on `DecisionBatch`),
-  cleanly refactor all types, call sites, and unit tests in one atomic step. Never hedge
-  or leave obsolete interfaces or runtime checks in the codebase.
+- **Zero Legacy Tech Debt & Greenfield Purity**: Kazusa is an unreleased,
+  greenfield framework. Never introduce transitional backward-compatibility
+  shims, dual-type unions (`T | LegacyT`), deprecated migration fallbacks, or
+  temporary adapter branches. When an architectural contract or signature
+  evolves (e.g., standardizing on `DecisionBatch`), cleanly refactor all types,
+  call sites, and unit tests in one atomic step. Never hedge or leave obsolete
+  interfaces or runtime checks in the codebase.
 - **Atomic Markdown Writes**: When mutating Markdown files, always write to a
   temporary file in the same directory and atomically `rename(tmp, target)` so
   concurrent reads never see partial writes.
@@ -400,9 +473,9 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/messaging.md` — Read when implementing `send_message`, sender
   attribution, or direct/group ledger writes.
 - `references/client.md` — Read when reviewing or building `apps/web`, human
-  chat APIs, authentication, live updates, or end-to-end messaging tests.
-  The client's overall architecture (shell, views, registries, read-model
-  routes, world journal) lives in the separate `kazusa-client` skill.
+  chat APIs, authentication, live updates, or end-to-end messaging tests. The
+  client's overall architecture (shell, views, registries, read-model routes,
+  world journal) lives in the separate `kazusa-client` skill.
 - `references/perception.md` — Read when designing stimulus routing, busy-brain
   admission, steering, deferred attention, or moving task wakes behind the gate.
 - `references/phases_and_testing.md` — Read when planning milestone deliverables

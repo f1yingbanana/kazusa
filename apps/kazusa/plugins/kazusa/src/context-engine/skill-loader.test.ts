@@ -137,13 +137,13 @@ name: "unterminated string
     const doc = await loader.loadSkillDocument("context-conventions");
     expect(doc.frontmatter?.name).toBe("context-conventions");
     expect(doc.frontmatter?.["user-invocable"]).toBe(false);
-    expect(doc.body).toContain("# Kazusa Context & Stream Conventions");
+    expect(doc.body).toContain("# Kazusa Character Perspective");
   });
 
   it("resolves built-in packaged fallback skills", async () => {
     const loader = createSkillLoader();
     const content = await loader.loadSkill("context-conventions");
-    expect(content).toContain("Context & Stream Conventions");
+    expect(content).toContain("Character Perspective");
     expect(content).not.toContain("---");
   });
 
@@ -299,7 +299,7 @@ name: "unterminated string
 
     const content = await loader.loadSkill("context-conventions");
     // Bundled skill must win over extraDirs
-    expect(content).toContain("Kazusa Context & Stream Conventions");
+    expect(content).toContain("Kazusa Character Perspective");
     expect(content).not.toContain("Colliding Extra Convention");
   });
 

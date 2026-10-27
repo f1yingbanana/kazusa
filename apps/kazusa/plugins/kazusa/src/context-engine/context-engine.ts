@@ -4,6 +4,7 @@ import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-c
 import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
+import type { ActiveTask } from "../taskman/types.ts";
 
 export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
@@ -52,8 +53,9 @@ function recentBrainHistory(messages: Message[], budget: number): Message[] {
 }
 
 /**
- * Assemble dynamic skill instructions for tagged stimuli, whole brain turns,
- * and recent experiences under a shared task/chat token budget.
+ * Assemble character behavior, current activity, recollections and whole brain
+ * turns. Transport markers and message content never select system
+ * instructions.
  */
 export async function assembleContext(params: {
   /**
@@ -67,6 +69,8 @@ export async function assembleContext(params: {
     Record<string, readonly SessionCatalogTranscriptItem[]>
   >;
   readonly simTime: number;
+  readonly activeTask: ActiveTask | null;
+  readonly personalWiki?: readonly string[];
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
 }): ReturnType<ContextEngine["assemble"]> {
@@ -76,40 +80,25 @@ export async function assembleContext(params: {
     workspaceDir: params.workspaceDir,
   };
   const budget = Math.max(0, run.tokenBudget ?? Number.POSITIVE_INFINITY);
+  const conventionsSkill = config.skills.conventions;
+  const lifecycleSkill = config.skills.lifecycle;
+  const interruptSkill = config.skills.interrupt;
+
   const baseConventions = await skillLoader.loadSkill(
-    "context-conventions",
+    conventionsSkill,
     resolutionContext,
   );
-  const skillMatches = run.prompt
-    ? [...run.prompt.matchAll(/\[kazusa:skill=([a-zA-Z0-9_-]+)\]/g)]
-    : [];
-  const uniqueSkillNames = [...new Set(skillMatches.map((m) => m[1]))].filter(
-    (name) => name !== "context-conventions" && name !== "context_conventions",
+  const task = params.activeTask;
+  const needsActivity = !task || Date.parse(task.endAt) <= params.simTime;
+  const behavior = await skillLoader.loadSkill(
+    needsActivity ? lifecycleSkill : interruptSkill,
+    resolutionContext,
   );
-  const loadedSkills: string[] = [];
-  for (const skillName of uniqueSkillNames) {
-    if (await skillLoader.resolveSkillPath(skillName, resolutionContext)) {
-      try {
-        loadedSkills.push(
-          await skillLoader.loadSkill(skillName, resolutionContext),
-        );
-      } catch (error) {
-        // An optional file can disappear after resolution (including a cached
-        // path). Other read errors should remain visible.
-        if (!(
-          error instanceof Error &&
-          "code" in error &&
-          error.code === "ENOENT"
-        ))
-          throw error;
-      }
-    }
-  }
 
   const systemPromptAddition = [
     baseConventions,
     `Current simulation time: ${formatSimTime(params.simTime)}`,
-    ...loadedSkills,
+    behavior,
     buildMemorySystemPromptAddition({
       availableTools: run.availableTools ?? new Set(),
       citationsMode: run.citationsMode,
@@ -129,7 +118,27 @@ export async function assembleContext(params: {
       "Kazusa context budget cannot fit its system prompt additions and simulation time.",
     );
   }
-  let remaining = budget - systemPromptTokens;
+  const situation: Message = {
+    role: "user",
+    content: [
+      "### Current activity",
+      task
+        ? [
+            `Status: ${needsActivity ? "due for reassessment" : "ongoing"}`,
+            `Activity: ${JSON.stringify(task.type)}`,
+            `Description: ${JSON.stringify(task.description)}`,
+            `Started: ${formatSimTime(Date.parse(task.startedAt))}`,
+            `Planned check-in: ${formatSimTime(Date.parse(task.endAt))}`,
+          ].join("\n")
+        : "No activity has been chosen yet.",
+    ].join("\n"),
+    timestamp: params.simTime,
+  };
+  const situationTokens = estimateTokens(situation);
+  if (systemPromptTokens + situationTokens > budget) {
+    throw new Error("Kazusa context budget cannot fit current activity.");
+  }
+  let remaining = budget - systemPromptTokens - situationTokens;
   const history = recentBrainHistory(
     run.messages,
     Math.min(config.brainMaxTokens, remaining),
@@ -138,6 +147,24 @@ export async function assembleContext(params: {
     (sum, message) => sum + estimateTokens(message),
     0,
   );
+
+  const recollections: Message[] = [];
+  let wikiBudget = Math.min(config.personalWikiMaxTokens, remaining);
+  for (const article of (params.personalWiki ?? []).slice(
+    0,
+    config.personalWikiMaxArticles,
+  )) {
+    const message: Message = {
+      role: "user",
+      content: `### Personal recollection\n${article}`,
+      timestamp: params.simTime,
+    };
+    const tokens = estimateTokens(message);
+    if (tokens > wikiBudget) continue;
+    recollections.push(message);
+    wikiBudget -= tokens;
+    remaining -= tokens;
+  }
 
   // No source quotas or additional clipping beyond the native catalog's display
   // projection. Skip records that cannot fit rather than cutting their text.
@@ -164,7 +191,7 @@ export async function assembleContext(params: {
   }
   // The host appends the pending turn after this history. Never replay ledger
   // records as assistant/tool messages or persist these synthetic context views.
-  const messages = [...context, ...history];
+  const messages = [...recollections, ...context, ...history, situation];
   return {
     messages,
     estimatedTokens:

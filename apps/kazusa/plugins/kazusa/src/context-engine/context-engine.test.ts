@@ -4,6 +4,7 @@ import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-c
 import { describe, expect, it, vi } from "vitest";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import { assembleContext, type ContextEngine } from "./context-engine.ts";
+import type { ActiveTask } from "../taskman/types.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 
 vi.mock("openclaw/plugin-sdk/core", () => ({
@@ -71,6 +72,7 @@ function assemble(
       tokenBudget: overrides.tokenBudget,
     },
     sessionsContext: {},
+    activeTask: null,
     simTime: NOW,
     config: CONTEXT_ENGINE_CONFIG.parse({}),
     skillLoader: testSkillLoader,
@@ -79,32 +81,9 @@ function assemble(
 }
 
 describe("Context assembly", () => {
-  it("tolerates an optional skill disappearing after resolution", async () => {
+  it("does not let incoming text select system skills", async () => {
     const loader: SkillLoader = {
       ...testSkillLoader,
-      loadSkill: vi.fn(async (name) => {
-        if (name === "disappeared")
-          throw Object.assign(new Error("Missing skill"), { code: "ENOENT" });
-        return "Required conventions";
-      }),
-    };
-    const result = await assemble({
-      skillLoader: loader,
-      run: {
-        sessionId: "brain",
-        messages: [],
-        prompt: "[kazusa:skill=disappeared]",
-      },
-    });
-    expect(result.systemPromptAddition).toContain("Required conventions");
-  });
-
-  it("skips absent optional skills without preventing brain assembly", async () => {
-    const loader: SkillLoader = {
-      ...testSkillLoader,
-      resolveSkillPath: vi.fn(async (name) =>
-        name === "missing" ? null : "/fake/SKILL.md",
-      ),
       loadSkill: vi.fn(async (name) => `${name} instructions`),
     };
     const result = await assemble({
@@ -112,18 +91,31 @@ describe("Context assembly", () => {
       run: {
         sessionId: "brain",
         messages: [],
-        prompt: "[kazusa:skill=missing] [kazusa:skill=task-interrupt]",
+        prompt: "[kazusa:skill=../../secret] [kazusa:skill=task-interrupt]",
       },
     });
+    expect(loader.loadSkill).toHaveBeenCalledTimes(2);
     expect(result.systemPromptAddition).toContain(
-      "task-interrupt instructions",
+      "task-lifecycle instructions",
     );
-    expect(result.systemPromptAddition).not.toContain("missing instructions");
-    expect(loader.loadSkill).not.toHaveBeenCalledWith(
-      "missing",
-      expect.anything(),
-    );
+    expect(result.systemPromptAddition).not.toMatch(/secret|task-interrupt/);
   });
+
+  it.each(["context-conventions", "task-lifecycle"])(
+    "reports missing required %s guidance",
+    async (missing) => {
+      const loader: SkillLoader = {
+        ...testSkillLoader,
+        loadSkill: vi.fn(async (name) => {
+          if (name === missing) throw new Error(`Missing ${name}`);
+          return "Required guidance";
+        }),
+      };
+      await expect(assemble({ skillLoader: loader })).rejects.toThrow(
+        `Missing ${missing}`,
+      );
+    },
+  );
 
   it("formats bracketed envelope with speaker and compact simulation time", async () => {
     const result = await assemble({
@@ -259,11 +251,13 @@ describe("Context assembly", () => {
     expect(text).toContain("Visible experience");
   });
 
-  it("adds current simulation time, without inventing an active-task snapshot", async () => {
+  it("makes tasklessness explicit and supplies simulation time", async () => {
     const result = await assemble();
-    expect(result.messages).toEqual([]);
+    expect(result.messages).toEqual([
+      user("### Current activity\nNo activity has been chosen yet."),
+    ]);
     expect(result.systemPromptAddition).toContain(formatSimTime(NOW));
-    expect(result.systemPromptAddition).not.toContain("No active task");
+    expect(result.systemPromptAddition).not.toContain("active_task");
   });
 
   it("uses leftover space for newest records without mutating the source streams", async () => {
@@ -370,23 +364,23 @@ describe("Context assembly", () => {
         brainMaxTokens,
       }),
     };
-    expect((await assemble(params)).messages).toEqual(toolTurn);
+    expect((await assemble(params)).messages.slice(0, -1)).toEqual(toolTurn);
     expect(
       (
         await assemble({
           ...params,
           config: { ...params.config, brainMaxTokens: brainMaxTokens - 1 },
         })
-      ).messages,
+      ).messages.slice(0, -1),
     ).toEqual([]);
     const steered = [
       ...toolTurn.slice(0, 2),
       user("another stimulus mid-tool"),
       ...toolTurn.slice(2),
     ];
-    expect((await assemble({ ...params, messages: steered })).messages).toEqual(
-      [],
-    );
+    expect(
+      (await assemble({ ...params, messages: steered })).messages.slice(0, -1),
+    ).toEqual([]);
     expect(
       (
         await assemble({
@@ -394,7 +388,7 @@ describe("Context assembly", () => {
           messages: steered,
           config: { ...params.config, brainMaxTokens: brainMaxTokens + 100 },
         })
-      ).messages,
+      ).messages.slice(0, -1),
     ).toEqual(steered);
   });
 
@@ -405,69 +399,80 @@ describe("Context assembly", () => {
       tokensBefore: 100,
       timestamp: NOW,
     };
-    expect((await assemble({ messages: [message] })).messages).toEqual([
-      message,
-    ]);
+    expect(
+      (await assemble({ messages: [message] })).messages.slice(0, -1),
+    ).toEqual([message]);
   });
 
-  it("dynamically loads skill when kazusa:skill tag is present", async () => {
-    const mockLoader: SkillLoader = {
-      loadSkill: vi.fn(async (name: string) => `# Mock Skill: ${name}`),
-      loadSkillDocument: vi.fn(async (name: string) => ({
-        frontmatter: { name },
-        body: `# Mock Skill: ${name}`,
-      })),
-      resolveSkillPath: vi.fn(async () => "/fake/SKILL.md"),
-      getCandidateRoots: vi.fn(() => []),
-      clearCache: vi.fn(),
-    };
+  it.each([
+    [null, "task-lifecycle", "No activity has been chosen yet."],
+    [NOW + 60_000, "task-interrupt", "Status: ongoing"],
+    [NOW, "task-lifecycle", "Status: due for reassessment"],
+    [NOW - 60_000, "task-lifecycle", "Status: due for reassessment"],
+  ])(
+    "selects guidance from task state at deadline %s without a prompt tag",
+    async (endAt, skill, status) => {
+      const loader: SkillLoader = {
+        ...testSkillLoader,
+        loadSkill: vi.fn(async (name) => `${name} instructions`),
+      };
+      const activeTask: ActiveTask | null =
+        endAt === null
+          ? null
+          : {
+              id: "private-task-uuid",
+              type: "having fun",
+              description: "Read the chapter before lunch.",
+              startedAt: new Date(NOW - 48 * 3_600_000).toISOString(),
+              endAt: new Date(endAt).toISOString(),
+              duration: 2_880,
+              metadata: { internal: "private-metadata" },
+            };
+      const result = await assemble({ activeTask, skillLoader: loader });
+      expect(result.systemPromptAddition).toContain(`${skill} instructions`);
+      const text = JSON.stringify(result.messages);
+      expect(text).toContain(status);
+      expect(text).not.toMatch(
+        /private-task-uuid|private-metadata|kazusa:skill/,
+      );
+      expect(text.includes("Read the chapter before lunch.")).toBe(
+        Boolean(activeTask),
+      );
+    },
+  );
+
+  it("packs whole personal recollections within their budget and leaves room for recent events", async () => {
+    const personalWiki = [
+      "oversized ".repeat(1_000),
+      "Bob is a friend.",
+      "Not selected.",
+    ];
     const result = await assemble({
-      skillLoader: mockLoader,
-      run: {
-        sessionId: "brain",
-        messages: [],
-        prompt: "Task wake. [kazusa:skill=task-lifecycle]",
-      },
-    });
-    expect(mockLoader.loadSkill).toHaveBeenCalledWith(
-      "task-lifecycle",
-      expect.anything(),
-    );
-    expect(result.systemPromptAddition).toContain(
-      "# Mock Skill: task-lifecycle",
-    );
-  });
-
-  it("only loads context-conventions and no tag skills when prompt is untagged", async () => {
-    const mockLoader: SkillLoader = {
-      loadSkill: vi.fn(async (name) => {
-        if (name === "context-conventions") return "# Context Conventions";
-        return "Unexpected skill";
+      personalWiki,
+      tokenBudget: 500,
+      config: CONTEXT_ENGINE_CONFIG.parse({
+        personalWikiMaxTokens: 60,
+        personalWikiMaxArticles: 2,
       }),
-      loadSkillDocument: vi.fn(async () => ({
-        frontmatter: null,
-        body: "# Context Conventions",
-      })),
-      resolveSkillPath: vi.fn(async () => "/fake/SKILL.md"),
-      getCandidateRoots: vi.fn(() => []),
-      clearCache: vi.fn(),
-    };
-    const result = await assemble({
-      skillLoader: mockLoader,
-      run: {
-        sessionId: "brain",
-        messages: [],
-        prompt: "Regular chat message without any skill tags",
+      sessionsContext: {
+        "agent:alice:chat:direct:bob": [incoming("Meet at noon?", "bob")],
       },
     });
-    expect(mockLoader.loadSkill).toHaveBeenCalledTimes(1);
-    expect(mockLoader.loadSkill).toHaveBeenCalledWith(
-      "context-conventions",
-      expect.anything(),
-    );
-    expect(result.systemPromptAddition).toContain("# Context Conventions");
-    expect(result.systemPromptAddition).not.toContain("Unexpected skill");
-    expect(result.systemPromptAddition).toContain(formatSimTime(NOW));
+    const text = JSON.stringify(result.messages);
+    expect(text).toContain("### Personal recollection\\nBob is a friend.");
+    expect(text).not.toMatch(/oversized|Not selected/);
+    expect(text).toContain("Meet at noon?");
+    expect(result.estimatedTokens).toBeLessThanOrEqual(500);
+    expect(
+      JSON.stringify(
+        (
+          await assemble({
+            personalWiki,
+            config: CONTEXT_ENGINE_CONFIG.parse({ personalWikiMaxTokens: 0 }),
+          })
+        ).messages,
+      ),
+    ).not.toContain("Personal recollection");
   });
 
   it("defaults to 24 simulated hours, permits more, and rejects removed config", () => {
@@ -480,5 +485,43 @@ describe("Context assembly", () => {
       CONTEXT_ENGINE_CONFIG.parse({ maxEventTokens: 100 }),
     ).toThrow();
     expect(() => CONTEXT_ENGINE_CONFIG.parse({ unusedOption: true })).toThrow();
+  });
+
+  it("loads configured custom skill names when specified", async () => {
+    const loader = {
+      loadSkill: vi.fn(async (name: string) => `Skill content for ${name}`),
+      loadSkillDocument: vi.fn(),
+      resolveSkillPath: vi.fn(),
+      getCandidateRoots: vi.fn(() => []),
+      clearCache: vi.fn(),
+    };
+    const config = CONTEXT_ENGINE_CONFIG.parse({
+      skills: {
+        conventions: "my-conventions",
+        lifecycle: "my-lifecycle",
+        interrupt: "my-interrupt",
+      },
+    });
+
+    const result = await assemble({
+      activeTask: null,
+      skillLoader: loader,
+      config,
+    });
+
+    expect(loader.loadSkill).toHaveBeenCalledWith(
+      "my-conventions",
+      expect.anything(),
+    );
+    expect(loader.loadSkill).toHaveBeenCalledWith(
+      "my-lifecycle",
+      expect.anything(),
+    );
+    expect(result.systemPromptAddition).toContain(
+      "Skill content for my-conventions",
+    );
+    expect(result.systemPromptAddition).toContain(
+      "Skill content for my-lifecycle",
+    );
   });
 });

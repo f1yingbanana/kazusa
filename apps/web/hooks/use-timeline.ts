@@ -10,7 +10,11 @@ import type {
 } from "@kazusa/client";
 import { mergeNewestFirst } from "@/lib/live/journal";
 import { journalTailStore } from "@/lib/live/state";
-import { matchesTimelineQuery, queryJournal, TIMELINE_PAGE_SIZE } from "@/lib/source/mock/timeline";
+import {
+  matchesTimelineQuery,
+  queryJournal,
+  TIMELINE_PAGE_SIZE,
+} from "@/lib/source/mock/timeline";
 import { fetchTimeline } from "@/lib/source/timeline/http";
 import { useSources } from "@/lib/source/provider";
 import { useKazusaConfig } from "@/lib/state/config-store";
@@ -34,7 +38,8 @@ function useTimelineFetcher() {
   const config = useKazusaConfig();
   const source = resolved.timeline;
   const fetcher = (query: TimelineQuery): Promise<TimelineResponse> => {
-    if (source === "mock" && world) return Promise.resolve(queryJournal(world.journal, query));
+    if (source === "mock" && world)
+      return Promise.resolve(queryJournal(world.journal, query));
     return fetchTimeline(config.baseUrl, query, config.token);
   };
   return { source, worldId: world?.id ?? 0, fetcher };
@@ -42,8 +47,8 @@ function useTimelineFetcher() {
 
 function useTail(query: TimelineQuery) {
   const tail = useSyncExternalStore(
-    journalTailStore.subscribe,
-    journalTailStore.get,
+    (listener) => journalTailStore.subscribe(listener),
+    () => journalTailStore.get(),
     () => [],
   );
   return useMemo(
@@ -58,27 +63,52 @@ export function useTimeline(filters: TimelineFilters) {
   const query = useMemo(() => toQuery(filters), [filters]);
   const filterKey = JSON.stringify(query);
 
-  const { data, error, isLoading, size, setSize, isValidating } = useSWRInfinite(
-    (index: number, previous: TimelineResponse | null) => {
-      if (source === "unavailable") return null;
-      if (index === 0) return ["kazusa/timeline", source, worldId, filterKey, null] as const;
-      if (!previous?.hasMore || previous.nextCursor === undefined) return null;
-      return ["kazusa/timeline", source, worldId, filterKey, previous.nextCursor] as const;
-    },
-    ([, , , , before]) =>
-      fetcher({ ...query, before: before ?? undefined, limit: TIMELINE_PAGE_SIZE }),
-    { revalidateOnFocus: false, revalidateFirstPage: false },
-  );
+  const { data, error, isLoading, size, setSize, isValidating } =
+    useSWRInfinite<TimelineResponse, Error>(
+      (index: number, previous: TimelineResponse | null) => {
+        if (source === "unavailable") return null;
+        if (index === 0)
+          return ["kazusa/timeline", source, worldId, filterKey, null] as const;
+        if (!previous?.hasMore || previous.nextCursor === undefined)
+          return null;
+        return [
+          "kazusa/timeline",
+          source,
+          worldId,
+          filterKey,
+          previous.nextCursor,
+        ] as const;
+      },
+      ([, , , , before]: readonly [
+        string,
+        string,
+        number,
+        string,
+        number | null,
+      ]) =>
+        fetcher({
+          ...query,
+          before: typeof before === "number" ? before : undefined,
+          limit: TIMELINE_PAGE_SIZE,
+        }),
+      { revalidateOnFocus: false, revalidateFirstPage: false },
+    );
 
   const tail = useTail(query);
-  const history = useMemo(() => data?.flatMap((page) => page.events) ?? [], [data]);
-  const events = useMemo(() => mergeNewestFirst(tail, history), [tail, history]);
+  const history = useMemo(
+    () => data?.flatMap((page) => page.events) ?? [],
+    [data],
+  );
+  const events = useMemo(
+    () => mergeNewestFirst(tail, history),
+    [tail, history],
+  );
   const hasMore = Boolean(data?.[data.length - 1]?.hasMore);
   const isLoadingMore = isValidating && size > (data?.length ?? 0);
 
   return {
     events,
-    error: error as Error | undefined,
+    error: error,
     isLoading,
     hasMore,
     isLoadingMore,
@@ -92,7 +122,9 @@ export function useRecentEvents(actorId: string, limit = 5) {
   const { source, worldId, fetcher } = useTimelineFetcher();
   const query = useMemo(() => ({ actors: [actorId] }), [actorId]);
   const { data, isLoading } = useSWR(
-    source === "unavailable" ? null : (["kazusa/timeline/recent", source, worldId, actorId, limit] as const),
+    source === "unavailable"
+      ? null
+      : (["kazusa/timeline/recent", source, worldId, actorId, limit] as const),
     () => fetcher({ ...query, limit }),
     { revalidateOnFocus: false },
   );

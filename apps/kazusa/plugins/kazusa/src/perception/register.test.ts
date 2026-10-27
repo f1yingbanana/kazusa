@@ -288,7 +288,11 @@ describe("Perception host integration", () => {
     const { ctx, replyOptions, dispatcherOptions } =
       h.dispatchBrain.mock.calls[0][0];
     expect(replyOptions?.sourceReplyDeliveryMode).toBe("message_tool_only");
-    expect(replyOptions?.runId).toBe(ctx.MessageSid);
+    expect(replyOptions?.runId).toBe(ctx.ProviderUpdateId);
+    expect(replyOptions?.runId).toBeTruthy();
+    expect(ctx.MessageSid).toBeUndefined();
+    expect(ctx.AmbientTranscriptBody).toBe(ctx.BodyForAgent);
+    expect(ctx.AmbientTranscriptBody).not.toContain(ctx.ProviderUpdateId);
     expect(
       dispatcherOptions.transformReplyPayload?.({ text: "Must stay private" }),
     ).toBeNull();

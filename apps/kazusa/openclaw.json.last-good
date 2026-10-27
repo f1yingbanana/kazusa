@@ -24,6 +24,7 @@
     }
   },
   "plugins": {
+    "allow": ["kazusa"],
     "slots": {
       "contextEngine": "kazusa"
     },
@@ -108,6 +109,10 @@
     },
     "port": 18789,
     "bind": "loopback",
+    "trustedProxies": ["127.0.0.1", "::1"],
+    "controlUi": {
+      "allowedOrigins": ["*"]
+    },
     "tailscale": {
       "mode": "off"
     }

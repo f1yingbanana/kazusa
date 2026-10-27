@@ -4,12 +4,18 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { ClockActionPayload } from "@kazusa/client";
 import { clockStore } from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
+import { executeClockAction } from "@/lib/source/clock/http";
 import { applyClockAction } from "@/lib/source/mock/clock";
 import { useSources } from "@/lib/source/provider";
+import { useKazusaConfig } from "@/lib/state/config-store";
 import { MINUTE, bucket, simTimeAt } from "@/lib/time/sim";
 
 export function useClockAnchor() {
-  return useSyncExternalStore(clockStore.subscribe, clockStore.get, () => null);
+  return useSyncExternalStore(
+    (listener) => clockStore.subscribe(listener),
+    () => clockStore.get(),
+    () => null,
+  );
 }
 
 /*
@@ -23,7 +29,9 @@ let timer: number | undefined;
 
 function sample() {
   const anchor = clockStore.get();
-  currentSimNow = anchor ? simTimeAt(anchor.clock, Date.now(), anchor.offset) : 0;
+  currentSimNow = anchor
+    ? simTimeAt(anchor.clock, Date.now(), anchor.offset)
+    : 0;
   for (const listener of tickListeners) listener();
 }
 
@@ -54,8 +62,23 @@ export function useSimNow(resolution = MINUTE) {
 
 export function useClockActions() {
   const { resolved, world } = useSources();
+  const config = useKazusaConfig();
+
   const apply = useCallback(
-    (action: ClockActionPayload) => {
+    async (action: ClockActionPayload) => {
+      if (resolved.clock === "live") {
+        try {
+          const result = await executeClockAction(
+            config.baseUrl,
+            action,
+            config.token,
+          );
+          dispatchLive({ type: "clock", clock: result.clock });
+        } catch (error) {
+          console.error("Failed to execute clock action:", error);
+        }
+        return;
+      }
       if (resolved.clock !== "mock") return;
       const anchor = clockStore.get();
       if (!anchor) return;
@@ -76,7 +99,11 @@ export function useClockActions() {
         dispatchLive({ type: "journal", event });
       }
     },
-    [resolved.clock, world],
+    [resolved.clock, world, config.baseUrl, config.token],
   );
-  return { apply, enabled: resolved.clock === "mock" };
+
+  return {
+    apply,
+    enabled: resolved.clock === "live" || resolved.clock === "mock",
+  };
 }

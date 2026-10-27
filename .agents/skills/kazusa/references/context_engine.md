@@ -1,8 +1,9 @@
 # Character Context Engine
 
-Perception is a separate in-process attention gate using the Decision Model
-API, not a second generative session or a context-engine profile. Its steering
-transport still needs a supported host entry point. See [Perception](perception.md).
+Perception is a separate in-process attention gate using the Decision Model API,
+not a second generative session or a context-engine profile. Its steering
+transport still needs a supported host entry point. See
+[Perception](perception.md).
 
 Implemented in `plugins/kazusa/src/context-engine/`, registered through native
 `api.registerContextEngine("kazusa", ...)`, selected by
@@ -24,8 +25,8 @@ separate views of their dialogue; a group's stable ID is shared across its
 members' private views. Only record events a character could perceive.
 
 Outgoing chat records use `assistant`, incoming records `user`, including
-messages sent by another LLM character. `send_message` owns these writes
-and native `__openclaw` sender attribution, derived from the tool caller. See
+messages sent by another LLM character. `send_message` owns these writes and
+native `__openclaw` sender attribution, derived from the tool caller. See
 [the messaging contract](messaging.md) for the exact metadata shape. Perception
 and its claiming hook never write chat transcripts.
 
@@ -39,19 +40,22 @@ and direct-chat keys never establish authorship. Task monologues already
 represent thoughts; no `:thoughts` stream. Chat/task ledgers are not execution
 sessions. `sessions_send` to a ledger would start an unwanted run. Perception
 targets `:brain` when appropriate; inbound chat notifications enter through the
-claiming hook after their producer has persisted the chat.
-OpenClaw 2026.10.5 ignores `session.mainKey`, so it cannot
-rename the default `main` session into `brain`.
+claiming hook after their producer has persisted the chat. OpenClaw 2026.10.5
+ignores `session.mainKey`, so it cannot rename the default `main` session into
+`brain`.
 
 - `SOUL.md`, `IDENTITY.md`, `MEMORY.md`: native workspace bootstrap. Do not
   inject them twice. `MEMORY.md` is curated long-term memory.
 - `memory/`: tool-recalled archive, not another eagerly loaded context stream.
   Native `/new` and `/reset` may load daily notes; we do not override that.
   Shared recall configuration lives under `memory.search`.
-- Taskman's `tasks` keyed store: scheduling truth, not a brain-context source.
-  No active-task snapshot or metadata injection. Task starts, due times, delay
-  updates, outcomes, and monologues come from the task ledger. The separate
-  lightweight Perception profile may read the active task to judge urgency.
+- Taskman's `tasks` keyed store: scheduling truth and the source of the pinned
+  current-activity view. Inject type, description, start, check-in, and status;
+  omit internal IDs and metadata. Null explicitly means no activity was chosen.
+  Task history and monologues still come from the task ledger.
+- The owner's personal wiki: retrieve relevant impressions using the pending
+  perception, preserve recorded dates, and inject bounded whole cards as
+  subjective recollections. No world-wiki or other-character private retrieval.
 - Prior complete brain turns (`recentBrainHistory`): A bounded continuity
   allowance (`brainMaxTokens`, default 2000; can be set to `0` for pure
   stateless ledger-driven runs). Retaining prior turns serves three functions:
@@ -72,9 +76,8 @@ rename the default `main` session into `brain`.
 
 All Kazusa experience/chat **message timestamps are simulation milliseconds**.
 Capture `clock.time()` when the event occurs and pass it as the native
-`message.timestamp`. Task transitions/delays and `send_message` follow
-this contract. Deferring admission must not
-change an event's occurrence time.
+`message.timestamp`. Task transitions/delays and `send_message` follow this
+contract. Deferring admission must not change an event's occurrence time.
 
 OpenClaw session `updatedAt`, transcript envelope creation time, and cron `at`
 schedules remain wall-clock. Do not replace `Date.now()` globally or alter host
@@ -102,51 +105,52 @@ Delay text supplies the new deadline and remaining simulated minutes **at that
 update**. Subtract elapsed simulation time to infer what remains now. A delay
 extends the prior deadline; it is not a duration starting from the update.
 
-A task can outlive the window, or its start can lose the token-budget selection.
-Then that start is absent from context; absence is not proof of no task. Do not
-quietly restore an active-task pull to conceal this tradeoff. No metadata
-reconstruction or special pinned task section is implemented.
+A task can outlive the window or lose its ledger start to budget selection. The
+pinned current-activity view independently preserves the current commitment. Its
+check-in is a cue to reassess progress, not evidence of completion. A later
+successful task-tool result supersedes the snapshot.
 
 ## Selection and token budgets
 
 Settings under `plugins.entries.kazusa.config.contextEngine`:
 
-| Setting          | Default | Meaning                                                           |
-| ---------------- | ------- | ----------------------------------------------------------------- |
-| `brainMaxTokens` | 2000    | Maximum recent complete brain turns; unused space goes to ledgers |
-| `shortTermHours` | 24      | Strict simulated-time window; may be increased                    |
+| Setting                   | Default | Meaning                                                           |
+| ------------------------- | ------- | ----------------------------------------------------------------- |
+| `brainMaxTokens`          | 2000    | Maximum recent complete brain turns; unused space goes to ledgers |
+| `shortTermHours`          | 24      | Strict simulated-time window; may be increased                    |
+| `personalWikiMaxTokens`   | 1200    | Maximum whole personal-recollection cards                         |
+| `personalWikiMaxArticles` | 3       | Maximum relevant personal cards                                   |
 
 1. Parse the native assembly `params.sessionKey` for the owner and `:brain`
-   suffix. This is the authoritative identity, including tool continuations.
-   Do not consult `runtimeContext.sessionTarget` or its store path: the harness
-   may omit it. Resolve the owner's store/workspace through native config helpers;
+   suffix. This is the authoritative identity, including tool continuations. Do
+   not consult `runtimeContext.sessionTarget` or its store path: the harness may
+   omit it. Resolve the owner's store/workspace through native config helpers;
    other sessions receive no private ledger injection.
 2. Discover only that owner's task/direct/group ledgers. Read native
    `readSessionTranscriptCatalogPage` pages (`limit: 200`, the host's page
    maximum) newest-first; there is no total history count cap. Follow opaque
-   cursors, including across empty pages containing only omitted activity.
-   Stop when a dated entry is older than the cutoff. This requires writers to
-   append in nondecreasing simulation-time order; backdated imports require a
-   different retrieval policy. The reader has no SQL timestamp-bound option.
-   It returns ISO timestamps projected from native `message.timestamp`, not
-   envelope creation times. Skip undated/invalid timestamps and future items.
-   Retain native `SessionCatalogTranscriptItem` objects, keyed by session;
-   reverse each stream into append order so equal-time records remain ordered.
+   cursors, including across empty pages containing only omitted activity. Stop
+   when a dated entry is older than the cutoff. This requires writers to append
+   in nondecreasing simulation-time order; backdated imports require a different
+   retrieval policy. The reader has no SQL timestamp-bound option. It returns
+   ISO timestamps projected from native `message.timestamp`, not envelope
+   creation times. Skip undated/invalid timestamps and future items. Retain
+   native `SessionCatalogTranscriptItem` objects, keyed by session; reverse each
+   stream into append order so equal-time records remain ordered.
 3. Filter the simulated-time window. Keep visible text, including authored
    monologues; exclude tool internals, hidden reasoning, and `NO_REPLY`.
-4. Budget foundational conventions (`context-conventions` loaded unconditionally
-   at the top of `systemPromptAddition`), current simulation time, and
-   dynamically resolved skills (from `[kazusa:skill=...]` tags in the incoming
-   stimulus), followed by memory guidance and recent whole brain turns. Preserve
-   tool-call/result pairs across steering boundaries and native recovery
-   summaries. Fail clearly if the budget cannot fit system prompt additions;
-   never silently cut instructions halfway through.
+4. Budget full `context-conventions`, state-selected `task-lifecycle` (no task
+   or overdue) or `task-interrupt` (ongoing), simulation time, and native memory
+   guidance. Reserve the pinned current-activity view, then recent whole brain
+   turns and bounded whole personal-wiki impressions. Preserve tool pairs and
+   recovery summaries. Fail clearly if mandatory additions do not fit; do not
+   silently clip instructions. Host handling of assembly errors remains native.
 5. Pool task and chat messages, newest-first. Include a whole record if it fits
    the remaining shared budget; otherwise skip it and try older records. Count
    session labels and timestamp/sender wrappers too. Accept the native catalog's
    display normalization/redaction and 6,000-character per-item clipping. Add no
-   quotas or further message clipping,
-   extra short-term cap, or busy-chat sampling.
+   quotas or further message clipping, extra short-term cap, or busy-chat
+   sampling.
 6. Regroup selected records by session ID; display each group chronologically.
    This is recency-first packing, not a smallest-message-first knapsack that
    maximizes count at the expense of recent experience.
@@ -164,22 +168,19 @@ reserves, prompt overhead, and provider usage. Keep native
 `agents.defaults.contextTokens`, `bootstrapMaxChars`, and
 `bootstrapTotalMaxChars` for their respective limits. Kazusa does not impose an
 artificial token ceiling; it partitions the host-provided `tokenBudget` across
-mandatory system additions, recent brain continuity (`brainMaxTokens`), and
-multi-session experience ledgers. New tool results can grow the active turn
-after initial assembly; this is not a hard per-request token guarantee.
+mandatory system additions/current activity, recent brain continuity
+(`brainMaxTokens`), bounded personal recollections, and multi-session ledgers.
+New tool results can grow the active turn after initial assembly; this is not a
+hard per-request token guarantee.
 
-## Dynamic skill resolution (SkillLoader)
+## State-selected skill resolution (SkillLoader)
 
-When an incoming stimulus contains `[kazusa:skill=<name>]` tags (e.g. emitted by
-Perception on task deadlines or interrupts), the Context Engine dynamically
-resolves and loads the corresponding `SKILL.md` documents on-demand.
+The context engine always loads `context-conventions` and selects one task skill
+from authoritative current-task state: missing/overdue means `task-lifecycle`;
+ongoing means `task-interrupt`. Selection does not depend on whether the host
+supplies `run.prompt`, and incoming chat content never chooses system
+instructions. Skills are full injected bodies, not a hint to read a file.
 
-- **Tag Matching**: Scans `run.prompt` for
-  `/\[kazusa:skill=([a-zA-Z0-9_-]+)\]/g`. Multiple tags in the same prompt are
-  deduplicated.
-- **Foundational Skill**: `context-conventions` is always loaded for brain
-  assembly. Other skills load only for explicit markers in the current prompt,
-  never by scanning historical dialogue.
 - **Frontmatter Parsing & Stripping**: Skills use standard YAML frontmatter
   delimited by `--- ... ---`. The loader parses frontmatter using the `yaml`
   library and strips it from the injected body so that the LLM receives only
@@ -219,7 +220,8 @@ Each record inside a session group is formatted by `formatEnvelopeRecord`:
 3. **Missing attribution**: Output is `\n\n[unknown <time>] <text>`. Never infer
    identity from native role, text or the peer address. OpenClaw 2026.10.5 omits
    outgoing sender metadata from its catalog projection, so those entries remain
-   unknown until a bounded native reader exposes it. See [messaging](messaging.md).
+   unknown until a bounded native reader exposes it. See
+   [messaging](messaging.md).
 
 Records within each group are rendered in strict chronological order, even
 though they were greedily selected in recency-first order to maximize the
@@ -269,43 +271,52 @@ This is not yet implemented and is planned for future work.
 
 ## Tier 2 Social Salience and Eager Contact Roster
 
-In addition to Tier 3 session stream tails (`:tasks`, `:chat:direct:*`, `:chat:group:*`),
-the target context engine design incorporates Tier 2 social salience:
+In addition to Tier 3 session stream tails (`:tasks`, `:chat:direct:*`,
+`:chat:group:*`), the target context engine design incorporates Tier 2 social
+salience:
 
 1. **Eager Compact Contact Roster (Working Social Cache)**:
-   - **Discovery**: Automatically identifies the most recent $K$ unique individuals
-     (configurable via `contextEngine.contactRosterLimit`, default `20`) with whom
-     the character has sent or received messages across their private direct and
-     group ledgers, or had recorded encounters.
-   - **Personal Wiki Resolution**: For each identified peer, looks up the subjective
-     card at `workspaces/<agentId>/wiki/entities/characters/<peerId>.md`.
-   - **Extraction**: Reads YAML frontmatter `name`, `peer_id`, `relation_type`, and
-     the concise 1-line `summary` (e.g., `"Music student at Oak Hill Dorm and fellow composer."`).
-   - **Context Section**: Injects a compact, high-density roster into the prompt:
+   - **Discovery**: Automatically identifies the most recent $K$ unique
+     individuals (configurable via `contextEngine.contactRosterLimit`, default
+     `20`) with whom the character has sent or received messages across their
+     private direct and group ledgers, or had recorded encounters.
+   - **Personal Wiki Resolution**: For each identified peer, looks up the
+     subjective card at
+     `workspaces/<agentId>/wiki/entities/characters/<peerId>.md`.
+   - **Extraction**: Reads YAML frontmatter `name`, `peer_id`, `relation_type`,
+     and the concise 1-line `summary` (e.g.,
+     `"Music student at Oak Hill Dorm and fellow composer."`).
+   - **Context Section**: Injects a compact, high-density roster into the
+     prompt:
      ```markdown
      ### Known Contacts (Recent)
-     - Bob Moreno (@bob, close_friend): Music student at Oak Hill Dorm. [chat:direct:bob]
-     - Hifumi Ajitani (@hifumi, acquaintance): Trinity library committee member. [chat:direct:hifumi]
-     - Sensei (@user:sensei, mentor): SCHALE Advisor who guides students across Kivotos. [chat:direct:user:sensei]
+
+     - Bob Moreno (@bob, close_friend): Music student at Oak Hill Dorm.
+       [chat:direct:bob]
+     - Hifumi Ajitani (@hifumi, acquaintance): Trinity library committee member.
+       [chat:direct:hifumi]
+     - Sensei (@user:sensei, mentor): SCHALE Advisor who guides students across
+       Kivotos. [chat:direct:user:sensei]
      ```
    - Supports both agent peers and human players (`user:` prefix).
    - **Economics & Performance**: A 20-contact list costs only ~150 tokens. This
      completely eliminates the double-turn latency penalty of an agent calling
-     `list_chats` or `wiki_search` before sending a message, avoids ID hallucinations,
-     and stimulates spontaneous in-character outreach.
+     `list_chats` or `wiki_search` before sending a message, avoids ID
+     hallucinations, and stimulates spontaneous in-character outreach.
    - **Strict Epistemic Isolation**: Contacts are resolved exclusively from the
-     agent's **Personal Wiki**, never the omniscient World Wiki (`shared/wiki/`),
-     guaranteeing agents never leak awareness of strangers they have never met.
+     agent's **Personal Wiki**, never the omniscient World Wiki
+     (`shared/wiki/`), guaranteeing agents never leak awareness of strangers
+     they have never met.
 
 2. **Active Peer Impressions**:
-   - For the active interlocutor in a 1-on-1 direct chat, the context engine eagerly
-     injects their full `## Quick Impression` block (emotional sentiment, open
-     conversational threads).
-   - In group chats or crowded rooms, the engine calculates salience
-     ($S = \text{affinity} + \text{familiarity} + \text{recency}$) and injects
+   - For the active interlocutor in a 1-on-1 direct chat, the context engine
+     eagerly injects their full `## Quick Impression` block (emotional
+     sentiment, open conversational threads).
+   - In group chats or crowded rooms, the engine calculates salience ($S =
+     \text{affinity} + \text{familiarity} + \text{recency}$) and injects
      `## Quick Impression` for only the Top-3 members.
-   - Full historical entries (`## Interaction Log`) remain lazy and are retrieved
-     only on demand via agent wiki tools.
+   - Full historical entries (`## Interaction Log`) remain lazy and are
+     retrieved only on demand via agent wiki tools.
 
 ## Compaction and lifecycle
 
@@ -324,10 +335,10 @@ workflow, not a compaction side effect we rely on.
 
 OpenClaw persists native agent transcripts, including private projections of
 canonical messages in the retained `messaging` store. The context engine creates
-no additional database or mirror. `ingest`/`commitTurn` have no side effects. Declare the
-native current-turn fence and idempotent advancement contract; the host appends
-the pending turn after assembled history. Never persist synthetic memory views
-back into the source ledgers.
+no additional database or mirror. `ingest`/`commitTurn` have no side effects.
+Declare the native current-turn fence and idempotent advancement contract; the
+host appends the pending turn after assembled history. Never persist synthetic
+memory views back into the source ledgers.
 
 ## Skill expansion and future scope
 
@@ -338,8 +349,8 @@ Perception sends trusted task markers; classifier-generated summary text escapes
 marker syntax before joining a trusted wake.
 
 Perception compiles its own Decision Model inputs, including current task and
-relevant stimuli. It does not use a second context-engine assembly branch.
-See [Perception](perception.md) for admission and configuration.
+relevant stimuli. It does not use a second context-engine assembly branch. See
+[Perception](perception.md) for admission and configuration.
 
 No incognito feature or external chat adapters. Location, desires, grounded
 media, social context, and read-receipt sampling remain future work. Keep
