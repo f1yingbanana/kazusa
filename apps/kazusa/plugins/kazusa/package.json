@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
+    "@kazusa/client": "*",
     "dayjs": "^1.11.23",
     "yaml": "^2.7.0",
     "zod": "^4.6.5"

@@ -14,6 +14,8 @@
     "gateway": "npm run --workspace=@openrp-ai/kazusa gateway",
     "status": "npm run --workspace=@openrp-ai/kazusa status",
     "doctor": "npm run --workspace=@openrp-ai/kazusa doctor",
+    "web": "npm run --workspace=@kazusa/web dev",
+    "web:build": "npm run --workspace=@kazusa/web build",
     "typecheck": "tsc -p apps/kazusa/plugins/kazusa",
     "test": "vitest run --config ./vitest.config.ts",
     "lint": "eslint . --fix",

@@ -1,3 +1,9 @@
+import type {
+  ChatMessage,
+  MessagesResponse,
+  TypingStreamEvent,
+} from "@kazusa/client";
+import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
 import type { StateStore } from "../state.ts";
@@ -12,6 +18,7 @@ import {
   isUser,
   messagingId,
   ownChatSession,
+  parseChatSession,
   type ChatConversation,
   type ChatSummary,
   type ManageChatParams,
@@ -23,21 +30,6 @@ export interface GetChatHistoryInput {
   readonly userId: string;
   readonly before?: number;
   readonly limit?: number;
-}
-
-export interface ChatHistoryMessage {
-  readonly id: string;
-  readonly sequence: number;
-  readonly sender: string;
-  readonly senderName: string;
-  readonly text: string;
-  readonly timestamp: number;
-}
-
-export interface ChatHistoryResult {
-  readonly messages: readonly ChatHistoryMessage[];
-  readonly nextCursor?: number;
-  readonly hasMore: boolean;
 }
 
 export interface MessageCopy {
@@ -71,6 +63,30 @@ export interface SendMessageResult {
   readonly status: "delivered" | "pending";
   readonly sessionKey: string;
   readonly recipients: readonly string[];
+  readonly chatId: string;
+  readonly message: ChatMessage;
+}
+
+export type MessagingEvent =
+  | { readonly type: "message"; readonly delivery: MessageDelivery }
+  | {
+      readonly type: "typing";
+      readonly typing: TypingStreamEvent;
+      readonly audience: readonly string[];
+    }
+  | { readonly type: "chats"; readonly audience: readonly string[] };
+
+/** One projection shared by history, send responses and live message events. */
+export function clientMessage(delivery: MessageDelivery): ChatMessage {
+  return {
+    id: delivery.id,
+    requestId: delivery.params.requestId,
+    sequence: delivery.sequence,
+    senderId: delivery.sender,
+    senderName: delivery.senderName,
+    text: delivery.params.text,
+    timestamp: delivery.timestamp,
+  };
 }
 
 function isDeliverySettled(delivery: MessageDelivery): boolean {
@@ -111,6 +127,11 @@ export class Messaging {
   private readonly deliveries = new Map<string, MessageDelivery>();
   private readonly chats = new Map<string, ChatConversation>();
   private readonly notifying = new Set<string>();
+  private readonly listeners = new Set<(event: MessagingEvent) => void>();
+  private readonly typing = new Map<
+    string,
+    { event: TypingStreamEvent; runId?: string }
+  >();
   private initialized = false;
   private sequence = 0;
   private timer?: NodeJS.Timeout;
@@ -118,6 +139,90 @@ export class Messaging {
   constructor(private readonly deps: MessagingDeps) {}
 
   readonly assertCurrent = (): void => this.lifetime.signal.throwIfAborted();
+
+  public onEvent(listener: (event: MessagingEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** Best-effort UI signals never affect canonical acceptance or attention. */
+  private emit(event: MessagingEvent): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch {
+        /* The client can resynchronize from history. */
+      }
+    }
+  }
+
+  /**
+   * Explicit composition activity; never inferred from a brain wake or
+   * reasoning.
+   */
+  async setTyping(
+    participantId: string,
+    name: string,
+    sessionKey: string,
+    isTyping: boolean,
+    runId?: string,
+    assertInvocationCurrent?: () => void,
+  ): Promise<void> {
+    await this.serial.enqueue("messages", async () => {
+      await this.init();
+      assertInvocationCurrent?.();
+      const chat = this.requireChat(participantId, sessionKey);
+      const key = `${chat.id}:${participantId}`;
+      const event: TypingStreamEvent = {
+        type: "typing",
+        chatId: chat.id,
+        senderId: participantId,
+        senderName: name,
+        isTyping,
+        ...(isUser(participantId) ? { expiresAt: Date.now() + 8000 } : {}),
+      };
+      if (isTyping) this.typing.set(key, { event, runId });
+      else this.typing.delete(key);
+      this.emit({ type: "typing", typing: event, audience: chat.members });
+    });
+  }
+
+  /** A stale run's terminal event must not clear a newer composition. */
+  clearTyping(participantId: string, runId?: string, chatId?: string): void {
+    for (const [key, value] of this.typing) {
+      if (
+        value.event.senderId !== participantId ||
+        (runId && value.runId !== runId) ||
+        (chatId && value.event.chatId !== chatId)
+      )
+        continue;
+      this.typing.delete(key);
+      this.emit({
+        type: "typing",
+        typing: { ...value.event, isTyping: false },
+        audience: this.chats.get(value.event.chatId)?.members ?? [],
+      });
+    }
+  }
+
+  /** Reconnecting clients recover only current, visible composition signals. */
+  async getTyping(viewer: string): Promise<TypingStreamEvent[]> {
+    return this.serial.enqueue("messages", async () => {
+      await this.init();
+      return [...this.typing.values()]
+        .map(({ event }) => event)
+        .filter((event) => {
+          const members = this.chats.get(event.chatId)?.members ?? [];
+          return (
+            (!event.expiresAt || event.expiresAt > Date.now()) &&
+            members.includes(viewer) &&
+            members.includes(event.senderId)
+          );
+        });
+    });
+  }
 
   /** Restore routing metadata and delivery order before admitting new effects. */
   private async init(): Promise<void> {
@@ -157,7 +262,21 @@ export class Messaging {
         assertInvocationCurrent?.();
       },
     });
+    const previous = this.chats.get(chat.id);
     this.chats.set(chat.id, chat);
+    if (
+      !previous ||
+      previous.title !== chat.title ||
+      JSON.stringify(previous.members) !== JSON.stringify(chat.members)
+    ) {
+      for (const member of previous?.members ?? [])
+        if (!chat.members.includes(member))
+          this.clearTyping(member, undefined, chat.id);
+      this.emit({
+        type: "chats",
+        audience: [...new Set([...(previous?.members ?? []), ...chat.members])],
+      });
+    }
     this.scheduleRetry();
   }
 
@@ -199,10 +318,7 @@ export class Messaging {
     configuredAgents?: ReadonlySet<string>,
   ): Promise<ChatConversation> {
     if (params.sessionKey) {
-      const full = ownChatSession(sender, params.sessionKey);
-      const parts = full.split(":");
-      const kind = parts[3];
-      const peer = parts.slice(4).join(":");
+      const { kind, peerOrGroupId: peer } = parseChatSession(params.sessionKey);
       const chatId = conversationId(sender, params.sessionKey);
       const existing = this.chats.get(chatId);
       if (existing) {
@@ -223,6 +339,7 @@ export class Messaging {
           id: chatId,
           kind: "direct",
           members,
+          title: null,
           creationFingerprint: messagingId([sender, ...members]),
           needsProjection: true,
         };
@@ -241,7 +358,7 @@ export class Messaging {
     const members = [sender, ...others].sort();
     this.validateMembers(members, configuredAgents);
     const kind =
-      others.length === 1 && params.title === undefined ? "direct" : "group";
+      others.length === 1 && params.title === null ? "direct" : "group";
     const chatId =
       kind === "direct" ? `direct:${messagingId(members)}` : `group:${id}`;
     const creationFingerprint = messagingId([
@@ -266,7 +383,7 @@ export class Messaging {
       id: chatId,
       kind,
       members,
-      title: kind === "group" ? (params.title ?? "Group chat") : undefined,
+      title: kind === "group" ? (params.title ?? "Group chat") : null,
       creationFingerprint,
       needsProjection: true,
     };
@@ -307,7 +424,7 @@ export class Messaging {
   async getChatHistory(
     input: GetChatHistoryInput,
     assertInvocationCurrent?: () => void,
-  ): Promise<ChatHistoryResult> {
+  ): Promise<MessagesResponse> {
     PARTICIPANT_ID.parse(input.userId);
     const chatId = input.chatId;
     const limit = Math.max(1, Math.min(input.limit ?? 30, 100));
@@ -317,43 +434,24 @@ export class Messaging {
       await this.init();
       assertInvocationCurrent?.();
 
-      let candidates: MessageDelivery[];
-      if (this.deps.store.entriesInKeyRange) {
-        const endSeq = before !== undefined ? before : 9999999999;
-        const endPadded = String(endSeq).padStart(10, "0");
-        const entries = await this.deps.store.entriesInKeyRange({
-          keyStartInclusive: `msg:${chatId}:0000000000`,
-          keyEndExclusive: `msg:${chatId}:${endPadded}`,
-          limit: (limit + 1) * 2,
-          order: "desc",
-        });
-        candidates = entries.map((e) => e.value);
-      } else {
-        const entries = await this.deps.store.entries();
-        candidates = entries
-          .map((e) => e.value)
-          .filter((d) => d.chatId === chatId)
-          .sort((a, b) => b.sequence - a.sequence);
-        if (before !== undefined) {
-          candidates = candidates.filter((d) => d.sequence < before);
-        }
-      }
-
-      const eligible = candidates.filter((d) =>
-        d.audience.includes(input.userId),
-      );
+      // Records are keyed by stable message ID, not a chat/sequence index.
+      // Filter audience before paging so invisible messages cannot hide an
+      // older eligible page across a leave/rejoin interval.
+      const entries = await this.deps.store.entries();
+      const eligible = entries
+        .map(({ value }) => value)
+        .filter(
+          (message) =>
+            message.chatId === chatId &&
+            message.audience.includes(input.userId) &&
+            (before === undefined || message.sequence < before),
+        )
+        .sort((a, b) => b.sequence - a.sequence);
       const hasMore = eligible.length > limit;
       const page = eligible.slice(0, limit);
       page.sort((a, b) => a.sequence - b.sequence);
 
-      const messages: ChatHistoryMessage[] = page.map((d) => ({
-        id: d.id,
-        sequence: d.sequence,
-        sender: d.sender,
-        senderName: d.senderName,
-        text: d.params.text,
-        timestamp: d.timestamp,
-      }));
+      const messages = page.map(clientMessage);
 
       const nextCursor =
         hasMore && page.length > 0 ? page[0].sequence : undefined;
@@ -455,10 +553,11 @@ export class Messaging {
     PARTICIPANT_ID.parse(sender);
     const params = DELIVERY_REQUEST.parse(input);
     params.members?.sort();
+    params.title ??= null;
     if (params.sessionKey) {
       params.sessionKey = ownChatSession(sender, params.sessionKey);
-      params.members = undefined;
-      params.title = undefined;
+      delete params.members;
+      params.title = null;
     }
     const id = messagingId([sender, params.requestId]);
     const result = await this.serial.enqueue("messages", async () => {
@@ -514,11 +613,15 @@ export class Messaging {
         // survives the invoking turn and can be completed by the plugin service.
         await this.save(delivery, assertInvocationCurrent);
         this.rememberDelivery(delivery);
+        this.clearTyping(sender, undefined, delivery.chatId);
+        this.emit({ type: "message", delivery });
       }
       await this.projectChats();
       await this.flushLedgers();
       return {
         messageId: id,
+        chatId: delivery.chatId,
+        message: clientMessage(delivery),
         sessionKey: chat
           ? chatSummary(chat, sender).sessionKey
           : (delivery.copies[0]?.sessionKey ?? ""),
@@ -537,12 +640,17 @@ export class Messaging {
 
   /** Recover metadata projections and pending copies without invoking a brain. */
   async resume(): Promise<void> {
+    if (this.lifetime.signal.aborted) return;
     try {
       await this.serial.enqueue("messages", async () => {
+        if (this.lifetime.signal.aborted) return;
         await this.init();
+        if (this.lifetime.signal.aborted) return;
         await this.projectChats();
+        if (this.lifetime.signal.aborted) return;
         await this.flushLedgers();
       });
+      if (this.lifetime.signal.aborted) return;
       this.notify();
     } finally {
       this.scheduleRetry();
@@ -619,9 +727,10 @@ export class Messaging {
         const key = `${delivery.id}:${copy.agentId}`;
         if (this.notifying.has(key)) continue;
         this.notifying.add(key);
-        // receive() may await a brain turn which itself sends a message. Never
-        // await it from send() or while holding the ledger/state queue.
-        void this.notifyCopy(delivery, copy)
+        // Retain an independent host scope before the HTTP/tool caller returns.
+        // Perception may dispatch a reply which sends again: never await that
+        // work from send() or while holding the ledger/state queue.
+        void runDetachedWebhookWork(() => this.notifyCopy(delivery, copy))
           .catch((error: unknown) => this.warn(error))
           .finally(() => {
             this.notifying.delete(key);
@@ -671,7 +780,9 @@ export class Messaging {
     if (!pending) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.resume().catch((error: unknown) => this.warn(error));
+      void runDetachedWebhookWork(() => this.resume()).catch((error: unknown) =>
+        this.warn(error),
+      );
     }, 1000);
     this.timer.unref();
   }
@@ -685,5 +796,7 @@ export class Messaging {
   dispose(): void {
     this.lifetime.abort();
     if (this.timer) clearTimeout(this.timer);
+    this.typing.clear();
+    this.listeners.clear();
   }
 }

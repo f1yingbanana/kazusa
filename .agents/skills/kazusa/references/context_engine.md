@@ -30,9 +30,11 @@ and native `__openclaw` sender attribution, derived from the tool caller. See
 and its claiming hook never write chat transcripts.
 
 Every ledger message contains one text block with all readable content and media
-summaries, so one native catalog text item equals one experience. Incoming
-authorship comes exclusively from the projected `sender.identity.id`; outgoing
-`agentMessage` items are self. Missing attribution is `unknown`. Body prefixes
+summaries, so one native catalog text item equals one experience. All chat
+authorship comes exclusively from `__openclaw` metadata projected as
+`sender.identity.id`. Self requires that ID to match the owner; native role does
+not establish authorship. Missing attribution is `unknown`, including outgoing
+items whose metadata OpenClaw 2026.10.5 omits from the catalog. Body prefixes
 and direct-chat keys never establish authorship. Task monologues already
 represent thoughts; no `:thoughts` stream. Chat/task ledgers are not execution
 sessions. `sessions_send` to a ledger would start an unwanted run. Perception
@@ -114,9 +116,11 @@ Settings under `plugins.entries.kazusa.config.contextEngine`:
 | `brainMaxTokens` | 2000    | Maximum recent complete brain turns; unused space goes to ledgers |
 | `shortTermHours` | 24      | Strict simulated-time window; may be increased                    |
 
-1. Require `runtimeContext.sessionTarget.agentId`; throw if absent rather than
-   guessing ownership. Check ownership against the key and classify the Kazusa
-   `:brain` suffix; other sessions receive no private ledger injection.
+1. Parse the native assembly `params.sessionKey` for the owner and `:brain`
+   suffix. This is the authoritative identity, including tool continuations.
+   Do not consult `runtimeContext.sessionTarget` or its store path: the harness
+   may omit it. Resolve the owner's store/workspace through native config helpers;
+   other sessions receive no private ledger injection.
 2. Discover only that owner's task/direct/group ledgers. Read native
    `readSessionTranscriptCatalogPage` pages (`limit: 200`, the host's page
    maximum) newest-first; there is no total history count cap. Follow opaque
@@ -208,12 +212,14 @@ Each record inside a session group is formatted by `formatEnvelopeRecord`:
 
 1. **Tasks Stream**: Output is `\n\n[<time>] <text>` (pure factual record, no
    speaker prefix).
-2. **Outgoing `agentMessage`**: Output is `\n\n[(self) <time>] <text>`.
-3. **Incoming `userMessage`**: Use native `sender.identity.id` for both direct
-   and group chats: `\n\n[<id> <time>] <text>`. The catalog derives this from
-   persisted `__openclaw.senderIdentity`; a display label is not a stable ID.
-4. **Missing attribution**: Output is `\n\n[unknown <time>] <text>`; never infer
-   identity from text or the session key. Legacy tags remain ordinary text.
+2. **Chats of either native role**: Use `sender.identity.id`, projected from
+   persisted `__openclaw.senderIdentity`, for direct and group chats. Render
+   `(self)` only when that explicit ID matches the ledger owner; otherwise use
+   the stable ID. Display labels are not identity.
+3. **Missing attribution**: Output is `\n\n[unknown <time>] <text>`. Never infer
+   identity from native role, text or the peer address. OpenClaw 2026.10.5 omits
+   outgoing sender metadata from its catalog projection, so those entries remain
+   unknown until a bounded native reader exposes it. See [messaging](messaging.md).
 
 Records within each group are rendered in strict chronological order, even
 though they were greedily selected in recency-first order to maximize the
@@ -316,8 +322,9 @@ separate task/chat ledgers, and disabling it does not stop raw transcripts
 growing on disk. Memory consolidation into `MEMORY.md` is a separate future
 workflow, not a compaction side effect we rely on.
 
-OpenClaw persists canonical transcripts; Kazusa creates no secondary context
-database or mirror. `ingest`/`commitTurn` have no side effects. Declare the
+OpenClaw persists native agent transcripts, including private projections of
+canonical messages in the retained `messaging` store. The context engine creates
+no additional database or mirror. `ingest`/`commitTurn` have no side effects. Declare the
 native current-turn fence and idempotent advancement contract; the host appends
 the pending turn after assembled history. Never persist synthetic memory views
 back into the source ledgers.

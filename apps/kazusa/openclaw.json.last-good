@@ -1,0 +1,191 @@
+{
+  "agents": {
+    "ownership": "explicit",
+    "entries": {
+      "kazusa": { "workspace": "./workspaces/kazusa" },
+      "kurimura-airi": { "workspace": "./workspaces/kurimura-airi" },
+      "yoshimi": { "workspace": "./workspaces/yoshimi" },
+      "yutori-natsu": { "workspace": "./workspaces/yutori-natsu" }
+    },
+    "defaults": {
+      "workspace": "./workspaces",
+      "compaction": {
+        "enabled": false
+      },
+      "models": {
+        "zai/glm-5.2": {
+          "alias": "GLM"
+        }
+      },
+      "model": {
+        "primary": "zai/glm-5.2"
+      },
+      "decisionModel": "typesafe/jev-latest"
+    }
+  },
+  "plugins": {
+    "slots": {
+      "contextEngine": "kazusa"
+    },
+    "load": {
+      "paths": ["./plugins/kazusa"]
+    },
+    "entries": {
+      "kazusa": {
+        "enabled": true,
+        "hooks": {
+          "allowConversationAccess": true
+        },
+        "config": {
+          "contextEngine": {
+            "brainMaxTokens": 2000,
+            "shortTermHours": 24,
+            "decisionMaxTokens": 8000,
+            "decisionShortTermHours": 4,
+            "decisionIdentityMaxTokens": 600,
+            "decisionSoulMaxTokens": 1000,
+            "decisionMemoryMaxTokens": 1000,
+            "decisionBrainMaxTokens": 800,
+            "decisionHistoryMaxTokens": 1600,
+            "decisionWikiMaxTokens": 800,
+            "decisionStimulusMaxTokens": 512,
+            "decisionHistoryItems": 60,
+            "decisionWikiMaxArticles": 4
+          },
+          "perception": {
+            "coalesceWindowMs": 500,
+            "maxBatchSize": 16,
+            "maxBatchChars": 48000,
+            "decisionTimeoutMs": 10000
+          },
+          "user": {
+            "id": "user:sensei",
+            "name": "Sensei"
+          }
+        }
+      },
+      "anthropic": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "codex": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "zai": {
+        "enabled": true
+      },
+      "typesafe": {
+        "enabled": true,
+        "config": {
+          "apiKey": {
+            "source": "env",
+            "provider": "default",
+            "id": "TYPESAFE_API_KEY"
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "migrations": {
+      "modelPolicyAllowlist": true,
+      "utilityModelSeparation": true
+    },
+    "lastTouchedVersion": "2026.10.5"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "$include": "./openclaw.local.json",
+      "mode": "token"
+    },
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off"
+    }
+  },
+  "tools": {
+    "profile": "full",
+    "deny": ["group:sessions", "message"],
+    "sessions": {
+      "visibility": "agent"
+    }
+  },
+  "messages": {
+    "queue": {
+      "mode": "steer"
+    }
+  },
+  "memory": {
+    "search": {
+      "provider": "openai-compatible",
+      "model": "text-embedding-3-small",
+      "remote": {
+        "baseUrl": "${AZURE_OPENAI_URL}",
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "AZURE_OPENAI_API_KEY"
+        }
+      },
+      "experimental": {
+        "sessionMemory": true
+      },
+      "sources": ["memory", "sessions"]
+    }
+  },
+  "skills": {
+    "load": {
+      "extraDirs": ["./shared/skills"]
+    },
+    "install": {
+      "nodeManager": "npm"
+    }
+  },
+  "auth": {
+    "profiles": {
+      "zai:default": {
+        "provider": "zai",
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "zai": {
+        "baseUrl": "https://api.z.ai/api/paas/v4",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "glm-4.7-flashx",
+            "name": "GLM-4.7-flashx"
+          }
+        ]
+      }
+    }
+  },
+  "hooks": {
+    "internal": {
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "wizard": {
+    "lastRunAt": "2026-10-21T07:59:47.007Z",
+    "lastRunVersion": "2026.10.5",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  }
+}

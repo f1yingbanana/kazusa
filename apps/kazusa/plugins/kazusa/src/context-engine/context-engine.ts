@@ -61,6 +61,8 @@ export async function assembleContext(params: {
    * runs.
    */
   readonly run: Parameters<ContextEngine["assemble"]>[0];
+  readonly agentId: string;
+  readonly workspaceDir?: string;
   readonly sessionsContext: Readonly<
     Record<string, readonly SessionCatalogTranscriptItem[]>
   >;
@@ -70,11 +72,8 @@ export async function assembleContext(params: {
 }): ReturnType<ContextEngine["assemble"]> {
   const { config, run, skillLoader } = params;
   const resolutionContext = {
-    agentId: run.runtimeContext?.sessionTarget?.agentId,
-    cwd:
-      typeof run.runtimeContext?.cwd === "string"
-        ? run.runtimeContext.cwd
-        : undefined,
+    agentId: params.agentId,
+    workspaceDir: params.workspaceDir,
   };
   const budget = Math.max(0, run.tokenBudget ?? Number.POSITIVE_INFINITY);
   const baseConventions = await skillLoader.loadSkill(
@@ -114,9 +113,8 @@ export async function assembleContext(params: {
     buildMemorySystemPromptAddition({
       availableTools: run.availableTools ?? new Set(),
       citationsMode: run.citationsMode,
-      agentId: run.runtimeContext?.sessionTarget?.agentId,
-      agentSessionKey:
-        run.sessionKey ?? run.runtimeContext?.sessionTarget?.sessionKey,
+      agentId: params.agentId,
+      agentSessionKey: run.sessionKey,
     }),
   ]
     .filter(Boolean)

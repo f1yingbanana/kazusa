@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { stimulusKey } from "../stimulus.ts";
 import type { DecisionContextRequest } from "../context-engine/decision-context.ts";
 import {
@@ -58,6 +59,7 @@ function setup(options: SetupOptions = {}) {
   const stateStore = {
     lookup: async (key: string) => structuredClone(states.get(key)),
     register: async (key: string, value: PerceptionState) => {
+      z.json().parse(value);
       states.set(key, structuredClone(value));
     },
     entries: async () =>

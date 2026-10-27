@@ -17,9 +17,6 @@ export function registerClock(api: OpenClawPluginApi): Clock {
     retention: "retained",
   });
   const clock = new Clock({ store });
-  // Plugin registration is synchronous in OpenClaw. Start loading immediately;
-  // each asynchronous use awaits the same idempotent initialization promise.
-  void clock.init().catch((): void => {});
 
   api.registerTool({
     name: "clock_now",
@@ -143,8 +140,12 @@ export function registerClock(api: OpenClawPluginApi): Clock {
   });
   // Flush the final wall-clock anchor on orderly Gateway shutdown.
   api.on("gateway_stop", async (): Promise<void> => {
-    await clock.init();
-    await clock.close();
+    try {
+      await clock.init();
+      await clock.close();
+    } catch {
+      // State database may already be closed during daemon shutdown
+    }
   });
 
   return clock;

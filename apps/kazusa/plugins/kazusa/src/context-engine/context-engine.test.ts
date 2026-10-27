@@ -64,6 +64,7 @@ function assemble(
   } = {},
 ): ReturnType<typeof assembleContext> {
   return assembleContext({
+    agentId: "alice",
     run: {
       sessionId: "brain",
       messages: overrides.messages ?? [],

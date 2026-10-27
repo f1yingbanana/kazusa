@@ -17,10 +17,10 @@ description:
 # Kazusa: Real-time multi-agent AI world simulator framework for role-play
 
 **Perception implementation status:** Uses OpenClaw's native Decision Model API
-(`api.runtime.decisions.evaluate`). Attention policy is in-process, but the
-current private active-run steering adapter is not a supported SDK contract.
-Do not replace it with deprecated `queueAgentHarnessMessage` or assume the
-controller described by rolling upstream docs is exposed to local plugins.
+(`api.runtime.decisions.evaluate`). Attention policy is in-process. Brain handoff uses the public channel reply
+dispatcher and native turn-adoption lifecycle. Detached host work owns the
+coalescing wait and full dispatch lifetime. Do not use deprecated
+`queueAgentHarnessMessage` or private controller imports.
 See `references/perception.md` for routing and transport constraints.
 
 Kazusa is a real-time, multi-agent society simulation framework built natively
@@ -105,7 +105,7 @@ file-parsing overhead.
 | :-------------------------- | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Machine Working State**   | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`)                                  | High-frequency virtual clock state/speed and active task leases. Never store in Markdown.                                                                                          |
 | **Cognitive Brain Queue**   | OpenClaw Session `agent:<id>:brain`                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                        |
-| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`, `"messages"`) | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`) | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`). |
 | **Stream Ledgers**          | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
 | **Agent Identity & Memory** | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                    | Static voice/values (`SOUL.md`), bio & YAML desire parameters (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). |
 | **Objective Canon**         | `shared/wiki/`                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                             |
@@ -218,11 +218,13 @@ direct references connect these modules in process.
   block with all readable content and media summaries. `send_message`
   writes native `__openclaw.senderId`, `senderName`, and `senderIdentity`
   metadata; see [the messaging contract](references/messaging.md). The context
-  engine uses the catalog's structured sender for all incoming direct/group
-  messages, native outgoing role for self, and no speaker for task records.
+  engine uses only sender metadata projected from `__openclaw` for every chat
+  record. Self requires an explicit ID matching the owner; missing attribution
+  is unknown, including outgoing records omitted by the installed catalog. Task
+  records need no speaker.
   Never infer authorship from text prefixes, display names, or peer keys.
-- Require `runtimeContext.sessionTarget.agentId` during assembly; throw if
-  absent rather than deriving ownership from a key. `register.ts` owns SDK
+- Derive ownership only from the native assembly `params.sessionKey`. The
+  harness may omit `runtimeContext.sessionTarget`; it is not an alternate source. `register.ts` owns SDK
   lifecycle, configuration, and session I/O. `context-engine.ts` owns selection,
   rendering, and skill expansion.
 - Adds current simulation time and reads task and chat records from the last 24
@@ -254,15 +256,18 @@ direct references connect these modules in process.
   additional `<name>` skills via a dedicated `SkillLoader` following OpenClaw's
   precedence hierarchy. Frontmatter is stripped using a YAML parser so the LLM
   receives only clean Markdown.
-- Messaging owns retained `"chats"` routing metadata and `"messaging"` delivery
-  receipts. `send_message` targets an existing session or creates a chat with
-  its first message; `list_chats` discovers current memberships; `manage_chat`
-  lets any current member edit a group. Human players (`user:` prefix) have no
-  brain sessions. Agent sends support human recipients; production human group
-  ingress must fan out to all agent members and is not implemented yet. Default
-  WebChat is a development bridge, not the production UI. Raw session tools
-  are denied via `tools.deny: ["group:sessions"]`. See [messaging](references/messaging.md)
-  for role projection, local recovery rationale, and the open storage decision.
+- Messaging owns retained `"chats"` membership and permanent canonical
+  `"messaging"` records. Native agent chat sessions are private projections;
+  human clients read canonical history filtered by frozen message audience.
+  `send_message` targets an address or starts a chat with its first message;
+  `list_chats` discovers memberships; any current member can `manage_chat`.
+  Humans have no brain or native agent session. Shared acceptance fans human
+  messages out to agent members before Perception. The `apps/web` prototype and
+  Gateway HTTP adapter still need contract/authentication alignment. Native
+  WebChat group posting is unsupported. Raw session tools remain denied via
+  `tools.deny: ["group:sessions", "message"]`. See [messaging](references/messaging.md) for
+  canonical storage and [the client reference](references/client.md) for UI
+  requirements, current gaps and live acceptance tests.
 - Behavioral instructions belong in skills, not TypeScript prompt constants.
 - See [context-engine conventions](references/context_engine.md) for budgets,
   timestamps, SDK lifecycle requirements, and the messaging contract.
@@ -332,9 +337,10 @@ direct references connect these modules in process.
     Perception. Chat producers own prior ledger persistence, not this hook.
   - Brain busy/idle tracking uses native in-process agent events
     (`api.agent.events.registerAgentEventSubscription({ streams: ["lifecycle"] })`).
-  - Idle brain waking uses native cron automations (`ctx.getCron().add(...)`)
-    targeting `agent:<id>:brain`.
-  - Ongoing turn interruptions use OpenClaw's native `mode: "steer"` session queue.
+  - Brain handoff uses `dispatchReplyWithBufferedBlockDispatcher` through the
+    internal Kazusa channel, targeting `agent:<id>:brain`. Routine input uses
+    `room_event`; urgent steering uses `user_request`. Only `onAdopted` confirms
+    adoption. Detached scopes cover delayed work and the full model/tool run.
 - **Task Deadlines as Stimuli & Attention Floor**: Task deadlines enter Perception as first-class
   `Stimulus` objects via ephemeral cron interception (`before_agent_reply` claiming
   with `{ handled: true }`). Because characters are never taskless and the passage of
@@ -393,6 +399,8 @@ Load these reference files on demand when working on their specific subsystem:
   naming, memory layers, budgets, or future chat producers.
 - `references/messaging.md` — Read when implementing `send_message`, sender
   attribution, or direct/group ledger writes.
+- `references/client.md` — Read when reviewing or building `apps/web`, human
+  chat APIs, authentication, live updates, or end-to-end messaging tests.
 - `references/perception.md` — Read when designing stimulus routing, busy-brain
   admission, steering, deferred attention, or moving task wakes behind the gate.
 - `references/phases_and_testing.md` — Read when planning milestone deliverables

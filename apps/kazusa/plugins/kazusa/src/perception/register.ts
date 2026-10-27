@@ -229,8 +229,15 @@ export function registerPerception(
   // Provides crash resilience and zero state loss across Gateway restarts.
   // =========================================================================
   api.on("gateway_start", async () => {
-    await deps.clock.init();
-    await perception.recover();
+    if (lifetime.signal.aborted) return;
+    try {
+      await deps.clock.init();
+      if (lifetime.signal.aborted) return;
+      await perception.recover();
+    } catch (error) {
+      if (lifetime.signal.aborted) return;
+      throw error;
+    }
   });
   return perception;
 }

@@ -40,14 +40,19 @@ export class Clock {
   async init(): Promise<void> {
     if (!this.initPromise) {
       this.initPromise = (async (): Promise<void> => {
-        const loaded = await this.store.lookup("primary");
-        if (loaded) {
-          this.simTime = loaded.simTime;
-          this.speed = loaded.speed;
-          this.anchorTime = Date.now();
-          return;
+        try {
+          const loaded = await this.store.lookup("primary");
+          if (loaded) {
+            this.simTime = loaded.simTime;
+            this.speed = loaded.speed;
+            this.anchorTime = Date.now();
+            return;
+          }
+          await this.persist();
+        } catch (error) {
+          this.initPromise = undefined;
+          throw error;
         }
-        await this.persist();
       })();
     }
     return this.initPromise;

@@ -39,7 +39,7 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
             id: string;
             pluginId: string;
             accountId: null;
-            senderKind: "bot";
+            senderKind: "human" | "bot";
           };
         };
       };

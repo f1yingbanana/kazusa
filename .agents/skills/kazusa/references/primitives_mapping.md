@@ -21,7 +21,7 @@ explains how every simulation requirement maps to OpenClaw.
 | **Task Experiences & Thoughts**         | OpenClaw Session (`agent:<id>:tasks`)                                                | One append-only ledger of task lifecycles, outcomes, and in-character monologues.                                                                                                                                                                                                                          |
 | **Inter-Agent & Human Chat Streams**    | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes. Supports both agent peers and human players (`user:` prefix). |
 | **Human Player (Sensei / User)**       | WebChat / Client Channel + Plugin Config (`pluginConfig.user`)                      | Human players participate in-world without consuming an agent runner process or brain session. They read and send via the character's ledger `agent:<id>:chat:direct:user:<userId>`. `before_dispatch` attributes stimuli and routes to Perception. |
-| **Chat Group Metadata & Delivery**     | OpenClaw Retained Keyed Stores (`"chats"`, `"messaging"`)                           | Retained stores track group memberships, titles, and per-copy delivery settlement receipts. Transcripts remain 100% native in OpenClaw sessions. All session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
+| **Chat Group Metadata & Delivery**     | OpenClaw Retained Keyed Stores (`"chats"`, `"messaging"`)                           | Retained stores own membership and permanent canonical messages with frozen audiences and projection progress. Native sessions hold private agent projections; human clients read audience-filtered canonical history. All session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
 | **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                                           | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                         |
 | **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)                                 | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                       |
 | **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)                                  | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                               |
@@ -54,11 +54,11 @@ session keys:
      Direct and group messages use native `__openclaw` sender metadata, not
      dialogue prefixes. See [the messaging contract](messaging.md).
    - Supports both agent peers (`bob`) and human players (`user:sensei`). For
-     human recipients, deliveries settle immediately without spinning up agent
-     sessions or waking brains.
+     human recipients, canonical audience membership grants history access
+     without creating agent sessions, fake receipts or brain wakes.
    - Shared group routing metadata (members, titles, creation fingerprints) is
-     maintained in the retained `"chats"` keyed store, while per-copy delivery
-     state is tracked in the retained `"messaging"` keyed store.
+     maintained in the retained `"chats"` keyed store. Permanent messages and
+     their per-agent projection progress live in the retained `"messaging"` store.
    - Transcripts remain native OpenClaw session files. All session orchestration
      tools (`sessions_*`) are denied to characters via `tools.deny: ["group:sessions"]`,
      ensuring safe operation while `memory_search` handles session recall.

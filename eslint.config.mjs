@@ -9,12 +9,13 @@ const TEST_FILES = ["**/*.test.ts"];
 
 export default defineConfig([
   globalIgnores([
-    ".turbo/**",
-    ".state/**",
-    "coverage/**",
-    "dist/**",
-    "node_modules/**",
-    "*.tsbuildinfo",
+    "**/.turbo/**",
+    "**/.state/**",
+    "**/coverage/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/*.tsbuildinfo",
   ]),
 
   js.configs.recommended,
@@ -68,7 +69,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["*.{js,mjs,cjs}", "vitest.config.ts"],
+    files: ["**/*.{js,mjs,cjs}", "vitest.config.ts"],
     ...typescript.configs.disableTypeChecked,
   },
 

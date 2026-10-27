@@ -54,6 +54,7 @@ async function setup(contextEngine = {}) {
     on,
     runtime: {
       agent: {
+        resolveAgentWorkspaceDir: () => "/test/workspace",
         session: {
           resolveStorePath: () => "/test/store",
           createSessionEntryListReader: async () => async () => ({
@@ -81,50 +82,36 @@ async function setup(contextEngine = {}) {
 }
 
 describe("Native context-engine registration", () => {
-  it("requires a runtime agent identity even when the session key has one", async () => {
+  it("assembles from the native session key when the harness omits runtimeContext", async () => {
     const { engine, readHistory } = await setup();
-    await expect(
-      engine.assemble({
-        sessionId: "brain",
-        sessionKey: "agent:alice:brain",
-        messages: [],
-      }),
-    ).rejects.toThrow("requires runtimeContext.sessionTarget.agentId");
-    expect(readHistory).not.toHaveBeenCalled();
+    const result = await engine.assemble({
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(readHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "alice" }),
+    );
+    expect(result.systemPromptAddition).toContain("send_message");
   });
 
-  it("uses the runtime session target when supplied", async () => {
+  it("uses only the canonical session key for ownership and native store resolution", async () => {
     const { engine, readHistory } = await setup();
     await engine.assemble({
       sessionId: "brain",
+      sessionKey: "agent:alice:brain",
       messages: [],
       runtimeContext: {
         sessionTarget: {
-          agentId: "alice",
-          sessionKey: "agent:alice:brain",
-          storePath: "/runtime/store",
+          agentId: "bob",
+          sessionKey: "agent:bob:brain",
+          storePath: "/wrong/store",
         },
       },
     });
     expect(readHistory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agentId: "alice",
-        storePath: "/runtime/store",
-      }),
+      expect.objectContaining({ agentId: "alice", storePath: "/test/store" }),
     );
-  });
-
-  it("rejects conflicting runtime and session-key owners before reading", async () => {
-    const { engine, readHistory } = await setup();
-    await expect(
-      engine.assemble({
-        sessionId: "brain",
-        sessionKey: "agent:alice:brain",
-        messages: [],
-        runtimeContext: { sessionTarget: { agentId: "bob" } },
-      }),
-    ).rejects.toThrow("does not match");
-    expect(readHistory).not.toHaveBeenCalled();
   });
 
   it("registers a replay-safe engine and reads only the current character's ledgers", async () => {

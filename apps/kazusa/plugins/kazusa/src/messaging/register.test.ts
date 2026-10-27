@@ -1,5 +1,9 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
+import { Socket } from "node:net";
+import { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { z } from "zod";
 import path from "node:path";
 import type {
   OpenClawPluginApi,
@@ -31,8 +35,10 @@ async function setup() {
   );
   const registerTool = vi.fn();
   const registerService = vi.fn();
-  const routes = new Map<string, any>();
-  const registerHttpRoute = vi.fn((params: any) => {
+  const registerAgentEventSubscription = vi.fn();
+  type HttpRoute = Parameters<OpenClawPluginApi["registerHttpRoute"]>[0];
+  const routes = new Map<string, HttpRoute>();
+  const registerHttpRoute = vi.fn((params: HttpRoute) => {
     routes.set(params.path, params);
   });
   const dispose = vi.fn();
@@ -53,6 +59,7 @@ async function setup() {
   // Partial SDK host, confined to the test boundary.
   const api = {
     config,
+    agent: { events: { registerAgentEventSubscription } },
     registerTool,
     registerService,
     registerHttpRoute,
@@ -143,6 +150,7 @@ async function setup() {
     api,
     workspace,
     registerService,
+    registerAgentEventSubscription,
     dispose,
     messaging,
     receive,
@@ -209,7 +217,7 @@ describe("send_message SDK integration", () => {
   it("registers discovery, send and group management as guarded tools", async () => {
     const h = await setup();
     expect(h.registerTool.mock.calls[0][1]).toEqual({
-      names: ["send_message", "list_chats", "manage_chat"],
+      names: ["send_message", "list_chats", "manage_chat", "set_typing"],
     });
     const first = await h.execute({
       title: "Tea",
@@ -412,91 +420,189 @@ describe("send_message SDK integration", () => {
     expect(append).not.toHaveBeenCalled();
   });
 
+  it("signals typing only on explicit composition and clears it for its owning turn", async () => {
+    const h = await setup();
+    await h.execute();
+    const lifecycle = h.registerAgentEventSubscription.mock.calls[0][0];
+    const event = (phase: string, runId: string) =>
+      lifecycle.handle({
+        stream: "lifecycle",
+        sessionKey: "agent:alice:brain",
+        runId,
+        data: { phase },
+      });
+    event("start", "run-1");
+    expect(await h.messaging.getTyping("bob")).toEqual([]);
+    await h.executeTool("set_typing", {
+      sessionKey: "chat:direct:bob",
+      isTyping: true,
+    });
+    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
+    event("end", "old-run");
+    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
+    event("error", "run-1");
+    expect(await h.messaging.getTyping("bob")).toEqual([]);
+    await expect(
+      h.executeTool("set_typing", {
+        sessionKey: "chat:direct:bob",
+        isTyping: true,
+      }),
+    ).rejects.toThrow("active brain turn");
+  });
+
   it("registers Gateway HTTP routes and handles chats, messages, and send", async () => {
     const h = await setup();
-    expect(h.routes.has("/kazusa/chats")).toBe(true);
-    expect(h.routes.has("/kazusa/messages")).toBe(true);
-    expect(h.routes.has("/kazusa/send")).toBe(true);
-    expect(h.routes.has("/kazusa/chats/manage")).toBe(true);
-
-    function createMockRes() {
-      const res: any = {
+    async function invoke(routePath: string, body?: unknown, url = routePath) {
+      const route = h.routes.get(routePath);
+      if (!route) throw new Error(`Missing route: ${routePath}`);
+      const req = Object.assign(
+        Readable.from(
+          body === undefined ? [] : [Buffer.from(JSON.stringify(body))],
+        ),
+        {
+          method: body === undefined ? "GET" : "POST",
+          url,
+          headers: {},
+          socket: new Socket(),
+        },
+      );
+      const res = {
         statusCode: 200,
-        headers: {},
+        headers: new Map<string, string>(),
         body: "",
+        writeHead(status: number, headers: Record<string, string>) {
+          this.statusCode = status;
+          for (const [key, value] of Object.entries(headers))
+            this.headers.set(key, value);
+        },
         setHeader(name: string, value: string) {
-          res.headers[name] = value;
+          this.headers.set(name, value);
         },
         end(data: string) {
-          res.body = data;
+          this.body = data;
         },
       };
-      return res;
+      // Minimal HTTP objects at the test boundary; the Gateway owns real sockets.
+      expect(
+        await route.handler(
+          req as unknown as IncomingMessage,
+          res as unknown as ServerResponse,
+        ),
+      ).toBe(true);
+      return {
+        statusCode: res.statusCode,
+        body: JSON.parse(res.body) as unknown,
+      };
     }
 
-    // 1. Send via /kazusa/send
-    const sendRoute = h.routes.get("/kazusa/send")!;
-    const sendReq: any = (async function* () {
-      yield Buffer.from(
-        JSON.stringify({
-          sender: "user:sensei",
-          members: ["alice", "bob"],
-          title: "Study Group",
-          text: "Hello everyone from Sensei!",
+    const sent = await invoke("/kazusa/send", {
+      requestId: "browser-submit",
+      members: ["alice", "bob"],
+      title: "Study Group",
+      text: "Hello everyone from Sensei!",
+    });
+    expect(sent.statusCode).toBe(200);
+    const sendData = z
+      .object({
+        message: z.object({
+          id: z.string(),
+          requestId: z.string(),
+          sequence: z.number(),
+          senderId: z.string(),
+          timestamp: z.number(),
         }),
-      );
-    })();
-    sendReq.method = "POST";
-    const sendRes = createMockRes();
-    const handled = await sendRoute.handler(sendReq, sendRes);
-    expect(handled).toBe(true);
-    expect(sendRes.statusCode).toBe(200);
-    const sendData = JSON.parse(sendRes.body);
-    expect(sendData.status).toBe("delivered");
-    expect(sendData.recipients).toEqual(["alice", "bob"]);
-
-    // 2. Query /kazusa/chats for user:sensei
-    const chatsRoute = h.routes.get("/kazusa/chats")!;
-    const chatsReq: any = { url: "/kazusa/chats?userId=user:sensei" };
-    const chatsRes = createMockRes();
-    await chatsRoute.handler(chatsReq, chatsRes);
-    expect(chatsRes.statusCode).toBe(200);
-    const chatsData = JSON.parse(chatsRes.body);
-    expect(chatsData.chats).toHaveLength(1);
-    expect(chatsData.chats[0].title).toBe("Study Group");
-
-    // 3. Query /kazusa/messages for user:sensei
-    const messagesRoute = h.routes.get("/kazusa/messages")!;
-    const foundChat = [...h.chats.values()].find(
-      (c: any) => c.title === "Study Group",
-    ) as any;
-    const chatId = foundChat?.id;
-    const msgReq: any = { url: `/kazusa/messages?chatId=${chatId}&userId=user:sensei` };
-    const msgRes = createMockRes();
-    await messagesRoute.handler(msgReq, msgRes);
-    expect(msgRes.statusCode).toBe(200);
-    const msgData = JSON.parse(msgRes.body);
-    expect(msgData.messages).toHaveLength(1);
-    expect(msgData.messages[0].text).toBe("Hello everyone from Sensei!");
-    expect(msgData.messages[0].sender).toBe("user:sensei");
-
-    // 4. Manage chat via /kazusa/chats/manage
-    const manageRoute = h.routes.get("/kazusa/chats/manage")!;
-    const manageReq: any = (async function* () {
-      yield Buffer.from(
-        JSON.stringify({
-          userId: "user:sensei",
-          action: "rename",
-          sessionKey: chatsData.chats[0].sessionKey,
-          title: "Renamed Study Group",
+        chatId: z.string(),
+        status: z.literal("delivered"),
+      })
+      .parse(sent.body);
+    expect(sendData.message).toMatchObject({
+      requestId: "browser-submit",
+      senderId: "user:sensei",
+      timestamp: 123456,
+    });
+    expect(
+      append.mock.calls.map(([params]) => params.message.__openclaw),
+    ).toEqual([
+      expect.objectContaining({
+        senderId: "user:sensei",
+        senderIdentity: expect.objectContaining({
+          id: "user:sensei",
+          senderKind: "human",
         }),
-      );
-    })();
-    manageReq.method = "POST";
-    const manageRes = createMockRes();
-    await manageRoute.handler(manageReq, manageRes);
-    expect(manageRes.statusCode).toBe(200);
-    const manageData = JSON.parse(manageRes.body);
-    expect(manageData.title).toBe("Renamed Study Group");
+      }),
+      expect.objectContaining({
+        senderId: "user:sensei",
+        senderIdentity: expect.objectContaining({
+          id: "user:sensei",
+          senderKind: "human",
+        }),
+      }),
+    ]);
+
+    const listed = await invoke(
+      "/kazusa/chats",
+      undefined,
+      "/kazusa/chats?userId=user:sensei",
+    );
+    expect(listed.statusCode).toBe(200);
+    const chats = z
+      .object({
+        chats: z.array(z.object({ name: z.string(), sessionKey: z.string() })),
+      })
+      .parse(listed.body).chats;
+    expect(chats).toHaveLength(1);
+    expect(chats[0].name).toBe("Study Group");
+
+    const chatId = h.retained.get(sendData.message.id)?.chatId;
+    expect(chatId).toBeDefined();
+    const history = await invoke(
+      "/kazusa/messages",
+      undefined,
+      `/kazusa/messages?chatId=${chatId}&userId=user:sensei`,
+    );
+    expect(history.statusCode).toBe(200);
+    expect(history.body).toMatchObject({
+      messages: [
+        { text: "Hello everyone from Sensei!", senderId: "user:sensei" },
+      ],
+    });
+
+    const retry = await invoke("/kazusa/send", {
+      requestId: "browser-submit",
+      members: ["alice", "bob"],
+      title: "Study Group",
+      text: "Hello everyone from Sensei!",
+    });
+    expect(retry.body).toEqual(sent.body);
+    expect(h.retained.size).toBe(1);
+    expect(append).toHaveBeenCalledTimes(2);
+    const spoofed = await invoke("/kazusa/send", {
+      requestId: "spoof",
+      sender: "alice",
+      sessionKey: chats[0].sessionKey,
+      text: "Fake",
+    });
+    expect(spoofed.statusCode).toBe(400);
+    const next = await invoke("/kazusa/send", {
+      requestId: "browser-next",
+      sessionKey: chats[0].sessionKey,
+      text: "Same conversation",
+    });
+    expect(next.statusCode).toBe(200);
+    expect(next.body).toMatchObject({
+      chatId,
+      message: { senderId: "user:sensei", sequence: 2 },
+    });
+    expect(h.chats.size).toBe(1);
+
+    const managed = await invoke("/kazusa/chats/manage", {
+      action: "rename",
+      sessionKey: chats[0].sessionKey,
+      title: "Renamed Study Group",
+    });
+    expect(managed.statusCode).toBe(200);
+    expect(managed.body).toMatchObject({
+      chat: { name: "Renamed Study Group" },
+    });
   });
 });

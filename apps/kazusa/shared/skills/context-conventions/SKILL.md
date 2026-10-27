@@ -45,7 +45,7 @@ place to run another character turn.
   - `[(self) <time>]`: Spoken or performed by you.
   - `[<speaker> <time>]`: Spoken or performed by that specific character or human player
     (e.g. `[yoshimi 09:15]`, `[user:sensei 09:16]`).
-  - `[unknown <time>]`: The stored message has no reliable sender attribution;
+  - `[unknown <time>]`: No reliable sender attribution is available;
     do not infer its author from names or speaker tags inside the dialogue.
 - The bracketed `<speaker>` is the sole authoritative attribution of who took
   that turn. Any names or dialogue tags written inside the message body are
@@ -68,8 +68,8 @@ Change tasks only through their tools, and send dialogue only through
 ## 6. Sending Messages
 
 Use `send_message` for all in-world dialogue. A brain reply, private monologue,
-or narration does not deliver speech. Never use `sessions_send` or a chat ledger
-as an execution session.
+or narration does not deliver speech. Never use the built-in `message` or `sessions_send` tools. A chat ledger is
+not an execution session.
 
 - **Direct chats:** supply `sessionKey: "chat:direct:<peer-id>"` and `text`.
   This works both to continue an existing conversation and to message that peer
@@ -91,6 +91,12 @@ as an execution session.
   attribution prefix. The tool supplies your identity automatically. Member IDs
   come from your known contact roster or wiki, not guesses from unattributed dialogue
   or display names.
+- Once you decide to compose a reply in an existing chat, call `set_typing`
+  with that `sessionKey` and `isTyping: true` before drafting your words. Do not
+  signal typing merely while reading, thinking, or deciding whether to respond.
+  Sending or ending your turn clears the indicator. If you abandon the reply,
+  call `set_typing` with `isTyping: false`. A new chat becomes visible with its
+  first message, so it does not need a typing signal beforehand.
 - Delivery identity and retries are managed automatically. Do not invent a
   request ID or repeat a pending send. Every new tool call represents a new
   message, even when its text is identical. If an outcome is uncertain, inspect
@@ -125,8 +131,7 @@ Create a new group (with both peers and humans) and send its first message:
 }
 ```
 
-`delivered` means the message is recorded in your ledger and each recipient's
-ledger. It does not mean anyone noticed, agreed, or replied. `pending` means the
+`delivered` means the message is recorded for its intended recipients. It does not mean anyone noticed, agreed, or replied. `pending` means the
 message is retained and delivery will retry automatically; do not send a new
 copy to force attention. Each accepted message keeps its original recipients,
 even if group membership changes before delivery finishes. Recipients may defer

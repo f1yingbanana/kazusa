@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
@@ -12,7 +11,10 @@ import {
   appendSessionTranscriptMessageByIdentityStrict,
   publishSessionTranscriptUpdateByIdentity,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import YAML from "yaml";
+import type { Agent } from "@kazusa/client";
+import { registerMessagingHttp } from "./http.ts";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -22,27 +24,11 @@ import {
   SEND_MESSAGE,
   LIST_CHATS,
   MANAGE_CHAT,
+  TYPING,
   isUser,
   messagingId,
   type ChatConversation,
 } from "./conversations.ts";
-
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(
-      typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer),
-    );
-  }
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw.trim() ? JSON.parse(raw) : {};
-}
-
-function sendJson(res: ServerResponse, status: number, data: unknown): void {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(data));
-}
 
 const IDENTITY = z.object({
   agent_id: AGENT_ID.optional(),
@@ -77,6 +63,36 @@ async function senderName(
       return agentId;
     throw error;
   }
+}
+
+/** Read optional roster presentation without changing canonical authorship. */
+async function rosterAgent(
+  api: OpenClawPluginApi,
+  agentId: string,
+): Promise<Agent> {
+  const agent: Agent = {
+    id: agentId,
+    name: await senderName(api, api.config, agentId),
+  };
+  try {
+    const text = await readFile(
+      path.join(
+        api.runtime.agent.resolveAgentWorkspaceDir(api.config, agentId),
+        "IDENTITY.md",
+      ),
+      "utf8",
+    );
+    const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+    if (frontmatter) {
+      const presentation = z
+        .object({ avatarUrl: z.string().optional() })
+        .parse(YAML.parse(frontmatter[1]));
+      if (presentation.avatarUrl) agent.avatarUrl = presentation.avatarUrl;
+    }
+  } catch {
+    /* Optional avatar metadata does not block roster discovery. */
+  }
+  return agent;
 }
 
 /**
@@ -155,7 +171,7 @@ export function registerMessaging(
               id: delivery.sender,
               pluginId: "kazusa",
               accountId: null,
-              senderKind: "bot",
+              senderKind: isUser(delivery.sender) ? "human" : "bot",
             },
           },
         },
@@ -215,15 +231,67 @@ export function registerMessaging(
     return { agentId, config, agents };
   };
 
+  const activeRuns = new Map<string, string>();
+  api.agent.events.registerAgentEventSubscription({
+    id: "messaging-typing",
+    streams: ["lifecycle"],
+    handle(event) {
+      const owner = parseAgentSessionKey(event.sessionKey ?? "");
+      const data = z
+        .object({ phase: z.enum(["start", "end", "error"]) })
+        .safeParse(event.data);
+      if (!owner || owner.rest !== "brain" || !data.success) return;
+      if (data.data.phase === "start") {
+        messaging.clearTyping(owner.agentId);
+        activeRuns.set(owner.agentId, event.runId);
+      } else {
+        messaging.clearTyping(owner.agentId, event.runId);
+        if (activeRuns.get(owner.agentId) === event.runId)
+          activeRuns.delete(owner.agentId);
+      }
+    },
+  });
+
   api.registerTool(
     {
       contextVersion: 2,
       create: (context) => [
         {
+          name: "set_typing",
+          label: "Set Typing",
+          description:
+            "Call with isTyping true only when you have decided to compose a reply in an existing chat, before drafting it. Never signal typing just for reading or thinking. Sending or ending your turn clears it automatically; use false if you abandon the reply.",
+          parameters: z.toJSONSchema(TYPING),
+          async execute(_id, input: unknown) {
+            const { agentId, config } = caller(context);
+            const params = TYPING.parse(input);
+            const runId = activeRuns.get(agentId);
+            if (!runId)
+              throw new Error("Typing requires an active brain turn.");
+            await messaging.setTyping(
+              agentId,
+              await senderName(api, config, agentId),
+              params.sessionKey,
+              params.isTyping,
+              runId,
+              context.assertInvocationCurrent,
+            );
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ isTyping: params.isTyping }),
+                },
+              ],
+              details: { isTyping: params.isTyping },
+            };
+          },
+        },
+        {
           name: "send_message",
           label: "Send Message",
           description:
-            "Send dialogue to an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Delivery retries automatically; another tool call sends another message. Use list_chats when the address is unknown.",
+            "Send dialogue to an existing chat with sessionKey. Once you decide to reply, call set_typing with isTyping true before composing the text. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Delivery retries automatically; another tool call sends another message. Use list_chats when the address is unknown.",
           parameters: z.toJSONSchema(SEND_MESSAGE),
           async execute(toolCallId, input: unknown) {
             const { agentId, config, agents } = caller(context);
@@ -233,7 +301,11 @@ export function registerMessaging(
             const sessionId = z.string().trim().min(1).parse(context.sessionId);
             const callId = z.string().trim().min(1).parse(toolCallId);
             const requestId = messagingId([sessionId, callId]);
-            const result = await messaging.send(
+            const {
+              chatId: _chatId,
+              message: _message,
+              ...result
+            } = await messaging.send(
               agentId,
               await senderName(api, config, agentId),
               { ...params, requestId },
@@ -310,162 +382,9 @@ export function registerMessaging(
         },
       ],
     },
-    { names: ["send_message", "list_chats", "manage_chat"] },
+    { names: ["send_message", "list_chats", "manage_chat", "set_typing"] },
   );
 
-  api.registerHttpRoute?.({
-    path: "/kazusa/chats",
-    auth: "gateway",
-    match: "exact",
-    handler: async (req, res) => {
-      try {
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const userId = url.searchParams.get("userId");
-        if (!userId) {
-          sendJson(res, 400, {
-            error: "Missing required query parameter: userId",
-          });
-          return true;
-        }
-        const query = url.searchParams.get("query") ?? undefined;
-        const chats = await messaging.listChats(userId, { query });
-        sendJson(res, 200, { chats });
-        return true;
-      } catch (error) {
-        sendJson(res, 400, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return true;
-      }
-    },
-  });
-
-  api.registerHttpRoute?.({
-    path: "/kazusa/messages",
-    auth: "gateway",
-    match: "exact",
-    handler: async (req, res) => {
-      try {
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const chatId = url.searchParams.get("chatId");
-        const userId = url.searchParams.get("userId");
-        if (!chatId || !userId) {
-          sendJson(res, 400, {
-            error: "Missing required query parameters: chatId and userId",
-          });
-          return true;
-        }
-        const beforeParam = url.searchParams.get("before");
-        const before = beforeParam !== null ? Number(beforeParam) : undefined;
-        const limitParam = url.searchParams.get("limit");
-        const limit = limitParam !== null ? Number(limitParam) : undefined;
-
-        const result = await messaging.getChatHistory({
-          chatId,
-          userId,
-          before: Number.isNaN(before) ? undefined : before,
-          limit: Number.isNaN(limit) ? undefined : limit,
-        });
-        sendJson(res, 200, result);
-        return true;
-      } catch (error) {
-        sendJson(res, 400, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return true;
-      }
-    },
-  });
-
-  api.registerHttpRoute?.({
-    path: "/kazusa/send",
-    auth: "gateway",
-    match: "exact",
-    handler: async (req, res) => {
-      try {
-        if (req.method !== "POST") {
-          sendJson(res, 405, { error: "Method not allowed. Use POST." });
-          return true;
-        }
-        const body = (await readJsonBody(req)) as Record<string, unknown>;
-        const sender = z.string().trim().min(1).parse(body.sender);
-        const text = z.string().trim().min(1).parse(body.text);
-        const sessionKey =
-          typeof body.sessionKey === "string" ? body.sessionKey : undefined;
-        const members = Array.isArray(body.members)
-          ? (body.members as string[])
-          : undefined;
-        const title = typeof body.title === "string" ? body.title : undefined;
-        const senderName =
-          typeof body.senderName === "string" && body.senderName.trim()
-            ? body.senderName.trim()
-            : isUser(sender)
-              ? "Sensei"
-              : sender;
-
-        const requestId = generateSecureUuid();
-        const config = api.config;
-        const agents = new Set(listAgentIds(config));
-
-        const result = await messaging.send(
-          sender,
-          senderName,
-          {
-            sessionKey,
-            members,
-            title,
-            text,
-            requestId,
-          },
-          undefined,
-          agents,
-        );
-        sendJson(res, 200, result);
-        return true;
-      } catch (error) {
-        sendJson(res, 400, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return true;
-      }
-    },
-  });
-
-  api.registerHttpRoute?.({
-    path: "/kazusa/chats/manage",
-    auth: "gateway",
-    match: "exact",
-    handler: async (req, res) => {
-      try {
-        if (req.method !== "POST") {
-          sendJson(res, 405, { error: "Method not allowed. Use POST." });
-          return true;
-        }
-        const { userId, ...rest } = (await readJsonBody(req)) as Record<
-          string,
-          unknown
-        >;
-        const parsedUserId = z.string().trim().min(1).parse(userId);
-        const params = MANAGE_CHAT.parse(rest);
-        const config = api.config;
-        const agents = new Set(listAgentIds(config));
-
-        const result = await messaging.manageChat(
-          parsedUserId,
-          params,
-          undefined,
-          agents,
-        );
-        sendJson(res, 200, result);
-        return true;
-      } catch (error) {
-        sendJson(res, 400, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return true;
-      }
-    },
-  });
-
+  registerMessagingHttp(api, messaging, (id) => rosterAgent(api, id));
   return messaging;
 }

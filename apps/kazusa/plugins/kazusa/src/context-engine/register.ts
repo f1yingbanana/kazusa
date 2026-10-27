@@ -61,15 +61,9 @@ function createContextEngine(
     // and overflow recovery instead of pretending a no-op freed any capacity.
     compact: delegateCompactionToRuntime,
     async assemble(params) {
-      const target = params.runtimeContext?.sessionTarget;
-      if (!target?.agentId) {
-        throw new Error(
-          "Kazusa context assembly requires runtimeContext.sessionTarget.agentId.",
-        );
-      }
-      const agentId = target.agentId;
-      const sessionKey = params.sessionKey ?? target.sessionKey;
+      const sessionKey = params.sessionKey;
       const owner = parseAgentSessionKey(sessionKey ?? "");
+      const agentId = owner?.agentId;
       // The slot is global, but private character state belongs only in brain
       // turns, never chat ledgers, operator sessions, or spawned helper agents.
       if (!owner || owner.rest !== "brain") {
@@ -87,22 +81,16 @@ function createContextEngine(
           }),
         };
       }
-      if (owner.agentId !== agentId) {
-        throw new Error(
-          `Session owner "${owner.agentId}" does not match runtime agent "${agentId}".`,
-        );
-      }
+      const brainAgentId = owner.agentId;
       await clock.init();
       const now = clock.time();
       const cutoff = now - config.shortTermHours * 3_600_000;
       const sessions = api.runtime.agent.session;
-      const storePath =
-        target.storePath ??
-        sessions.resolveStorePath(api.config.session?.store, {
-          agentId,
-        });
+      const storePath = sessions.resolveStorePath(api.config.session?.store, {
+        agentId: brainAgentId,
+      });
       const readSessions = await sessions.createSessionEntryListReader({
-        agentId,
+        agentId: brainAgentId,
         storePath,
       });
       const snapshot = await readSessions();
@@ -110,14 +98,14 @@ function createContextEngine(
       const streams = snapshot.entries.filter(({ sessionKey }) => {
         const key = parseAgentSessionKey(sessionKey);
         return (
-          key?.agentId === agentId &&
+          key?.agentId === brainAgentId &&
           (key.rest === "tasks" ||
             key.rest.startsWith("chat:direct:") ||
             key.rest.startsWith("chat:group:"))
         );
       });
       const sessionsContext = await readSessionStreams({
-        agentId,
+        agentId: brainAgentId,
         streams,
         storePath,
         pluginId: api.id,
@@ -126,6 +114,11 @@ function createContextEngine(
       });
       return assembleContext({
         run: params,
+        agentId: brainAgentId,
+        workspaceDir: api.runtime.agent.resolveAgentWorkspaceDir(
+          api.config,
+          brainAgentId,
+        ),
         sessionsContext,
         simTime: now,
         config,

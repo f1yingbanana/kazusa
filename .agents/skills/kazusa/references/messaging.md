@@ -1,6 +1,6 @@
 # Messaging — Conversations and Delivery
 
-`src/messaging/` implements `send_message`, `list_chats`, and `manage_chat`,
+`src/messaging/` implements `send_message`, `list_chats`, `manage_chat` and `set_typing`,
 registered by the unified plugin. Messaging owns conversation routing metadata
 and direct/group chat persistence; Perception only admits stimuli after their
 ledger writes have committed. Never dispatch a character turn in a chat ledger
@@ -67,11 +67,19 @@ though the broader participant type includes it. The native builder is not a
 public SDK export; verify this persisted format when upgrading OpenClaw.
 
 Do not insert `[speaker:...]` or `Name:` prefixes for attribution. Body text is
-dialogue, not identity. The catalog reader projects incoming native metadata to
-`item.sender.identity` and `item.sender.label`; outgoing `agentMessage` items
-are self-authored in the owner's ledger and do not expose a sender projection.
-Missing sender metadata renders as `unknown`, never a guess from text or the
-direct-chat peer. Existing unattributed records are not silently migrated.
+not identity. Context rendering uses only `__openclaw.senderIdentity.id`, as
+exposed by the native catalog's `item.sender.identity.id`, for **both** native
+roles. `(self)` requires that explicit ID to match the ledger owner. Missing
+metadata renders `unknown`; role, peer address and display name are never
+fallback evidence. Task records need no speaker.
+
+**Installed SDK limitation:** OpenClaw 2026.10.5 persists outgoing metadata but
+omits it from assistant catalog items. Those records currently render `unknown`.
+The native transcript contract test covers this omission. Keep the bounded
+catalog reader; do not add full-history scans or role inference to conceal it.
+Complete outgoing attribution needs a native bounded read exposing the stored
+metadata (or an upstream catalog fix). Human sends use `senderKind: "human"`;
+agent sends use `"bot"`.
 
 ## Persistence and notification
 
@@ -118,7 +126,8 @@ in the installed SDK is distinct from conformance to the latest rolling docs.
   IDs), optional `title`, and `text`. The sender is included automatically. One
   other member without a title reuses the canonical direct pair; otherwise
   create a group. A title allows a two-person group. Text is limited to 32,000
-  characters; media is future work.
+  characters; media is future work. Absent stored titles are `null`, not
+  `undefined`, so retained records satisfy the native JSON state contract.
 
 The result includes the caller's `sessionKey` for later sends. Direct chat
 identity is derived from its sorted pair. Group identity is opaque and derived
@@ -134,8 +143,10 @@ transcripts. Agents can use a known context header or result key directly;
 lookup is needed only when choosing an unknown or ambiguous chat. Agent-facing
 conventions call `chat:...` keys chat addresses while the API retains native
 `sessionKey` terminology. All native session-orchestration tools are denied
-via `tools.deny: ["group:sessions"]` (`sessions_list`, `sessions_history`,
+via `tools.deny: ["group:sessions", "message"]` (`sessions_list`, `sessions_history`,
 `sessions_send`, `sessions_spawn`, `session_status`) in `openclaw.json`.
+The built-in `message` tool is also denied: its native delivery mirror bypasses
+Kazusa canonical acceptance and cannot substitute for `send_message`.
 Native `memory_search` (with `sources: ["memory", "sessions"]`) indexes past
 session transcripts and handles cross-session recall safely without exposing raw
 session manipulation tools to roleplay characters.
@@ -176,12 +187,10 @@ without consuming agent runner processes or brain sessions:
 - **Configuration**: For the single-user MVP, the active human identity is configured
   in `openclaw.json` under `plugins.entries.kazusa.config.user` (`id: "user:sensei"`,
   `name: "Sensei"`), declared in `openclaw.plugin.json`.
-- **Zero-Waste Delivery**: When an agent sends a message to a human user, the
-  sender's private ledger appends the outgoing assistant turn. In `send()`, copies
-  for human recipients (`isUser(agentId)`) are marked pre-settled (`messageId: id,
-  published: true, notified: true`). `projectChats()` skips human members, and
-  neither native agent session initialization nor brain waking is attempted for
-  the human.
+- **Human delivery**: Humans belong to the canonical message's frozen `audience`.
+  `copies` contains actual agent projections only; there are no fake settled
+  human copies, human agent directories or human brains. Human history is read
+  from the canonical store, filtered by acceptance-time audience.
 - **Development WebChat Bridge**: The default WebChat is not the production UI.
   For development, a human can use a character's direct ledger session
   (`agent:<agentId>:chat:direct:user:<userId>`). The current `before_dispatch`
@@ -192,72 +201,64 @@ without consuming agent runner processes or brain sessions:
 - **Current Group Limitation**: Outgoing agent messages support human members,
   but native human ingress reaches only the selected session owner. It does not
   apply Kazusa group membership checks or copy the input to the other members.
-  Pre-settled human copies are not evidence of a shared human group inbox.
+  Do not post human messages into native WebChat group sessions, even when the
+  human is a member. Use the Kazusa conversation ingress after client wiring is
+  validated; native WebChat remains a direct-chat development bridge.
 - **Wiki Grounding**: Canonical human character data is documented in the World Wiki
   (`shared/wiki/entities/characters/sensei.md` with `is_simulated_agent: false`),
   while characters track their subjective relationship cards in their Personal Wiki
   (`workspaces/<id>/wiki/entities/characters/sensei.md` with `peer_id: "user:sensei"`,
   `name: "Sensei"`, `relation_type: "mentor"`, and concise `summary`).
 
-### Production human conversations & Gateway HTTP Ingress
+### Human conversations and the custom client
 
-A human sends **to the conversation**, not to an arbitrarily selected member's
-private session. The production ingress resolves the trusted human identity,
-validates membership, captures simulation time and the current audience, and
-uses the same message acceptance and fan-out policy as agent speech. Each agent
-recipient gets an attributed private transcript copy before Perception is
-notified. Humans have no brain to wake, no OpenClaw agent directory, and no
-native agent session. A group message from Sensei to Alice and Bob reaches both
-characters' private transcripts and triggers their Perception intake.
+Human sends must use the same acceptance and agent fan-out policy as agent
+speech. `Messaging.send()` supports human participant IDs and writes each agent
+copy before notifying that agent's Perception. It never creates a human brain.
+The HTTP adapter exposes `/kazusa/chats`, `/kazusa/messages`, `/kazusa/send`,
+`/kazusa/chats/manage`, `/kazusa/agents`, `/kazusa/typing` and `/kazusa/events`.
+These are Kazusa routes, not native `chat.send`. Wire schemas are shared through
+`@kazusa/client`; the backend binds the configured single human. See
+[the client reference](client.md) for typing, sequence pagination and live
+verification. End-user authentication is deferred.
 
-The plugin exposes standard Gateway HTTP routes (`api.registerHttpRoute`):
-- `GET /kazusa/chats?userId=user:<id>`: Discovers all direct and group chats
-  where `user:<id>` is currently a member.
-- `GET /kazusa/messages?chatId=<chatId>&userId=user:<id>&cursor=<seq>&limit=<n>`:
-  Returns subjective, cursor-paginated chat history where `audience.includes(userId)`.
-  Uses OpenClaw's retained store (`entriesInKeyRange`) with sortable keys
-  (`msg:${chatId}:${paddedSequence}`) for $O(\log N)$ SQLite-backed range scans.
-  Joining grants no historical backfill; leaving cuts off future messages.
-- `POST /kazusa/send`: Ingress endpoint for humans to send messages
-  (`{ sender: "user:<id>", sessionKey: "<chatId>", text: "..." }`). Directly
-  invokes `messaging.send()`, saving the canonical delivery, projecting copies
-  to agent members, and waking their brains via `perception.receive()`.
-- `POST /kazusa/chats/manage`: Manages group chat membership and titles
-  (`{ userId: "user:<id>", sessionKey: "<chatId>", action: "add_members" | "remove_members" | "rename" | "leave", ... }`).
+Native WebChat's claimed-dispatch fallback may persist a human message with
+wall-clock time and native input identity after the Perception hook runs. It
+bypasses canonical acceptance and does not fan out to other group members.
+Changing the frontend while retaining native `chat.send` does not fix this.
 
-### Frontend Client Requirements
+### Design decision: canonical server and private agent projections
 
-The dedicated frontend acts as the player's in-world smartphone (e.g., MomoTalk):
-1. **API Ingress**: Communicates exclusively through the Gateway HTTP endpoints
-   above (`/kazusa/chats`, `/kazusa/messages`, `/kazusa/send`). It must **never**
-   attempt to send directly to an individual agent's native OpenClaw session or
-   read an arbitrary member's ledger.
-2. **Subjective Timeline & Audience Boundary**: The client queries chat history
-   using `GET /kazusa/messages?userId=user:<id>&chatId=<chatId>`, displaying only
-   dialogue transmitted while the user was in the room.
-3. **Simulation Clock Synchronization**: The client synchronizes with the virtual
-   simulation clock (`GET /kazusa/clock/time`) to format message timestamps in
-   in-world time rather than host wall-clock time.
-4. **Attributed Multi-Party Chat UI**: Renders messages with distinct sender cards
-   and avatars, marking the human's messages as self and displaying agent peers
-   by their canonical character names. It does not force an LLM "assistant" vs
-   human "user" dichotomy.
-5. **Real-Time Updates**: Polls or listens for incoming messages on active chats
-   so incoming agent replies appear live as they are committed.
+The retained native `messaging` keyed store is the **canonical conversation
+server**. Each accepted message is stored once, permanently, keyed by its stable
+message ID. It records text, sender ID/name, conversation ID, simulation time,
+acceptance sequence, frozen `audience`, and agent-copy progress. There is no TTL
+or deletion on delivery completion. The separate retained `chats` store owns
+current membership and titles. There is no additional `messages` namespace,
+custom SQLite schema, or second canonical message database.
 
-### Storage Architecture: Dual-Layered Messaging
+Each native `agent:<id>:chat:*` transcript is that character's private **client
+projection**, retained for context assembly and native session-memory search.
+It contains only messages that character was entitled to receive. Human clients
+read the same canonical history filtered by frozen audience; they do not read
+another character's private session. Joining grants no backfill, leaving stops
+future receipt, and previously received history remains readable. Removal does
+not cancel delivery of already accepted messages.
 
-1. **Canonical Retained Store (`api.runtime.state.openKeyedStore` with `retention: "retained"`)**:
-   - Stores each canonical `MessageDelivery` once in SQLite under namespace `"messages"`.
-   - Keys are sortable: `msg:${chatId}:${paddedSequence}` (e.g. `msg:group:afterschool:0000000042`).
-   - Every delivery records its frozen `audience: readonly string[]`, `timestamp`, `sequence`,
-     `sender`, and `params.text`.
-   - Supports efficient cursor pagination via `entriesInKeyRange` with `limit` and `order: "desc" | "asc"`.
-2. **Native Subjective Transcripts (`agent:<id>:chat:*`)**:
-   - Maintained exclusively for AI agents to feed their LLM prompt assembly pipeline
-     in the 3-Tier Context Engine.
-   - Humans have no native transcripts; their subjective view is generated on demand
-     by filtering the canonical store on `audience.includes(userId)`.
+Projection checkpoints live on the canonical record. Only unfinished work stays
+in RAM; replay reads the permanent message by ID and keeps its original audience
+and time. This removes the separate settled-result cache. Humans need neither
+projection checkpoints nor synthetic native receipts. A message's existence
+means accepted, not necessarily projected, noticed or answered.
+
+Tradeoff: canonical text plus agent transcripts consumes extra disk space, and
+cross-store appends still need small recovery checkpoints. In return, history
+and retry identity have one source of truth, human groups need no dummy agent,
+and clients can resynchronize without merging private ledgers. Startup and
+current human history queries scan the retained store; history is then filtered
+and paginated by acceptance sequence. This is O(total retained messages), not
+an indexed range query. Add an actual supported index only when measured volume
+requires it; do not query `msg:...` keys that the writer never saves.
 
 ## Tool and delivery lifecycle
 
@@ -274,7 +275,7 @@ is saved, so retrying must reuse its identity instead of adding the text again.
 Likewise, a committed record may still need its attention notification. Stable
 IDs, retained unfinished work, and frozen audiences address those concrete gaps.
 They do not promise a read receipt, an immediate reply, or exactly-once thinking.
-The settled-result cache is an implementation choice, not a design requirement.
+No settled-result cache is needed; durable message lookup handles replays.
 
 The retained native `messaging` store records intent before any append and
 tracks session identity, committed message ID, publication, and attention
@@ -296,13 +297,11 @@ settlement (`isDeliverySettled`). The service resumes retained work at startup
 and retries pending work without invoking an LLM. Disposal cancels retries and
 guards further writes.
 
-**Current replay limitation:** `recentResults` retains only the last 200 settled
-outcomes. `send()` does not look up evicted receipts in the retained store, so
-an old replay can be accepted again with a new timestamp and current audience.
-This violates the stable-replay contract above. The recommended simplification
-is durable receipt lookup instead of the extra settled-result cache; the code
-has not yet been changed. Retained records and startup loading are also not
-bounded by this cache limit.
+Replays consult the retained message even after hundreds of newer sends and
+across restarts. Conflicting arguments under the same host invocation are
+rejected. Client message events fire on new canonical acceptance, not on a host
+replay. They are best-effort invalidations; clients recover missed events by
+reading history rather than requiring another durable event-delivery log.
 
 After a recipient copy commits, messaging publishes its native transcript update
 and directly submits its unchanged text, stable sender ID, message ID, and
@@ -310,8 +309,12 @@ original timestamp to `perception.receive()`. It never dispatches a turn to a
 chat session or routes its own notification back through `before_dispatch`.
 Notifications run outside the write queue and are not awaited by the sending
 tool: recipient turns can themselves send messages without deadlocking.
+`runDetachedWebhookWork` reserves notification work before the HTTP/tool owner
+returns, and retry timers enter a fresh detached scope. Perception independently
+owns the delayed coalescer and full brain dispatch scopes; a bare fire-and-forget
+promise can inherit a closed host scope even in this entirely local system.
 
-`delivered` confirms all ledger copies committed; `pending` confirms retained
+`delivered` confirms all required agent ledger copies committed; `pending` confirms retained
 intent with incomplete ledger delivery. Neither is an attention or reply
 receipt. Attention delivery is retried with the same stimulus ID; Perception
 owns its existing deduplication and adoption policy. There is no cross-store
@@ -326,4 +329,6 @@ management, and retry behavior.
 `conversations.ts` defines tool schemas and conversation addressing;
 `messaging.ts` owns membership and the retained delivery state machine;
 `register.ts` binds those policies to native state, session, transcript,
-identity, lifecycle, and tool-context APIs.
+identity, lifecycle, and tool-context APIs. `http.ts` serves the configured
+human through the shared client contract. `set_typing` explicitly signals
+composition; native lifecycle events only clear it, never infer it from thinking.

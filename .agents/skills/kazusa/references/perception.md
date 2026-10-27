@@ -57,36 +57,48 @@ supported delivery/steering transport:
    real-time via
    `api.agent.events.registerAgentEventSubscription({ streams: ["lifecycle"] })`,
    monitoring `agent_start` and `agent_end` events for `agent:<id>:brain`.
-3. **Idle Brain Wake Scheduling**: Idle brain runs are scheduled using
-   OpenClaw's native Cron Automations (`ctx.getCron().add(...)`) or direct turn
-   invocation targeting `agent:<id>:brain`, identical to Taskman.
-4. **Active Brain Steering**: The target is host-owned `steer` admission. The
-   current private handle adapter is transitional, not a supported API.
+3. **Public Brain Handoff**: The internal Kazusa channel uses
+   `dispatchReplyWithBufferedBlockDispatcher` targeting `agent:<id>:brain`.
+   Routine inputs use `InboundEventKind: "room_event"` to queue behind a busy
+   turn; urgent steering uses `"user_request"`. Native `onAdopted` acknowledges
+   custody; deferred or uncertain handoffs retain their pending reservation.
+4. **Explicit Speech**: The channel suppresses automatic outward replies.
+   Visible dialogue requires Kazusa `send_message`; built-in `message` is denied.
 5. **No Ghost Sessions**: Deletes `agent:<id>:perception`, eliminating
    tool-stripping hacks (`toolsAllow: []`), prompt overrides, and cross-session
    fact reads.
 
-### Session controller and SDK boundary (verified 2026-10-25)
+### Host work ownership (verified live 2026-10-27)
 
-Rolling docs describe a host-owned session controller: it owns the current turn,
-waiting inputs, lifecycle barriers, and exact-target steering. It is not a
-plugin-created queue or an agent runtime handle. Upstream `main` routes the
-deprecated `queueAgentHarnessMessage` through internal
-`resolveActiveReplyOperationForSessionId` and `steerSessionControllerOperation`.
-Those helpers are not public plugin SDK exports. The installed 2026.10.5 and
-stable 2026.10.7 helper still use the older native-run queue; both already have
-`onQueueAccepted` and both deprecate the public queue helper.
+Use the public channel dispatcher and adoption lifecycle; do not import private
+session controllers or deprecated `queueAgentHarnessMessage`. Perception never
+appends brain/chat transcripts to manufacture admission.
 
-Do not introduce that deprecated helper, import private controller modules,
-manufacture host admission, or treat a raw transcript append as steering. Public
-`dispatchGatewayMethod` can call `chat.send` with steering only inside an
-authorized plugin request scope; it is not a background-worker capability. A
-supported autonomous transport needs an authorized Gateway client or an upstream
-public host-admission surface. Do not clear pending stimuli based only on
-initial queue eligibility; acceptance and transcript commitment differ.
+OpenClaw scopes async work to its owner. Returning HTTP success or resolving
+Perception ingress does not keep a detached timer/model run alive. Use the
+installed `runDetachedWebhookWork` helper for these concrete lifetime boundaries:
 
-- [Session controller](https://docs.openclaw.ai/concepts/session-controller)
-- [Harness admission](https://docs.openclaw.ai/plugins/sdk-agent-harness/attempt-runtime)
+- Messaging reserves notification work before its HTTP/tool caller returns.
+- Perception reserves a scope spanning the whole coalescing wait and drain.
+  Cancelling that timer resolves its wait, so disposal does not leak the scope.
+- Brain submission owns the full dispatcher promise, even after `onAdopted` or
+  `onDeferred` resolves ingress. Later tool continuations still need live scope.
+- A drain scheduled by adoption and a delivery retry enter their own detached
+  scope. Errors remain observed; an adopted turn is never replayed for a later
+  model/tool failure.
+
+Keep the fixed window starting at the first arrival. The public
+`channel-inbound-debounce` helper buffers until a quiet interval; it does not
+provide detached work ownership. Replacing the coalescer would change attention
+latency under continuous traffic without fixing the scope failure.
+
+Native keyed-store values must be JSON. Delete absent optional run/context
+properties rather than writing explicit `undefined`; tests enforce that same
+contract. Recovery retains uncertain reservations and does not automatically
+repeat possibly adopted work.
+
+- [Webhook and SDK helpers](https://docs.openclaw.ai/plugins/sdk-subpaths)
+- [Inbound debounce](https://docs.openclaw.ai/plugins/sdk-channel-inbound)
 
 ---
 

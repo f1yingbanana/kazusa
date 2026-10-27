@@ -21,6 +21,10 @@ export const CHAT_SESSION = z
   .regex(
     /^(?:agent:(?:user:)?[a-z0-9][a-z0-9_-]*:)?chat:(?:direct|group):(?:user:)?[a-z0-9][a-z0-9_-]*$/,
   );
+export const TYPING = z.strictObject({
+  sessionKey: CHAT_SESSION,
+  isTyping: z.boolean(),
+});
 const MEMBERS = z
   .array(PARTICIPANT_ID)
   .min(1)
@@ -39,9 +43,11 @@ export const SEND_MESSAGE = z
     members: MEMBERS.optional().describe(
       "Other configured agent IDs to start a chat with; you are included automatically. Omit if sessionKey is provided.",
     ),
-    title: TITLE.optional().describe(
-      "Optional new group title. One other member without a title reuses the direct chat.",
-    ),
+    title: TITLE.nullable()
+      .optional()
+      .describe(
+        "Optional new group title. One other member without a title reuses the direct chat.",
+      ),
     text: z
       .string()
       .min(1)
@@ -104,7 +110,7 @@ export interface ChatConversation {
   readonly id: string;
   readonly kind: "direct" | "group";
   readonly members: readonly string[];
-  readonly title?: string;
+  readonly title: string | null;
   /**
    * Detect conflicting retries of a group creation before its first send
    * commits.

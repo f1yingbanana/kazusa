@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StateStore } from "../state.ts";
 import {
@@ -20,6 +21,7 @@ function setup(
   const register = vi.fn<StateStore<MessageDelivery>["register"]>(
     async (key, value, options) => {
       options?.assertCurrent?.();
+      z.json().parse(value);
       retained.set(key, structuredClone(value));
     },
   );
@@ -53,6 +55,7 @@ function setup(
       lookup: async (key) => structuredClone(chats.get(key)),
       register: async (key, value, options) => {
         options?.assertCurrent?.();
+        z.json().parse(value);
         chats.set(key, structuredClone(value));
       },
       entries: async () =>
@@ -159,6 +162,10 @@ describe("message delivery", () => {
 
   it("reuses the original timestamp and delivery for equivalent retries and rejects changed content", async () => {
     const h = setup();
+    const event = vi.fn();
+    h.messaging.onEvent((value) => {
+      if (value.type === "message") event(value);
+    });
     const first = await h.send({
       title: "club",
       members: ["carol", "bob"],
@@ -169,6 +176,7 @@ describe("message delivery", () => {
       first,
     );
     expect(h.append).toHaveBeenCalledTimes(3);
+    expect(event).toHaveBeenCalledTimes(1);
     await expect(h.send({ text: "Changed" })).rejects.toThrow(
       "different message",
     );
@@ -727,6 +735,26 @@ describe("conversation routing and management", () => {
     expect(reply.recipients).toEqual(["user:sensei"]);
   });
 
+  it("opens a direct conversation from a human address and fans out only to the agent", async () => {
+    const h = setup();
+    const result = await h.messaging.send("user:sensei", "Sensei", {
+      requestId: "human-direct",
+      sessionKey: "chat:direct:alice",
+      text: "Hello Alice",
+    });
+    expect(result.sessionKey).toBe("chat:direct:alice");
+    expect(result.recipients).toEqual(["alice"]);
+    expect(
+      h.append.mock.calls.map(([, copy]) => [copy.sessionKey, copy.role]),
+    ).toEqual([["agent:alice:chat:direct:user:sensei", "user"]]);
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledExactlyOnceWith(
+        "alice",
+        expect.objectContaining({ sender: "user:sensei", text: "Hello Alice" }),
+      ),
+    );
+  });
+
   it("supports group chats containing both agents and human users", async () => {
     const h = setup();
     const group = await h.send({
@@ -884,5 +912,83 @@ describe("conversation routing and management", () => {
     expect(senseiChats[0].sessionKey).toBe(
       `chat:group:${actualChatId.replace("group:", "")}`,
     );
+  });
+});
+
+describe("composition presence", () => {
+  it("is explicit, scoped to current members and cleared on acceptance", async () => {
+    const h = setup();
+    const result = await h.send({
+      members: ["bob", "user:sensei"],
+      title: "Club",
+    });
+    expect(await h.messaging.getTyping("user:sensei")).toEqual([]);
+    await h.messaging.setTyping(
+      "alice",
+      "Alice",
+      result.sessionKey,
+      true,
+      "run-1",
+    );
+    expect(await h.messaging.getTyping("user:sensei")).toMatchObject([
+      { chatId: result.chatId, senderId: "alice", isTyping: true },
+    ]);
+    expect(await h.messaging.getTyping("carol")).toEqual([]);
+    await expect(
+      h.messaging.setTyping(
+        "carol",
+        "Carol",
+        result.sessionKey.replace("agent:alice:", "agent:carol:"),
+        true,
+        "run-c",
+      ),
+    ).rejects.toThrow("unavailable");
+    h.messaging.clearTyping("alice", "older-run");
+    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
+    await h.send({ requestId: "reply", sessionKey: result.sessionKey });
+    expect(await h.messaging.getTyping("bob")).toEqual([]);
+  });
+
+  it("expires human activity, removes departed typists and rejects stale invocations", async () => {
+    const h = setup();
+    const result = await h.send({
+      members: ["bob", "user:sensei"],
+      title: "Club",
+    });
+    const humanKey = result.sessionKey.replace("agent:alice:", "");
+    await h.messaging.setTyping("user:sensei", "Sensei", humanKey, true);
+    const time = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 8001);
+    expect(await h.messaging.getTyping("alice")).toEqual([]);
+    time.mockRestore();
+    await h.messaging.setTyping(
+      "bob",
+      "Bob",
+      result.sessionKey.replace("agent:alice:", "agent:bob:"),
+      true,
+      "run-b",
+    );
+    await h.messaging.manageChat("alice", {
+      sessionKey: result.sessionKey,
+      action: "remove_members",
+      members: ["bob"],
+    });
+    expect(
+      (await h.messaging.getTyping("alice")).map((x) => x.senderId),
+    ).not.toContain("bob");
+    await expect(
+      h.messaging.setTyping(
+        "alice",
+        "Alice",
+        result.sessionKey,
+        true,
+        "old",
+        () => {
+          throw new Error("expired");
+        },
+      ),
+    ).rejects.toThrow("expired");
+    expect(
+      (await h.messaging.getTyping("alice")).map((x) => x.senderId),
+    ).not.toContain("alice");
   });
 });

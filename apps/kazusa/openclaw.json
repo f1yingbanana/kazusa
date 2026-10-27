@@ -2,7 +2,10 @@
   "agents": {
     "ownership": "explicit",
     "entries": {
-      "main": {}
+      "kazusa": { "workspace": "./workspaces/kazusa" },
+      "kurimura-airi": { "workspace": "./workspaces/kurimura-airi" },
+      "yoshimi": { "workspace": "./workspaces/yoshimi" },
+      "yutori-natsu": { "workspace": "./workspaces/yutori-natsu" }
     },
     "defaults": {
       "workspace": "./workspaces",
@@ -111,7 +114,7 @@
   },
   "tools": {
     "profile": "full",
-    "deny": ["group:sessions"],
+    "deny": ["group:sessions", "message"],
     "sessions": {
       "visibility": "agent"
     }
@@ -123,7 +126,16 @@
   },
   "memory": {
     "search": {
-      "provider": "openai",
+      "provider": "openai-compatible",
+      "model": "text-embedding-3-small",
+      "remote": {
+        "baseUrl": "${AZURE_OPENAI_URL}",
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "AZURE_OPENAI_API_KEY"
+        }
+      },
       "experimental": {
         "sessionMemory": true
       },
@@ -152,7 +164,12 @@
       "zai": {
         "baseUrl": "https://api.z.ai/api/paas/v4",
         "api": "openai-completions",
-        "models": []
+        "models": [
+          {
+            "id": "glm-4.7-flashx",
+            "name": "GLM-4.7-flashx"
+          }
+        ]
       }
     }
   },

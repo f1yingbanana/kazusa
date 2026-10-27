@@ -1,3 +1,4 @@
+import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
 import { createHash } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -109,7 +110,7 @@ export class Perception {
   private readonly store: StateStore<PerceptionState>;
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
-  private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
+  private readonly debounceTimers = new Map<string, () => void>();
 
   constructor(deps: PerceptionDeps) {
     this.deps = deps;
@@ -207,7 +208,7 @@ export class Perception {
     if (pendingCount >= this.config.maxBatchSize) {
       const existing = this.debounceTimers.get(agentId);
       if (existing) {
-        clearTimeout(existing);
+        existing();
         this.debounceTimers.delete(agentId);
       }
       await this.drain(agentId);
@@ -218,11 +219,23 @@ export class Perception {
     if (this.config.coalesceWindowMs > 0) {
       const existing = this.debounceTimers.get(agentId);
       if (existing) return;
-      const timer = setTimeout(() => {
-        this.debounceTimers.delete(agentId);
-        void this.drain(agentId).catch((error: unknown) => this.warn(error));
-      }, this.config.coalesceWindowMs);
-      this.debounceTimers.set(agentId, timer);
+      // Reserve while ingress still owns admission, including the time spent
+      // waiting. A bare timer would inherit a request/tool scope that can close.
+      // Keep the fixed first-arrival window: a quiet-period debouncer would
+      // change attention timing under continuous traffic.
+      const ready = new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => {
+          this.debounceTimers.delete(agentId);
+          resolve(true);
+        }, this.config.coalesceWindowMs);
+        this.debounceTimers.set(agentId, () => {
+          clearTimeout(timer);
+          resolve(false);
+        });
+      });
+      void runDetachedWebhookWork(async () => {
+        if (await ready) await this.drain(agentId);
+      }).catch((error: unknown) => this.warn(error));
     } else {
       await this.drain(agentId);
     }
@@ -249,11 +262,13 @@ export class Perception {
   }
 
   /**
-   * Captures the prompt body currently being processed by the character's brain.
+   * Captures the prompt body currently being processed by the character's
+   * brain.
    *
    * When new sensory stimuli arrive while the brain is busy, Jev compares the
    * incoming stimulus against this active thought context to determine whether
-   * the stimulus warrants an immediate interruption (STEER) or can wait (QUEUE_NEXT).
+   * the stimulus warrants an immediate interruption (STEER) or can wait
+   * (QUEUE_NEXT).
    */
   async attending(agentId: string, text: string): Promise<void> {
     await this.change(
@@ -279,8 +294,8 @@ export class Perception {
   async ended(agentId: string, runId: string, stopped: boolean): Promise<void> {
     await this.change(agentId, (state) => {
       if (state.brainRun === runId || state.brainRun === "external") {
-        state.brainRun = undefined;
-        state.brainContext = undefined;
+        delete state.brainRun;
+        delete state.brainContext;
         state.stopped = stopped;
       } else return;
     });
@@ -306,8 +321,8 @@ export class Perception {
                 `Unconfirmed brain handoff retained for ${agentId}: ${state.deliveries.map((delivery) => delivery.id).join(", ")}`,
               );
             }
-            state.brainRun = undefined;
-            state.brainContext = undefined;
+            delete state.brainRun;
+            delete state.brainContext;
           },
           true,
         ),
@@ -456,8 +471,10 @@ export class Perception {
     const evaluate =
       this.deps.evaluateDecision ??
       (api?.runtime.decisions
-        ? (batch: DecisionBatch, opts: Parameters<DecisionRuntimeV1["evaluate"]>[1]) =>
-            api.runtime.decisions.evaluate(batch, opts)
+        ? (
+            batch: DecisionBatch,
+            opts: Parameters<DecisionRuntimeV1["evaluate"]>[1],
+          ) => api.runtime.decisions.evaluate(batch, opts)
         : undefined);
     if (!assemble || !evaluate) return "STEER";
     const timeout = new AbortController();
@@ -622,8 +639,8 @@ export class Perception {
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
           // from inside the first host's adoption callback.
-          void this.drain(delivery.agentId).catch((error: unknown) =>
-            this.warn(error),
+          void runDetachedWebhookWork(() => this.drain(delivery.agentId)).catch(
+            (error: unknown) => this.warn(error),
           );
         },
         onDeferred: () => {
@@ -647,21 +664,19 @@ export class Perception {
       };
       // Start outside the state lock, and observe the full dispatch promise even
       // after ingress has returned. Errors after adoption must never replay tools.
-      void Promise.resolve()
-        .then(async () => {
-          this.assertCurrent();
-          if (!this.deps.deliver)
-            throw new Error("Perception requires a brain delivery adapter");
-          await this.deps.deliver(delivery, lifecycle);
-          if (!adopted && !deferred && !failed) {
-            reportFailure(
-              new Error(
-                `Brain dispatch returned without adoption: ${delivery.id}`,
-              ),
-            );
-          }
-        })
-        .catch((error: unknown) => reportFailure(error));
+      void runDetachedWebhookWork(async () => {
+        this.assertCurrent();
+        if (!this.deps.deliver)
+          throw new Error("Perception requires a brain delivery adapter");
+        await this.deps.deliver(delivery, lifecycle);
+        if (!adopted && !deferred && !failed) {
+          reportFailure(
+            new Error(
+              `Brain dispatch returned without adoption: ${delivery.id}`,
+            ),
+          );
+        }
+      }).catch((error: unknown) => reportFailure(error));
     });
   }
 
@@ -671,7 +686,7 @@ export class Perception {
 
   dispose(): void {
     this.lifetime.abort();
-    for (const timer of this.debounceTimers.values()) clearTimeout(timer);
+    for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();
   }
 }
