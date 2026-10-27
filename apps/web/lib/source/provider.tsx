@@ -2,7 +2,11 @@
 
 import { createContext, useContext, useEffect, useMemo } from "react";
 import useSWR from "swr";
-import type { CharacterSummary } from "@kazusa/client";
+import type {
+  CharacterStatus,
+  CharacterSummary,
+  WorldResponse,
+} from "@kazusa/client";
 import { useChats } from "@/hooks/use-chats";
 import { clockStore, journalTailStore, statusStore } from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
@@ -15,6 +19,7 @@ import {
   type ResolvedSources,
 } from "./capabilities";
 import { fetchCharacters } from "./characters/http";
+import { fetchWorld } from "./clock/http";
 import {
   MOCK_WORLD_START,
   advanceMockWorld,
@@ -55,21 +60,29 @@ export function SourcesProvider({
   const probing = chats.isLoading && !chats.error;
   const reachable = !chats.error && !chats.isLoading;
 
+  const worldResource = useSWR<WorldResponse, Error>(
+    reachable
+      ? (["kazusa/world", config.baseUrl, config.token ?? ""] as const)
+      : null,
+    () => fetchWorld(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
+  );
+
   const resolved = useMemo(
     () =>
       resolveSources({
-        capabilities: LEGACY_CAPABILITIES,
+        capabilities: worldResource.data?.capabilities ?? LEGACY_CAPABILITIES,
         reachable,
         mocks: config.mocks,
       }),
-    [reachable, config.mocks],
+    [reachable, config.mocks, worldResource.data?.capabilities],
   );
 
-  const liveCharacters = useSWR(
+  const liveCharacters = useSWR<CharacterSummary[], Error>(
     resolved.characters === "live"
       ? (["kazusa/characters", config.baseUrl, config.token ?? ""] as const)
       : null,
-    ([, baseUrl]) => fetchCharacters(baseUrl, config.token),
+    () => fetchCharacters(config.baseUrl, config.token),
     { revalidateOnFocus: false },
   );
 
@@ -91,14 +104,25 @@ export function SourcesProvider({
     () =>
       resolved.characters === "mock"
         ? { id: "user:you", name: "You" }
-        : { id: config.userId, name: config.userName },
-    [resolved.characters, config.userId, config.userName],
+        : {
+            id: worldResource.data?.user.id ?? config.userId,
+            name: worldResource.data?.user.name ?? config.userName,
+          },
+    [
+      resolved.characters,
+      worldResource.data?.user,
+      config.userId,
+      config.userName,
+    ],
   );
 
   const characters = useMemo<readonly CharacterSummary[]>(() => {
     if (resolved.characters === "mock") return world?.characters ?? [];
     if (resolved.characters === "unavailable") return [];
     const list = liveCharacters.data ?? [];
+    if (list.some((c) => c.kind === "player" || c.id === player.id)) {
+      return list;
+    }
     return [
       ...list,
       { id: player.id, name: player.name, kind: "player", aliases: [] },
@@ -111,30 +135,44 @@ export function SourcesProvider({
   );
 
   useEffect(() => {
-    if (resolved.status === "mock" && world) statusStore.reset(world.statuses);
-    else statusStore.reset([]);
-  }, [resolved.status, world]);
+    if (resolved.status === "mock" && world) {
+      statusStore.reset(world.statuses);
+    } else if (resolved.status === "live" && liveCharacters.data) {
+      const entries: Array<readonly [string, CharacterStatus]> = [];
+      for (const c of liveCharacters.data) {
+        if (c.status) entries.push([c.id, c.status]);
+      }
+      statusStore.reset(entries);
+    } else if (resolved.status === "unavailable") {
+      statusStore.reset([]);
+    }
+  }, [resolved.status, world, liveCharacters.data]);
 
   useEffect(() => {
     journalTailStore.set([]);
   }, [world, resolved.timeline]);
 
   useEffect(() => {
-    if (resolved.clock !== "mock") {
-      clockStore.set(null);
-      return;
-    }
-    if (!clockStore.get()) {
+    if (resolved.clock === "live" && worldResource.data) {
       clockStore.set({
-        clock: {
-          simTime: MOCK_WORLD_START,
-          speed: MOCK_DEFAULT_SPEED,
-          updatedAt: Date.now(),
-        },
-        offset: 0,
+        clock: worldResource.data.clock,
+        offset: worldResource.data.serverNow - Date.now(),
       });
+    } else if (resolved.clock === "mock") {
+      if (!clockStore.get()) {
+        clockStore.set({
+          clock: {
+            simTime: MOCK_WORLD_START,
+            speed: MOCK_DEFAULT_SPEED,
+            updatedAt: Date.now(),
+          },
+          offset: 0,
+        });
+      }
+    } else if (resolved.clock === "unavailable") {
+      clockStore.set(null);
     }
-  }, [resolved.clock]);
+  }, [resolved.clock, worldResource.data]);
 
   useEffect(() => {
     if (!world) return;
@@ -188,6 +226,7 @@ export function SourcesProvider({
 
 export function useSources() {
   const context = useContext(SourcesContext);
-  if (!context) throw new Error("useSources must be used within SourcesProvider");
+  if (!context)
+    throw new Error("useSources must be used within SourcesProvider");
   return context;
 }

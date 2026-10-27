@@ -189,9 +189,10 @@ roasted coffee drifts from the bakery aisle.
 - **Simulation Mapping**:
   - **Active Simulated Agents**: Have a workspace in `workspaces/<id>/` and an
     entry in `openclaw.json`.
-  - **Human Players (`user:`)**: Represented with `character_id: user:<id>` (e.g.
-    `user:sensei`) and `is_simulated_agent: false`. They participate directly in
-    in-world chats through client interfaces without consuming runner processes.
+  - **Human Players (`user:`)**: Represented with `character_id: user:<id>`
+    (e.g. `user:sensei`) and `is_simulated_agent: false`. They participate
+    directly in in-world chats through client interfaces without consuming
+    runner processes.
   - **Background NPCs**: Exist only as World Wiki entity cards. Active agents
     can search for them, talk about them, and reference their canonical bio
     without spawning runner processes.
@@ -214,8 +215,8 @@ is_simulated_agent: false # Human player
 
 # Sensei
 
-The advisor appointed to lead the Federal Investigation Club SCHALE and mentor to
-students across Kivotos. Stationed at the SCHALE Central Office.
+The advisor appointed to lead the Federal Investigation Club SCHALE and mentor
+to students across Kivotos. Stationed at the SCHALE Central Office.
 ```
 
 ### 3.3 Canonical World Concepts & Lore (`shared/wiki/concepts/<topic_id>.md`)
@@ -304,13 +305,14 @@ talkative, though he procrastinates on assignments.
 ### Field Specifications
 
 - `peer_id` (string, required): Canonical peer identifier matching an agent ID
-  (e.g. `bob`) or a human player identifier with the `user:` prefix (e.g. `user:sensei`).
+  (e.g. `bob`) or a human player identifier with the `user:` prefix (e.g.
+  `user:sensei`).
 - `name` (string, required): Full display name (e.g. `Bob Moreno`).
 - `relation_type` (string, required): Qualitative relationship label
   (`close_friend`, `friend`, `classmate`, `acquaintance`, `rival`, `mentor`,
   `stranger`).
-- `summary` (string, required): A concise, 1-line description of who this peer is
-  to this character (under 120 characters). The Context Engine extracts this
+- `summary` (string, required): A concise, 1-line description of who this peer
+  is to this character (under 120 characters). The Context Engine extracts this
   directly to build the **Eager Compact Contact Roster** in the prompt:
   `- <name> (@<peer_id>, <relation_type>): <summary> [chat:direct:<peer_id>]`.
 - `familiarity` (number 0..100): Quantitative depth of shared history.
@@ -321,15 +323,18 @@ talkative, though he procrastinates on assignments.
 ### Agent Personal Wiki Maintenance Contract
 
 Characters own and update their own subjective Personal Wiki:
-1. **First Encounters**: When an agent meets an unfamiliar character or exchanges
-   contact info, they initialize a new card at
-   `workspaces/<id>/wiki/entities/characters/<peer_id>.md` with initial `summary`,
-   `relation_type: acquaintance`, and an initial `## Quick Impression`.
-2. **Social Evolution & Reflection**: During conversations or during nightly sleep
-   reflection, agents update the card:
+
+1. **First Encounters**: When an agent meets an unfamiliar character or
+   exchanges contact info, they initialize a new card at
+   `workspaces/<id>/wiki/entities/characters/<peer_id>.md` with initial
+   `summary`, `relation_type: acquaintance`, and an initial
+   `## Quick Impression`.
+2. **Social Evolution & Reflection**: During conversations or during nightly
+   sleep reflection, agents update the card:
    - Adjust `summary` and `relation_type` as their dynamic evolves.
    - Re-calibrate `affinity`, `trust`, and `familiarity`.
-   - Update `## Quick Impression` to reflect current sentiment and open conversational threads.
+   - Update `## Quick Impression` to reflect current sentiment and open
+     conversational threads.
    - Append date-stamped summaries to `## Interaction Log`.
 3. **Tool Grounding**: Agents perform these updates via deterministic wiki tools
    (`wiki_update_entity` / `wiki_patch`), maintaining markdown integrity.
@@ -423,6 +428,7 @@ on my quartet exposition.
     }
   },
   "plugins": {
+    "allow": ["kazusa"],
     "load": {
       "paths": ["./plugins/kazusa"]
     },
@@ -443,8 +449,21 @@ on my quartet exposition.
 }
 ```
 
-- Note: Per-agent `AGENTS.md` files are deliberately omitted so all characters
-  run on the unified simulation harness.
+### Character Workspace Invariant: Strict Ban on `AGENTS.md`
+
+- **STRICT INVARIANT: Never create or place `AGENTS.md` inside any character
+  workspace (`workspaces/<agent_id>/`).**
+- In OpenClaw, any `AGENTS.md` in a workspace is automatically loaded into the
+  agent's system prompt by default. In Kazusa, all behavioral guidance,
+  simulation time conventions, task lifecycle management, and interrupt
+  protocols are dynamically injected as skills via the Context Engine
+  (`shared/skills/*`).
+- Placing an `AGENTS.md` in a character workspace leads to redundant
+  double-injection, instructions drifting out of sync across characters, wasted
+  token budget, and breaking the simulation harness. Character workspaces must
+  strictly contain only persona/identity files (`SOUL.md`, `IDENTITY.md`),
+  reflections (`MEMORY.md`), memories (`memory/`), and subjective personal
+  beliefs (`wiki/`).
 - Local developer overrides and test rosters are defined in
   `openclaw.local.json` via `"$include": ["./openclaw.json"]` and kept
   git-ignored.
@@ -464,8 +483,20 @@ metadata, dependencies, and optional configuration schema:
 ```json
 {
   "id": "kazusa",
-  "name": "Kazusa Simulation",
-  "description": "Simulated time and task scheduling for Kazusa roleplay agents"
+  "channels": ["kazusa"],
+  "channelConfigs": {
+    "kazusa": {
+      "label": "Kazusa Brain",
+      "description": "In-process admission of perceived stimuli to character brains.",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
+  "kind": "context-engine",
+  "name": "Kazusa",
+  "description": "Multi-agent world simulation for roleplay."
 }
 ```
 

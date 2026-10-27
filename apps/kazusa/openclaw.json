@@ -24,6 +24,7 @@
     }
   },
   "plugins": {
+    "allow": ["kazusa"],
     "slots": {
       "contextEngine": "kazusa"
     },

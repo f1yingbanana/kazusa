@@ -50,6 +50,19 @@ export async function executeStartTask(
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
     timestamp,
+    {
+      kind: "task.started",
+      payload: {
+        taskId: task.id,
+        type: task.type,
+        description: task.description,
+        duration: task.duration,
+        endAt: Date.parse(task.endAt),
+        summary: params.summary,
+        monologue: params.monologue,
+        replacedTaskId: priorTask?.id,
+      },
+    },
   );
   return { success: true, task, message };
 }
@@ -83,6 +96,16 @@ export async function executeDelayTask(
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
     timestamp,
+    {
+      kind: "task.delayed",
+      payload: {
+        taskId: task.id,
+        additionalMinutes: additionalDuration,
+        endAt: Date.parse(task.endAt),
+        reason: params.reason,
+        monologue: params.monologue,
+      },
+    },
   );
   return { success: true, task, message };
 }

@@ -1,10 +1,24 @@
 import type { Clock } from "../clock/clock.ts";
 import type { StateStore } from "../state.ts";
 
+/** Canonical major task categories recognized across the simulation framework. */
+export const TASK_CATEGORIES = [
+  "sleeping",
+  "traveling",
+  "eating",
+  "studying",
+  "working",
+  "socializing",
+  "having fun",
+  "miscellaneous",
+] as const;
+
+export type TaskCategory = (typeof TASK_CATEGORIES)[number];
+
 /** Durable active-task lease. */
 export interface ActiveTask {
   readonly id: string;
-  readonly type: string;
+  readonly type: TaskCategory;
   readonly description: string;
   readonly startedAt: string;
   readonly endAt: string;
@@ -24,11 +38,12 @@ export interface ToolExecutionContext {
   readonly appendTaskLedgerEntry: (
     message: string,
     timestamp: number,
+    metadata?: unknown,
   ) => Promise<void>;
 }
 
 export interface StartTaskParams {
-  readonly type: string;
+  readonly type: TaskCategory;
   readonly description: string;
   readonly duration: number;
   /** What happened in the prior task when this call replaces one. */

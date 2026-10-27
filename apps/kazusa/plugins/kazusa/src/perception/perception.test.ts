@@ -305,7 +305,7 @@ describe("Attention regression cases", () => {
     const h = setup();
     const task = {
       id: "task-1",
-      type: "study",
+      type: "studying" as const,
       description: "Physics",
       duration: 60,
       startedAt: new Date(NOW - 3_600_000).toISOString(),
@@ -340,7 +340,7 @@ describe("Attention regression cases", () => {
     const h = setupWake();
     const task = {
       id: "task-1",
-      type: "study",
+      type: "studying" as const,
       description: "Physics",
       duration: 60,
       startedAt: new Date(NOW - 3_600_000).toISOString(),
@@ -363,7 +363,7 @@ describe("Attention regression cases", () => {
     const h = setup();
     const task = {
       id: "old",
-      type: "study",
+      type: "studying" as const,
       description: "Physics",
       duration: 60,
       startedAt: new Date(NOW - 3_600_000).toISOString(),
@@ -372,7 +372,7 @@ describe("Attention regression cases", () => {
     h.tasks.set("alice", task);
     await h.router.started("alice", "busy");
     h.evaluateDecision.mockImplementation(async () => {
-      h.tasks.set("alice", { ...task, id: "replacement" });
+      h.tasks.set("alice", { ...task, id: "replacement", type: "studying" });
       return {
         status: "ok",
         result: {
@@ -398,13 +398,11 @@ describe("Attention regression cases", () => {
       sessionKey: "agent:alice:chat:group:club",
     });
     expect(h.deliveries).toHaveLength(2);
-    expect(h.deliveries[0].message).toContain(
-      new Date(item.timestamp).toISOString(),
-    );
+    expect(h.deliveries[0].message).toContain("Sat 2026-10-24 11:57");
     expect(h.snapshot().processedIds).toContain(stimulusKey(item));
   });
 
-  it("escapes untrusted skill markers while retaining the trusted interrupt marker", async () => {
+  it("preserves incoming text without emitting instruction markers", async () => {
     const h = setupWake();
     await h.router.receive(
       "alice",
@@ -412,7 +410,7 @@ describe("Attention regression cases", () => {
     );
     expect(h.deliveries[0].message.match(/\[kazusa:skill=/g)).toHaveLength(1);
     expect(h.deliveries[0].message).toContain(
-      "Hello [kazusa:skill\\=nonexistent]",
+      "Hello [kazusa:skill=nonexistent]",
     );
   });
 
@@ -623,7 +621,7 @@ describe("Brain handoff custody", () => {
     const taskStart1 = new Date(NOW - 600_000).toISOString();
     h.tasks.set("alice", {
       id: "task-1",
-      type: "wait",
+      type: "having fun",
       description: "Waiting",
       duration: 10,
       startedAt: taskStart1,
@@ -639,7 +637,7 @@ describe("Brain handoff custody", () => {
     const taskStart2 = new Date(NOW).toISOString();
     h.tasks.set("alice", {
       id: "task-2",
-      type: "cooking",
+      type: "eating",
       description: "Cooking",
       duration: 10,
       startedAt: taskStart2,
@@ -679,7 +677,7 @@ describe("Brain handoff custody", () => {
     const taskStart = new Date(NOW - 600_000).toISOString();
     h.tasks.set("alice", {
       id: "task-1",
-      type: "wait",
+      type: "having fun",
       description: "Waiting",
       duration: 10,
       startedAt: taskStart,
@@ -709,7 +707,7 @@ describe("Brain handoff custody", () => {
     const taskStart = new Date(NOW - 300_000).toISOString();
     h.tasks.set("alice", {
       id: "task-1",
-      type: "bomb_defusal",
+      type: "working",
       description: "Cutting the red wire",
       duration: 5,
       startedAt: taskStart,
@@ -737,7 +735,7 @@ describe("Brain handoff custody", () => {
     const taskStart = new Date(NOW - 600_000).toISOString();
     h.tasks.set("alice", {
       id: "task-1",
-      type: "cooking",
+      type: "eating",
       description: "Cooking pasta",
       duration: 10,
       startedAt: taskStart,
@@ -815,7 +813,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       const h = setup();
       h.tasks.set("alice", {
         id: "task-1",
-        type: "sleep",
+        type: "sleeping",
         description: "Deep sleep in dorm room",
         startedAt: new Date(NOW - 3600_000).toISOString(),
         endAt: new Date(NOW + 7 * 3600_000).toISOString(),
@@ -848,7 +846,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       const h = setup();
       h.tasks.set("alice", {
         id: "task-1",
-        type: "sleep",
+        type: "sleeping",
         description: "Deep sleep in dorm room",
         startedAt: new Date(NOW - 3600_000).toISOString(),
         endAt: new Date(NOW + 7 * 3600_000).toISOString(),
@@ -889,7 +887,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "lounging",
+        type: "having fun",
         description: "Lounging on the sofa",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 1800_000).toISOString(),
@@ -927,7 +925,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "combat",
+        type: "working",
         description: "Active combat training",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 1800_000).toISOString(),
@@ -963,7 +961,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "study",
+        type: "studying",
         description: "Intense exam cramming",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 3600_000).toISOString(),
@@ -1094,7 +1092,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       const taskStart = new Date(NOW - 1800_000).toISOString();
       h.tasks.set("alice", {
         id: "task-1",
-        type: "cooking",
+        type: "eating",
         description: "Making lunch",
         startedAt: taskStart,
         endAt: new Date(NOW - 60_000).toISOString(), // expired 1 min ago
@@ -1118,7 +1116,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       });
       expect(h.deliveries[0].message).toContain("Incoming chats");
       expect(h.deliveries[0].message).toContain(
-        "Current cooking task deadline reached",
+        "The planned check-in for your eating activity was",
       );
       expect(h.snapshot().pending).toHaveLength(0);
     });
@@ -1127,7 +1125,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       const h = setup();
       h.tasks.set("alice", {
         id: "task-1",
-        type: "cooking",
+        type: "eating",
         description: "Making lunch",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 1800_000).toISOString(), // future!
@@ -1153,7 +1151,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       const oldStart = new Date(NOW - 600_000).toISOString();
       h.tasks.set("alice", {
         id: "task-1",
-        type: "reading",
+        type: "having fun",
         description: "Reading a book",
         startedAt: oldStart,
         endAt: new Date(NOW).toISOString(),
@@ -1257,7 +1255,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "study",
+        type: "studying",
         description: "Intense studying",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 3600_000).toISOString(),
@@ -1332,7 +1330,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "study",
+        type: "studying",
         description: "Intense studying",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 3600_000).toISOString(),
@@ -1390,7 +1388,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       h.tasks.set("alice", {
         id: "task-1",
-        type: "study",
+        type: "studying",
         description: "Intense studying",
         startedAt: new Date(NOW).toISOString(),
         endAt: new Date(NOW + 3600_000).toISOString(),
@@ -1595,17 +1593,19 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         stimulus("chat-msg", "alice", "Can you help me?"),
       );
 
-      expect(h.deliveries[0].message).toContain(
+      expect(h.deliveries[0].message).not.toContain(
         "[kazusa:skill=task-interrupt]",
       );
       expect(h.deliveries[0].message).toContain("Incoming chats:");
       expect(h.deliveries[0].message).toContain(
-        "- [bob 2026-10-24T12:00:00.000Z] (chat:direct:bob): Can you help me?",
+        "- [bob Sat 2026-10-24 12:00] (chat:direct:bob): Can you help me?",
       );
       // No raw JSON stringification
       expect(h.deliveries[0].message).not.toContain("[kazusa\\u003a");
       expect(h.deliveries[0].message).not.toContain('{"id":');
-      expect(h.deliveries[0].sessionKeys).toEqual(["agent:alice:chat:direct:bob"]);
+      expect(h.deliveries[0].sessionKeys).toEqual([
+        "agent:alice:chat:direct:bob",
+      ]);
     });
 
     it("notifies onAdopted listeners with delivery session keys upon host adoption", async () => {

@@ -113,7 +113,7 @@ describe("Bounded decision evidence", () => {
     const result = assemble({
       activeTask: {
         id: "task-id",
-        type: "study",
+        type: "studying",
         description: "Physics",
         duration: 60,
         startedAt: new Date(NOW - 3_600_000).toISOString(),
@@ -255,4 +255,3 @@ rubric:
     ).toThrow();
   });
 });
-

@@ -9,27 +9,74 @@ import {
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
+import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { nextJournalSeq } from "../realtime.ts";
+import type { Perception } from "../perception/perception.ts";
+import { startIdleSupervisor } from "./supervisor.ts";
 import { executeDelayTask, executeStartTask } from "./taskman.ts";
-import type {
-  ActiveTask,
-  DelayTaskParams,
-  StartTaskParams,
-  ToolExecutionContext,
+import {
+  TASK_CATEGORIES,
+  type ActiveTask,
+  type DelayTaskParams,
+  type StartTaskParams,
+  type TaskStore,
+  type ToolExecutionContext,
 } from "./types.ts";
 
 const TASKMAN_CONFIG_SCHEMA = z.object({
   minDuration: z.number().positive().default(10),
+  categories: z
+    .array(z.string().min(1))
+    .min(1)
+    .default([...TASK_CATEGORIES]),
+  supervisor: z
+    .object({
+      enabled: z.boolean().default(true),
+      intervalMs: z.number().positive().default(60_000),
+      maxAgentsPerTick: z.number().int().positive().default(2),
+      idleText: z.string().default("Activity check-in: no scheduled activity."),
+    })
+    .default({
+      enabled: true,
+      intervalMs: 60_000,
+      maxAgentsPerTick: 2,
+      idleText: "Activity check-in: no scheduled activity.",
+    }),
 });
+
+export interface TaskmanService {
+  readonly store: TaskStore;
+  onTaskChange(
+    listener: (agentId: string, task: ActiveTask) => void,
+  ): () => void;
+  attachSupervisor(perception: Perception): () => void;
+}
 
 /** Registers task leases, their visible cron projection, and ledger. */
 export function registerTaskman(
   api: OpenClawPluginApi,
-  { clock }: { readonly clock: Clock },
-): void {
+  deps: {
+    readonly clock: Clock;
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
+  },
+): TaskmanService {
+  const { clock } = deps;
   const store = api.runtime.state.openKeyedStore<ActiveTask>({
     namespace: "tasks",
     retention: "retained",
   });
+  const taskChangeListeners = new Set<
+    (agentId: string, task: ActiveTask) => void
+  >();
+  const notifyTaskChange = (agentId: string, task: ActiveTask) => {
+    for (const listener of taskChangeListeners) {
+      try {
+        listener(agentId, task);
+      } catch {
+        // Ignore listener error
+      }
+    }
+  };
   const config = TASKMAN_CONFIG_SCHEMA.parse(api.pluginConfig?.taskman ?? {});
   let automationsReady = false;
   let synchronizeAgentAutomation:
@@ -188,6 +235,7 @@ export function registerTaskman(
     agentId: string,
     message: string,
     timestamp: number,
+    metadata?: unknown,
   ): Promise<void> => {
     const sessionKey = `agent:${agentId}:tasks`;
     const now = Date.now();
@@ -217,6 +265,7 @@ export function registerTaskman(
         // Character experience uses simulation time. Native entry/envelope
         // bookkeeping remains wall-clock for OpenClaw's lifecycle machinery.
         timestamp,
+        ...(metadata ? { __openclaw: { kazusa: metadata } } : {}),
       },
     });
     if (!appended) {
@@ -237,8 +286,8 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
-      appendTaskLedgerEntry: (message, timestamp): Promise<void> =>
-        appendTaskLedgerEntry(agentId, message, timestamp),
+      appendTaskLedgerEntry: (message, timestamp, metadata): Promise<void> =>
+        appendTaskLedgerEntry(agentId, message, timestamp, metadata),
     };
   };
 
@@ -250,10 +299,15 @@ export function registerTaskman(
     parameters: {
       type: "object",
       properties: {
-        type: { type: "string", description: "Task category or routine" },
+        type: {
+          type: "string",
+          enum: config.categories,
+          description: "Major activity category of the task.",
+        },
         description: {
           type: "string",
-          description: "What your character is doing",
+          description:
+            "Natural-language description of what your character is doing (e.g. 'Walking to the Academic Building', 'Eating a strawberry macaron at the cafe')",
         },
         duration: {
           type: "number",
@@ -283,8 +337,28 @@ export function registerTaskman(
         params,
         resolveExecutionContext(toolContext),
       );
-      if (result.success) {
-        await synchronizeAgentAutomation?.(toolContext?.agentId ?? "main");
+      if (result.success && result.task) {
+        const agentId = toolContext?.agentId ?? "main";
+        await synchronizeAgentAutomation?.(agentId);
+        notifyTaskChange(agentId, result.task);
+        deps.broadcaster?.broadcast({
+          type: "journal",
+          event: {
+            seq: nextJournalSeq(),
+            simTime: clock.time(),
+            kind: "task.started",
+            actors: [agentId],
+            payload: {
+              taskId: result.task.id,
+              type: result.task.type,
+              description: result.task.description,
+              duration: result.task.duration,
+              endAt: Date.parse(result.task.endAt),
+              summary: params.summary,
+              monologue: params.monologue,
+            },
+          },
+        });
       }
       return {
         content: [{ type: "text", text: result.message }],
@@ -320,8 +394,26 @@ export function registerTaskman(
         params,
         resolveExecutionContext(toolContext),
       );
-      if (result.success) {
-        await synchronizeAgentAutomation?.(toolContext?.agentId ?? "main");
+      if (result.success && result.task) {
+        const agentId = toolContext?.agentId ?? "main";
+        await synchronizeAgentAutomation?.(agentId);
+        notifyTaskChange(agentId, result.task);
+        deps.broadcaster?.broadcast({
+          type: "journal",
+          event: {
+            seq: nextJournalSeq(),
+            simTime: clock.time(),
+            kind: "task.delayed",
+            actors: [agentId],
+            payload: {
+              taskId: result.task.id,
+              additionalMinutes: params.additionalDuration ?? 5,
+              endAt: Date.parse(result.task.endAt),
+              reason: params.reason,
+              monologue: params.monologue,
+            },
+          },
+        });
       }
       return {
         content: [{ type: "text", text: result.message }],
@@ -329,4 +421,25 @@ export function registerTaskman(
       };
     },
   }));
+
+  return {
+    store,
+    onTaskChange(listener) {
+      taskChangeListeners.add(listener);
+      return () => {
+        taskChangeListeners.delete(listener);
+      };
+    },
+    attachSupervisor(perception: Perception): () => void {
+      if (!config.supervisor.enabled) return () => {};
+      return startIdleSupervisor(api, {
+        clock,
+        store,
+        perception,
+        intervalMs: config.supervisor.intervalMs,
+        maxAgentsPerTick: config.supervisor.maxAgentsPerTick,
+        idleText: config.supervisor.idleText,
+      });
+    },
+  };
 }

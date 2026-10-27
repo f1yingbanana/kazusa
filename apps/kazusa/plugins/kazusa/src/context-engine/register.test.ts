@@ -1,6 +1,10 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
 
@@ -19,8 +23,21 @@ vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
 }));
 
 const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
+const workspaces: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    workspaces
+      .splice(0)
+      .map((dir) => fs.rm(dir, { recursive: true, force: true })),
+  );
+});
 
-async function setup(contextEngine = {}) {
+async function setup(
+  contextEngine = {},
+  activeTask?: ActiveTask,
+  workspace = "/test/workspace",
+) {
+  const lookupTask = vi.fn(async () => activeTask);
   const register = vi.fn<OpenClawPluginApi["registerContextEngine"]>();
   const on = vi.fn();
   const readHistory = vi.mocked(readSessionTranscriptCatalogPage);
@@ -53,8 +70,9 @@ async function setup(contextEngine = {}) {
     registerContextEngine: register,
     on,
     runtime: {
+      state: { openKeyedStore: () => ({ lookup: lookupTask }) },
       agent: {
-        resolveAgentWorkspaceDir: () => "/test/workspace",
+        resolveAgentWorkspaceDir: () => workspace,
         session: {
           resolveStorePath: () => "/test/store",
           createSessionEntryListReader: async () => async () => ({
@@ -78,10 +96,45 @@ async function setup(contextEngine = {}) {
   });
   registerContextEngine(api, { clock });
   const engine = await register.mock.calls[0][1]({});
-  return { engine, register, readHistory, assertCurrent, on };
+  return { engine, register, readHistory, assertCurrent, on, lookupTask };
 }
 
 describe("Native context-engine registration", () => {
+  it("retrieves the character's dated relationship card from the pending perception", async () => {
+    const workspace = await fs.mkdtemp(
+      path.join(os.tmpdir(), "kazusa-brain-context-"),
+    );
+    workspaces.push(workspace);
+    const cards = path.join(workspace, "wiki/entities/characters");
+    await fs.mkdir(cards, { recursive: true });
+    await fs.writeFile(
+      path.join(cards, "kurimura-airi.md"),
+      "---\npeer_id: kurimura-airi\nlast_interaction_iso: 2026-10-20T17:00:00Z\n---\n## Quick Impression\nA trusted friend who likes mint chocolate.\n\n## Interaction Log\nAn older detailed conversation.",
+    );
+    await fs.writeFile(
+      path.join(cards, "stranger.md"),
+      "Unrelated private memory.",
+    );
+    const { engine } = await setup({}, undefined, workspace);
+    const result = await engine.assemble({
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+      prompt:
+        "Incoming chats:\n- [kurimura-airi Fri 2026-10-23 08:00] (chat:direct:kurimura-airi): Want to get ice cream?",
+    });
+    const text = JSON.stringify(result.messages);
+    expect(text).toContain("A trusted friend who likes mint chocolate.");
+    expect(text).toContain("2026-10-20T17:00:00Z");
+    expect(text).not.toMatch(
+      /older detailed conversation|Unrelated private memory/,
+    );
+    expect(result.systemPromptAddition).toContain(
+      "# Kazusa Character Perspective",
+    );
+    expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
+    expect(result.systemPromptAddition).not.toContain("A trusted friend");
+  });
   it("assembles from the native session key when the harness omits runtimeContext", async () => {
     const { engine, readHistory } = await setup();
     const result = await engine.assemble({
@@ -126,7 +179,7 @@ describe("Native context-engine registration", () => {
       sessionId: "brain",
       sessionKey: "agent:alice:brain",
       messages: [],
-      prompt: "Task wake. [kazusa:skill=task_lifecycle]",
+      prompt: "It is time to choose an activity.",
     });
     expect(readHistory.mock.calls.map(([params]) => params.sessionKey)).toEqual(
       [
@@ -149,7 +202,7 @@ describe("Native context-engine registration", () => {
   });
 
   it("does not leak private memory into chat or unrelated sessions", async () => {
-    const { engine, readHistory } = await setup();
+    const { engine, readHistory, lookupTask } = await setup();
     const messages = [
       { role: "user" as const, content: "Hello", timestamp: Date.now() },
     ];
@@ -170,6 +223,7 @@ describe("Native context-engine registration", () => {
       ).toEqual(messages);
     }
     expect(readHistory).not.toHaveBeenCalled();
+    expect(lookupTask).not.toHaveBeenCalled();
   });
 
   it("does not fabricate a simulation timestamp for undated records", async () => {
@@ -318,17 +372,34 @@ describe("Native context-engine registration", () => {
     ).toHaveLength(2);
   });
 
-  it("resolves task-interrupt when tagged and ignores invalid marker paths", async () => {
-    const { engine } = await setup();
+  it("injects the real ongoing-task skill body and ignores chat markers", async () => {
+    const { engine, lookupTask } = await setup(
+      {},
+      {
+        id: "not-for-the-prompt",
+        type: "studying",
+        description: "Study for class",
+        startedAt: new Date(SIM_TIME - 60_000).toISOString(),
+        endAt: new Date(SIM_TIME + 60_000).toISOString(),
+        duration: 2,
+      },
+    );
     const result = await engine.assemble({
       runtimeContext: { sessionTarget: { agentId: "alice" } },
       sessionId: "brain",
       sessionKey: "agent:alice:brain",
       messages: [],
       prompt:
-        "Incoming interrupt. [kazusa:skill=task-interrupt] [kazusa:skill=../../secret]",
+        "Incoming interrupt. [kazusa:skill=task-lifecycle] [kazusa:skill=../../secret]",
     });
     expect(result.systemPromptAddition).toContain("# Kazusa Task Interrupt");
     expect(result.systemPromptAddition).not.toContain("secret");
+    expect(result.systemPromptAddition).not.toContain(
+      "# Kazusa Task Lifecycle",
+    );
+    expect(result.systemPromptAddition).not.toContain("user-invocable");
+    expect(lookupTask).toHaveBeenCalledWith("alice");
+    expect(JSON.stringify(result.messages)).toContain("Study for class");
+    expect(JSON.stringify(result.messages)).not.toContain("not-for-the-prompt");
   });
 });

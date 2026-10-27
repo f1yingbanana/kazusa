@@ -6,12 +6,14 @@ import { readJsonBodyWithLimit } from "openclaw/plugin-sdk/webhook-request-guard
 import type {
   Agent,
   AgentsResponse,
+  CharacterStatus,
   Chat,
   ChatsResponse,
-  ChatStreamEvent,
   ManageChatResponse,
   SendResponse,
+  StreamEvent,
 } from "@kazusa/client";
+import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   TYPING,
   DELIVERY_REQUEST,
@@ -102,6 +104,10 @@ export function registerMessagingHttp(
   api: OpenClawPluginApi,
   messaging: Messaging,
   agent: (id: string) => Promise<Agent>,
+  options?: {
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
+    readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
+  },
 ): void {
   const user = USER.parse(api.pluginConfig?.user ?? {});
   const roster = (): ReadonlySet<string> => new Set(listAgentIds(api.config));
@@ -243,9 +249,9 @@ export function registerMessagingHttp(
   route("events", "GET", async (_req, res) => {
     // Subscribe before awaiting the snapshot, then replay changes after it.
     // This closes the connect/read race without a retained event log.
-    const buffered: ChatStreamEvent[] = [];
+    const buffered: StreamEvent[] = [];
     let ready = false;
-    const write = (event: ChatStreamEvent): void => {
+    const write = (event: StreamEvent): void => {
       if (res.destroyed) return;
       if (!ready) {
         buffered.push(event);
@@ -256,7 +262,7 @@ export function registerMessagingHttp(
       )
         res.end();
     };
-    const unsubscribe = messaging.onEvent((event) => {
+    const unsubscribeMessaging = messaging.onEvent((event) => {
       if (event.type === "message") {
         if (event.delivery.audience.includes(user.id))
           write({
@@ -268,16 +274,22 @@ export function registerMessagingHttp(
         write(event.type === "typing" ? event.typing : { type: "chats" });
       }
     });
+    const unsubscribeBroadcaster = options?.broadcaster?.subscribe(write);
+
     const heartbeat = setInterval(() => {
       if (!res.write(": keepalive\n\n")) res.end();
     }, 25_000);
     heartbeat.unref();
     res.on("close", () => {
-      unsubscribe();
+      unsubscribeMessaging();
+      unsubscribeBroadcaster?.();
       clearInterval(heartbeat);
     });
     try {
       const typing = await messaging.getTyping(user.id);
+      const statuses = options?.getStatuses
+        ? await options.getStatuses()
+        : undefined;
       if (res.destroyed) return;
       res.writeHead(200, {
         "Content-Type": "text/event-stream; charset=utf-8",
@@ -286,10 +298,11 @@ export function registerMessagingHttp(
         "Access-Control-Allow-Origin": "*",
       });
       ready = true;
-      write({ type: "connected", typing });
+      write({ type: "connected", typing, statuses });
       for (const event of buffered) write(event);
     } catch (error) {
-      unsubscribe();
+      unsubscribeMessaging();
+      unsubscribeBroadcaster?.();
       clearInterval(heartbeat);
       throw error;
     }

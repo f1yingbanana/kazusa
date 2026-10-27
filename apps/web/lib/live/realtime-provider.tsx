@@ -21,6 +21,7 @@ import {
   type StreamEvent,
 } from "@kazusa/client";
 import { dispatchLive } from "@/lib/registry/live";
+import { statusStore } from "./state";
 import {
   appendMessageToPages,
   chatsKey,
@@ -45,9 +46,14 @@ type RealtimeContextValue = {
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 
-/** One SSE connection per scope; observer event types fan out through the live registry. */
+/**
+ * One SSE connection per scope; observer event types fan out through the live
+ * registry.
+ */
 const OBSERVER_EVENTS = ["status", "journal", "clock"] as const;
 const PLAYER_EVENTS = ["message", "typing", "connected", "chats"] as const;
+const RETRY_MIN_MS = 1_000;
+const RETRY_MAX_MS = 15_000;
 
 function parseEvent(raw: string): StreamEvent | null {
   return parseStreamEvent(raw);
@@ -77,13 +83,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const { baseUrl, userId, token } = config;
-    let source: EventSource;
-    try {
-      source = new EventSource(eventsUrl(baseUrl, token));
-    } catch {
-      setStatus("error");
-      return;
-    }
+    let source: EventSource | null = null;
+    let retryTimer: number | undefined;
+    let retryDelay = RETRY_MIN_MS;
     setStatus("connecting");
     const seenMessages = new Set<string>();
     setTypingByChat({});
@@ -189,6 +191,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         case "connected":
           setTypingByChat({});
           for (const typing of data.typing) handleTyping(typing);
+          if ("statuses" in data && data.statuses) {
+            statusStore.reset(Object.entries(data.statuses));
+          }
           // Always refresh: messages can arrive between the initial GET and SSE.
           void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
             for (const chat of current?.chats ?? [])
@@ -200,21 +205,48 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    source.onopen = () => {
-      setStatus("open");
-    };
-    source.onerror = () => {
-      setTypingByChat({});
-      setStatus(
-        source.readyState === EventSource.CLOSED ? "error" : "connecting",
-      );
-    };
     const eventNames = [...PLAYER_EVENTS, ...OBSERVER_EVENTS];
-    for (const name of eventNames) source.addEventListener(name, onEvent);
-
-    return () => {
+    const disconnect = () => {
+      if (!source) return;
       for (const name of eventNames) source.removeEventListener(name, onEvent);
       source.close();
+      source = null;
+    };
+    // EventSource only retries network drops on its own. A non-SSE response
+    // (e.g. the proxy's 502 while the Gateway restarts) closes it for good, so
+    // reopen it ourselves with backoff.
+    const connect = () => {
+      retryTimer = undefined;
+      let next: EventSource;
+      try {
+        next = new EventSource(eventsUrl(baseUrl, token));
+      } catch {
+        setStatus("error");
+        return;
+      }
+      source = next;
+      next.onopen = () => {
+        retryDelay = RETRY_MIN_MS;
+        setStatus("open");
+      };
+      next.onerror = () => {
+        setTypingByChat({});
+        if (next.readyState !== EventSource.CLOSED) {
+          setStatus("connecting");
+          return;
+        }
+        setStatus("error");
+        disconnect();
+        retryTimer = window.setTimeout(connect, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+      };
+      for (const name of eventNames) next.addEventListener(name, onEvent);
+    };
+    connect();
+
+    return () => {
+      window.clearTimeout(retryTimer);
+      disconnect();
     };
     // config fields are listed explicitly so a new object identity does not reconnect.
   }, [config.baseUrl, config.userId, mutate]);

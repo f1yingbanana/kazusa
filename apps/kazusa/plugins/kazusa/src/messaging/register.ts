@@ -100,12 +100,17 @@ async function rosterAgent(
  * and Perception receives committed messages. Register discovery, sending and
  * group management together so agents never need to reconstruct membership.
  */
+import type { CharacterStatus } from "@kazusa/client";
+import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
+
 export function registerMessaging(
   api: OpenClawPluginApi,
   deps: {
     readonly clock: Pick<Clock, "init" | "time">;
     readonly perception: Pick<Perception, "receive"> &
       Partial<Pick<Perception, "onAdopted">>;
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
+    readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
   },
 ): Messaging {
   const messaging = new Messaging({
@@ -201,6 +206,29 @@ export function registerMessaging(
     warn: (message) => api.logger.warn(message),
   });
   api.lifecycle.onDispose?.(() => messaging.dispose());
+  if (deps.broadcaster) {
+    const unsubscribeJournal = messaging.onEvent((event) => {
+      if (event.type === "message") {
+        deps.broadcaster?.broadcast({
+          type: "journal",
+          event: {
+            seq: nextJournalSeq(),
+            simTime: event.delivery.timestamp,
+            kind: "message.sent",
+            actors: [event.delivery.sender, ...event.delivery.audience],
+            chatId: event.delivery.chatId,
+            payload: {
+              messageId: event.delivery.id,
+              sequence: event.delivery.sequence,
+              senderId: event.delivery.sender,
+              preview: event.delivery.params.text.slice(0, 100),
+            },
+          },
+        });
+      }
+    });
+    api.lifecycle.onDispose?.(unsubscribeJournal);
+  }
   api.registerService({
     id: "kazusa-messaging",
     start: () => messaging.resume(),
@@ -373,6 +401,9 @@ export function registerMessaging(
     { names: ["send_message", "list_chats", "manage_chat"] },
   );
 
-  registerMessagingHttp(api, messaging, (id) => rosterAgent(api, id));
+  registerMessagingHttp(api, messaging, (id) => rosterAgent(api, id), {
+    broadcaster: deps.broadcaster,
+    getStatuses: deps.getStatuses,
+  });
   return messaging;
 }

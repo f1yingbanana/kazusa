@@ -63,6 +63,8 @@ const WIKI_LABELS = z.object({
   title: z.string().optional(),
   aliases: z.array(z.string()).optional(),
   peer_id: z.string().optional(),
+  last_interaction_iso: z.string().optional(),
+  last_updated_iso: z.string().optional(),
 });
 
 /**
@@ -105,6 +107,7 @@ export async function readPersonalWiki(
     }
     const name = path.relative(root, filename);
     const aliases = [
+      path.basename(filename, ".md"),
       path.basename(filename, ".md").replace(/[_-]/g, " "),
       labels.name,
       labels.title,
@@ -115,8 +118,7 @@ export async function readPersonalWiki(
       ...(labels.aliases ?? []),
     ].filter((label): label is string => Boolean(label));
     const isSenderMatch =
-      sender ||
-      Boolean(labels.peer_id && senders.includes(labels.peer_id));
+      sender || Boolean(labels.peer_id && senders.includes(labels.peer_id));
     const score = isSenderMatch
       ? 100
       : aliases.filter((label) => {
@@ -134,7 +136,16 @@ export async function readPersonalWiki(
     const impression = body.match(
       /^## Quick Impression\s*\r?\n([\s\S]*?)(?=^## |$(?![\s\S]))/m,
     )?.[1];
-    matches.push({ score, name, body: `### ${name}\n${impression ?? body}` });
+    const recordedAt = labels.last_interaction_iso ?? labels.last_updated_iso;
+    matches.push({
+      score,
+      name,
+      body: [
+        `### ${name}`,
+        ...(recordedAt ? [`Memory date: ${recordedAt}`] : []),
+        impression ?? body,
+      ].join("\n"),
+    });
   };
   const senderPaths = new Set(
     senders
