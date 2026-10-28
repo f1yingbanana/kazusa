@@ -18,7 +18,11 @@ import { registerMessagingHttp } from "./http.ts";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { Perception } from "../perception/perception.ts";
-import { Messaging, type MessageDelivery } from "./messaging.ts";
+import {
+  Messaging,
+  type MessageDelivery,
+  type OutboxPlan,
+} from "./messaging.ts";
 import {
   AGENT_ID,
   SEND_MESSAGE,
@@ -106,9 +110,9 @@ import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 export function registerMessaging(
   api: OpenClawPluginApi,
   deps: {
-    readonly clock: Pick<Clock, "init" | "time">;
+    readonly clock: Pick<Clock, "init" | "time" | "now">;
     readonly perception: Pick<Perception, "receive"> &
-      Partial<Pick<Perception, "onAdopted">>;
+      Partial<Pick<Perception, "onAdopted" | "attachSpeech">>;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
   },
@@ -120,6 +124,10 @@ export function registerMessaging(
     }),
     conversations: api.runtime.state.openKeyedStore<ChatConversation>({
       namespace: "chats",
+      retention: "retained",
+    }),
+    outbox: api.runtime.state.openKeyedStore<OutboxPlan>({
+      namespace: "outbox",
       retention: "retained",
     }),
     clock: deps.clock,
@@ -206,6 +214,12 @@ export function registerMessaging(
     warn: (message) => api.logger.warn(message),
   });
   api.lifecycle.onDispose?.(() => messaging.dispose());
+  // Steering lands at the next tool boundary; an open send_message is that
+  // boundary, so Perception must be able to cut the speaker off.
+  deps.perception.attachSpeech?.({
+    current: (agentId) => messaging.currentSpeech(agentId),
+    interrupt: (agentId) => messaging.interrupt(agentId),
+  });
   if (deps.broadcaster) {
     const unsubscribeJournal = messaging.onEvent((event) => {
       if (event.type === "message") {
@@ -307,7 +321,7 @@ export function registerMessaging(
           name: "send_message",
           label: "Send Message",
           description:
-            "Send dialogue to an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Delivery retries automatically; another tool call sends another message. Use list_chats when the address is unknown.",
+            "Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural chat bubbles in messages; they are typed and sent one at a time. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.",
           parameters: z.toJSONSchema(SEND_MESSAGE),
           async execute(toolCallId, input: unknown) {
             const { agentId, config, agents } = caller(context);
@@ -317,20 +331,25 @@ export function registerMessaging(
             const sessionId = z.string().trim().min(1).parse(context.sessionId);
             const callId = z.string().trim().min(1).parse(toolCallId);
             const requestId = messagingId([sessionId, callId]);
-            const {
-              chatId: _chatId,
-              message: _message,
-              ...result
-            } = await messaging.send(
+            const details = await messaging.speak(
               agentId,
               await senderName(api, config, agentId),
               { ...params, requestId },
               context.assertInvocationCurrent,
               agents,
             );
+            // Message hashes are bookkeeping, not something the character reads.
+            const { messageIds: _messageIds, ...speech } = details;
+            const result =
+              speech.status === "interrupted"
+                ? {
+                    ...speech,
+                    note: "You stopped before the unsaid bubbles; nobody saw them.",
+                  }
+                : speech;
             return {
               content: [{ type: "text", text: JSON.stringify(result) }],
-              details: result,
+              details,
             };
           },
         },

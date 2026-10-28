@@ -35,35 +35,55 @@ const MEMBERS = z
   );
 const TITLE = z.string().trim().min(1).max(160);
 
-export const SEND_MESSAGE = z
-  .strictObject({
-    sessionKey: CHAT_SESSION.optional().describe(
-      "Your chat address, from context or list_chats (e.g. chat:direct:bob); omit members and title.",
+const CHAT_TARGET = z.strictObject({
+  sessionKey: CHAT_SESSION.optional().describe(
+    "Your chat address, from context or list_chats (e.g. chat:direct:bob); omit members and title.",
+  ),
+  members: MEMBERS.optional().describe(
+    "Other configured agent IDs to start a chat with; you are included automatically. Omit if sessionKey is provided.",
+  ),
+  title: TITLE.nullable()
+    .optional()
+    .describe(
+      "Optional new group title. One other member without a title reuses the direct chat.",
     ),
-    members: MEMBERS.optional().describe(
-      "Other configured agent IDs to start a chat with; you are included automatically. Omit if sessionKey is provided.",
-    ),
-    title: TITLE.nullable()
-      .optional()
-      .describe(
-        "Optional new group title. One other member without a title reuses the direct chat.",
-      ),
-    text: z
-      .string()
-      .min(1)
-      .max(32_000)
-      .refine((text) => text.trim().length > 0)
-      .describe(
-        "Your character's message; sender attribution is supplied automatically.",
-      ),
-  })
-  .refine((params) => Boolean(params.sessionKey) || Boolean(params.members), {
-    message: "Supply either a sessionKey or members for a chat.",
-  });
-/** Delivery identity is supplied by the host adapter, never the model. */
-export const DELIVERY_REQUEST = SEND_MESSAGE.safeExtend({
-  requestId: z.string().trim().min(1).max(128),
 });
+const HAS_TARGET = [
+  (params: z.infer<typeof CHAT_TARGET>) =>
+    Boolean(params.sessionKey) || Boolean(params.members),
+  { message: "Supply either a sessionKey or members for a chat." },
+] as const;
+const TEXT = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((text) => text.trim().length > 0);
+
+const BUBBLES = z
+  .array(TEXT(4_000))
+  .min(1)
+  .max(8)
+  .describe(
+    "Your character's chat bubbles, in order, without speaker labels. They are typed and sent one at a time; you may be interrupted before later ones are sent.",
+  );
+export const SEND_MESSAGE = CHAT_TARGET.extend({ messages: BUBBLES }).refine(
+  ...HAS_TARGET,
+);
+/** A paced multi-bubble send; the host adapter supplies its identity. */
+export const SPEECH_REQUEST = CHAT_TARGET.extend({
+  messages: BUBBLES,
+  requestId: z.string().trim().min(1).max(128),
+}).refine(...HAS_TARGET);
+export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
+/**
+ * One canonical message. Delivery identity is supplied by the host adapter,
+ * never the model.
+ */
+export const DELIVERY_REQUEST = CHAT_TARGET.extend({
+  text: TEXT(32_000),
+  requestId: z.string().trim().min(1).max(128),
+}).refine(...HAS_TARGET);
 export type SendMessageParams = z.infer<typeof DELIVERY_REQUEST>;
 
 export const LIST_CHATS = z.strictObject({

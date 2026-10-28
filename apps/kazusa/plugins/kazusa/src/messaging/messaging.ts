@@ -5,12 +5,14 @@ import type {
 } from "@kazusa/client";
 import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
-import type { Clock } from "../clock/clock.ts";
-import type { StateStore } from "../state.ts";
+import { sleepSim, type Clock } from "../clock/clock.ts";
+import type { CurrentSpeech } from "../perception/types.ts";
+import type { RemovableStateStore, StateStore } from "../state.ts";
 import type { Stimulus } from "../stimulus.ts";
 import {
   DELIVERY_REQUEST,
   LIST_CHATS,
+  SPEECH_REQUEST,
   MANAGE_CHAT,
   PARTICIPANT_ID,
   chatSummary,
@@ -23,6 +25,7 @@ import {
   type ChatSummary,
   type ManageChatParams,
   type SendMessageParams,
+  type SpeechParams,
 } from "./conversations.ts";
 
 export interface GetChatHistoryInput {
@@ -67,6 +70,77 @@ export interface SendMessageResult {
   readonly message: ChatMessage;
 }
 
+/**
+ * A retained multi-bubble send. It exists only while bubbles may still be
+ * unsent; recovery delivers whatever remains.
+ */
+export interface OutboxPlan {
+  readonly id: string;
+  readonly sender: string;
+  readonly senderName: string;
+  readonly params: SpeechParams;
+}
+
+export interface SpeechResult {
+  readonly status: "delivered" | "pending" | "interrupted";
+  readonly sessionKey: string;
+  readonly recipients: readonly string[];
+  readonly messageIds: readonly string[];
+  readonly said: readonly string[];
+  readonly unsaid: readonly string[];
+}
+
+/** A chat whose latest visible message came from someone else. */
+/** A chat the participant read, where someone else has spoken since. */
+export interface AwaitingReply {
+  readonly sessionKey: string;
+  readonly sender: string;
+  readonly timestamp: number;
+}
+
+/** A message reference in the participant's own ledger addressing. */
+export interface MessageRef {
+  readonly id: string;
+  readonly sessionKey: string;
+}
+
+/**
+ * Canonical facts a person weighs before answering: who is in the chat and
+ * where the conversation stands for this participant.
+ */
+export interface ChatFacts {
+  readonly sessionKey: string;
+  readonly kind: "direct" | "group";
+  readonly title: string | null;
+  readonly memberCount: number;
+  /** When this participant last spoke here, if ever (simulation time). */
+  readonly lastSpokeAt: number | null;
+  /** Messages from others since this participant last spoke. */
+  readonly unanswered: number;
+  /** Simulation time of the oldest of those messages. */
+  readonly waitingSince: number | null;
+}
+
+/** Simulated texting time before a later bubble: 1s plus 50ms per character. */
+export function typingMs(text: string): number {
+  return Math.min(8_000, 1_000 + 50 * text.length);
+}
+
+interface ConversationTail {
+  readonly chat: ChatConversation;
+  readonly sessionKey: string;
+  lastSpokeAt: number | null;
+  since: MessageDelivery[];
+}
+
+interface Speech {
+  readonly planId: string;
+  readonly controller: AbortController;
+  readonly params: SpeechParams;
+  readonly said: string[];
+  sessionKey?: string;
+}
+
 export type MessagingEvent =
   | { readonly type: "message"; readonly delivery: MessageDelivery }
   | {
@@ -101,7 +175,8 @@ function isDeliverySettled(delivery: MessageDelivery): boolean {
 export interface MessagingDeps {
   readonly store: StateStore<MessageDelivery>;
   readonly conversations: StateStore<ChatConversation>;
-  readonly clock: Pick<Clock, "init" | "time">;
+  readonly outbox: RemovableStateStore<OutboxPlan>;
+  readonly clock: Pick<Clock, "init" | "time" | "now">;
   readonly ensureSession: (
     copy: Pick<MessageCopy, "agentId" | "sessionKey">,
     title: string,
@@ -127,7 +202,9 @@ export class Messaging {
   private readonly deliveries = new Map<string, MessageDelivery>();
   private readonly chats = new Map<string, ChatConversation>();
   private readonly notifying = new Set<string>();
+  private readonly flushing = new Set<string>();
   private readonly listeners = new Set<(event: MessagingEvent) => void>();
+  private readonly speaking = new Map<string, Speech>();
   private readonly typing = new Map<
     string,
     { event: TypingStreamEvent; runId?: string }
@@ -658,6 +735,272 @@ export class Messaging {
     return result;
   }
 
+  /**
+   * Type and send each bubble as its own canonical message, pacing later
+   * bubbles on the simulation clock while the tool call stays open. The plan is
+   * retained first so a crash flushes what remains; an interrupt drops the
+   * unsent rest.
+   */
+  async speak(
+    sender: string,
+    senderName: string,
+    input: SpeechParams,
+    assertInvocationCurrent?: () => void,
+    configuredAgents?: ReadonlySet<string>,
+  ): Promise<SpeechResult> {
+    PARTICIPANT_ID.parse(sender);
+    const params = SPEECH_REQUEST.parse(input);
+    return await this.play(
+      {
+        id: messagingId([sender, params.requestId]),
+        sender,
+        senderName,
+        params,
+      },
+      true,
+      assertInvocationCurrent,
+      configuredAgents,
+    );
+  }
+
+  /**
+   * Deliver a plan's bubbles in order. A live plan is persisted, paced and
+   * interruptible; a recovered plan is flushed at once. Bubble identities are
+   * stable, so replaying an already-sent bubble returns its original receipt.
+   */
+  private async play(
+    plan: OutboxPlan,
+    live: boolean,
+    assertInvocationCurrent?: () => void,
+    configuredAgents?: ReadonlySet<string>,
+  ): Promise<SpeechResult> {
+    const { sender, senderName, params } = plan;
+    const { messages, requestId, ...target } = params;
+    const speech: Speech = {
+      planId: plan.id,
+      controller: new AbortController(),
+      params,
+      said: [],
+    };
+    if (live) {
+      this.speaking.get(sender)?.controller.abort();
+      this.speaking.set(sender, speech);
+    }
+    const signal = AbortSignal.any([
+      speech.controller.signal,
+      this.lifetime.signal,
+    ]);
+    const sent: SendMessageResult[] = [];
+    let paced = live;
+    try {
+      await this.init();
+      if (live)
+        await this.deps.outbox.register(plan.id, plan, {
+          assertCurrent: () => {
+            this.assertCurrent();
+            assertInvocationCurrent?.();
+          },
+        });
+      for (const [index, text] of messages.entries()) {
+        const first = sent[0];
+        const bubble: SendMessageParams = {
+          ...(first ? { sessionKey: first.sessionKey } : target),
+          text,
+          requestId: messagingId([requestId, String(index)]),
+        };
+        if (
+          first &&
+          paced &&
+          !(await this.accepted(sender, bubble.requestId))
+        ) {
+          await this.setTyping(
+            sender,
+            senderName,
+            first.sessionKey,
+            true,
+            undefined,
+            assertInvocationCurrent,
+          );
+          // A paused world would hold the brain turn open indefinitely.
+          paced = await sleepSim(this.deps.clock, typingMs(text), signal);
+        }
+        signal.throwIfAborted();
+        sent.push(
+          await this.send(
+            sender,
+            senderName,
+            bubble,
+            assertInvocationCurrent,
+            configuredAgents,
+          ),
+        );
+        speech.said.push(text);
+        speech.sessionKey = sent[0].sessionKey;
+      }
+    } catch (error) {
+      if (!speech.controller.signal.aborted) throw error;
+    } finally {
+      try {
+        // Keep the plan only for a later generation to flush; forget it before
+        // releasing the speaker so recovery can never resurrect dropped bubbles.
+        if (!this.lifetime.signal.aborted)
+          await this.deps.outbox.delete(plan.id);
+      } finally {
+        if (this.speaking.get(sender) === speech) this.speaking.delete(sender);
+      }
+    }
+    const unsaid = messages.slice(sent.length);
+    if (unsaid.length && sent[0])
+      this.clearTyping(sender, undefined, sent[0].chatId);
+    return {
+      status: unsaid.length
+        ? "interrupted"
+        : sent.every((result) => result.status === "delivered")
+          ? "delivered"
+          : "pending",
+      sessionKey: sent[0]?.sessionKey ?? target.sessionKey ?? "",
+      recipients: sent.at(-1)?.recipients ?? [],
+      messageIds: sent.map((result) => result.messageId),
+      said: messages.slice(0, sent.length),
+      unsaid,
+    };
+  }
+
+  private async accepted(sender: string, requestId: string): Promise<boolean> {
+    const id = messagingId([sender, requestId]);
+    return this.deliveries.has(id) || Boolean(await this.deps.store.lookup(id));
+  }
+
+  /** Stop a character mid-speech; returns whether anything was being said. */
+  interrupt(agentId: string): boolean {
+    const speech = this.speaking.get(agentId);
+    speech?.controller.abort(new Error("Speech interrupted"));
+    return Boolean(speech);
+  }
+
+  currentSpeech(agentId: string): CurrentSpeech | undefined {
+    const speech = this.speaking.get(agentId);
+    if (!speech) return undefined;
+    return {
+      ...(speech.sessionKey ? { sessionKey: speech.sessionKey } : {}),
+      said: [...speech.said],
+      unsaid: speech.params.messages.slice(speech.said.length),
+    };
+  }
+
+  /**
+   * Per current chat: this participant's address and the messages from others
+   * after their own latest message, in order. Reads canonical history, never
+   * catalog attribution.
+   */
+  private async conversationTails(
+    agentId: string,
+  ): Promise<Map<string, ConversationTail>> {
+    const visible = (await this.deps.store.entries())
+      .map(({ value }) => value)
+      .filter((message) => message.audience.includes(agentId))
+      .sort((a, b) => a.sequence - b.sequence);
+    const tails = new Map<string, ConversationTail>();
+    for (const message of visible) {
+      const chat = this.chats.get(message.chatId);
+      if (!chat?.members.includes(agentId)) continue;
+      const tail = tails.get(chat.id) ?? {
+        chat,
+        sessionKey: chatSummary(chat, agentId).sessionKey,
+        lastSpokeAt: null,
+        since: [],
+      };
+      if (message.sender === agentId) {
+        tail.lastSpokeAt = message.timestamp;
+        tail.since = [];
+      } else tail.since.push(message);
+      tails.set(chat.id, tail);
+    }
+    return tails;
+  }
+
+  /**
+   * Chats where someone spoke after this participant's latest message and the
+   * participant actually read at least one of those messages. `noticed` comes
+   * from attention: ignored or still-waiting stimuli never count as read.
+   */
+  async awaitingReplies(
+    agentId: string,
+    since: number,
+    noticed: (ref: MessageRef) => boolean,
+  ): Promise<AwaitingReply[]> {
+    PARTICIPANT_ID.parse(agentId);
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      const result: AwaitingReply[] = [];
+      for (const { sessionKey, since: tail } of (
+        await this.conversationTails(agentId)
+      ).values()) {
+        const read = tail.filter(
+          (message) =>
+            message.timestamp >= since &&
+            noticed({ id: message.id, sessionKey }),
+        );
+        const latest = read.at(-1);
+        if (latest)
+          result.push({
+            sessionKey,
+            sender: latest.sender,
+            timestamp: latest.timestamp,
+          });
+      }
+      return result.sort((a, b) => a.timestamp - b.timestamp);
+    });
+  }
+
+  /** Conversation facts for the participant's own chat ledger keys. */
+  async chatFacts(
+    agentId: string,
+    sessionKeys: readonly string[],
+  ): Promise<ChatFacts[]> {
+    PARTICIPANT_ID.parse(agentId);
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      const tails = await this.conversationTails(agentId);
+      return [...new Set(sessionKeys)].flatMap((sessionKey) => {
+        const chat = this.chats.get(conversationId(agentId, sessionKey));
+        if (!chat?.members.includes(agentId)) return [];
+        const tail = tails.get(chat.id);
+        return [
+          {
+            sessionKey: chatSummary(chat, agentId).sessionKey,
+            kind: chat.kind,
+            title: chat.kind === "group" ? chat.title : null,
+            memberCount: chat.members.length,
+            lastSpokeAt: tail?.lastSpokeAt ?? null,
+            unanswered: tail?.since.length ?? 0,
+            waitingSince: tail?.since[0]?.timestamp ?? null,
+          },
+        ];
+      });
+    });
+  }
+
+  /** Send every bubble of plans a previous generation left unfinished. */
+  private async flushOutbox(): Promise<void> {
+    for (const { value: plan } of await this.deps.outbox.entries()) {
+      if (this.lifetime.signal.aborted) return;
+      if (
+        this.flushing.has(plan.id) ||
+        [...this.speaking.values()].some((speech) => speech.planId === plan.id)
+      )
+        continue;
+      this.flushing.add(plan.id);
+      try {
+        await this.play(plan, false);
+      } catch (error) {
+        this.warn(error);
+      } finally {
+        this.flushing.delete(plan.id);
+      }
+    }
+  }
+
   /** Recover metadata projections and pending copies without invoking a brain. */
   async resume(): Promise<void> {
     if (this.lifetime.signal.aborted) return;
@@ -672,6 +1015,7 @@ export class Messaging {
       });
       if (this.lifetime.signal.aborted) return;
       this.notify();
+      await this.flushOutbox();
     } finally {
       this.scheduleRetry();
     }
@@ -817,6 +1161,7 @@ export class Messaging {
     this.lifetime.abort();
     if (this.timer) clearTimeout(this.timer);
     this.typing.clear();
+    this.speaking.clear();
     this.listeners.clear();
   }
 }

@@ -44,6 +44,7 @@ async function setup() {
   const dispose = vi.fn();
   const retained = new Map<string, MessageDelivery>();
   const chats = new Map<string, unknown>();
+  const outbox = new Map<string, unknown>();
   const config = { agents: { entries: { alice: {}, bob: {}, carol: {} } } };
   const resolveAgentIdentity = vi.fn(() => undefined);
   const entries = new Map<
@@ -67,43 +68,32 @@ async function setup() {
     logger: { warn: vi.fn() },
     runtime: {
       state: {
-        openKeyedStore: ({ namespace }: { namespace: string }) =>
-          namespace === "chats"
-            ? {
-                lookup: async (key: string) => structuredClone(chats.get(key)),
-                register: async (
-                  key: string,
-                  value: unknown,
-                  options?: { assertCurrent?: () => void },
-                ) => {
-                  options?.assertCurrent?.();
-                  chats.set(key, structuredClone(value));
-                },
-                entries: async () =>
-                  [...chats].map(([key, value]) => ({
-                    key,
-                    value: structuredClone(value),
-                    createdAt: Date.now(),
-                  })),
-              }
-            : {
-                lookup: async (key: string) =>
-                  structuredClone(retained.get(key)),
-                register: async (
-                  key: string,
-                  value: MessageDelivery,
-                  options?: { assertCurrent?: () => void },
-                ) => {
-                  options?.assertCurrent?.();
-                  retained.set(key, structuredClone(value));
-                },
-                entries: async () =>
-                  [...retained].map(([key, value]) => ({
-                    key,
-                    value: structuredClone(value),
-                    createdAt: Date.now(),
-                  })),
-              },
+        openKeyedStore: ({ namespace }: { namespace: string }) => {
+          const map: Map<string, unknown> =
+            namespace === "chats"
+              ? chats
+              : namespace === "outbox"
+                ? outbox
+                : retained;
+          return {
+            lookup: async (key: string) => structuredClone(map.get(key)),
+            register: async (
+              key: string,
+              value: unknown,
+              options?: { assertCurrent?: () => void },
+            ) => {
+              options?.assertCurrent?.();
+              map.set(key, structuredClone(value));
+            },
+            delete: async (key: string) => map.delete(key),
+            entries: async () =>
+              [...map].map(([key, value]) => ({
+                key,
+                value: structuredClone(value),
+                createdAt: Date.now(),
+              })),
+          };
+        },
       },
       agent: {
         resolveAgentIdentity,
@@ -129,7 +119,11 @@ async function setup() {
     return () => {};
   });
   const messaging = registerMessaging(api, {
-    clock: { init: async () => {}, time: () => 123456 },
+    clock: {
+      init: async () => {},
+      time: () => 123456,
+      now: () => ({ simTime: 123456, speed: 0, formatted: "" }),
+    },
     perception: { receive, onAdopted },
   });
   instances.push(messaging);
@@ -153,7 +147,7 @@ async function setup() {
   const execute = (
     input: unknown = {
       members: ["bob"],
-      text: "Hello Bob",
+      messages: ["Hello Bob"],
     },
     overrides: Partial<OpenClawPluginToolContext<2>> = {},
   ) => executeTool("send_message", input, overrides);
@@ -199,7 +193,7 @@ afterEach(async () => {
 describe("send_message SDK integration", () => {
   it("deduplicates host replays without model-supplied IDs and scopes calls to the brain session", async () => {
     const h = await setup();
-    const input = { members: ["bob"], title: "Tea", text: "Hello" };
+    const input = { members: ["bob"], title: "Tea", messages: ["Hello"] };
     const first = await h.executeTool("send_message", input, {}, "same-call");
     const replay = await h.executeTool("send_message", input, {}, "same-call");
     expect(replay.details).toEqual(first.details);
@@ -209,20 +203,20 @@ describe("send_message SDK integration", () => {
     await expect(
       h.executeTool(
         "send_message",
-        { ...input, text: "Changed" },
+        { ...input, messages: ["Changed"] },
         {},
         "same-call",
       ),
     ).rejects.toThrow("different message");
     const fresh = await h.executeTool("send_message", input, {}, "new-call");
-    expect(fresh.details.messageId).not.toBe(first.details.messageId);
+    expect(fresh.details.messageIds[0]).not.toBe(first.details.messageIds[0]);
     const reset = await h.executeTool(
       "send_message",
       input,
       { sessionId: "new-brain-session" },
       "same-call",
     );
-    expect(reset.details.messageId).not.toBe(first.details.messageId);
+    expect(reset.details.messageIds[0]).not.toBe(first.details.messageIds[0]);
     expect(h.chats.size).toBe(3);
     await expect(
       h.execute({ ...input, requestId: "model-id" }),
@@ -240,7 +234,7 @@ describe("send_message SDK integration", () => {
     const first = await h.execute({
       title: "Tea",
       members: ["bob"],
-      text: "Hello",
+      messages: ["Hello"],
     });
     const bob = { agentId: "bob", sessionKey: "agent:bob:brain" };
     const found = await h.executeTool("list_chats", { query: "tea" }, bob);
@@ -273,7 +267,10 @@ describe("send_message SDK integration", () => {
     vi.spyOn(h.api.runtime.agent, "resolveAgentIdentity").mockReturnValue({
       name: "Bob",
     });
-    const reply = await h.execute({ sessionKey, text: "See you there" }, bob);
+    const reply = await h.execute(
+      { sessionKey, messages: ["See you there"] },
+      bob,
+    );
     expect(reply.details.recipients).toEqual(["alice", "carol"]);
     expect(
       append.mock.calls
@@ -287,7 +284,7 @@ describe("send_message SDK integration", () => {
     const first = await h.execute({
       title: "Tea",
       members: ["bob"],
-      text: "Hello",
+      messages: ["Hello"],
     });
     const sessionKey = first.details.sessionKey;
     await expect(
@@ -378,12 +375,12 @@ describe("send_message SDK integration", () => {
     await expect(
       h.execute({
         members: ["bob"],
-        text: "Hi",
+        messages: ["Hi"],
         sender: "carol",
       }),
     ).rejects.toThrow();
     await expect(
-      h.execute({ members: ["missing"], text: "Hi" }),
+      h.execute({ members: ["missing"], messages: ["Hi"] }),
     ).rejects.toThrow("Unknown character");
     expect(append).not.toHaveBeenCalled();
   });

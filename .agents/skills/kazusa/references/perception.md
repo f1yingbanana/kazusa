@@ -730,11 +730,14 @@ configuration.
 Instead of arbitrary numerical hysteresis bands, Perception respects Jev's
 discrete categorical attention decisions directly:
 
-- **Idle State**: `WAKE` (deliver immediately) vs `IGNORE` (drop from
-  attention).
-- **Busy State**: `STEER` (immediate mid-turn injection via `mode: "steer"`),
-  `QUEUE_NEXT` (accumulate for single consolidated batch wake upon turn
-  completion), or `IGNORE` (drop from attention).
+- **Idle State**: `WAKE` (deliver after the scored `response_latency`, often
+  immediately), `DEFER` (hold until the current activity ends) or `IGNORE` (drop
+  from attention).
+- **Busy State**: `STEER` (immediate mid-turn injection via `mode: "steer"`,
+  interrupting any in-progress `send_message`), `QUEUE_NEXT` (accumulate for a
+  single consolidated wake upon turn completion), `DEFER` (hold until the
+  current activity ends), or `IGNORE` (drop from attention).
+- See §12 for readiness, task boundaries and paced speech.
 
 ---
 
@@ -753,6 +756,8 @@ discrete categorical attention decisions directly:
 | Task extended during active turn        | If `delay_task` was called, stale deadline check is dropped when turn finishes.                   |
 | Decision model unavailable / error      | Fails open to `WAKE` (if idle) or `STEER` (if busy); never silently drops or stalls stimuli.      |
 | Process restart                         | Retained stimuli in `"perception"` store recovered; re-evaluates against live clock and task.     |
+| Deferred chat when the task ends        | Delivered in the same turn as the deadline check-in (§12).                                        |
+| `STEER` while `send_message` is pacing  | Remaining bubbles are dropped; the tool returns said/unsaid before the steer is injected (§12.4). |
 | Explicit operator stop                  | Retains pending stimuli in store without immediately triggering an auto-wake.                     |
 
 ---
@@ -793,3 +798,116 @@ When a development input arrives on `agent:<id>:chat:direct:user:<userId>`:
 4. If admitted, the character's decision model and brain evaluate the human's
    message in the context of their relationship card in the Personal Wiki
    (`workspaces/<id>/wiki/entities/characters/sensei.md`).
+
+---
+
+## 12. Human Reply Timing, Task Boundaries & Paced Speech
+
+The design target is a person with a phone. A notification does not mean the
+message is read now, and reading it does not mean replying now. People finish
+what they are doing, check at natural breaks, and once they pick up the phone
+they see everything waiting. Section 3's WAKE/IGNORE gate had two gaps: an
+`IGNORE` during a task was never brought back, and two characters woken by the
+same group message replied at the same instant.
+
+### 12.1 Decision questions
+
+One `DecisionBatch` carries every question; this adds no Jev latency.
+
+| Brain | Choice question                                                  | Extra question                        |
+| :---- | :--------------------------------------------------------------- | :------------------------------------ |
+| Idle  | `wake_decision`: `WAKE`, `DEFER`, `IGNORE`                       | `response_latency` (score, see below) |
+| Busy  | `attention_allocation`: `STEER`, `QUEUE_NEXT`, `DEFER`, `IGNORE` | —                                     |
+
+- `IGNORE` is final. Ignored keys are kept in `ignoredIds` (bounded like
+  `processedIds`); `Perception.noticed()` excludes them, so an ignored message
+  never reaches the brain or its "Chats awaiting your reply" view. "Maybe later"
+  is `DEFER`. A future cheap pre-filter (e.g. large-group chatter that never
+  mentions the character) could skip Jev entirely; it is not built.
+- `response_latency` is a `score` question whose ordered criteria are objects
+  `{ minutes, description }` from the perception rubric (default anchors 0, 1,
+  5, 20, 60, 180 simulated minutes). Perception reads the same criteria from the
+  batch, interpolates the fractional score in `log(1 + minutes)` space, and
+  applies ±20% jitter so characters with the same score do not reply in
+  lockstep. It is used only when the choice is `WAKE`.
+- A failed or missing latency answer means zero delay, matching the fail-open
+  policy.
+- Task deadlines and idle check-ins still bypass Jev when the brain is idle.
+
+**Evidence for timing.** A person deciding how soon to answer weighs who they
+are, what they are doing, who is asking, where the conversation stands, and what
+it says. The decision state carries each:
+
+| Factor                       | Field                                                                                                           | Source                                  |
+| :--------------------------- | :-------------------------------------------------------------------------------------------------------------- | :-------------------------------------- |
+| Temperament, recorded mood   | `character.identity`, `soul`, `memory`                                                                          | workspace files                         |
+| Activity and absorption      | `currentActivity` (`type`, `description`, `elapsedMinutes`, `remainingMinutes`)                                 | Taskman lease                           |
+| Time of day                  | `simulationTime`                                                                                                | Clock                                   |
+| Relationship with the sender | `personalWiki` (sender cards first)                                                                             | personal wiki                           |
+| Conversation state           | `conversations[]`: `kind`, `title`, `members`, `youLastSpokeMinutesAgo`, `unansweredMessages`, `waitingMinutes` | Messaging canonical store (`chatFacts`) |
+| Content and addressing       | `incomingBundle`, `recentChannelContext`                                                                        | stimuli, ledgers                        |
+| Mid-speech                   | `currentSpeech` (busy only)                                                                                     | Messaging outbox                        |
+
+Desires and mood are not modelled yet; when they are, they belong in `character`
+next to identity, and the rubric already tells Jev to weigh mood.
+
+### 12.2 Waiting items and readiness
+
+Approved-but-not-yet-delivered stimuli stay in `state.pending` with
+`action: "QUEUE_NEXT"` and an optional `until`:
+
+| Outcome                | `until`                                   |
+| :--------------------- | :---------------------------------------- |
+| Busy `QUEUE_NEXT`      | none: ready when the current thought ends |
+| Idle `WAKE`, delay > 0 | `{ notBefore, taskId? }`                  |
+| `DEFER` with a task    | `{ taskId }`                              |
+| `DEFER` without a task | none (behaves like `WAKE`/`QUEUE_NEXT`)   |
+
+An item is **ready** when it has no `until`, its `notBefore` has passed, or its
+bound task is over (the lease is gone, replaced, or past `endAt`). The boundary
+binds to the task **id**, not `endAt`: `delay_task` keeps the wait ("study ran
+over"), `start_task` ends it ("gave up and checked my phone").
+
+When the brain is idle and **any** approved item is ready, Perception reserves
+one followup containing **all** approved items: picking up the phone shows
+everything. A fresh `WAKE` with no delay, or an idle deadline, does the same.
+Readiness is reached through existing events (deadline cron → `receive`, brain
+end → `ended`) plus one per-agent timer for the earliest `notBefore`. The timer
+re-checks at most every 30 real seconds, so clock speed changes, pauses, and
+`clock_advance` need no extra subscription. `pending` is retained, so waits
+survive restarts; `recover()` and the next drain re-arm the timer.
+
+### 12.3 Scenarios
+
+| Situation                                       | Outcome                                                                                                  |
+| :---------------------------------------------- | :------------------------------------------------------------------------------------------------------- |
+| Studying until 15:00, user texts at 14:20       | `DEFER`. At 15:00 the deadline turn carries "Incoming chats" + "Activity check-in" together.             |
+| Character extends the study at that check-in    | The deferred chats were already in that turn; replying briefly or holding off is the brain's choice.     |
+| `WAKE` after 20 min, but the task ends in 5     | The task boundary makes it ready first; delivered with the check-in.                                     |
+| Items waiting, an urgent message arrives        | Fresh `WAKE` with no delay pulls in every waiting item.                                                  |
+| Items waiting, a minor message arrives          | It is `DEFER`red or ignored for good; earlier waits are unaffected.                                      |
+| Mid-task reaction turn, another message arrives | Busy `DEFER` keeps it for the task boundary instead of forcing another turn right after this one.        |
+| Sleeping 23:00–07:00, message at 02:00          | `DEFER`; the character wakes up to their messages.                                                       |
+| A group message wakes two characters            | Different latency scores (plus jitter) stagger them; the later one sees the earlier reply in its ledger. |
+| Idle supervisor tick while items wait           | Skipped (`queued > 0`); the next wake is already scheduled.                                              |
+| Clock paused                                    | `notBefore` cannot pass and tasks cannot end; nothing fires.                                             |
+
+### 12.4 Paced speech and steering
+
+`send_message({ messages: [...] })` keeps the tool call open while Messaging
+delivers each bubble as its own canonical message, waiting a simulated typing
+interval before every bubble after the first (the brain's thinking time already
+showed the typing indicator for the first). While the call is open the brain is
+busy, so new stimuli go through `attention_allocation`. Jev's state includes
+`currentSpeech: { chat, said, unsaid }` so it can tell that a reply contradicts
+what the character is about to say.
+
+OpenClaw's steer queue injects only at the next tool boundary. Perception
+therefore interrupts Messaging when it **reserves** a steer delivery (not at
+adoption): the tool returns a partial result, and the host injects the steer
+message right after it. Without the interrupt, every bubble would be delivered
+before the character noticed anything.
+
+Interrupted bubbles were never committed, so no ledger or human ever saw them.
+The tool result lists what was said and unsaid; the steer message carries the
+interrupting text, so the result does not repeat it.

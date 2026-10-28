@@ -143,3 +143,40 @@ export class Clock {
     return snapshot;
   }
 }
+
+/**
+ * Wait until `simMs` of simulation time has elapsed. Wall time follows the
+ * current speed and is re-checked every `pollMs`, so speed changes and clock
+ * advances apply mid-wait. Returns false without waiting further once the clock
+ * is paused; callers decide what a frozen world means for them.
+ */
+export async function sleepSim(
+  clock: Pick<Clock, "now">,
+  simMs: number,
+  signal: AbortSignal,
+  pollMs = 250,
+): Promise<boolean> {
+  const target = clock.now().simTime + simMs;
+  for (;;) {
+    signal.throwIfAborted();
+    const { simTime, speed } = clock.now();
+    if (simTime >= target) return true;
+    if (speed <= 0) return false;
+    const wait = Math.min(pollMs, Math.ceil((target - simTime) / speed));
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new Error("Simulation sleep aborted"),
+        );
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, wait);
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+}

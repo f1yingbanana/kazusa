@@ -197,6 +197,21 @@ instructions. Skills are full injected bodies, not a hint to read a file.
 - **Resolution Caching**: Resolves and caches skill paths and parsed Markdown
   bodies in memory; `clearCache()` invalidates for tests.
 
+## Chats awaiting a reply (the "phone glance")
+
+The `### Current activity` situation message ends with
+`### Chats awaiting your reply` when any exist: current chats where, within
+`shortTermHours`, someone spoke after the character's own latest message **and
+the brain was actually shown at least one of those messages**. Each line is
+`- <address>: <sender id> at <sim time>` for the latest such message; the text
+is already in the ledger history. Messaging computes the conversation tail from
+its canonical store, not from catalog attribution (outgoing catalog records can
+lack sender metadata), and `Perception.noticed()` filters it: `IGNORE`d stimuli
+were discarded for good and waiting (`DEFER`, delayed `WAKE`) ones are unread.
+This is how a character notices a conversation they read but forgot to answer.
+The `context-conventions` skill says the list is not a demand: a closed
+conversation or a deliberate silence needs nothing.
+
 ## Transcript envelope & speaker attribution
 
 The Context Engine packages selected experience records into a single synthetic

@@ -50,10 +50,23 @@ export default definePluginEntry({
 
     registerClockHttp(api, clock);
     const taskman = registerTaskman(api, { clock, broadcaster });
-    registerContextEngine(api, { clock });
+    const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
+    registerContextEngine(api, {
+      clock,
+      // Only conversations the character actually read: an ignored message was
+      // discarded and a deferred one has not been seen yet.
+      awaitingReplies: async (agentId, since) =>
+        (await messagingRef.current?.awaitingReplies(
+          agentId,
+          since,
+          await perception.noticed(agentId),
+        )) ?? [],
+    });
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
+      chatFacts: async (agentId, sessionKeys) =>
+        (await messagingRef.current?.chatFacts(agentId, sessionKeys)) ?? [],
     });
     const perception = registerPerception(api, {
       clock,
@@ -64,8 +77,6 @@ export default definePluginEntry({
     api.lifecycle.onDispose?.(stopSupervisor);
 
     registerTimelineHttp(api, { clock });
-
-    const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
 
     const getStatuses = async (): Promise<Record<string, CharacterStatus>> => {
       if (!messagingRef.current) return {};

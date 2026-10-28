@@ -7,6 +7,7 @@ import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-tr
 import YAML from "yaml";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
+import type { ChatFacts } from "../messaging/messaging.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleDecisionBatch,
@@ -201,6 +202,11 @@ export function createDecisionContextAssembler(
   deps: {
     readonly clock: Pick<Clock, "time">;
     readonly skillLoader?: SkillLoader;
+    /** Canonical conversation state; absent until Messaging exists. */
+    readonly chatFacts?: (
+      agentId: string,
+      sessionKeys: readonly string[],
+    ) => Promise<readonly ChatFacts[]>;
   },
 ): DecisionContextAssembler {
   const config = CONTEXT_ENGINE_CONFIG.parse(
@@ -229,69 +235,79 @@ export function createDecisionContextAssembler(
       api.config.session?.store,
       { agentId },
     );
-    const [streams, characterFiles, wiki, skillMarkdown] = await Promise.all([
-      Promise.all(
-        keys.slice(0, 32).map(async (sessionKey) => {
-          const items: SessionCatalogTranscriptItem[] = [];
-          let cursor: string | undefined;
-          // Catalog pages may contain non-dialogue entries. Follow up to four
-          // pages, stopping at the time cutoff or configured usable-record count.
-          for (let pageIndex = 0; pageIndex < 4; pageIndex++) {
-            request.signal?.throwIfAborted();
-            const page = await readSessionTranscriptCatalogPage({
-              agentId,
-              sessionKey,
-              storePath,
-              pluginId: api.id,
-              sourceDomain: "kazusa",
-              limit: 200,
-              cursor,
-            }).catch((error: unknown) => {
+    const [streams, characterFiles, wiki, skillMarkdown, chats] =
+      await Promise.all([
+        Promise.all(
+          keys.slice(0, 32).map(async (sessionKey) => {
+            const items: SessionCatalogTranscriptItem[] = [];
+            let cursor: string | undefined;
+            // Catalog pages may contain non-dialogue entries. Follow up to four
+            // pages, stopping at the time cutoff or configured usable-record count.
+            for (let pageIndex = 0; pageIndex < 4; pageIndex++) {
               request.signal?.throwIfAborted();
-              api.logger.warn(
-                `Decision context could not read ${sessionKey}: ${String(error)}`,
-              );
-              return { items: [], nextCursor: undefined };
-            });
-            let old = false;
-            for (const item of page.items) {
-              const time = Date.parse(item.timestamp ?? "");
-              if (time < simTime - config.decisionShortTermHours * 3_600_000) {
-                old = true;
-                break;
+              const page = await readSessionTranscriptCatalogPage({
+                agentId,
+                sessionKey,
+                storePath,
+                pluginId: api.id,
+                sourceDomain: "kazusa",
+                limit: 200,
+                cursor,
+              }).catch((error: unknown) => {
+                request.signal?.throwIfAborted();
+                api.logger.warn(
+                  `Decision context could not read ${sessionKey}: ${String(error)}`,
+                );
+                return { items: [], nextCursor: undefined };
+              });
+              let old = false;
+              for (const item of page.items) {
+                const time = Date.parse(item.timestamp ?? "");
+                if (
+                  time <
+                  simTime - config.decisionShortTermHours * 3_600_000
+                ) {
+                  old = true;
+                  break;
+                }
+                if (
+                  time <= simTime &&
+                  item.text?.trim() &&
+                  (item.type === "userMessage" || item.type === "agentMessage")
+                )
+                  items.push(item);
+                if (items.length >= config.decisionHistoryItems) break;
               }
               if (
-                time <= simTime &&
-                item.text?.trim() &&
-                (item.type === "userMessage" || item.type === "agentMessage")
+                old ||
+                items.length >= config.decisionHistoryItems ||
+                !page.nextCursor
               )
-                items.push(item);
-              if (items.length >= config.decisionHistoryItems) break;
+                break;
+              cursor = page.nextCursor;
             }
-            if (
-              old ||
-              items.length >= config.decisionHistoryItems ||
-              !page.nextCursor
-            )
-              break;
-            cursor = page.nextCursor;
-          }
-          return [sessionKey, items.reverse()] as const;
+            return [sessionKey, items.reverse()] as const;
+          }),
+        ),
+        readCharacterFiles(workspace, request.signal),
+        readPersonalWiki(
+          workspace,
+          stimuli.map((item) => item.sender),
+          stimuli.map((item) => item.text).join("\n"),
+          config.decisionWikiMaxArticles,
+          request.signal,
+        ),
+        skillLoader.loadSkillDocument("perception", {
+          agentId,
+          workspaceDir: workspace,
         }),
-      ),
-      readCharacterFiles(workspace, request.signal),
-      readPersonalWiki(
-        workspace,
-        stimuli.map((item) => item.sender),
-        stimuli.map((item) => item.text).join("\n"),
-        config.decisionWikiMaxArticles,
-        request.signal,
-      ),
-      skillLoader.loadSkillDocument("perception", {
-        agentId,
-        workspaceDir: workspace,
-      }),
-    ]);
+        deps.chatFacts?.(
+          agentId,
+          request.incomingBundle
+            .map((item) => item.sessionKey)
+            .filter((key) => key.includes(":chat:")),
+        ) ?? [],
+      ]);
     request.signal?.throwIfAborted();
     return assembleDecisionBatch({
       ...request,
@@ -300,6 +316,7 @@ export function createDecisionContextAssembler(
       config,
       characterFiles,
       wiki,
+      chats,
       rubric: skillMarkdown,
       sessionsContext: Object.fromEntries(streams),
     });

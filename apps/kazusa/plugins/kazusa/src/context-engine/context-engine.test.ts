@@ -260,6 +260,29 @@ describe("Context assembly", () => {
     expect(result.systemPromptAddition).not.toContain("active_task");
   });
 
+  it("lists chats awaiting a reply as a compact inbox glance", async () => {
+    const result = await assemble({
+      awaitingReplies: [
+        {
+          sessionKey: "agent:alice:chat:direct:user:sensei",
+          sender: "user:sensei",
+          timestamp: NOW,
+        },
+      ],
+    });
+    expect(result.messages).toEqual([
+      user(
+        [
+          "### Current activity",
+          "No activity has been chosen yet.",
+          "",
+          "### Chats awaiting your reply",
+          `- chat:direct:user:sensei: user:sensei at ${formatSimTime(NOW)}`,
+        ].join("\n"),
+      ),
+    ]);
+  });
+
   it("uses leftover space for newest records without mutating the source streams", async () => {
     const messages = Array.from({ length: 50 }, (_, index) =>
       event(`event-${index} ${"x".repeat(150)}`, NOW - 50 + index),
