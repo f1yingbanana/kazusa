@@ -5,10 +5,17 @@ import useSWR from "swr";
 import type {
   CharacterStatus,
   CharacterSummary,
+  DesiresResponse,
   WorldResponse,
 } from "@kazusa/client";
 import { useChats } from "@/hooks/use-chats";
-import { clockStore, journalTailStore, statusStore } from "@/lib/live/state";
+import {
+  clockStore,
+  desireConfigStore,
+  desireStore,
+  journalTailStore,
+  statusStore,
+} from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { simTimeAt } from "@/lib/time/sim";
@@ -19,6 +26,7 @@ import {
   type ResolvedSources,
 } from "./capabilities";
 import { fetchCharacters } from "./characters/http";
+import { DESIRES_KEY, fetchDesires } from "./desires/http";
 import { fetchWorld } from "./clock/http";
 import {
   MOCK_WORLD_START,
@@ -86,10 +94,19 @@ export function SourcesProvider({
     { revalidateOnFocus: false },
   );
 
+  const liveDesires = useSWR<DesiresResponse, Error>(
+    resolved.desires === "live"
+      ? ([DESIRES_KEY, config.baseUrl, config.token ?? ""] as const)
+      : null,
+    () => fetchDesires(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
+  );
+
   const needsWorld =
     resolved.characters === "mock" ||
     resolved.status === "mock" ||
-    resolved.timeline === "mock";
+    resolved.timeline === "mock" ||
+    resolved.desires === "mock";
   const liveIds = liveCharacters.data?.map((c) => c.id).join("|");
 
   const world = useMemo(() => {
@@ -147,6 +164,19 @@ export function SourcesProvider({
       statusStore.reset([]);
     }
   }, [resolved.status, world, liveCharacters.data]);
+
+  useEffect(() => {
+    if (resolved.desires === "mock" && world) {
+      desireConfigStore.set(world.desireConfig);
+      desireStore.reset(world.desires);
+    } else if (resolved.desires === "live" && liveDesires.data) {
+      desireConfigStore.set(liveDesires.data.config);
+      desireStore.reset(Object.entries(liveDesires.data.records));
+    } else if (resolved.desires === "unavailable") {
+      desireConfigStore.set(null);
+      desireStore.reset([]);
+    }
+  }, [resolved.desires, world, liveDesires.data]);
 
   useEffect(() => {
     journalTailStore.set([]);

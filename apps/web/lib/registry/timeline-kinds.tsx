@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { JournalEvent, JournalKind } from "@kazusa/client";
 import { CharacterChip, ChatChip } from "@/components/entities/chips";
+import { taskLabel } from "@/components/entities/task-icon";
 import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
 import type { TimelineKind } from "./types";
 
@@ -26,6 +27,7 @@ export const TIMELINE_KINDS: KindMap = {
     salience: "low",
     fact: (event) => (
       <>
+        <span className="text-muted-foreground">{`${taskLabel(event.payload.type)} · `}</span>
         <span>{event.payload.description}</span>
         <span className="font-mono text-xs text-muted-foreground">
           {" · "}
@@ -68,6 +70,8 @@ export const TIMELINE_KINDS: KindMap = {
     icon: MessageSquareTextIcon,
     facet: "chat",
     salience: "normal",
+    // Chats already show every message; in the stream they drown out actions.
+    hiddenByDefault: true,
     actors: (event) => [event.payload.senderId],
     fact: (event) => (
       <>
@@ -226,6 +230,27 @@ function formatDelay(ms: number) {
 export const TIMELINE_KIND_LIST = Object.values(
   TIMELINE_KINDS,
 ) as TimelineKind[];
+
+/** What the Timeline and the inspector's Recent show with no `tl.kinds` param. */
+export const DEFAULT_TIMELINE_KINDS: readonly JournalKind[] =
+  TIMELINE_KIND_LIST.filter((kind) => !kind.hiddenByDefault).map(
+    (kind) => kind.kind,
+  );
+
+/** `tl.kinds` absent means the default set, not every kind. */
+export function effectiveTimelineKinds(
+  param: readonly JournalKind[],
+): readonly JournalKind[] {
+  return param.length ? param : DEFAULT_TIMELINE_KINDS;
+}
+
+/** The `tl.kinds` value for a selection: null when it equals the default. */
+export function timelineKindsParam(kinds: readonly JournalKind[]) {
+  const isDefault =
+    kinds.length === DEFAULT_TIMELINE_KINDS.length &&
+    DEFAULT_TIMELINE_KINDS.every((kind) => kinds.includes(kind));
+  return isDefault ? null : kinds.join(",");
+}
 
 /**
  * Typed accessor: TS can't correlate `event.kind` with the map entry on its

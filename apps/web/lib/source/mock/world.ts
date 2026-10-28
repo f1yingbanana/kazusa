@@ -3,11 +3,14 @@ import type {
   CharacterStatus,
   CharacterSummary,
   ChatType,
+  DesireRecord,
+  DesiresConfig,
   JournalEvent,
   StreamEvent,
   TaskSummary,
 } from "@kazusa/client";
 import { HOUR, MINUTE } from "../../time/sim";
+import { MOCK_DESIRES_CONFIG, mockDesireRecord } from "./desires";
 
 /*
  * Deterministic placeholder world. Everything here is concept data for
@@ -184,7 +187,7 @@ type TaskTemplate = {
 
 const DAY_TASKS: readonly TaskTemplate[] = [
   {
-    type: "read",
+    type: "having fun",
     descriptions: [
       "Reading a field journal",
       "Reading old letters",
@@ -193,7 +196,7 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [20, 90],
   },
   {
-    type: "work",
+    type: "working",
     descriptions: [
       "Sorting the day's intake",
       "Repairing a worn mechanism",
@@ -202,12 +205,12 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [45, 180],
   },
   {
-    type: "eat",
+    type: "eating",
     descriptions: ["Having lunch", "Grabbing a quick snack", "Sharing tea"],
     minutes: [15, 45],
   },
   {
-    type: "walk",
+    type: "traveling",
     descriptions: [
       "Walking along the river",
       "Running an errand",
@@ -216,7 +219,7 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [15, 60],
   },
   {
-    type: "study",
+    type: "studying",
     descriptions: [
       "Studying for an exam",
       "Practicing notation",
@@ -225,7 +228,7 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [30, 120],
   },
   {
-    type: "talk",
+    type: "socializing",
     descriptions: [
       "Catching up with a friend",
       "Arguing about a plan",
@@ -234,7 +237,7 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [15, 60],
   },
   {
-    type: "rest",
+    type: "miscellaneous",
     descriptions: [
       "Resting on a bench",
       "Staring out the window",
@@ -243,12 +246,12 @@ const DAY_TASKS: readonly TaskTemplate[] = [
     minutes: [10, 40],
   },
   {
-    type: "cook",
+    type: "eating",
     descriptions: ["Cooking dinner", "Baking bread", "Prepping ingredients"],
     minutes: [30, 90],
   },
   {
-    type: "write",
+    type: "miscellaneous",
     descriptions: [
       "Writing in a diary",
       "Composing a letter",
@@ -258,7 +261,7 @@ const DAY_TASKS: readonly TaskTemplate[] = [
   },
 ];
 const NIGHT_TASK: TaskTemplate = {
-  type: "sleep",
+  type: "sleeping",
   descriptions: ["Sleeping", "Sleeping in late", "Napping"],
   minutes: [300, 480],
 };
@@ -314,6 +317,9 @@ export interface MockWorld {
   /** Ascending by seq. Mutated by `advanceMockWorld` (it's the mock "server"). */
   readonly journal: JournalEvent[];
   readonly statuses: Map<string, CharacterStatus>;
+  readonly desireConfig: DesiresConfig;
+  /** Closed-form records, re-anchored on every mock task start. */
+  readonly desires: Map<string, DesireRecord>;
   readonly rng: Rng;
   nextSeq: number;
   taskCounter: number;
@@ -483,7 +489,7 @@ export function createMockWorld(
       const { event, task } = startTask(counter, agent.id, at);
       drafts.push(event);
       let end = task.endAt;
-      if (task.type !== "sleep" && chance(rng, 0.12)) {
+      if (task.type !== "sleeping" && chance(rng, 0.12)) {
         const extra = int(rng, 10, 40);
         const delayAt =
           task.startedAt + Math.floor((task.endAt - task.startedAt) * 0.7);
@@ -555,6 +561,16 @@ export function createMockWorld(
     );
   }
 
+  const desires = new Map<string, DesireRecord>();
+  for (const agent of agents) {
+    const task = current.get(agent.id);
+    if (task)
+      desires.set(
+        agent.id,
+        mockDesireRecord(rng, undefined, task, task.startedAt),
+      );
+  }
+
   return {
     id: ++worldCounter,
     title: "Mock World",
@@ -565,6 +581,8 @@ export function createMockWorld(
     chats,
     journal,
     statuses,
+    desireConfig: MOCK_DESIRES_CONFIG,
+    desires,
     rng,
     nextSeq: journal.length + 1,
     taskCounter: counter.taskCounter,
@@ -598,6 +616,14 @@ export function advanceMockWorld(
     const started = startTask(world, id, now, undefined);
     append(started.event);
     world.statuses.set(id, { ...status, task: started.task });
+    const record = mockDesireRecord(
+      rng,
+      world.desires.get(id),
+      started.task,
+      now,
+    );
+    world.desires.set(id, record);
+    events.push({ type: "desires", characterId: id, record });
     changed.add(id);
     starts += 1;
   }

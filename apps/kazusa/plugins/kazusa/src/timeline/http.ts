@@ -68,6 +68,10 @@ export function registerTimelineHttp(
           )
       : undefined;
 
+    // Clients hide messages by default; skip reading every chat ledger then.
+    const wantsMessages =
+      !kindsFilter?.length || kindsFilter.includes("message.sent");
+
     const allAgentIds = [...new Set(listAgentIds(api.config))];
     const targetAgents = actorsFilter
       ? allAgentIds.filter((id) => actorsFilter.includes(id))
@@ -101,8 +105,9 @@ export function registerTimelineHttp(
           return (
             key?.agentId === agentId &&
             (key.rest === "tasks" ||
-              key.rest.startsWith("chat:direct:") ||
-              key.rest.startsWith("chat:group:"))
+              (wantsMessages &&
+                (key.rest.startsWith("chat:direct:") ||
+                  key.rest.startsWith("chat:group:"))))
           );
         });
 

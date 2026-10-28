@@ -310,6 +310,81 @@ export type CharacterDetailResponse = z.infer<
 >;
 
 /* ========================================================================== */
+/* Read model: desires (GET /kazusa/desires, SSE `desires`)                   */
+/* ========================================================================== */
+
+/** One step of the world's level-to-state mapping (ascending by `min`). */
+export const DesireStateDefSchema = z.object({
+  name: z.string(),
+  /** A level is in the last state whose `min` it reaches. */
+  min: z.number(),
+  /** Where a task targeting this state settles. */
+  level: z.number(),
+});
+export type DesireStateDef = z.infer<typeof DesireStateDefSchema>;
+
+export const DesireDefinitionSchema = z.object({
+  /** Stable key, shown to the LLM verbatim; clients may prettify it. */
+  name: z.string(),
+  /** The semantic contract given to the LLM. */
+  description: z.string(),
+  /** Default points lost per simulated hour. */
+  drain: z.number().nonnegative(),
+});
+export type DesireDefinition = z.infer<typeof DesireDefinitionSchema>;
+
+/** The world's desire catalog (`plugins.entries.kazusa.config.desires`). */
+export const DesiresConfigSchema = z.object({
+  states: z.array(DesireStateDefSchema).min(1),
+  /** State an unseen desire starts in. */
+  initial: z.string(),
+  catalog: z.array(DesireDefinitionSchema),
+});
+export type DesiresConfig = z.infer<typeof DesiresConfigSchema>;
+
+/** A task's pull on one desire: move toward `target`, then hold there. */
+export const DesireEffectSchema = z.object({
+  target: z.number(),
+  /** Points per simulated hour, always non-negative. */
+  rate: z.number().nonnegative(),
+});
+export type DesireEffect = z.infer<typeof DesireEffectSchema>;
+
+/**
+ * One character's desires in closed form, exact at `anchorAt`. Levels at any
+ * later sim time are a pure function of this record, so clients compute them
+ * locally instead of polling. Changes only on task transitions and operator
+ * configuration.
+ */
+export const DesireRecordSchema = z.object({
+  /** Epoch-ms sim time at which `levels` are exact. */
+  anchorAt: z.number(),
+  /** Levels 0..100 at `anchorAt`, keyed by catalog name. */
+  levels: z.record(z.string(), z.number()),
+  /** The current task's declared effects, applying until `until`. */
+  effects: z
+    .object({
+      taskId: z.string(),
+      until: z.number(),
+      byDesire: z.record(z.string(), DesireEffectSchema),
+    })
+    .optional(),
+  /** Sparse per-character drain overrides (points/hour). */
+  drain: z.record(z.string(), z.number()),
+});
+export type DesireRecord = z.infer<typeof DesireRecordSchema>;
+
+/**
+ * GET /kazusa/desires. Simulated characters without a record are still in the
+ * catalog's `initial` state and do not drain until their first task.
+ */
+export const DesiresResponseSchema = z.object({
+  config: DesiresConfigSchema,
+  records: z.record(z.string(), DesireRecordSchema),
+});
+export type DesiresResponse = z.infer<typeof DesiresResponseSchema>;
+
+/* ========================================================================== */
 /* Read model: world journal (PROPOSED — src/journal/, GET /kazusa/timeline)  */
 /* ========================================================================== */
 
@@ -510,6 +585,14 @@ export const ClockStreamEventSchema = z.object({
 });
 export type ClockStreamEvent = z.infer<typeof ClockStreamEventSchema>;
 
+/** A character's re-anchored desire record (full replacement for that id). */
+export const DesiresStreamEventSchema = z.object({
+  type: z.literal("desires"),
+  characterId: z.string(),
+  record: DesireRecordSchema,
+});
+export type DesiresStreamEvent = z.infer<typeof DesiresStreamEventSchema>;
+
 /**
  * `connected` with the observer-scope additions (journal high-water, status
  * seed).
@@ -527,6 +610,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   StatusStreamEventSchema,
   JournalStreamEventSchema,
   ClockStreamEventSchema,
+  DesiresStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
 export type StreamEventType = StreamEvent["type"];

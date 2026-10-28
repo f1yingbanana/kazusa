@@ -68,6 +68,11 @@ export interface TimelineKind<K extends JournalKind = JournalKind> {
   readonly icon: LucideIcon;
   readonly facet: "task" | "chat" | "world" | "social" | "mind";
   readonly salience: "low" | "normal" | "high";
+  /**
+   * Left out of the default Timeline filter and the inspector's Recent. Still
+   * one checkbox away in the Timeline sidebar.
+   */
+  readonly hiddenByDefault?: boolean;
   /** Actors shown as chips; defaults to `event.actors`. */
   readonly actors?: (event: JournalEventOf<K>) => readonly string[];
   readonly fact: (event: JournalEventOf<K>) => ReactNode;

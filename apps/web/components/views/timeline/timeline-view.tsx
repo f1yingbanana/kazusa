@@ -17,7 +17,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useCharacters } from '@/hooks/use-characters'
 import { useTimeline } from '@/hooks/use-timeline'
 import { useListParam, useNavigate, useParam } from '@/hooks/use-url-state'
-import { TIMELINE_KIND_LIST } from '@/lib/registry/timeline-kinds'
+import { effectiveTimelineKinds, TIMELINE_KIND_LIST } from '@/lib/registry/timeline-kinds'
 import { requestSidebar } from '@/lib/state/sidebar-request'
 import { useWatchlist } from '@/lib/state/watchlist'
 import { formatSimDateLong, simDayStart } from '@/lib/time/sim'
@@ -50,7 +50,8 @@ export function TimelineView() {
   const { byId } = useCharacters()
 
   const actors = watchOnly ? watchlist : actorParam
-  const filters = useMemo(() => ({ actors, kinds: kindParam }), [actors, kindParam])
+  const kinds = effectiveTimelineKinds(kindParam)
+  const filters = useMemo(() => ({ actors, kinds }), [actors, kinds])
   const timeline = useTimeline(filters)
   const hasFilters = actorParam.length > 0 || kindParam.length > 0 || watchOnly
 
@@ -97,7 +98,8 @@ export function TimelineView() {
       : actorParam.length > 1
         ? `${actorParam.length} characters`
         : 'Everyone'
-  const kindsLabel = kindParam.length ? `${kindParam.length} of ${TIMELINE_KIND_LIST.length} kinds` : 'all kinds'
+  const kindsLabel =
+    kinds.length === TIMELINE_KIND_LIST.length ? 'all kinds' : `${kinds.length} of ${TIMELINE_KIND_LIST.length} kinds`
 
   return (
     <section aria-label="Timeline" className="flex min-h-0 flex-1 flex-col">

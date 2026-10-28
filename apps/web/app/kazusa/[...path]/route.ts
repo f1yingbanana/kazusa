@@ -12,6 +12,7 @@ const ROUTES = new Map([
   ["chats/manage", "POST"],
   ["typing", "POST"],
   ["timeline", "GET"],
+  ["desires", "GET"],
 ]);
 
 type Context = { params: Promise<{ path: string[] }> };
