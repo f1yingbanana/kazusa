@@ -12,6 +12,7 @@ import {
   PERCEPTION_CONFIG,
   latencyMs,
   type PerceptionConfig,
+  type PerceptionDecisionRecord,
   type Stimulus,
 } from "./types.ts";
 import {
@@ -42,7 +43,15 @@ type SetupOptions = Partial<PerceptionConfig> & {
 };
 
 function setup(options: SetupOptions = {}) {
+  // One "perception" namespace: character states and decision entries.
   const states = new Map<string, PerceptionState>();
+  const decisions = new Map<string, PerceptionDecisionRecord>();
+  const namespaceEntries = () =>
+    [...states, ...decisions].map(([key, value]) => ({
+      key,
+      createdAt: NOW,
+      value: structuredClone(value),
+    }));
   const tasks = new Map<string, ActiveTask>();
   let simTime = NOW;
   const deliveries: PerceptionDelivery[] = [];
@@ -64,10 +73,21 @@ function setup(options: SetupOptions = {}) {
       states.set(key, structuredClone(value));
     },
     entries: async () =>
-      [...states].map(([key, value]) => ({
-        key,
-        createdAt: NOW,
-        value: structuredClone(value),
+      namespaceEntries().map((entry) => ({
+        ...entry,
+        value: entry.value as PerceptionState,
+      })),
+  };
+  const decisionStore = {
+    lookup: async (key: string) => structuredClone(decisions.get(key)),
+    register: async (key: string, value: PerceptionDecisionRecord) => {
+      z.json().parse(value);
+      decisions.set(key, structuredClone(value));
+    },
+    entries: async () =>
+      namespaceEntries().map((entry) => ({
+        ...entry,
+        value: entry.value as PerceptionDecisionRecord,
       })),
   };
 
@@ -119,6 +139,7 @@ function setup(options: SetupOptions = {}) {
 
   const deps = {
     stateStore,
+    decisionStore,
     clock: {
       time: () => simTime,
       now: () => ({ simTime, speed: 1, formatted: "" }),
@@ -142,6 +163,7 @@ function setup(options: SetupOptions = {}) {
   return {
     router,
     states,
+    decisions,
     tasks,
     deliveries,
     deliver,
@@ -1125,6 +1147,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         ],
       });
       expect(h.deliveries[0].message).toContain("Incoming chats");
+      // Leading sim-time envelope suppresses OpenClaw's wall-clock stamp.
+      expect(h.deliveries[0].message).toMatch(
+        /^\[\w{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}\] Incoming chats:/,
+      );
       expect(h.deliveries[0].message).toContain(
         "The planned check-in for your eating activity was",
       );
@@ -1471,6 +1497,11 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
           },
           entries: async () => [],
         },
+        decisionStore: {
+          lookup: async () => undefined,
+          register: async () => {},
+          entries: async () => [],
+        },
         clock: {
           time: () => NOW,
           now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
@@ -1750,6 +1781,45 @@ describe("Human reply timing and task boundaries", () => {
     h.setTime(NOW + HOUR);
     await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["text"]));
     expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("records each decision as its own entry, beside the character state", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    h.evaluateDecision.mockResolvedValue(answer("WAKE", 1));
+    await h.router.receive("alice", stimulus("text"));
+    h.evaluateDecision.mockResolvedValue({
+      status: "unavailable",
+      reason: "timeout",
+    });
+    await h.router.receive("alice", stimulus("again"));
+
+    expect([...h.decisions.keys()]).toEqual([
+      expect.stringMatching(/^alice:decision:/),
+      expect.stringMatching(/^alice:decision:/),
+    ]);
+    const recorded = await h.router.decisions();
+    expect(recorded.map(({ agentId }) => agentId)).toEqual(["alice", "alice"]);
+    expect(recorded[0].record).toMatchObject({
+      question: "wake_decision",
+      action: "STEER",
+      source: "model",
+      choice: "WAKE",
+      latencyScore: 1,
+      delayMs: HOUR,
+      simTime: NOW,
+      stimulusIds: ["text"],
+      taskId: "study",
+    });
+    expect(recorded[1].record).toMatchObject({
+      action: "STEER",
+      source: "fallback",
+      note: "decision unavailable: timeout",
+    });
+
+    // Recovery walks character states only, never decision entries.
+    await h.restart().recover();
+    expect([...h.states.keys()]).toEqual(["alice"]);
   });
 
   it("checks earlier when the activity ends before the delay", async () => {

@@ -136,7 +136,7 @@ file-parsing overhead.
 
 | State Category                        | Canonical Storage Location                                                                  | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | :------------------------------------ | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`)                                   | High-frequency virtual clock state/speed and active task leases. Never store in Markdown.                                                                                                                                                                                                                                                                                                                                                          |
+| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"perception"`)                   | Virtual clock state/speed, active task leases, and Perception's records: one inbox/custody state per character (key `<agentId>`) plus one entry per attention decision (key `<agentId>:decision:<uuid>`), uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                                                                                              |
 | **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                         | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
 | **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`)                               | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                     |
 | **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
@@ -157,6 +157,9 @@ apps/kazusa/
 │   ├── tsconfig.json
 │   └── src/
 │       ├── index.ts                    # Composes Clock, Taskman, ContextEngine, Perception
+│       ├── ledger.ts                   # appendLedgerEntry: strict appends to the :tasks ledger
+│       ├── realtime.ts                 # Process-shared SSE broadcaster + journal seq
+│       ├── timeline/                   # GET /kazusa/timeline from ledger metadata
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
 │       ├── taskman/                    # "tasks" leases, :tasks ledger, cron projection, tools
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
@@ -186,12 +189,29 @@ directly in process. Do not introduce cross-plugin service boundaries or split
 these into separate packages. Keep their internal responsibilities decoupled;
 callbacks and direct references connect these modules in process.
 
+- **One world per process, many registrations**: OpenClaw can call `register()`
+  more than once in one Gateway process. An agent turn without an unambiguous
+  owner gets its own plugin instance beside the one serving HTTP, and tools,
+  hooks and the context engine run on that instance. Anything that must be one
+  value per world lives in a process-wide cell on `globalThis` under a
+  `Symbol.for("kazusa.*")` key: the clock cell (`clock/register.ts`), the
+  realtime broadcaster and journal sequence (`realtime.ts`), and Taskman's cron
+  automation hook (`taskman/register.ts`). Per-instance state silently diverges:
+  before this, a client pause reached only the HTTP instance, while the turn
+  instance kept time running and persisted over it. Listeners on the shared
+  clock are shared too, so register process-wide side effects once
+  (`forwardClockOnce`). Durable state still belongs in keyed stores.
+
 ### 3.1 `src/clock/` — Virtual Formula Clock
 
 - Owns forward-only simulation time ($\text{sim\_time} + \Delta t \times
   \text{speed}$), lifecycle persistence in the `"clock"` keyed store, agent
   tools (`clock_now`, `clock_set_speed`, `clock_advance`), and matching
   `clock.*` Gateway RPCs.
+- Every `Clock` built by `registerClock` wraps the same process-wide `ClockCell`
+  (time, anchor, speed, init promise, listeners). A speed change or advance from
+  any instance is seen by all, and each change notifies every listener (Taskman
+  cron reconciliation, client SSE) exactly once.
 
 ### 3.2 `src/taskman/` — Lease State, Ledger & Wake Scheduling
 
@@ -228,6 +248,15 @@ callbacks and direct references connect these modules in process.
   in-character `monologue`. Format it as an italic blockquote directly below the
   factual summary inside the same ledger message text rather than extending
   OpenClaw's message schema.
+- **Ledger Writes (`src/ledger.ts`)**: All ledger rows go through
+  `appendLedgerEntry`, which uses
+  `appendSessionTranscriptMessageByIdentityStrict`. Task tools run inside the
+  character's `:brain` turn; the lenient
+  `appendSessionTranscriptMessageByIdentity` inherits that turn's writer claim
+  and OpenClaw refuses it for another session ("session writer claim changed
+  before transcript persistence"). Every row carries its journal event as
+  `__openclaw.kazusa = { kind, payload }`; the text is narrative only and is
+  never parsed back.
 - **Simulation Timestamps**: Set native ledger `message.timestamp` from the
   clock at the task mutation. Delay entries include the new due time and
   remaining simulated minutes. Keep OpenClaw bookkeeping timestamps real-time.
@@ -250,6 +279,14 @@ callbacks and direct references connect these modules in process.
   avoids writing any prompt/reply to transcripts, and marks the cron run as
   `status: "ok"` (success) on OpenClaw's dashboard, after which OpenClaw deletes
   the ephemeral session (`deleteAfterRun: true`).
+- **Cron Ownership**: Other plugins declare cron jobs too (memory-core's
+  dreaming promotion). Taskman only lists, clears or reconciles jobs whose
+  `declarationKey` is a configured character id. Pausing (speed 0) clears those
+  jobs; resuming recomputes each `at` from the lease's remaining sim time.
+- **Cross-Instance Automation**: Only the instance that receives
+  `cron_reconciled` can write jobs, but task tools and cron wakes may run on
+  another instance. The `synchronize` hook and the readiness flag that gates
+  cron runs live in the process-wide `kazusa.taskman.automation` cell.
 - In the target design, Perception owns brain admission and selects cognitive
   skill markers. The existing Taskman wake marker is transitional.
 - **Strict Boundary**: Taskman schedules wakes and owns task state/ledgers. It
@@ -376,7 +413,10 @@ callbacks and direct references connect these modules in process.
      and Top-3 salient co-present characters in groups/crowds. Deep historical
      interaction logs remain lazy (Tier 3 cognitive retrieval).
 3. **Tier 3 (Session Stream Tails)**: Merges recent entries from the agent's
-   `:tasks`, `:chat:direct:*`, and `:chat:group:*` streams (implemented).
+   `:tasks`, `:chat:direct:*`, and `:chat:group:*` streams (implemented). The
+   decision model's context reads `:tasks` too, so every ledger row reaches a
+   prompt. Observer-only records (attention decisions) live in keyed stores,
+   never in a ledger.
 
 ### 3.4 `src/perception/` — Stimulus Router & Attention Gate (Jev Decision Model)
 
@@ -422,6 +462,38 @@ callbacks and direct references connect these modules in process.
 - **Zero Second-Character Sessions**: Completely eliminates the previous
   `agent:<id>:perception` chat session, tool stripping (`toolsAllow: []`), and
   JSON string parsing. Perception operates purely in-process.
+- **Decision Recording**: Every attention decision is recorded with its question
+  (`wake_decision` / `attention_allocation`), action, `source` (`model`,
+  `automatic` for deadlines and idle check-ins on an idle brain, or `fallback`
+  with a `note` when the model was unavailable or gave an unusable answer),
+  model `choice`, `latencyScore`, `delayMs`, stimulus ids, task id, and sim and
+  wall time (`PerceptionDecisionRecord`). It goes to:
+  - its own entry in the `"perception"` store, key `<agentId>:decision:<uuid>`,
+    uncapped and restart-safe. This is the one durable copy; the timeline reads
+    it through `perception.decisions()`. `recover()` and anything else walking
+    that store must skip decision keys.
+  - one `Perception <agent>: …` Gateway log line;
+  - an `attention.decided` SSE journal event (`onDecision` in
+    `perception/register.ts`).
+
+  A failed write is logged and never fails routing. Decisions stay out of
+  ledgers on purpose: every ledger is replayed into a prompt, and attention
+  mechanics ("noticed after 94s", "queued, not steered") must never reach a
+  character or the decision model. They stay out of the `"tasks"` store because
+  stimuli aren't tasks. Before this existed, a delayed approval lived only on
+  the pending item's `until` and vanished on delivery, so "why didn't they
+  reply?" was unanswerable. `entries()` loads the whole namespace, so add
+  pruning or a per-character read if history grows large.
+
+- **Sim-Time Envelope on Brain Input**: At the LLM boundary OpenClaw prefixes
+  every user turn with its wall-clock write time in the host timezone (e.g.
+  `[Tue 2026-10-27 21:26 EDT]`), unless the text already opens with a
+  `[... YYYY-MM-DD HH:mm` stamp. `formatDeliveryMessage` therefore leads every
+  delivery with `[<sim time>]`, so characters never see the operator's clock.
+- **Known Gap: Shutdown Mid-Turn**: An adopted delivery leaves custody once the
+  brain turn starts. If the Gateway stops during that turn, the stimulus is
+  neither answered nor re-queued (interrupted handoffs are deliberately not
+  replayed blindly). Recovering it needs an explicit design.
 - **In-Process Lifecycle & Ingress Hooks**:
   - `before_dispatch` claiming hook returns `{ handled: true }` and notifies
     Perception. Chat producers own prior ledger persistence, not this hook.
@@ -466,6 +538,17 @@ callbacks and direct references connect these modules in process.
   evolves (e.g., standardizing on `DecisionBatch`), cleanly refactor all types,
   call sites, and unit tests in one atomic step. Never hedge or leave obsolete
   interfaces or runtime checks in the codebase.
+- **OpenClaw Runtime Pitfalls (verified live on 2026.10.5, 2026-10-27)**:
+  - The plugin may be registered several times per process (§3).
+  - Inside an agent run, write another session's transcript only with the strict
+    append (§3.2).
+  - `readSessionTranscriptCatalogPage` items have no `__openclaw`/raw field.
+    Read structured ledger metadata with
+    `readVisibleSessionTranscriptMessageEntries` (needs the session id from the
+    session entry). Catalog pages remain right for chat text and sender
+    attribution.
+  - User turns are stamped with host wall time at the LLM boundary (§3.4).
+  - A bare `catch {}` around SDK reads hides these failures. Log a warning.
 - **Atomic Markdown Writes**: When mutating Markdown files, always write to a
   temporary file in the same directory and atomically `rename(tmp, target)` so
   concurrent reads never see partial writes.

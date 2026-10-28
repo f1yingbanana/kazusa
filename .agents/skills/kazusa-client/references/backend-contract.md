@@ -211,9 +211,17 @@ messaging: a canonical record for clients, with projections for agents.
 | `message.sent` | Messaging canonical acceptance | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience |
 | `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management | `{ title?, added?, removed? }` |
 | `clock.changed` | Clock `set_speed` / `advance` | `{ speed?, advancedMinutes? }` |
+| `attention.decided` | Perception, per decision (entry in the `"perception"` store) | `{ question, action, source, delayMs, choice?, latencyScore?, note?, stimulusIds, taskId? }` |
 
-**Planned kinds** (registered when their backends exist): `attention.decided`,
-`location.moved`, `encounter`, `relationship.changed`, `reflection.written`.
+**Planned kinds** (registered when their backends exist): `location.moved`,
+`encounter`, `relationship.changed`, `reflection.written`.
+
+**Where history comes from:** `GET /kazusa/timeline` reads `:tasks` rows'
+structured `__openclaw.kazusa = { kind, payload }` with
+`readVisibleSessionTranscriptMessageEntries` (the catalog reader drops
+`__openclaw`), chat rows from the catalog, and attention decisions from the
+`"perception"` store. Ledger text is never parsed (D4). Rows without metadata
+are skipped.
 
 **Invariants:**
 

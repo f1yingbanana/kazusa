@@ -1,6 +1,7 @@
-'use client'
+"use client";
 
 import {
+  BrainIcon,
   ClockIcon,
   MessageSquareTextIcon,
   PencilLineIcon,
@@ -8,118 +9,128 @@ import {
   TimerResetIcon,
   UserCogIcon,
   UsersRoundIcon,
-} from 'lucide-react'
-import type { JournalEvent, JournalKind } from '@kazusa/client'
-import { CharacterChip, ChatChip } from '@/components/entities/chips'
-import { formatSimDuration, formatSpeed, MINUTE } from '@/lib/time/sim'
-import type { TimelineKind } from './types'
+} from "lucide-react";
+import type { JournalEvent, JournalKind } from "@kazusa/client";
+import { CharacterChip, ChatChip } from "@/components/entities/chips";
+import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
+import type { TimelineKind } from "./types";
 
-type KindMap = { [K in JournalKind]: TimelineKind<K> }
+type KindMap = { [K in JournalKind]: TimelineKind<K> };
 
 export const TIMELINE_KINDS: KindMap = {
-  'task.started': {
-    kind: 'task.started',
-    label: 'Task started',
+  "task.started": {
+    kind: "task.started",
+    label: "Task started",
     icon: PlayIcon,
-    facet: 'task',
-    salience: 'low',
+    facet: "task",
+    salience: "low",
     fact: (event) => (
       <>
         <span>{event.payload.description}</span>
         <span className="font-mono text-xs text-muted-foreground">
-          {' · '}
+          {" · "}
           {formatSimDuration(event.payload.duration * MINUTE)}
         </span>
       </>
     ),
     thought: (event) =>
-      event.payload.monologue ? { by: event.actors[0], text: event.payload.monologue } : undefined,
+      event.payload.monologue
+        ? { by: event.actors[0], text: event.payload.monologue }
+        : undefined,
     collapseKey: (event) => `task.started:${event.payload.type}`,
-    target: (event) => ({ kind: 'character', id: event.actors[0] }),
+    target: (event) => ({ kind: "character", id: event.actors[0] }),
   },
-  'task.delayed': {
-    kind: 'task.delayed',
-    label: 'Task extended',
+  "task.delayed": {
+    kind: "task.delayed",
+    label: "Task extended",
     icon: TimerResetIcon,
-    facet: 'task',
-    salience: 'normal',
+    facet: "task",
+    salience: "normal",
     fact: (event) => (
       <>
-        Extended the current task by{' '}
-        <span className="font-mono">{formatSimDuration(event.payload.additionalMinutes * MINUTE)}</span>
+        Extended the current task by{" "}
+        <span className="font-mono">
+          {formatSimDuration(event.payload.additionalMinutes * MINUTE)}
+        </span>
       </>
     ),
     thought: (event) => {
-      const text = [event.payload.reason, event.payload.monologue].filter(Boolean).join(' ')
-      return text ? { by: event.actors[0], text } : undefined
+      const text = [event.payload.reason, event.payload.monologue]
+        .filter(Boolean)
+        .join(" ");
+      return text ? { by: event.actors[0], text } : undefined;
     },
-    target: (event) => ({ kind: 'character', id: event.actors[0] }),
+    target: (event) => ({ kind: "character", id: event.actors[0] }),
   },
-  'message.sent': {
-    kind: 'message.sent',
-    label: 'Message',
+  "message.sent": {
+    kind: "message.sent",
+    label: "Message",
     icon: MessageSquareTextIcon,
-    facet: 'chat',
-    salience: 'normal',
+    facet: "chat",
+    salience: "normal",
     actors: (event) => [event.payload.senderId],
     fact: (event) => (
       <>
-        in {event.chatId ? <ChatChip id={event.chatId} /> : 'a chat'}
-        <span className="text-muted-foreground">{': '}</span>
+        in {event.chatId ? <ChatChip id={event.chatId} /> : "a chat"}
+        <span className="text-muted-foreground">{": "}</span>
         <span>{`“${event.payload.preview}”`}</span>
       </>
     ),
     target: (event) =>
       event.chatId
         ? {
-            view: 'chats',
-            params: { 'chats.id': event.chatId, 'chats.msg': event.payload.messageId },
-            label: 'Open chat',
+            view: "chats",
+            params: {
+              "chats.id": event.chatId,
+              "chats.msg": event.payload.messageId,
+            },
+            label: "Open chat",
           }
         : undefined,
   },
-  'chat.created': {
-    kind: 'chat.created',
-    label: 'Chat created',
+  "chat.created": {
+    kind: "chat.created",
+    label: "Chat created",
     icon: UsersRoundIcon,
-    facet: 'chat',
-    salience: 'normal',
+    facet: "chat",
+    salience: "normal",
     actors: (event) => event.actors.slice(0, 1),
     fact: (event) => (
       <>
-        Created {event.payload.type === 'group' ? 'group' : 'chat'}{' '}
+        Created {event.payload.type === "group" ? "group" : "chat"}{" "}
         <span className="font-medium">{event.payload.title}</span>
         <span className="font-mono text-xs text-muted-foreground">{` · ${event.payload.members.length} members`}</span>
       </>
     ),
-    target: (event) => (event.chatId ? { kind: 'chat', id: event.chatId } : undefined),
+    target: (event) =>
+      event.chatId ? { kind: "chat", id: event.chatId } : undefined,
   },
-  'chat.renamed': {
-    kind: 'chat.renamed',
-    label: 'Chat renamed',
+  "chat.renamed": {
+    kind: "chat.renamed",
+    label: "Chat renamed",
     icon: PencilLineIcon,
-    facet: 'chat',
-    salience: 'low',
+    facet: "chat",
+    salience: "low",
     actors: (event) => event.actors.slice(0, 1),
     fact: (event) => (
       <>
-        Renamed {event.chatId ? <ChatChip id={event.chatId} /> : 'a chat'} to{' '}
+        Renamed {event.chatId ? <ChatChip id={event.chatId} /> : "a chat"} to{" "}
         <span className="font-medium">{event.payload.title}</span>
       </>
     ),
   },
-  'chat.members_changed': {
-    kind: 'chat.members_changed',
-    label: 'Members changed',
+  "chat.members_changed": {
+    kind: "chat.members_changed",
+    label: "Members changed",
     icon: UserCogIcon,
-    facet: 'chat',
-    salience: 'normal',
+    facet: "chat",
+    salience: "normal",
     actors: (event) => event.actors.slice(0, 1),
     fact: (event) => (
       <>
         {event.payload.added.length ? (
           <>
-            Added{' '}
+            Added{" "}
             {event.payload.added.slice(0, 3).map((id) => (
               <CharacterChip key={id} id={id} />
             ))}
@@ -127,7 +138,8 @@ export const TIMELINE_KINDS: KindMap = {
         ) : null}
         {event.payload.removed.length ? (
           <>
-            {' '}Removed{' '}
+            {" "}
+            Removed{" "}
             {event.payload.removed.slice(0, 3).map((id) => (
               <CharacterChip key={id} id={id} />
             ))}
@@ -135,33 +147,95 @@ export const TIMELINE_KINDS: KindMap = {
         ) : null}
         {event.chatId ? (
           <>
-            {' '}in <ChatChip id={event.chatId} />
+            {" "}
+            in <ChatChip id={event.chatId} />
           </>
         ) : null}
       </>
     ),
   },
-  'clock.changed': {
-    kind: 'clock.changed',
-    label: 'Clock',
+  "clock.changed": {
+    kind: "clock.changed",
+    label: "Clock",
     icon: ClockIcon,
-    facet: 'world',
-    salience: 'high',
+    facet: "world",
+    salience: "high",
     fact: (event) =>
       event.payload.advancedMinutes !== undefined
         ? `Clock advanced ${formatSimDuration(event.payload.advancedMinutes * MINUTE)}`
         : `Speed set to ${formatSpeed(event.payload.speed ?? 0)}`,
   },
+  "attention.decided": {
+    kind: "attention.decided",
+    label: "Attention",
+    icon: BrainIcon,
+    facet: "mind",
+    salience: "low",
+    fact: (event) => {
+      const {
+        action,
+        delayMs,
+        question,
+        source,
+        choice,
+        latencyScore,
+        note,
+        stimulusIds,
+      } = event.payload;
+      const outcome =
+        action === "IGNORE"
+          ? "Ignored"
+          : action === "DEFER"
+            ? "Deferred until the current activity ends"
+            : action === "QUEUE_NEXT"
+              ? "Queued after the current thought"
+              : question === "attention_allocation"
+                ? "Interrupted the current thought"
+                : delayMs > 0
+                  ? `Noticed after ${formatDelay(delayMs)}`
+                  : "Noticed immediately";
+      const why =
+        source === "model"
+          ? [choice, latencyScore !== undefined && `score ${latencyScore}`]
+              .filter(Boolean)
+              .join(" · ")
+          : source === "fallback"
+            ? `fallback${note ? `: ${note}` : ""}`
+            : "automatic";
+      return (
+        <>
+          <span>{outcome}</span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {` · ${stimulusIds.length} ${stimulusIds.length === 1 ? "stimulus" : "stimuli"} · ${why}`}
+          </span>
+        </>
+      );
+    },
+    target: (event) => ({ kind: "character", id: event.actors[0] }),
+  },
+};
+
+/**
+ * Pickup delays are often under a minute, which `formatSimDuration` floors to
+ * 0m.
+ */
+function formatDelay(ms: number) {
+  return ms < MINUTE ? `${Math.round(ms / 1000)}s` : formatSimDuration(ms);
 }
 
-export const TIMELINE_KIND_LIST = Object.values(TIMELINE_KINDS) as TimelineKind[]
+export const TIMELINE_KIND_LIST = Object.values(
+  TIMELINE_KINDS,
+) as TimelineKind[];
 
-/** Typed accessor: TS can't correlate `event.kind` with the map entry on its own. */
+/**
+ * Typed accessor: TS can't correlate `event.kind` with the map entry on its
+ * own.
+ */
 export function kindOf<E extends JournalEvent>(event: E) {
-  return TIMELINE_KINDS[event.kind] as unknown as TimelineKind<E['kind']> & {
-    fact: (event: E) => React.ReactNode
-    thought?: (event: E) => ReturnType<NonNullable<TimelineKind['thought']>>
-    actors?: (event: E) => readonly string[]
-    target?: (event: E) => ReturnType<NonNullable<TimelineKind['target']>>
-  }
+  return TIMELINE_KINDS[event.kind] as unknown as TimelineKind<E["kind"]> & {
+    fact: (event: E) => React.ReactNode;
+    thought?: (event: E) => ReturnType<NonNullable<TimelineKind["thought"]>>;
+    actors?: (event: E) => readonly string[];
+    target?: (event: E) => ReturnType<NonNullable<TimelineKind["target"]>>;
+  };
 }

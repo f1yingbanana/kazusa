@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { MessagesSquareIcon, UsersIcon } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { MessagesSquareIcon, UsersIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -10,7 +10,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '@/components/ui/empty'
+} from "@/components/ui/empty";
 import {
   Item,
   ItemActions,
@@ -19,14 +19,15 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-} from '@/components/ui/item'
-import { Skeleton } from '@/components/ui/skeleton'
-import { formatListTimestamp } from '@/lib/format'
-import type { Agent } from '@kazusa/client'
-import type { Chat } from '@/lib/source/chats/types'
-import { cn } from '@/lib/utils'
-import { ChatAvatar } from './chat-avatar'
-import { useRealtime } from '@/lib/live/realtime-provider'
+} from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSimNow } from "@/hooks/use-clock";
+import { formatListTimestamp } from "@/lib/format";
+import type { Agent } from "@kazusa/client";
+import type { Chat } from "@/lib/source/chats/types";
+import { cn } from "@/lib/utils";
+import { ChatAvatar } from "./chat-avatar";
+import { useRealtime } from "@/lib/live/realtime-provider";
 
 export function ChatList({
   chats,
@@ -38,27 +39,28 @@ export function ChatList({
   onSelect,
   onNewGroup,
 }: {
-  chats: Chat[]
-  agentsById: ReadonlyMap<string, Agent>
-  userId: string
-  isLoading: boolean
-  query: string
-  selectedChatId: string | null
-  onSelect: (chatId: string) => void
-  onNewGroup: () => void
+  chats: Chat[];
+  agentsById: ReadonlyMap<string, Agent>;
+  userId: string;
+  isLoading: boolean;
+  query: string;
+  selectedChatId: string | null;
+  onSelect: (chatId: string) => void;
+  onNewGroup: () => void;
 }) {
-  const { typingByChat, unreadByChat } = useRealtime()
+  const { typingByChat, unreadByChat } = useRealtime();
+  const simNow = useSimNow();
 
-  if (isLoading) return <ListSkeleton />
+  if (isLoading) return <ListSkeleton />;
 
-  const normalized = query.trim().toLowerCase()
+  const normalized = query.trim().toLowerCase();
   const filtered = normalized
     ? chats.filter(
         (chat) =>
           chat.name.toLowerCase().includes(normalized) ||
           chat.lastMessage?.text.toLowerCase().includes(normalized),
       )
-    : chats
+    : chats;
 
   if (chats.length === 0) {
     return (
@@ -69,7 +71,8 @@ export function ChatList({
           </EmptyMedia>
           <EmptyTitle>No conversations yet</EmptyTitle>
           <EmptyDescription>
-            Message a character from the inspector, or gather a few into a group.
+            Message a character from the inspector, or gather a few into a
+            group.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
@@ -78,29 +81,29 @@ export function ChatList({
           </Button>
         </EmptyContent>
       </Empty>
-    )
+    );
   }
 
   if (filtered.length === 0) {
     return (
       <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-        {'No conversations match “'}
+        {"No conversations match “"}
         {query}
-        {'”.'}
+        {"”."}
       </p>
-    )
+    );
   }
 
   return (
     <ItemGroup className="gap-0.5 px-2 pb-2">
       {filtered.map((chat) => {
-        const typists = typingByChat[chat.id] ?? []
-        const unread = unreadByChat[chat.id] ?? 0
-        const isActive = chat.id === selectedChatId
+        const typists = typingByChat[chat.id] ?? [];
+        const unread = unreadByChat[chat.id] ?? 0;
+        const isActive = chat.id === selectedChatId;
         const preview =
           typists.length > 0
             ? `${typists[0].senderName} is typing…`
-            : (chat.lastMessage?.text ?? 'No messages yet')
+            : (chat.lastMessage?.text ?? "No messages yet");
 
         return (
           <Item
@@ -108,10 +111,10 @@ export function ChatList({
             size="sm"
             render={<button type="button" />}
             onClick={() => onSelect(chat.id)}
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
-              'w-full cursor-pointer text-left hover:bg-sidebar-accent/70',
-              isActive && 'bg-sidebar-accent hover:bg-sidebar-accent',
+              "w-full cursor-pointer text-left hover:bg-sidebar-accent/70",
+              isActive && "bg-sidebar-accent hover:bg-sidebar-accent",
             )}
           >
             <ItemMedia aria-hidden>
@@ -120,7 +123,7 @@ export function ChatList({
             <ItemContent className="min-w-0">
               <ItemTitle className="w-full min-w-0">
                 <span className="truncate">{chat.name}</span>
-                {chat.type === 'group' ? (
+                {chat.type === "group" ? (
                   <UsersIcon
                     aria-label="Group"
                     className="size-3.5 shrink-0 text-muted-foreground"
@@ -129,9 +132,9 @@ export function ChatList({
               </ItemTitle>
               <ItemDescription
                 className={cn(
-                  'line-clamp-1',
-                  typists.length > 0 && 'shimmer text-primary',
-                  unread > 0 && 'text-foreground',
+                  "line-clamp-1",
+                  typists.length > 0 && "shimmer text-primary",
+                  unread > 0 && "text-foreground",
                 )}
               >
                 {preview}
@@ -143,21 +146,21 @@ export function ChatList({
                   dateTime={new Date(chat.lastMessage.timestamp).toISOString()}
                   className="font-mono text-[11px] text-muted-foreground tabular-nums"
                 >
-                  {formatListTimestamp(chat.lastMessage.timestamp)}
+                  {formatListTimestamp(chat.lastMessage.timestamp, simNow)}
                 </time>
               ) : null}
               {unread > 0 ? (
                 <Badge className="h-5 min-w-5 px-1.5 tabular-nums">
-                  {unread > 99 ? '99+' : unread}
+                  {unread > 99 ? "99+" : unread}
                   <span className="sr-only"> unread</span>
                 </Badge>
               ) : null}
             </ItemActions>
           </Item>
-        )
+        );
       })}
     </ItemGroup>
-  )
+  );
 }
 
 export function ListSkeleton() {
@@ -173,5 +176,5 @@ export function ListSkeleton() {
         </div>
       ))}
     </div>
-  )
+  );
 }

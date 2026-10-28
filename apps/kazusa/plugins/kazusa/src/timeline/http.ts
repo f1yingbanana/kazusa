@@ -1,6 +1,9 @@
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
+import {
+  readSessionTranscriptCatalogPage,
+  readVisibleSessionTranscriptMessageEntries,
+} from "openclaw/plugin-sdk/session-transcript-runtime";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import type {
   JournalEvent,
@@ -9,6 +12,7 @@ import type {
 } from "@kazusa/client";
 import { JOURNAL_KINDS } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
+import type { PerceptionDecisionRecord } from "../perception/types.ts";
 import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
 
 interface RawKazusaMetadata {
@@ -16,59 +20,18 @@ interface RawKazusaMetadata {
   payload: Record<string, unknown>;
 }
 
-function parseTaskStartedText(text: string): {
-  type: string;
-  description: string;
-  endAt: number;
-  duration: number;
-  summary?: string;
-  monologue?: string;
-} | null {
-  const monologueMatch = /\n\n> \*(.*)\*$/su.exec(text);
-  const monologue = monologueMatch ? monologueMatch[1] : undefined;
-  const clean = monologueMatch ? text.slice(0, monologueMatch.index) : text;
-
-  const match =
-    /(?:Concluded ([^ ]+) task\.(?: Summary: "([^"]+)"\.)? )?Started ([^ ]+) task: "([^"]+)"\. Scheduled to conclude at ([^ ]+) \((\d+) minutes\)\./u.exec(
-      clean,
-    );
-  if (!match) return null;
-  return {
-    type: match[3],
-    description: match[4],
-    endAt: Date.parse(match[5]),
-    duration: parseInt(match[6], 10),
-    summary: match[2],
-    monologue,
-  };
-}
-
-function parseTaskDelayedText(text: string): {
-  additionalMinutes: number;
-  endAt: number;
-  reason?: string;
-  monologue?: string;
-} | null {
-  const monologueMatch = /\n\n> \*(.*)\*$/su.exec(text);
-  const monologue = monologueMatch ? monologueMatch[1] : undefined;
-  const clean = monologueMatch ? text.slice(0, monologueMatch.index) : text;
-
-  const match =
-    /Delayed current task by (\d+) minutes\. New completion time: ([^ ]+?)\.(?: Reason: (.*?)\.?)?$/u.exec(
-      clean,
-    );
-  if (!match) return null;
-  return {
-    additionalMinutes: parseInt(match[1], 10),
-    endAt: Date.parse(match[2]),
-    reason: match[3],
-    monologue,
-  };
-}
-
 export function registerTimelineHttp(
   api: OpenClawPluginApi,
-  deps: { readonly clock: Clock },
+  deps: {
+    readonly clock: Clock;
+    /** Perception's recorded attention decisions (the "perception" store). */
+    readonly decisions?: () => Promise<
+      ReadonlyArray<{
+        readonly agentId: string;
+        readonly record: PerceptionDecisionRecord;
+      }>
+    >;
+  },
 ): void {
   const route = createRouteRegistrar(api);
 
@@ -143,95 +106,92 @@ export function registerTimelineHttp(
           );
         });
 
-        for (const { sessionKey } of streams) {
-          const isTasks = sessionKey.endsWith(":tasks");
+        for (const { sessionKey, entry } of streams) {
+          const isLedger = sessionKey.endsWith(":tasks");
+          const rowLimit = Math.min(limit * 2, 200);
+
+          // 1. Task ledger. The catalog projection drops
+          // `__openclaw`, where each row carries its structured journal
+          // metadata, so read raw message entries instead. Ledger text is
+          // narrative for characters and is never parsed for fields.
+          if (isLedger) {
+            const sessionId = entry.sessionId?.trim();
+            if (!sessionId) continue;
+            const rows = await readVisibleSessionTranscriptMessageEntries({
+              agentId,
+              sessionKey,
+              sessionId,
+              storePath,
+            });
+            for (const { message } of rows.slice(-rowLimit)) {
+              const timestamp = message.timestamp;
+              if (typeof timestamp !== "number" || !Number.isFinite(timestamp))
+                continue;
+              const kazusa = message.__openclaw?.kazusa as
+                RawKazusaMetadata | undefined;
+              if (!kazusa?.kind || !kazusa.payload) continue;
+              rawEvents.push({
+                simTime: timestamp,
+                kind: kazusa.kind,
+                actors: [agentId],
+                payload: kazusa.payload,
+              });
+            }
+            continue;
+          }
+
+          // 2. Chat streams
           const page = await readSessionTranscriptCatalogPage({
             agentId,
             sessionKey,
             storePath,
             pluginId: api.id,
             sourceDomain: "kazusa",
-            limit: Math.min(limit * 2, 200),
+            limit: rowLimit,
           });
-
           for (const item of page.items) {
             const timestamp = item.timestamp
               ? Date.parse(item.timestamp)
               : Number.NaN;
             if (Number.isNaN(timestamp)) continue;
-
-            // 1. Process tasks stream
-            if (isTasks) {
-              const kazusa = (
-                item.raw as { __openclaw?: { kazusa?: RawKazusaMetadata } }
-              )?.__openclaw?.kazusa;
-              if (kazusa && kazusa.kind && kazusa.payload) {
-                rawEvents.push({
-                  simTime: timestamp,
-                  kind: kazusa.kind,
-                  actors: [agentId],
-                  payload: kazusa.payload,
-                });
-                continue;
-              }
-
-              // Fallback: parse from narrative text
-              const text = item.text ?? "";
-              const started = parseTaskStartedText(text);
-              if (started) {
-                rawEvents.push({
-                  simTime: timestamp,
-                  kind: "task.started",
-                  actors: [agentId],
-                  payload: {
-                    taskId: `${agentId}:${timestamp}`,
-                    type: started.type,
-                    description: started.description,
-                    duration: started.duration,
-                    endAt: started.endAt,
-                    summary: started.summary,
-                    monologue: started.monologue,
-                  },
-                });
-                continue;
-              }
-
-              const delayed = parseTaskDelayedText(text);
-              if (delayed) {
-                rawEvents.push({
-                  simTime: timestamp,
-                  kind: "task.delayed",
-                  actors: [agentId],
-                  payload: {
-                    taskId: `${agentId}:${timestamp}`,
-                    additionalMinutes: delayed.additionalMinutes,
-                    endAt: delayed.endAt,
-                    reason: delayed.reason,
-                    monologue: delayed.monologue,
-                  },
-                });
-                continue;
-              }
-            } else {
-              // 2. Process chat stream
-              const sender = item.sender?.identity.id ?? agentId;
-              rawEvents.push({
-                simTime: timestamp,
-                kind: "message.sent",
-                actors: [sender, agentId],
-                payload: {
-                  messageId: item.id ?? `msg:${timestamp}`,
-                  sequence: 0,
-                  senderId: sender,
-                  preview: (item.text ?? "").slice(0, 100),
-                },
-              });
-            }
+            const sender = item.sender?.identity.id ?? agentId;
+            rawEvents.push({
+              simTime: timestamp,
+              kind: "message.sent",
+              actors: [sender, agentId],
+              payload: {
+                messageId: item.id ?? `msg:${timestamp}`,
+                sequence: 0,
+                senderId: sender,
+                preview: (item.text ?? "").slice(0, 100),
+              },
+            });
           }
         }
-      } catch {
-        // Continue querying other agents if one fails
+      } catch (error: unknown) {
+        // Continue querying other agents if one fails, but say why.
+        api.logger.warn(
+          `Timeline read failed for ${agentId}: ${String(error)}`,
+        );
       }
+    }
+
+    // Attention decisions are machine records in the "perception" store, not a
+    // ledger: nothing character-facing ever reads them.
+    try {
+      const targets = new Set(targetAgents);
+      for (const { agentId, record } of (await deps.decisions?.()) ?? []) {
+        if (!targets.has(agentId)) continue;
+        const { simTime, wallTime: _wallTime, ...payload } = record;
+        rawEvents.push({
+          simTime,
+          kind: "attention.decided",
+          actors: [agentId],
+          payload,
+        });
+      }
+    } catch (error: unknown) {
+      api.logger.warn(`Timeline decision read failed: ${String(error)}`);
     }
 
     // Apply filtering
@@ -249,7 +209,12 @@ export function registerTimelineHttp(
     // Deduplicate and sort chronologically ascending to assign monotonic seq
     const unique = new Map<string, RawJournalItem>();
     for (const e of filtered) {
+      // Attention decisions share a task (and, while paused, a sim time);
+      // their stimuli tell them apart.
       const entityId =
+        (Array.isArray(e.payload.stimulusIds)
+          ? e.payload.stimulusIds.join(",")
+          : "") ||
         (typeof e.payload.taskId === "string" ? e.payload.taskId : "") ||
         (typeof e.payload.messageId === "string" ? e.payload.messageId : "");
       const key = `${e.kind}:${e.actors.join(",")}:${e.simTime}:${entityId}`;

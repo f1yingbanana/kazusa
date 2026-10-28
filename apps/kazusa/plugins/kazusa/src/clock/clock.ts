@@ -5,19 +5,29 @@ import type {
   ClockStore,
 } from "./types.ts";
 
+/**
+ * The clock's mutable state. Clocks constructed over one cell read and change
+ * one simulation time, and notify each other's listeners.
+ */
+export interface ClockCell {
+  simTime: number;
+  anchorTime: number;
+  speed: number;
+  initPromise?: Promise<void>;
+  readonly listeners: Set<ClockChangeListener>;
+}
+
 export interface ClockOptions {
   readonly store: ClockStore;
   readonly initialTime?: string | number;
   readonly defaultSpeed?: number;
+  /** Shared state; when it is already initialized, the other options are unused. */
+  readonly cell?: ClockCell;
 }
 
 export class Clock {
   private readonly store: ClockStore;
-  private simTime: number;
-  private anchorTime: number;
-  private speed: number;
-  private initPromise?: Promise<void>;
-  private readonly listeners = new Set<ClockChangeListener>();
+  private readonly cell: ClockCell;
 
   constructor(options: ClockOptions) {
     if (options.defaultSpeed !== undefined && options.defaultSpeed < 0) {
@@ -27,49 +37,56 @@ export class Clock {
     }
 
     this.store = options.store;
-    this.simTime =
+    this.cell = options.cell ?? {
+      simTime: 0,
+      anchorTime: 0,
+      speed: 0,
+      listeners: new Set(),
+    };
+    if (this.cell.initPromise) return;
+    this.cell.simTime =
       typeof options.initialTime === "number"
         ? options.initialTime
         : options.initialTime
           ? new Date(options.initialTime).getTime()
           : Date.now();
-    this.speed = options.defaultSpeed ?? 1;
-    this.anchorTime = Date.now();
+    this.cell.speed = options.defaultSpeed ?? 1;
+    this.cell.anchorTime = Date.now();
   }
 
   async init(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = (async (): Promise<void> => {
+    const cell = this.cell;
+    if (!cell.initPromise) {
+      cell.initPromise = (async (): Promise<void> => {
         try {
           const loaded = await this.store.lookup("primary");
           if (loaded) {
-            this.simTime = loaded.simTime;
-            this.speed = loaded.speed;
-            this.anchorTime = Date.now();
+            cell.simTime = loaded.simTime;
+            cell.speed = loaded.speed;
+            cell.anchorTime = Date.now();
             return;
           }
           await this.persist();
         } catch (error) {
-          this.initPromise = undefined;
+          cell.initPromise = undefined;
           throw error;
         }
       })();
     }
-    return this.initPromise;
+    return cell.initPromise;
   }
 
   time(): number {
-    if (this.speed === 0) return this.simTime;
-    return (
-      this.simTime + Math.round((Date.now() - this.anchorTime) * this.speed)
-    );
+    const { simTime, anchorTime, speed } = this.cell;
+    if (speed === 0) return simTime;
+    return simTime + Math.round((Date.now() - anchorTime) * speed);
   }
 
   now(): ClockSnapshot {
     const simTime = this.time();
     return {
       simTime,
-      speed: this.speed,
+      speed: this.cell.speed,
       formatted: new Intl.DateTimeFormat("en-US", {
         weekday: "long",
         year: "numeric",
@@ -85,9 +102,9 @@ export class Clock {
   }
 
   onClockChange(listener: ClockChangeListener): () => void {
-    this.listeners.add(listener);
+    this.cell.listeners.add(listener);
     return (): void => {
-      this.listeners.delete(listener);
+      this.cell.listeners.delete(listener);
     };
   }
 
@@ -98,9 +115,9 @@ export class Clock {
       );
     }
     const previous = this.now();
-    this.simTime = this.time();
-    this.anchorTime = Date.now();
-    this.speed = speed;
+    this.cell.simTime = this.time();
+    this.cell.anchorTime = Date.now();
+    this.cell.speed = speed;
     await this.persist();
     return await this.notifyListeners(previous);
   }
@@ -111,8 +128,8 @@ export class Clock {
     }
 
     const previous = this.now();
-    this.simTime = this.time() + Math.round(minutes * 60_000);
-    this.anchorTime = Date.now();
+    this.cell.simTime = this.time() + Math.round(minutes * 60_000);
+    this.cell.anchorTime = Date.now();
     await this.persist();
     return await this.notifyListeners(previous);
   }
@@ -120,7 +137,7 @@ export class Clock {
   async persist(): Promise<void> {
     const record: ClockPersistedRecord = {
       simTime: this.time(),
-      speed: this.speed,
+      speed: this.cell.speed,
     };
     await this.store.register("primary", record);
   }
@@ -133,7 +150,7 @@ export class Clock {
     previousSnapshot: ClockSnapshot,
   ): Promise<ClockSnapshot> {
     const snapshot = this.now();
-    for (const listener of this.listeners) {
+    for (const listener of [...this.cell.listeners]) {
       try {
         await listener(snapshot, previousSnapshot);
       } catch {

@@ -15,7 +15,11 @@ import {
   registerCharactersHttp,
   resolveCharacterStatus,
 } from "./characters/http.ts";
-import { KazusaRealtimeBroadcaster, nextJournalSeq } from "./realtime.ts";
+import {
+  forwardClockOnce,
+  nextJournalSeq,
+  sharedBroadcaster,
+} from "./realtime.ts";
 import { registerTimelineHttp } from "./timeline/http.ts";
 
 export default definePluginEntry({
@@ -23,30 +27,33 @@ export default definePluginEntry({
   name: "Kazusa",
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
-    const broadcaster = new KazusaRealtimeBroadcaster();
+    const broadcaster = sharedBroadcaster();
     const clock = registerClock(api);
 
-    // Forward clock ticks and journal events to observer clients
-    clock.onClockChange((snapshot) => {
-      broadcaster.broadcast({
-        type: "clock",
-        clock: {
-          simTime: snapshot.simTime,
-          speed: snapshot.speed,
-          updatedAt: Date.now(),
-        },
-      });
-      broadcaster.broadcast({
-        type: "journal",
-        event: {
-          seq: nextJournalSeq(),
-          simTime: snapshot.simTime,
-          kind: "clock.changed",
-          actors: [],
-          payload: { speed: snapshot.speed },
-        },
-      });
-    });
+    // Forward clock ticks and journal events to observer clients. The listener
+    // only touches process-wide state, so it outlives this registration.
+    forwardClockOnce(() =>
+      clock.onClockChange((snapshot) => {
+        broadcaster.broadcast({
+          type: "clock",
+          clock: {
+            simTime: snapshot.simTime,
+            speed: snapshot.speed,
+            updatedAt: Date.now(),
+          },
+        });
+        broadcaster.broadcast({
+          type: "journal",
+          event: {
+            seq: nextJournalSeq(),
+            simTime: snapshot.simTime,
+            kind: "clock.changed",
+            actors: [],
+            payload: { speed: snapshot.speed },
+          },
+        });
+      }),
+    );
 
     registerClockHttp(api, clock);
     const taskman = registerTaskman(api, { clock, broadcaster });
@@ -71,12 +78,16 @@ export default definePluginEntry({
     const perception = registerPerception(api, {
       clock,
       assembleDecisionContext,
+      broadcaster,
     });
 
     const stopSupervisor = taskman.attachSupervisor(perception);
     api.lifecycle.onDispose?.(stopSupervisor);
 
-    registerTimelineHttp(api, { clock });
+    registerTimelineHttp(api, {
+      clock,
+      decisions: () => perception.decisions(),
+    });
 
     const getStatuses = async (): Promise<Record<string, CharacterStatus>> => {
       if (!messagingRef.current) return {};

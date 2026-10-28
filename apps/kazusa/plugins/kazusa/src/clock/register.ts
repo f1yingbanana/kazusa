@@ -1,6 +1,6 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
-import { Clock } from "./clock.ts";
+import { Clock, type ClockCell } from "./clock.ts";
 import type { ClockPersistedRecord, ClockSnapshot } from "./types.ts";
 
 const speedParams = z
@@ -10,13 +10,32 @@ const advanceParams = z
   .object({ minutes: z.number().finite().positive() })
   .strict();
 
+/*
+ * OpenClaw can load this plugin more than once in one Gateway process: an agent
+ * turn without an unambiguous owner gets its own instance beside the one that
+ * serves HTTP. The world has one simulation time, so every instance shares one
+ * clock cell. Otherwise a pause from the client never reaches the instance
+ * running character turns, which keeps time moving and persists over it.
+ */
+const SHARED_CLOCK_CELL = Symbol.for("kazusa.clock.cell");
+
+function sharedClockCell(): ClockCell {
+  const scope = globalThis as { [SHARED_CLOCK_CELL]?: ClockCell };
+  return (scope[SHARED_CLOCK_CELL] ??= {
+    simTime: 0,
+    anchorTime: 0,
+    speed: 0,
+    listeners: new Set(),
+  });
+}
+
 /** Registers Clock's tools, Gateway methods, and persistence hooks. */
 export function registerClock(api: OpenClawPluginApi): Clock {
   const store = api.runtime.state.openKeyedStore<ClockPersistedRecord>({
     namespace: "clock",
     retention: "retained",
   });
-  const clock = new Clock({ store });
+  const clock = new Clock({ store, cell: sharedClockCell() });
 
   api.registerTool({
     name: "clock_now",

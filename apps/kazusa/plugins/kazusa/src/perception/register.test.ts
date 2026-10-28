@@ -27,7 +27,7 @@ function setup() {
     config: {},
     on,
     registerChannel,
-    logger: { warn: vi.fn() },
+    logger: { info: vi.fn(), warn: vi.fn() },
     lifecycle: { onDispose: dispose },
     agent: { events: { registerAgentEventSubscription: subscription } },
     runtime: {
@@ -240,7 +240,7 @@ describe("Perception host integration", () => {
       config: {},
       on: vi.fn(),
       registerChannel: vi.fn(),
-      logger: { warn: vi.fn() },
+      logger: { info: vi.fn(), warn: vi.fn() },
       lifecycle: { onDispose: vi.fn() },
       agent: { events: { registerAgentEventSubscription: vi.fn() } },
       runtime: {

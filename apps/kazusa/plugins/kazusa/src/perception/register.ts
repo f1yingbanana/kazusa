@@ -4,7 +4,9 @@ import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
+import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { Perception } from "./perception.ts";
+import type { PerceptionDecisionRecord } from "./types.ts";
 import { registerBrainChannel } from "./brain-channel.ts";
 
 const LIFECYCLE = z.object({
@@ -18,15 +20,35 @@ export function registerPerception(
   deps: {
     readonly clock: Pick<Clock, "time" | "init" | "now">;
     readonly assembleDecisionContext?: DecisionContextAssembler;
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
   },
 ): Perception {
   const lifetime = new AbortController();
+  // Each decision is persisted by Perception in the "perception" store, which
+  // the timeline reads; this only broadcasts it to live observers.
+  const onDecision = (
+    agentId: string,
+    record: PerceptionDecisionRecord,
+  ): void => {
+    const { simTime, wallTime: _wallTime, stimulusIds, ...rest } = record;
+    deps.broadcaster?.broadcast({
+      type: "journal",
+      event: {
+        seq: nextJournalSeq(),
+        simTime,
+        actors: [agentId],
+        kind: "attention.decided",
+        payload: { ...rest, stimulusIds: [...stimulusIds] },
+      },
+    });
+  };
   const perception = new Perception({
     api,
     clock: deps.clock,
     assertCurrent: () => lifetime.signal.throwIfAborted(),
     deliver: registerBrainChannel(api, lifetime.signal),
     assembleDecisionContext: deps.assembleDecisionContext,
+    onDecision,
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)
