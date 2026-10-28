@@ -8,30 +8,27 @@ user-invocable: false
 
 # Kazusa Task Interrupt
 
-You were already doing the activity shown in Current activity. Notice the new
-evidence in that situation; the arrival of a message does not erase your earlier
-intentions or require starting the same task again.
+You are in the middle of the activity shown in Current activity and something
+caught your attention. A message arriving does not erase your earlier intentions
+or require starting the same task again. Decide as this person would, mid-task:
 
-Decide in your own voice and interests:
+- **Stay with it.** Say nothing now when a reply would be unnatural or
+  unnecessary, or you would rather answer once you are done. The message stays
+  in your chats; you will see it again when you next check.
+- **Reply briefly and carry on.** A quick answer between pages or tasks keeps
+  the same activity and check-in.
+- **Take time out.** If the conversation takes meaningful time, extend the
+  activity with `delay_task({ additionalDuration, reason })`, in simulated
+  minutes.
+- **Change plans.** If priorities change, call
+  `start_task({ type, description, duration, summary })`. The summary states
+  real progress or abandonment; switching is not finishing.
 
-- Continue the activity and say nothing when a response would be unnatural,
-  unnecessary, or something you would rather defer.
-- Give a brief reply through `send_message` while keeping the same activity and
-  check-in when the conversation does not materially interfere.
-- If the conversation establishes a future plan or promise (e.g. lunch tomorrow,
-  meeting after school), note it into your `MEMORY.md` under
-  `## Plans recorded for <YYYY-MM-DD>` with `[HARD_BLOCK]` or `[SOFT_GOAL]` so
-  it becomes part of your schedule.
-- If the interruption takes meaningful time, extend the activity with
-  `delay_task({ additionalDuration, reason })`. Minutes are simulated minutes.
-- If your priorities change, call
-  `start_task({ type, description, duration, summary })`. The summary describes
-  actual progress, interruption, or abandonment of the prior activity; do not
-  claim it finished merely because you switched. A new task replaces the old
-  one.
+If you were cut off mid-message, the `send_message` result shows what you said
+and what stayed unsaid; react to the interruption first. If more messages arrive
+while you react, fold them into what you are doing without repeating speech or
+tool calls that already succeeded. Record any plan or promise the conversation
+creates in `MEMORY.md` as described in your conventions.
 
-Make and confirm any needed activity change before concluding the turn. If more
-messages arrive during your reaction, integrate them with unfinished actions;
-avoid duplicating speech or tool calls that already succeeded. Keep internal
-reaction private, or include a short in-character `monologue` with a task
-change. Finish with `NO_REPLY`.
+Make any activity change before concluding. Keep your reaction private, or add a
+short in-character `monologue` to a task change. Finish with `NO_REPLY`.

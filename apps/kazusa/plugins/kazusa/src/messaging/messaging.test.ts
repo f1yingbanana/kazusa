@@ -6,6 +6,7 @@ import {
   type MessageCopy,
   type MessageDelivery,
   type MessagingDeps,
+  type OutboxPlan,
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
 
@@ -16,8 +17,13 @@ function setup(
   retained = new Map<string, MessageDelivery>(),
   committed = new Map<string, { timestamp: number; text: string }>(),
   chats = new Map<string, ChatConversation>(),
+  outbox = new Map<string, OutboxPlan>(),
 ) {
   let now = NOW;
+  // Paused unless a test runs the world: then sim time follows the wall clock.
+  let speed = 0;
+  let anchor = Date.now();
+  const simNow = () => now + Math.round((Date.now() - anchor) * speed);
   const register = vi.fn<StateStore<MessageDelivery>["register"]>(
     async (key, value, options) => {
       options?.assertCurrent?.();
@@ -65,7 +71,26 @@ function setup(
           createdAt: NOW,
         })),
     },
-    clock: { init: async () => {}, time: () => now },
+    outbox: {
+      lookup: async (key) => structuredClone(outbox.get(key)),
+      register: async (key, value, options) => {
+        options?.assertCurrent?.();
+        z.json().parse(value);
+        outbox.set(key, structuredClone(value));
+      },
+      delete: async (key) => outbox.delete(key),
+      entries: async () =>
+        [...outbox].map(([key, value]) => ({
+          key,
+          value: structuredClone(value),
+          createdAt: NOW,
+        })),
+    },
+    clock: {
+      init: async () => {},
+      time: simNow,
+      now: () => ({ simTime: simNow(), speed, formatted: "" }),
+    },
     ensureSession,
     append,
     publish,
@@ -92,8 +117,14 @@ function setup(
     publish,
     receive,
     warn,
+    outbox,
     setNow: (value: number) => {
       now = value;
+    },
+    setSpeed: (value: number) => {
+      now = simNow();
+      anchor = Date.now();
+      speed = value;
     },
   };
 }
@@ -990,5 +1021,202 @@ describe("composition presence", () => {
     expect(
       (await h.messaging.getTyping("alice")).map((x) => x.senderId),
     ).not.toContain("alice");
+  });
+});
+
+describe("paced speech", () => {
+  const speech = (messages: string[], requestId = "speech-1") => ({
+    requestId,
+    members: ["bob"],
+    messages,
+  });
+  const texts = (retained: Map<string, MessageDelivery>) =>
+    [...retained.values()]
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((delivery) => delivery.params.text);
+
+  it("types later bubbles on the simulation clock and sends each as its own message", async () => {
+    const h = setup();
+    h.setSpeed(1_000_000);
+    const typing: boolean[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing") typing.push(event.typing.isTyping);
+    });
+    const result = await h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["Wait...", "Are you serious?", "Why?"]),
+    );
+    expect(result).toMatchObject({
+      status: "delivered",
+      said: ["Wait...", "Are you serious?", "Why?"],
+      unsaid: [],
+      sessionKey: "agent:alice:chat:direct:bob",
+      recipients: ["bob"],
+    });
+    expect(result.messageIds).toHaveLength(3);
+    expect(texts(h.retained)).toEqual(["Wait...", "Are you serious?", "Why?"]);
+    // Typing starts before each later bubble and each send clears it.
+    expect(typing).toEqual([true, false, true, false]);
+    expect(h.outbox.size).toBe(0);
+    expect(h.messaging.currentSpeech("alice")).toBeUndefined();
+  });
+
+  it("stops at an interrupt and never records the unsaid bubbles", async () => {
+    const h = setup();
+    h.setSpeed(0.000_001); // Each typing interval would take days of wall time.
+    const pending = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["Wait...", "I told you not to go!", "What were you thinking?"]),
+    );
+    await vi.waitFor(() =>
+      expect(h.messaging.currentSpeech("alice")).toEqual({
+        sessionKey: "agent:alice:chat:direct:bob",
+        said: ["Wait..."],
+        unsaid: ["I told you not to go!", "What were you thinking?"],
+      }),
+    );
+    expect(h.messaging.interrupt("alice")).toBe(true);
+    const result = await pending;
+    expect(result).toMatchObject({
+      status: "interrupted",
+      said: ["Wait..."],
+      unsaid: ["I told you not to go!", "What were you thinking?"],
+    });
+    expect(texts(h.retained)).toEqual(["Wait..."]);
+    expect(h.outbox.size).toBe(0);
+    expect(await h.messaging.getTyping("bob")).toEqual([]);
+    expect(h.messaging.interrupt("alice")).toBe(false);
+  });
+
+  it("sends the rest at once while the world is paused", async () => {
+    const h = setup();
+    const result = await h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["One", "Two", "Three"]),
+    );
+    expect(result.status).toBe("delivered");
+    expect(texts(h.retained)).toEqual(["One", "Two", "Three"]);
+  });
+
+  it("flushes a plan left by a crashed generation without repeating sent bubbles", async () => {
+    const retained = new Map<string, MessageDelivery>();
+    const committed = new Map<string, { timestamp: number; text: string }>();
+    const chats = new Map<string, ChatConversation>();
+    const outbox = new Map<string, OutboxPlan>();
+    const first = setup(retained, committed, chats, outbox);
+    first.setSpeed(0.000_001);
+    const crashed = first.messaging
+      .speak("alice", "ALICE", speech(["Hi", "Are you free?", "Lunch?"]))
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(retained.size).toBe(1));
+    first.messaging.dispose();
+    expect(await crashed).toBeInstanceOf(Error);
+    expect(outbox.size).toBe(1);
+
+    const next = setup(retained, committed, chats, outbox);
+    await next.messaging.resume();
+    expect(texts(retained)).toEqual(["Hi", "Are you free?", "Lunch?"]);
+    expect(outbox.size).toBe(0);
+  });
+
+  it("lets a new send from the same speaker cut off an older one", async () => {
+    const h = setup();
+    h.setSpeed(0.000_001);
+    const older = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["A", "B"], "old"),
+    );
+    await vi.waitFor(() => expect(h.retained.size).toBe(1));
+    h.setSpeed(0);
+    await h.messaging.speak("alice", "ALICE", speech(["C"], "new"));
+    expect((await older).status).toBe("interrupted");
+    expect(texts(h.retained)).toEqual(["A", "C"]);
+  });
+});
+
+describe("chats awaiting a reply", () => {
+  const all = () => true;
+
+  it("lists chats where someone spoke after the reader, from canonical history", async () => {
+    const h = setup();
+    await h.send();
+    expect(await h.messaging.awaitingReplies("bob", NOW, all)).toEqual([
+      {
+        sessionKey: "agent:bob:chat:direct:alice",
+        sender: "alice",
+        timestamp: NOW,
+      },
+    ]);
+    expect(await h.messaging.awaitingReplies("alice", NOW, all)).toEqual([]);
+    expect(await h.messaging.awaitingReplies("bob", NOW + 1, all)).toEqual([]);
+    await h.send(
+      { requestId: "reply", sessionKey: "chat:direct:alice", text: "Hi!" },
+      "bob",
+    );
+    expect(await h.messaging.awaitingReplies("bob", NOW, all)).toEqual([]);
+    expect(await h.messaging.awaitingReplies("alice", NOW, all)).toHaveLength(
+      1,
+    );
+  });
+
+  it("leaves out messages the reader never noticed", async () => {
+    const h = setup();
+    const first = await h.send();
+    await h.send({
+      requestId: "second",
+      sessionKey: "chat:direct:bob",
+      text: "Still there?",
+    });
+    const seen = new Set([first.messageId]);
+    expect(
+      await h.messaging.awaitingReplies("bob", NOW, (ref) => {
+        expect(ref.sessionKey).toBe("agent:bob:chat:direct:alice");
+        return seen.has(ref.id);
+      }),
+    ).toHaveLength(1);
+    seen.clear();
+    expect(
+      await h.messaging.awaitingReplies("bob", NOW, (ref) => seen.has(ref.id)),
+    ).toEqual([]);
+  });
+
+  it("describes where each conversation stands for the reader", async () => {
+    const h = setup();
+    await h.send();
+    h.setNow(NOW + 10 * 60_000);
+    await h.send(
+      { requestId: "reply", sessionKey: "chat:direct:alice", text: "Hi!" },
+      "bob",
+    );
+    h.setNow(NOW + 20 * 60_000);
+    await h.send(
+      { requestId: "again", sessionKey: "chat:direct:alice", text: "You?" },
+      "bob",
+    );
+    expect(
+      await h.messaging.chatFacts("alice", [
+        "agent:alice:chat:direct:bob",
+        "agent:alice:chat:direct:carol",
+      ]),
+    ).toEqual([
+      {
+        sessionKey: "agent:alice:chat:direct:bob",
+        kind: "direct",
+        title: null,
+        memberCount: 2,
+        lastSpokeAt: NOW,
+        unanswered: 2,
+        waitingSince: NOW + 10 * 60_000,
+      },
+    ]);
+    expect(
+      await h.messaging.chatFacts("bob", ["agent:bob:chat:direct:alice"]),
+    ).toMatchObject([
+      { lastSpokeAt: NOW + 20 * 60_000, unanswered: 0, waitingSince: null },
+    ]);
   });
 });

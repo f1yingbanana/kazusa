@@ -109,6 +109,82 @@ describe("Bounded decision evidence", () => {
     });
   });
 
+  it("gives timing evidence: activity progress and where each conversation stands", () => {
+    const result = assemble({
+      activeTask: {
+        id: "task",
+        type: "studying",
+        description: "Exam revision",
+        duration: 120,
+        startedAt: new Date(NOW - 90 * 60_000).toISOString(),
+        endAt: new Date(NOW + 30 * 60_000).toISOString(),
+      },
+      chats: [
+        {
+          sessionKey: "agent:alice:chat:group:club",
+          kind: "group",
+          title: "Club",
+          memberCount: 100,
+          lastSpokeAt: NOW - 3 * 60_000,
+          unanswered: 4,
+          waitingSince: NOW - 2 * 60_000,
+        },
+        {
+          sessionKey: "agent:alice:chat:direct:bob",
+          kind: "direct",
+          title: null,
+          memberCount: 2,
+          lastSpokeAt: null,
+          unanswered: 1,
+          waitingSince: NOW,
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      currentActivity: { elapsedMinutes: 90, remainingMinutes: 30 },
+      conversations: [
+        {
+          channel: "chat:group:club",
+          kind: "group",
+          title: "Club",
+          members: 100,
+          youLastSpokeMinutesAgo: 3,
+          unansweredMessages: 4,
+          waitingMinutes: 2,
+        },
+        {
+          channel: "chat:direct:bob",
+          kind: "direct",
+          title: null,
+          members: 2,
+          youLastSpokeMinutesAgo: null,
+          unansweredMessages: 1,
+          waitingMinutes: 0,
+        },
+      ],
+    });
+  });
+
+  it("shows what the character is still in the middle of saying", () => {
+    expect(assemble()).toMatchObject({ currentSpeech: null });
+    expect(
+      assemble({
+        brainStatus: "busy_thinking",
+        currentSpeech: {
+          sessionKey: "agent:alice:chat:direct:bob",
+          said: ["Wait..."],
+          unsaid: ["I told you not to go there!"],
+        },
+      }),
+    ).toMatchObject({
+      currentSpeech: {
+        chat: "chat:direct:bob",
+        said: ["Wait..."],
+        unsaid: ["I told you not to go there!"],
+      },
+    });
+  });
+
   it("keeps overdue timing and drops opaque stimulus IDs from model evidence", () => {
     const result = assemble({
       activeTask: {
@@ -163,6 +239,31 @@ describe("Bounded decision evidence", () => {
     }
   });
 
+  it("parses the shipped perception rubric", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const rubric = parsePerceptionSkill(
+      await readFile(
+        new URL(
+          "../../../../shared/skills/perception/SKILL.md",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    expect(Object.keys(buildDecisionQuestions("idle", rubric))).toEqual([
+      "wake_decision",
+      "response_latency",
+    ]);
+    expect(Object.keys(rubric.questions.wake_decision.criteria)).toEqual([
+      "WAKE",
+      "DEFER",
+      "IGNORE",
+    ]);
+    expect(Object.keys(rubric.questions.attention_allocation.criteria)).toEqual(
+      ["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"],
+    );
+  });
+
   it("parses prompt instructions and criteria dynamically from perception skill YAML frontmatter", () => {
     const rawMarkdown = `---
 name: perception
@@ -183,6 +284,13 @@ rubric:
         STEER: "Interrupt current thought immediately."
         QUEUE_NEXT: "Attend after current thought finishes."
         IGNORE: "Discard this evidence."
+    response_latency:
+      description: "How soon would they reply?"
+      criteria:
+        - minutes: 0
+          description: "Now."
+        - minutes: 30
+          description: "Later."
 ---
 
 # Perception Attention Gate Rubrics
@@ -217,7 +325,17 @@ rubric:
       },
     });
 
+    expect(idleQuestions.response_latency).toEqual({
+      type: "score",
+      instructions: expect.stringContaining("How soon would they reply?"),
+      criteria: [
+        { minutes: 0, description: "Now." },
+        { minutes: 30, description: "Later." },
+      ],
+    });
+
     const busyQuestions = buildDecisionQuestions("busy_thinking", rubric);
+    expect(busyQuestions).not.toHaveProperty("response_latency");
     expect(busyQuestions).toHaveProperty("attention_allocation");
     expect(busyQuestions.attention_allocation).toMatchObject({
       type: "choice",

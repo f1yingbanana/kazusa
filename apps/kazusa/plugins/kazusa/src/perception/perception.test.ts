@@ -6,10 +6,11 @@ import {
   textTokens,
 } from "../context-engine/decision-context.ts";
 import type { DecisionBatch } from "openclaw/plugin-sdk/decisions";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActiveTask } from "../taskman/types.ts";
 import {
   PERCEPTION_CONFIG,
+  latencyMs,
   type PerceptionConfig,
   type Stimulus,
 } from "./types.ts";
@@ -118,7 +119,10 @@ function setup(options: SetupOptions = {}) {
 
   const deps = {
     stateStore,
-    clock: { time: () => simTime },
+    clock: {
+      time: () => simTime,
+      now: () => ({ simTime, speed: 1, formatted: "" }),
+    },
     tasks: { lookup: async (id: string) => tasks.get(id) },
     config,
     assertCurrent,
@@ -207,6 +211,12 @@ describe("Attention regression cases", () => {
                   QUEUE_NEXT: "Queue",
                   IGNORE: "Ignore",
                 },
+              },
+              response_latency: {
+                criteria: [
+                  { minutes: 0, description: "Now" },
+                  { minutes: 60, description: "Later" },
+                ],
               },
             },
           },
@@ -1461,7 +1471,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
           },
           entries: async () => [],
         },
-        clock: { time: () => NOW },
+        clock: {
+          time: () => NOW,
+          now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
+        },
         tasks: { lookup: async () => undefined },
         config: PERCEPTION_CONFIG.parse({ coalesceWindowMs: 0 }),
         assertCurrent: vi.fn(),
@@ -1620,6 +1633,216 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       );
       expect(h.deliver).toHaveBeenCalledTimes(1);
       expect(adopted).toEqual(["agent:alice:chat:direct:bob"]);
+    });
+  });
+});
+
+describe("Human reply timing and task boundaries", () => {
+  const HOUR = 3_600_000;
+  const study = (id = "study", endAt = NOW + HOUR): ActiveTask => ({
+    id,
+    type: "studying",
+    description: "Revising for the exam",
+    duration: 60,
+    startedAt: new Date(NOW).toISOString(),
+    endAt: new Date(endAt).toISOString(),
+  });
+  const requests: DecisionContextRequest[] = [];
+  /** Mirror the real batch: idle bundles carry the latency score question. */
+  const assembleDecisionContext = vi.fn(
+    async (
+      _agentId: string,
+      request: DecisionContextRequest,
+    ): Promise<DecisionBatch> => {
+      requests.push(request);
+      return {
+        state: {},
+        questions:
+          request.brainStatus === "idle"
+            ? {
+                wake_decision: { type: "choice", criteria: {} },
+                response_latency: {
+                  type: "score",
+                  criteria: [
+                    { minutes: 0, description: "Now" },
+                    { minutes: 60, description: "An hour" },
+                  ],
+                },
+              }
+            : { attention_allocation: { type: "choice", criteria: {} } },
+      };
+    },
+  );
+  const answer = (choice: string, score = 0) => ({
+    status: "ok",
+    result: {
+      answers: {
+        wake_decision: { type: "choice", choice },
+        attention_allocation: { type: "choice", choice },
+        response_latency: { type: "score", score, probabilities: [] },
+      },
+    },
+  });
+
+  beforeEach(() => {
+    requests.length = 0;
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // No jitter.
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("maps latency scores onto log-spaced anchors with jitter", () => {
+    expect(latencyMs(0, [0, 1, 5, 20, 60], () => 0.5)).toBe(0);
+    expect(latencyMs(2, [0, 1, 5, 20, 60], () => 0.5)).toBe(5 * 60_000);
+    expect(latencyMs(9, [0, 60], () => 0.5)).toBe(HOUR);
+    const half = latencyMs(0.5, [0, 60], () => 0.5) / 60_000;
+    expect(half).toBeGreaterThan(5);
+    expect(half).toBeLessThan(10);
+    expect(latencyMs(1, [0, 60], () => 0)).toBe(0.8 * HOUR);
+    expect(latencyMs(1, [0, 60], () => 1)).toBe(1.2 * HOUR);
+    expect(latencyMs(1, [], () => 0.5)).toBe(0);
+  });
+
+  it("defers a message until the activity ends and delivers it with the check-in", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("text"));
+    expect(h.deliver).not.toHaveBeenCalled();
+    expect(h.snapshot().pending[0]).toMatchObject({
+      action: "QUEUE_NEXT",
+      until: { taskId: "study" },
+    });
+
+    await h.router.drain("alice");
+    expect(h.deliver).not.toHaveBeenCalled();
+
+    h.setTime(NOW + HOUR);
+    await h.router.deadline("alice");
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0].ids).toEqual([
+      `task-deadline:study:${new Date(NOW + HOUR).toISOString()}`,
+      "text",
+    ]);
+    expect(h.deliveries[0].message).toContain("Incoming chats:");
+    expect(h.deliveries[0].message).toContain("Activity check-in");
+  });
+
+  it("keeps waiting when the activity is extended and releases on replacement", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("text"));
+    h.setTime(NOW + HOUR);
+    h.tasks.set("alice", study("study", NOW + 2 * HOUR)); // delay_task
+    await h.router.drain("alice");
+    expect(h.deliver).not.toHaveBeenCalled();
+    h.tasks.set("alice", study("snack", NOW + 2 * HOUR)); // start_task
+    await h.router.drain("alice");
+    expect(h.deliveries[0].ids).toEqual(["text"]);
+  });
+
+  it("delays an idle wake by the scored latency, then wakes on its own", async () => {
+    const h = setup({ assembleDecisionContext, readinessPollMs: 10 });
+    h.evaluateDecision.mockResolvedValue(answer("WAKE", 1));
+    await h.router.receive("alice", stimulus("text"));
+    expect(h.deliver).not.toHaveBeenCalled();
+    expect(h.snapshot().pending[0].until).toEqual({ notBefore: NOW + HOUR });
+    h.setTime(NOW + HOUR);
+    await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["text"]));
+    expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks earlier when the activity ends before the delay", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study("study", NOW + 5 * 60_000));
+    h.evaluateDecision.mockResolvedValue(answer("WAKE", 1));
+    await h.router.receive("alice", stimulus("text"));
+    expect(h.snapshot().pending[0].until).toEqual({
+      notBefore: NOW + HOUR,
+      taskId: "study",
+    });
+    h.setTime(NOW + 5 * 60_000);
+    await h.router.deadline("alice");
+    expect(h.deliveries[0].ids).toContain("text");
+  });
+
+  it("shows everything waiting once something gets an immediate wake", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    h.evaluateDecision.mockResolvedValueOnce(answer("DEFER"));
+    await h.router.receive("alice", stimulus("homework"));
+    h.evaluateDecision.mockResolvedValueOnce(answer("WAKE", 0));
+    await h.router.receive("alice", stimulus("emergency"));
+    expect(h.deliveries).toHaveLength(1);
+    expect([...h.deliveries[0].ids].sort()).toEqual(["emergency", "homework"]);
+  });
+
+  it("lets a busy brain defer to the activity boundary instead of the next thought", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    await h.router.started("alice", "busy");
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("text"));
+    await h.router.ended("alice", "busy", false);
+    expect(h.deliver).not.toHaveBeenCalled();
+    h.setTime(NOW + HOUR);
+    await h.router.deadline("alice");
+    expect(h.deliveries[0].ids).toContain("text");
+  });
+
+  it("discards ignored stimuli for good and reports only what the brain was shown", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    h.evaluateDecision.mockResolvedValueOnce(answer("IGNORE"));
+    await h.router.receive("alice", stimulus("chatter"));
+    h.evaluateDecision.mockResolvedValueOnce(answer("DEFER"));
+    await h.router.receive("alice", stimulus("later"));
+    let noticed = await h.router.noticed("alice");
+    expect(noticed(stimulus("chatter"))).toBe(false);
+    expect(noticed(stimulus("later"))).toBe(false);
+
+    h.setTime(NOW + HOUR);
+    await h.router.deadline("alice");
+    expect(h.deliveries[0].ids).not.toContain("chatter");
+    noticed = await h.router.noticed("alice");
+    expect(noticed(stimulus("chatter"))).toBe(false);
+    expect(noticed(stimulus("later"))).toBe(true);
+    // A duplicate of the ignored stimulus is still deduplicated.
+    await h.router.receive("alice", stimulus("chatter"));
+    expect(h.snapshot().pending.map((item) => item.id)).not.toContain(
+      "chatter",
+    );
+  });
+
+  it("treats a deferral with no activity as attention now", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("text"));
+    expect(h.deliveries[0].ids).toEqual(["text"]);
+  });
+
+  it("shows Jev the speech in progress and cuts it off on a steer", async () => {
+    const h = setup({ assembleDecisionContext });
+    const speech = {
+      current: vi.fn(() => ({
+        sessionKey: "agent:alice:chat:direct:bob",
+        said: ["Wait..."],
+        unsaid: ["I told you not to go!"],
+      })),
+      interrupt: vi.fn(() => true),
+    };
+    h.router.attachSpeech(speech);
+    await h.router.started("alice", "busy");
+    h.evaluateDecision.mockResolvedValueOnce(answer("QUEUE_NEXT"));
+    await h.router.receive("alice", stimulus("uh huh"));
+    expect(speech.interrupt).not.toHaveBeenCalled();
+    expect(requests.at(-1)?.currentSpeech).toEqual(speech.current());
+    h.evaluateDecision.mockResolvedValueOnce(answer("STEER"));
+    await h.router.receive("alice", stimulus("I didn't actually go!"));
+    expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice");
+    expect(h.deliveries[0]).toMatchObject({
+      mode: "steer",
+      ids: ["I didn't actually go!"],
     });
   });
 });

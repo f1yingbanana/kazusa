@@ -101,10 +101,22 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      thought.
    - **Context-Aware Semantic Admission (Zero Numeric Thresholds)**: When the
      brain is busy, Jev classifies stimuli categorically across `STEER`,
-     `QUEUE_NEXT`, and `IGNORE` (or `WAKE` vs. `IGNORE` when idle). Decision
-     policies rely on contextual understanding of the ongoing activity
-     description and relationship stakes, not arbitrary probability or wake
-     thresholds.
+     `QUEUE_NEXT`, `DEFER`, and `IGNORE` (or `WAKE` vs. `DEFER` vs. `IGNORE`
+     when idle). Decision policies rely on contextual understanding of the
+     ongoing activity description and relationship stakes, not arbitrary
+     probability or wake thresholds.
+   - **Human Reply Timing ("checking the phone")**: An idle `WAKE` also carries
+     a `response_latency` score that delays the wake by simulated minutes.
+     `DEFER` holds a stimulus until the current activity ends (deadline or
+     replacement). Whichever comes first makes the character "pick up the
+     phone", and every approved waiting stimulus is delivered in that one turn.
+     Task check-ins therefore arrive bundled with the messages a character set
+     aside while busy. See `references/perception.md` §12.
+   - **Paced, Interruptible Speech**: `send_message` takes an array of chat
+     bubbles and delivers them one by one at simulated typing speed while the
+     tool call stays open. A `STEER` aborts the rest; unsent bubbles never reach
+     any ledger, and the tool result tells the brain what was and was not said.
+     See `references/messaging.md` (Paced speech).
    - **No Generative Rewriting & Zero Prompt Injections**: Jev is a
      non-generative classifier with categorical choices. Admitted stimuli pass
      through verbatim to the `:brain` session without hallucination or
@@ -315,6 +327,12 @@ callbacks and direct references connect these modules in process.
   precedence and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]`
   markers must never select system instructions. Perception no longer emits
   those markers.
+- **Chats awaiting your reply**: The situation message lists, from Messaging's
+  canonical store, current chats where someone spoke after the character (within
+  the short-term window) and the brain was shown that message: address, sender,
+  and time only. It is the "glance at the phone" view for conversations read but
+  never answered. Ignored stimuli never appear; the skills decide whether
+  answering is natural.
 - Keep delivery hashes in operational run/adoption/provider metadata, not
   `MessageSid`; the latter is rendered into prompts. Use the native
   `AmbientTranscriptBody` for clean room-event text while preserving the host's
@@ -373,16 +391,20 @@ callbacks and direct references connect these modules in process.
   evaluated against the character's active task and cognitive state:
   - **Idle Brain**: Characters are never truly inactive (sleep, reading, and
     waiting are active tasks, defaulting to "resting" when unset). Jev evaluates
-    `["WAKE", "IGNORE"]` based on the ongoing activity description and
-    situational context. Bundles where all items were already approved as
-    `QUEUE_NEXT` during a busy turn bypass Jev re-evaluation and wake
-    immediately on turn completion. Ignored stimuli remain in the subjective
-    ledger without invoking an LLM turn.
-  - **Busy Brain**: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` semantically
-    based on the current activity and relationship stakes. High-focus or
-    delicate tasks (e.g. studying, deep sleep, serious conversations) naturally
-    demand high situational urgency to steer, while routine stimuli are
-    comfortably queued for the next turn (`QUEUE_NEXT`) or ignored.
+    `["WAKE", "DEFER", "IGNORE"]` plus a `response_latency` score in one batch.
+    `WAKE` waits the scored simulated delay (zero wakes now); `DEFER` waits for
+    the current task to end. Bundles where all items were already approved
+    during a busy turn bypass Jev re-evaluation once ready. `IGNORE` is final:
+    the stimulus stays in the subjective ledger but never reaches the brain or
+    its "Chats awaiting your reply" view. Anything the character might still
+    answer later is `DEFER`.
+  - **Busy Brain**: Evaluates `["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"]`
+    semantically based on the current activity, relationship stakes, and any
+    speech the character is still delivering. High-focus or delicate tasks (e.g.
+    studying, deep sleep, serious conversations) naturally demand high
+    situational urgency to steer, while routine stimuli are queued for the next
+    turn (`QUEUE_NEXT`), set aside until the activity ends (`DEFER`), or
+    ignored. `STEER` also interrupts an in-progress `send_message`.
 - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid arrivals coalesce
   within a brief window (`coalesceWindowMs = 500ms`). Jev evaluates the incoming
   bundle against recent channel context and currently pending items so two

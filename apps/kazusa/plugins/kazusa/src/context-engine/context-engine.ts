@@ -71,6 +71,12 @@ export async function assembleContext(params: {
   readonly simTime: number;
   readonly activeTask: ActiveTask | null;
   readonly personalWiki?: readonly string[];
+  /** Chats whose latest visible message came from someone else. */
+  readonly awaitingReplies?: readonly {
+    readonly sessionKey: string;
+    readonly sender: string;
+    readonly timestamp: number;
+  }[];
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
 }): ReturnType<ContextEngine["assemble"]> {
@@ -131,6 +137,16 @@ export async function assembleContext(params: {
             `Planned check-in: ${formatSimTime(Date.parse(task.endAt))}`,
           ].join("\n")
         : "No activity has been chosen yet.",
+      ...(params.awaitingReplies?.length
+        ? [
+            "",
+            "### Chats awaiting your reply",
+            ...params.awaitingReplies.map(
+              (chat) =>
+                `- ${formatSessionHeader(chat.sessionKey)}: ${chat.sender} at ${formatSimTime(chat.timestamp)}`,
+            ),
+          ]
+        : []),
     ].join("\n"),
     timestamp: params.simTime,
   };

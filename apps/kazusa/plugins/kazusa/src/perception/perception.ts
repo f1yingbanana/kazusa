@@ -20,17 +20,27 @@ import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
+import { z } from "zod";
 import {
   PERCEPTION_CONFIG,
   STIMULUS,
-  type AttentionAction,
+  latencyMs,
+  type AttentionDecision,
   type PerceptionConfig,
+  type SpeechSource,
   type Stimulus,
 } from "./types.ts";
 
+/**
+ * `QUEUE_NEXT` marks attention already approved. `until` holds it back: it is
+ * ready once `notBefore` passes or its bound task is over, whichever is first.
+ */
 export interface PendingItem extends Stimulus {
   action?: "QUEUE_NEXT";
+  until?: { taskId?: string; notBefore?: number };
 }
+
+const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 
 export interface PerceptionState {
   pending: PendingItem[];
@@ -42,7 +52,10 @@ export interface PerceptionState {
    */
   deliveries?: PerceptionDelivery[];
   stopped?: boolean;
+  /** Adopted or ignored stimulus keys, for deduplication. */
   processedIds?: string[];
+  /** The ignored subset: discarded on purpose, never shown to the brain. */
+  ignoredIds?: string[];
 }
 
 export interface PerceptionDelivery {
@@ -56,7 +69,7 @@ export interface PerceptionDelivery {
 }
 
 export interface PerceptionDeps {
-  readonly clock: Pick<Clock, "time">;
+  readonly clock: Pick<Clock, "time" | "now">;
   readonly api?: OpenClawPluginApi;
   readonly config?: Partial<PerceptionConfig>;
   readonly assertCurrent?: () => void;
@@ -119,6 +132,8 @@ export class Perception {
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
+  private readonly readinessTimers = new Map<string, NodeJS.Timeout>();
+  private speech?: SpeechSource;
   private readonly adoptedListeners = new Set<
     (delivery: PerceptionDelivery) => void | Promise<void>
   >();
@@ -384,6 +399,27 @@ export class Perception {
     }
   }
 
+  /**
+   * Which stimuli the brain was actually shown. Ignored ones were discarded on
+   * purpose, and waiting ones have not been read yet.
+   */
+  async noticed(
+    agentId: string,
+  ): Promise<(ref: Pick<Stimulus, "id" | "sessionKey">) => boolean> {
+    const state = await this.store.lookup(agentId);
+    const processed = new Set(state?.processedIds);
+    const ignored = new Set(state?.ignoredIds);
+    return (ref) => {
+      const key = stimulusKey(ref);
+      return processed.has(key) && !ignored.has(key);
+    };
+  }
+
+  /** Let attention see, and cut off, what the character is saying. */
+  attachSpeech(source: SpeechSource): void {
+    this.speech = source;
+  }
+
   onAdopted(
     listener: (delivery: PerceptionDelivery) => void | Promise<void>,
   ): () => void {
@@ -479,6 +515,47 @@ export class Perception {
     );
   }
 
+  /** Approved attention waits until its delay passes or its activity ends. */
+  private isReady(item: PendingItem, task?: ActiveTask): boolean {
+    const until = item.until;
+    if (!until) return true;
+    const now = this.deps.clock.time();
+    if (until.notBefore !== undefined && until.notBefore <= now) return true;
+    if (until.taskId === undefined) return until.notBefore === undefined;
+    return !task || task.id !== until.taskId || Date.parse(task.endAt) <= now;
+  }
+
+  /**
+   * Re-check readiness when the earliest delay should pass. Task boundaries
+   * arrive as deadline stimuli or brain ends, so only `notBefore` needs a
+   * timer; the poll cap absorbs clock speed changes and advances.
+   */
+  private armReadiness(agentId: string, items: readonly PendingItem[]): void {
+    const existing = this.readinessTimers.get(agentId);
+    if (existing) clearTimeout(existing);
+    this.readinessTimers.delete(agentId);
+    const times = items.flatMap((item) =>
+      item.until?.notBefore === undefined ? [] : [item.until.notBefore],
+    );
+    if (!times.length || this.lifetime.signal.aborted) return;
+    const { simTime, speed } = this.deps.clock.now();
+    const wait =
+      speed > 0
+        ? Math.min(
+            this.config.readinessPollMs,
+            Math.max(0, Math.ceil((Math.min(...times) - simTime) / speed)),
+          )
+        : this.config.readinessPollMs;
+    const timer = setTimeout(() => {
+      this.readinessTimers.delete(agentId);
+      void runDetachedWebhookWork(() => this.drain(agentId)).catch(
+        (error: unknown) => this.warn(error),
+      );
+    }, wait);
+    timer.unref();
+    this.readinessTimers.set(agentId, timer);
+  }
+
   private async drainState(
     agentId: string,
     state: PerceptionState,
@@ -501,11 +578,16 @@ export class Perception {
       if (!fresh.length) {
         await this.save(agentId, state);
         if (busy || !available.length) return;
+        if (!available.some((item) => this.isReady(item, task))) {
+          this.armReadiness(agentId, available);
+          return;
+        }
+        // Picking up the phone shows everything that was waiting.
         return this.reserve(agentId, state, this.batch(available), "followup");
       }
-      const action =
+      const { action, delayMs } =
         !busy && fresh.every((item) => item.deadline || item.idle)
-          ? "STEER"
+          ? { action: "STEER" as const, delayMs: 0 }
           : await this.classify(agentId, state, task, fresh, busy);
       this.assertCurrent();
       // start_task/delay_task can execute while Jev is evaluating.
@@ -519,6 +601,21 @@ export class Perception {
       state.pending = state.pending.filter(
         (item) => !stale.has(stimulusKey(item)),
       );
+      const activeTask =
+        currentTask && Date.parse(currentTask.endAt) > this.deps.clock.time()
+          ? currentTask
+          : undefined;
+      if (action === "STEER" && current.length && !busy && delayMs > 0) {
+        const notBefore = this.deps.clock.time() + delayMs;
+        for (const item of current) {
+          item.action = "QUEUE_NEXT";
+          item.until = activeTask
+            ? { notBefore, taskId: activeTask.id }
+            : { notBefore };
+        }
+        await this.save(agentId, state);
+        continue;
+      }
       if (action === "STEER" && current.length) {
         const admitted = busy
           ? current
@@ -539,7 +636,10 @@ export class Perception {
       }
       const ignored = new Set<string>();
       for (const item of current) {
-        if (action === "QUEUE_NEXT" || item.deadline || item.idle)
+        if (action === "DEFER") {
+          item.action = "QUEUE_NEXT";
+          if (activeTask) item.until = { taskId: activeTask.id };
+        } else if (action === "QUEUE_NEXT" || item.deadline || item.idle)
           item.action = "QUEUE_NEXT";
         else ignored.add(stimulusKey(item));
       }
@@ -549,6 +649,10 @@ export class Perception {
       state.processedIds = [...(state.processedIds ?? []), ...ignored].slice(
         -1_000,
       );
+      if (ignored.size)
+        state.ignoredIds = [...(state.ignoredIds ?? []), ...ignored].slice(
+          -1_000,
+        );
       await this.save(agentId, state);
       // Continue through all unevaluated batches, including after IGNORE.
     }
@@ -560,7 +664,8 @@ export class Perception {
     task: ActiveTask | undefined,
     bundle: PendingItem[],
     busy: boolean,
-  ): Promise<AttentionAction> {
+  ): Promise<AttentionDecision> {
+    const admit = { action: "STEER", delayMs: 0 } as const;
     const assemble = this.deps.assembleDecisionContext;
     const api = this.api;
     const evaluate =
@@ -571,7 +676,7 @@ export class Perception {
             opts: Parameters<DecisionRuntimeV1["evaluate"]>[1],
           ) => api.runtime.decisions.evaluate(batch, opts)
         : undefined);
-    if (!assemble || !evaluate) return "STEER";
+    if (!assemble || !evaluate) return admit;
     const timeout = new AbortController();
     const signal = AbortSignal.any([this.lifetime.signal, timeout.signal]);
     const timer = setTimeout(
@@ -591,11 +696,14 @@ export class Perception {
         signal.addEventListener("abort", onAbort, { once: true });
         if (signal.aborted) onAbort();
       });
+      let anchors: number[] = [];
       const work = async (): Promise<DecisionOutcome> => {
+        const speech = busy ? this.speech?.current(agentId) : undefined;
         const batch = await assemble(agentId, {
           activeTask: task,
           brainStatus: busy ? "busy_thinking" : "idle",
           brainContext: state.brainContext,
+          ...(speech ? { currentSpeech: speech } : {}),
           incomingBundle: bundle,
           pendingQueue: state.pending
             .filter(
@@ -609,10 +717,16 @@ export class Perception {
           signal,
         });
         signal.throwIfAborted();
+        const latency = batch.questions.response_latency;
+        if (latency?.type === "score") {
+          const parsed = LATENCY_ANCHORS.safeParse(latency.criteria);
+          if (parsed.success)
+            anchors = parsed.data.map((level) => level.minutes);
+        }
         return evaluate(batch, {
           agentId,
           purpose: `perception.${question}`,
-          rubricVersion: "3",
+          rubricVersion: "4",
           timeoutMs: this.config.decisionTimeoutMs,
           signal,
         });
@@ -621,18 +735,29 @@ export class Perception {
       const answer =
         outcome.status === "ok" ? outcome.result.answers[question] : undefined;
       if (answer?.type === "choice") {
-        if (answer.choice === "IGNORE") return "IGNORE";
-        if (busy && answer.choice === "QUEUE_NEXT") return "QUEUE_NEXT";
+        if (answer.choice === "IGNORE") return { action: "IGNORE", delayMs: 0 };
+        if (answer.choice === "DEFER") return { action: "DEFER", delayMs: 0 };
+        if (busy && answer.choice === "QUEUE_NEXT")
+          return { action: "QUEUE_NEXT", delayMs: 0 };
+        const latency =
+          outcome.status === "ok"
+            ? outcome.result.answers.response_latency
+            : undefined;
+        if (!busy && answer.choice === "WAKE" && latency?.type === "score")
+          return {
+            action: "STEER",
+            delayMs: latencyMs(latency.score, anchors),
+          };
       }
       if (outcome.status !== "ok")
         this.warn(
           `Decision unavailable: ${outcome.reason}; admitting attention`,
         );
-      return "STEER";
+      return admit;
     } catch (error) {
       this.assertCurrent(); // Disposal is cancellation, never a fallback brain turn.
       this.warn(error);
-      return "STEER";
+      return admit;
     } finally {
       clearTimeout(timer);
       if (onAbort) signal.removeEventListener("abort", onAbort);
@@ -655,6 +780,10 @@ export class Perception {
           .map((item) => item.sessionKey),
       ),
     ];
+    // Steering lands at the next tool boundary. If the character is mid-speech,
+    // that boundary is the open send_message: stop it so the steer is noticed
+    // before the remaining bubbles are said.
+    if (mode === "steer") this.speech?.interrupt(agentId);
     const delivery: PerceptionDelivery = {
       id: createHash("sha256")
         .update(JSON.stringify([agentId, [...keys].sort()]))
@@ -802,5 +931,7 @@ export class Perception {
     this.brainStateListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();
+    for (const timer of this.readinessTimers.values()) clearTimeout(timer);
+    this.readinessTimers.clear();
   }
 }

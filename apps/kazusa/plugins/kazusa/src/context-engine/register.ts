@@ -15,6 +15,16 @@ import {
 import { createSkillLoader } from "./skill-loader.ts";
 import { readPersonalWiki } from "./decision-sources.ts";
 import type { ActiveTask } from "../taskman/types.ts";
+import type { AwaitingReply } from "../messaging/messaging.ts";
+
+interface ContextEngineDeps {
+  readonly clock: Clock;
+  /** Canonical "glance at the phone" view; absent until Messaging exists. */
+  readonly awaitingReplies?: (
+    agentId: string,
+    since: number,
+  ) => Promise<readonly AwaitingReply[]>;
+}
 
 /**
  * Wire host lifecycle and session I/O; selection and skill expansion stay in
@@ -22,14 +32,14 @@ import type { ActiveTask } from "../taskman/types.ts";
  */
 export function registerContextEngine(
   api: OpenClawPluginApi,
-  deps: { readonly clock: Clock },
+  deps: ContextEngineDeps,
 ): void {
   api.registerContextEngine("kazusa", () => createContextEngine(api, deps));
 }
 
 function createContextEngine(
   api: OpenClawPluginApi,
-  { clock }: { readonly clock: Clock },
+  { clock, awaitingReplies }: ContextEngineDeps,
 ): ContextEngine {
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
@@ -114,23 +124,25 @@ function createContextEngine(
         api.config,
         brainAgentId,
       );
-      const [sessionsContext, activeTask, personalWiki] = await Promise.all([
-        readSessionStreams({
-          agentId: brainAgentId,
-          streams,
-          storePath,
-          pluginId: api.id,
-          now,
-          cutoff,
-        }),
-        tasks.lookup(brainAgentId),
-        readPersonalWiki(
-          workspaceDir,
-          [],
-          params.prompt ?? "",
-          config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
-        ),
-      ]);
+      const [sessionsContext, activeTask, personalWiki, awaiting] =
+        await Promise.all([
+          readSessionStreams({
+            agentId: brainAgentId,
+            streams,
+            storePath,
+            pluginId: api.id,
+            now,
+            cutoff,
+          }),
+          tasks.lookup(brainAgentId),
+          readPersonalWiki(
+            workspaceDir,
+            [],
+            params.prompt ?? "",
+            config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
+          ),
+          awaitingReplies?.(brainAgentId, cutoff) ?? [],
+        ]);
       return assembleContext({
         run: params,
         agentId: brainAgentId,
@@ -138,6 +150,7 @@ function createContextEngine(
         sessionsContext,
         activeTask: activeTask ?? null,
         personalWiki,
+        awaitingReplies: awaiting,
         simTime: now,
         config,
         skillLoader,

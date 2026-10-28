@@ -6,6 +6,8 @@ import type {
 } from "openclaw/plugin-sdk/decisions";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
 import { z } from "zod";
+import type { ChatFacts } from "../messaging/messaging.ts";
+import type { CurrentSpeech } from "../perception/types.ts";
 import type { Stimulus } from "../stimulus.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
@@ -20,6 +22,8 @@ export interface DecisionContextRequest {
   readonly activeTask?: ActiveTask;
   readonly brainStatus: "idle" | "busy_thinking";
   readonly brainContext?: string;
+  /** Speech still being delivered by send_message during a busy turn. */
+  readonly currentSpeech?: CurrentSpeech;
   readonly incomingBundle: readonly Stimulus[];
   readonly pendingQueue: readonly Stimulus[];
   readonly signal?: AbortSignal;
@@ -65,6 +69,8 @@ export function assembleDecisionContext(
     >;
     readonly characterFiles?: CharacterFiles;
     readonly wiki?: readonly string[];
+    /** Canonical facts for the chats in the incoming bundle. */
+    readonly chats?: readonly ChatFacts[];
     readonly config?: ContextEngineConfig;
   },
 ): DecisionEntry {
@@ -95,6 +101,8 @@ export function assembleDecisionContext(
     cutoff: params.simTime - config.decisionShortTermHours * 3_600_000,
     tokenBudget: Math.min(config.decisionHistoryMaxTokens, budget / 5),
   });
+  const minutesAgo = (time: number) =>
+    Math.max(0, Math.round((params.simTime - time) / 60_000));
   const formatStimuli = (items: readonly Stimulus[]) =>
     items.map((item) => ({
       kind: item.deadline ? "task_deadline" : "message",
@@ -130,6 +138,9 @@ export function assembleDecisionContext(
       ? {
           type: truncateText(task.type, 64),
           description: truncateText(task.description, 256),
+          elapsedMinutes: Math.round(
+            (params.simTime - Date.parse(task.startedAt)) / 60_000,
+          ),
           remainingMinutes: Math.round(
             (Date.parse(task.endAt) - params.simTime) / 60_000,
           ),
@@ -143,6 +154,32 @@ export function assembleDecisionContext(
             Math.min(config.decisionBrainMaxTokens, budget / 8),
           )
         : null,
+    currentSpeech: params.currentSpeech
+      ? {
+          chat: params.currentSpeech.sessionKey
+            ? formatSessionHeader(params.currentSpeech.sessionKey)
+            : null,
+          said: params.currentSpeech.said.map((text) =>
+            truncateText(text, 256),
+          ),
+          unsaid: params.currentSpeech.unsaid.map((text) =>
+            truncateText(text, 256),
+          ),
+        }
+      : null,
+    // What a person sees before deciding how soon to answer: a direct chat or
+    // a crowd, whether they are already talking, and how long it has waited.
+    conversations: (params.chats ?? []).map((chat) => ({
+      channel: formatSessionHeader(chat.sessionKey),
+      kind: chat.kind,
+      title: chat.title ? truncateText(chat.title, 32) : null,
+      members: chat.memberCount,
+      youLastSpokeMinutesAgo:
+        chat.lastSpokeAt === null ? null : minutesAgo(chat.lastSpokeAt),
+      unansweredMessages: chat.unanswered,
+      waitingMinutes:
+        chat.waitingSince === null ? null : minutesAgo(chat.waitingSince),
+    })),
     recentChannelContext: [...selected].map(
       ([key, records]) =>
         `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
@@ -166,6 +203,7 @@ export function assembleDecisionContext(
     else if (result.pendingQueue.length) result.pendingQueue.shift();
     else if (result.personalWiki.length) result.personalWiki.pop();
     else if (result.currentAttention) result.currentAttention = null;
+    else if (result.currentSpeech) result.currentSpeech = null;
     else
       throw new Error(
         "Decision evidence cannot fit the configured request budget",
@@ -193,6 +231,25 @@ export const PerceptionRubricSchema = z.object({
         .refine(
           (c) => Object.keys(c).length > 0,
           "attention_allocation criteria cannot be empty",
+        ),
+    }),
+    response_latency: z.object({
+      description: z.string().optional(),
+      criteria: z
+        .array(
+          z.strictObject({
+            minutes: z.number().min(0),
+            description: z.string().min(1),
+          }),
+        )
+        .min(2)
+        .refine(
+          (levels) =>
+            levels.every(
+              (level, index) =>
+                index === 0 || level.minutes >= levels[index - 1].minutes,
+            ),
+          "response_latency criteria must be ordered by minutes",
         ),
     }),
   }),
@@ -227,13 +284,26 @@ export function buildDecisionQuestions(
   const instructions = [rubric.instructions, target.description]
     .filter(Boolean)
     .join("\n\n");
-  return {
+  const questions: Record<string, DecisionQuestion> = {
     [questionKey]: {
       type: "choice",
       instructions,
       criteria: target.criteria,
     },
   };
+  // Asked in the same pass; Perception uses it only for an idle WAKE.
+  if (!busy)
+    questions.response_latency = {
+      type: "score",
+      instructions: [
+        rubric.instructions,
+        rubric.questions.response_latency.description,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      criteria: rubric.questions.response_latency.criteria,
+    };
+  return questions;
 }
 
 export function assembleDecisionBatch(

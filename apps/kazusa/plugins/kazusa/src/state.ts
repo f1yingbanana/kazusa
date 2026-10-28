@@ -8,3 +8,7 @@ export type StateStore<T> = Pick<
   ReturnType<typeof openKeyedStore<T>>,
   "lookup" | "register" | "entries"
 >;
+
+/** A store whose entries are removed once their work completes. */
+export type RemovableStateStore<T> = StateStore<T> &
+  Pick<ReturnType<typeof openKeyedStore<T>>, "delete">;

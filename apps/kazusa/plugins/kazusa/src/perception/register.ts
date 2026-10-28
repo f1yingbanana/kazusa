@@ -16,7 +16,7 @@ const LIFECYCLE = z.object({
 export function registerPerception(
   api: OpenClawPluginApi,
   deps: {
-    readonly clock: Pick<Clock, "time" | "init">;
+    readonly clock: Pick<Clock, "time" | "init" | "now">;
     readonly assembleDecisionContext?: DecisionContextAssembler;
   },
 ): Perception {
@@ -70,7 +70,8 @@ export function registerPerception(
           const directPeer = owner.rest.slice("chat:direct:".length);
           if (directPeer) sender = directPeer;
         } else if (api.pluginConfig && "user" in api.pluginConfig) {
-          const configuredUser = api.pluginConfig.user as { id?: string } | undefined;
+          const configuredUser = api.pluginConfig.user as
+            { id?: string } | undefined;
           if (configuredUser?.id) sender = configuredUser.id;
         }
       }

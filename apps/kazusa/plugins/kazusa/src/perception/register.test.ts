@@ -65,7 +65,11 @@ function setup() {
     },
   } as unknown as OpenClawPluginApi;
 
-  const clock = { time: () => NOW, init: async () => {} };
+  const clock = {
+    time: () => NOW,
+    init: async () => {},
+    now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
+  };
   const perception = registerPerception(api, { clock });
 
   const hook = (name: string) =>
@@ -254,7 +258,11 @@ describe("Perception host integration", () => {
     } as unknown as OpenClawPluginApi;
     const assembleDecisionContext = vi.fn();
     const perception = registerPerception(api, {
-      clock: { time: () => NOW, init: async () => {} },
+      clock: {
+        time: () => NOW,
+        init: async () => {},
+        now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
+      },
       assembleDecisionContext,
     });
     expect(perception).toBeDefined();
