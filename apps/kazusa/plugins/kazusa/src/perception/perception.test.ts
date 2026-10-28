@@ -1152,7 +1152,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         /^\[\w{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}\] Incoming chats:/,
       );
       expect(h.deliveries[0].message).toContain(
-        "The planned check-in for your eating activity was",
+        "Activity check-in: your eating activity was planned to end at",
       );
       expect(h.snapshot().pending).toHaveLength(0);
     });

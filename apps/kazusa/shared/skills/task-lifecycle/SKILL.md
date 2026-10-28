@@ -46,7 +46,7 @@ Look at `## Plans recorded for <date>` in `MEMORY.md`:
 
 - **`[HARD_BLOCK] <start> - <end>`**: fixed anchors (classes, club meetups,
   promised appointments). If one starts now or shortly, go to it.
-- **`[SOFT_GOAL]`**: flexible intentions. In open gaps, weigh how you feel
+- **`[SOFT_GOAL]`**: flexible intentions. In open gaps, weigh **How you feel**
   (hungry? tired? bored?) and `## Long-Term Goals`, and pick something that
   serves one.
 - **Waking up:** after overnight sleep, glance at today's schedule and your

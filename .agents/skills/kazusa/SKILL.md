@@ -5,13 +5,13 @@ description:
   simulation framework on top of OpenClaw (`@openrp-ai/kazusa` and
   `@kazusa/plugin`). Always trigger this skill whenever designing, building,
   modifying, debugging, or testing anything in Kazusa—including the unified
-  `@kazusa/plugin` (`src/clock`, `src/taskman`, `src/context-engine`,
-  `src/perception`), stimulus admission and routing, `agent:ID:brain` steer
-  routing, `start_task`/`delay_task` leases, `clock_*` tools and Gateway RPCs,
-  the 3-Tier `assemble()` retrieval pipeline, World Wiki (`shared/wiki/`) vs.
-  Personal Wiki (`workspaces/ID/wiki/`) schemas, desire homeostasis math, or
-  OpenClaw session and cron integrations, even if the user only mentions a
-  single module, tool, or character file.
+  `@kazusa/plugin` (`src/clock`, `src/taskman`, `src/desires`,
+  `src/context-engine`, `src/perception`), stimulus admission and routing,
+  `agent:ID:brain` steer routing, `start_task`/`delay_task` leases, `clock_*`
+  tools and Gateway RPCs, the 3-Tier `assemble()` retrieval pipeline, World Wiki
+  (`shared/wiki/`) vs. Personal Wiki (`workspaces/ID/wiki/`) schemas, desire
+  states and task effects, or OpenClaw session and cron integrations, even if
+  the user only mentions a single module, tool, or character file.
 ---
 
 # Kazusa: Real-time multi-agent AI world simulator framework for role-play
@@ -136,11 +136,11 @@ file-parsing overhead.
 
 | State Category                        | Canonical Storage Location                                                                  | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | :------------------------------------ | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"perception"`)                   | Virtual clock state/speed, active task leases, and Perception's records: one inbox/custody state per character (key `<agentId>`) plus one entry per attention decision (key `<agentId>:decision:<uuid>`), uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                                                                                              |
+| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"perception"`)      | Virtual clock state/speed, active task leases, desire anchors, and Perception's records: one inbox/custody state per character (key `<agentId>`) plus one entry per attention decision (key `<agentId>:decision:<uuid>`), uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                                                                              |
 | **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                         | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
 | **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`)                               | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                     |
 | **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*` | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
-| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                     | Static voice/values (`SOUL.md`), bio & YAML desire parameters (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                  |
+| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                     | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
 | **Objective Canon**                   | `shared/wiki/`                                                                              | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
 | **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                     | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports.                                                                                                                                                                                                                                                                                                                                               |
 
@@ -162,6 +162,7 @@ apps/kazusa/
 │       ├── timeline/                   # GET /kazusa/timeline from ledger metadata
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
 │       ├── taskman/                    # "tasks" leases, :tasks ledger, cron projection, tools
+│       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
@@ -184,10 +185,11 @@ apps/kazusa/
 ## 3. Unified Plugin Architecture & Module Boundaries
 
 `plugins/kazusa` (`@kazusa/plugin`) is a single native OpenClaw plugin whose
-`src/index.ts` composes `Clock`, `Taskman`, `ContextEngine`, and `Perception`
-directly in process. Do not introduce cross-plugin service boundaries or split
-these into separate packages. Keep their internal responsibilities decoupled;
-callbacks and direct references connect these modules in process.
+`src/index.ts` composes `Clock`, `Taskman`, `Desires`, `ContextEngine`, and
+`Perception` directly in process. Do not introduce cross-plugin service
+boundaries or split these into separate packages. Keep their internal
+responsibilities decoupled; callbacks and direct references connect these
+modules in process.
 
 - **One world per process, many registrations**: OpenClaw can call `register()`
   more than once in one Gateway process. An agent turn without an unambiguous
@@ -238,12 +240,15 @@ callbacks and direct references connect these modules in process.
   settlement). Pure rigid enums destroy character expressiveness. Kazusa
   standardizes on configurable category `type` + rich natural language
   `description`.
-- **Desire Homeostasis Integration**: Task execution directly interfaces with
-  the homeostatic desire math (`references/mathematics.md`). Settlement ratio
-  $\text{Ratio} = \text{clamp}(\Delta t_{\text{elapsed}} /
-  t_{\text{planned\_min}},\; 0.0,\; 1.0)$ scales desire rewards $\Delta
-  D_{\text{awarded}} = \Delta D_{\text{target}} \times \text{Ratio}$ upon
-  completion.
+- **Task Extensions (Desire Integration)**: Taskman knows nothing about desires.
+  Other modules pass `TaskExtension`s to `registerTaskman`; each adds required
+  parameters to both task tools and a `beforeCommit` hook that runs with the raw
+  tool arguments after the new lease is computed and before it is written. A
+  thrown error fails the tool call with its message and writes nothing. Desires
+  uses this for `afterwards` (§3.5). `start_task`, `delay_task` and
+  `send_message` are `catalogMode: "direct-only"`: behind Tool Search their
+  parameter descriptions are invisible and models route calls through a generic
+  `tool_call`.
 - **In-Character Monologues**: Transitions and delays may include a brief
   in-character `monologue`. Format it as an italic blockquote directly below the
   factual summary inside the same ledger message text rather than extending
@@ -324,20 +329,24 @@ callbacks and direct references connect these modules in process.
   native `__openclaw.senderId`, `senderName`, and `senderIdentity` metadata; see
   [the messaging contract](references/messaging.md). The context engine uses
   only sender metadata projected from `__openclaw` for every chat record. Self
-  requires an explicit ID matching the owner; missing attribution is unknown,
-  including outgoing records omitted by the installed catalog. Task records need
-  no speaker. Never infer authorship from text prefixes, display names, or peer
-  keys.
+  requires an explicit ID matching the owner; missing attribution is unknown.
+  The native catalog projects sender identity only for `user`-role rows, so
+  every chat-ledger row, the owner's own included, is written as `user`. Task
+  records need no speaker. Never infer authorship from text prefixes, display
+  names, or peer keys.
 - Derive ownership only from the native assembly `params.sessionKey`. The
   harness may omit `runtimeContext.sessionTarget`; it is not an alternate
   source. `register.ts` owns SDK lifecycle, configuration, and session I/O.
   `context-engine.ts` owns selection, rendering, and skill expansion.
-- Adds current simulation time and reads task and chat records from the last 24
-  simulated hours (configurable upward), selects whole messages newest-first
-  under one shared remaining token budget, then groups them by session with
-  chronological, timestamped entries. Accept native catalog display clipping;
-  add no source quotas or further per-message clipping, incognito feature, or
-  external-channel adapter.
+- Leads the situation message with the current simulation time; it never goes in
+  `systemPromptAddition`, which is ordered stable-first (conventions, memory
+  guidance, then the state-selected skill) so its prefix survives across turns
+  for prompt caching. Reads task and chat records from the last 24 simulated
+  hours (configurable upward), selects whole messages newest-first under one
+  shared remaining token budget, then groups them by session with chronological,
+  timestamped entries. Accept native catalog display clipping; add no source
+  quotas or further per-message clipping, incognito feature, or external-channel
+  adapter.
 - **Multi-Media Architecture**: Grounded preflight + on-demand inspection. Media
   processors receive the Context Engine's assembled background (location,
   identities, conversation thread) to produce situation-aware descriptions.
@@ -364,6 +373,9 @@ callbacks and direct references connect these modules in process.
   precedence and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]`
   markers must never select system instructions. Perception no longer emits
   those markers.
+- **How you feel**: The situation message carries Desires' one-line state
+  summary (§3.5), supplied through a `feelings` provider like `awaitingReplies`.
+  The context engine renders it verbatim.
 - **Chats awaiting your reply**: The situation message lists, from Messaging's
   canonical store, current chats where someone spoke after the character (within
   the short-term window) and the brain was shown that message: address, sender,
@@ -384,8 +396,8 @@ callbacks and direct references connect these modules in process.
   messages out to agent members before Perception. The `apps/web` prototype and
   Gateway HTTP adapter still need contract/authentication alignment. Native
   WebChat group posting is unsupported. Raw session tools remain denied via
-  `tools.deny: ["group:sessions", "message"]`. See
-  [messaging](references/messaging.md) for canonical storage and
+  `tools.deny: ["group:sessions", "message"]` (see Character Tool Surface in
+  §4). See [messaging](references/messaging.md) for canonical storage and
   [the client reference](references/client.md) for UI requirements, current gaps
   and live acceptance tests.
 - Behavioral instructions belong in skills, not TypeScript prompt constants.
@@ -486,10 +498,13 @@ callbacks and direct references connect these modules in process.
   pruning or a per-character read if history grows large.
 
 - **Sim-Time Envelope on Brain Input**: At the LLM boundary OpenClaw prefixes
-  every user turn with its wall-clock write time in the host timezone (e.g.
-  `[Tue 2026-10-27 21:26 EDT]`), unless the text already opens with a
-  `[... YYYY-MM-DD HH:mm` stamp. `formatDeliveryMessage` therefore leads every
-  delivery with `[<sim time>]`, so characters never see the operator's clock.
+  every user message with its `message.timestamp` rendered in
+  `agents.defaults.userTimezone` (host zone when unset), unless the text already
+  opens with a `[... YYYY-MM-DD HH:mm` stamp. Envelopes cannot be disabled.
+  `formatDeliveryMessage` and the situation message lead with `[<sim time>]`;
+  other assembled context carries sim timestamps, and the world config sets
+  `userTimezone: "UTC"` so those stamps match `formatSimTime` (sim time is UTC).
+  Without it, sim 20:36 rendered as `16:36 EDT`.
 - **Known Gap: Shutdown Mid-Turn**: An adopted delivery leaves custody once the
   brain turn starts. If the Gateway stops during that turn, the stimulus is
   neither answered nor re-queued (interrupted handoffs are deliberately not
@@ -522,7 +537,65 @@ callbacks and direct references connect these modules in process.
   input or drains a queue. Admission must happen before a run starts, not in
   `assemble()`, which may be retried.
 
+### 3.5 `src/desires/` — Narrative Desires
+
+- Full model and config in [mathematics](references/mathematics.md) §1.
+- **State words, never numbers, at the LLM boundary**: config maps levels
+  `0..100` to ordered states (default `depleted`/`low`/`fine`/`full`, each with
+  a `min` and a target `level`). The brain reads one `### How you feel` line
+  (`energy: fine · satiety: low · …`) and declares a required
+  `afterwards: { <desire>: "<current>→<afterwards>" }` on `start_task` and
+  `delay_task`, listing only desires the activity changes. Same-state pairs are
+  not in the enum. Code uses only the afterwards state and turns it into a
+  linear rate toward that state's `level` over the planned duration.
+- **Catalog**: `desires.catalog: [{ name, description, drain }]`, per world,
+  defaulting to `energy`, `satiety`, `social`, `stimulation`, `composure`,
+  `purpose`, `expression`. `description` is the only semantic contract and is
+  delivered once, as prose in the `start_task` `afterwards` description (no
+  per-desire properties, which models fill like a form). An afterwards state
+  equal to the current one means no change. Characters cannot add desires.
+- **State**: `"desires"` keyed store, one `DesireRecord` per character (anchor,
+  levels, current task effects, sparse `drain` overrides). Levels are a closed
+  form of sim time: no ticks, polling, or settlement step. Desire values never
+  go in Markdown or ledgers.
+- **Hook**: a Taskman `TaskExtension` re-anchors on every `start_task` and
+  `delay_task` before the lease is written.
+- **RPCs**: `desires.get { agentId }` and
+  `desires.configure { agentId, drain?, levels? }` (levels as numbers or state
+  names), Zod-validated against the catalog.
+- **Not yet**: Jev decision-state input, threshold "pangs" as Perception
+  stimuli, instant emotional jolts, client read model.
+
 ## 4. Engineering & Zero-Build Conventions
+
+- **Character Tool Surface (`openclaw.json` `tools`)**: characters get an
+  explicit `tools.allow` list, never a profile: `start_task`, `delay_task`,
+  `send_message`, `list_chats`, `manage_chat`, `memory_search`, `memory_get`,
+  `read`, `edit`, `write` (`MEMORY.md` and the personal wiki), `view_image`.
+  `tools.deny` keeps `group:sessions` and `message`, and adds `apply_patch`
+  because allowing `write` implicitly enables it. `tools.toolSearch: false`:
+  with a dozen tools, Tool Search's three control tools cost more than they
+  save, and models route calls through its generic `tool_call`. `clock_*` stay
+  registered for operators but are not allowed for characters. Everything a
+  roleplaying character must not reach is excluded by omission: shell, web,
+  browser, UI, nodes/computer, Gateway/plugin management, media generation,
+  goals, `ask_user`, and `session_status` (whose presence also adds a "use
+  `session_status` for the exact time" line to the system prompt). A deployment
+  widens the surface in its own `openclaw.json` (`tools.allow`, or per character
+  `agents.entries.<id>.tools.allow`); a tool from a new plugin is unavailable
+  until allowed there.
+- **Time Shown to Characters**: one format everywhere, `formatSimTime` in
+  brackets. Every assembled user message (the background message, deliveries,
+  the situation message) opens with `[<sim time>]`, which stops OpenClaw from
+  adding its own envelope stamp; check-ins carry no extra stamp.
+  `agents.defaults.userTimezone: "UTC"` covers anything the host still stamps.
+  OpenClaw's retired `agents.defaults.envelopeTimestamp`/`envelopeElapsed` keys
+  are rejected by 2026.10.5. **Known gap**: the system prompt's
+  `## Temporal Context` (`Current date: <real date>`, `Time zone: UTC`) is built
+  from `Date.now()` with no config, hook or context-engine override (the
+  `before_prompt_build` `systemPrompt` result replaces the whole prompt). The
+  conventions skill tells characters that date is not their world's; removing it
+  needs an upstream option.
 
 - **Zero-Build Jiti Execution**: OpenClaw runs `./src/index.ts` directly via its
   runtime TypeScript loader. Never add a build step (`tsc --build`, `tsup`, or
@@ -567,9 +640,9 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/file_schemas.md` — Read when implementing Markdown/YAML parsers or
   creating/modifying `SOUL.md`, `IDENTITY.md`, `MEMORY.md`, World Wiki, or
   Personal Wiki files.
-- `references/mathematics.md` — Read when implementing or tuning passive desire
-  decay, circadian $M_{\text{tod}}$ multipliers, squared urgency rankings, sleep
-  debt, task settlement ratios, or encounter probability rolls.
+- `references/mathematics.md` — Read when implementing or tuning desires
+  (states, drain, task effects, rendering), task lease rules, or encounter
+  probability rolls.
 - `references/primitives_mapping.md` — Read when wiring OpenClaw sessions
   (`:brain`, `:tasks`, `:chat:*`), cron automations, `assemble()` hooks, or
   `memory-core` vector indexing.

@@ -56,7 +56,7 @@ apps/kazusa/ (or repository root)
 └── workspaces/                       # Active simulated agents (active subset of world roster)
     ├── alice/
     │   ├── SOUL.md
-    │   ├── IDENTITY.md               # Traits & desire decay configuration
+    │   ├── IDENTITY.md               # Bio & traits
     │   ├── MEMORY.md                 # Qualitative reflections, ongoing thoughts, goals
     │   ├── memory/
     │   │   └── 2026-10-20.md         # Cold daily distilled summaries (memory-core indexed)
@@ -105,29 +105,26 @@ apps/kazusa/ (or repository root)
 
 ---
 
-## Phase 1: Desire & Homeostasis Engine (`plugins/kazusa/src/homeostasis`)
+## Phase 1: Narrative Desires (`plugins/kazusa/src/desires`)
 
 ### Deliverables
 
-- `plugins/kazusa/src/homeostasis/desires.ts`:
-  - `syncAndDecayDesires(agentWorkspaceDir, clock)`: Computes time delta $\Delta
-    t_{\text{hours}}$, applies decay formula with circadian $M_{\text{tod}}$,
-    tracks `sleep_debt_min`, computes squared urgency $U_d$, maps to D2A natural
-    language rubric, and updates `MEMORY.md`.
-  - `applyActivityDesireDeltas(agentWorkspaceDir, deltas, fractionCompleted)`:
-    Rewards completed tasks scaled by actual elapsed time, clamping deltas to
-    `[-3.0, +3.0]`.
+- `desires/desires.ts` (pure): state lookup, closed-form `levelsAt`,
+  re-anchoring for task start/delay, `afterwards` JSON schema from the catalog,
+  and the `How you feel` line. See [mathematics](mathematics.md) §1.
+- `desires/register.ts`: `"desires"` store, Taskman `TaskExtension`,
+  `desires.get` / `desires.configure` RPCs, and the context-engine provider.
 
-### Test Specifications (`plugins/kazusa/src/homeostasis/desires.test.ts`)
+### Test Specifications (`plugins/kazusa/src/desires/desires.test.ts`)
 
-- **Test 1.1 (In-Place `MEMORY.md` Decay & Qualitative Rendering)**:
-  - Advance `SimClock` by 5 hours for `alice`, run `syncAndDecayDesires()`.
-  - Read `alice/MEMORY.md` as plain text; verify both YAML float values and
-    `## Current State & Desires` natural-language bullets updated accurately.
-- **Test 1.2 (Sleep Debt Accumulation)**:
-  - Advance clock across 18 waking hours; verify `sleep_debt_min` accumulates in
-    frontmatter and appends `"carrying 45 minutes of lingering sleep debt"` to
-    the rendered text.
+- **Test 1.1 (Drain)**: a `fine` desire drains at its rate and clamps at 0.
+- **Test 1.2 (Effects)**: `afterwards: { satiety: "low→full" }` over 30 minutes
+  reaches the `full` level at the planned end, then drains; replacing the task
+  halfway leaves it halfway; the effect never overshoots its target.
+- **Test 1.3 (Delay)**: `delay_task` restates effects from the current level to
+  the new end; naming a desire's current state is no change.
+- **Test 1.4 (Validation)**: missing `afterwards` or unknown desire/state names
+  fail `start_task` without writing a lease.
 
 ---
 
@@ -146,17 +143,16 @@ apps/kazusa/ (or repository root)
   Native workspace bootstrap supplies long-term memory. See
   [context-engine conventions](context_engine.md) for settings and chat naming.
 - Future extensions add the **3-Tier Retrieval Pipeline**:
-  1. Calls `syncAndDecayDesires()`.
-  2. **Tier 1 (Spatial Perception & Sensory Shock)**: Reads current place from
+  1. **Tier 1 (Spatial Perception & Sensory Shock)**: Reads current place from
      `shared/wiki/entities/places/<loc>.md`. Compares against agent's
      `workspaces/<id>/wiki/entities/places/<loc>.md`. If physical state changed
      while absent (e.g. `DESTROYED` vs `OPERATIONAL`), automatically injects a
      `[Sensory Observation]` notice.
-  3. Queries `WorldIndex` for co-present agents.
-  4. **Tier 2 (Social Salience)**: Injects adaptive relationship cards from
+  2. Queries `WorldIndex` for co-present agents.
+  3. **Tier 2 (Social Salience)**: Injects adaptive relationship cards from
      `workspaces/<id>/wiki/entities/characters/<peer>.md` (full
      `## Quick Impression` for 1-on-1; Top-3 salience ranking for crowds).
-  5. **Tier 3 (Session Stream Tails)**: Tail-slices recent events from
+  4. **Tier 3 (Session Stream Tails)**: Tail-slices recent events from
      `agent:<id>:tasks`, `:chat:direct:*`, and `:chat:group:*` (implemented).
 
 ### Test Specifications (`plugins/kazusa/src/context-engine/context-engine.test.ts`)
@@ -239,17 +235,20 @@ apps/kazusa/ (or repository root)
     using TypeSafe AI's Jev (`typesafe/jev-latest` or local Kev) to evaluate
     incoming stimuli in a single sub-100ms forward pass without output tokens.
   - **Universal Gate (Both Idle & Busy)**:
-    - *Idle*: Evaluates `["WAKE", "IGNORE"]` against the character's active task
+    - _Idle_: Evaluates `["WAKE", "IGNORE"]` against the character's active task
       (e.g., sleeping, reading). Casual chatter while sleeping is ignored,
-      saving expensive frontier LLM turns. Wakes brain when $P(\text{WAKE}) \ge T_{\text{wake}}$.
-    - *Busy*: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` with task-dependent
+      saving expensive frontier LLM turns. Wakes brain when $P(\text{WAKE}) \ge
+      T_{\text{wake}}$.
+    - _Busy_: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` with task-dependent
       hysteresis ($T_{\text{steer}} \in \{0.45, 0.75, 0.90\}$).
   - **In-Process Integration**: Tracks brain state via lifecycle events
     (`api.agent.events.registerAgentEventSubscription`), wakes idle brain via
     native cron automations, and steers ongoing turns via native `mode: "steer"`
-    session queue. Completely resolves the OpenClaw 2026.10.5 Gateway RPC blocker.
+    session queue. Completely resolves the OpenClaw 2026.10.5 Gateway RPC
+    blocker.
   - **Task Deadlines**: Coalesced flag checks active task lease against
-    `clock.time()`. Deadlines bypass the decision model and wake deterministically.
+    `clock.time()`. Deadlines bypass the decision model and wake
+    deterministically.
 - Verbatim stimulus preservation: Admitted stimuli pass through without lossy
   generative summarization.
 
@@ -258,13 +257,17 @@ apps/kazusa/ (or repository root)
 - Unit & state-machine coverage:
   - Sleep filtering: Routine chatter during `sleep` task evaluates to `IGNORE`;
     brain stays asleep with zero LLM turns.
-  - Emergency wake: Critical alert during sleep outputs $P(\text{WAKE}) \ge 0.85$;
-    wakes brain immediately with raw stimulus.
-  - Busy-brain hysteresis: Low-focus tasks steer easily ($T_{\text{steer}} = 0.45$);
-    high-focus tasks resist steering ($T_{\text{steer}} = 0.90$) and defer to `QUEUE_NEXT`.
-  - Queue draining: Completed brain turn automatically consumes pending queued stimuli.
-  - Task deadline re-validation: Expired lease triggers wake; delayed lease drops check.
-  - Process restart: Retained stimuli in `"perception"` store survive and re-evaluate.
+  - Emergency wake: Critical alert during sleep outputs $P(\text{WAKE}) \ge
+    0.85$; wakes brain immediately with raw stimulus.
+  - Busy-brain hysteresis: Low-focus tasks steer easily ($T_{\text{steer}} =
+    0.45$); high-focus tasks resist steering ($T_{\text{steer}} = 0.90$) and
+    defer to `QUEUE_NEXT`.
+  - Queue draining: Completed brain turn automatically consumes pending queued
+    stimuli.
+  - Task deadline re-validation: Expired lease triggers wake; delayed lease
+    drops check.
+  - Process restart: Retained stimuli in `"perception"` store survive and
+    re-evaluate.
 
 ---
 

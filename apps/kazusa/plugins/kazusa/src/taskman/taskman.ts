@@ -5,8 +5,23 @@ import type {
   DelayTaskResult,
   StartTaskParams,
   StartTaskResult,
+  TaskToolArguments,
+  TaskTransition,
   ToolExecutionContext,
 } from "./types.ts";
+
+/** Let extensions see the lease first; their refusal leaves nothing written. */
+async function commitExtensions(
+  ctx: ToolExecutionContext,
+  transition: TaskTransition,
+): Promise<string | undefined> {
+  try {
+    await ctx.beforeCommit?.(transition);
+    return undefined;
+  } catch (error: unknown) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
 
 /** Append character voice as a separate italic blockquote in the ledger text. */
 function formatTaskLedgerEntry(summary: string, monologue?: string): string {
@@ -19,7 +34,7 @@ function formatTaskLedgerEntry(summary: string, monologue?: string): string {
 }
 
 export async function executeStartTask(
-  params: StartTaskParams,
+  params: TaskToolArguments<StartTaskParams>,
   ctx: ToolExecutionContext,
 ): Promise<StartTaskResult> {
   const duration = Math.max(
@@ -42,6 +57,16 @@ export async function executeStartTask(
   };
 
   const priorTask = await ctx.store.lookup(ctx.agentId);
+  const refusal = await commitExtensions(ctx, {
+    kind: "started",
+    agentId: ctx.agentId,
+    at: timestamp,
+    task,
+    params,
+  });
+  if (refusal !== undefined) {
+    return { success: false, message: `Task not started: ${refusal}` };
+  }
   await ctx.store.register(ctx.agentId, task);
   const priorSummary = params.summary?.trim();
   const message = priorTask
@@ -68,7 +93,7 @@ export async function executeStartTask(
 }
 
 export async function executeDelayTask(
-  params: DelayTaskParams,
+  params: TaskToolArguments<DelayTaskParams>,
   ctx: ToolExecutionContext,
 ): Promise<DelayTaskResult> {
   const timestamp = ctx.clock.time();
@@ -89,6 +114,16 @@ export async function executeDelayTask(
       new Date(current.endAt).getTime() + additionalDuration * 60_000,
     ).toISOString(),
   };
+  const refusal = await commitExtensions(ctx, {
+    kind: "delayed",
+    agentId: ctx.agentId,
+    at: timestamp,
+    task,
+    params,
+  });
+  if (refusal !== undefined) {
+    return { success: false, message: `Task not delayed: ${refusal}` };
+  }
   await ctx.store.register(ctx.agentId, task);
 
   const reason = params.reason ? ` Reason: ${params.reason}.` : "";

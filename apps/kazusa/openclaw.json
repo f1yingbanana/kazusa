@@ -9,6 +9,7 @@
     },
     "defaults": {
       "workspace": "./workspaces",
+      "userTimezone": "UTC",
       "compaction": {
         "enabled": false
       },
@@ -118,8 +119,21 @@
     }
   },
   "tools": {
-    "profile": "full",
-    "deny": ["group:sessions", "message"],
+    "allow": [
+      "start_task",
+      "delay_task",
+      "send_message",
+      "list_chats",
+      "manage_chat",
+      "memory_search",
+      "memory_get",
+      "read",
+      "edit",
+      "write",
+      "view_image"
+    ],
+    "deny": ["group:sessions", "message", "apply_patch"],
+    "toolSearch": false,
     "sessions": {
       "visibility": "agent"
     }

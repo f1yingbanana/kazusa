@@ -77,6 +77,8 @@ export async function assembleContext(params: {
     readonly sender: string;
     readonly timestamp: number;
   }[];
+  /** One line of desire states, rendered verbatim. */
+  readonly feelings?: string;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
 }): ReturnType<ContextEngine["assemble"]> {
@@ -101,16 +103,17 @@ export async function assembleContext(params: {
     resolutionContext,
   );
 
+  // Ordered from most to least stable so the provider can reuse the prefix
+  // across turns. The clock lives in the situation message, never here.
   const systemPromptAddition = [
     baseConventions,
-    `Current simulation time: ${formatSimTime(params.simTime)}`,
-    behavior,
     buildMemorySystemPromptAddition({
       availableTools: run.availableTools ?? new Set(),
       citationsMode: run.citationsMode,
       agentId: params.agentId,
       agentSessionKey: run.sessionKey,
     }),
+    behavior,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -121,12 +124,16 @@ export async function assembleContext(params: {
   });
   if (systemPromptTokens > budget) {
     throw new Error(
-      "Kazusa context budget cannot fit its system prompt additions and simulation time.",
+      "Kazusa context budget cannot fit its system prompt additions.",
     );
   }
   const situation: Message = {
     role: "user",
     content: [
+      // A leading sim-time stamp also stops the host from stamping this
+      // message with its own clock and time zone.
+      `[${formatSimTime(params.simTime)}] Current simulation time`,
+      "",
       "### Current activity",
       task
         ? [
@@ -137,6 +144,7 @@ export async function assembleContext(params: {
             `Planned check-in: ${formatSimTime(Date.parse(task.endAt))}`,
           ].join("\n")
         : "No activity has been chosen yet.",
+      ...(params.feelings ? ["", "### How you feel", params.feelings] : []),
       ...(params.awaitingReplies?.length
         ? [
             "",
@@ -164,20 +172,20 @@ export async function assembleContext(params: {
     0,
   );
 
-  const recollections: Message[] = [];
+  const articles: string[] = [];
   let wikiBudget = Math.min(config.personalWikiMaxTokens, remaining);
   for (const article of (params.personalWiki ?? []).slice(
     0,
     config.personalWikiMaxArticles,
   )) {
-    const message: Message = {
+    const text = `### Personal recollection\n${article}`;
+    const tokens = estimateTokens({
       role: "user",
-      content: `### Personal recollection\n${article}`,
+      content: text,
       timestamp: params.simTime,
-    };
-    const tokens = estimateTokens(message);
+    });
     if (tokens > wikiBudget) continue;
-    recollections.push(message);
+    articles.push(text);
     wikiBudget -= tokens;
     remaining -= tokens;
   }
@@ -192,22 +200,30 @@ export async function assembleContext(params: {
     tokenBudget: remaining,
   });
 
-  const context: Message[] = [];
-  if (selected.size) {
-    context.push({
-      role: "user",
-      content: [...selected]
-        .map(
-          ([key, records]) =>
-            `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
-        )
-        .join("\n\n"),
-      timestamp: params.simTime,
-    });
-  }
+  // Recollections and ledgers share one message that leads with our own
+  // sim-time stamp: the host stamps any message without one, in its own format.
+  const background = [
+    ...articles,
+    ...[...selected].map(
+      ([key, records]) =>
+        `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
+    ),
+  ];
+  const context: Message[] = background.length
+    ? [
+        {
+          role: "user",
+          content: [
+            `[${formatSimTime(params.simTime)}] Recollections and recent records`,
+            ...background,
+          ].join("\n\n"),
+          timestamp: params.simTime,
+        },
+      ]
+    : [];
   // The host appends the pending turn after this history. Never replay ledger
   // records as assistant/tool messages or persist these synthetic context views.
-  const messages = [...recollections, ...context, ...history, situation];
+  const messages = [...context, ...history, situation];
   return {
     messages,
     estimatedTokens:

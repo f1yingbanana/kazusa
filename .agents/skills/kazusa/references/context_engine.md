@@ -140,11 +140,12 @@ Settings under `plugins.entries.kazusa.config.contextEngine`:
 3. Filter the simulated-time window. Keep visible text, including authored
    monologues; exclude tool internals, hidden reasoning, and `NO_REPLY`.
 4. Budget full `context-conventions`, state-selected `task-lifecycle` (no task
-   or overdue) or `task-interrupt` (ongoing), simulation time, and native memory
-   guidance. Reserve the pinned current-activity view, then recent whole brain
-   turns and bounded whole personal-wiki impressions. Preserve tool pairs and
-   recovery summaries. Fail clearly if mandatory additions do not fit; do not
-   silently clip instructions. Host handling of assembly errors remains native.
+   or overdue) or `task-interrupt` (ongoing), and native memory guidance, most
+   stable first; the simulation time leads the situation message instead.
+   Reserve the pinned current-activity view, then recent whole brain turns and
+   bounded whole personal-wiki impressions. Preserve tool pairs and recovery
+   summaries. Fail clearly if mandatory additions do not fit; do not silently
+   clip instructions. Host handling of assembly errors remains native.
 5. Pool task and chat messages, newest-first. Include a whole record if it fits
    the remaining shared budget; otherwise skip it and try older records. Count
    session labels and timestamp/sender wrappers too. Accept the native catalog's

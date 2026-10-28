@@ -14,21 +14,22 @@ Derive the sender's stable agent ID from the tool execution context, not an
 LLM-supplied argument. Resolve the display name from character identity data.
 Write one record to each participant's private view of the conversation:
 
-- Sender's ledger: `role: "assistant"`.
-- Each recipient's ledger: `role: "user"`, even when the sender is another LLM.
+- Every copy, the sender's own included: `role: "user"`. OpenClaw's catalog
+  projects `senderIdentity` only for user-role rows, so an assistant-role self
+  copy would read back unattributed.
 - Direct keys: `agent:<owner>:chat:direct:<peer-id>`.
 - Group keys: `agent:<owner>:chat:group:<group-id>`. Membership is resolved when
   a send is accepted. Each current member receives a private copy; membership
   never permits reading another agent's memories or backfilling older dialogue.
 
-Roles describe a record relative to its **agent ledger owner**, not whether the
-speaker is a human or an LLM. The same rule applies to direct and group chats:
+Authorship is the `senderIdentity`, never the role. The same rule applies to
+direct and group chats:
 
-| Actual speaker | Alice's native ledger        | Bob's native ledger          |
-| -------------- | ---------------------------- | ---------------------------- |
-| Alice          | `assistant`, self            | `user`, sender `alice`       |
-| Bob            | `user`, sender `bob`         | `assistant`, self            |
-| Human Sensei   | `user`, sender `user:sensei` | `user`, sender `user:sensei` |
+| Actual speaker | Alice's native ledger         | Bob's native ledger          |
+| -------------- | ----------------------------- | ---------------------------- |
+| Alice          | `user`, sender `alice` (self) | `user`, sender `alice`       |
+| Bob            | `user`, sender `bob`          | `user`, sender `bob` (self)  |
+| Human Sensei   | `user`, sender `user:sensei`  | `user`, sender `user:sensei` |
 
 The human row describes the required group projection; current WebChat ingress
 only reaches the owner of its selected session. Native roles are a persistence
@@ -41,7 +42,7 @@ Set native attribution on the copies, alongside the ordinary message fields:
 
 ```typescript
 {
-  role, // assistant for the sender's copy; user for a recipient's copy
+  role: "user", // every copy; the sender is identified by senderIdentity
   content: [{ type: "text", text }],
   timestamp: simulationTimestamp,
   __openclaw: {
@@ -146,11 +147,12 @@ conventions call `chat:...` keys chat addresses while the API retains native
 `sessionKey` terminology. All native session-orchestration tools are denied via
 `tools.deny: ["group:sessions", "message"]` (`sessions_list`,
 `sessions_history`, `sessions_send`, `sessions_spawn`, `session_status`) in
-`openclaw.json`. The built-in `message` tool is also denied: its native delivery
-mirror bypasses Kazusa canonical acceptance and cannot substitute for
-`send_message`. Native `memory_search` (with `sources: ["memory", "sessions"]`)
-indexes past session transcripts and handles cross-session recall safely without
-exposing raw session manipulation tools to roleplay characters.
+`openclaw.json`, on top of an explicit character `tools.allow` list. The
+built-in `message` tool is also denied: its native delivery mirror bypasses
+Kazusa canonical acceptance and cannot substitute for `send_message`. Native
+`memory_search` (with `sources: ["memory", "sessions"]`) indexes past session
+transcripts and handles cross-session recall safely without exposing raw session
+manipulation tools to roleplay characters.
 
 `manage_chat` requires a group `sessionKey` and one action:
 

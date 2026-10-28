@@ -1,106 +1,136 @@
 # Kazusa Deterministic Mathematics & Behavioral Dynamics
 
-This document details all deterministic mathematical models, decay formulas,
-urgency rankings, probability gates, and task settlement rules used across
-Kazusa. All operations in this document execute in native TypeScript code
-(costing **0 LLM tokens** and taking **< 1 ms**).
+This document details the deterministic models used across Kazusa: desire
+levels, encounter probability gates, and task lease rules. All operations in
+this document execute in native TypeScript code (costing **0 LLM tokens** and
+taking **< 1 ms**).
 
 ---
 
-## 1. Passive Desire Decay & Homeostasis
+## 1. Desires
 
-Desire levels are numerical meters bounded between `0.0` (critical deficiency)
-and `10.0` (complete satiation).
+Desires are narrative pressure, not chores. Code owns the arithmetic; the LLM
+owns meaning. The LLM never reads or writes a number: it reads each desire as a
+**state word** and declares, per task, the state word it expects to end in.
 
-### 1.1 Time Delta Calculation
+### 1.1 Configuration (`plugins.entries.kazusa.config.desires`)
 
-For any simulation wake event at timestamp $t_{\text{now}}$:
-$$\Delta t_{\text{hours}} = \frac{t_{\text{now}} - t_{\text{last}}}{3{,}600{,}000}$$
+```json5
+desires: {
+  // Ascending. A level belongs to the last state whose `min` it reaches; the
+  // first `min` is 0. `level` is where a task targeting that state settles.
+  states: [
+    { name: "depleted", min: 0,  level: 10 },
+    { name: "low",      min: 25, level: 35 },
+    { name: "fine",     min: 50, level: 65 },
+    { name: "full",     min: 80, level: 100 },
+  ],
+  initial: "fine",           // state a character's unseen desire starts in
+  catalog: [
+    { name: "energy",  drain: 4, description: "Physical and mental wakefulness." },
+    { name: "satiety", drain: 8, description: "Hunger and the pleasure of food." },
+    // social, stimulation, composure, purpose, expression ...
+  ],
+}
+```
 
-### 1.2 Decay Formula
+- Levels are `0..100`. `drain` is points lost per simulated hour.
+- `name` is the stable key, shown to the LLM verbatim. There is no label; a
+  client may prettify names.
+- `description` is the entire semantic contract with the LLM and appears once,
+  on the matching `start_task` `afterwards` property. It must say what `full`
+  means, because the same word reads differently per desire ("Your social
+  battery. Full means you've had your fill of people.").
+- The catalog is per world. Characters cannot add desires; their only tuning is
+  sparse `drain` overrides in the `"desires"` store.
+- There are deliberately no weights, targets, urgency tags, per-desire
+  restoration rates, top-N filters, or circadian multipliers.
 
-Each desire $d$ for agent $i$ decays according to its configured rate
-$\lambda_{i,d}$ (from `IDENTITY.md`) modulated by a circadian time-of-day factor
-$M_{\text{tod}}$:
+### 1.2 Task effects (`afterwards`)
 
-$$V_d(t_{\text{now}}) = \text{clamp}\Big(V_d(t_{\text{last}}) - \big(\lambda_{i,d} \cdot M_{\text{tod}}(t) \cdot \Delta t_{\text{hours}}\big),\; 0.0,\; 10.0\Big)$$
+`start_task` and `delay_task` both require
+`afterwards: { <name>: "<current>→<afterwards>" }`: only the desires the
+activity changes (`{}` when none). The `start_task` schema is generated from the
+catalog: one description naming each desire with its description, plus one
+example (`a night's sleep: { "energy": "low→full" }`); `propertyNames` limits
+keys to the catalog and the value enum holds every transition between different
+states (12 for four states). `delay_task` carries a short schema that points at
+`start_task`. No skill text explains it. Only the afterwards state is used; the
+stated current state is the model's reasoning aid and may be stale.
 
-### 1.3 Time-of-Day Multiplier ($M_{\text{tod}}$)
+At the transition time $t_0$ with level $L_0$ and planned end $t_{\text{end}}$,
+each listed desire moves toward its target state's `level` $L^*$ at
 
-- **Sleep Energy**:
-  - 07:00 – 21:00: $M_{\text{tod}} = 1.0$
-  - 21:00 – 01:00: $M_{\text{tod}} = 1.5$ (accelerated evening fatigue)
-  - 01:00 – 07:00: $M_{\text{tod}} = 2.2$ (extreme night exhaustion if awake)
-- **Hunger**:
-  - Near meal hours (11:00–13:00, 18:00–20:00): $M_{\text{tod}} = 1.4$
-  - Night (00:00–06:00): $M_{\text{tod}} = 0.3$ (metabolic slowdown)
-- **Other Desires**: $M_{\text{tod}} = 1.0$ (constant baseline decay).
+$$r = \frac{L^* - L_0}{t_{\text{end}} - t_0}\ \text{points/hour}$$
+
+and holds once it reaches $L^*$. Unlisted desires drain normally.
+
+- **An afterwards state equal to the current one means no change**, as a guard
+  for stale `from` states: a restated `fine` would otherwise prop desires up
+  forever, and a restated `low` would raise a level at the bottom of `low`.
+- **Magnitude** comes from the chosen state, **speed** from the duration: a
+  30-minute nap to `fine` and an 8-hour sleep to `full` both need no calibration
+  from the LLM.
+- **Interruption settles itself**: replacing the task halfway leaves the desire
+  halfway. There is no separate settlement ratio.
+- **Effects stop at the planned end.** After it, or with no task, every desire
+  drains at its rate. A stalled or overdue character keeps getting hungry.
+- **`delay_task` restates effects** from the current level to the new end, so an
+  activity that changes in nature mid-way ("waiting for Sensei" becoming "eating
+  with Sensei") still counts.
+
+#### Why these choices (live runs, GLM-5.2, 2026-10-28)
+
+- An optional parameter was never filled; it must be required.
+- The task tools and `send_message` are `catalogMode: "direct-only"`. Under
+  OpenClaw's default Tool Search, deferred tools show only name and description,
+  so `afterwards` and its descriptions were invisible.
+- Named `effects` ("how you expect to feel when this activity ends"), the model
+  reported its present state (an 8-hour sleep with `energy: depleted`).
+- With bare state values and one property per desire, the model filled every
+  property with its current state and copied that pattern from its own brain
+  history, so a later sleep came out as `energy: low` (no change). Transition
+  values fixed it: fresh calls were `{ "energy": "fine→full" }` alone.
+
+### 1.3 Closed form (zero ticks)
+
+Each character's record holds an anchor ($t_a$, levels at $t_a$) and the current
+task's effects (`until`, per-desire `target` and `rate` $r \ge 0$). For desire
+$d$ at time $t \ge t_a$, let the effect end at $u = \min(t, \max(t_a,
+\text{until}))$:
+
+- Affected: $L = \text{toward}(L_a, L^*, r\cdot(u - t_a)) - \lambda_d \cdot (t -
+  u)$
+- Unaffected: $L = L_a - \lambda_d \cdot (t - t_a)$
+
+then clamp to $[0, 100]$, where `toward` moves without overshooting and
+$\lambda_d$ is the character's drain. Every `start_task`/`delay_task` re-anchors
+at its sim time before the lease is written, so a failed lease write leaves the
+old effects continuing from a correct anchor. A clock pause or `clock_advance`
+needs no work: the level is a pure function of sim time.
+
+### 1.4 Rendering
+
+The brain's situation message gets one line in catalog order, with no numbers,
+tags, or filtering:
+
+```text
+### How you feel
+energy: fine · satiety: low · social: full · stimulation: low · composure: fine · purpose: fine · expression: depleted
+```
 
 ---
 
-## 2. Sleep Debt Accumulation & Recovery
+## 2. Deliberately Omitted
 
-Sleep debt tracks chronic exhaustion and forces characters into recovery sleep
-routines:
-
-- **Accumulation**:
-  - If the character remains awake between 23:00 and 06:00, or if
-    `desires.sleep_energy < 3.0`:
-    $$\text{debt}_{\text{new}} = \text{debt}_{\text{prev}} + \big(\Delta t_{\text{hours}} \times 15\text{ minutes}\big)$$
-- **Recovery During Sleep**:
-  - For sleep duration $\Delta t_{\text{slept}}$ hours:
-    $$\Delta V_{\text{sleep}} = \min(10.0, V_{\text{sleep}} + 1.25 \cdot \Delta t_{\text{slept}})$$
-    $$\text{debt}_{\text{new}} = \max\Big(0,\; \text{debt}_{\text{prev}} - (\Delta t_{\text{slept}} \times 20\text{ minutes})\Big)$$
-- **Qualitative Rendering**:
-  - When `sleep_debt_min > 30`, the rendered `Sleep & Energy` bullet appends:
-    `"carrying [N] minutes of lingering sleep debt"`, prompting the LLM to
-    schedule a longer sleep cycle (e.g. 9–11 hours).
+Earlier drafts had sleep debt, circadian multipliers, weighted squared-deficit
+urgency, and per-desire prose tables. They were dropped: state words plus the
+character's own judgment carry the same pressure with one config table. Do not
+reintroduce them without a concrete behavioral failure that needs them.
 
 ---
 
-## 3. Squared Urgency Ranking & Qualitative Rubric
-
-To prevent starvation of minor desires while ensuring acute needs dominate agent
-attention, Kazusa uses a non-linear squared deficit formulation:
-
-### 3.1 Squared Deficit Urgency Formula
-
-$$U_d = W_d \cdot \max(0,\; T_{i,d} - V_d)^2$$
-
-Where:
-
-- $T_{i,d}$ is the character's target baseline from `IDENTITY.md` (e.g., $7.5$
-  or $8.0$).
-- $V_d$ is the current meter level ($0.0..10.0$).
-- $W_d$ is the global priority weight ($W_{\text{sleep}} = 1.5$,
-  $W_{\text{hunger}} = 1.3$, $W_{\text{social}} = 0.9$, $W_{\text{curiosity}} =
-  0.8$, $W_{\text{progress}} = 1.1$).
-
-### 3.2 Urgency Thresholds for Display
-
-- $U_d \ge 18.0$: Tagged as **`[CRITICAL URGENCY]`** (placed at top of
-  `## Current State & Desires`).
-- $10.0 \le U_d < 18.0$: Tagged as **`[HIGH URGENCY]`**.
-- $4.0 \le U_d < 10.0$: Tagged as **`[MODERATE URGENCY]`**.
-- $U_d < 4.0$: Rendered with standard descriptive sentence without urgency tag.
-
-### 3.3 Discrete-to-Analog (D2A) Lookup Table (Sample)
-
-The rounded integer value $\text{round}(V_d)$ ($0..10$) maps to authentic
-natural language:
-
-| Value  | Hunger State                                                    | Sleep & Energy State                                              |
-| :----- | :-------------------------------------------------------------- | :---------------------------------------------------------------- |
-| **0**  | Starving and dizzy; barely able to focus on anything else.      | Completely collapsed from exhaustion; eyes closing involuntarily. |
-| **2**  | Very hungry; intense stomach pains; urgent need for sustenance. | Severely fatigued; yawning constantly; heavy limbs.               |
-| **4**  | Moderately hungry; stomach is rumbling; thinking about lunch.   | Growing tired; feeling a noticeable afternoon slump.              |
-| **6**  | Mildly peckish; could eat a snack if convenient.                | Functionally alert; steady baseline energy.                       |
-| **8**  | Well-nourished and comfortable; no desire for food.             | Fully refreshed, sharp, and physically energized.                 |
-| **10** | Completely full and stuffed after a hearty meal.                | Vibrantly energized and peaking in alertness.                     |
-
----
-
-## 4. Zero-LLM Encounter Gate
+## 3. Zero-LLM Encounter Gate
 
 When Agent $A$ and Agent $B$ are co-located at location $L$ (or co-commuting
 along transit corridor $C$), an encounter probability is evaluated in code:
@@ -132,27 +162,12 @@ $$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\
 
 ---
 
-## 5. Start-Then-Settle Task Lease Mathematics
+## 4. Task Lease Mathematics
 
-When an agent initiates a task via `start_task()`:
+Desire effects of a task are continuous (§1.2), so there is no settlement ratio
+or reward clamp: an interrupted task has simply accrued less.
 
-### 5.1 Settlement Ratio
-
-When the task completes, is paused, or is interrupted at $t_{\text{settle}}$:
-$$\Delta t_{\text{elapsed}} = \frac{t_{\text{settle}} - t_{\text{started}}}{60{,}000}\text{ minutes}$$
-$$\text{Ratio} = \text{clamp}\left(\frac{\Delta t_{\text{elapsed}}}{t_{\text{planned\_min}}},\; 0.0,\; 1.0\right)$$
-
-### 5.2 Desire Reward Settle Formula
-
-For any task targeting desire recovery $\Delta D_{\text{target}}$:
-$$\Delta D_{\text{awarded}} = \text{clamp}\big(\Delta D_{\text{target}},\; -3.0,\; +3.0\big) \times \text{Ratio}$$
-
-- If an agent planned a 60-minute study session to gain $+2.0$ Purpose, but was
-  interrupted after 15 minutes ($\text{Ratio} = 0.25$), they receive exactly
-  $+0.5$ Purpose.
-- Hallucinated instant claims are mathematically impossible.
-
-### 5.3 Interruption & Agent Task Autonomy
+### 4.1 Interruption & Agent Task Autonomy
 
 - **Agent Autonomous Decision**:
   - When interrupted by an external stimulus (encounter or message), the agent
