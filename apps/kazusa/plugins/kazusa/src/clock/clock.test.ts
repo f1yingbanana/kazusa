@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Clock } from "./clock.ts";
+import { Clock, type ClockCell } from "./clock.ts";
 import type { ClockPersistedRecord, ClockStore } from "./types.ts";
 
 function createInMemoryStore(): ClockStore {
@@ -71,5 +71,37 @@ describe("Clock", () => {
     expect(events[0]?.speed).toBe(2);
     expect(events[1]?.speed).toBe(2);
     await clock.close();
+  });
+
+  it("shares time, speed, and listeners between clocks over one cell", async () => {
+    const store = createInMemoryStore();
+    const cell: ClockCell = {
+      simTime: 0,
+      anchorTime: 0,
+      speed: 0,
+      listeners: new Set(),
+    };
+    const serving = new Clock({
+      store,
+      cell,
+      initialTime: "2026-10-21T08:00:00.000Z",
+    });
+    await serving.init();
+    const running = new Clock({ store, cell });
+    await running.init();
+    const speeds: number[] = [];
+    running.onClockChange((snapshot): void => {
+      speeds.push(snapshot.speed);
+    });
+
+    await serving.setSpeed(0);
+    const paused = running.time();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(running.now().speed).toBe(0);
+    expect(running.time()).toBe(paused);
+    expect(speeds).toEqual([0]);
+    await running.persist();
+    expect((await store.lookup("primary"))?.speed).toBe(0);
   });
 });

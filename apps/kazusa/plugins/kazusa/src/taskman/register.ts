@@ -3,12 +3,10 @@ import {
   type OpenClawPluginApi,
   type OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/core";
-import {
-  appendSessionTranscriptMessageByIdentity,
-  publishSessionTranscriptUpdateByIdentity,
-} from "openclaw/plugin-sdk/session-transcript-runtime";
+import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
+import { appendLedgerEntry } from "../ledger.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { nextJournalSeq } from "../realtime.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -44,6 +42,24 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
     }),
 });
 
+/**
+ * The cron projection as seen by every instance of this plugin in the Gateway
+ * process. Only the instance that received `cron_reconciled` can write jobs,
+ * but an agent turn may run task tools and cron wakes on a separately loaded
+ * instance, which must still reach it.
+ */
+interface TaskAutomation {
+  ready: boolean;
+  synchronize?: (agentId: string) => Promise<void>;
+}
+
+const SHARED_TASK_AUTOMATION = Symbol.for("kazusa.taskman.automation");
+
+function sharedTaskAutomation(): TaskAutomation {
+  const scope = globalThis as { [SHARED_TASK_AUTOMATION]?: TaskAutomation };
+  return (scope[SHARED_TASK_AUTOMATION] ??= { ready: false });
+}
+
 export interface TaskmanService {
   readonly store: TaskStore;
   onTaskChange(
@@ -78,9 +94,7 @@ export function registerTaskman(
     }
   };
   const config = TASKMAN_CONFIG_SCHEMA.parse(api.pluginConfig?.taskman ?? {});
-  let automationsReady = false;
-  let synchronizeAgentAutomation:
-    ((agentId: string) => Promise<void>) | undefined;
+  const automation = sharedTaskAutomation();
   let reconcileAutomations: (() => Promise<void>) | undefined;
 
   // Only explicit clock edits (advance or speed changes) change the mapping
@@ -97,8 +111,8 @@ export function registerTaskman(
   // source of truth. Its reconciliation lifecycle is the only time Taskman
   // examines the fleet; ordinary task changes upsert one declaration-keyed job.
   api.on("cron_reconciled", async (event, ctx): Promise<void> => {
-    automationsReady = false;
-    synchronizeAgentAutomation = undefined;
+    automation.ready = false;
+    automation.synchronize = undefined;
     reconcileAutomations = undefined;
     await clock.init();
     ctx.abortSignal.throwIfAborted();
@@ -118,6 +132,11 @@ export function registerTaskman(
       assertCurrent();
       await cron.remove(jobId);
     };
+
+    // Other plugins declare jobs too (memory-core's dreaming promotion). Taskman
+    // owns exactly the jobs keyed by a configured character.
+    const isTaskmanJob = (declarationKey: string | undefined): boolean =>
+      !!declarationKey && listAgentIds(api.config).includes(declarationKey);
 
     const removeAgentAutomation = async (agentId: string): Promise<void> => {
       const jobs = await listJobs();
@@ -189,7 +208,7 @@ export function registerTaskman(
     const clear = async (): Promise<void> => {
       const jobs = await listJobs();
       for (const job of jobs) {
-        await removeJob(job.id);
+        if (isTaskmanJob(job.declarationKey)) await removeJob(job.id);
       }
     };
 
@@ -198,7 +217,7 @@ export function registerTaskman(
       return;
     }
 
-    synchronizeAgentAutomation = synchronize;
+    automation.synchronize = synchronize;
     reconcileAutomations = async (): Promise<void> => {
       const tasks = await store.entries();
       if (clock.now().speed <= 0) {
@@ -208,9 +227,12 @@ export function registerTaskman(
       const activeAgentIds = new Set(tasks.map(({ key }) => key));
       const jobs = await listJobs();
       for (const job of jobs) {
-        // Kazusa currently owns all automations, so a job not represented by a
-        // retained lease is stale. This is deliberately lifecycle-only work.
-        if (!job.declarationKey || !activeAgentIds.has(job.declarationKey)) {
+        // A character's job not represented by a retained lease is stale. This
+        // is deliberately lifecycle-only work.
+        if (
+          isTaskmanJob(job.declarationKey) &&
+          !activeAgentIds.has(job.declarationKey!)
+        ) {
           await removeJob(job.id);
         }
       }
@@ -218,7 +240,7 @@ export function registerTaskman(
         await synchronize(agentId);
       }
     };
-    automationsReady = true;
+    automation.ready = true;
     await reconcileAutomations();
   });
 
@@ -226,56 +248,10 @@ export function registerTaskman(
   // projection after startup or reload. The brain session serializes all
   // normal character turns, so no per-run task lookup or repair is required.
   api.on("before_agent_run", (_event, ctx) => {
-    if (ctx.jobId && !automationsReady) {
+    if (ctx.jobId && !automation.ready) {
       return { outcome: "block", reason: "kazusa:taskman-initializing" };
     }
   });
-
-  const appendTaskLedgerEntry = async (
-    agentId: string,
-    message: string,
-    timestamp: number,
-    metadata?: unknown,
-  ): Promise<void> => {
-    const sessionKey = `agent:${agentId}:tasks`;
-    const now = Date.now();
-    const ledger = await api.runtime.agent.session.patchSessionEntry({
-      agentId,
-      sessionKey,
-      fallbackEntry: { sessionId: "", updatedAt: now, displayName: "Tasks" },
-      update: (entry) =>
-        entry.sessionId?.trim()
-          ? null
-          : { sessionId: generateSecureUuid(), updatedAt: now },
-    });
-    const sessionId = ledger?.sessionId?.trim();
-    if (!sessionId) {
-      throw new Error(`Could not initialize task ledger ${sessionKey}.`);
-    }
-    const identity = { agentId, sessionKey, sessionId };
-    // This separate ledger needs an append, without loading its history into a
-    // SessionManager. The identity helper owns the write transaction; notify
-    // transcript subscribers only after it returns a committed message ID.
-
-    const appended = await appendSessionTranscriptMessageByIdentity({
-      ...identity,
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: message }],
-        // Character experience uses simulation time. Native entry/envelope
-        // bookkeeping remains wall-clock for OpenClaw's lifecycle machinery.
-        timestamp,
-        ...(metadata ? { __openclaw: { kazusa: metadata } } : {}),
-      },
-    });
-    if (!appended) {
-      throw new Error(`Task ledger append was suppressed for ${sessionKey}.`);
-    }
-    await publishSessionTranscriptUpdateByIdentity({
-      ...identity,
-      update: { messageId: appended.messageId },
-    });
-  };
 
   const resolveExecutionContext = (
     toolContext?: OpenClawPluginToolContext,
@@ -286,8 +262,14 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
-      appendTaskLedgerEntry: (message, timestamp, metadata): Promise<void> =>
-        appendTaskLedgerEntry(agentId, message, timestamp, metadata),
+      appendTaskLedgerEntry: (text, timestamp, metadata): Promise<void> =>
+        appendLedgerEntry(api, {
+          agentId,
+          stream: "tasks",
+          text,
+          timestamp,
+          metadata,
+        }),
     };
   };
 
@@ -339,7 +321,7 @@ export function registerTaskman(
       );
       if (result.success && result.task) {
         const agentId = toolContext?.agentId ?? "main";
-        await synchronizeAgentAutomation?.(agentId);
+        await automation.synchronize?.(agentId);
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
@@ -396,7 +378,7 @@ export function registerTaskman(
       );
       if (result.success && result.task) {
         const agentId = toolContext?.agentId ?? "main";
-        await synchronizeAgentAutomation?.(agentId);
+        await automation.synchronize?.(agentId);
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",

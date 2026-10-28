@@ -18,6 +18,36 @@ export interface AttentionDecision {
   readonly delayMs: number;
 }
 
+/**
+ * How an attention decision was reached, retained for debugging. `automatic`
+ * skips the model (task deadlines and idle check-ins on an idle brain);
+ * `fallback` admits attention because the model was unavailable.
+ */
+export interface DecisionTrace {
+  readonly source: "model" | "automatic" | "fallback";
+  /** The model's categorical answer, when it gave one. */
+  readonly choice?: string;
+  /** The model's response-latency score, mapped to `delayMs`. */
+  readonly latencyScore?: number;
+  /** Why the fallback was taken. */
+  readonly note?: string;
+}
+
+/** One retained attention decision for a stimulus batch. */
+export interface PerceptionDecisionRecord
+  extends AttentionDecision, DecisionTrace {
+  /**
+   * Simulation time of the decision. Delayed attention is ready at simTime +
+   * delayMs.
+   */
+  readonly simTime: number;
+  /** Wall-clock time of the decision, to correlate with Gateway logs. */
+  readonly wallTime: number;
+  readonly question: "wake_decision" | "attention_allocation";
+  readonly stimulusIds: readonly string[];
+  readonly taskId?: string;
+}
+
 /** What the character is in the middle of saying through send_message. */
 export interface CurrentSpeech {
   readonly sessionKey?: string;

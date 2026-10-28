@@ -476,12 +476,17 @@ We explicitly choose to store separate subjective transcripts per character:
 ### Ledger Writer Contract & Separation of Responsibilities
 
 1. **Perception Never Writes to Ledgers**:
-   - Perception is strictly an **Attention / Salience Gate**, not a database or
-     transcript writer.
+   - Perception is strictly an **Attention / Salience Gate**, not a transcript
+     writer.
    - Perception takes pure in-memory `Stimulus` objects, evaluates salience via
      Jev, and delivers cognitive prompts to `agent:<id>:brain`.
    - Perception never calls `appendSessionTranscriptMessageByIdentity` or
-     manages session entries for chat ledgers.
+     manages session entries for any ledger.
+   - Its own records live in the `"perception"` keyed store: per-character inbox
+     state, and one entry per attention decision (`<agentId>:decision:<uuid>`).
+     Every ledger is replayed into a prompt, so attention mechanics ("noticed
+     after 94s", "queued, not steered") stay out of ledgers and never reach a
+     character or the decision model.
 
 2. **`send_message` Tool (Egress & Mutual Ledger Writer)**:
    - Implemented in `src/messaging/`; follow

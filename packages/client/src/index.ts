@@ -397,6 +397,36 @@ export const ClockChangedEventSchema = z.object({
   }),
 });
 
+/**
+ * Perception's attention verdict for one stimulus batch: why a character
+ * replied late, deferred, or never saw a message. Observer-only; never replayed
+ * into any character's context.
+ */
+export const AttentionDecidedEventSchema = z.object({
+  ...JournalBase,
+  kind: z.literal("attention.decided"),
+  payload: z.object({
+    /** `wake_decision` for an idle brain, `attention_allocation` for a busy one. */
+    question: z.enum(["wake_decision", "attention_allocation"]),
+    action: z.enum(["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"]),
+    /**
+     * `model` asked the decision model; `automatic` skipped it (deadlines and
+     * idle check-ins); `fallback` admitted because the model was unavailable.
+     */
+    source: z.enum(["model", "automatic", "fallback"]),
+    /** Sim ms before a delayed wake is noticed; 0 when immediate. */
+    delayMs: z.number().nonnegative(),
+    /** The model's categorical answer. */
+    choice: z.string().optional(),
+    /** The model's response-latency score, mapped to `delayMs`. */
+    latencyScore: z.number().optional(),
+    /** Why a fallback was taken. */
+    note: z.string().optional(),
+    stimulusIds: z.array(z.string()),
+    taskId: z.string().optional(),
+  }),
+});
+
 export const JournalEventSchema = z.discriminatedUnion("kind", [
   TaskStartedEventSchema,
   TaskDelayedEventSchema,
@@ -405,6 +435,7 @@ export const JournalEventSchema = z.discriminatedUnion("kind", [
   ChatRenamedEventSchema,
   ChatMembersChangedEventSchema,
   ClockChangedEventSchema,
+  AttentionDecidedEventSchema,
 ]);
 export type JournalEvent = z.infer<typeof JournalEventSchema>;
 export type JournalKind = JournalEvent["kind"];

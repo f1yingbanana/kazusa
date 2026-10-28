@@ -30,17 +30,19 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
         role: "assistant" | "user";
         content: ReadonlyArray<{ type: "text"; text: string }>;
         timestamp: number;
-        idempotencyKey: string;
-        __openclaw: {
-          senderId: string;
-          senderName: string;
-          senderIdentity: {
+        idempotencyKey?: string;
+        /** Chat copies carry sender attribution; ledger rows carry `kazusa`. */
+        __openclaw?: {
+          senderId?: string;
+          senderName?: string;
+          senderIdentity?: {
             type: "observation";
             id: string;
             pluginId: string;
             accountId: null;
             senderKind: "human" | "bot";
           };
+          kazusa?: unknown;
         };
       };
     },
@@ -53,6 +55,23 @@ declare module "openclaw/plugin-sdk/session-transcript-runtime" {
   export function publishSessionTranscriptUpdateByIdentity(
     params: SessionIdentity & { update: { messageId: string } },
   ): Promise<void>;
+
+  /** Branch-safe raw message entries; keeps `__openclaw` metadata. */
+  export function readVisibleSessionTranscriptMessageEntries(
+    params: SessionIdentity & { storePath?: string },
+  ): Promise<
+    Array<{
+      entryId: string;
+      seq: number;
+      role: string;
+      message: {
+        role: string;
+        content: unknown;
+        timestamp?: number;
+        __openclaw?: { kazusa?: unknown; [key: string]: unknown };
+      };
+    }>
+  >;
 
   export function readSessionTranscriptCatalogPage(params: {
     agentId: string;

@@ -177,7 +177,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   append.mockImplementation(async ({ message }) => ({
     kind: "result",
-    result: { messageId: message.idempotencyKey },
+    result: { messageId: message.idempotencyKey ?? "" },
   }));
 });
 
@@ -275,7 +275,7 @@ describe("send_message SDK integration", () => {
     expect(
       append.mock.calls
         .slice(2)
-        .map(([params]) => params.message.__openclaw.senderId),
+        .map(([params]) => params.message.__openclaw?.senderId),
     ).toEqual(["bob", "bob", "bob"]);
   });
 
@@ -407,7 +407,7 @@ describe("send_message SDK integration", () => {
       name: "Configured Alice",
     });
     await h.execute();
-    expect(append.mock.calls[0][0].message.__openclaw.senderName).toBe(
+    expect(append.mock.calls[0][0].message.__openclaw?.senderName).toBe(
       "Configured Alice",
     );
   });

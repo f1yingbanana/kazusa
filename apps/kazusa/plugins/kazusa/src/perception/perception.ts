@@ -1,5 +1,5 @@
 import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
   type OpenClawPluginApi,
@@ -26,7 +26,9 @@ import {
   STIMULUS,
   latencyMs,
   type AttentionDecision,
+  type DecisionTrace,
   type PerceptionConfig,
+  type PerceptionDecisionRecord,
   type SpeechSource,
   type Stimulus,
 } from "./types.ts";
@@ -58,6 +60,17 @@ export interface PerceptionState {
   ignoredIds?: string[];
 }
 
+/*
+ * The "perception" store holds Perception's records: one `PerceptionState`
+ * per character, keyed by agent id, and one entry per attention decision,
+ * keyed `<agentId>:decision:<id>`. Agent ids never contain ":".
+ */
+const DECISION_KEY = ":decision:";
+
+function isDecisionKey(key: string): boolean {
+  return key.includes(DECISION_KEY);
+}
+
 export interface PerceptionDelivery {
   id: string;
   agentId: string;
@@ -74,6 +87,8 @@ export interface PerceptionDeps {
   readonly config?: Partial<PerceptionConfig>;
   readonly assertCurrent?: () => void;
   readonly stateStore?: StateStore<PerceptionState>;
+  /** The same "perception" namespace, viewed as decision entries. */
+  readonly decisionStore?: StateStore<PerceptionDecisionRecord>;
   readonly tasks?: Pick<TaskStore, "lookup">;
   readonly deliver?: (
     delivery: PerceptionDelivery,
@@ -81,11 +96,17 @@ export interface PerceptionDeps {
   ) => Promise<void>;
   readonly evaluateDecision?: DecisionRuntimeV1["evaluate"];
   readonly assembleDecisionContext?: DecisionContextAssembler;
+  /** Observes each recorded decision; must not throw or block routing. */
+  readonly onDecision?: (
+    agentId: string,
+    record: PerceptionDecisionRecord,
+  ) => void;
 }
 
 function formatDeliveryMessage(
   bundle: PendingItem[],
   mode: "steer" | "followup",
+  simTime: number,
 ): string {
   const chatItems = bundle.filter((item) => !item.deadline && !item.idle);
   const deadlineItems = bundle.filter((item) => Boolean(item.deadline));
@@ -115,7 +136,11 @@ function formatDeliveryMessage(
     );
   }
 
-  return parts.join("\n\n");
+  // OpenClaw stamps each user turn at the LLM boundary with its wall-clock
+  // write time in the host timezone, unless the text already opens with a
+  // `[... YYYY-MM-DD HH:mm` envelope. Lead with simulation time so the character
+  // never sees the operator's clock.
+  return `[${formatSimTime(simTime)}] ${parts.join("\n\n")}`;
 }
 
 /**
@@ -129,6 +154,7 @@ export class Perception {
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
   private readonly store: StateStore<PerceptionState>;
+  private readonly decisionStore: StateStore<PerceptionDecisionRecord>;
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
@@ -149,15 +175,23 @@ export class Perception {
       this.deps.config ?? this.api?.pluginConfig?.perception ?? {},
     );
 
-    if (this.deps.stateStore) {
+    if (this.deps.stateStore && this.deps.decisionStore) {
       this.store = this.deps.stateStore;
+      this.decisionStore = this.deps.decisionStore;
     } else if (this.api) {
       this.store = this.api.runtime.state.openKeyedStore<PerceptionState>({
         namespace: "perception",
         retention: "retained",
       });
+      this.decisionStore =
+        this.api.runtime.state.openKeyedStore<PerceptionDecisionRecord>({
+          namespace: "perception",
+          retention: "retained",
+        });
     } else {
-      throw new Error("Perception requires an api or a stateStore dependency.");
+      throw new Error(
+        "Perception requires an api or stateStore and decisionStore dependencies.",
+      );
     }
 
     if (this.deps.tasks) {
@@ -434,7 +468,9 @@ export class Perception {
    * without a host receipt we cannot safely infer adoption or replay tools.
    */
   async recover(): Promise<void> {
-    const entries = await this.store.entries();
+    const entries = (await this.store.entries()).filter(
+      ({ key }) => !isDecisionKey(key),
+    );
     await Promise.all(
       entries.map(({ key: agentId }) =>
         this.change(
@@ -585,11 +621,13 @@ export class Perception {
         // Picking up the phone shows everything that was waiting.
         return this.reserve(agentId, state, this.batch(available), "followup");
       }
-      const { action, delayMs } =
+      const decision: AttentionDecision & DecisionTrace =
         !busy && fresh.every((item) => item.deadline || item.idle)
-          ? { action: "STEER" as const, delayMs: 0 }
+          ? { action: "STEER", delayMs: 0, source: "automatic" }
           : await this.classify(agentId, state, task, fresh, busy);
       this.assertCurrent();
+      const { action, delayMs } = decision;
+      await this.recordDecision(agentId, decision, fresh, busy, task);
       // start_task/delay_task can execute while Jev is evaluating.
       const currentTask = await this.taskStore.lookup(agentId);
       const current = fresh.filter((item) => this.isCurrent(item, currentTask));
@@ -664,8 +702,9 @@ export class Perception {
     task: ActiveTask | undefined,
     bundle: PendingItem[],
     busy: boolean,
-  ): Promise<AttentionDecision> {
-    const admit = { action: "STEER", delayMs: 0 } as const;
+  ): Promise<AttentionDecision & DecisionTrace> {
+    const admit = (note: string) =>
+      ({ action: "STEER", delayMs: 0, source: "fallback", note }) as const;
     const assemble = this.deps.assembleDecisionContext;
     const api = this.api;
     const evaluate =
@@ -676,7 +715,7 @@ export class Perception {
             opts: Parameters<DecisionRuntimeV1["evaluate"]>[1],
           ) => api.runtime.decisions.evaluate(batch, opts)
         : undefined);
-    if (!assemble || !evaluate) return admit;
+    if (!assemble || !evaluate) return admit("no decision runtime");
     const timeout = new AbortController();
     const signal = AbortSignal.any([this.lifetime.signal, timeout.signal]);
     const timer = setTimeout(
@@ -735,29 +774,38 @@ export class Perception {
       const answer =
         outcome.status === "ok" ? outcome.result.answers[question] : undefined;
       if (answer?.type === "choice") {
-        if (answer.choice === "IGNORE") return { action: "IGNORE", delayMs: 0 };
-        if (answer.choice === "DEFER") return { action: "DEFER", delayMs: 0 };
-        if (busy && answer.choice === "QUEUE_NEXT")
-          return { action: "QUEUE_NEXT", delayMs: 0 };
+        const { choice } = answer;
+        const model = { source: "model", choice } as const;
+        if (choice === "IGNORE")
+          return { action: "IGNORE", delayMs: 0, ...model };
+        if (choice === "DEFER")
+          return { action: "DEFER", delayMs: 0, ...model };
+        if (busy && choice === "QUEUE_NEXT")
+          return { action: "QUEUE_NEXT", delayMs: 0, ...model };
         const latency =
           outcome.status === "ok"
             ? outcome.result.answers.response_latency
             : undefined;
-        if (!busy && answer.choice === "WAKE" && latency?.type === "score")
+        if (!busy && choice === "WAKE" && latency?.type === "score")
           return {
             action: "STEER",
             delayMs: latencyMs(latency.score, anchors),
+            ...model,
+            latencyScore: latency.score,
           };
+        return admit(`unusable answer ${choice} to ${question}`);
       }
-      if (outcome.status !== "ok")
+      if (outcome.status !== "ok") {
         this.warn(
           `Decision unavailable: ${outcome.reason}; admitting attention`,
         );
-      return admit;
+        return admit(`decision unavailable: ${outcome.reason}`);
+      }
+      return admit(`no choice answer to ${question}`);
     } catch (error) {
       this.assertCurrent(); // Disposal is cancellation, never a fallback brain turn.
       this.warn(error);
-      return admit;
+      return admit(String(error));
     } finally {
       clearTimeout(timer);
       if (onAbort) signal.removeEventListener("abort", onAbort);
@@ -793,7 +841,7 @@ export class Perception {
       keys,
       ids: bundle.map((item) => item.id),
       sessionKeys,
-      message: formatDeliveryMessage(bundle, mode),
+      message: formatDeliveryMessage(bundle, mode, this.deps.clock.time()),
     };
     state.deliveries = [...(state.deliveries ?? []), delivery];
     await this.save(agentId, state);
@@ -919,6 +967,71 @@ export class Perception {
         }
       }).catch((error: unknown) => reportFailure(error));
     });
+  }
+
+  /**
+   * Persist one decision as its own entry, then log and report it. A failed
+   * write is logged and never fails attention routing.
+   */
+  private async recordDecision(
+    agentId: string,
+    decision: AttentionDecision & DecisionTrace,
+    bundle: readonly PendingItem[],
+    busy: boolean,
+    task: ActiveTask | undefined,
+  ): Promise<void> {
+    const record: PerceptionDecisionRecord = {
+      ...decision,
+      simTime: this.deps.clock.time(),
+      wallTime: Date.now(),
+      question: busy ? "attention_allocation" : "wake_decision",
+      stimulusIds: bundle.map((item) => item.id),
+      ...(task ? { taskId: task.id } : {}),
+    };
+    try {
+      await this.decisionStore.register(
+        `${agentId}${DECISION_KEY}${randomUUID()}`,
+        record,
+      );
+    } catch (error) {
+      this.warn(error);
+    }
+    try {
+      this.deps.onDecision?.(agentId, record);
+    } catch (error) {
+      this.warn(error);
+    }
+    const detail = [
+      decision.choice && `choice=${decision.choice}`,
+      decision.latencyScore !== undefined &&
+        `latencyScore=${decision.latencyScore}`,
+      decision.delayMs > 0 &&
+        `delay=${Math.round(decision.delayMs / 1000)}s readyAt=${formatSimTime(record.simTime + decision.delayMs)}`,
+      decision.note && `note=${JSON.stringify(decision.note)}`,
+    ].filter(Boolean);
+    this.api?.logger.info(
+      `Perception ${agentId}: ${record.question} -> ${decision.action} (${decision.source}) for ${bundle.length} stimuli${detail.length ? ` ${detail.join(" ")}` : ""}`,
+    );
+  }
+
+  /** Every recorded attention decision, oldest first. */
+  async decisions(): Promise<
+    Array<{
+      readonly agentId: string;
+      readonly record: PerceptionDecisionRecord;
+    }>
+  > {
+    return (await this.decisionStore.entries())
+      .filter(({ key }) => isDecisionKey(key))
+      .map(({ key, value }) => ({
+        agentId: key.slice(0, key.indexOf(DECISION_KEY)),
+        record: value,
+      }))
+      .sort(
+        (a, b) =>
+          a.record.simTime - b.record.simTime ||
+          a.record.wallTime - b.record.wallTime,
+      );
   }
 
   private warn(error: unknown): void {
