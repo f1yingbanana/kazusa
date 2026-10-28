@@ -69,6 +69,7 @@ export function registerClockHttp(
             characters: "live",
             status: "live",
             timeline: "live",
+            desires: "live",
           };
 
     sendJson(res, 200, {

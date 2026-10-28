@@ -10,6 +10,7 @@ import { registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerPerception } from "./perception/register.ts";
 import { registerDesires } from "./desires/register.ts";
+import { registerDesiresHttp } from "./desires/http.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import {
@@ -58,6 +59,7 @@ export default definePluginEntry({
 
     registerClockHttp(api, clock);
     const desires = registerDesires(api, { clock });
+    registerDesiresHttp(api, { desires, broadcaster });
     const taskman = registerTaskman(api, {
       clock,
       broadcaster,

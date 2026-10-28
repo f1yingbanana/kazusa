@@ -89,6 +89,20 @@ gets the same `Clock` module through HTTP (§3).
 | `GET /kazusa/observe/chats` | Params: `query?`, `member?`. Returns all canonical chats with members and latest preview | `chats` + `messaging` stores, audience-agnostic |
 | `GET /kazusa/observe/messages` | Same shape as `/kazusa/messages`, any chat | `messaging` store |
 
+### Built: desires
+
+| Route | Response | Backed by |
+| --- | --- | --- |
+| `GET /kazusa/desires` | `DesiresResponse = { config: { states, initial, catalog }, records: Record<characterId, DesireRecord> }`. Characters with no record are still in `initial` and don't drain | `"desires"` store + `desires` plugin config (`src/desires/http.ts`) |
+
+Records are the plugin's closed form (`anchorAt`, `levels`, `effects?`,
+`drain`), never precomputed levels: a level is a pure function of the record
+and sim time, so the client recomputes it from `useSimNow()` and nothing
+polls. A record changes only on `start_task`/`delay_task` and
+`desires.configure`, each pushed as SSE `desires`. The timeline route skips
+reading chat ledgers when `kinds` excludes `message.sent` (the client
+default).
+
 `CharacterSummary` (draft):
 
 ```ts
@@ -123,6 +137,7 @@ membership and never emit typing.
 | --- | --- | --- | --- |
 | `connected` | both | `{ typing[], journalSeq?, statuses? }` | Seed live store. If `journalSeq` > last seen, catch up with `timeline?after=` |
 | `message`, `typing`, `chats` | player: audience-filtered; observer: all | Existing shapes | Existing handlers |
+| `desires` | observer | `{ characterId, record: DesireRecord }` (full replacement) | `desireStore.set` unless the held record has a later `anchorAt`; `connected` refetches `/kazusa/desires` |
 | `journal` | observer | `JournalEvent` (with `seq`) | Append to the timeline tail; detect gaps → catch up |
 | `status` | observer | `{ characterId, status }` (full replacement for that id) | Live store per-id update |
 | `clock` | both | `{ simTime, speed, updatedAt }` | Re-anchor interpolation |
@@ -249,7 +264,8 @@ are skipped.
 | `timeline` | None | `src/journal/` + routes + SSE `journal` |
 | `places` | Schema only | `/kazusa/places` from World Wiki frontmatter (+ `parent`) |
 | `location` | Not designed | Spatial subsystem |
-| `relationships`, `attention`, `desires` | Schema only / drafted / planned | See the roadmap |
+| `desires` | Built: `/kazusa/desires`, SSE `desires` | — |
+| `relationships`, `attention` | Schema only / drafted | See the roadmap |
 
 Until a domain is live, the client serves it from the mock source when mocks
 are enabled, with visible `Mock` tags (D10).

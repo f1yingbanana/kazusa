@@ -3,7 +3,7 @@
 import { BrainIcon, InboxIcon, PenLineIcon } from 'lucide-react'
 import { ChatChip } from '@/components/entities/chips'
 import { Fact } from '@/components/entities/fact'
-import { taskIcon } from '@/components/entities/task-icon'
+import { taskIcon, taskLabel } from '@/components/entities/task-icon'
 import { useCharacter, useCharacterStatus } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
 import type { EntityRef } from '@/lib/state/entity-ref'
@@ -29,9 +29,13 @@ export function CharacterNowSection({ entity }: { entity: EntityRef }) {
     <div className="flex flex-col gap-3">
       {task ? (
         <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
-          <Fact icon={Icon} className="font-medium">
-            {task.description}
-          </Fact>
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              <Icon aria-hidden className="size-3.5 shrink-0" />
+              {taskLabel(task.type)}
+            </span>
+            <p className="text-sm leading-snug font-medium text-pretty">{task.description}</p>
+          </div>
           <div
             className="h-1 overflow-hidden rounded-full bg-muted"
             role="progressbar"

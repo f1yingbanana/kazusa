@@ -6,7 +6,11 @@ import { CharacterChip } from '@/components/entities/chips'
 import { MockTag } from '@/components/entities/source-state'
 import { Button } from '@/components/ui/button'
 import { useListParam, useNavigate, useParam } from '@/hooks/use-url-state'
-import { TIMELINE_KIND_LIST } from '@/lib/registry/timeline-kinds'
+import {
+  effectiveTimelineKinds,
+  TIMELINE_KIND_LIST,
+  timelineKindsParam,
+} from '@/lib/registry/timeline-kinds'
 import { useWatchlist } from '@/lib/state/watchlist'
 import { cn } from '@/lib/utils'
 
@@ -66,7 +70,8 @@ function SectionLabel({ id, children }: { id: string; children: React.ReactNode 
 /**
  * Timeline's sidebar: who to follow and which event kinds to show. Every
  * control writes `tl.*` URL params, so filters are shareable and survive reloads.
- * No kinds param means all kinds; unchecking one stores the rest.
+ * No kinds param means the default set (everything except messages); any
+ * other selection is stored explicitly.
  */
 export function TimelineSidebar() {
   const navigate = useNavigate()
@@ -74,7 +79,7 @@ export function TimelineSidebar() {
   const kindParam = useListParam('tl.kinds') as JournalKind[]
   const watchOnly = useParam('tl.watch') === '1'
   const watchlist = useWatchlist()
-  const effectiveKinds = kindParam.length ? kindParam : ALL_KINDS
+  const effectiveKinds = effectiveTimelineKinds(kindParam)
   const hasFilters = actorParam.length > 0 || kindParam.length > 0 || watchOnly
 
   function patch(next: Record<string, string | null>) {
@@ -83,7 +88,8 @@ export function TimelineSidebar() {
 
   function toggleKind(kind: JournalKind) {
     const next = effectiveKinds.includes(kind) ? effectiveKinds.filter((k) => k !== kind) : [...effectiveKinds, kind]
-    patch({ 'tl.kinds': next.length === ALL_KINDS.length ? null : next.join(',') })
+    // Keep registry order so the param is stable.
+    patch({ 'tl.kinds': timelineKindsParam(ALL_KINDS.filter((k) => next.includes(k))) })
   }
 
   return (
