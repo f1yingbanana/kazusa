@@ -9,23 +9,17 @@ in Kazusa.
 ## 1. Static Identity & Traits (`<workspace>/IDENTITY.md`)
 
 - **Location**: `<workspace>/IDENTITY.md`
-- **Purpose**: Defines static character bio, occupational context, desire
-  baselines, and individual decay constants.
-- **Access**: Read by OpenClaw bootstrap & Desire Engine. Written once during
-  world generation / import.
+- **Purpose**: Defines static character bio and occupational context. Desire
+  state and per-character drain live in the `"desires"` keyed store, never in
+  Markdown.
+- **Access**: Read by OpenClaw bootstrap. Written once during world generation /
+  import.
 
 ```markdown
 ---
 agent_id: alice
 name: Alice Lin
 occupation: Music Theory Student
-desire_config:
-  sleep_energy: { target: 8.0, decay_per_hour: 0.45 }
-  hunger: { target: 7.5, decay_per_hour: 0.60 }
-  social_connection: { target: 4.5, decay_per_hour: 0.15 }
-  curiosity: { target: 8.0, decay_per_hour: 0.30 }
-  recognition: { target: 6.5, decay_per_hour: 0.20 }
-  purpose_progress: { target: 8.5, decay_per_hour: 0.40 }
 ---
 
 # Identity
@@ -41,10 +35,6 @@ manuscript writing that she forgets to eat.
   entry.
 - `name` (string, required): Full display name.
 - `occupation` (string, required): Primary role or vocation.
-- `desire_config` (object, required): Map of desire keys to
-  `{ target: number, decay_per_hour: number }`.
-  - `target`: Ideal homeostasis setpoint (`0.0..10.0`).
-  - `decay_per_hour`: Natural baseline hourly depletion rate ($\lambda_{i,d}$).
 
 ---
 
@@ -59,13 +49,15 @@ manuscript writing that she forgets to eat.
     timestamp (`simTime`), speed multiplier (`speed`), and `updatedAt`.
   - `namespace: "tasks"` (`ActiveTask | null`): Stores current active task
     indexed by `agentId`.
+  - `namespace: "desires"` (`DesireRecord`): One record per `agentId` (see
+    below).
 - **Decoupling Architecture**:
   - Active tasks are stored directly in the plugin database and streamed to
     `agent:<agentId>:tasks`.
   - Spatial location is managed by the spatial subsystem (`LOCATION.md` / World
     Wiki places).
-  - Biological/psychological drives are managed by the homeostasis engine
-    (`IDENTITY.md` decay rates / hunger / energy).
+  - Desires are managed by `src/desires/` in the `"desires"` store
+    ([mathematics](mathematics.md) §1).
   - No `STATE.md` or `TASK.md` file parsing is required.
 
 ### Active Task Schema
@@ -90,6 +82,28 @@ export const activeTaskSchema = z.object({
 
 export type ActiveTask = z.infer<typeof activeTaskSchema>;
 ```
+
+### Desire Record Schema
+
+```typescript
+interface DesireRecord {
+  /** Sim time (epoch ms) at which `levels` were computed exactly. */
+  anchorAt: number;
+  /** Levels 0..100 at `anchorAt`, keyed by catalog desire name. */
+  levels: Record<string, number>;
+  /** The current task's effects; each applies from anchorAt until `until`. */
+  effects?: {
+    taskId: string;
+    until: number;
+    byDesire: Record<string, { target: number; rate: number }>; // rate: points/hour
+  };
+  /** Sparse per-character drain overrides (points/hour), keyed by name. */
+  drain: Record<string, number>;
+}
+```
+
+A catalog desire missing from `levels` starts at the configured `initial`
+state's `level`; names no longer in the catalog are dropped on the next write.
 
 ### Field Specifications
 

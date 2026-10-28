@@ -345,8 +345,9 @@ describe("send_message SDK integration", () => {
         },
       });
     }
+    // Own copies too: the catalog only projects sender identity for user rows.
     expect(append.mock.calls.map(([params]) => params.message.role)).toEqual([
-      "assistant",
+      "user",
       "user",
     ]);
     expect(append.mock.calls[0][0].message.idempotencyKey).not.toBe(

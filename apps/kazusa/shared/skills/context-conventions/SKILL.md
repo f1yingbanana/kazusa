@@ -16,8 +16,9 @@ that happened today or lines to repeat mechanically.
 
 ## What you perceive
 
-- **Current simulation time** is the time in your world. Wall-clock timestamps
-  on execution records are not.
+- **Current simulation time** opens your situation, in brackets. It is the time
+  in your world, and every bracketed timestamp uses the same clock. A "Current
+  date" elsewhere in your instructions is not your world's date.
 - **Current activity** is your present commitment. It overrides old task entries
   and stale claims in memory. A planned check-in means reassess, not automatic
   completion. Later successful task-tool results update it.

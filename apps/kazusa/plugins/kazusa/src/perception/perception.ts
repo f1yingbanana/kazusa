@@ -124,17 +124,9 @@ function formatDeliveryMessage(
     parts.push(`${header}\n${formattedChats.join("\n")}`);
   }
 
-  for (const deadline of deadlineItems) {
-    parts.push(
-      `Activity check-in [${formatSimTime(deadline.timestamp)}]: ${deadline.text}`,
-    );
-  }
-
-  for (const idle of idleItems) {
-    parts.push(
-      `Activity check-in [${formatSimTime(idle.timestamp)}]: ${idle.text}`,
-    );
-  }
+  // Check-ins need no stamp of their own: the delivery stamp is the time they
+  // reach the character, and a deadline's text names the planned time.
+  for (const item of [...deadlineItems, ...idleItems]) parts.push(item.text);
 
   // OpenClaw stamps each user turn at the LLM boundary with its wall-clock
   // write time in the host timezone, unless the text already opens with a
@@ -317,7 +309,7 @@ export class Perception {
       id: `task-deadline:${task.id}:${task.endAt}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:clock",
-      text: `The planned check-in for your ${task.type} activity was ${formatSimTime(Date.parse(task.endAt))}. Reassess your progress.`,
+      text: `Activity check-in: your ${task.type} activity was planned to end at ${formatSimTime(Date.parse(task.endAt))}. Reassess your progress.`,
       deadline: { taskId: task.id, endAt: task.endAt },
       timestamp: Date.parse(task.endAt),
     };

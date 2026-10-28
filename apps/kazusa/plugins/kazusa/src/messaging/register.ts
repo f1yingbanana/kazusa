@@ -172,7 +172,11 @@ export function registerMessaging(
         sessionId: copy.sessionId,
         preparation: { source: messaging.assertCurrent },
         message: {
-          role: copy.role,
+          // Every chat line is an observation attributed by senderIdentity, the
+          // character's own included: the native catalog projects sender
+          // identity only for user-role rows, so assistant rows read back as
+          // unattributed.
+          role: "user",
           content: [{ type: "text", text: delivery.params.text }],
           timestamp: delivery.timestamp,
           idempotencyKey: `kazusa:message:${delivery.id}:${copy.agentId}`,
@@ -320,6 +324,9 @@ export function registerMessaging(
         {
           name: "send_message",
           label: "Send Message",
+          // Speech is how characters act on most turns; keep its schema
+          // visible instead of behind Tool Search.
+          catalogMode: "direct-only",
           description:
             "Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural chat bubbles in messages; they are typed and sent one at a time. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.",
           parameters: z.toJSONSchema(SEND_MESSAGE),

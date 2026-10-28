@@ -541,7 +541,7 @@ const stimulus: Stimulus = {
   id: `task-deadline:${task.id}`,
   sessionKey: `agent:${agentId}:tasks`,
   sender: "kazusa:clock",
-  text: `The planned check-in for your ${task.type} activity was ${task.endAt}. Reassess your progress.`,
+  text: `Activity check-in: your ${task.type} activity was planned to end at ${formatSimTime(endAt)}. Reassess your progress.`,
   timestamp: clock.time(),
 };
 await perception.receive(agentId, stimulus);

@@ -13,22 +13,22 @@ explains how every simulation requirement maps to OpenClaw.
 
 ## 1. Primitives Overview Table
 
-| Simulation Component                    | OpenClaw Native Primitive                                                            | Implementation Mechanism                                                                                                                                                                                                                                                                                   |
-| :-------------------------------------- | :----------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shared Multi-Agent Harness**          | Gateway & Multi-Agent Roster (`agents.entries.*`)                                    | Active simulated characters have an entry in `openclaw.json` mapped to `workspaces/<agent_id>/`. Non-simulated background NPCs remain stored in the World Wiki without consuming runner processes.                                                                                                         |
-| **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                                                  | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio). YAML frontmatter in `IDENTITY.md` holds desire targets and decay constants.                                                                                                                                           |
-| **Hot Working State**                   | OpenClaw Keyed Plugin State & `MEMORY.md`                                            | OpenClaw Keyed Store (`"tasks"`) stores the active task execution lease (`activeTask`, `agentId`, `updatedAt`) directly in the database. Location is held in spatial subsystem / World Wiki; desires in `IDENTITY.md` / homeostasis engine. `MEMORY.md` holds qualitative narrative reflections and goals. |
-| **Task Experiences & Thoughts**         | OpenClaw Session (`agent:<id>:tasks`)                                                | One append-only ledger of task lifecycles, outcomes, and in-character monologues.                                                                                                                                                                                                                          |
-| **Inter-Agent & Human Chat Streams**    | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes. Supports both agent peers and human players (`user:` prefix). |
-| **Human Player (Sensei / User)**       | WebChat / Client Channel + Plugin Config (`pluginConfig.user`)                      | Human players participate in-world without consuming an agent runner process or brain session. They read and send via the character's ledger `agent:<id>:chat:direct:user:<userId>`. `before_dispatch` attributes stimuli and routes to Perception. |
-| **Chat Group Metadata & Delivery**     | OpenClaw Retained Keyed Stores (`"chats"`, `"messaging"`)                           | Retained stores own membership and permanent canonical messages with frozen audiences and projection progress. Native sessions hold private agent projections; human clients read audience-filtered canonical history. All session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
-| **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                                           | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                         |
-| **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)                                 | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                       |
-| **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)                                  | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                               |
-| **3-Tier Context Assembly & Brain**     | `plugins/kazusa/src/context-engine/`                                                 | Context assembly reads simulated-time task/chat history and resolves trusted skill markers. Spatial/social context is future work. Perception owns stimulus routing and a separate lightweight classifier profile.                                                                                         |
-| **Variable-Horizon Heartbeats**         | Taskman Autonomous Scheduling                                                        | Taskman automatically schedules the agent's wake-up heartbeat when the active task lease elapses, consuming zero tokens during active tasks.                                                                                                                                                               |
-| **Perception**                          | `plugins/kazusa/src/perception/`                                                     | Explicit text ingress, bounded steerable classification, and deterministic task-deadline admission; physical/world events are future adapters.                                                                                                                                                             |
-| **Behavioral Workflows**                | Shared OpenClaw Skills (`shared/skills/*/SKILL.md`)                                  | Shared reusable skill folders teaching characters how to plan heartbeats, converse socially, and distill memories before sleep.                                                                                                                                                                            |
+| Simulation Component                    | OpenClaw Native Primitive                                                            | Implementation Mechanism                                                                                                                                                                                                                                                                              |
+| :-------------------------------------- | :----------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shared Multi-Agent Harness**          | Gateway & Multi-Agent Roster (`agents.entries.*`)                                    | Active simulated characters have an entry in `openclaw.json` mapped to `workspaces/<agent_id>/`. Non-simulated background NPCs remain stored in the World Wiki without consuming runner processes.                                                                                                    |
+| **Character Persona**                   | Workspace `SOUL.md` & `IDENTITY.md`                                                  | OpenClaw automatically loads `SOUL.md` (voice, core values) and `IDENTITY.md` (bio).                                                                                                                                                                                                                  |
+| **Hot Working State**                   | OpenClaw Keyed Plugin State & `MEMORY.md`                                            | OpenClaw Keyed Store (`"tasks"`) stores the active task execution lease (`activeTask`, `agentId`, `updatedAt`) directly in the database. Location is held in spatial subsystem / World Wiki; desires in the `"desires"` keyed store. `MEMORY.md` holds qualitative narrative reflections and goals.   |
+| **Task Experiences & Thoughts**         | OpenClaw Session (`agent:<id>:tasks`)                                                | One append-only ledger of task lifecycles, outcomes, and in-character monologues.                                                                                                                                                                                                                     |
+| **Inter-Agent & Human Chat Streams**    | OpenClaw Sessions (`agent:<id>:chat:direct:<peer>`, `agent:<id>:chat:group:<group>`) | Private per-character conversation ledgers; Perception gates explicitly submitted text chats separately from their ledger writes. Supports both agent peers and human players (`user:` prefix).                                                                                                       |
+| **Human Player (Sensei / User)**        | WebChat / Client Channel + Plugin Config (`pluginConfig.user`)                       | Human players participate in-world without consuming an agent runner process or brain session. They read and send via the character's ledger `agent:<id>:chat:direct:user:<userId>`. `before_dispatch` attributes stimuli and routes to Perception.                                                   |
+| **Chat Group Metadata & Delivery**      | OpenClaw Retained Keyed Stores (`"chats"`, `"messaging"`)                            | Retained stores own membership and permanent canonical messages with frozen audiences and projection progress. Native sessions hold private agent projections; human clients read audience-filtered canonical history. All session-orchestration tools are denied (`tools.deny: ["group:sessions"]`). |
+| **Cold Archive & Reflection**           | Workspace `memory/` + `memory-core` plugin                                           | Nightly logs in `memory/YYYY-MM-DD.md` indexed via hybrid vector + keyword search (`memory_search`, `memory_get`).                                                                                                                                                                                    |
+| **Objective World Wiki (Ground Truth)** | `shared/wiki/` (OpenClaw `memory-wiki` global vault)                                 | Objective ground truth: places (`entities/places/`), full character roster of 100+ characters/NPCs (`entities/characters/`), and canonical concepts (`concepts/<topic>.md`). Mutated only via events or tool leases.                                                                                  |
+| **Subjective Personal Wiki (Beliefs)**  | `workspaces/<id>/wiki/` (`memory-wiki` agent vault)                                  | Subjective character mind: private impressions (`entities/characters/`), place memories (`entities/places/`), subjective concepts/claims with evidence (`concepts/<id>.md`), arc syntheses, and contradiction reports (`contradictions.md`).                                                          |
+| **3-Tier Context Assembly & Brain**     | `plugins/kazusa/src/context-engine/`                                                 | Context assembly reads simulated-time task/chat history and resolves trusted skill markers. Spatial/social context is future work. Perception owns stimulus routing and a separate lightweight classifier profile.                                                                                    |
+| **Variable-Horizon Heartbeats**         | Taskman Autonomous Scheduling                                                        | Taskman automatically schedules the agent's wake-up heartbeat when the active task lease elapses, consuming zero tokens during active tasks.                                                                                                                                                          |
+| **Perception**                          | `plugins/kazusa/src/perception/`                                                     | Explicit text ingress, bounded steerable classification, and deterministic task-deadline admission; physical/world events are future adapters.                                                                                                                                                        |
+| **Behavioral Workflows**                | Shared OpenClaw Skills (`shared/skills/*/SKILL.md`)                                  | Shared reusable skill folders teaching characters how to plan heartbeats, converse socially, and distill memories before sleep.                                                                                                                                                                       |
 
 ---
 
@@ -58,10 +58,12 @@ session keys:
      without creating agent sessions, fake receipts or brain wakes.
    - Shared group routing metadata (members, titles, creation fingerprints) is
      maintained in the retained `"chats"` keyed store. Permanent messages and
-     their per-agent projection progress live in the retained `"messaging"` store.
+     their per-agent projection progress live in the retained `"messaging"`
+     store.
    - Transcripts remain native OpenClaw session files. All session orchestration
-     tools (`sessions_*`) are denied to characters via `tools.deny: ["group:sessions"]`,
-     ensuring safe operation while `memory_search` handles session recall.
+     tools (`sessions_*`) are denied to characters via
+     `tools.deny: ["group:sessions"]`, ensuring safe operation while
+     `memory_search` handles session recall.
    - Messaging appends these ledgers and submits stimuli to Perception; never
      dispatch an agent turn to a ledger via `sessions_send`.
 
@@ -118,15 +120,17 @@ world changes when they physically arrive or hear about them:
 ### 3.2 Tier 2: Eager Social Salience & Compact Contact Roster
 
 - **Eager Compact Contact Roster (Working Cache)**:
-  - Discovers the latest $K$ unique individuals (configurable `contactRosterLimit`,
-    default 20) with whom the agent has recently exchanged messages or interacted.
-  - Pulls each contact's `name`, `peer_id`, `relation_type`, and 1-line `summary` from
-    their Personal Wiki card (`<workspace>/wiki/entities/characters/<peer_id>.md`).
+  - Discovers the latest $K$ unique individuals (configurable
+    `contactRosterLimit`, default 20) with whom the agent has recently exchanged
+    messages or interacted.
+  - Pulls each contact's `name`, `peer_id`, `relation_type`, and 1-line
+    `summary` from their Personal Wiki card
+    (`<workspace>/wiki/entities/characters/<peer_id>.md`).
   - Injects a compact address book section:
     `- Bob Moreno (@bob, close_friend): Music student at Oak Hill Dorm. [chat:direct:bob]`
-  - Costs ~150 tokens total for 20 contacts, avoiding the $2\times$ round-trip penalty
-    of querying `list_chats` or `wiki_search` before messaging someone, and
-    eliminating handle hallucinations.
+  - Costs ~150 tokens total for 20 contacts, avoiding the $2\times$ round-trip
+    penalty of querying `list_chats` or `wiki_search` before messaging someone,
+    and eliminating handle hallucinations.
 - **1-on-1 Chat Ledger (`agent:<a>:chat:direct:<b>`)**:
   - Eagerly injects full `## Quick Impression` from
     `<workspace>/wiki/entities/characters/<b>.md`.
@@ -189,11 +193,12 @@ classifier profile reads active tasks; brain context remains ledger-based.
 Taskman submits deadline checks through Perception while retaining dashboard
 automations. Inbound chat events enter via the `before_dispatch` claiming hook;
 native UI/chat messages are intercepted before unmanaged auto-replying. Admitted
-stimuli are delivered to `agent:<id>:brain` via an internal `kazusa` ingress channel
-using `dispatchReplyWithBufferedBlockDispatcher` with `turnAdoptionLifecycle`:
-active runs are steered mid-flight via `InboundEventKind: "user_request"`, while
-idle brains receive followup waking turns via `InboundEventKind: "room_event"`.
-Classifier decisions are evaluated via Jev Decision Model without world-mutating tools.
+stimuli are delivered to `agent:<id>:brain` via an internal `kazusa` ingress
+channel using `dispatchReplyWithBufferedBlockDispatcher` with
+`turnAdoptionLifecycle`: active runs are steered mid-flight via
+`InboundEventKind: "user_request"`, while idle brains receive followup waking
+turns via `InboundEventKind: "room_event"`. Classifier decisions are evaluated
+via Jev Decision Model without world-mutating tools.
 
 ---
 

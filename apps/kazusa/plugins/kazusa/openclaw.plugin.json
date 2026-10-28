@@ -180,6 +180,68 @@
           }
         }
       },
+      "desires": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "states": {
+            "type": "array",
+            "minItems": 2,
+            "description": "Ascending level-to-state mapping shown to the LLM. A level is in the last state whose min it reaches; level is where a task targeting the state settles.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "min", "level"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "level": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          },
+          "initial": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "State an unseen desire starts in (default: fine)."
+          },
+          "catalog": {
+            "type": "array",
+            "minItems": 1,
+            "description": "The world's desires. description is the semantic contract given to the LLM.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "description", "drain"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "drain": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Points lost per simulated hour on a 0-100 scale."
+                }
+              }
+            }
+          }
+        }
+      },
       "user": {
         "type": "object",
         "additionalProperties": false,

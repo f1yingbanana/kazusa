@@ -17,7 +17,9 @@ import {
   type ActiveTask,
   type DelayTaskParams,
   type StartTaskParams,
+  type TaskExtension,
   type TaskStore,
+  type TaskToolArguments,
   type ToolExecutionContext,
 } from "./types.ts";
 
@@ -74,9 +76,21 @@ export function registerTaskman(
   deps: {
     readonly clock: Clock;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
+    /** Modules that add `start_task` parameters and see leases first. */
+    readonly extensions?: readonly TaskExtension[];
   },
 ): TaskmanService {
   const { clock } = deps;
+  const extensions = deps.extensions ?? [];
+  const startTaskParameters = extensions.reduce<Record<string, unknown>>(
+    (all, extension) => ({ ...all, ...extension.startTaskParameters }),
+    {},
+  );
+  const delayTaskParameters = extensions.reduce<Record<string, unknown>>(
+    (all, extension) => ({ ...all, ...extension.delayTaskParameters }),
+    {},
+  );
+  const extensionRequired = extensions.flatMap(({ required }) => required);
   const store = api.runtime.state.openKeyedStore<ActiveTask>({
     namespace: "tasks",
     retention: "retained",
@@ -262,6 +276,11 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
+      async beforeCommit(transition): Promise<void> {
+        for (const extension of extensions) {
+          await extension.beforeCommit(transition);
+        }
+      },
       appendTaskLedgerEntry: (text, timestamp, metadata): Promise<void> =>
         appendLedgerEntry(api, {
           agentId,
@@ -275,6 +294,9 @@ export function registerTaskman(
 
   api.registerTool((toolContext) => ({
     name: "start_task",
+    // Every check-in uses this tool; deferring it behind Tool Search hides
+    // its parameter descriptions (including extensions' `effects`).
+    catalogMode: "direct-only",
     label: "Start or Transition Task",
     description:
       "Start an initial task or conclude your current task and begin the next one. Characters are never idle; include a summary when replacing a task.",
@@ -309,11 +331,12 @@ export function registerTaskman(
           type: "object",
           description: "Optional task-specific metadata",
         },
+        ...startTaskParameters,
       },
-      required: ["type", "description", "duration"],
+      required: ["type", "description", "duration", ...extensionRequired],
       additionalProperties: false,
     },
-    async execute(_id, params: StartTaskParams) {
+    async execute(_id, params: TaskToolArguments<StartTaskParams>) {
       await clock.init();
       const result = await executeStartTask(
         params,
@@ -351,6 +374,7 @@ export function registerTaskman(
 
   api.registerTool((toolContext) => ({
     name: "delay_task",
+    catalogMode: "direct-only",
     label: "Delay Task",
     description:
       "Delay the completion time of your current active task by N minutes.",
@@ -367,10 +391,12 @@ export function registerTaskman(
           description:
             "Optional one or two sentences of inner monologue in your character's voice, as plain text, alongside the reason for the delay.",
         },
+        ...delayTaskParameters,
       },
+      required: extensionRequired,
       additionalProperties: false,
     },
-    async execute(_id, params: DelayTaskParams) {
+    async execute(_id, params: TaskToolArguments<DelayTaskParams>) {
       await clock.init();
       const result = await executeDelayTask(
         params,

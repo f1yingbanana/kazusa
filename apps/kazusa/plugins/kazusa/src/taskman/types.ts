@@ -29,18 +29,48 @@ export interface ActiveTask {
 /** The keyed-store operations Taskman uses. */
 export type TaskStore = StateStore<ActiveTask>;
 
+/** A lease about to be written by `start_task` or `delay_task`. */
+export interface TaskTransition {
+  readonly kind: "started" | "delayed";
+  readonly agentId: string;
+  /** Sim time of the transition. */
+  readonly at: number;
+  readonly task: ActiveTask;
+  /** Raw tool arguments; each extension validates its own parameters. */
+  readonly params: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Another module's contribution to the task tools. Taskman stays ignorant of
+ * what the parameters mean.
+ */
+export interface TaskExtension {
+  /** JSON-schema properties merged into `start_task`'s parameters. */
+  readonly startTaskParameters: Readonly<Record<string, unknown>>;
+  /** The same properties for `delay_task`, which may refer to `start_task`. */
+  readonly delayTaskParameters: Readonly<Record<string, unknown>>;
+  /** Which of the properties both tools require. */
+  readonly required: readonly string[];
+  /** Runs before the lease is written; a thrown error fails the tool call. */
+  beforeCommit(transition: TaskTransition): Promise<void>;
+}
+
 /** Context passed to task tool execution. */
 export interface ToolExecutionContext {
   readonly agentId: string;
   readonly store: TaskStore;
   readonly clock: Pick<Clock, "time">;
   readonly minDuration: number;
+  readonly beforeCommit?: (transition: TaskTransition) => Promise<void>;
   readonly appendTaskLedgerEntry: (
     message: string,
     timestamp: number,
     metadata?: unknown,
   ) => Promise<void>;
 }
+
+/** Tool arguments, including parameters contributed by extensions. */
+export type TaskToolArguments<T> = T & Readonly<Record<string, unknown>>;
 
 export interface StartTaskParams {
   readonly type: TaskCategory;

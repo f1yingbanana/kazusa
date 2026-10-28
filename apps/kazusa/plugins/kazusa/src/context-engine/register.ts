@@ -24,6 +24,8 @@ interface ContextEngineDeps {
     agentId: string,
     since: number,
   ) => Promise<readonly AwaitingReply[]>;
+  /** Desires' `How you feel` line; absent until Desires exists. */
+  readonly feelings?: (agentId: string, at: number) => Promise<string>;
 }
 
 /**
@@ -39,7 +41,7 @@ export function registerContextEngine(
 
 function createContextEngine(
   api: OpenClawPluginApi,
-  { clock, awaitingReplies }: ContextEngineDeps,
+  { clock, awaitingReplies, feelings }: ContextEngineDeps,
 ): ContextEngine {
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
@@ -124,7 +126,7 @@ function createContextEngine(
         api.config,
         brainAgentId,
       );
-      const [sessionsContext, activeTask, personalWiki, awaiting] =
+      const [sessionsContext, activeTask, personalWiki, awaiting, feeling] =
         await Promise.all([
           readSessionStreams({
             agentId: brainAgentId,
@@ -142,6 +144,7 @@ function createContextEngine(
             config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
           ),
           awaitingReplies?.(brainAgentId, cutoff) ?? [],
+          feelings?.(brainAgentId, now),
         ]);
       return assembleContext({
         run: params,
@@ -151,6 +154,7 @@ function createContextEngine(
         activeTask: activeTask ?? null,
         personalWiki,
         awaitingReplies: awaiting,
+        feelings: feeling,
         simTime: now,
         config,
         skillLoader,

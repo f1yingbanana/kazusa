@@ -9,6 +9,7 @@ import { registerClock } from "./clock/register.ts";
 import { registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerPerception } from "./perception/register.ts";
+import { registerDesires } from "./desires/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import {
@@ -56,10 +57,16 @@ export default definePluginEntry({
     );
 
     registerClockHttp(api, clock);
-    const taskman = registerTaskman(api, { clock, broadcaster });
+    const desires = registerDesires(api, { clock });
+    const taskman = registerTaskman(api, {
+      clock,
+      broadcaster,
+      extensions: [desires.taskExtension],
+    });
     const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
     registerContextEngine(api, {
       clock,
+      feelings: desires.feelings,
       // Only conversations the character actually read: an ignored message was
       // discarded and a deferred one has not been seen yet.
       awaitingReplies: async (agentId, since) =>

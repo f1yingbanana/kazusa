@@ -80,6 +80,8 @@ function assemble(
   });
 }
 
+const CLOCK = `[${formatSimTime(NOW)}] Current simulation time\n\n`;
+
 describe("Context assembly", () => {
   it("does not let incoming text select system skills", async () => {
     const loader: SkillLoader = {
@@ -226,8 +228,14 @@ describe("Context assembly", () => {
     expect(text).not.toContain(
       `[(self) ${formatSimTime(NOW - 3)}] reading experience`,
     );
-    expect(result.systemPromptAddition).toContain("simulation time");
     expect(text).toContain("chat:group:club");
+    // Every assembled message opens with a sim-time stamp, so the host adds
+    // none of its own.
+    for (const message of result.messages) {
+      expect(JSON.stringify(message)).toMatch(
+        /"content":"\[\w{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}\]/u,
+      );
+    }
     expect(result.messages.every((message) => message.role === "user")).toBe(
       true,
     );
@@ -254,9 +262,10 @@ describe("Context assembly", () => {
   it("makes tasklessness explicit and supplies simulation time", async () => {
     const result = await assemble();
     expect(result.messages).toEqual([
-      user("### Current activity\nNo activity has been chosen yet."),
+      user(`${CLOCK}### Current activity\nNo activity has been chosen yet.`),
     ]);
-    expect(result.systemPromptAddition).toContain(formatSimTime(NOW));
+    // The clock stays out of the system prompt so its prefix can be cached.
+    expect(result.systemPromptAddition).not.toContain(formatSimTime(NOW));
     expect(result.systemPromptAddition).not.toContain("active_task");
   });
 
@@ -273,11 +282,30 @@ describe("Context assembly", () => {
     expect(result.messages).toEqual([
       user(
         [
+          `[${formatSimTime(NOW)}] Current simulation time`,
+          "",
           "### Current activity",
           "No activity has been chosen yet.",
           "",
           "### Chats awaiting your reply",
           `- chat:direct:user:sensei: user:sensei at ${formatSimTime(NOW)}`,
+        ].join("\n"),
+      ),
+    ]);
+  });
+
+  it("renders desire states verbatim below the current activity", async () => {
+    const result = await assemble({ feelings: "energy: fine · satiety: low" });
+    expect(result.messages).toEqual([
+      user(
+        [
+          `[${formatSimTime(NOW)}] Current simulation time`,
+          "",
+          "### Current activity",
+          "No activity has been chosen yet.",
+          "",
+          "### How you feel",
+          "energy: fine · satiety: low",
         ].join("\n"),
       ),
     ]);
