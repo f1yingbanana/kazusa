@@ -21,7 +21,12 @@ import {
 } from "./desires.ts";
 
 export interface DesiresService {
+  readonly config: DesiresConfig;
   readonly store: DesireStore;
+  /** Called after every record write (task transitions and `desires.configure`). */
+  readonly onChange: (
+    listener: (agentId: string, record: DesireRecord) => void,
+  ) => () => void;
   /** Adds `afterwards` to both task tools and re-anchors on every transition. */
   readonly taskExtension: TaskExtension;
   /** The `How you feel` line for a brain turn. */
@@ -67,6 +72,17 @@ export function registerDesires(
     namespace: "desires",
     retention: "retained",
   });
+  const listeners = new Set<(agentId: string, record: DesireRecord) => void>();
+  const write = async (agentId: string, record: DesireRecord) => {
+    await store.register(agentId, record);
+    for (const listener of listeners) {
+      try {
+        listener(agentId, record);
+      } catch (error: unknown) {
+        api.logger.warn(`Desire change listener failed: ${String(error)}`);
+      }
+    }
+  };
 
   const taskExtension: TaskExtension = {
     startTaskParameters: { afterwards: afterwardsParameter(config) },
@@ -83,7 +99,7 @@ export function registerDesires(
           `invalid afterwards: ${z.prettifyError(effects.error)}`,
         );
       }
-      await store.register(
+      await write(
         agentId,
         startEffects(
           config,
@@ -171,13 +187,18 @@ export function registerDesires(
         levels: nextLevels,
         drain: nextDrain,
       };
-      await store.register(agentId, record);
+      await write(agentId, record);
       respond(true, describe(agentId, record), undefined);
     },
   );
 
   return {
+    config,
     store,
+    onChange: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     taskExtension,
     feelings: async (agentId, at): Promise<string> => {
       return feelingsLine(

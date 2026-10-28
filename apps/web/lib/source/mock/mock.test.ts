@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { JournalEventSchema, CharacterSummarySchema } from "@kazusa/client";
+import {
+  CharacterSummarySchema,
+  JournalEventSchema,
+  StreamEventSchema,
+} from "@kazusa/client";
 import { MINUTE } from "../../time/sim";
 import { applyClockAction } from "./clock";
 import { queryJournal } from "./timeline";
@@ -37,6 +41,10 @@ describe("mock world", () => {
     expect(world.journal.length).toBeGreaterThan(before);
     expect(events.some((e) => e.type === "journal")).toBe(true);
     expect(events.some((e) => e.type === "status")).toBe(true);
+    const desires = events.filter((e) => e.type === "desires");
+    expect(desires.length).toBeGreaterThan(0);
+    for (const event of desires)
+      expect(StreamEventSchema.safeParse(event).success).toBe(true);
   });
 });
 

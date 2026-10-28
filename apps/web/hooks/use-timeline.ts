@@ -118,13 +118,32 @@ export function useTimeline(filters: TimelineFilters) {
 }
 
 /** The few latest events for one actor (inspector "Recent"). */
-export function useRecentEvents(actorId: string, limit = 5) {
+export function useRecentEvents(
+  actorId: string,
+  limit: number,
+  kinds: readonly JournalKind[],
+) {
   const { source, worldId, fetcher } = useTimelineFetcher();
-  const query = useMemo(() => ({ actors: [actorId] }), [actorId]);
+  const kindsKey = kinds.join(",");
+  const query = useMemo(
+    () =>
+      toQuery({
+        actors: [actorId],
+        kinds: kindsKey.split(",") as JournalKind[],
+      }),
+    [actorId, kindsKey],
+  );
   const { data, isLoading } = useSWR(
     source === "unavailable"
       ? null
-      : (["kazusa/timeline/recent", source, worldId, actorId, limit] as const),
+      : ([
+          "kazusa/timeline/recent",
+          source,
+          worldId,
+          actorId,
+          limit,
+          kindsKey,
+        ] as const),
     () => fetcher({ ...query, limit }),
     { revalidateOnFocus: false },
   );

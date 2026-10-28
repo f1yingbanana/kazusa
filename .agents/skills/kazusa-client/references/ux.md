@@ -128,7 +128,10 @@ Trailing action: New group. Observed chats will appear below as a section
 
 **Timeline sidebar (filters):** Following (Everyone / Watchlist, plus any
 specific characters from "Open in Timeline" as removable chips) and Show (one
-checkbox per registered timeline kind; all checked means no `tl.kinds` param).
+checkbox per registered timeline kind; the default set, every kind without
+`hiddenByDefault`, means no `tl.kinds` param). Messages are hidden by default:
+Chats already shows them, and in the stream they drown out what characters
+do.
 Clear resets everything.
 
 ## 5. Stage: World
@@ -233,13 +236,24 @@ section starts growing tabs, the depth belongs in a stage view instead.
 
 1. **Header:** presence avatar (large), name, role or occupation, affiliation,
    kind (Simulated, NPC, Player), star toggle.
-2. **Now:** current task as a fact card (type icon, description, started, ends,
-   progress bar, `34m left`), brain state, the chats being composed in.
-3. **Recent:** the last ~5 journal events for this actor (the Timeline
-   component), plus "Open in Timeline".
-4. **Conversations:** chats this character is in, with a live dot. Click opens
+2. **Now:** current task as a fact card (category icon and label, description,
+   started, ends, progress bar, `34m left`), brain state, the chats being
+   composed in.
+3. **Desires:** one row per catalog desire in catalog order: prettified name
+   (description on hover), a bar segmented at the world's state boundaries, and
+   the state word the brain reads. Desires are background pressure, not a
+   chore list, so the section stays quiet: the lowest state is emphasized, a
+   desire the current task is moving gets the accent, a tick at its declared
+   target and `→ full by 07:00`, and one forecast line names the next state
+   drop among desires nothing is raising ("Satiety turns low in 38m"). That
+   answers both "why did she pick this task?" and "what will she want next?".
+   Levels are computed on the client from the closed-form record; no numbers
+   are shown (they are in the meter's ARIA value).
+4. **Recent:** the last ~5 journal events for this actor (the Timeline
+   component, default kinds only, so no messages), plus "Open in Timeline".
+5. **Conversations:** chats this character is in, with a live dot. Click opens
    them in Chats (observed if the player isn't a member).
-5. **Profile:** frontmatter fields (aliases, traits, role) as key/value facts,
+6. **Profile:** frontmatter fields (aliases, traits, role) as key/value facts,
    plus `bodyMarkdown` rendered verbatim in a collapsed block.
 
 **Chat:** members (presence avatars with activity), type, created, latest

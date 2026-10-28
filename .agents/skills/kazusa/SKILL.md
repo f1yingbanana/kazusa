@@ -162,7 +162,7 @@ apps/kazusa/
 │       ├── timeline/                   # GET /kazusa/timeline from ledger metadata
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
 │       ├── taskman/                    # "tasks" leases, :tasks ledger, cron projection, tools
-│       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs
+│       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs, GET /kazusa/desires
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
@@ -563,8 +563,13 @@ modules in process.
 - **RPCs**: `desires.get { agentId }` and
   `desires.configure { agentId, drain?, levels? }` (levels as numbers or state
   names), Zod-validated against the catalog.
+- **Client read model (`src/desires/http.ts`)**: `GET /kazusa/desires` returns
+  the catalog and every stored record in closed form; every record write
+  (`beforeCommit`, `desires.configure`) goes through one `write` that notifies
+  `onChange` listeners, which broadcast SSE `desires`. Clients compute levels
+  from sim time; never add a ticking push.
 - **Not yet**: Jev decision-state input, threshold "pangs" as Perception
-  stimuli, instant emotional jolts, client read model.
+  stimuli, instant emotional jolts.
 
 ## 4. Engineering & Zero-Build Conventions
 

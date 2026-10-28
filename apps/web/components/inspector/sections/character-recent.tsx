@@ -5,11 +5,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TimelineRow } from '@/components/views/timeline/timeline-row'
 import { useRecentEvents } from '@/hooks/use-timeline'
 import { useNavigate } from '@/hooks/use-url-state'
+import { DEFAULT_TIMELINE_KINDS } from '@/lib/registry/timeline-kinds'
 import type { EntityRef } from '@/lib/state/entity-ref'
 
-/** The Timeline stream component, filtered to one actor and a few rows. */
+/**
+ * The Timeline stream component, filtered to one actor and a few rows. Uses
+ * the Timeline's default kinds, so messages (already in Chats) stay out.
+ */
 export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
-  const { events, isLoading } = useRecentEvents(entity.id, 5)
+  const { events, isLoading } = useRecentEvents(entity.id, 5, DEFAULT_TIMELINE_KINDS)
   const navigate = useNavigate()
 
   if (isLoading) {
