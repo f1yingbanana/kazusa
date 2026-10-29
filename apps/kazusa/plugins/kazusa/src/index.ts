@@ -8,9 +8,12 @@ import { createDecisionContextAssembler } from "./context-engine/decision-source
 import { registerClock } from "./clock/register.ts";
 import { registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
+import { registerContextHttp } from "./context-engine/http.ts";
 import { registerPerception } from "./perception/register.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
+import { registerLocation } from "./location/register.ts";
+import { registerLocationHttp } from "./location/http.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import {
@@ -60,15 +63,22 @@ export default definePluginEntry({
     registerClockHttp(api, clock);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
+    const location = registerLocation(api, { clock });
+    registerLocationHttp(api, { location });
     const taskman = registerTaskman(api, {
       clock,
       broadcaster,
-      extensions: [desires.taskExtension],
+      extensions: [
+        desires.taskExtension,
+        ...(location.taskExtension ? [location.taskExtension] : []),
+      ],
     });
     const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
-    registerContextEngine(api, {
+    const context = registerContextEngine(api, {
       clock,
       feelings: desires.feelings,
+      whereabouts: location.whereabouts,
+      inCompany: location.inCompany,
       // Only conversations the character actually read: an ignored message was
       // discarded and a deferred one has not been seen yet.
       awaitingReplies: async (agentId, since) =>
@@ -78,6 +88,7 @@ export default definePluginEntry({
           await perception.noticed(agentId),
         )) ?? [],
     });
+    registerContextHttp(api, { context });
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
@@ -88,7 +99,10 @@ export default definePluginEntry({
       clock,
       assembleDecisionContext,
       broadcaster,
+      onDeadline: location.settle,
+      confirm: location.confirm,
     });
+    location.attachPerception(perception);
 
     const stopSupervisor = taskman.attachSupervisor(perception);
     api.lifecycle.onDispose?.(stopSupervisor);
@@ -121,10 +135,15 @@ export default definePluginEntry({
     const messaging = registerMessaging(api, {
       clock,
       perception,
+      placeOf: location.placeOf,
       broadcaster,
       getStatuses,
     });
     messagingRef.current = messaging;
+
+    // Huddles live in Messaging; Location reads them for sightings and
+    // `With you`, and takes people out of them when they walk away.
+    location.attachConversations(messaging);
 
     registerCharactersHttp(api, {
       taskman,

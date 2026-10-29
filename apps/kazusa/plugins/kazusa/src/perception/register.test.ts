@@ -4,7 +4,7 @@ import { registerPerception } from "./register.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
-function setup() {
+function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
   const stores = new Map<string, Map<string, unknown>>();
   const on = vi.fn();
   const subscription = vi.fn();
@@ -69,8 +69,9 @@ function setup() {
     time: () => NOW,
     init: async () => {},
     now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
+    onClockChange: () => () => {},
   };
-  const perception = registerPerception(api, { clock });
+  const perception = registerPerception(api, { clock, onDeadline });
 
   const hook = (name: string) =>
     on.mock.calls.find(([registered]) => registered === name)?.[1];
@@ -262,6 +263,7 @@ describe("Perception host integration", () => {
         time: () => NOW,
         init: async () => {},
         now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
+        onClockChange: () => () => {},
       },
       assembleDecisionContext,
     });
@@ -278,8 +280,29 @@ describe("Perception host integration", () => {
       { trigger: "cron", jobId: "cron-job-1", agentId: "alice" },
     );
 
-    expect(deadlineSpy).toHaveBeenCalledWith("alice");
+    expect(deadlineSpy).toHaveBeenCalledWith("alice", undefined);
     expect(result).toEqual({ handled: true });
+  });
+
+  it("settles what a deadline means elsewhere before admitting it", async () => {
+    const calls: string[] = [];
+    const h = setup(async (agentId) => {
+      calls.push(`settle ${agentId}`);
+      return "You've arrived at the club.";
+    });
+    vi.spyOn(h.perception, "deadline").mockImplementation(
+      async (agentId, note) => {
+        calls.push(`deadline ${agentId}: ${note}`);
+      },
+    );
+    await h.hook("before_agent_reply")(
+      { cleanedBody: "Scheduled task deadline reached" },
+      { trigger: "cron", jobId: "cron-job-1", agentId: "alice" },
+    );
+    expect(calls).toEqual([
+      "settle alice",
+      "deadline alice: You've arrived at the club.",
+    ]);
   });
 
   it("registers an internal ingress channel with no outbound adapter", () => {

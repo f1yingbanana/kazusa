@@ -6,11 +6,13 @@ import {
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
+import { untilRunning } from "../clock/clock.ts";
+import { shutdownSignal } from "../shutdown.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { nextJournalSeq } from "../realtime.ts";
 import type { Perception } from "../perception/perception.ts";
-import { startIdleSupervisor } from "./supervisor.ts";
+import { sharedSupervisorCell, startIdleSupervisor } from "./supervisor.ts";
 import { executeDelayTask, executeStartTask } from "./taskman.ts";
 import {
   TASK_CATEGORIES,
@@ -90,7 +92,13 @@ export function registerTaskman(
     (all, extension) => ({ ...all, ...extension.delayTaskParameters }),
     {},
   );
-  const extensionRequired = extensions.flatMap(({ required }) => required);
+  // A tool requires only the extension properties it takes.
+  const requiredBy = (
+    tool: "startTaskParameters" | "delayTaskParameters",
+  ): string[] =>
+    extensions.flatMap((extension) =>
+      extension.required.filter((name) => name in extension[tool]),
+    );
   const store = api.runtime.state.openKeyedStore<ActiveTask>({
     namespace: "tasks",
     retention: "retained",
@@ -276,10 +284,12 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
-      async beforeCommit(transition): Promise<void> {
+      async prepare(transition) {
+        const prepared = [];
         for (const extension of extensions) {
-          await extension.beforeCommit(transition);
+          prepared.push(await extension.prepare(transition));
         }
+        return prepared;
       },
       appendTaskLedgerEntry: (text, timestamp, metadata): Promise<void> =>
         appendLedgerEntry(api, {
@@ -333,11 +343,18 @@ export function registerTaskman(
         },
         ...startTaskParameters,
       },
-      required: ["type", "description", "duration", ...extensionRequired],
+      required: [
+        "type",
+        "description",
+        "duration",
+        ...requiredBy("startTaskParameters"),
+      ],
       additionalProperties: false,
     },
     async execute(_id, params: TaskToolArguments<StartTaskParams>) {
       await clock.init();
+      // A paused world holds whoever acts in it.
+      await untilRunning(clock, shutdownSignal());
       const result = await executeStartTask(
         params,
         resolveExecutionContext(toolContext),
@@ -353,15 +370,7 @@ export function registerTaskman(
             simTime: clock.time(),
             kind: "task.started",
             actors: [agentId],
-            payload: {
-              taskId: result.task.id,
-              type: result.task.type,
-              description: result.task.description,
-              duration: result.task.duration,
-              endAt: Date.parse(result.task.endAt),
-              summary: params.summary,
-              monologue: params.monologue,
-            },
+            payload: result.payload,
           },
         });
       }
@@ -393,16 +402,17 @@ export function registerTaskman(
         },
         ...delayTaskParameters,
       },
-      required: extensionRequired,
+      required: requiredBy("delayTaskParameters"),
       additionalProperties: false,
     },
     async execute(_id, params: TaskToolArguments<DelayTaskParams>) {
       await clock.init();
+      await untilRunning(clock, shutdownSignal());
       const result = await executeDelayTask(
         params,
         resolveExecutionContext(toolContext),
       );
-      if (result.success && result.task) {
+      if (result.success && result.task && result.payload) {
         const agentId = toolContext?.agentId ?? "main";
         await automation.synchronize?.(agentId);
         notifyTaskChange(agentId, result.task);
@@ -413,13 +423,7 @@ export function registerTaskman(
             simTime: clock.time(),
             kind: "task.delayed",
             actors: [agentId],
-            payload: {
-              taskId: result.task.id,
-              additionalMinutes: params.additionalDuration ?? 5,
-              endAt: Date.parse(result.task.endAt),
-              reason: params.reason,
-              monologue: params.monologue,
-            },
+            payload: result.payload,
           },
         });
       }
@@ -447,6 +451,7 @@ export function registerTaskman(
         intervalMs: config.supervisor.intervalMs,
         maxAgentsPerTick: config.supervisor.maxAgentsPerTick,
         idleText: config.supervisor.idleText,
+        cell: sharedSupervisorCell(),
       });
     },
   };

@@ -5,6 +5,7 @@ import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-tr
 import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
+import { personLabel } from "../person-label.ts";
 
 export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
@@ -75,10 +76,17 @@ export async function assembleContext(params: {
   readonly awaitingReplies?: readonly {
     readonly sessionKey: string;
     readonly sender: string;
+    readonly senderName?: string;
     readonly timestamp: number;
   }[];
   /** One line of desire states, rendered verbatim. */
   readonly feelings?: string;
+  /** Position and travel times, rendered verbatim. */
+  readonly whereabouts?: string;
+  /** Someone else is here, so the in-person skill applies. */
+  readonly inCompany?: boolean;
+  /** Names of the people in these records, by id. */
+  readonly names?: ReadonlyMap<string, string>;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
 }): ReturnType<ContextEngine["assemble"]> {
@@ -102,6 +110,10 @@ export async function assembleContext(params: {
     needsActivity ? lifecycleSkill : interruptSkill,
     resolutionContext,
   );
+  // Last, so the stable prefix survives people coming and going.
+  const inPerson = params.inCompany
+    ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
+    : undefined;
 
   // Ordered from most to least stable so the provider can reuse the prefix
   // across turns. The clock lives in the situation message, never here.
@@ -114,6 +126,7 @@ export async function assembleContext(params: {
       agentSessionKey: run.sessionKey,
     }),
     behavior,
+    inPerson,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -144,6 +157,9 @@ export async function assembleContext(params: {
             `Planned check-in: ${formatSimTime(Date.parse(task.endAt))}`,
           ].join("\n")
         : "No activity has been chosen yet.",
+      ...(params.whereabouts
+        ? ["", "### Where you are", params.whereabouts]
+        : []),
       ...(params.feelings ? ["", "### How you feel", params.feelings] : []),
       ...(params.awaitingReplies?.length
         ? [
@@ -151,7 +167,7 @@ export async function assembleContext(params: {
             "### Chats awaiting your reply",
             ...params.awaitingReplies.map(
               (chat) =>
-                `- ${formatSessionHeader(chat.sessionKey)}: ${chat.sender} at ${formatSimTime(chat.timestamp)}`,
+                `- ${formatSessionHeader(chat.sessionKey)}: ${personLabel(chat.senderName, chat.sender)} at ${formatSimTime(chat.timestamp)}`,
             ),
           ]
         : []),
@@ -198,6 +214,7 @@ export async function assembleContext(params: {
     simTime: params.simTime,
     cutoff,
     tokenBudget: remaining,
+    ...(params.names ? { names: params.names } : {}),
   });
 
   // Recollections and ledgers share one message that leads with our own
@@ -244,6 +261,7 @@ export function packLedgerRecords(params: {
   readonly simTime: number;
   readonly cutoff: number;
   readonly tokenBudget: number;
+  readonly names?: ReadonlyMap<string, string>;
 }): Map<string, string[]> {
   const { sessionsContext, simTime, cutoff, tokenBudget } = params;
   const records = Object.entries(sessionsContext)
@@ -267,7 +285,10 @@ export function packLedgerRecords(params: {
   const selected = new Map<string, string[]>();
   let used = 0;
   for (const event of records.reverse()) {
-    const record = formatEnvelopeRecord(event);
+    const record = formatEnvelopeRecord({
+      ...event,
+      ...(params.names ? { names: params.names } : {}),
+    });
     const streamHeader = `### ${formatSessionHeader(event.sessionKey)}`;
     const group = selected.get(event.sessionKey);
     const cost =

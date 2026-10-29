@@ -3,6 +3,7 @@ import type {
   ActiveTask,
   DelayTaskParams,
   DelayTaskResult,
+  PreparedTaskCommit,
   StartTaskParams,
   StartTaskResult,
   TaskToolArguments,
@@ -10,17 +11,63 @@ import type {
   ToolExecutionContext,
 } from "./types.ts";
 
-/** Let extensions see the lease first; their refusal leaves nothing written. */
+interface CommittedExtensions {
+  /** The lease as written: an extension may have brought its end forward. */
+  readonly task: ActiveTask;
+  /** Extension sentences, each prefixed with a space, or empty. */
+  readonly notes: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+}
+
+/** The lease ending at the earliest check-in an extension asked for. */
+function checkedIn(
+  task: ActiveTask,
+  prepared: readonly PreparedTaskCommit[],
+): ActiveTask {
+  const startedAt = Date.parse(task.startedAt);
+  const end = Math.min(
+    Date.parse(task.endAt),
+    ...prepared.flatMap(({ checkInAt }) =>
+      checkInAt === undefined ? [] : [Math.max(startedAt, checkInAt)],
+    ),
+  );
+  if (end === Date.parse(task.endAt)) return task;
+  return {
+    ...task,
+    endAt: new Date(end).toISOString(),
+    duration: task.duration - (Date.parse(task.endAt) - end) / 60_000,
+  };
+}
+
+/**
+ * Let every extension see the lease first. One refusal leaves nothing written;
+ * otherwise each extension commits against the final lease before it is
+ * written.
+ */
 async function commitExtensions(
   ctx: ToolExecutionContext,
   transition: TaskTransition,
-): Promise<string | undefined> {
+): Promise<{ readonly refusal: string } | CommittedExtensions> {
+  let prepared: readonly PreparedTaskCommit[];
   try {
-    await ctx.beforeCommit?.(transition);
-    return undefined;
+    prepared = (await ctx.prepare?.(transition)) ?? [];
   } catch (error: unknown) {
-    return error instanceof Error ? error.message : String(error);
+    return { refusal: error instanceof Error ? error.message : String(error) };
   }
+  const task = checkedIn(transition.task, prepared);
+  for (const extension of prepared) await extension.commit(task);
+  return {
+    task,
+    notes: prepared
+      .map(({ note }) => note?.trim())
+      .filter((note): note is string => !!note)
+      .map((note) => ` ${note}`)
+      .join(""),
+    payload: prepared.reduce<Record<string, unknown>>(
+      (all, { payload }) => ({ ...all, ...payload }),
+      {},
+    ),
+  };
 }
 
 /** Append character voice as a separate italic blockquote in the ledger text. */
@@ -57,39 +104,43 @@ export async function executeStartTask(
   };
 
   const priorTask = await ctx.store.lookup(ctx.agentId);
-  const refusal = await commitExtensions(ctx, {
+  const extensions = await commitExtensions(ctx, {
     kind: "started",
     agentId: ctx.agentId,
     at: timestamp,
     task,
     params,
   });
-  if (refusal !== undefined) {
-    return { success: false, message: `Task not started: ${refusal}` };
+  if ("refusal" in extensions) {
+    return {
+      success: false,
+      message: `Task not started: ${extensions.refusal}`,
+    };
   }
-  await ctx.store.register(ctx.agentId, task);
+  const lease = extensions.task;
+  await ctx.store.register(ctx.agentId, lease);
   const priorSummary = params.summary?.trim();
+  const started = `Started ${lease.type} task: "${lease.description}".${extensions.notes} Scheduled to conclude at ${lease.endAt} (${Math.round(lease.duration)} minutes).`;
   const message = priorTask
-    ? `Concluded ${priorTask.type} task.${priorSummary ? ` Summary: "${priorSummary}".` : ""} Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`
-    : `Started ${task.type} task: "${task.description}". Scheduled to conclude at ${endAt} (${duration} minutes).`;
+    ? `Concluded ${priorTask.type} task.${priorSummary ? ` Summary: "${priorSummary}".` : ""} ${started}`
+    : started;
+  const payload = {
+    taskId: lease.id,
+    type: lease.type,
+    description: lease.description,
+    duration: lease.duration,
+    endAt: Date.parse(lease.endAt),
+    summary: params.summary,
+    monologue: params.monologue,
+    replacedTaskId: priorTask?.id,
+    ...extensions.payload,
+  };
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
     timestamp,
-    {
-      kind: "task.started",
-      payload: {
-        taskId: task.id,
-        type: task.type,
-        description: task.description,
-        duration: task.duration,
-        endAt: Date.parse(task.endAt),
-        summary: params.summary,
-        monologue: params.monologue,
-        replacedTaskId: priorTask?.id,
-      },
-    },
+    { kind: "task.started", payload },
   );
-  return { success: true, task, message };
+  return { success: true, task: lease, message, payload };
 }
 
 export async function executeDelayTask(
@@ -114,33 +165,36 @@ export async function executeDelayTask(
       new Date(current.endAt).getTime() + additionalDuration * 60_000,
     ).toISOString(),
   };
-  const refusal = await commitExtensions(ctx, {
+  const extensions = await commitExtensions(ctx, {
     kind: "delayed",
     agentId: ctx.agentId,
     at: timestamp,
     task,
     params,
   });
-  if (refusal !== undefined) {
-    return { success: false, message: `Task not delayed: ${refusal}` };
+  if ("refusal" in extensions) {
+    return {
+      success: false,
+      message: `Task not delayed: ${extensions.refusal}`,
+    };
   }
-  await ctx.store.register(ctx.agentId, task);
+  const lease = extensions.task;
+  await ctx.store.register(ctx.agentId, lease);
 
   const reason = params.reason ? ` Reason: ${params.reason}.` : "";
-  const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${task.endAt}.${reason}`;
+  const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${lease.endAt}.${reason}${extensions.notes}`;
+  const payload = {
+    taskId: lease.id,
+    additionalMinutes: additionalDuration,
+    endAt: Date.parse(lease.endAt),
+    reason: params.reason,
+    monologue: params.monologue,
+    ...extensions.payload,
+  };
   await ctx.appendTaskLedgerEntry(
     formatTaskLedgerEntry(message, params.monologue),
     timestamp,
-    {
-      kind: "task.delayed",
-      payload: {
-        taskId: task.id,
-        additionalMinutes: additionalDuration,
-        endAt: Date.parse(task.endAt),
-        reason: params.reason,
-        monologue: params.monologue,
-      },
-    },
+    { kind: "task.delayed", payload },
   );
-  return { success: true, task, message };
+  return { success: true, task: lease, message, payload };
 }

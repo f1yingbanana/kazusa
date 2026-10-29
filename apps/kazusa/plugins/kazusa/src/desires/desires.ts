@@ -164,20 +164,25 @@ export function feelingsLine(
 const ARROW = "→";
 
 /**
- * Every `current→afterwards` value between different states. Asking for the
- * transition makes the model compare against how it feels now, and leaves an
- * unchanged desire without a valid value to restate.
+ * Every `current→afterwards` value. Asking for the transition makes the model
+ * compare against how it feels now. An unchanged one (`fine→fine`) is accepted
+ * and means no change: rejecting it only cost the model a retry, live.
  */
 export function transitions(config: DesiresConfig): string[] {
   const states = config.states.map(({ name }) => name);
-  return states.flatMap((from) =>
-    states.filter((to) => to !== from).map((to) => `${from}${ARROW}${to}`),
-  );
+  return states.flatMap((from) => states.map((to) => `${from}${ARROW}${to}`));
 }
 
 /** The afterwards state of a `current→afterwards` value. */
 export function targetOf(transition: string): string {
   return transition.slice(transition.indexOf(ARROW) + ARROW.length);
+}
+
+/** Whether a `current→afterwards` value names no change. */
+export function isUnchanged(transition: string): boolean {
+  return (
+    transition.slice(0, transition.indexOf(ARROW)) === targetOf(transition)
+  );
 }
 
 /** The task tools' `afterwards` parameter, generated from the catalog. */

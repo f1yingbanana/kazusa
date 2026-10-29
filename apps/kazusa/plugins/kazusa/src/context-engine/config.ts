@@ -24,11 +24,13 @@ export const CONTEXT_ENGINE_CONFIG = z.strictObject({
       conventions: z.string().default("context-conventions"),
       lifecycle: z.string().default("task-lifecycle"),
       interrupt: z.string().default("task-interrupt"),
+      inPerson: z.string().default("in-person"),
     })
     .default({
       conventions: "context-conventions",
       lifecycle: "task-lifecycle",
       interrupt: "task-interrupt",
+      inPerson: "in-person",
     }),
 });
 

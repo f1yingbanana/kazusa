@@ -217,25 +217,33 @@ export function MessageList({
                                   {participant.name}
                                 </MessageHeader>
                               ) : null}
-                              <Bubble
-                                align={align}
-                                variant={
-                                  pendingMessage?.status === "failed"
-                                    ? "destructive"
-                                    : isSelf
-                                      ? "default"
-                                      : "secondary"
-                                }
-                                className={
-                                  pendingMessage?.status === "sending"
-                                    ? "opacity-70"
-                                    : undefined
-                                }
-                              >
-                                <BubbleContent className="whitespace-pre-wrap">
-                                  {message.text}
-                                </BubbleContent>
-                              </Bubble>
+                              {"type" in message &&
+                              message.type === "action" ? (
+                                // Done, not said: narrated in third person.
+                                <p className="text-muted-foreground px-1 text-sm italic whitespace-pre-wrap">
+                                  {`${participant.name} ${message.text}`}
+                                </p>
+                              ) : (
+                                <Bubble
+                                  align={align}
+                                  variant={
+                                    pendingMessage?.status === "failed"
+                                      ? "destructive"
+                                      : isSelf
+                                        ? "default"
+                                        : "secondary"
+                                  }
+                                  className={
+                                    pendingMessage?.status === "sending"
+                                      ? "opacity-70"
+                                      : undefined
+                                  }
+                                >
+                                  <BubbleContent className="whitespace-pre-wrap">
+                                    {message.text}
+                                  </BubbleContent>
+                                </Bubble>
+                              )}
                               {isLast ? (
                                 <MessageFooter className="gap-2 font-normal">
                                   <MessageStatus

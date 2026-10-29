@@ -135,11 +135,11 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[bob Fri 2026-10-23 12:00] Hello Alice");
+    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Hello Alice");
     expect(text).toContain("[(self) Fri 2026-10-23 12:00] Hello Bob");
-    expect(text).toContain("[carol Fri 2026-10-23 12:00] Hello everyone");
-    expect(text).toContain("[bob Fri 2026-10-23 12:00] Welcome");
-    expect(text).toContain("[bob Fri 2026-10-23 12:00] Role is not identity");
+    expect(text).toContain("[`carol` Fri 2026-10-23 12:00] Hello everyone");
+    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Welcome");
+    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Role is not identity");
     expect(text).toContain(
       "[(self) Fri 2026-10-23 12:00] Metadata identifies self",
     );
@@ -155,9 +155,9 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[carol Fri 2026-10-23 12:00] bob: A quotation");
+    expect(text).toContain("[`carol` Fri 2026-10-23 12:00] bob: A quotation");
     expect(text).toContain(
-      "[bob Fri 2026-10-23 12:00] [speaker:alice] A quotation",
+      "[`bob` Fri 2026-10-23 12:00] [speaker:alice] A quotation",
     );
     expect(text).not.toContain("Display name, not identity");
   });
@@ -275,6 +275,7 @@ describe("Context assembly", () => {
         {
           sessionKey: "agent:alice:chat:direct:user:sensei",
           sender: "user:sensei",
+          senderName: "Sensei",
           timestamp: NOW,
         },
       ],
@@ -288,7 +289,7 @@ describe("Context assembly", () => {
           "No activity has been chosen yet.",
           "",
           "### Chats awaiting your reply",
-          `- chat:direct:user:sensei: user:sensei at ${formatSimTime(NOW)}`,
+          `- chat:direct:user:sensei: Sensei \`user:sensei\` at ${formatSimTime(NOW)}`,
         ].join("\n"),
       ),
     ]);
@@ -306,6 +307,42 @@ describe("Context assembly", () => {
           "",
           "### How you feel",
           "energy: fine · satiety: low",
+        ].join("\n"),
+      ),
+    ]);
+  });
+
+  it("adds the in-person skill last, only when someone else is here", async () => {
+    const loader: SkillLoader = {
+      ...testSkillLoader,
+      loadSkill: vi.fn(async (name) => `${name} instructions`),
+    };
+    const alone = await assemble({ skillLoader: loader });
+    expect(alone.systemPromptAddition).not.toContain("in-person");
+    const together = await assemble({ skillLoader: loader, inCompany: true });
+    expect(together.systemPromptAddition).toMatch(
+      /task-lifecycle instructions\n\nin-person instructions$/,
+    );
+  });
+
+  it("renders where the character is between the activity and feelings", async () => {
+    const result = await assemble({
+      whereabouts: "Club Room `club` (School). Smells of vanilla.",
+      feelings: "energy: fine",
+    });
+    expect(result.messages).toEqual([
+      user(
+        [
+          `[${formatSimTime(NOW)}] Current simulation time`,
+          "",
+          "### Current activity",
+          "No activity has been chosen yet.",
+          "",
+          "### Where you are",
+          "Club Room `club` (School). Smells of vanilla.",
+          "",
+          "### How you feel",
+          "energy: fine",
         ].join("\n"),
       ),
     ]);

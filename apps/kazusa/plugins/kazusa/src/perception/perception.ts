@@ -1,4 +1,5 @@
 import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -18,8 +19,28 @@ import {
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
+
+/**
+ * Runs a callback in the async context this module was loaded in, at Gateway
+ * startup. A readiness timer armed during a tool call (a sighting foreseen by
+ * someone's `start_task`) wakes long after that call closed; inside its scope,
+ * the decision runtime and brain handoff refuse ("agent tool caller authority
+ * is no longer active"), and the character is quarantined.
+ */
+const outsideCallers = AsyncLocalStorage.snapshot();
+
+/**
+ * Starts work that outlives its caller. `runDetachedWebhookWork` keeps Gateway
+ * admission but not the caller's request scope, so work started from an RPC or
+ * HTTP call is refused once that client disconnects ("Gateway caller authority
+ * is no longer active"). Live, every stimulus from `location.place` fell back.
+ */
+function detached<T>(run: () => Promise<T>): Promise<T> {
+  return outsideCallers(() => runDetachedWebhookWork(run));
+}
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
+import { personLabel } from "../person-label.ts";
 import { z } from "zod";
 import {
   PERCEPTION_CONFIG,
@@ -101,6 +122,26 @@ export interface PerceptionDeps {
     agentId: string,
     record: PerceptionDecisionRecord,
   ) => void;
+  /**
+   * When a foreseen stimulus's moment comes: what actually happens? Its
+   * producer re-checks the world (and may judge it) and returns the stimulus as
+   * it happens, or `undefined` to drop it unseen.
+   */
+  /**
+   * The per-character lock, shared by every instance in the process: two
+   * instances draining one character decided and delivered the same stimuli
+   * twice. Each test gets its own.
+   */
+  readonly serial?: KeyedAsyncQueue;
+  /**
+   * Whether a handoff left over from before a restart reached the brain.
+   * Absent: it stays quarantined.
+   */
+  readonly adopted?: (delivery: PerceptionDelivery) => Promise<boolean>;
+  readonly confirm?: (
+    agentId: string,
+    item: Stimulus,
+  ) => Promise<Stimulus | undefined>;
 }
 
 function formatDeliveryMessage(
@@ -108,7 +149,15 @@ function formatDeliveryMessage(
   mode: "steer" | "followup",
   simTime: number,
 ): string {
-  const chatItems = bundle.filter((item) => !item.deadline && !item.idle);
+  const chatItems = bundle.filter(
+    (item) =>
+      !item.deadline && !item.idle && item.sessionKey.includes(":chat:"),
+  );
+  // Things seen around them, recorded in their own `:tasks` ledger.
+  const sightings = bundle.filter(
+    (item) =>
+      !item.deadline && !item.idle && !item.sessionKey.includes(":chat:"),
+  );
   const deadlineItems = bundle.filter((item) => Boolean(item.deadline));
   const idleItems = bundle.filter((item) => Boolean(item.idle));
 
@@ -119,9 +168,16 @@ function formatDeliveryMessage(
       mode === "steer" ? "Messages noticed while thinking:" : "Incoming chats:";
     const formattedChats = chatItems.map((item) => {
       const channel = formatSessionHeader(item.sessionKey);
-      return `- [${item.sender} ${formatSimTime(item.timestamp)}] (${channel}): ${item.text}`;
+      return `- [${personLabel(item.senderName, item.sender)} ${formatSimTime(item.timestamp)}] (${channel}): ${item.text}`;
     });
     parts.push(`${header}\n${formattedChats.join("\n")}`);
+  }
+  if (sightings.length) {
+    parts.push(
+      `${mode === "steer" ? "Seen while thinking:" : "Seen around you:"}\n${sightings
+        .map((item) => `- [${formatSimTime(item.timestamp)}] ${item.text}`)
+        .join("\n")}`,
+    );
   }
 
   // Check-ins need no stamp of their own: the delivery stamp is the time they
@@ -141,7 +197,7 @@ function formatDeliveryMessage(
  * both idle and busy states.
  */
 export class Perception {
-  private readonly serial = new KeyedAsyncQueue();
+  private readonly serial: KeyedAsyncQueue;
   private readonly api?: OpenClawPluginApi;
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
@@ -162,6 +218,7 @@ export class Perception {
   constructor(deps: PerceptionDeps) {
     this.deps = deps;
     this.api = deps.api;
+    this.serial = deps.serial ?? new KeyedAsyncQueue();
 
     this.config = PERCEPTION_CONFIG.parse(
       this.deps.config ?? this.api?.pluginConfig?.perception ?? {},
@@ -288,7 +345,7 @@ export class Perception {
           resolve(false);
         });
       });
-      void runDetachedWebhookWork(async () => {
+      void detached(async () => {
         if (await ready) await this.drain(agentId);
       }).catch((error: unknown) => this.warn(error));
     } else {
@@ -296,7 +353,8 @@ export class Perception {
     }
   }
 
-  async deadline(agentId: string): Promise<void> {
+  /** `note` is what the lease's end means elsewhere, such as an arrival. */
+  async deadline(agentId: string, note?: string): Promise<void> {
     const task = await this.taskStore.lookup(agentId);
     if (!task?.id) return;
     const simNow = this.deps.clock.time();
@@ -309,7 +367,7 @@ export class Perception {
       id: `task-deadline:${task.id}:${task.endAt}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:clock",
-      text: `Activity check-in: your ${task.type} activity was planned to end at ${formatSimTime(Date.parse(task.endAt))}. Reassess your progress.`,
+      text: `Activity check-in: your ${task.type} activity was planned to end at ${formatSimTime(Date.parse(task.endAt))}. ${note ? `${note} ` : ""}Reassess your progress.`,
       deadline: { taskId: task.id, endAt: task.endAt },
       timestamp: Date.parse(task.endAt),
     };
@@ -456,8 +514,10 @@ export class Perception {
   }
 
   /**
-   * A persisted run ID is not a lock. Unconfirmed handoffs are quarantined:
-   * without a host receipt we cannot safely infer adoption or replay tools.
+   * A persisted run ID is not a lock. An unconfirmed handoff is reconciled with
+   * the brain transcript: adopted input is done (its turn ran, or was cut off
+   * mid-way; replaying it could repeat tools), and input the brain never got
+   * goes back to waiting. Without a way to tell, it is quarantined.
    */
   async recover(): Promise<void> {
     const entries = (await this.store.entries()).filter(
@@ -467,7 +527,36 @@ export class Perception {
       entries.map(({ key: agentId }) =>
         this.change(
           agentId,
-          (state) => {
+          async (state) => {
+            const adopted = this.deps.adopted;
+            if (state.deliveries?.length && adopted) {
+              for (const delivery of state.deliveries) {
+                let done: boolean;
+                try {
+                  done = await adopted(delivery);
+                } catch (error) {
+                  this.warn(error);
+                  continue;
+                }
+                if (done) {
+                  const keys = new Set(delivery.keys);
+                  state.pending = state.pending.filter(
+                    (item) => !keys.has(stimulusKey(item)),
+                  );
+                  state.processedIds = [
+                    ...(state.processedIds ?? []),
+                    ...delivery.keys,
+                  ].slice(-1_000);
+                }
+                state.deliveries = state.deliveries?.filter(
+                  (item) => item.id !== delivery.id,
+                );
+              }
+              if (!state.deliveries?.length) {
+                delete state.deliveries;
+                state.stopped = false;
+              }
+            }
             if (state.deliveries?.length) {
               // The previous process may have handed this exact input to the
               // host before saving its receipt. Keep it for reconciliation, not
@@ -516,6 +605,14 @@ export class Perception {
     await this.change(agentId, () => {});
   }
 
+  /** The clock runs again: take up whatever waited while it was paused. */
+  async resume(): Promise<void> {
+    const agents = (await this.store.entries())
+      .map(({ key }) => key)
+      .filter((key) => !isDecisionKey(key));
+    await Promise.all(agents.map((agentId) => this.drain(agentId)));
+  }
+
   private batch(items: PendingItem[]): PendingItem[] {
     const selected: PendingItem[] = [];
     let chars = 0;
@@ -545,9 +642,11 @@ export class Perception {
 
   /** Approved attention waits until its delay passes or its activity ends. */
   private isReady(item: PendingItem, task?: ActiveTask): boolean {
+    const now = this.deps.clock.time();
+    // A foreseen stimulus has not happened yet.
+    if (item.timestamp > now) return false;
     const until = item.until;
     if (!until) return true;
-    const now = this.deps.clock.time();
     if (until.notBefore !== undefined && until.notBefore <= now) return true;
     if (until.taskId === undefined) return until.notBefore === undefined;
     return !task || task.id !== until.taskId || Date.parse(task.endAt) <= now;
@@ -562,11 +661,12 @@ export class Perception {
     const existing = this.readinessTimers.get(agentId);
     if (existing) clearTimeout(existing);
     this.readinessTimers.delete(agentId);
-    const times = items.flatMap((item) =>
-      item.until?.notBefore === undefined ? [] : [item.until.notBefore],
-    );
-    if (!times.length || this.lifetime.signal.aborted) return;
     const { simTime, speed } = this.deps.clock.now();
+    const times = items.flatMap((item) => [
+      ...(item.until?.notBefore === undefined ? [] : [item.until.notBefore]),
+      ...(item.timestamp > simTime ? [item.timestamp] : []),
+    ]);
+    if (!times.length || this.lifetime.signal.aborted) return;
     const wait =
       speed > 0
         ? Math.min(
@@ -576,8 +676,8 @@ export class Perception {
         : this.config.readinessPollMs;
     const timer = setTimeout(() => {
       this.readinessTimers.delete(agentId);
-      void runDetachedWebhookWork(() => this.drain(agentId)).catch(
-        (error: unknown) => this.warn(error),
+      void detached(() => this.drain(agentId)).catch((error: unknown) =>
+        this.warn(error),
       );
     }, wait);
     timer.unref();
@@ -590,6 +690,10 @@ export class Perception {
   ): Promise<PerceptionDelivery | undefined> {
     while (!state.stopped) {
       this.assertCurrent();
+      // A paused world is frozen: nothing is judged or handed over until the
+      // clock runs again (`resume`). Live, a paused meeting of four ran a
+      // hundred bubbles at one sim instant.
+      if (this.deps.clock.now().speed <= 0) return undefined;
       const task = await this.taskStore.lookup(agentId);
       const reserved = new Set(
         state.deliveries?.flatMap((delivery) => delivery.keys),
@@ -602,16 +706,61 @@ export class Perception {
         (item) => !reserved.has(stimulusKey(item)),
       );
       const busy = Boolean(state.brainRun || state.deliveries?.length);
-      const fresh = this.batch(available.filter((item) => !item.action));
+      const now = this.deps.clock.time();
+      const happened = this.batch(
+        available.filter((item) => !item.action && item.timestamp <= now),
+      );
+      // A foreseen stimulus is kept only if it still happens now.
+      const unconfirmed = new Set<string>();
+      for (const item of happened) {
+        if (!item.foreseen || !this.deps.confirm) continue;
+        let happened: Stimulus | undefined;
+        try {
+          happened = await this.deps.confirm(agentId, item);
+        } catch (error) {
+          this.warn(error);
+        }
+        // Confirmed once is confirmed: it happened as told, and is now ordinary.
+        if (happened) {
+          item.text = happened.text;
+          delete item.foreseen;
+        } else unconfirmed.add(stimulusKey(item));
+      }
+      if (unconfirmed.size) {
+        state.pending = state.pending.filter(
+          (item) => !unconfirmed.has(stimulusKey(item)),
+        );
+        state.processedIds = [
+          ...(state.processedIds ?? []),
+          ...unconfirmed,
+        ].slice(-1_000);
+        await this.save(agentId, state);
+        continue;
+      }
+      const fresh = happened;
       if (!fresh.length) {
         await this.save(agentId, state);
-        if (busy || !available.length) return;
+        if (busy || !available.length) {
+          // A busy brain drains when it ends; only what has not happened yet
+          // needs a timer meanwhile.
+          this.armReadiness(
+            agentId,
+            available.filter((item) => item.timestamp > now),
+          );
+          return;
+        }
         if (!available.some((item) => this.isReady(item, task))) {
           this.armReadiness(agentId, available);
           return;
         }
-        // Picking up the phone shows everything that was waiting.
-        return this.reserve(agentId, state, this.batch(available), "followup");
+        // Picking up the phone shows everything that was waiting, but not
+        // what has not happened yet.
+        return this.reserve(
+          agentId,
+          state,
+          this.batch(available.filter((item) => item.timestamp <= now)),
+          "followup",
+        );
       }
       const decision: AttentionDecision & DecisionTrace =
         !busy && fresh.every((item) => item.deadline || item.idle)
@@ -757,7 +906,7 @@ export class Perception {
         return evaluate(batch, {
           agentId,
           purpose: `perception.${question}`,
-          rubricVersion: "4",
+          rubricVersion: "5",
           timeoutMs: this.config.decisionTimeoutMs,
           signal,
         });
@@ -774,6 +923,8 @@ export class Perception {
           return { action: "DEFER", delayMs: 0, ...model };
         if (busy && choice === "QUEUE_NEXT")
           return { action: "QUEUE_NEXT", delayMs: 0, ...model };
+        if (busy && choice === "STEER")
+          return { action: "STEER", delayMs: 0, ...model };
         const latency =
           outcome.status === "ok"
             ? outcome.result.answers.response_latency
@@ -920,7 +1071,7 @@ export class Perception {
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
           // from inside the first host's adoption callback.
-          void runDetachedWebhookWork(() => this.drain(delivery.agentId)).catch(
+          void detached(() => this.drain(delivery.agentId)).catch(
             (error: unknown) => this.warn(error),
           );
         },
@@ -945,7 +1096,7 @@ export class Perception {
       };
       // Start outside the state lock, and observe the full dispatch promise even
       // after ingress has returned. Errors after adoption must never replay tools.
-      void runDetachedWebhookWork(async () => {
+      void detached(async () => {
         this.assertCurrent();
         if (!this.deps.deliver)
           throw new Error("Perception requires a brain delivery adapter");

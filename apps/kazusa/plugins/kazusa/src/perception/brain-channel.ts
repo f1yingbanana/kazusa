@@ -1,6 +1,8 @@
+import { noteShutdown } from "../shutdown.ts";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type { PerceptionDeps } from "./perception.ts";
+import { readVisibleSessionTranscriptMessageEntries } from "openclaw/plugin-sdk/session-transcript-runtime";
+import type { PerceptionDelivery, PerceptionDeps } from "./perception.ts";
 
 const CHANNEL_ID = "kazusa";
 
@@ -27,15 +29,89 @@ const BRAIN_CHANNEL: ChannelPlugin<{ accountId: string }> = {
   defaults: { queue: { debounceMs: 0 } },
 };
 
+const brainKey = (agentId: string): string => `agent:${agentId}:brain`;
+
+/** OpenClaw refusing work on a session a restart cut off mid-run. */
+function isRestartTombstone(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "SessionRestartRecoveryTombstoneError" ||
+      error.message.includes("ended during restart recovery"))
+  );
+}
+
+/**
+ * Clears OpenClaw's restart-recovery state on a brain session, as OpenClaw
+ * itself does after a run completes. A restart that cuts off a brain run leaves
+ * it tombstoned: OpenClaw cannot resume a `message_tool_only` run from this
+ * channel, and refuses all later work on the session. Perception owns what
+ * becomes of that input instead (see `adoptedByBrain`).
+ */
+async function clearRestartTombstone(
+  api: OpenClawPluginApi,
+  agentId: string,
+): Promise<void> {
+  await api.runtime.agent.session.patchSessionEntry({
+    agentId,
+    sessionKey: brainKey(agentId),
+    preserveActivity: true,
+    update: (entry) => {
+      // `mainRestartRecovery` holds the tombstone; it is host-internal and
+      // missing from the public SessionEntry type.
+      const recovery = entry as { mainRestartRecovery?: unknown };
+      if (
+        recovery.mainRestartRecovery === undefined &&
+        !entry.abortedLastRun &&
+        entry.restartRecoveryRuns === undefined
+      )
+        return null;
+      return Object.assign(
+        { abortedLastRun: false, restartRecoveryRuns: undefined },
+        { mainRestartRecovery: undefined },
+      );
+    },
+  });
+}
+
+/**
+ * Whether a hand-off reached the brain before a restart: its message is in the
+ * brain transcript. Perception asks on startup instead of quarantining.
+ */
+export function adoptedByBrain(
+  api: OpenClawPluginApi,
+): NonNullable<PerceptionDeps["adopted"]> {
+  return async (delivery: PerceptionDelivery): Promise<boolean> => {
+    const sessionKey = brainKey(delivery.agentId);
+    const sessionId = api.runtime.agent.session
+      .getSessionEntry({ agentId: delivery.agentId, sessionKey })
+      ?.sessionId?.trim();
+    if (!sessionId) return false;
+    const rows = await readVisibleSessionTranscriptMessageEntries({
+      agentId: delivery.agentId,
+      sessionKey,
+      sessionId,
+    });
+    return rows.some(
+      ({ message }) =>
+        message.role === "user" &&
+        JSON.stringify(message.content).includes(
+          JSON.stringify(delivery.message).slice(1, -1),
+        ),
+    );
+  };
+}
+
 export function registerBrainChannel(
   api: OpenClawPluginApi,
   signal: AbortSignal,
 ): NonNullable<PerceptionDeps["deliver"]> {
   api.registerChannel({ plugin: BRAIN_CHANNEL });
 
-  return async (delivery, lifecycle): Promise<void> => {
+  const dispatch = async (
+    ...[delivery, lifecycle]: Parameters<NonNullable<PerceptionDeps["deliver"]>>
+  ): Promise<void> => {
     signal.throwIfAborted();
-    const sessionKey = `agent:${delivery.agentId}:brain`;
+    const sessionKey = brainKey(delivery.agentId);
     await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
       cfg: api.config,
       ctx: {
@@ -89,5 +165,22 @@ export function registerBrainChannel(
         },
       },
     });
+  };
+
+  return async (delivery, lifecycle): Promise<void> => {
+    try {
+      await dispatch(delivery, lifecycle);
+    } catch (error: unknown) {
+      // The Gateway is stopping: let anything frozen on a paused clock go.
+      if (error instanceof Error && error.name === "GatewayDrainingError")
+        noteShutdown("draining");
+      if (!isRestartTombstone(error)) throw error;
+      // Nothing ran: clear the tombstone and hand the same input over again.
+      api.logger.warn(
+        `Brain session of ${delivery.agentId} was tombstoned by a restart; clearing it.`,
+      );
+      await clearRestartTombstone(api, delivery.agentId);
+      await dispatch(delivery, lifecycle);
+    }
   };
 }

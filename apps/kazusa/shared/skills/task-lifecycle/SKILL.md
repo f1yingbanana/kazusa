@@ -25,8 +25,13 @@ activity, whichever is natural; a conversation can also become the activity
 ## 2. Choosing an activity
 
 With `start_task`, pick the category from the tool's allowed types that best
-matches your intention, and put flavor, location, and specifics in
-`description`. When relocating, set `metadata: { destination: "<place-id>" }`.
+matches your intention, put flavor and specifics in `description`, and set
+`where` to the place it happens. Somewhere nearby, you simply walk over as part
+of the activity; the walk comes out of its `duration`, so an activity too short
+to get there is refused, with the usual walking time. For a longer journey, or
+when the getting there matters, start a `traveling` activity to that place
+first, then the activity itself when you arrive. **Where you are** shows how
+long the usual way takes; you decide how you actually go.
 
 ## 3. Orienting without an activity
 
@@ -45,7 +50,7 @@ People plan opportunistically, at transitions, not on a spreadsheet at dawn.
 Look at `## Plans recorded for <date>` in `MEMORY.md`:
 
 - **`[HARD_BLOCK] <start> - <end>`**: fixed anchors (classes, club meetups,
-  promised appointments). If one starts now or shortly, go to it.
+  promised appointments). If one starts soon, set out in time to arrive.
 - **`[SOFT_GOAL]`**: flexible intentions. In open gaps, weigh **How you feel**
   (hungry? tired? bored?) and `## Long-Term Goals`, and pick something that
   serves one.

@@ -5,7 +5,9 @@ import {
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
+import type { AssembledContext } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
+import type { StateStore } from "../state.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleContext,
@@ -16,6 +18,7 @@ import { createSkillLoader } from "./skill-loader.ts";
 import { readPersonalWiki } from "./decision-sources.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
+import { personName } from "../identity.ts";
 
 interface ContextEngineDeps {
   readonly clock: Clock;
@@ -26,22 +29,58 @@ interface ContextEngineDeps {
   ) => Promise<readonly AwaitingReply[]>;
   /** Desires' `How you feel` line; absent until Desires exists. */
   readonly feelings?: (agentId: string, at: number) => Promise<string>;
+  /**
+   * Location's `Where you are` lines; absent for a world without places.
+   * `evidence` is this turn's input, so places it names come to mind.
+   */
+  readonly whereabouts?: (
+    agentId: string,
+    at: number,
+    evidence: string,
+  ) => Promise<string | undefined>;
+  /** Whether someone else is where the character is: face to face. */
+  readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
 }
 
 /**
  * Wire host lifecycle and session I/O; selection and skill expansion stay in
  * the engine.
  */
+/** How many brain turns' contexts are kept per character, for observers. */
+const RECENT_CONTEXTS = 20;
+
+export interface ContextEngineService {
+  /** A character's last brain turns' contexts, newest first. */
+  readonly recentContexts: (agentId: string) => Promise<AssembledContext[]>;
+}
+
 export function registerContextEngine(
   api: OpenClawPluginApi,
   deps: ContextEngineDeps,
-): void {
-  api.registerContextEngine("kazusa", () => createContextEngine(api, deps));
+): ContextEngineService {
+  // What each brain turn was given, which no transcript keeps.
+  const recent = api.runtime.state.openKeyedStore<AssembledContext[]>({
+    namespace: "context",
+    retention: "retained",
+  });
+  api.registerContextEngine("kazusa", () =>
+    createContextEngine(api, deps, recent),
+  );
+  return {
+    recentContexts: async (agentId) => (await recent.lookup(agentId)) ?? [],
+  };
 }
 
 function createContextEngine(
   api: OpenClawPluginApi,
-  { clock, awaitingReplies, feelings }: ContextEngineDeps,
+  {
+    clock,
+    awaitingReplies,
+    feelings,
+    whereabouts,
+    inCompany,
+  }: ContextEngineDeps,
+  recent: StateStore<AssembledContext[]>,
 ): ContextEngine {
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
@@ -119,35 +158,61 @@ function createContextEngine(
           key?.agentId === brainAgentId &&
           (key.rest === "tasks" ||
             key.rest.startsWith("chat:direct:") ||
-            key.rest.startsWith("chat:group:"))
+            key.rest.startsWith("chat:group:") ||
+            key.rest.startsWith("chat:huddle:"))
         );
       });
       const workspaceDir = api.runtime.agent.resolveAgentWorkspaceDir(
         api.config,
         brainAgentId,
       );
-      const [sessionsContext, activeTask, personalWiki, awaiting, feeling] =
-        await Promise.all([
-          readSessionStreams({
-            agentId: brainAgentId,
-            streams,
-            storePath,
-            pluginId: api.id,
-            now,
-            cutoff,
-          }),
-          tasks.lookup(brainAgentId),
-          readPersonalWiki(
-            workspaceDir,
-            [],
-            params.prompt ?? "",
-            config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
+      const [
+        sessionsContext,
+        activeTask,
+        personalWiki,
+        awaiting,
+        feeling,
+        place,
+        company,
+      ] = await Promise.all([
+        readSessionStreams({
+          agentId: brainAgentId,
+          streams,
+          storePath,
+          pluginId: api.id,
+          now,
+          cutoff,
+        }),
+        tasks.lookup(brainAgentId),
+        readPersonalWiki(
+          workspaceDir,
+          [],
+          params.prompt ?? "",
+          config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
+        ),
+        awaitingReplies?.(brainAgentId, cutoff) ?? [],
+        feelings?.(brainAgentId, now),
+        whereabouts?.(brainAgentId, now, params.prompt ?? ""),
+        inCompany?.(brainAgentId, now) ?? false,
+      ]);
+      // Everyone the records speak of, named from their own identity.
+      const speakers = new Set(
+        Object.values(sessionsContext).flatMap((items) =>
+          items.flatMap((item) =>
+            item.sender ? [item.sender.identity.id] : [],
           ),
-          awaitingReplies?.(brainAgentId, cutoff) ?? [],
-          feelings?.(brainAgentId, now),
-        ]);
-      return assembleContext({
+        ),
+      );
+      const names = new Map(
+        await Promise.all(
+          [...speakers].map(
+            async (id) => [id, await personName(api, id)] as const,
+          ),
+        ),
+      );
+      const assembled = await assembleContext({
         run: params,
+        names,
         agentId: brainAgentId,
         workspaceDir,
         sessionsContext,
@@ -155,10 +220,38 @@ function createContextEngine(
         personalWiki,
         awaitingReplies: awaiting,
         feelings: feeling,
+        whereabouts: place,
+        inCompany: company,
         simTime: now,
         config,
         skillLoader,
       });
+      // The situation message is always last (see assembleContext).
+      const last = assembled.messages.at(-1);
+      const situation = last && "content" in last ? last.content : undefined;
+      try {
+        const previous = (await recent.lookup(brainAgentId)) ?? [];
+        await recent.register(
+          brainAgentId,
+          [
+            {
+              simTime: now,
+              situation:
+                typeof situation === "string"
+                  ? situation
+                  : JSON.stringify(situation),
+              inPerson: company,
+              estimatedTokens: assembled.estimatedTokens,
+            },
+            ...previous,
+          ].slice(0, RECENT_CONTEXTS),
+        );
+      } catch (error: unknown) {
+        api.logger.warn(
+          `Context engine: could not record context: ${String(error)}`,
+        );
+      }
+      return assembled;
     },
   };
 }

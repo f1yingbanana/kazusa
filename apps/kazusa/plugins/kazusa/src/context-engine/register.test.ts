@@ -38,6 +38,7 @@ async function setup(
   workspace = "/test/workspace",
 ) {
   const lookupTask = vi.fn(async () => activeTask);
+  const contexts = new Map<string, unknown>();
   const register = vi.fn<OpenClawPluginApi["registerContextEngine"]>();
   const on = vi.fn();
   const readHistory = vi.mocked(readSessionTranscriptCatalogPage);
@@ -70,7 +71,17 @@ async function setup(
     registerContextEngine: register,
     on,
     runtime: {
-      state: { openKeyedStore: () => ({ lookup: lookupTask }) },
+      state: {
+        openKeyedStore: ({ namespace }: { namespace: string }) =>
+          namespace === "context"
+            ? {
+                lookup: async (key: string) => contexts.get(key),
+                register: async (key: string, value: unknown) => {
+                  contexts.set(key, value);
+                },
+              }
+            : { lookup: lookupTask },
+      },
       agent: {
         resolveAgentWorkspaceDir: () => workspace,
         session: {
@@ -94,9 +105,17 @@ async function setup(
     defaultSpeed: 0,
     store: { lookup: async () => undefined, register: async () => {} },
   });
-  registerContextEngine(api, { clock });
+  const service = registerContextEngine(api, { clock });
   const engine = await register.mock.calls[0][1]({});
-  return { engine, register, readHistory, assertCurrent, on, lookupTask };
+  return {
+    engine,
+    service,
+    register,
+    readHistory,
+    assertCurrent,
+    on,
+    lookupTask,
+  };
 }
 
 describe("Native context-engine registration", () => {
@@ -168,7 +187,7 @@ describe("Native context-engine registration", () => {
   });
 
   it("registers a replay-safe engine and reads only the current character's ledgers", async () => {
-    const { engine, register, readHistory } = await setup();
+    const { engine, service, register, readHistory } = await setup();
     expect(register.mock.calls[0][0]).toBe("kazusa");
     expect(engine.info.transcriptSemantics?.currentTurnFence).toBe(
       "before-current-turn-entry-v1",
@@ -198,6 +217,10 @@ describe("Native context-engine registration", () => {
     });
     expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
     expect(result.systemPromptAddition).toContain("memory_search");
+    // The situation the model saw is kept for observers.
+    const [recorded] = await service.recentContexts("alice");
+    expect(recorded?.situation).toContain("Current simulation time");
+    expect(recorded?.inPerson).toBe(false);
     expect(result.systemPromptAddition).not.toContain("user-invocable");
   });
 
@@ -367,7 +390,7 @@ describe("Native context-engine registration", () => {
     });
     expect(
       JSON.stringify(result.messages).match(
-        /\[carol Fri 2026-10-23 08:00\] \[speaker:alice\] Hello/g,
+        /\[`carol` Fri 2026-10-23 08:00\] \[speaker:alice\] Hello/g,
       ),
     ).toHaveLength(2);
   });

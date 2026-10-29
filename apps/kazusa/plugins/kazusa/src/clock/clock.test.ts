@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { Clock, type ClockCell } from "./clock.ts";
+import { describe, expect, it, vi } from "vitest";
+import { Clock, sleepSim, untilRunning, type ClockCell } from "./clock.ts";
 import type { ClockPersistedRecord, ClockStore } from "./types.ts";
 
 function createInMemoryStore(): ClockStore {
@@ -103,5 +103,40 @@ describe("Clock", () => {
     expect(speeds).toEqual([0]);
     await running.persist();
     expect((await store.lookup("primary"))?.speed).toBe(0);
+  });
+});
+
+describe("waiting on a paused world", () => {
+  const paused = (speed = 0) => {
+    const state = { speed };
+    return {
+      state,
+      clock: { now: () => ({ simTime: 0, speed: state.speed, formatted: "" }) },
+    };
+  };
+
+  it("holds a sim sleep while paused; a release lets go of it", async () => {
+    const { clock } = paused();
+    const release = new AbortController();
+    let done: boolean | undefined;
+    void sleepSim(clock, 1_000, new AbortController().signal, {
+      release: release.signal,
+      pollMs: 5,
+    }).then((value) => (done = value));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(done).toBeUndefined();
+    release.abort();
+    await vi.waitFor(() => expect(done).toBe(false));
+  });
+
+  it("waits for the clock to run, or for a release", async () => {
+    const { clock, state } = paused();
+    let ran = false;
+    void untilRunning(clock, undefined, 5).then(() => (ran = true));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(ran).toBe(false);
+    state.speed = 1;
+    await vi.waitFor(() => expect(ran).toBe(true));
+    await untilRunning(paused().clock, AbortSignal.abort());
   });
 });

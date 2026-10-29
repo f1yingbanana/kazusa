@@ -14,6 +14,7 @@ import {
   levelsAt,
   startEffects,
   stateOf,
+  isUnchanged,
   targetOf,
   transitions,
   type DesireRecord,
@@ -90,30 +91,36 @@ export function registerDesires(
     required: ["afterwards"],
     // A delay restates how the rest of the activity will feel, so both tools
     // replace the effects from now until the lease's end.
-    async beforeCommit({ agentId, at, task, params }): Promise<void> {
-      const anchored = anchorAt(config, await store.lookup(agentId), at);
-      const lease = { id: task.id, until: Date.parse(task.endAt) };
+    async prepare({ agentId, at, params }) {
       const effects = schemas.effects.safeParse(params.afterwards);
       if (!effects.success) {
         throw new Error(
           `invalid afterwards: ${z.prettifyError(effects.error)}`,
         );
       }
-      await write(
-        agentId,
-        startEffects(
-          config,
-          anchored,
-          lease,
-          // Only the afterwards state counts; the stated current state is the
-          // model's own reasoning aid and may be stale.
-          Object.fromEntries(
-            Object.entries(effects.data).flatMap(([name, value]) =>
-              value === undefined ? [] : [[name, targetOf(value)]],
-            ),
-          ),
+      // Only the afterwards state counts; the stated current state is the
+      // model's own reasoning aid and may be stale.
+      const targets = Object.fromEntries(
+        Object.entries(effects.data).flatMap(([name, value]) =>
+          value === undefined || isUnchanged(value)
+            ? []
+            : [[name, targetOf(value)]],
         ),
       );
+      const anchored = anchorAt(config, await store.lookup(agentId), at);
+      return {
+        // Against the lease as written, which may end earlier than asked.
+        commit: (task) =>
+          write(
+            agentId,
+            startEffects(
+              config,
+              anchored,
+              { id: task.id, until: Date.parse(task.endAt) },
+              targets,
+            ),
+          ),
+      };
     },
   };
 

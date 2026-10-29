@@ -21,8 +21,10 @@ or require starting the same task again. Decide as this person would, mid-task:
   activity with `delay_task({ additionalDuration, reason })`, in simulated
   minutes.
 - **Change plans.** If priorities change, call
-  `start_task({ type, description, duration, summary })`. The summary states
-  real progress or abandonment; switching is not finishing.
+  `start_task({ type, description, duration, summary, where })`. The summary
+  states real progress or abandonment; switching is not finishing. If you stop
+  partway through a trip, you are where **Where you are** says you are passing;
+  carry on from there.
 
 If you were cut off mid-message, the `send_message` result shows what you said
 and what stayed unsaid; react to the interruption first. If more messages arrive
