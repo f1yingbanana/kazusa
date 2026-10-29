@@ -785,7 +785,10 @@ connect these modules in process.
   selects the `in-person` skill. Noted for optimization: busy places mean many
   `notice` judgments, uncapped for now. Overhearing is a later feature.
 - **RPC** operator `location.place`; **read models** `GET /kazusa/places`,
-  `GET /kazusa/locations`.
+  `GET /kazusa/locations`; **SSE** `location` on every record write (place,
+  trip start, arrival, `noticed` change) and `journal` for each confirmed
+  sighting (`location.noticed`; the timeline reads it back from the observer's
+  `:tasks` ledger metadata like any task row).
 - **Known gap**: a lease started before Location existed has no `where`, so its
   holder is treated as at `home` until their next `start_task`.
 
