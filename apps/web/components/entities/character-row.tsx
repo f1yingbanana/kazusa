@@ -9,33 +9,52 @@ import { toggleWatch } from '@/lib/state/watchlist'
 import { formatSimDuration } from '@/lib/time/sim'
 import { cn } from '@/lib/utils'
 import { PresenceAvatar } from './presence-avatar'
+import { Badge } from '@/components/ui/badge'
 import { taskIcon } from './task-icon'
 
-const KIND_LABEL = { agent: 'Simulated', npc: 'NPC', player: 'Player' } as const
+const KIND_LABEL = {
+  agent: 'Simulated',
+  npc: 'NPC',
+  player: 'Player',
+} as const
 
-/** ≈44px character row, used by the World folder list, World search, and anywhere else a roster is shown. */
+/**
+ * ≈44px character row, used by the World folder list, World search, and
+ * anywhere else a roster is shown.
+ */
 export const CharacterRow = memo(function CharacterRow({
   character,
   selected,
   starred,
   onSelect,
   className,
+  trailing,
 }: {
   character: CharacterSummary
   selected: boolean
   starred: boolean
   onSelect: (id: string) => void
   className?: string
+  /** Replaces the remaining-time readout (e.g. an arrival time). */
+  trailing?: string
 }) {
-  const status = useCharacterStatus(character.kind === 'agent' ? character.id : undefined)
+  const status = useCharacterStatus(
+    character.kind === 'agent' ? character.id : undefined,
+  )
   const now = useSimNow()
-  const task = status?.task
+  const offstage = status?.onstage === false
+  const task = offstage ? undefined : status?.task
   const TaskIcon = taskIcon(task?.type)
-  const activity = task
-    ? task.description
-    : character.kind === 'agent'
-      ? (character.occupation ?? 'No current task')
-      : (character.occupation ?? KIND_LABEL[character.kind])
+  const waiting = status?.queued ?? 0
+  const activity = offstage
+    ? waiting > 0
+      ? `Offstage · ${waiting} waiting`
+      : 'Offstage'
+    : task
+      ? task.description
+      : character.kind === 'agent'
+        ? (character.occupation ?? 'No current task')
+        : (character.occupation ?? KIND_LABEL[character.kind])
 
   return (
     <div
@@ -59,13 +78,33 @@ export const CharacterRow = memo(function CharacterRow({
           size="sm"
         />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm leading-tight font-medium">{character.name}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={cn(
+                'truncate text-sm leading-tight font-medium',
+                offstage && 'text-muted-foreground',
+              )}
+            >
+              {character.name}
+            </span>
+            {character.isSystemAgent ? (
+              <Badge variant="secondary" className="h-4 px-1 text-[9px]">
+                ADMIN
+              </Badge>
+            ) : null}
+          </span>
           <span className="flex min-w-0 items-center gap-1 text-xs leading-tight text-muted-foreground">
-            {task ? <TaskIcon aria-label={task.type} className="size-3 shrink-0" /> : null}
+            {task ? (
+              <TaskIcon aria-label={task.type} className="size-3 shrink-0" />
+            ) : null}
             <span className="truncate">{activity}</span>
           </span>
         </span>
-        {task && now > 0 ? (
+        {trailing !== undefined ? (
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
+            {trailing}
+          </span>
+        ) : task && now > 0 ? (
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
             {task.endAt > now ? formatSimDuration(task.endAt - now) : 'due'}
           </span>
@@ -77,11 +116,16 @@ export const CharacterRow = memo(function CharacterRow({
         aria-pressed={starred}
         className={cn(
           'flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring',
-          !starred && 'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
+          !starred &&
+            'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
         )}
       >
-        <StarIcon className={cn('size-3.5', starred && 'fill-current text-foreground')} />
-        <span className="sr-only">{starred ? `Unstar ${character.name}` : `Star ${character.name}`}</span>
+        <StarIcon
+          className={cn('size-3.5', starred && 'fill-current text-foreground')}
+        />
+        <span className="sr-only">
+          {starred ? `Unstar ${character.name}` : `Star ${character.name}`}
+        </span>
       </button>
     </div>
   )

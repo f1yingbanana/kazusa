@@ -40,6 +40,7 @@ requirement; the proxy is not a login system.
 | Route | Contract |
 | --- | --- |
 | `GET /kazusa/agents` | Roster IDs, display names and optional avatars. |
+| `GET /kazusa/avatar` | `id` (roster agent) and cache-busting `v`; streams `<workspace>/avatar.<ext>` with an immutable cache header. Characters and roster entries point here when `IDENTITY.md` sets no `avatarUrl`. |
 | `GET /kazusa/chats` | Configured human and conversations with canonical `id`, viewer `sessionKey`, `type`, `name`, members and latest preview. |
 | `GET /kazusa/messages` | `chatId`, optional sequence `before`, optional `limit`; returns `messages`, `nextCursor`, `hasMore`. |
 | `POST /kazusa/send` | Stable automatic `requestId`, text and either `sessionKey` or new-chat members/title; returns canonical message and delivery status. |

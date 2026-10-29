@@ -1,20 +1,5 @@
 {
   "agents": {
-    "ownership": "explicit",
-    "entries": {
-      "kazusa": {
-        "workspace": "./workspaces/kazusa"
-      },
-      "kurimura-airi": {
-        "workspace": "./workspaces/kurimura-airi"
-      },
-      "yoshimi": {
-        "workspace": "./workspaces/yoshimi"
-      },
-      "yutori-natsu": {
-        "workspace": "./workspaces/yutori-natsu"
-      }
-    },
     "defaults": {
       "workspace": "./workspaces",
       "userTimezone": "UTC",
@@ -24,27 +9,507 @@
       "models": {
         "zai/glm-5.3-flash": {
           "alias": "GLM"
-        }
+        },
+        "venice/zai-org-glm-4.7": {}
       },
       "model": {
-        "primary": "zai/glm-5.3-flash"
+        "primary": "venice/qwen3-235b-a22b-thinking-2507"
       },
-      "decisionModel": "typesafe/jev-latest"
+      "decisionModel": "typesafe/jev-latest",
+      "systemAgent": {
+        "agentId": "arona"
+      },
+      "heartbeat": {
+        "every": "0m"
+      }
+    },
+    "ownership": "explicit",
+    "entries": {
+      "anna-niki": {
+        "workspace": "./workspaces/anna-niki"
+      },
+      "erina-niki": {
+        "workspace": "./workspaces/erina-niki"
+      },
+      "kokoro-toumi": {
+        "workspace": "./workspaces/kokoro-toumi"
+      },
+      "kotone-fuchigami": {
+        "workspace": "./workspaces/kotone-fuchigami"
+      },
+      "kei-tendou": {
+        "workspace": "./workspaces/kei-tendou"
+      },
+      "niko-yoshino": {
+        "workspace": "./workspaces/niko-yoshino"
+      },
+      "kurumi-takakura": {
+        "workspace": "./workspaces/kurumi-takakura"
+      },
+      "otogi-tenjinyama": {
+        "workspace": "./workspaces/otogi-tenjinyama"
+      },
+      "takane-miyoshi": {
+        "workspace": "./workspaces/takane-miyoshi"
+      },
+      "yakumo-aramaki": {
+        "workspace": "./workspaces/yakumo-aramaki"
+      },
+      "subaru-kakehashi": {
+        "workspace": "./workspaces/subaru-kakehashi"
+      },
+      "hikari-tachibana": {
+        "workspace": "./workspaces/hikari-tachibana"
+      },
+      "nozomi-tachibana": {
+        "workspace": "./workspaces/nozomi-tachibana"
+      },
+      "aoba-utsumi": {
+        "workspace": "./workspaces/aoba-utsumi"
+      },
+      "sena-himuro": {
+        "workspace": "./workspaces/sena-himuro"
+      },
+      "megu-shimokura": {
+        "workspace": "./workspaces/megu-shimokura"
+      },
+      "kasumi-kinugawa": {
+        "workspace": "./workspaces/kasumi-kinugawa"
+      },
+      "kirara-yozakura": {
+        "workspace": "./workspaces/kirara-yozakura"
+      },
+      "chiaki-motomiya": {
+        "workspace": "./workspaces/chiaki-motomiya"
+      },
+      "satsuki-kyougoku": {
+        "workspace": "./workspaces/satsuki-kyougoku"
+      },
+      "erika-hatami": {
+        "workspace": "./workspaces/erika-hatami"
+      },
+      "kirino-nakatsukasa": {
+        "workspace": "./workspaces/kirino-nakatsukasa"
+      },
+      "fubuki-nemugaki": {
+        "workspace": "./workspaces/fubuki-nemugaki"
+      },
+      "kanna-ogata": {
+        "workspace": "./workspaces/kanna-ogata"
+      },
+      "konoka-shima": {
+        "workspace": "./workspaces/konoka-shima"
+      },
+      "rabu-komakaze": {
+        "workspace": "./workspaces/rabu-komakaze"
+      },
+      "suzumi-morizuki": {
+        "workspace": "./workspaces/suzumi-morizuki"
+      },
+      "shimiko-endou": {
+        "workspace": "./workspaces/shimiko-endou"
+      },
+      "ui-kozeki": {
+        "workspace": "./workspaces/ui-kozeki"
+      },
+      "reisa-uzawa": {
+        "workspace": "./workspaces/reisa-uzawa"
+      },
+      "eimi-izumimoto": {
+        "workspace": "./workspaces/eimi-izumimoto"
+      },
+      "sumire-otohana": {
+        "workspace": "./workspaces/sumire-otohana"
+      },
+      "kotori-toyomi": {
+        "workspace": "./workspaces/kotori-toyomi"
+      },
+      "hibiki-nekozuka": {
+        "workspace": "./workspaces/hibiki-nekozuka"
+      },
+      "utaha-shiraishi": {
+        "workspace": "./workspaces/utaha-shiraishi"
+      },
+      "rei-nomasa": {
+        "workspace": "./workspaces/rei-nomasa"
+      },
+      "kaho-kuwakami": {
+        "workspace": "./workspaces/kaho-kuwakami"
+      },
+      "yukari-kadenokouji": {
+        "workspace": "./workspaces/yukari-kadenokouji"
+      },
+      "renge-fuwa": {
+        "workspace": "./workspaces/renge-fuwa"
+      },
+      "kikyou-kiryuu": {
+        "workspace": "./workspaces/kikyou-kiryuu"
+      },
+      "umika-satohama": {
+        "workspace": "./workspaces/umika-satohama"
+      },
+      "nagusa-goryou": {
+        "workspace": "./workspaces/nagusa-goryou"
+      },
+      "niya-amachi": {
+        "workspace": "./workspaces/niya-amachi"
+      },
+      "wakamo-kosaka": {
+        "workspace": "./workspaces/wakamo-kosaka"
+      },
+      "chise-waraku": {
+        "workspace": "./workspaces/chise-waraku"
+      },
+      "tsubaki-kasuga": {
+        "workspace": "./workspaces/tsubaki-kasuga"
+      },
+      "pina-asahina": {
+        "workspace": "./workspaces/pina-asahina"
+      },
+      "izuna-kuda": {
+        "workspace": "./workspaces/izuna-kuda"
+      },
+      "shizuko-kawawa": {
+        "workspace": "./workspaces/shizuko-kawawa"
+      },
+      "mimori-mizuha": {
+        "workspace": "./workspaces/mimori-mizuha"
+      },
+      "kaede-isami": {
+        "workspace": "./workspaces/kaede-isami"
+      },
+      "michiru-chidori": {
+        "workspace": "./workspaces/michiru-chidori"
+      },
+      "tsukuyo-oono": {
+        "workspace": "./workspaces/tsukuyo-oono"
+      },
+      "shun-sunohara": {
+        "workspace": "./workspaces/shun-sunohara"
+      },
+      "kokona-sunohara": {
+        "workspace": "./workspaces/kokona-sunohara"
+      },
+      "saya-yakushi": {
+        "workspace": "./workspaces/saya-yakushi"
+      },
+      "rumi-akeshiro": {
+        "workspace": "./workspaces/rumi-akeshiro"
+      },
+      "mina-konoe": {
+        "workspace": "./workspaces/mina-konoe"
+      },
+      "reijo-kayama": {
+        "workspace": "./workspaces/reijo-kayama"
+      },
+      "kisaki-ryuuge": {
+        "workspace": "./workspaces/kisaki-ryuuge"
+      },
+      "eri-shirao": {
+        "workspace": "./workspaces/eri-shirao"
+      },
+      "kanoe-itagaki": {
+        "workspace": "./workspaces/kanoe-itagaki"
+      },
+      "miyo-sakurai": {
+        "workspace": "./workspaces/miyo-sakurai"
+      },
+      "fuyu-wakasa": {
+        "workspace": "./workspaces/fuyu-wakasa"
+      },
+      "ritsu-usuba": {
+        "workspace": "./workspaces/ritsu-usuba"
+      },
+      "rena-kinui": {
+        "workspace": "./workspaces/rena-kinui"
+      },
+      "tsumugi-shiina": {
+        "workspace": "./workspaces/tsumugi-shiina"
+      },
+      "cherino-renkawa": {
+        "workspace": "./workspaces/cherino-renkawa"
+      },
+      "tomoe-sashiro": {
+        "workspace": "./workspaces/tomoe-sashiro"
+      },
+      "marina-ikekura": {
+        "workspace": "./workspaces/marina-ikekura"
+      },
+      "nodoka-amami": {
+        "workspace": "./workspaces/nodoka-amami"
+      },
+      "shigure-mayoi": {
+        "workspace": "./workspaces/shigure-mayoi"
+      },
+      "minori-yasumori": {
+        "workspace": "./workspaces/minori-yasumori"
+      },
+      "meru-himeki": {
+        "workspace": "./workspaces/meru-himeki"
+      },
+      "momiji-akiizumi": {
+        "workspace": "./workspaces/momiji-akiizumi"
+      },
+      "tsurugi-kenzaki": {
+        "workspace": "./workspaces/tsurugi-kenzaki"
+      },
+      "hasumi-hanekawa": {
+        "workspace": "./workspaces/hasumi-hanekawa"
+      },
+      "mashiro-shizuyama": {
+        "workspace": "./workspaces/mashiro-shizuyama"
+      },
+      "ichika-nakamasa": {
+        "workspace": "./workspaces/ichika-nakamasa"
+      },
+      "sakurako-utazumi": {
+        "workspace": "./workspaces/sakurako-utazumi"
+      },
+      "mari-iochi": {
+        "workspace": "./workspaces/mari-iochi"
+      },
+      "hinata-wakaba": {
+        "workspace": "./workspaces/hinata-wakaba"
+      },
+      "mine-aomori": {
+        "workspace": "./workspaces/mine-aomori"
+      },
+      "hanae-asagao": {
+        "workspace": "./workspaces/hanae-asagao"
+      },
+      "serina-sumi": {
+        "workspace": "./workspaces/serina-sumi"
+      },
+      "fuuka-aikiyo": {
+        "workspace": "./workspaces/fuuka-aikiyo"
+      },
+      "juri-ushimaki": {
+        "workspace": "./workspaces/juri-ushimaki"
+      },
+      "makoto-hanuma": {
+        "workspace": "./workspaces/makoto-hanuma"
+      },
+      "iroha-natsume": {
+        "workspace": "./workspaces/iroha-natsume"
+      },
+      "ibuki-tanga": {
+        "workspace": "./workspaces/ibuki-tanga"
+      },
+      "haruna-kurodate": {
+        "workspace": "./workspaces/haruna-kurodate"
+      },
+      "junko-akashi": {
+        "workspace": "./workspaces/junko-akashi"
+      },
+      "izumi-shishidou": {
+        "workspace": "./workspaces/izumi-shishidou"
+      },
+      "akari-wanibuchi": {
+        "workspace": "./workspaces/akari-wanibuchi"
+      },
+      "maki-konuri": {
+        "workspace": "./workspaces/maki-konuri"
+      },
+      "hare-omagari": {
+        "workspace": "./workspaces/hare-omagari"
+      },
+      "kotama-otose": {
+        "workspace": "./workspaces/kotama-otose"
+      },
+      "koyuki-kurosaki": {
+        "workspace": "./workspaces/koyuki-kurosaki"
+      },
+      "yuuka-hayase": {
+        "workspace": "./workspaces/yuuka-hayase"
+      },
+      "noa-ushio": {
+        "workspace": "./workspaces/noa-ushio"
+      },
+      "rio-tsukatsuki": {
+        "workspace": "./workspaces/rio-tsukatsuki"
+      },
+      "himari-akeboshi": {
+        "workspace": "./workspaces/himari-akeboshi"
+      },
+      "chihiro-kagami": {
+        "workspace": "./workspaces/chihiro-kagami"
+      },
+      "neru-mikamo": {
+        "workspace": "./workspaces/neru-mikamo"
+      },
+      "asuna-ichinose": {
+        "workspace": "./workspaces/asuna-ichinose"
+      },
+      "karin-kakudate": {
+        "workspace": "./workspaces/karin-kakudate"
+      },
+      "akane-murokasa": {
+        "workspace": "./workspaces/akane-murokasa"
+      },
+      "toki-asuma": {
+        "workspace": "./workspaces/toki-asuma"
+      },
+      "saori-joumae": {
+        "workspace": "./workspaces/saori-joumae"
+      },
+      "atsuko-hakari": {
+        "workspace": "./workspaces/atsuko-hakari"
+      },
+      "misaki-imashino": {
+        "workspace": "./workspaces/misaki-imashino"
+      },
+      "hiyori-tsuchinaga": {
+        "workspace": "./workspaces/hiyori-tsuchinaga"
+      },
+      "hina-sorasaki": {
+        "workspace": "./workspaces/hina-sorasaki"
+      },
+      "ako-amau": {
+        "workspace": "./workspaces/ako-amau"
+      },
+      "iori-shiromi": {
+        "workspace": "./workspaces/iori-shiromi"
+      },
+      "chinatsu-hinomiya": {
+        "workspace": "./workspaces/chinatsu-hinomiya"
+      },
+      "nagisa-kirifuji": {
+        "workspace": "./workspaces/nagisa-kirifuji"
+      },
+      "mika-misono": {
+        "workspace": "./workspaces/mika-misono"
+      },
+      "seia-yurizono": {
+        "workspace": "./workspaces/seia-yurizono"
+      },
+      "miyako-tsukiyuki": {
+        "workspace": "./workspaces/miyako-tsukiyuki"
+      },
+      "saki-sorai": {
+        "workspace": "./workspaces/saki-sorai"
+      },
+      "moe-kazekura": {
+        "workspace": "./workspaces/moe-kazekura"
+      },
+      "miyu-kasumizawa": {
+        "workspace": "./workspaces/miyu-kasumizawa"
+      },
+      "aris-tendou": {
+        "workspace": "./workspaces/aris-tendou"
+      },
+      "yuzu-hanaoka": {
+        "workspace": "./workspaces/yuzu-hanaoka"
+      },
+      "momoi-saiba": {
+        "workspace": "./workspaces/momoi-saiba"
+      },
+      "midori-saiba": {
+        "workspace": "./workspaces/midori-saiba"
+      },
+      "aru-rikuhachima": {
+        "workspace": "./workspaces/aru-rikuhachima"
+      },
+      "mutsuki-asagi": {
+        "workspace": "./workspaces/mutsuki-asagi"
+      },
+      "kayoko-onikata": {
+        "workspace": "./workspaces/kayoko-onikata"
+      },
+      "haruka-igusa": {
+        "workspace": "./workspaces/haruka-igusa"
+      },
+      "hoshino-takanashi": {
+        "workspace": "./workspaces/hoshino-takanashi"
+      },
+      "shiroko-sunaookami": {
+        "workspace": "./workspaces/shiroko-sunaookami"
+      },
+      "serika-kuromi": {
+        "workspace": "./workspaces/serika-kuromi"
+      },
+      "nonomi-izayoi": {
+        "workspace": "./workspaces/nonomi-izayoi"
+      },
+      "ayane-okusora": {
+        "workspace": "./workspaces/ayane-okusora"
+      },
+      "hifumi-ajitani": {
+        "workspace": "./workspaces/hifumi-ajitani"
+      },
+      "azusa-shirasu": {
+        "workspace": "./workspaces/azusa-shirasu"
+      },
+      "hanako-urawa": {
+        "workspace": "./workspaces/hanako-urawa"
+      },
+      "koharu-shimoe": {
+        "workspace": "./workspaces/koharu-shimoe"
+      },
+      "kazusa-kyouyama": {
+        "workspace": "./workspaces/kazusa-kyouyama"
+      },
+      "airi-kurimura": {
+        "workspace": "./workspaces/airi-kurimura"
+      },
+      "yoshimi-ibaragi": {
+        "workspace": "./workspaces/yoshimi-ibaragi"
+      },
+      "natsu-yutori": {
+        "workspace": "./workspaces/natsu-yutori"
+      },
+      "arona": {
+        "workspace": "./workspaces/arona",
+        "identity": {
+          "name": "ARONA"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": [
+            "start_task",
+            "delay_task",
+            "send_message",
+            "list_chats",
+            "manage_chat",
+            "memory_search",
+            "memory_get",
+            "read",
+            "edit",
+            "write",
+            "view_image",
+            "web_search",
+            "web_fetch",
+            "clock_now",
+            "clock_set_speed",
+            "clock_advance",
+            "apply_patch"
+          ],
+          "deny": ["exec", "process", "code_execution", "openclaw"],
+          "exec": {
+            "security": "deny",
+            "applyPatch": {
+              "enabled": true,
+              "workspaceOnly": true
+            }
+          },
+          "fs": {
+            "workspaceOnly": true
+          },
+          "elevated": {
+            "enabled": false
+          }
+        },
+        "skills": ["kazusa", "openclaw", "typescript"],
+        "cwd": "~/Documents/GitHub/kazusa/apps/kazusa"
+      }
     }
   },
   "plugins": {
-    "allow": [
-      "kazusa",
-      "zai",
-      "typesafe"
-    ],
+    "allow": ["kazusa", "zai", "typesafe", "venice", "openrouter", "parallel"],
     "slots": {
       "contextEngine": "kazusa"
     },
     "load": {
-      "paths": [
-        "./plugins/kazusa"
-      ]
+      "paths": ["./plugins/kazusa"]
     },
     "entries": {
       "kazusa": {
@@ -106,6 +571,15 @@
             "id": "TYPESAFE_API_KEY"
           }
         }
+      },
+      "venice": {
+        "enabled": true
+      },
+      "openrouter": {
+        "enabled": true
+      },
+      "parallel": {
+        "enabled": true
       }
     }
   },
@@ -124,21 +598,25 @@
     },
     "port": 18789,
     "bind": "loopback",
-    "trustedProxies": [
-      "127.0.0.1",
-      "::1"
-    ],
+    "trustedProxies": ["127.0.0.1", "::1"],
     "controlUi": {
-      "allowedOrigins": [
-        "*"
-      ]
+      "allowedOrigins": ["*"]
     },
     "tailscale": {
       "mode": "off"
     }
   },
   "tools": {
-    "allow": [
+    "deny": ["group:sessions", "message", "gateway"],
+    "toolSearch": false,
+    "codeMode": {
+      "enabled": false
+    },
+    "sessions": {
+      "visibility": "agent"
+    },
+    "profile": "minimal",
+    "alsoAllow": [
       "start_task",
       "delay_task",
       "send_message",
@@ -151,17 +629,19 @@
       "write",
       "view_image"
     ],
-    "deny": [
-      "group:sessions",
-      "message",
-      "apply_patch"
-    ],
-    "toolSearch": false,
-    "codeMode": {
-      "enabled": false
+    "fs": {
+      "workspaceOnly": true
     },
-    "sessions": {
-      "visibility": "agent"
+    "exec": {
+      "applyPatch": {
+        "enabled": false
+      }
+    },
+    "web": {
+      "search": {
+        "enabled": true,
+        "provider": "parallel-free"
+      }
     }
   },
   "messages": {
@@ -184,20 +664,20 @@
       "experimental": {
         "sessionMemory": true
       },
-      "sources": [
-        "memory",
-        "sessions"
-      ]
+      "sources": ["memory", "sessions"]
     }
   },
   "skills": {
     "load": {
-      "extraDirs": [
-        "./shared/skills"
-      ]
+      "extraDirs": ["./shared/skills", "../../.agents/skills"]
     },
     "install": {
       "nodeManager": "npm"
+    },
+    "workshop": {
+      "autonomous": {
+        "mode": "off"
+      }
     }
   },
   "auth": {
@@ -220,6 +700,13 @@
             "name": "GLM-4.7-flashx"
           }
         ]
+      },
+      "venice": {
+        "apiKey": {
+          "source": "store",
+          "provider": "default",
+          "id": "VENICE_API_KEY"
+        }
       }
     }
   },

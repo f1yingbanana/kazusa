@@ -3,6 +3,7 @@
 import {
   BrainIcon,
   ClockIcon,
+  EyeIcon,
   MessageSquareTextIcon,
   PencilLineIcon,
   PlayIcon,
@@ -11,7 +12,11 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import type { JournalEvent, JournalKind } from "@kazusa/client";
-import { CharacterChip, ChatChip } from "@/components/entities/chips";
+import {
+  CharacterChip,
+  ChatChip,
+  PlaceChip,
+} from "@/components/entities/chips";
 import { taskLabel } from "@/components/entities/task-icon";
 import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
 import type { TimelineKind } from "./types";
@@ -33,6 +38,14 @@ export const TIMELINE_KINDS: KindMap = {
           {" · "}
           {formatSimDuration(event.payload.duration * MINUTE)}
         </span>
+        {event.payload.where ? (
+          <>
+            <span className="text-muted-foreground">
+              {event.payload.from ? " · heading to " : " · at "}
+            </span>
+            <PlaceChip id={event.payload.where} />
+          </>
+        ) : null}
       </>
     ),
     thought: (event) =>
@@ -99,13 +112,25 @@ export const TIMELINE_KINDS: KindMap = {
     facet: "chat",
     salience: "normal",
     actors: (event) => event.actors.slice(0, 1),
-    fact: (event) => (
-      <>
-        Created {event.payload.type === "group" ? "group" : "chat"}{" "}
-        <span className="font-medium">{event.payload.title}</span>
-        <span className="font-mono text-xs text-muted-foreground">{` · ${event.payload.members.length} members`}</span>
-      </>
-    ),
+    fact: (event) =>
+      event.payload.type === "huddle" ? (
+        // Untitled: face to face, the people are the conversation.
+        <>
+          Started talking with{" "}
+          {event.payload.members
+            .filter((id) => id !== event.actors[0])
+            .slice(0, 3)
+            .map((id) => (
+              <CharacterChip key={id} id={id} />
+            ))}
+        </>
+      ) : (
+        <>
+          Created {event.payload.type === "group" ? "group" : "chat"}{" "}
+          <span className="font-medium">{event.payload.title}</span>
+          <span className="font-mono text-xs text-muted-foreground">{` · ${event.payload.members.length} members`}</span>
+        </>
+      ),
     target: (event) =>
       event.chatId ? { kind: "chat", id: event.chatId } : undefined,
   },
@@ -217,7 +242,54 @@ export const TIMELINE_KINDS: KindMap = {
     },
     target: (event) => ({ kind: "character", id: event.actors[0] }),
   },
+  "location.noticed": {
+    kind: "location.noticed",
+    label: "Noticed",
+    icon: EyeIcon,
+    facet: "social",
+    salience: "normal",
+    fact: (event) => {
+      const { subjects, placeId, moment, between, word } = event.payload;
+      return (
+        <>
+          <span className="text-muted-foreground">{NOTICED_LEAD[moment]} </span>
+          {subjects.slice(0, 3).map((id) => (
+            <CharacterChip key={id} id={id} />
+          ))}
+          {subjects.length > 3 ? (
+            <span className="font-mono text-xs text-muted-foreground">{` +${subjects.length - 3}`}</span>
+          ) : null}
+          <span className="text-muted-foreground">
+            {NOTICED_WHERE[moment]}{" "}
+          </span>
+          <PlaceChip id={placeId} />
+          {between ? (
+            <>
+              <span className="text-muted-foreground"> and </span>
+              <PlaceChip id={between} />
+            </>
+          ) : null}
+          <span className="font-mono text-xs text-muted-foreground">{` · ${word}`}</span>
+        </>
+      );
+    },
+    target: (event) => ({ kind: "place", id: event.payload.placeId }),
+  },
 };
+
+const NOTICED_LEAD = {
+  arrive: "Walked in on",
+  comes: "Saw",
+  cross: "Crossed paths with",
+  meet: "Passed",
+} as const;
+
+const NOTICED_WHERE = {
+  arrive: " at",
+  comes: " come into",
+  cross: " at",
+  meet: " between",
+} as const;
 
 /**
  * Pickup delays are often under a minute, which `formatSimDuration` floors to
@@ -231,11 +303,20 @@ export const TIMELINE_KIND_LIST = Object.values(
   TIMELINE_KINDS,
 ) as TimelineKind[];
 
-/** What the Timeline and the inspector's Recent show with no `tl.kinds` param. */
+/** What the Timeline shows with no `tl.kinds` param. */
 export const DEFAULT_TIMELINE_KINDS: readonly JournalKind[] =
   TIMELINE_KIND_LIST.filter((kind) => !kind.hiddenByDefault).map(
     (kind) => kind.kind,
   );
+
+/**
+ * The inspector's Recent: what the character did and ran into. Attention
+ * bookkeeping (the `mind` facet) fires on every stimulus and would bury it;
+ * it stays in the Timeline.
+ */
+export const RECENT_KINDS: readonly JournalKind[] = TIMELINE_KIND_LIST.filter(
+  (kind) => !kind.hiddenByDefault && kind.facet !== "mind",
+).map((kind) => kind.kind);
 
 /** `tl.kinds` absent means the default set, not every kind. */
 export function effectiveTimelineKinds(

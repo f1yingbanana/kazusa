@@ -12,6 +12,7 @@ import {
 import { useSWRConfig } from "swr";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
+import { isLocationsKey } from "@/lib/source/location/http";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import {
   parseStreamEvent,
@@ -51,7 +52,13 @@ const RealtimeContext = createContext<RealtimeContextValue | null>(null);
  * One SSE connection per scope; observer event types fan out through the live
  * registry.
  */
-const OBSERVER_EVENTS = ["status", "journal", "clock", "desires"] as const;
+const OBSERVER_EVENTS = [
+  "status",
+  "journal",
+  "clock",
+  "desires",
+  "location",
+] as const;
 const PLAYER_EVENTS = ["message", "typing", "connected", "chats"] as const;
 const RETRY_MIN_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
@@ -197,6 +204,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           }
           // Desire records changed while disconnected are only in the snapshot.
           void mutate(isDesiresKey);
+          void mutate(isLocationsKey);
           // Always refresh: messages can arrive between the initial GET and SSE.
           void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
             for (const chat of current?.chats ?? [])

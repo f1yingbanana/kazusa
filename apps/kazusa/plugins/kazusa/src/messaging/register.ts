@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -16,6 +17,7 @@ import YAML from "yaml";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
 import { characterName, personName } from "../identity.ts";
+import { localAvatarUrl } from "../characters/avatar.ts";
 import { z } from "zod";
 import { untilRunning, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
@@ -60,15 +62,16 @@ function sharedMessagingState(): MessagingState {
 async function rosterAgent(
   api: OpenClawPluginApi,
   agentId: string,
+  config: OpenClawConfig,
 ): Promise<Agent> {
   const agent: Agent = {
     id: agentId,
-    name: await characterName(api, api.config, agentId),
+    name: await characterName(api, config, agentId),
   };
   try {
     const text = await readFile(
       path.join(
-        api.runtime.agent.resolveAgentWorkspaceDir(api.config, agentId),
+        api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
         "IDENTITY.md",
       ),
       "utf8",
@@ -83,6 +86,7 @@ async function rosterAgent(
   } catch {
     /* Optional avatar metadata does not block roster discovery. */
   }
+  agent.avatarUrl ??= await localAvatarUrl(api, agentId, config);
   return agent;
 }
 
@@ -109,6 +113,7 @@ export function registerMessaging(
     readonly release?: AbortSignal;
   },
 ): Messaging {
+  const getConfig = () => currentConfig(api);
   const release = deps.release ?? shutdownSignal();
   const messagingConfig = MESSAGING_CONFIG.parse(
     api.pluginConfig?.messaging ?? {},
@@ -130,7 +135,7 @@ export function registerMessaging(
     }),
     clock: deps.clock,
     release,
-    nameOf: (id) => personName(api, id),
+    nameOf: (id) => personName(api, id, getConfig()),
     /** Create or label a passive ledger; this never starts an agent turn. */
     ensureSession: async (copy, title) => {
       messaging.assertCurrent();
@@ -271,7 +276,7 @@ export function registerMessaging(
       context.getRuntimeConfig?.() ??
       context.runtimeConfig ??
       context.config ??
-      api.config;
+      getConfig();
     const agents = new Set(listAgentIds(config));
     if (!agents.has(agentId))
       throw new Error(`Unknown character agent: ${agentId}.`);
@@ -281,7 +286,7 @@ export function registerMessaging(
   deps.perception.onAdopted?.(async (delivery) => {
     if (!delivery.sessionKeys?.length) return;
     try {
-      const config = api.config;
+      const config = getConfig();
       const name = await characterName(api, config, delivery.agentId);
       for (const sessionKey of delivery.sessionKeys) {
         await messaging.setTyping(
@@ -331,9 +336,9 @@ export function registerMessaging(
           description: `Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. To speak aloud to people where you are, supply members with aloud: true, or use a chat:huddle:... address to join a conversation going on there. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural bubbles in messages, 1 to ${messagingConfig.maxBubbles}; they are typed and sent one at a time. Face to face, a bubble can also be an action, { "text": "sets the textbook on the desk", "type": "action" }: third person, without your name. Actions in a text chat are dropped. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.`,
           parameters: z.toJSONSchema(sendMessage),
           async execute(toolCallId, input: unknown) {
-            // A paused world holds whoever acts in it.
-            await untilRunning(deps.clock, release);
             const { agentId, config, agents } = caller(context);
+            if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              await untilRunning(deps.clock, release);
             const params = sendMessage.parse(input);
             // A host replay reuses this identity; a new model call is a new send.
             // Session scoping prevents collisions when a brain is reset.
@@ -346,6 +351,7 @@ export function registerMessaging(
               { ...params, requestId },
               context.assertInvocationCurrent,
               agents,
+              config.agents?.defaults?.systemAgent?.agentId,
             );
             // Message hashes are bookkeeping, not something the character reads.
             const { messageIds: _messageIds, ...speech } = details;
@@ -411,8 +417,9 @@ export function registerMessaging(
             additionalProperties: false,
           },
           async execute(_id, input: unknown) {
-            await untilRunning(deps.clock, release);
-            const { agentId, agents } = caller(context);
+            const { agentId, config, agents } = caller(context);
+            if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              await untilRunning(deps.clock, release);
             const result = await messaging.manageChat(
               agentId,
               MANAGE_CHAT.parse(input),
@@ -430,9 +437,14 @@ export function registerMessaging(
     { names: ["send_message", "list_chats", "manage_chat"] },
   );
 
-  registerMessagingHttp(api, messaging, (id) => rosterAgent(api, id), {
-    broadcaster: deps.broadcaster,
-    getStatuses: deps.getStatuses,
-  });
+  registerMessagingHttp(
+    api,
+    messaging,
+    (id) => rosterAgent(api, id, getConfig()),
+    {
+      broadcaster: deps.broadcaster,
+      getStatuses: deps.getStatuses,
+    },
+  );
   return messaging;
 }

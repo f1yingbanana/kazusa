@@ -10,9 +10,14 @@ const people: CharacterSummary[] = [
 
 describe("roster filtering and grouping", () => {
   it("filters by kind and searches name, id and aliases", () => {
-    expect(filterCharacters(people, "simulated", "").map((c) => c.id)).toEqual(["a", "b"]);
+    expect(filterCharacters(people, "characters", "").map((c) => c.id)).toEqual(["a", "b"]);
     expect(filterCharacters(people, "everyone", "adi").map((c) => c.id)).toEqual(["a"]);
     expect(filterCharacters(people, "npc", "").map((c) => c.id)).toEqual(["n"]);
+  });
+  it("splits characters by whether they are onstage", () => {
+    const offstage = (id: string) => id === "b";
+    expect(filterCharacters(people, "onstage", "", offstage).map((c) => c.id)).toEqual(["a"]);
+    expect(filterCharacters(people, "offstage", "", offstage).map((c) => c.id)).toEqual(["b"]);
   });
   it("puts characters without the structured field in a trailing honest bucket", () => {
     const groups = groupCharacters(people, "affiliation", () => undefined);
@@ -21,7 +26,7 @@ describe("roster filtering and grouping", () => {
   });
   it("groups by live status fields, never by task text", () => {
     const groups = groupCharacters(people.slice(0, 2), "brain", (id) =>
-      id === "a" ? { brain: "thinking", composingIn: [], queued: 0 } : undefined,
+      id === "a" ? { brain: "thinking", composingIn: [], queued: 0, onstage: true } : undefined,
     );
     expect(groups.map((g) => g.label)).toEqual(["Thinking", "No status"]);
   });

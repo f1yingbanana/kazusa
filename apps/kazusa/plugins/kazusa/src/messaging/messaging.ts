@@ -1133,6 +1133,7 @@ export class Messaging {
     input: SpeechParams,
     assertInvocationCurrent?: () => void,
     configuredAgents?: ReadonlySet<string>,
+    systemAgentId?: string,
   ): Promise<SpeechResult> {
     PARTICIPANT_ID.parse(sender);
     const params = SPEECH_REQUEST.parse(input);
@@ -1146,6 +1147,7 @@ export class Messaging {
       true,
       assertInvocationCurrent,
       configuredAgents,
+      systemAgentId,
     );
   }
 
@@ -1159,6 +1161,7 @@ export class Messaging {
     live: boolean,
     assertInvocationCurrent?: () => void,
     configuredAgents?: ReadonlySet<string>,
+    systemAgentId?: string,
   ): Promise<SpeechResult> {
     const { sender, senderName, params } = plan;
     const { messages, requestId, ...target } = params;
@@ -1249,7 +1252,13 @@ export class Messaging {
           );
           // A paused world holds the next bubble; a stopping Gateway lets the
           // rest go at once rather than wait on a frozen clock.
-          paced = await sleepSim(this.deps.clock, typingMs(text), signal, {
+          const speechClock =
+            sender === systemAgentId
+              ? {
+                  now: () => ({ simTime: Date.now(), speed: 1, formatted: "" }),
+                }
+              : this.deps.clock;
+          paced = await sleepSim(speechClock, typingMs(text), signal, {
             release: this.deps.release ?? shutdownSignal(),
           });
         }

@@ -1,15 +1,34 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type {
-  LocationRecord,
-  LocationsResponse,
-  PlacesResponse,
+import {
+  MovePayloadSchema,
+  type LocationRecord as ClientLocationRecord,
+  type LocationsResponse,
+  type MoveResponse,
+  type PlacesResponse,
 } from "@kazusa/client";
-import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
+import {
+  createRouteRegistrar,
+  readJsonBody,
+  sendJson,
+} from "../http/helpers.ts";
+import { USER } from "./config.ts";
+import type { LocationRecord } from "./location.ts";
 import type { LocationService } from "./register.ts";
+
+/** A stored record on the wire: the same closed form, with plain arrays. */
+export function clientRecord(record: LocationRecord): ClientLocationRecord {
+  const { trip, noticed, ...rest } = record;
+  return {
+    ...rest,
+    ...(trip ? { trip: { ...trip, legs: [...trip.legs] } } : {}),
+    ...(noticed ? { noticed: [...noticed] } : {}),
+  };
+}
 
 /**
  * Serves the map and every participant's closed-form position record, so
- * observers compute positions at any sim time themselves.
+ * observers compute positions at any sim time themselves. Changes are pushed as
+ * SSE `location` events by the service itself.
  */
 export function registerLocationHttp(
   api: OpenClawPluginApi,
@@ -17,6 +36,7 @@ export function registerLocationHttp(
 ): void {
   const route = createRouteRegistrar(api);
   const { location } = deps;
+  const player = USER.parse(api.pluginConfig?.user ?? {});
 
   route("places", "GET", async (_req, res) => {
     const map = location.world?.map;
@@ -36,18 +56,23 @@ export function registerLocationHttp(
   });
 
   route("locations", "GET", async (_req, res) => {
-    const records: Record<string, LocationRecord> = {};
+    const records: Record<string, ClientLocationRecord> = {};
     await Promise.all(
-      location.participants().map(async (id) => {
+      (await location.participants()).map(async (id) => {
         const record = await location.record(id);
-        if (!record) return;
-        const { trip, ...rest } = record;
-        records[id] = {
-          ...rest,
-          ...(trip ? { trip: { ...trip, legs: [...trip.legs] } } : {}),
-        };
+        if (record) records[id] = clientRecord(record);
       }),
     );
     sendJson(res, 200, { records } satisfies LocationsResponse);
+  });
+
+  // The player has no tasks, so they go straight there. Who moves comes from
+  // config, never the request.
+  route("move", "POST", async (req, res) => {
+    const { placeId } = MovePayloadSchema.parse(await readJsonBody(req));
+    const record = await location.place(player.id, placeId);
+    sendJson(res, 200, {
+      record: clientRecord(record),
+    } satisfies MoveResponse);
   });
 }

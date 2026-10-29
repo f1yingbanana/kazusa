@@ -65,6 +65,9 @@ describe("Decision context sources", () => {
         },
       },
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
     const assembler = createDecisionContextAssembler(api, {
       clock: { time: () => now },
     });

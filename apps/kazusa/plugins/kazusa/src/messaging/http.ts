@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -96,6 +97,7 @@ function clientChat(summary: ChatSummary, viewer: string): Chat {
     type: summary.kind,
     name: summary.title,
     members: [...summary.members],
+    ...(summary.placeId ? { placeId: summary.placeId } : {}),
   };
 }
 
@@ -109,8 +111,9 @@ export function registerMessagingHttp(
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
   },
 ): void {
+  const getConfig = () => currentConfig(api);
   const user = USER.parse(api.pluginConfig?.user ?? {});
-  const roster = (): ReadonlySet<string> => new Set(listAgentIds(api.config));
+  const roster = (): ReadonlySet<string> => new Set(listAgentIds(getConfig()));
   const expectedToken = resolveAuthToken(api);
   const route = (
     path: string,
@@ -179,6 +182,9 @@ export function registerMessagingHttp(
             text: latest.text,
             timestamp: latest.timestamp,
             sequence: latest.sequence,
+            senderId: latest.senderId,
+            senderName: latest.senderName,
+            ...(latest.type ? { type: latest.type } : {}),
           };
         return chat;
       }),
@@ -225,12 +231,20 @@ export function registerMessagingHttp(
     } satisfies ManageChatResponse);
   });
   route("agents", "GET", async (_req, res) => {
+    const config = getConfig();
     const agents = await Promise.all(
-      [...roster()].map(async (id) => {
+      listAgentIds(config).map(async (id) => {
         try {
-          return await agent(id);
+          return {
+            ...(await agent(id)),
+            isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+          };
         } catch {
-          return { id, name: id };
+          return {
+            id,
+            name: id,
+            isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+          };
         }
       }),
     );

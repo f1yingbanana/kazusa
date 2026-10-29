@@ -9,7 +9,7 @@ import { useParam, useSelection } from '@/hooks/use-url-state'
 import { RealtimeProvider } from '@/lib/live/realtime-provider'
 import { SourcesProvider } from '@/lib/source/provider'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
-import { onInspectorRequest } from '@/lib/state/inspector-request'
+import { isQuietSelection, onInspectorRequest, settleQuietSelection } from '@/lib/state/inspector-request'
 import { onSidebarRequest } from '@/lib/state/sidebar-request'
 import { CommandPalette } from './command-palette'
 import { Inspector } from './inspector'
@@ -44,15 +44,17 @@ function Layout() {
   const wide = useMediaQuery('(min-width: 1280px)')
   const Sidebar = active.sidebar
 
-  // Narrow screens: the inspector sheet opens on a new selection, closes when a
-  // link changes the view (keeping the selection), and dismissing it clears it.
+  // Narrow screens: the inspector sheet opens on a new selection (unless it was
+  // made quietly), closes when a link changes the view (keeping the
+  // selection), and dismissing it clears it.
   const selKey = selection ? serializeEntityRef(selection) : null
   const [sheetOpen, setSheetOpen] = useState(Boolean(selKey))
   const [seen, setSeen] = useState({ selKey, view })
   if (seen.selKey !== selKey || seen.view !== view) {
     setSeen({ selKey, view })
-    setSheetOpen(seen.selKey !== selKey ? Boolean(selKey) : false)
+    setSheetOpen(seen.selKey !== selKey ? Boolean(selKey) && !isQuietSelection(selKey) : false)
   }
+  useEffect(() => settleQuietSelection(selKey), [selKey])
   useEffect(() => onInspectorRequest(() => setSheetOpen(true)), [])
   useEffect(() => onSidebarRequest(() => setSidebarOpen(true)), [])
 

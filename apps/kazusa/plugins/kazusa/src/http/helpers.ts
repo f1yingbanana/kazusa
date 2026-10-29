@@ -66,8 +66,16 @@ export type RouteRegistrar = (
   handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>,
 ) => void;
 
-export function createRouteRegistrar(api: OpenClawPluginApi): RouteRegistrar {
-  const expectedToken = resolveAuthToken(api);
+/**
+ * `gateway` routes are authenticated by the Gateway itself, which is what lets
+ * a handler dispatch Gateway methods as its caller (`gateway-method-runtime`).
+ */
+export function createRouteRegistrar(
+  api: OpenClawPluginApi,
+  options?: { readonly auth?: "gateway" | "plugin" },
+): RouteRegistrar {
+  const auth = options?.auth ?? "plugin";
+  const expectedToken = auth === "plugin" ? resolveAuthToken(api) : undefined;
   return (
     path: string,
     method: "GET" | "POST",
@@ -75,7 +83,7 @@ export function createRouteRegistrar(api: OpenClawPluginApi): RouteRegistrar {
   ): void => {
     api.registerHttpRoute({
       path: `/kazusa/${path}`,
-      auth: "plugin",
+      auth,
       match: "exact",
       handler: async (req, res) => {
         res.setHeader("Access-Control-Allow-Origin", "*");

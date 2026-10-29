@@ -14,3 +14,6 @@ export type Chat = ServerChat & { draft?: boolean };
 export type PendingMessage = Omit<ChatMessage, "sequence"> & {
   status: "sending" | "failed";
 };
+
+/** Absent on the wire means speech. */
+export type MessageType = NonNullable<ChatMessage["type"]>;

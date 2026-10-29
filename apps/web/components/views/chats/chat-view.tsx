@@ -3,9 +3,14 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useCharacters } from "@/hooks/use-characters";
+import { readSimNow } from "@/hooks/use-clock";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
 import { setTyping } from "@/lib/source/chats/http";
-import type { Chat, PendingMessage } from "@/lib/source/chats/types";
+import type {
+  Chat,
+  MessageType,
+  PendingMessage,
+} from "@/lib/source/chats/types";
 import { resolveParticipant } from "./chat-avatar";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
@@ -31,7 +36,6 @@ export function ChatView({
   const [membersOpen, setMembersOpen] = useState(false);
 
   const typists = typingByChat[chat.id] ?? [];
-  const isGroup = chat.type === "group";
 
   const resolve = useCallback(
     (id: string, fallbackName?: string) => {
@@ -50,7 +54,12 @@ export function ChatView({
   const deliver = useCallback(
     async (message: PendingMessage) => {
       try {
-        const response = await send(chat, message.text, message.requestId);
+        const response = await send(
+          chat,
+          message.text,
+          message.requestId,
+          message.type,
+        );
         commitSentMessage(response.chatId, response.message);
         if (chat.draft) {
           onSent({
@@ -76,7 +85,7 @@ export function ChatView({
     [chat, send, commitSentMessage, onSent, refreshChats],
   );
 
-  function handleSend(text: string) {
+  function handleSend(text: string, type: MessageType) {
     const requestId = crypto.randomUUID();
     const message: PendingMessage = {
       id: requestId,
@@ -84,7 +93,8 @@ export function ChatView({
       senderId: config.userId,
       senderName: config.userName,
       text,
-      timestamp: Date.now(),
+      ...(type === "action" ? { type } : {}),
+      timestamp: readSimNow(),
       status: "sending",
     };
     setPending((current) => [...current, message]);
@@ -153,13 +163,16 @@ export function ChatView({
       />
 
       <Composer
-        placeholder={`Message ${chat.name}`}
+        placeholder={
+          chat.type === "huddle" ? "Say something" : `Message ${chat.name}`
+        }
+        canAct={chat.type === "huddle"}
         onSend={handleSend}
         onTyping={handleTyping}
         disabled={chat.draft && pending.length > 0}
       />
 
-      {isGroup && !chat.draft ? (
+      {chat.type === "group" && !chat.draft ? (
         <MembersSheet
           open={membersOpen}
           onOpenChange={setMembersOpen}

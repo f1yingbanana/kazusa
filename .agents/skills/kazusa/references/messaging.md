@@ -214,7 +214,7 @@ without consuming agent runner processes or brain sessions:
   `user:sensei` or `user:abc123`). Validated by
   `PARTICIPANT_ID = z.string().regex(/^(?:user:)?[a-z0-9][a-z0-9_-]*$/)`. Direct
   chats use the session key `agent:<agentId>:chat:direct:user:<userId>` (e.g.
-  `agent:kazusa:chat:direct:user:sensei`).
+  `agent:kazusa-kyouyama:chat:direct:user:sensei`).
 - **Configuration**: For the single-user MVP, the active human identity is
   configured in `openclaw.json` under `plugins.entries.kazusa.config.user`
   (`id: "user:sensei"`, `name: "Sensei"`), declared in `openclaw.plugin.json`.

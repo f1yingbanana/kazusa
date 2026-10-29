@@ -97,6 +97,9 @@ describe("registerTimelineHttp", () => {
         routes[opts.path] = opts.handler;
       }),
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
 
     const clock = createMockClock();
     registerTimelineHttp(api, { clock });
@@ -235,6 +238,9 @@ describe("registerTimelineHttp", () => {
         routes[opts.path] = opts.handler;
       }),
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
 
     registerTimelineHttp(api, { clock: createMockClock() });
 
@@ -327,6 +333,9 @@ describe("registerTimelineHttp", () => {
         routes[opts.path] = opts.handler;
       }),
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
 
     // Two decisions at one sim time (a paused clock) for the same task.
     const decision = (agentId: string, stimulusIds: string[]) => ({
