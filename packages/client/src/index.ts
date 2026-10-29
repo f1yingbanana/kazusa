@@ -8,6 +8,7 @@ export const AgentSchema = z.object({
   id: z.string(),
   name: z.string(),
   avatarUrl: z.string().optional(),
+  isSystemAgent: z.boolean().optional(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 
@@ -35,11 +36,19 @@ export const ChatSchema = z.object({
   type: ChatTypeSchema,
   name: z.string(),
   members: z.array(z.string()),
+  /** Huddles only: the place where the conversation is happening. */
+  placeId: z.string().optional(),
   lastMessage: ChatMessageSchema.pick({
     text: true,
     timestamp: true,
     sequence: true,
-  }).optional(),
+    type: true,
+  })
+    .extend(
+      ChatMessageSchema.pick({ senderId: true, senderName: true }).partial()
+        .shape,
+    )
+    .optional(),
 });
 export type Chat = z.infer<typeof ChatSchema>;
 
@@ -83,6 +92,14 @@ export const SendPayloadSchema = z
   .object({
     requestId: z.string().trim().min(1),
     text: z.string().min(1),
+    /** Absent: speech. Actions are kept only in huddles (face to face). */
+    type: z.enum(["speech", "action"]).optional(),
+    /**
+     * With `members`: say it face to face to people where you are. They join
+     * your huddle there with anyone they were talking with, or you join
+     * theirs.
+     */
+    aloud: z.boolean().optional(),
     sessionKey: z.string().optional(),
     members: z.array(z.string()).optional(),
     title: z.string().nullable().optional(),
@@ -193,6 +210,8 @@ export const DomainSchema = z.enum([
   "relationships",
   "attention",
   "desires",
+  "stage",
+  "models",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -246,6 +265,109 @@ export const ClockResponseSchema = z.object({ clock: ClockStateSchema });
 export type ClockResponse = z.infer<typeof ClockResponseSchema>;
 
 /* ========================================================================== */
+/* Read model: models (GET /kazusa/models, POST /kazusa/model|thinking)       */
+/* ========================================================================== */
+
+/** `provider/model`, as OpenClaw writes model refs. */
+export const ModelRefSchema = z.string().regex(/^[^/\s]+\/\S+$/);
+
+/**
+ * OpenClaw's reasoning ladder (`/think`), without `ultra`: that is a harness
+ * mode (planning, sub-agents), not how hard the model reasons.
+ */
+export const ThinkingLevelSchema = z.enum([
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "adaptive",
+  "max",
+]);
+export type ThinkingLevel = z.infer<typeof ThinkingLevelSchema>;
+
+/**
+ * A level a model accepts; `label` is the provider's word (Z.AI calls `low`
+ * "on").
+ */
+export const ThinkingOptionSchema = z.object({
+  id: ThinkingLevelSchema,
+  label: z.string(),
+});
+export type ThinkingOption = z.infer<typeof ThinkingOptionSchema>;
+
+/** One model from the Gateway's catalog (`models.list`). */
+export const ModelOptionSchema = z.object({
+  ref: ModelRefSchema,
+  provider: z.string(),
+  id: z.string(),
+  name: z.string(),
+  /** Display name from `agents.defaults.models`. */
+  alias: z.string().optional(),
+  /** Listed in `agents.defaults.models`, the world's shortlist. */
+  pinned: z.boolean(),
+  /** False when the provider has no working credentials right now. */
+  available: z.boolean(),
+  unavailableReason: z
+    .enum(["missing-auth", "auth-failed", "cooldown"])
+    .optional(),
+  contextWindow: z.number().int().optional(),
+  reasoning: z.boolean().optional(),
+  /** Levels this model accepts, weakest first. Empty: it can't be tuned. */
+  thinkingLevels: z.array(ThinkingOptionSchema),
+  /** What the model runs at when no level is configured. */
+  thinkingDefault: ThinkingLevelSchema.optional(),
+});
+export type ModelOption = z.infer<typeof ModelOptionSchema>;
+
+export const ModelProviderStatusSchema = z.object({
+  provider: z.string(),
+  status: z.enum(["ready", "auth-rejected", "unavailable"]),
+});
+export type ModelProviderStatus = z.infer<typeof ModelProviderStatusSchema>;
+
+/** GET /kazusa/models. `?refresh=1` asks providers for their catalogs again. */
+export const ModelsResponseSchema = z.object({
+  /**
+   * The model every character runs on: the one picked here, else `configured`.
+   * Kazusa applies it per turn, not through `openclaw.json`.
+   */
+  current: ModelRefSchema.optional(),
+  /** `agents.defaults.model.primary`, used until a model is picked. */
+  configured: ModelRefSchema.optional(),
+  /**
+   * The reasoning level picked for every character. Absent: each model runs at
+   * its own default. A level the model lacks is remapped by OpenClaw to the
+   * nearest one it has.
+   */
+  thinking: ThinkingLevelSchema.optional(),
+  models: z.array(ModelOptionSchema),
+  providers: z.array(ModelProviderStatusSchema),
+});
+export type ModelsResponse = z.infer<typeof ModelsResponseSchema>;
+
+/** POST /kazusa/model. Sets the model for every character. */
+export const ModelSelectPayloadSchema = z.object({ ref: ModelRefSchema });
+export type ModelSelectPayload = z.infer<typeof ModelSelectPayloadSchema>;
+
+export const ModelSelectResponseSchema = z.object({ current: ModelRefSchema });
+export type ModelSelectResponse = z.infer<typeof ModelSelectResponseSchema>;
+
+/** POST /kazusa/thinking. `null` goes back to each model's own default. */
+export const ThinkingSelectPayloadSchema = z.object({
+  level: ThinkingLevelSchema.nullable(),
+});
+export type ThinkingSelectPayload = z.infer<typeof ThinkingSelectPayloadSchema>;
+
+export const ThinkingSelectResponseSchema = z.object({
+  thinking: ThinkingLevelSchema.optional(),
+});
+export type ThinkingSelectResponse = z.infer<
+  typeof ThinkingSelectResponseSchema
+>;
+
+/* ========================================================================== */
 /* Read model: characters (PROPOSED — replaces GET /kazusa/agents)            */
 /* ========================================================================== */
 
@@ -275,6 +397,16 @@ export const CharacterStatusSchema = z.object({
   composingIn: z.array(z.string()),
   /** Pending admitted stimuli. */
   queued: z.number().int().nonnegative(),
+  /**
+   * Offstage characters are not simulated: no turns, no place in the world.
+   * Texts to them wait (counted in `queued`) until they come back.
+   */
+  onstage: z.boolean(),
+  /**
+   * Sim time they went offstage, when known. Their desires stand still from
+   * then: clients compute levels at this moment, not now.
+   */
+  offstageSince: z.number().optional(),
 });
 export type CharacterStatus = z.infer<typeof CharacterStatusSchema>;
 
@@ -282,6 +414,7 @@ export const CharacterSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   kind: CharacterKindSchema,
+  isSystemAgent: z.boolean().optional(),
   avatarUrl: z.string().optional(),
   occupation: z.string().optional(),
   affiliation: z.string().optional(),
@@ -312,6 +445,21 @@ export const CharacterDetailResponseSchema = z.object({
 export type CharacterDetailResponse = z.infer<
   typeof CharacterDetailResponseSchema
 >;
+
+/**
+ * POST /kazusa/character/stage. Sends characters off or brings them back, one
+ * group in one request. Answers with each character's new status.
+ */
+export const StagePayloadSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+  onstage: z.boolean(),
+});
+export type StagePayload = z.infer<typeof StagePayloadSchema>;
+
+export const StageResponseSchema = z.object({
+  statuses: z.record(z.string(), CharacterStatusSchema),
+});
+export type StageResponse = z.infer<typeof StageResponseSchema>;
 
 /* ========================================================================== */
 /* Read model: desires (GET /kazusa/desires, SSE `desires`)                   */
@@ -462,6 +610,17 @@ export const LocationsResponseSchema = z.object({
   records: z.record(z.string(), LocationRecordSchema),
 });
 export type LocationsResponse = z.infer<typeof LocationsResponseSchema>;
+
+/**
+ * POST /kazusa/move: the player goes straight to a place (no trip; the player
+ * has no tasks). They leave their huddles where they were, and those there may
+ * notice them come and go, as with any move. Who moves comes from config.
+ */
+export const MovePayloadSchema = z.object({ placeId: z.string().min(1) });
+export type MovePayload = z.infer<typeof MovePayloadSchema>;
+
+export const MoveResponseSchema = z.object({ record: LocationRecordSchema });
+export type MoveResponse = z.infer<typeof MoveResponseSchema>;
 
 /* ========================================================================== */
 /* Read model: assembled brain context (GET /kazusa/context?id=)              */

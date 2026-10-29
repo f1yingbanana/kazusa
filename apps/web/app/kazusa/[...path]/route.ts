@@ -15,6 +15,12 @@ const ROUTES = new Map([
   ["desires", "GET"],
   ["places", "GET"],
   ["locations", "GET"],
+  ["move", "POST"],
+  ["character/stage", "POST"],
+  ["avatar", "GET"],
+  ["models", "GET"],
+  ["model", "POST"],
+  ["thinking", "POST"],
 ]);
 
 type Context = { params: Promise<{ path: string[] }> };
@@ -56,7 +62,8 @@ async function forward(request: Request, context: Context): Promise<Response> {
       headers: {
         "Content-Type":
           response.headers.get("content-type") ?? "application/json",
-        "Cache-Control": "no-cache, no-transform",
+        "Cache-Control":
+          response.headers.get("cache-control") ?? "no-cache, no-transform",
         "X-Accel-Buffering": "no",
       },
     });

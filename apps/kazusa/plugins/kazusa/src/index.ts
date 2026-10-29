@@ -1,3 +1,4 @@
+import { currentConfig } from "./current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
   definePluginEntry,
@@ -14,6 +15,7 @@ import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
 import { registerLocation } from "./location/register.ts";
 import { registerLocationHttp } from "./location/http.ts";
+import { registerModels } from "./models/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import {
@@ -26,12 +28,14 @@ import {
   sharedBroadcaster,
 } from "./realtime.ts";
 import { registerTimelineHttp } from "./timeline/http.ts";
+import { registerStage, stageControl } from "./stage/register.ts";
 
 export default definePluginEntry({
   id: "kazusa",
   name: "Kazusa",
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
+    const getConfig = () => currentConfig(api);
     const broadcaster = sharedBroadcaster();
     const clock = registerClock(api);
 
@@ -60,10 +64,12 @@ export default definePluginEntry({
       }),
     );
 
+    const stage = registerStage(api);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
-    const location = registerLocation(api, { clock, broadcaster });
+    const location = registerLocation(api, { clock, broadcaster, stage });
     registerLocationHttp(api, { location });
+    const models = registerModels(api);
     // A world without places has no positions to serve.
     registerClockHttp(api, clock, {
       getCapabilities: () => ({
@@ -80,6 +86,7 @@ export default definePluginEntry({
         desires.taskExtension,
         ...(location.taskExtension ? [location.taskExtension] : []),
       ],
+      stage,
     });
     const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
     const context = registerContextEngine(api, {
@@ -109,6 +116,8 @@ export default definePluginEntry({
       broadcaster,
       onDeadline: location.settle,
       confirm: location.confirm,
+      onstage: (agentId) => stage.isOnstage(agentId),
+      thinking: async () => (await models.read()).thinking,
     });
     location.attachPerception(perception);
 
@@ -122,7 +131,7 @@ export default definePluginEntry({
 
     const getStatuses = async (): Promise<Record<string, CharacterStatus>> => {
       if (!messagingRef.current) return {};
-      const roster = [...new Set(listAgentIds(api.config))];
+      const roster = [...new Set(listAgentIds(getConfig()))];
       const statuses: Record<string, CharacterStatus> = {};
       await Promise.all(
         roster.map(async (id) => {
@@ -131,6 +140,7 @@ export default definePluginEntry({
               taskStore: taskman.store,
               perception,
               messaging: messagingRef.current!,
+              stage,
             });
           } catch {
             // Ignore individual agent status failures
@@ -158,6 +168,19 @@ export default definePluginEntry({
       perception,
       messaging,
       broadcaster,
+      stage,
+      setOnstage: stageControl({
+        stage,
+        clock,
+        interrupt: (id) => {
+          messaging.interrupt(id);
+        },
+        exit: location.exit,
+        enter: location.enter,
+        reschedule: (id) => taskman.reschedule(id),
+        resumeDesires: desires.resume,
+        drain: (id) => perception.drain(id),
+      }),
     });
   },
 });

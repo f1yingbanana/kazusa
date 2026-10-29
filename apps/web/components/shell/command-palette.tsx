@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { MapPinIcon, MessageSquareIcon, UsersIcon } from 'lucide-react'
+import { MapPinIcon } from 'lucide-react'
+import { chatIcon } from '@/components/entities/chips'
 import { PresenceAvatar } from '@/components/entities/presence-avatar'
 import {
   CommandDialog,
@@ -73,16 +74,19 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           </CommandGroup>
           {chats.length > 0 ? (
             <CommandGroup heading="Chats">
-              {chats.map((chat) => (
-                <CommandItem
-                  key={chat.id}
-                  value={`chat ${chat.name} ${chat.id}`}
-                  onSelect={() => go({ view: 'chats', 'chats.id': chat.id })}
-                >
-                  {chat.type === 'group' ? <UsersIcon /> : <MessageSquareIcon />}
-                  <span className="truncate">{chat.name}</span>
-                </CommandItem>
-              ))}
+              {chats.map((chat) => {
+                const Icon = chatIcon(chat.type)
+                return (
+                  <CommandItem
+                    key={chat.id}
+                    value={`chat ${chat.name} ${chat.id}`}
+                    onSelect={() => go({ view: 'chats', 'chats.id': chat.id })}
+                  >
+                    <Icon />
+                    <span className="truncate">{chat.name}</span>
+                  </CommandItem>
+                )
+              })}
             </CommandGroup>
           ) : null}
           {places && places.places.length > 0 ? (

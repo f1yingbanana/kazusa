@@ -1,0 +1,8 @@
+# Runtime state and databases
+.state/
+
+# Local OpenClaw config overrides
+*.local.json
+openclaw.json.last-good
+openclaw.local.json
+workspaces/*/memory

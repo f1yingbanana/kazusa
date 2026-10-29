@@ -26,7 +26,10 @@ const directories: string[] = [];
 const instances: Messaging[] = [];
 const append = vi.mocked(appendSessionTranscriptMessageByIdentityStrict);
 
-async function setup(pluginConfig: Record<string, unknown> = {}) {
+async function setup(
+  pluginConfig: Record<string, unknown> = {},
+  options: Pick<Parameters<typeof registerMessaging>[1], "release"> = {},
+) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "kazusa-message-"));
   directories.push(workspace);
   await writeFile(
@@ -103,6 +106,9 @@ async function setup(pluginConfig: Record<string, unknown> = {}) {
       },
     },
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
   const receive = vi.fn(async () => {});
   let adoptedListener:
     | ((delivery: {
@@ -128,6 +134,7 @@ async function setup(pluginConfig: Record<string, unknown> = {}) {
       now: () => ({ simTime: 123456, speed: 0, formatted: "" }),
     },
     perception: { receive, onAdopted },
+    ...options,
   });
   instances.push(messaging);
   const context: OpenClawPluginToolContext<2> = {
@@ -198,6 +205,52 @@ afterEach(async () => {
 });
 
 describe("send_message SDK integration", () => {
+  it("lets the system agent send and manage chats while a peer waits for resume", async () => {
+    const release = new AbortController();
+    const h = await setup(
+      {},
+      {
+        release: release.signal,
+      },
+    );
+    Object.assign(h.api.config, {
+      agents: {
+        ...h.api.config.agents,
+        defaults: { systemAgent: { agentId: "alice" } },
+      },
+    });
+    const sent = await h.execute({
+      members: ["bob"],
+      title: "Console",
+      messages: ["Ready"],
+    });
+    await h.executeTool("manage_chat", {
+      action: "rename",
+      sessionKey: sent.details.sessionKey,
+      title: "Admin",
+    });
+    let finished = false;
+    vi.mocked(h.api.runtime.agent.resolveAgentIdentity).mockReturnValue({
+      name: "Bob",
+    });
+    const peer = h
+      .execute(
+        { members: ["alice"], messages: ["Waiting"] },
+        {
+          agentId: "bob",
+          sessionKey: "agent:bob:brain",
+          sessionId: "bob-brain",
+        },
+      )
+      .then(() => {
+        finished = true;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(finished).toBe(false);
+    release.abort();
+    await peer;
+    expect(finished).toBe(true);
+  });
   it("deduplicates host replays without model-supplied IDs and scopes calls to the brain session", async () => {
     const h = await setup();
     const input = { members: ["bob"], title: "Tea", messages: ["Hello"] };
@@ -490,6 +543,9 @@ describe("send_message SDK integration", () => {
 
   it("registers Gateway HTTP routes and handles chats, messages, and send", async () => {
     const h = await setup();
+    Object.assign(h.api.config.agents ?? {}, {
+      defaults: { systemAgent: { agentId: "alice" } },
+    });
     async function invoke(routePath: string, body?: unknown, url = routePath) {
       const route = h.routes.get(routePath);
       if (!route) throw new Error(`Missing route: ${routePath}`);
@@ -533,6 +589,14 @@ describe("send_message SDK integration", () => {
       };
     }
 
+    const roster = await invoke("/kazusa/agents");
+    expect(roster.body).toMatchObject({
+      agents: [
+        { id: "alice", isSystemAgent: true },
+        { id: "bob", isSystemAgent: false },
+        { id: "carol", isSystemAgent: false },
+      ],
+    });
     const sent = await invoke("/kazusa/send", {
       requestId: "browser-submit",
       members: ["alice", "bob"],

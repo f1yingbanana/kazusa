@@ -23,6 +23,7 @@ import type { ActiveTask, ToolExecutionContext } from "../taskman/types.ts";
 import type { Stimulus } from "../stimulus.ts";
 import type { LocationRecord } from "./location.ts";
 import { registerLocation } from "./register.ts";
+import { createStage, type Stage, type StageRecord } from "../stage/stage.ts";
 
 const T0 = Date.parse("2026-10-27T16:00:00.000Z");
 const minutes = (n: number): number => T0 + n * 60_000;
@@ -112,7 +113,7 @@ const temporary = (prefix: string): string => {
   return dir;
 };
 
-function setup() {
+function setup(options: { readonly stage?: Stage } = {}) {
   const wikiDir = temporary("kazusa-wiki-");
   for (const [file, text] of Object.entries(PAGES)) {
     const target = path.join(wikiDir, "entities", file);
@@ -186,6 +187,9 @@ function setup() {
       tools.push(factory({}));
     },
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
   const clock = {
     init: vi.fn(async () => {}),
     time: () => now,
@@ -205,6 +209,7 @@ function setup() {
     appendLedger: async ({ agentId, text, metadata }) => {
       sightings.push({ agentId, text, metadata });
     },
+    ...(options.stage ? { stage: options.stage } : {}),
   });
   const extensions = [desires.taskExtension, location.taskExtension!];
   const ledger: { text: string; metadata: unknown }[] = [];
@@ -465,6 +470,41 @@ describe("location registration", () => {
     ).toMatchObject({ ok: false });
   });
 
+  it("moves the player straight there, seen arriving, out of the huddles they left", async () => {
+    const { call, location } = setup();
+    const received: Stimulus[] = [];
+    location.attachPerception({
+      receive: async (_agentId, stimulus) => {
+        received.push(stimulus);
+      },
+    });
+    const left: { who: string; placeId: string }[] = [];
+    location.attachConversations({
+      huddlesAt: async () => [],
+      leavePlace: async (who, _name, placeId) => {
+        left.push({ who, placeId });
+      },
+    });
+    await call("location.place", { id: "kurimura-airi", placeId: "club" });
+    received.length = 0;
+
+    const placed = await location.place("user:sensei", "club");
+    expect(placed).toEqual({ placeId: "club", since: T0 });
+    // Airi may notice Sensei come in; Sensei has no brain to notice with.
+    expect(received.map(({ id }) => id)).toEqual([
+      `sighting|comes|user:sensei|club|${T0}`,
+    ]);
+    // Already there: nothing moves, nobody sees it again.
+    expect(await location.place("user:sensei", "club")).toBe(placed);
+    expect(received).toHaveLength(1);
+
+    await location.place("user:sensei", "library");
+    expect(left).toEqual([{ who: "user:sensei", placeId: "club" }]);
+    await expect(location.place("user:sensei", "nowhere")).rejects.toThrow(
+      "No place called nowhere.",
+    );
+  });
+
   it("sights arrivals both ways, a huddle as one group, and a leaver by those who noticed", async () => {
     const { context, location, call, setNow, sightings } = setup();
     const received: Stimulus[] = [];
@@ -567,6 +607,63 @@ describe("location registration", () => {
         id: `departure|kazusa|club|${minutes(14)}`,
         text: "`kazusa` leaves, heading toward School.",
       }),
+    );
+  });
+
+  it("takes an offstage character out of the world, seen leaving", async () => {
+    const stage = createStage(createInMemoryStore<StageRecord>(), {
+      defaultOnstage: true,
+    });
+    const { call, location, stores } = setup({ stage });
+    const received: Stimulus[] = [];
+    location.attachPerception({
+      receive: async (_agentId, stimulus) => {
+        received.push(stimulus);
+      },
+    });
+    const left: { who: string; placeId: string }[] = [];
+    location.attachConversations({
+      huddlesAt: async () => [],
+      leavePlace: async (who, _name, placeId) => {
+        left.push({ who, placeId });
+      },
+    });
+    await call("location.place", { id: "kurimura-airi", placeId: "club" });
+    await call("location.place", { id: "yutori-natsu", placeId: "club" });
+    await stores.get("location")!.register("yutori-natsu", {
+      placeId: "club",
+      since: T0,
+      noticed: ["kurimura-airi"],
+    });
+    received.length = 0;
+    const sighting: Stimulus = {
+      id: `sighting|arrive|kurimura-airi|club|${T0}`,
+      sessionKey: "agent:yutori-natsu:tasks",
+      sender: "kurimura-airi",
+      text: "`kurimura-airi` is here.",
+      timestamp: T0,
+      foreseen: true,
+    };
+
+    await stage.set("kurimura-airi", false, T0);
+    await location.exit("kurimura-airi", T0);
+
+    expect(left).toEqual([{ who: "kurimura-airi", placeId: "club" }]);
+    expect(received.map(({ id }) => id)).toEqual([
+      `departure|kurimura-airi|club|${T0}`,
+    ]);
+    expect((await location.record("yutori-natsu"))?.noticed).toEqual([]);
+    expect(await location.participants()).not.toContain("kurimura-airi");
+    expect(await location.placeOf("kurimura-airi")).toBeUndefined();
+    expect(await location.confirm("yutori-natsu", sighting)).toBeUndefined();
+
+    // Back on: where she was, and Natsu may notice her come in.
+    received.length = 0;
+    await stage.set("kurimura-airi", true, T0);
+    await location.enter("kurimura-airi", T0);
+    expect(await location.participants()).toContain("kurimura-airi");
+    expect(received.map(({ id }) => id)).toContain(
+      `sighting|comes|kurimura-airi|club|${T0}`,
     );
   });
 

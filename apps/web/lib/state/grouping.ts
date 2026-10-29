@@ -1,7 +1,16 @@
 import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
 
 export type GroupBy = "none" | "affiliation" | "activity" | "brain";
-export type KindFilter = "simulated" | "npc" | "everyone";
+/**
+ * `characters` are all agents, onstage or not; `onstage` and `offstage` split
+ * them by whether they're being simulated right now.
+ */
+export type KindFilter =
+  | "characters"
+  | "onstage"
+  | "offstage"
+  | "npc"
+  | "everyone";
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   none: "None",
@@ -20,10 +29,16 @@ export function filterCharacters(
   characters: readonly CharacterSummary[],
   kind: KindFilter,
   query: string,
+  isOffstage: (id: string) => boolean = () => false,
 ) {
   const needle = query.trim().toLowerCase();
   return characters.filter((character) => {
-    if (kind === "simulated" && character.kind !== "agent") return false;
+    const agent = character.kind === "agent";
+    if (kind === "characters" && !agent) return false;
+    if (kind === "onstage" && (!agent || isOffstage(character.id)))
+      return false;
+    if (kind === "offstage" && (!agent || !isOffstage(character.id)))
+      return false;
     if (kind === "npc" && character.kind !== "npc") return false;
     if (!needle) return true;
     return (

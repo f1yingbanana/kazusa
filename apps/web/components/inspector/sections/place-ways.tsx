@@ -9,7 +9,7 @@ function WayRow({ to, ways, note }: { to: string; ways: string; note?: string })
   return (
     <li className="flex flex-col py-0.5">
       <span className="flex min-w-0 items-center justify-between gap-2">
-        <PlaceChip id={to} />
+        <PlaceChip id={to} bare />
         <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{ways}</span>
       </span>
       {note ? <span className="pl-1 text-xs leading-relaxed text-muted-foreground">{note}</span> : null}

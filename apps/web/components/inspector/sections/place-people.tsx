@@ -7,6 +7,7 @@ import { PlaceChip } from '@/components/entities/chips'
 import { useCharacters } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
 import { useLocationVersion, useOccupancy, usePlaces } from '@/hooks/use-location'
+import { useOffstage } from '@/hooks/use-stage'
 import { useSelection } from '@/hooks/use-url-state'
 import { locationStore } from '@/lib/live/state'
 import { headingTo, peopleWithin } from '@/lib/location/places'
@@ -34,12 +35,19 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
   const ids = useMemo(() => characters.map((c) => c.id), [characters])
   const occupied = useOccupancy(ids)
   const version = useLocationVersion()
+  const offstage = useOffstage()
   const now = useSimNow()
 
   const arriving = useMemo(
-    () => headingTo(ids, (id) => locationStore.get(id), entity.id, now),
+    () =>
+      headingTo(
+        ids.filter((id) => !offstage.has(id)),
+        (id) => locationStore.get(id),
+        entity.id,
+        now,
+      ),
     // `version` stands in for every record in the store.
-    [ids, entity.id, now, version],
+    [ids, offstage, entity.id, now, version],
   )
 
   if (!places?.byId.has(entity.id)) return null
@@ -88,7 +96,7 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
           <ul className="-ml-1 flex flex-col">
             {inside.map(({ id, count }) => (
               <li key={id} className="flex items-center justify-between gap-2">
-                <PlaceChip id={id} />
+                <PlaceChip id={id} bare />
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
               </li>
             ))}

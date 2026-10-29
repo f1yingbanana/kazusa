@@ -48,7 +48,7 @@ export function useCharacterDetail(id: string): {
       : null,
     ([, baseUrl, charId]) =>
       fetchCharacterDetail(baseUrl, charId, config.token),
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: true, refreshInterval: 30_000 },
   );
 
   if (isLive) {

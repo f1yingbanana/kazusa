@@ -13,6 +13,7 @@ export const MOCKABLE: ReadonlySet<Domain> = new Set<Domain>([
   "desires",
   "places",
   "location",
+  "stage",
 ]);
 
 /**

@@ -1,10 +1,12 @@
 import {
   LocationsResponseSchema,
+  MoveResponseSchema,
   PlacesResponseSchema,
   type LocationsResponse,
+  type MoveResponse,
   type PlacesResponse,
 } from "@kazusa/client";
-import { buildUrl, request } from "../http";
+import { buildUrl, postJson, request } from "../http";
 
 export const PLACES_KEY = "kazusa/places";
 export const LOCATIONS_KEY = "kazusa/locations";
@@ -36,4 +38,18 @@ export async function fetchLocations(
     token,
   );
   return LocationsResponseSchema.parse(data);
+}
+
+/** The player goes straight to a place; the backend knows who the player is. */
+export async function movePlayer(
+  baseUrl: string,
+  placeId: string,
+  token?: string,
+): Promise<MoveResponse> {
+  const data = await postJson<unknown>(
+    buildUrl(baseUrl, "/kazusa/move"),
+    { placeId },
+    token,
+  );
+  return MoveResponseSchema.parse(data);
 }

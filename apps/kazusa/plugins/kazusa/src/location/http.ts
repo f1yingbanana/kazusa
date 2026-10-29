@@ -1,10 +1,17 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type {
-  LocationRecord as ClientLocationRecord,
-  LocationsResponse,
-  PlacesResponse,
+import {
+  MovePayloadSchema,
+  type LocationRecord as ClientLocationRecord,
+  type LocationsResponse,
+  type MoveResponse,
+  type PlacesResponse,
 } from "@kazusa/client";
-import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
+import {
+  createRouteRegistrar,
+  readJsonBody,
+  sendJson,
+} from "../http/helpers.ts";
+import { USER } from "./config.ts";
 import type { LocationRecord } from "./location.ts";
 import type { LocationService } from "./register.ts";
 
@@ -29,6 +36,7 @@ export function registerLocationHttp(
 ): void {
   const route = createRouteRegistrar(api);
   const { location } = deps;
+  const player = USER.parse(api.pluginConfig?.user ?? {});
 
   route("places", "GET", async (_req, res) => {
     const map = location.world?.map;
@@ -50,11 +58,21 @@ export function registerLocationHttp(
   route("locations", "GET", async (_req, res) => {
     const records: Record<string, ClientLocationRecord> = {};
     await Promise.all(
-      location.participants().map(async (id) => {
+      (await location.participants()).map(async (id) => {
         const record = await location.record(id);
         if (record) records[id] = clientRecord(record);
       }),
     );
     sendJson(res, 200, { records } satisfies LocationsResponse);
+  });
+
+  // The player has no tasks, so they go straight there. Who moves comes from
+  // config, never the request.
+  route("move", "POST", async (req, res) => {
+    const { placeId } = MovePayloadSchema.parse(await readJsonBody(req));
+    const record = await location.place(player.id, placeId);
+    sendJson(res, 200, {
+      record: clientRecord(record),
+    } satisfies MoveResponse);
   });
 }

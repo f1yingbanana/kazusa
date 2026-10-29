@@ -138,6 +138,8 @@ export interface PerceptionDeps {
    * Absent: it stays quarantined.
    */
   readonly adopted?: (delivery: PerceptionDelivery) => Promise<boolean>;
+  /** Whether the character is simulated. Absent: everyone is. */
+  readonly onstage?: (agentId: string) => Promise<boolean>;
   readonly confirm?: (
     agentId: string,
     item: Stimulus,
@@ -693,7 +695,14 @@ export class Perception {
       // A paused world is frozen: nothing is judged or handed over until the
       // clock runs again (`resume`). Live, a paused meeting of four ran a
       // hundred bubbles at one sim instant.
-      if (this.deps.clock.now().speed <= 0) return undefined;
+      const systemAgent =
+        this.deps.api?.runtime.config.current().agents?.defaults?.systemAgent
+          ?.agentId === agentId;
+      if (this.deps.clock.now().speed <= 0 && !systemAgent) return undefined;
+      // Offstage, the same holds for one character: what reaches them waits,
+      // unjudged, until they come back (`drain`).
+      if (this.deps.onstage && !(await this.deps.onstage(agentId)))
+        return undefined;
       const task = await this.taskStore.lookup(agentId);
       const reserved = new Set(
         state.deliveries?.flatMap((delivery) => delivery.keys),
@@ -749,7 +758,13 @@ export class Perception {
           );
           return;
         }
-        if (!available.some((item) => this.isReady(item, task))) {
+        if (
+          !available.some(
+            (item) =>
+              item.timestamp <= now &&
+              (systemAgent || this.isReady(item, task)),
+          )
+        ) {
           this.armReadiness(agentId, available);
           return;
         }
@@ -763,7 +778,8 @@ export class Perception {
         );
       }
       const decision: AttentionDecision & DecisionTrace =
-        !busy && fresh.every((item) => item.deadline || item.idle)
+        systemAgent ||
+        (!busy && fresh.every((item) => item.deadline || item.idle))
           ? { action: "STEER", delayMs: 0, source: "automatic" }
           : await this.classify(agentId, state, task, fresh, busy);
       this.assertCurrent();

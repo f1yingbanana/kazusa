@@ -34,6 +34,8 @@ export const DEFAULT_CAPABILITIES: Readonly<
   status: "live",
   timeline: "live",
   desires: "live",
+  stage: "live",
+  models: "live",
 };
 
 export function toClockState(clock: Clock): ClockState {

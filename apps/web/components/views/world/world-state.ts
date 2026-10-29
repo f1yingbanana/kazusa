@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import type { CharacterSummary } from '@kazusa/client'
 import { useCharacters, useStatusVersion } from '@/hooks/use-characters'
 import { useOccupancy, usePlaces } from '@/hooks/use-location'
+import { useOffstage } from '@/hooks/use-stage'
 import { useParam } from '@/hooks/use-url-state'
 import { locationStore, statusStore } from '@/lib/live/state'
 import type { Occupancy, PlaceIndex } from '@/lib/location/places'
@@ -19,7 +20,7 @@ import { useWatchlist } from '@/lib/state/watchlist'
  *   world.in   – open folder: `all`, `watch`, or a group key. Absent means
  *                "nothing opened yet": desktop shows `all`, narrow screens
  *                show the folder list as the section's first screen.
- *   world.kind – simulated (default) | npc | everyone
+ *   world.kind – characters (default) | onstage | offstage | npc | everyone
  */
 export type Dimension = Exclude<GroupBy, 'none'> | 'place'
 
@@ -31,7 +32,9 @@ const ALL_DIMENSIONS: readonly { id: Dimension; label: string }[] = [
 ]
 
 export const KIND_LABELS: Record<KindFilter, string> = {
-  simulated: 'Simulated',
+  characters: 'Characters',
+  onstage: 'Onstage',
+  offstage: 'Offstage',
   npc: 'NPCs',
   everyone: 'Everyone',
 }
@@ -41,6 +44,7 @@ export const WATCH_FOLDER = 'watch'
 export const PLACE_PREFIX = 'place:'
 export const TRANSIT_FOLDER = '__transit'
 export const UNPLACED_FOLDER = '__unplaced'
+export const OFFSTAGE_FOLDER = '__offstage'
 
 /** Place folders need both the map and positions. */
 export function usePlacesAvailable() {
@@ -63,7 +67,7 @@ export function useWorldParams() {
   const dimensions = useDimensions()
   const defaultBy: Dimension = dimensions.some((d) => d.id === 'place') ? 'place' : 'affiliation'
   const by: Dimension = dimensions.some((d) => d.id === rawBy) ? (rawBy as Dimension) : defaultBy
-  const kind: KindFilter = rawKind && rawKind in KIND_LABELS ? (rawKind as KindFilter) : 'simulated'
+  const kind: KindFilter = rawKind && rawKind in KIND_LABELS ? (rawKind as KindFilter) : 'characters'
   return { by, defaultBy, kind, folderParam, folder: folderParam ?? ALL_FOLDER }
 }
 
@@ -93,6 +97,7 @@ function placeFolders(
   index: PlaceIndex,
   occupied: Occupancy,
   byId: ReadonlyMap<string, CharacterSummary>,
+  offstage: readonly CharacterSummary[],
 ): Folder[] {
   const people = (ids: readonly string[]) =>
     ids
@@ -146,6 +151,8 @@ function placeFolders(
   })
   const unplaced = people(occupied.unplaced)
   if (unplaced.length) folders.push({ key: UNPLACED_FOLDER, label: 'Unplaced', members: unplaced })
+  // Offstage characters aren't anywhere in the world.
+  if (offstage.length) folders.push({ key: OFFSTAGE_FOLDER, label: 'Offstage', members: [...offstage].sort(byName) })
   return folders
 }
 
@@ -156,20 +163,39 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
   const statusVersion = useStatusVersion()
   const statusGrouped = by === 'activity' || by === 'brain'
   const places = usePlaces()
+  const offstage = useOffstage()
 
   const pool = useMemo(
-    () => filterCharacters(characters, kind, '').filter((c) => c.kind !== 'player'),
-    [characters, kind],
+    () => filterCharacters(characters, kind, '', (id) => offstage.has(id)).filter((c) => c.kind !== 'player'),
+    [characters, kind, offstage],
   )
   const poolIds = useMemo(() => (by === 'place' ? pool.map((c) => c.id) : []), [pool, by])
   const occupied = useOccupancy(poolIds)
 
   const groups: Folder[] = useMemo(() => {
-    if (by === 'place') return places ? placeFolders(places, occupied, byId) : []
+    if (by === 'place')
+      return places ? placeFolders(places, occupied, byId, pool.filter((c) => offstage.has(c.id))) : []
     const statusGroups: Group[] = groupCharacters(pool, by, (id) => statusStore.get(id))
     return statusGroups
     // Activity and brain folders regroup on live status deltas.
-  }, [pool, by, places, occupied, byId, statusGrouped ? statusVersion : 0])
+  }, [pool, by, places, occupied, byId, offstage, statusGrouped ? statusVersion : 0])
+
+  /*
+   * Who a folder's onstage controls act on: every character in it, whatever
+   * the Show filter hides. Only Everyone and affiliation folders are groups
+   * worth switching; activity, brain and place folders change by the minute,
+   * and offstage characters have none of those.
+   */
+  const agents = useMemo(() => characters.filter((c) => c.kind === 'agent').sort(byName), [characters])
+  const affiliations = useMemo(
+    () => new Map(groupCharacters(agents, 'affiliation', () => undefined).map((g) => [g.key, g.members])),
+    [agents],
+  )
+  const castOf = (key: string): readonly CharacterSummary[] | undefined => {
+    if (key === ALL_FOLDER) return agents
+    if (by === 'affiliation') return affiliations.get(key)
+    return undefined
+  }
 
   const watched = useMemo(
     () =>
@@ -187,7 +213,7 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
     return groups.find((g) => g.key === key) ?? null
   }
 
-  return { characters, groups, watched, everyone, resolve, isLoading, error, places }
+  return { characters, groups, watched, everyone, resolve, castOf, offstage, isLoading, error, places }
 }
 
 /** "2 thinking · 1 composing", or null when nobody is busy. */

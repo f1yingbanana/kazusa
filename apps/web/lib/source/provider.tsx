@@ -10,7 +10,7 @@ import type {
   PlacesResponse,
   WorldResponse,
 } from "@kazusa/client";
-import { useChats } from "@/hooks/use-chats";
+import { useChatsResource } from "@/hooks/use-chats";
 import {
   clockStore,
   desireConfigStore,
@@ -75,7 +75,7 @@ export function SourcesProvider({
   fallback: React.ReactNode;
 }) {
   const config = useKazusaConfig();
-  const chats = useChats();
+  const chats = useChatsResource();
   const probing = chats.isLoading && !chats.error;
   const reachable = !chats.error && !chats.isLoading;
 
@@ -102,7 +102,7 @@ export function SourcesProvider({
       ? (["kazusa/characters", config.baseUrl, config.token ?? ""] as const)
       : null,
     () => fetchCharacters(config.baseUrl, config.token),
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: true, refreshInterval: 30_000 },
   );
 
   const liveDesires = useSWR<DesiresResponse, Error>(
@@ -271,7 +271,7 @@ export function SourcesProvider({
       mocks: config.mocks,
       reachable,
       backendError: chats.error,
-      retryBackend: () => void chats.reload(),
+      retryBackend: () => void chats.mutate(),
       world,
       player,
       characters,
@@ -287,7 +287,7 @@ export function SourcesProvider({
       config.mocks,
       reachable,
       chats.error,
-      chats.reload,
+      chats.mutate,
       world,
       player,
       characters,

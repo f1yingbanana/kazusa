@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeftIcon, UsersIcon } from 'lucide-react'
+import { ChevronLeftIcon, MapPinIcon, UsersIcon } from 'lucide-react'
 import type { CharacterSummary } from '@kazusa/client'
 import { PresenceAvatar } from '@/components/entities/presence-avatar'
 import { taskIcon } from '@/components/entities/task-icon'
@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCharacterStatus, useCharacters } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
+import { usePlace } from '@/hooks/use-location'
 import { useSelection } from '@/hooks/use-url-state'
 import { formatTypingLabel } from '@/lib/format'
 import type { Typist } from '@/lib/live/realtime-provider'
+import { chatSubject, listNames } from '@/lib/source/chats/display'
 import type { Chat } from '@/lib/source/chats/types'
-import type { EntityRef } from '@/lib/state/entity-ref'
+import { sameEntity } from '@/lib/state/entity-ref'
 import { requestInspector } from '@/lib/state/inspector-request'
 import { formatSimDuration } from '@/lib/time/sim'
 import { cn } from '@/lib/utils'
@@ -42,19 +44,10 @@ function Activity({ character }: { character: CharacterSummary | undefined }) {
   )
 }
 
-function shortName(name: string) {
-  return name.split(' ')[0] ?? name
-}
-
-function memberNames(members: readonly CharacterSummary[], total: number) {
-  const shown = members.slice(0, 3).map((member) => shortName(member.name))
-  const rest = total - shown.length
-  return rest > 0 ? `${shown.join(', ')} +${rest}` : shown.join(', ')
-}
-
 /**
- * Tapping the identity area opens the inspector: the character for a DM, the
- * chat (with each member's activity) for a group.
+ * Tapping the identity area reopens the inspector on the chat's subject: the
+ * character for a DM, the chat (each member's activity) otherwise. A huddle
+ * names where it is happening: it is face to face, not on the phone.
  */
 export function ChatHeader({
   chat,
@@ -71,24 +64,19 @@ export function ChatHeader({
 }) {
   const { byId } = useCharacters()
   const [selection, select] = useSelection()
-  const isGroup = chat.type === 'group'
+  const place = usePlace(chat.placeId)
+  const isDirect = chat.type === 'direct'
   const others = chat.members.filter((id) => id !== userId)
-  const partner = !isGroup ? byId.get(others[0] ?? '') : undefined
+  const partner = isDirect ? byId.get(others[0] ?? '') : undefined
   const known = others.map((id) => byId.get(id)).filter((c): c is CharacterSummary => Boolean(c))
 
-  const target: EntityRef | null = isGroup
-    ? chat.draft
-      ? null
-      : { kind: 'chat', id: chat.id }
-    : others[0]
-      ? { kind: 'character', id: others[0] }
-      : null
-  const isSelected = Boolean(target && selection?.kind === target.kind && selection.id === target.id)
+  const target = chatSubject(chat, userId)
+  const isSelected = target !== null && sameEntity(target, selection)
   const typing = typists.length > 0
 
   const identity = (
     <>
-      {isGroup ? (
+      {!isDirect ? (
         <span aria-hidden className="flex shrink-0 items-center pl-0.5">
           {known.slice(0, MAX_STACK).map((member, index) => (
             <PresenceAvatar
@@ -121,10 +109,20 @@ export function ChatHeader({
         >
           {typing ? (
             <span className="truncate">
-              {isGroup ? formatTypingLabel(typists.map((t) => shortName(t.senderName))) : 'typing…'}
+              {isDirect
+                ? 'typing…'
+                : formatTypingLabel(
+                    typists.map((t) => t.senderName),
+                    chat.type === 'huddle' ? 'about to speak' : undefined,
+                  )}
             </span>
-          ) : isGroup ? (
-            <span className="truncate">{memberNames(known, others.length) || 'Just you'}</span>
+          ) : chat.type === 'huddle' ? (
+            <>
+              <MapPinIcon aria-hidden className="size-3 shrink-0" />
+              <span className="truncate">{`In person at ${place?.name ?? 'the same place'}`}</span>
+            </>
+          ) : chat.type === 'group' ? (
+            <span className="truncate">{listNames(known.map((member) => member.name)) || 'Just you'}</span>
           ) : (
             <Activity character={partner} />
           )}
@@ -160,13 +158,13 @@ export function ChatHeader({
           >
             {identity}
           </TooltipTrigger>
-          <TooltipContent>{isGroup ? 'Chat details' : `About ${partner?.name ?? chat.name}`}</TooltipContent>
+          <TooltipContent>{isDirect ? `About ${partner?.name ?? chat.name}` : 'Chat details'}</TooltipContent>
         </Tooltip>
       ) : (
         <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 px-2">{identity}</div>
       )}
 
-      {isGroup && !chat.draft ? (
+      {chat.type === 'group' && !chat.draft ? (
         <Tooltip>
           <TooltipTrigger render={<Button variant="ghost" size="sm" onClick={onOpenMembers} />}>
             <UsersIcon data-icon="inline-start" />

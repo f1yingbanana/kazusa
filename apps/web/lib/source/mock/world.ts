@@ -594,7 +594,52 @@ function initialStatus(
     brain: chance(rng, 0.08) ? "thinking" : "idle",
     composingIn: composing ? [pick(rng, memberOf).id] : [],
     queued: chance(rng, 0.1) ? int(rng, 1, 3) : 0,
+    onstage: true,
   };
+}
+
+/** Offstage: not thinking, not anywhere; texts to them wait. */
+function offstage(status: CharacterStatus, since: number): CharacterStatus {
+  return {
+    ...status,
+    onstage: false,
+    offstageSince: since,
+    brain: "idle",
+    composingIn: [],
+  };
+}
+
+/**
+ * The mock side of `POST /kazusa/character/stage`. Coming back, a character is
+ * where they last were (or home) and reads what waited.
+ */
+export function setMockStage(
+  world: MockWorld,
+  ids: readonly string[],
+  onstage: boolean,
+  now: number,
+): StreamEvent[] {
+  const events: StreamEvent[] = [];
+  for (const id of ids) {
+    const status = world.statuses.get(id);
+    if (!status || status.onstage === onstage) continue;
+    const { offstageSince: _, ...rest } = status;
+    const next = onstage
+      ? { ...rest, onstage: true, queued: 0 }
+      : offstage(status, now);
+    world.statuses.set(id, next);
+    if (!onstage) world.locations.delete(id);
+    else if (!world.locations.has(id)) {
+      const home = world.homes.get(id);
+      if (home) {
+        const record = { placeId: home, since: now };
+        world.locations.set(id, record);
+        events.push({ type: "location", characterId: id, record });
+      }
+    }
+    events.push({ type: "status", characterId: id, status: next });
+  }
+  return events;
 }
 
 /**
@@ -748,6 +793,17 @@ export function createMockWorld(
     });
   }
 
+  // A big cast is partly offstage: one whole group, and some of every other.
+  if (!options.characters) {
+    const benched = AFFILIATIONS.at(-1)?.name;
+    for (const [index, agent] of agents.entries()) {
+      if (agent.affiliation !== benched && index % 5 !== 1) continue;
+      const status = statuses.get(agent.id);
+      if (status) statuses.set(agent.id, offstage(status, now));
+      locations.delete(agent.id);
+    }
+  }
+
   return {
     id: ++worldCounter,
     title: "Mock World",
@@ -793,6 +849,7 @@ export function advanceMockWorld(
   let starts = 0;
   for (const [id, status] of world.statuses) {
     if (starts >= maxStarts) break;
+    if (!status.onstage) continue;
     if (!status.task || status.task.endAt > now) continue;
     // Journal simTime is the clock at the mutation, like the real producer.
     const started = startTask(world, id, now, undefined);
@@ -820,7 +877,9 @@ export function advanceMockWorld(
     starts += 1;
   }
 
-  const ids = [...world.statuses.keys()];
+  const ids = [...world.statuses]
+    .filter(([, status]) => status.onstage)
+    .map(([id]) => id);
   for (let flip = 0; flip < 3 && ids.length > 0; flip += 1) {
     const id = pick(rng, ids);
     const status = world.statuses.get(id);
@@ -842,7 +901,10 @@ export function advanceMockWorld(
 
   if (world.chats.length > 0 && chance(rng, 0.35)) {
     const chat = pick(rng, world.chats);
-    const senderId = pick(rng, chat.members);
+    const speakers = chat.members.filter(
+      (id) => world.statuses.get(id)?.onstage !== false,
+    );
+    const senderId = pick(rng, speakers.length ? speakers : chat.members);
     append({
       kind: "message.sent",
       simTime: now,

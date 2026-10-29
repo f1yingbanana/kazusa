@@ -33,7 +33,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSimNow } from "@/hooks/use-clock";
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
+import { actionLine } from "@/lib/source/chats/display";
 import type { Chat, PendingMessage } from "@/lib/source/chats/types";
+import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
 import type { Typist } from "@/lib/live/realtime-provider";
 
@@ -43,10 +45,14 @@ type DisplayMessage = (ChatMessage & { status?: never }) | PendingMessage;
 
 type Run = {
   key: string;
+  /** Actions are narrated, never bubbled, so they never share a run with speech. */
+  isAction: boolean;
   senderId: string;
   senderName: string;
   messages: DisplayMessage[];
   dayLabel: string | null;
+  /** Right after the same sender's action, which already named them. */
+  introduced: boolean;
 };
 
 function buildRuns(messages: DisplayMessage[], simNow: number) {
@@ -54,6 +60,7 @@ function buildRuns(messages: DisplayMessage[], simNow: number) {
   let previous: DisplayMessage | null = null;
 
   for (const message of messages) {
+    const isAction = message.type === "action";
     const newDay =
       !previous || !isSameDay(previous.timestamp, message.timestamp);
     const current = runs[runs.length - 1];
@@ -61,6 +68,7 @@ function buildRuns(messages: DisplayMessage[], simNow: number) {
       current &&
       !newDay &&
       previous &&
+      current.isAction === isAction &&
       previous.senderId === message.senderId &&
       message.timestamp - previous.timestamp < RUN_GAP_MS &&
       !previous.status === !message.status;
@@ -70,10 +78,15 @@ function buildRuns(messages: DisplayMessage[], simNow: number) {
     } else {
       runs.push({
         key: message.id,
+        isAction,
         senderId: message.senderId,
         senderName: message.senderName,
         messages: [message],
         dayLabel: newDay ? formatDayLabel(message.timestamp, simNow) : null,
+        introduced:
+          !newDay &&
+          Boolean(current?.isAction) &&
+          current?.senderId === message.senderId,
       });
     }
     previous = message;
@@ -109,7 +122,8 @@ export function MessageList({
   userId: string;
 }) {
   const simNow = useSimNow();
-  const isGroup = chat.type === "group";
+  // Huddles and groups both need names on lines; only a DM has one voice.
+  const isGroup = chat.type !== "direct";
   const runs = buildRuns([...messages, ...pending], simNow);
   const pendingById = new Map(pending.map((message) => [message.id, message]));
 
@@ -162,15 +176,9 @@ export function MessageList({
                     <EmptyMedia variant="icon">
                       <SparklesIcon />
                     </EmptyMedia>
-                    <EmptyTitle>
-                      {isGroup
-                        ? `Welcome to ${chat.name}`
-                        : `Say hello to ${chat.name}`}
-                    </EmptyTitle>
+                    <EmptyTitle>{EMPTY[chat.type].title(chat.name)}</EmptyTitle>
                     <EmptyDescription>
-                      {isGroup
-                        ? "Every agent in this group will see your message and can reply."
-                        : "Messages here are private between you and this agent."}
+                      {EMPTY[chat.type].description}
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
@@ -191,39 +199,55 @@ export function MessageList({
                       </Marker>
                     </MessageScrollerItem>
                   ) : null}
-                  <MessageScrollerItem messageId={run.key}>
-                    <MessageGroup className="gap-1">
-                      {run.messages.map((message, index) => {
-                        const isFirst = index === 0;
-                        const isLast = index === run.messages.length - 1;
-                        const pendingMessage = pendingById.get(message.id);
+                  {run.isAction ? (
+                    <MessageScrollerItem messageId={run.key}>
+                      <div
+                        className={cn(
+                          "flex flex-col gap-1",
+                          isSelf ? "items-end text-right" : "pl-10",
+                        )}
+                      >
+                        {run.messages.map((message) => (
+                          <ActionLine
+                            key={message.id}
+                            name={participant.name}
+                            message={message}
+                            pending={pendingById.get(message.id)}
+                            onRetry={onRetry}
+                          />
+                        ))}
+                      </div>
+                    </MessageScrollerItem>
+                  ) : (
+                    <MessageScrollerItem messageId={run.key}>
+                      <MessageGroup className="gap-1">
+                        {run.messages.map((message, index) => {
+                          const isFirst = index === 0;
+                          const isLast = index === run.messages.length - 1;
+                          const pendingMessage = pendingById.get(message.id);
 
-                        return (
-                          <Message key={message.id} align={align}>
-                            {!isSelf ? (
-                              isLast ? (
-                                <MessageAvatar>
-                                  <ParticipantAvatar
-                                    participant={participant}
-                                  />
-                                </MessageAvatar>
-                              ) : (
-                                <div aria-hidden className="w-8 shrink-0" />
-                              )
-                            ) : null}
-                            <MessageContent className="gap-1">
-                              {isFirst && isGroup && !isSelf ? (
-                                <MessageHeader>
-                                  {participant.name}
-                                </MessageHeader>
+                          return (
+                            <Message key={message.id} align={align}>
+                              {!isSelf ? (
+                                isLast ? (
+                                  <MessageAvatar>
+                                    <ParticipantAvatar
+                                      participant={participant}
+                                    />
+                                  </MessageAvatar>
+                                ) : (
+                                  <div aria-hidden className="w-8 shrink-0" />
+                                )
                               ) : null}
-                              {"type" in message &&
-                              message.type === "action" ? (
-                                // Done, not said: narrated in third person.
-                                <p className="text-muted-foreground px-1 text-sm italic whitespace-pre-wrap">
-                                  {`${participant.name} ${message.text}`}
-                                </p>
-                              ) : (
+                              <MessageContent className="gap-1">
+                                {isFirst &&
+                                isGroup &&
+                                !isSelf &&
+                                !run.introduced ? (
+                                  <MessageHeader>
+                                    {participant.name}
+                                  </MessageHeader>
+                                ) : null}
                                 <Bubble
                                   align={align}
                                   variant={
@@ -243,22 +267,22 @@ export function MessageList({
                                     {message.text}
                                   </BubbleContent>
                                 </Bubble>
-                              )}
-                              {isLast ? (
-                                <MessageFooter className="gap-2 font-normal">
-                                  <MessageStatus
-                                    message={message}
-                                    pending={pendingMessage}
-                                    onRetry={onRetry}
-                                  />
-                                </MessageFooter>
-                              ) : null}
-                            </MessageContent>
-                          </Message>
-                        );
-                      })}
-                    </MessageGroup>
-                  </MessageScrollerItem>
+                                {isLast ? (
+                                  <MessageFooter className="gap-2 font-normal">
+                                    <MessageStatus
+                                      message={message}
+                                      pending={pendingMessage}
+                                      onRetry={onRetry}
+                                    />
+                                  </MessageFooter>
+                                ) : null}
+                              </MessageContent>
+                            </Message>
+                          );
+                        })}
+                      </MessageGroup>
+                    </MessageScrollerItem>
+                  )}
                 </Fragment>
               );
             })}
@@ -281,7 +305,9 @@ export function MessageList({
                       <Bubble variant="secondary">
                         <BubbleContent>
                           <span className="shimmer" aria-live="polite">
-                            {`${isGroup ? "Typing" : `${participant.name} is typing`}…`}
+                            {chat.type === "huddle"
+                              ? "…"
+                              : `${isGroup ? "Typing" : `${participant.name} is typing`}…`}
                           </span>
                         </BubbleContent>
                       </Bubble>
@@ -295,6 +321,66 @@ export function MessageList({
         <MessageScrollerButton />
       </MessageScroller>
     </MessageScrollerProvider>
+  );
+}
+
+const EMPTY = {
+  direct: {
+    title: (name: string) => `Say hello to ${name}`,
+    description: "Messages here are private between you and this character.",
+  },
+  group: {
+    title: (name: string) => `Welcome to ${name}`,
+    description: "Everyone in this group sees your message and can reply.",
+  },
+  huddle: {
+    title: () => "Nobody has spoken yet",
+    description: "You are talking face to face: everyone here can hear you.",
+  },
+} as const;
+
+/**
+ * Something done rather than said, narrated in third person ("Kazusa leans
+ * back. She sips her tea."). The stored text leaves out the subject; the name
+ * is set upright so the line still reads as one sentence.
+ */
+function ActionLine({
+  name,
+  message,
+  pending,
+  onRetry,
+}: {
+  name: string;
+  message: DisplayMessage;
+  pending?: PendingMessage;
+  onRetry: (message: PendingMessage) => void;
+}) {
+  const line = actionLine(name, message.text);
+  return (
+    <div className="flex max-w-[80%] flex-col gap-0.5">
+      <p
+        title={formatTime(message.timestamp)}
+        className={cn(
+          "text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground italic",
+          pending?.status === "sending" && "opacity-70",
+          pending?.status === "failed" && "text-destructive",
+        )}
+      >
+        <span className="font-medium text-foreground not-italic">
+          {line.subject}
+        </span>
+        {line.rest}
+      </p>
+      {pending ? (
+        <span className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+          <MessageStatus
+            message={message}
+            pending={pending}
+            onRetry={onRetry}
+          />
+        </span>
+      ) : null}
+    </div>
   );
 }
 

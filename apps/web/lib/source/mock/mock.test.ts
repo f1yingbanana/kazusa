@@ -7,7 +7,12 @@ import {
 import { MINUTE } from "../../time/sim";
 import { applyClockAction } from "./clock";
 import { queryJournal } from "./timeline";
-import { MOCK_WORLD_START, advanceMockWorld, createMockWorld } from "./world";
+import {
+  MOCK_WORLD_START,
+  advanceMockWorld,
+  createMockWorld,
+  setMockStage,
+} from "./world";
 
 describe("mock world", () => {
   it("is deterministic for a seed and sized for scale work", () => {
@@ -33,6 +38,22 @@ describe("mock world", () => {
     expect(world.characters).toHaveLength(1);
     expect(world.characters[0].affiliation).toBeUndefined();
     expect(world.statuses.get("alice")?.task).toBeDefined();
+  });
+  it("keeps part of the cast offstage, nowhere and never advanced", () => {
+    const world = createMockWorld({ seed: 5, count: 30 });
+    const off = [...world.statuses].filter(([, s]) => !s.onstage).map(([id]) => id);
+    expect(off.length).toBeGreaterThan(0);
+    for (const id of off) expect(world.locations.has(id)).toBe(false);
+    const events = advanceMockWorld(world, MOCK_WORLD_START + 600 * MINUTE, 30);
+    const touched = new Set(events.flatMap((e) => (e.type === "status" ? [e.characterId] : [])));
+    for (const id of off) expect(touched.has(id)).toBe(false);
+
+    const [back] = off;
+    const returned = setMockStage(world, [back], true, MOCK_WORLD_START);
+    expect(world.statuses.get(back)?.onstage).toBe(true);
+    expect(world.locations.has(back)).toBe(true);
+    expect(returned.map((e) => e.type)).toEqual(["location", "status"]);
+    expect(setMockStage(world, [back], true, MOCK_WORLD_START)).toEqual([]);
   });
   it("advances ended tasks into journal + status stream events", () => {
     const world = createMockWorld({ seed: 5, count: 30 });
