@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -209,13 +210,14 @@ export function createDecisionContextAssembler(
     ) => Promise<readonly ChatFacts[]>;
   },
 ): DecisionContextAssembler {
+  const getConfig = () => currentConfig(api);
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
   );
   const skillLoader =
     deps.skillLoader ??
     createSkillLoader({
-      config: api.config,
+      config: getConfig(),
       pluginRootDir: api.rootDir,
     });
   return async (agentId, request) => {
@@ -228,11 +230,11 @@ export function createDecisionContextAssembler(
       ]),
     ];
     const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
-      api.config,
+      getConfig(),
       agentId,
     );
     const storePath = api.runtime.agent.session.resolveStorePath(
-      api.config.session?.store,
+      getConfig().session?.store,
       { agentId },
     );
     const [streams, characterFiles, wiki, skillMarkdown, chats] =

@@ -35,6 +35,9 @@ manuscript writing that she forgets to eat.
   entry.
 - `name` (string, required): Full display name.
 - `occupation` (string, required): Primary role or vocation.
+- `avatarUrl` (string, optional): Explicit avatar URL override. Normally
+  omitted: drop `avatar.{webp,png,jpg,jpeg,gif,avif}` in the workspace root and
+  the plugin serves it at `/kazusa/avatar?id=<agent_id>&v=<mtime>`.
 
 ---
 
@@ -418,7 +421,7 @@ entityType: place
 place_id: trinity_patisserie
 name: Pâtisserie de Trinity
 aliases: [the patisserie]
-learned: been there # or "told by kurimura-airi", "looked it up"
+learned: been there # or "told by airi-kurimura", "looked it up"
 first_visited_iso: "2026-10-27T16:14:00.000Z"
 ---
 

@@ -235,6 +235,8 @@ export interface ChatSummary {
   readonly kind: ChatKind;
   readonly title: string;
   readonly members: readonly string[];
+  /** A huddle's place. */
+  readonly placeId?: string;
 }
 
 /** Stable identities scope send retries and canonical direct conversations. */
@@ -308,5 +310,6 @@ export function chatSummary(
     kind: chat.kind,
     title: chat.title ?? peer ?? "Group chat",
     members: [...chat.members],
+    ...(chat.placeId ? { placeId: chat.placeId } : {}),
   };
 }

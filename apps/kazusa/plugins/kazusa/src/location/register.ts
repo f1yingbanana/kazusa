@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -12,10 +13,13 @@ import { createSkillLoader } from "../context-engine/skill-loader.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import type { Perception } from "../perception/perception.ts";
+import type { Stage } from "../stage/stage.ts";
+import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { Stimulus } from "../stimulus.ts";
 import type { ActiveTask, TaskExtension } from "../taskman/types.ts";
 import type { Huddle } from "../messaging/messaging.ts";
 import { crossings } from "./encounters.ts";
+import { clientRecord } from "./http.ts";
 import { LOCATION_CONFIG, USER, type LocationConfig } from "./config.ts";
 import { judge } from "./judgment.ts";
 import {
@@ -127,8 +131,23 @@ export interface LocationService {
    * check-in should tell the character about arriving.
    */
   readonly settle: (agentId: string) => Promise<string | undefined>;
-  /** Configured characters and the player. */
-  readonly participants: () => string[];
+  /** Onstage characters and the player. */
+  readonly participants: () => Promise<string[]>;
+  /**
+   * Going offstage: they leave where they stand, seen by whoever had noticed
+   * them, and their conversations there go on without them.
+   */
+  readonly exit: (id: string, at: number) => Promise<void>;
+  /**
+   * Coming back onstage: they are where they were (or on their way), seen by
+   * whoever is there as if they had just come in.
+   */
+  readonly enter: (id: string, at: number) => Promise<void>;
+  /**
+   * Puts someone at a place now, without travel. Operators place characters;
+   * the player, who has no tasks, moves only this way.
+   */
+  readonly place: (id: string, placeId: string) => Promise<LocationRecord>;
   /** Whether the character is talking with or has noticed someone here. */
   readonly inCompany: (agentId: string, at: number) => Promise<boolean>;
   /** Where a participant stands now, or `undefined` while traveling. */
@@ -178,9 +197,14 @@ export function registerLocation(
       readonly timestamp: number;
       readonly metadata: unknown;
     }) => Promise<void>;
+    /** Observer SSE: `location` on every record write, `journal` on sightings. */
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
+    /** Offstage characters are nowhere. Absent: everyone is onstage. */
+    readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
   },
 ): LocationService {
-  const { clock } = deps;
+  const getConfig = () => currentConfig(api);
+  const { clock, broadcaster } = deps;
   const appendLedger =
     deps.appendLedger ??
     ((entry) => appendLedgerEntry(api, { ...entry, stream: "tasks" }));
@@ -189,23 +213,35 @@ export function registerLocation(
     namespace: "location",
     retention: "retained",
   });
+  /** Every write goes through here, so observers see each one. */
+  const save = async (id: string, next: LocationRecord): Promise<void> => {
+    await store.register(id, next);
+    broadcaster?.broadcast({
+      type: "location",
+      characterId: id,
+      record: clientRecord(next),
+    });
+  };
   const world = loadWorld(config.wikiDir);
   const warn = (message: string): void => api.logger.warn(message);
   const skillLoader = createSkillLoader({
-    config: api.config,
+    config: getConfig(),
     pluginRootDir: api.rootDir,
   });
-  const participants = (): string[] => [
+  /** Configured characters and the player, onstage or not. */
+  const everyone = (): string[] => [
     ...new Set([
-      ...listAgentIds(api.config),
+      ...listAgentIds(getConfig()),
       USER.parse(api.pluginConfig?.user ?? {}).id,
     ]),
   ];
+  const participants = async (): Promise<string[]> =>
+    deps.stage ? await deps.stage.onstage(everyone()) : everyone();
   const isUser = (id: string): boolean => id.startsWith("user:");
   const workspaceOf = (id: string): string | undefined =>
     isUser(id)
       ? undefined
-      : api.runtime.agent.resolveAgentWorkspaceDir(api.config, id);
+      : api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), id);
   const record = async (id: string): Promise<LocationRecord | undefined> => {
     const stored = await store.lookup(id);
     if (stored) return stored;
@@ -244,7 +280,7 @@ export function registerLocation(
       ? id === userConfig.id
         ? userConfig.name
         : id
-      : await characterName(api, api.config, id).catch(() => id);
+      : await characterName(api, getConfig(), id).catch(() => id);
 
   /** Who someone is and where they are, as evidence for a judgment. */
   const person = async (map: WorldMap, id: string, at: number) => {
@@ -310,7 +346,7 @@ export function registerLocation(
   /** Who stands at a place at `at`, the asker included. */
   const occupants = async (placeId: string, at: number): Promise<string[]> => {
     const here = await Promise.all(
-      participants().map(async (id) => {
+      (await participants()).map(async (id) => {
         const current = await record(id);
         const position = current && positionAt(current, at);
         return position?.kind === "at" && position.placeId === placeId
@@ -345,6 +381,7 @@ export function registerLocation(
    * judged when it happens.
    */
   const SIGHTING = "sighting";
+  const MOMENTS = ["cross", "arrive", "comes", "meet"] as const;
   const sight = async (
     observer: string,
     kind: "cross" | "arrive" | "comes" | "meet",
@@ -384,10 +421,49 @@ export function registerLocation(
   ): Promise<void> => {
     const current = await record(id);
     if (!current) return;
-    await store.register(id, {
+    await save(id, {
       ...current,
       noticed: [...new Set(change(current.noticed ?? []))],
     });
+  };
+
+  /**
+   * Someone goes from a place: out of its huddles (a line to those in them),
+   * and seen going by anyone who had noticed them.
+   */
+  const leave = async (
+    who: string,
+    placeId: string,
+    at: number,
+    toward?: string,
+  ): Promise<void> => {
+    const huddled = new Set(
+      (await huddlesAt(placeId))
+        .filter(({ members }) => members.includes(who))
+        .flatMap(({ members }) => members),
+    );
+    for (const other of await occupants(placeId, at)) {
+      const theirs = await record(other);
+      if (other === who || !theirs?.noticed?.includes(who)) continue;
+      await setNoticed(other, (noticed) => noticed.filter((id) => id !== who));
+      // Those talking with them hear them go in the huddle itself.
+      if (huddled.has(other) || isUser(other) || !perception) continue;
+      await perception.receive(other, {
+        id: ["departure", who, placeId, at].join("|"),
+        sessionKey: `agent:${other}:tasks`,
+        sender: who,
+        text: `${await label(who)} leaves${toward ? `, heading toward ${toward}` : ""}.`,
+        timestamp: at,
+      });
+    }
+    await conversations
+      ?.leavePlace(who, await displayName(who), placeId, {
+        ...(toward ? { toward } : {}),
+        at,
+      })
+      .catch((error: unknown) =>
+        warn(`Location: leaving huddles failed: ${String(error)}`),
+      );
   };
 
   /**
@@ -411,35 +487,7 @@ export function registerLocation(
         : after,
     );
     if (before !== undefined && before !== after) {
-      const huddled = new Set(
-        (await huddlesAt(before))
-          .filter(({ members }) => members.includes(who))
-          .flatMap(({ members }) => members),
-      );
-      for (const other of await occupants(before, at)) {
-        const theirs = await record(other);
-        if (other === who || !theirs?.noticed?.includes(who)) continue;
-        await setNoticed(other, (noticed) =>
-          noticed.filter((id) => id !== who),
-        );
-        // Those talking with them hear them go in the huddle itself.
-        if (huddled.has(other) || isUser(other) || !perception) continue;
-        await perception.receive(other, {
-          id: ["departure", who, before, at].join("|"),
-          sessionKey: `agent:${other}:tasks`,
-          sender: who,
-          text: `${await label(who)} leaves${toward ? `, heading toward ${toward}` : ""}.`,
-          timestamp: at,
-        });
-      }
-      await conversations
-        ?.leavePlace(who, await displayName(who), before, {
-          ...(toward ? { toward } : {}),
-          at,
-        })
-        .catch((error: unknown) =>
-          warn(`Location: leaving huddles failed: ${String(error)}`),
-        );
+      await leave(who, before, at, toward);
     }
     if (after !== undefined && after !== before) {
       const others = (await occupants(after, at)).filter((id) => id !== who);
@@ -457,7 +505,7 @@ export function registerLocation(
       }
     }
     const windowMs = config.passWindowMinutes * 60_000;
-    for (const other of participants()) {
+    for (const other of await participants()) {
       if (other === who) continue;
       const theirs = await record(other);
       if (!theirs) continue;
@@ -505,8 +553,9 @@ export function registerLocation(
     item: Stimulus,
   ): Promise<Stimulus | undefined> => {
     if (!world) return undefined;
-    const [prefix, kind, subject, placeId, , betweenId] = item.id.split("|");
+    const [prefix, rawKind, subject, placeId, , betweenId] = item.id.split("|");
     const place = placeId ? world.map.places.get(placeId) : undefined;
+    const kind = MOMENTS.find((moment) => moment === rawKind);
     if (prefix !== SIGHTING || !kind || !subject || !place) return undefined;
     const between =
       kind === "meet" && betweenId
@@ -514,6 +563,16 @@ export function registerLocation(
         : undefined;
     if (kind === "meet" && !between) return undefined;
     const at = item.timestamp;
+    // Nobody sees an offstage character, and an offstage observer saw nothing.
+    if (
+      deps.stage &&
+      !(
+        (await deps.stage.presentAt(observer, at)) &&
+        (await deps.stage.presentAt(subject, at)) &&
+        (await deps.stage.isOnstage(subject))
+      )
+    )
+      return undefined;
     const [mine, theirs] = await Promise.all([
       nearAt(observer, at),
       nearAt(subject, at),
@@ -621,23 +680,32 @@ export function registerLocation(
     if (!mine.passing && !theirs.passing) {
       await setNoticed(observer, (noticed) => [...noticed, ...present]);
     }
+    const payload = {
+      subjects: present,
+      placeId: place.id,
+      moment: kind,
+      ...(between ? { between: between.id } : {}),
+      ...(huddle ? { huddle: huddle.address } : {}),
+      word: judgment.word,
+      probability: judgment.probability,
+      roll: judgment.roll,
+      source: judgment.source,
+    };
     await appendLedger({
       agentId: observer,
       text,
       timestamp: at,
-      metadata: {
+      metadata: { kind: "location.noticed", payload },
+    });
+    broadcaster?.broadcast({
+      type: "journal",
+      event: {
+        seq: nextJournalSeq(),
+        simTime: at,
         kind: "location.noticed",
-        payload: {
-          subjects: present,
-          placeId: place.id,
-          moment: kind,
-          ...(between ? { between: between.id } : {}),
-          ...(huddle ? { huddle: huddle.address } : {}),
-          word: judgment.word,
-          probability: judgment.probability,
-          roll: judgment.roll,
-          source: judgment.source,
-        },
+        actors: [observer],
+        placeId: place.id,
+        payload,
       },
     });
     return { ...item, text };
@@ -678,7 +746,7 @@ export function registerLocation(
           const after = positionAt(move.record, at);
           // Staying put keeps what they have noticed here; moving clears it.
           const stays = after.kind === "at" && after.placeId === before;
-          await store.register(agentId, {
+          await save(agentId, {
             ...move.record,
             ...(stays && current?.noticed ? { noticed: current.noticed } : {}),
           });
@@ -726,31 +794,54 @@ export function registerLocation(
     };
   };
 
-  // Operator placement: no travel, no ledger row. Characters move only
-  // through their own tasks.
+  /**
+   * Puts someone at a place now: no travel, no ledger row. Leaving and arriving
+   * are seen like any move. Standing there already changes nothing.
+   */
+  const place = async (
+    id: string,
+    placeId: string,
+  ): Promise<LocationRecord> => {
+    if (!everyone().includes(id)) throw new Error(`No participant ${id}.`);
+    if (!world?.map.places.has(placeId))
+      throw new Error(`No place called ${placeId}.`);
+    await clock.init();
+    const at = clock.time();
+    const previous = await record(id);
+    const was = previous && positionAt(previous, at);
+    if (previous && was?.kind === "at" && was.placeId === placeId)
+      return previous;
+    const placed: LocationRecord = { placeId, since: at };
+    await save(id, placed);
+    await moved(id, placed, was?.kind === "at" ? was.placeId : undefined, at);
+    return placed;
+  };
+
+  // Operator placement. Characters otherwise move only through their own
+  // tasks; the player, who has none, moves through `POST /kazusa/move`.
   api.registerGatewayMethod("location.place", async ({ params, respond }) => {
     const parsed = z
       .object({ id: z.string(), placeId: z.string() })
       .safeParse(params);
-    if (
-      !parsed.success ||
-      !participants().includes(parsed.data.id) ||
-      !world?.map.places.has(parsed.data.placeId)
-    ) {
+    if (!parsed.success) {
       respond(false, undefined, {
         code: "INVALID_ARGUMENT",
         message: "id must name a participant and placeId a place",
       });
       return;
     }
-    await clock.init();
+    const { id } = parsed.data;
+    let placed: LocationRecord;
+    try {
+      placed = await place(id, parsed.data.placeId);
+    } catch (error: unknown) {
+      respond(false, undefined, {
+        code: "INVALID_ARGUMENT",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
     const at = clock.time();
-    const { id, placeId } = parsed.data;
-    const previous = await record(id);
-    const was = previous && positionAt(previous, at);
-    const placed: LocationRecord = { placeId, since: at };
-    await store.register(id, placed);
-    await moved(id, placed, was?.kind === "at" ? was.placeId : undefined, at);
     respond(
       true,
       { id, at, record: placed, position: positionAt(placed, at) },
@@ -763,6 +854,23 @@ export function registerLocation(
     ...(taskExtension ? { taskExtension } : {}),
     record,
     participants,
+    place,
+    exit: async (id, at) => {
+      if (!world) return;
+      const current = await record(id);
+      if (!current) return;
+      const position = positionAt(current, at);
+      if (position.kind === "at") await leave(id, position.placeId, at);
+      if (current.noticed?.length) await save(id, { ...current, noticed: [] });
+    },
+    enter: async (id, at) => {
+      if (!world) return;
+      const current = await record(id);
+      if (!current) return;
+      // Observers dropped them while they were away; this brings them back.
+      await save(id, current);
+      await moved(id, current, undefined, at);
+    },
     whereabouts: async (agentId, at, evidence) => {
       if (!world) return undefined;
       const current = await record(agentId);
@@ -813,7 +921,7 @@ export function registerLocation(
       const arrival =
         stored && world && arrive(world.map, stored, clock.time());
       if (!arrival) return undefined;
-      await store.register(agentId, arrival.record);
+      await save(agentId, arrival.record);
       await moved(agentId, arrival.record, undefined, arrival.record.since);
       return arrival.note;
     },
@@ -834,6 +942,8 @@ export function registerLocation(
     },
     placeOf: async (id) => {
       if (!world) return undefined;
+      // Nobody can speak to someone offstage, nor they to anyone.
+      if (deps.stage && !(await deps.stage.isOnstage(id))) return undefined;
       await clock.init();
       const current = await record(id);
       const position = current && positionAt(current, clock.time());

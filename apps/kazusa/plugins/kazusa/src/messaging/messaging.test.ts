@@ -1173,6 +1173,34 @@ describe("paced speech", () => {
     expect(texts(h.retained)).toEqual(["One", "Two", "Three"]);
   });
 
+  it("paces every system-agent bubble on wall time while sim time stays frozen", async () => {
+    const stopping = new AbortController();
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      stopping.signal,
+    );
+    const result = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["One", "Two"]),
+      undefined,
+      undefined,
+      "alice",
+    );
+    await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
+    expect((await result).status).toBe("delivered");
+    expect(texts(h.retained)).toEqual(["One", "Two"]);
+    expect([...h.retained.values()].map((d) => d.timestamp)).toEqual([
+      NOW,
+      NOW,
+    ]);
+  });
+
   it("says the rest at once when the Gateway stops during a pause", async () => {
     const stopping = new AbortController();
     const h = setup(

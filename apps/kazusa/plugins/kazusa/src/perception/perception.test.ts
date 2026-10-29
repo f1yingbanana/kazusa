@@ -1,3 +1,4 @@
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { stimulusKey } from "../stimulus.ts";
@@ -42,6 +43,8 @@ function stimulus(
 type SetupOptions = Partial<PerceptionConfig> & {
   assembleDecisionContext?: PerceptionDeps["assembleDecisionContext"];
   confirm?: PerceptionDeps["confirm"];
+  onstage?: PerceptionDeps["onstage"];
+  systemAgentId?: string;
 };
 
 function setup(options: SetupOptions = {}) {
@@ -94,7 +97,7 @@ function setup(options: SetupOptions = {}) {
       })),
   };
 
-  const { confirm, ...configOptions } = options;
+  const { confirm, onstage, systemAgentId, ...configOptions } = options;
   const config = PERCEPTION_CONFIG.parse({
     coalesceWindowMs: 0, // synchronous draining for most tests
     ...configOptions,
@@ -155,6 +158,23 @@ function setup(options: SetupOptions = {}) {
     evaluateDecision,
     assembleDecisionContext,
     ...(confirm ? { confirm } : {}),
+    ...(onstage ? { onstage } : {}),
+    ...(systemAgentId
+      ? {
+          api: {
+            runtime: {
+              config: {
+                current: () => ({
+                  agents: {
+                    defaults: { systemAgent: { agentId: systemAgentId } },
+                  },
+                }),
+              },
+            },
+            logger: { info: vi.fn(), warn: vi.fn() },
+          } as unknown as OpenClawPluginApi,
+        }
+      : {}),
   };
 
   const router = new Perception(deps);
@@ -2053,6 +2073,69 @@ describe("Foreseen stimuli", () => {
     h.setSpeed(1);
     await h.router.resume();
     expect(h.deliveries[0]?.ids).toEqual(["held"]);
+  });
+
+  it("admits the system agent immediately while peers stay frozen, including busy steering", async () => {
+    const h = setupWake({ systemAgentId: "alice" });
+    h.setSpeed(0);
+    // A long activity must not make console input wait for its sim deadline.
+    h.tasks.set("alice", {
+      id: "console-task",
+      type: "working",
+      description: "Assisting Sensei",
+      duration: 60,
+      startedAt: new Date(NOW).toISOString(),
+      endAt: new Date(NOW + 3_600_000).toISOString(),
+    });
+    await h.router.receive("bob", stimulus("peer-held", "bob"));
+    await h.router.receive("alice", stimulus("console"));
+    expect(h.deliveries.map((d) => d.ids)).toEqual([["console"]]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    await h.router.started("alice", "console-run");
+    await h.router.receive("alice", stimulus("follow-up"));
+    expect(h.deliveries[1]).toMatchObject({
+      mode: "steer",
+      ids: ["follow-up"],
+    });
+    expect(h.snapshot("bob").pending.map((item) => item.id)).toEqual([
+      "peer-held",
+    ]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+  });
+
+  it("keeps the system agent's offstage gate", async () => {
+    const h = setupWake({ systemAgentId: "alice", onstage: async () => false });
+    h.setSpeed(0);
+    await h.router.receive("alice", stimulus("offstage"));
+    expect(h.deliveries).toEqual([]);
+  });
+
+  it("does not give the system agent a foreseen event before its sim timestamp", async () => {
+    const h = setupWake({ systemAgentId: "alice" });
+    h.setSpeed(0);
+    await h.router.receive("alice", {
+      ...stimulus("future"),
+      timestamp: NOW + 60_000,
+    });
+    expect(h.deliveries).toEqual([]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    h.setTime(NOW + 60_000);
+    await h.router.drain("alice");
+    expect(h.deliveries[0]?.ids).toEqual(["future"]);
+  });
+
+  it("keeps texts to an offstage character, unjudged, until they come back", async () => {
+    const offstage = new Set(["alice"]);
+    const h = setupWake({ onstage: async (id) => !offstage.has(id) });
+    await h.router.receive("alice", stimulus("while-away"));
+    await h.router.idleWake("alice");
+    expect(h.deliveries).toEqual([]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect(h.snapshot().pending).toHaveLength(2);
+    offstage.delete("alice");
+    await h.router.drain("alice");
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0]?.ids).toContain("while-away");
   });
 
   it("leaves a sighting that has not happened out of what was waiting", async () => {

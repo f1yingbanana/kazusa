@@ -1,0 +1,46 @@
+# Personal memory
+
+The state and day plan below were recorded on 2026-10-28. They are not evidence
+of current location, feelings, completed events, or an active task. Use the
+supplied current activity and recent experiences for the present.
+
+## Remembered state (2026-10-28T11:36:00Z)
+
+- **Location**: Trinity General School (`trinity_school`), arrived with Natsu for afternoon classes.
+- **Sleep & Energy**: Missed morning classes after last night's chaos (late night with Sensei + midnight fire alarm). Got up around 10:13, had late breakfast with Natsu. Tired but functional.
+- **Hunger**: Fine — had toast with chocolate mint jam and tea for breakfast.
+- **Social Connection**: Wonderful morning with Natsu; late-night bonding with Sensei last night.
+- **Purpose & Progress**: Behind on morning classes; attending afternoon classes now.
+
+## Long-Term Goals
+
+- Discover and introduce delicious mint-chocolate dessert variations to all
+  Trinity students.
+- Always support Kazusa, Yoshimi, and Natsu whenever they need encouragement.
+- Bring fresh cupcakes to Sensei at SCHALE when work gets overwhelming.
+
+## Recent events (2026-10-27 to 2026-10-28)
+
+- **2026-10-27 evening**: Sensei came to the dorm lounge for a midnight snack — mint-choco cookie ice cream and chocolate mint treats. Then Sensei surprised me with Tea Party macarons (including mint ones!). Had to run his wallet to the front door after he left it on the lounge table.
+- **2026-10-28 ~00:11**: Fire alarm at the dorm — false alarm (burnt toast). Evacuated to the courtyard; Sensei came and gave me his jacket. Got cocoa from the vending machine before bed.
+- **2026-10-28 morning**: Missed morning classes. Had late breakfast (toast with chocolate mint jam, tea) with Natsu in the dorm kitchenette. Natsu was sent by Sensei to check on me.
+- **2026-10-28 walk to school**: Walked to Trinity Academic Building with Natsu. She told me about her emotional landscape cookie series — especially the 'wistful' cookie. We agreed to do a test batch together at sweets club this week: I bring mint, she brings Earl Grey extract. The cookie: pale green mint dough, a curve that arcs upward but doesn't close (trails off the edge), wobble on purpose, vanilla with Earl Grey flavor. Jar label: 'The ghost of wanting something.'
+- Also agreed to visit the Church Street jam shop (blue awning near the station) with Natsu sometime this week.
+- **2026-10-28 afternoon**: Kazusa's tuner errand complete (her key borrowed, room untouched, key returned in person ~16:20). Yoshimi's three-cream-layer shortcake got the official verdict: Kazusa 9.4, me 9.5, Natsu 9.2 → official avg 9.37; Natsu's long-awaited corner piece scored 10.0 'on pure faith.' I earned my one supervised fingertip of frosting. Kazusa opened a written 'SENSEI'S TAB' notebook (textbook, monorail fare, one afternoon, one milk detour — Natsu's name under the milk).
+- **2026-10-28 evening**: Sensei offered to treat the whole club (group chat 'Sweets Club treat'). Marched to `trinity_patisserie` — CLOSED at seven, shutters down, flavor's name never learned (tragedy in one act). Redirected per Kazusa's backup ruling to Mille-Feuille Cafe with Yoshimi; Kazusa detoured for a Sensei sunset at Trinity Beach, Natsu for a wallet raid.
+
+## Plans recorded for 2026-10-28
+
+- **[HARD_BLOCK]**: Afternoon classes at Trinity Academic Building (`trinity_school`) — missed morning, can't miss these too
+- **[SOFT_GOAL]**: Lunch — check courtyard/cafeteria for Kazusa and Yoshimi
+- **[HARD_BLOCK] ~16:15 - 17:30**: After-School Sweets Club meetup at `sweets_club_room`. UPDATE ~15:39: Kazusa roped into an Angel 24 milk run by Sensei — now arrives ~16:15 (was 16:00, before that 15:30), start without her. Mission COMPLETE ~15:04: her bass tuner (black, pink sticker, top drawer) fetched, room locked, nothing else touched. Her room key stays guarded in my bag until she arrives in person ~16:15 (she needs it tonight). Meanwhile: Yoshimi's three-cream-layer shortcake finished ~15:09 — provisional panel scores 9.5 (Airi) / 9.2 (Natsu) at 15:30 tea; Kazusa's slice reserved with the biggest strawberry, now under Yoshimi's officially-crooked tape seal until her Judgment Face. Deal struck: I get ONE supervised fingertip of frosting when she arrives. Tea ready the second she walks in. VERDICT COMPLETE ~16:20 — see Recent events. OPEN ITEM: still need copies of Kazusa's detailed class notes (make-up exam prep) — ask her Thursday.
+- **[HARD_BLOCK] 19:29 → ~19:42 tonight**: UPDATE 19:29 — the patisserie trip became Sensei's treat: he messaged 'go now, it is on me,' so the whole club is walking to `trinity_patisserie` together. I promised Sensei a photo of the seasonal flavor the second it lands on the table. EXECUTED 19:43: patisserie CLOSED at seven — shutters down before we learned the flavor's name. Club redirected to Mille-Feuille Cafe (see Plans 2026-10-29); photo promise moves to tomorrow's real treat.
+- **[SOFT_GOAL]**: Check Angel 24 for mint ice cream restocks (`angel_24_trinity`)
+- **[HARD_BLOCK] ~21:00 tonight**: Choco mint ice cream with Sensei — his invite ('9 or 10?'), my '9 please~'. SETTLED 20:19–20:20: he already parted with Kazusa after the sunset (has an errand), so he is NOT coming to the cafe — he comes to `trinity_dorm` (my room) around 21:00. Told him: cafe with the club until the cupcake inspection wraps ~21:00, then straight back to the dorm for choco mint. Leave on time. <!-- project: github.com/f1yingbanana/kazusa -->
+
+## Plans recorded for 2026-10-29
+
+- **[HARD_BLOCK] after classes**: Operation Wistful test batch with Natsu at `sweets_club_room` — I bring the mint, she brings Earl Grey extract + the wobbly sketch. First joint project of the 'romantic consultants, after-school division.' Yoshimi approved it as executive producer — supervised ('Supervised. Wobbly. Cookies.'), post burnt-toast-incident. ORDER SETTLED 20:10 (group rulings): cookies FIRST, then treat — Natsu's motion passed by Yoshimi's executive ruling, under Kazusa's time cap (if the oven runs long, the summit starts without us and cookies follow as round two; dessert never makes the patron wait). First warm wistful cookie lands on Sensei's plate as the summit opener ('his tab funds art'). ALSO hours clause from Kazusa — check the patisserie's hours before marching; RESOLVED 20:11: posted hours 10:00–19:00 (Yoshimi read them on ghost duty), so tomorrow's treat march must land well before 19:00.
+- **[REDIRECTED 19:43 → ARRIVED 19:54]**: Tonight's Sensei's-treat trip hit a wall — `trinity_patisserie` closed at seven (Yoshimi's bulletin from the dark storefront, 19:43). Backup activated per Kazusa's own ruling: Mille-Feuille Cafe (station end of Church Street, near Trinity Station). ARRIVED 19:54 with Yoshimi — cafe OPEN, evening hours confirmed (lights on past seven, as remembered; Angel 24 plan C not needed). Corner table by the window claimed; cupcakes ordered — mine + Kazusa's under 'cupcake security' (biggest one on top, untouched until the judge arrives from her coast-road sunset with Sensei). Natsu marching in after her wallet raid. Group scout report posted; all relays complete. Tomorrow's real treat after class still stands at the patisserie; Sensei's photo promise (seasonal flavor) moves to tomorrow. UPDATE ~20:05: seated with Yoshimi — her strawberry-milk cupcake drew a full Judgment Face (denied on the record; verdict 'amazing, coming back possibly every day', full report + recommendation to Sensei promised). Natsu's wistful commission filled: milk-tea frosting swirl leaning left. My chocolate mint one — the boss remembered my favorite. Kazusa's big one stays on top under security; judge ETA ~20:20 with Sensei from the sunset. UPDATE 20:06: Kazusa extended guard duty to BOTH of Natsu's purchased wistful cupcakes until she inspects them personally — Yoshimi's own order exempt ('too many motions filed tonight'). UPDATE ~20:07–20:10: run-off APPROVED — both wistful candidates get purchased (my unfinished-arc swirl vs Yoshimi's milk-tea swirl leaning left like it's watching someone leave on a train). Guard duty total: the judge's cupcake + both wistful candidates. Kazusa + Sensei land ~20:20 from the sunset; Natsu minutes out. UPDATE 20:20: Natsu HAS landed — philosophy slot occupied, both commissions in custody. Sensei parted from Kazusa (errand, then `trinity_dorm` ~21:00), so the judge lands SOLO ~20:40 under her 20-minute radio-silence decree — nobody texts her (court procedure + fork-wrath).
+- **[SOFT_GOAL]**: Get copies of Kazusa's detailed class notes for make-up exam prep
+<!-- project: github.com/f1yingbanana/kazusa -->

@@ -1,7 +1,9 @@
+import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
 import type { Perception } from "../perception/perception.ts";
+import type { Stage } from "../stage/stage.ts";
 import type { TaskStore } from "./types.ts";
 
 export interface IdleSupervisorDeps {
@@ -13,6 +15,8 @@ export interface IdleSupervisorDeps {
   readonly idleText?: string;
   /** Shared by every registration in the process; each test gets its own. */
   readonly cell?: SupervisorCell;
+  /** Offstage characters are never checked in on. */
+  readonly stage?: Pick<Stage, "onstage">;
 }
 
 /**
@@ -39,6 +43,7 @@ export function startIdleSupervisor(
   api: OpenClawPluginApi,
   deps: IdleSupervisorDeps,
 ): () => void {
+  const getConfig = () => currentConfig(api);
   const intervalMs = deps.intervalMs ?? 60_000;
   const maxAgentsPerTick = deps.maxAgentsPerTick ?? 2;
   const idleText = deps.idleText;
@@ -55,7 +60,10 @@ export function startIdleSupervisor(
       const snapshot = deps.clock.now();
       if (snapshot.speed <= 0) return;
 
-      const agentIds = [...new Set(listAgentIds(api.config))];
+      const configured = [...new Set(listAgentIds(getConfig()))];
+      const agentIds = deps.stage
+        ? await deps.stage.onstage(configured)
+        : configured;
       if (!agentIds.length) return;
 
       const idleCandidates: string[] = [];

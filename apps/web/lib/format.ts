@@ -67,9 +67,10 @@ export function initials(name: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-export function formatTypingLabel(names: string[]) {
+/** "Airi is typing", "Airi and Natsu are about to speak". */
+export function formatTypingLabel(names: string[], doing = "typing") {
   if (names.length === 0) return "";
-  if (names.length === 1) return `${names[0]} is typing`;
-  if (names.length === 2) return `${names[0]} and ${names[1]} are typing`;
-  return `${names[0]} and ${names.length - 1} others are typing`;
+  if (names.length === 1) return `${names[0]} is ${doing}`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are ${doing}`;
+  return `${names[0]} and ${names.length - 1} others are ${doing}`;
 }

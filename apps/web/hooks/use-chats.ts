@@ -9,6 +9,8 @@ import {
   manageChat,
   sendMessage,
 } from "@/lib/source/chats/http";
+import { useCharacters } from "@/hooks/use-characters";
+import { chatTitle } from "@/lib/source/chats/display";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import { saveConfig, useKazusaConfig } from "@/lib/state/config-store";
 import type {
@@ -17,7 +19,7 @@ import type {
   ChatsResponse,
   MessagesResponse,
 } from "@kazusa/client";
-import type { Chat } from "@/lib/source/chats/types";
+import type { Chat, MessageType } from "@/lib/source/chats/types";
 import type { KazusaConfig } from "@/lib/state/config-store";
 
 export function chatsKey(config: Pick<KazusaConfig, "baseUrl" | "userId" | "token">) {
@@ -39,13 +41,18 @@ export function sortChats(chats: Chat[]) {
   );
 }
 
-export function useChats() {
+/**
+ * The raw chats resource. The sources provider reads it as the reachability
+ * probe, so it must not depend on anything the provider supplies.
+ */
+export function useChatsResource() {
   const config = useKazusaConfig();
-  const { data, error, isLoading, mutate } = useSWR<
+  const resource = useSWR<
     ChatsResponse,
     Error,
     ReturnType<typeof chatsKey>
   >(chatsKey(config), ([, baseUrl]) => fetchChats(baseUrl, config.token));
+  const { data } = resource;
 
   useEffect(() => {
     if (
@@ -56,7 +63,25 @@ export function useChats() {
     }
   }, [data, config]);
 
-  const chats = useMemo(() => sortChats(data?.chats ?? []), [data]);
+  return resource;
+}
+
+/** The player's chats, newest first, titled for display. */
+export function useChats() {
+  const config = useKazusaConfig();
+  const { data, error, isLoading, mutate } = useChatsResource();
+  const { byId } = useCharacters();
+  const chats = useMemo(() => {
+    const userId = data?.user.id ?? config.userId;
+    const nameOf = (id: string) =>
+      byId.get(id)?.name ?? (id === userId ? data?.user.name : undefined) ?? id;
+    return sortChats(
+      (data?.chats ?? []).map((chat) => ({
+        ...chat,
+        name: chatTitle(chat, userId, nameOf),
+      })),
+    );
+  }, [data, byId, config.userId]);
 
   return {
     chats,
@@ -120,7 +145,7 @@ export function appendMessageToPages(
 export function updateChatPreview(
   current: ChatsResponse | undefined,
   chatId: string,
-  message: Pick<ChatMessage, "text" | "timestamp" | "sequence">,
+  message: ChatMessage,
 ) {
   if (!current) return current;
   return {
@@ -134,6 +159,9 @@ export function updateChatPreview(
               text: message.text,
               timestamp: message.timestamp,
               sequence: message.sequence,
+              senderId: message.senderId,
+              senderName: message.senderName,
+              type: message.type,
             },
           }
         : chat,
@@ -145,7 +173,12 @@ export function useChatActions() {
   const config = useKazusaConfig();
   const { mutate } = useSWRConfig();
 
-  async function send(chat: Chat, text: string, requestId: string) {
+  async function send(
+    chat: Chat,
+    text: string,
+    requestId: string,
+    type?: MessageType,
+  ) {
     return sendMessage(
       config.baseUrl,
       chat.draft
@@ -154,8 +187,17 @@ export function useChatActions() {
             text,
             members: chat.members.filter((id) => id !== config.userId),
             ...(chat.type === "group" ? { title: chat.name } : {}),
+            // Face to face: it joins or starts a huddle where you stand.
+            ...(chat.type === "huddle"
+              ? { aloud: true, ...(type === "action" ? { type } : {}) }
+              : {}),
           }
-        : { requestId, text, sessionKey: chat.sessionKey },
+        : {
+            requestId,
+            text,
+            sessionKey: chat.sessionKey,
+            ...(type === "action" ? { type } : {}),
+          },
       config.token,
     );
   }
@@ -177,6 +219,7 @@ export function useChatActions() {
     type: ChatType;
     name: string;
     members: string[];
+    placeId?: string;
   }): Chat {
     return {
       ...input,

@@ -10,6 +10,7 @@ import type { DecisionContextAssembler } from "../context-engine/decision-contex
 import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { Perception, type PerceptionDeps } from "./perception.ts";
 import type { PerceptionDecisionRecord } from "./types.ts";
+import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 
 const LIFECYCLE = z.object({
@@ -41,6 +42,10 @@ export function registerPerception(
     readonly onDeadline?: (agentId: string) => Promise<string | undefined>;
     /** Confirms a foreseen stimulus when its moment comes. */
     readonly confirm?: PerceptionDeps["confirm"];
+    /** Whether a character is simulated; offstage, input waits. */
+    readonly onstage?: PerceptionDeps["onstage"];
+    /** The reasoning level each brain turn runs at (Models). */
+    readonly thinking?: () => Promise<ThinkingLevel | undefined>;
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -66,12 +71,13 @@ export function registerPerception(
     api,
     clock: deps.clock,
     assertCurrent: () => lifetime.signal.throwIfAborted(),
-    deliver: registerBrainChannel(api, lifetime.signal),
+    deliver: registerBrainChannel(api, lifetime.signal, deps.thinking),
     adopted: adoptedByBrain(api),
     assembleDecisionContext: deps.assembleDecisionContext,
     onDecision,
     serial: sharedPerceptionQueue(),
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
+    ...(deps.onstage ? { onstage: deps.onstage } : {}),
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)

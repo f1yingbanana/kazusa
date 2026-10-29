@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import {
   generateSecureUuid,
   type OpenClawPluginApi,
@@ -12,6 +13,7 @@ import { appendLedgerEntry } from "../ledger.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { nextJournalSeq } from "../realtime.ts";
 import type { Perception } from "../perception/perception.ts";
+import type { Stage } from "../stage/stage.ts";
 import { sharedSupervisorCell, startIdleSupervisor } from "./supervisor.ts";
 import { executeDelayTask, executeStartTask } from "./taskman.ts";
 import {
@@ -70,6 +72,8 @@ export interface TaskmanService {
     listener: (agentId: string, task: ActiveTask) => void,
   ): () => void;
   attachSupervisor(perception: Perception): () => void;
+  /** Re-projects one character's wake from their lease and stage. */
+  reschedule(agentId: string): Promise<void>;
 }
 
 /** Registers task leases, their visible cron projection, and ledger. */
@@ -80,8 +84,11 @@ export function registerTaskman(
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     /** Modules that add `start_task` parameters and see leases first. */
     readonly extensions?: readonly TaskExtension[];
+    /** Offstage characters have no wake. Absent: everyone is onstage. */
+    readonly stage?: Pick<Stage, "isOnstage" | "onstage">;
   },
 ): TaskmanService {
+  const getConfig = () => currentConfig(api);
   const { clock } = deps;
   const extensions = deps.extensions ?? [];
   const startTaskParameters = extensions.reduce<Record<string, unknown>>(
@@ -158,7 +165,7 @@ export function registerTaskman(
     // Other plugins declare jobs too (memory-core's dreaming promotion). Taskman
     // owns exactly the jobs keyed by a configured character.
     const isTaskmanJob = (declarationKey: string | undefined): boolean =>
-      !!declarationKey && listAgentIds(api.config).includes(declarationKey);
+      !!declarationKey && listAgentIds(getConfig()).includes(declarationKey);
 
     const removeAgentAutomation = async (agentId: string): Promise<void> => {
       const jobs = await listJobs();
@@ -219,7 +226,11 @@ export function registerTaskman(
         await store.register(agentId, task, { assertCurrent });
       }
       const snapshot = clock.now();
-      if (!task || snapshot.speed <= 0) {
+      if (
+        !task ||
+        snapshot.speed <= 0 ||
+        (deps.stage && !(await deps.stage.isOnstage(agentId)))
+      ) {
         await removeAgentAutomation(agentId);
         return;
       }
@@ -353,8 +364,12 @@ export function registerTaskman(
     },
     async execute(_id, params: TaskToolArguments<StartTaskParams>) {
       await clock.init();
-      // A paused world holds whoever acts in it.
-      await untilRunning(clock, shutdownSignal());
+      if (
+        !toolContext?.agentId ||
+        getConfig().agents?.defaults?.systemAgent?.agentId !==
+          toolContext.agentId
+      )
+        await untilRunning(clock, shutdownSignal());
       const result = await executeStartTask(
         params,
         resolveExecutionContext(toolContext),
@@ -407,7 +422,12 @@ export function registerTaskman(
     },
     async execute(_id, params: TaskToolArguments<DelayTaskParams>) {
       await clock.init();
-      await untilRunning(clock, shutdownSignal());
+      if (
+        !toolContext?.agentId ||
+        getConfig().agents?.defaults?.systemAgent?.agentId !==
+          toolContext.agentId
+      )
+        await untilRunning(clock, shutdownSignal());
       const result = await executeDelayTask(
         params,
         resolveExecutionContext(toolContext),
@@ -452,7 +472,11 @@ export function registerTaskman(
         maxAgentsPerTick: config.supervisor.maxAgentsPerTick,
         idleText: config.supervisor.idleText,
         cell: sharedSupervisorCell(),
+        ...(deps.stage ? { stage: deps.stage } : {}),
       });
+    },
+    async reschedule(agentId) {
+      await automation.synchronize?.(agentId);
     },
   };
 }

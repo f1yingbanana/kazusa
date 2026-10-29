@@ -1,8 +1,10 @@
+import { currentConfig } from "../current-config.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import {
   buildMemorySystemPromptAddition,
   delegateCompactionToRuntime,
   type OpenClawPluginApi,
+  type OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import type { AssembledContext } from "@kazusa/client";
@@ -58,13 +60,14 @@ export function registerContextEngine(
   api: OpenClawPluginApi,
   deps: ContextEngineDeps,
 ): ContextEngineService {
+  const getConfig = () => currentConfig(api);
   // What each brain turn was given, which no transcript keeps.
   const recent = api.runtime.state.openKeyedStore<AssembledContext[]>({
     namespace: "context",
     retention: "retained",
   });
   api.registerContextEngine("kazusa", () =>
-    createContextEngine(api, deps, recent),
+    createContextEngine(api, deps, recent, getConfig),
   );
   return {
     recentContexts: async (agentId) => (await recent.lookup(agentId)) ?? [],
@@ -81,12 +84,13 @@ function createContextEngine(
     inCompany,
   }: ContextEngineDeps,
   recent: StateStore<AssembledContext[]>,
+  getConfig: () => OpenClawConfig,
 ): ContextEngine {
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
   );
   const skillLoader = createSkillLoader({
-    config: api.config,
+    config: getConfig(),
     pluginRootDir: api.rootDir,
   });
   const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
@@ -143,7 +147,7 @@ function createContextEngine(
       const now = clock.time();
       const cutoff = now - config.shortTermHours * 3_600_000;
       const sessions = api.runtime.agent.session;
-      const storePath = sessions.resolveStorePath(api.config.session?.store, {
+      const storePath = sessions.resolveStorePath(getConfig().session?.store, {
         agentId: brainAgentId,
       });
       const readSessions = await sessions.createSessionEntryListReader({
@@ -163,7 +167,7 @@ function createContextEngine(
         );
       });
       const workspaceDir = api.runtime.agent.resolveAgentWorkspaceDir(
-        api.config,
+        getConfig(),
         brainAgentId,
       );
       const [

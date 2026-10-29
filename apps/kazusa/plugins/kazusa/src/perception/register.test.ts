@@ -64,6 +64,9 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
       },
     },
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
 
   const clock = {
     time: () => NOW,
@@ -257,6 +260,9 @@ describe("Perception host integration", () => {
         },
       },
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
     const assembleDecisionContext = vi.fn();
     const perception = registerPerception(api, {
       clock: {

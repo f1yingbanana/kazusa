@@ -13,23 +13,30 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-/** Frontmatter fields as facts; `bodyMarkdown` shown verbatim and never mined (D4). */
+/**
+ * Frontmatter fields as facts (affiliation is already in the header);
+ * `bodyMarkdown` shown verbatim and never mined (D4).
+ */
 export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id)
   const { detail, available } = useCharacterDetail(entity.id)
   if (!character) return null
 
-  const aliases = detail?.aliases ?? character.aliases
+  // An alias equal to the id or the name says nothing new.
+  const aliases = (detail?.aliases ?? character.aliases).filter(
+    (alias) => alias !== character.id && alias.toLowerCase() !== character.name.toLowerCase(),
+  )
+  const traits = detail?.personalityTraits ?? []
+  if (available && !aliases.length && !detail?.role && !traits.length && !detail?.bodyMarkdown) {
+    return <p className="text-sm text-muted-foreground">No profile written yet.</p>
+  }
 
   return (
     <div className="flex flex-col gap-3">
       <dl className="flex flex-col gap-1.5">
         {aliases.length ? <Row label="Aliases">{aliases.join(', ')}</Row> : null}
         {detail?.role ? <Row label="Role">{detail.role}</Row> : null}
-        {character.affiliation ? <Row label="Affiliation">{character.affiliation}</Row> : null}
-        {detail?.personalityTraits.length ? (
-          <Row label="Traits">{detail.personalityTraits.join(', ')}</Row>
-        ) : null}
+        {traits.length ? <Row label="Traits">{traits.join(', ')}</Row> : null}
       </dl>
       {detail?.bodyMarkdown ? (
         <details className="group rounded-lg border">

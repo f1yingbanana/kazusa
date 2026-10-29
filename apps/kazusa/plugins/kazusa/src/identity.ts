@@ -51,9 +51,10 @@ export async function characterName(
 export async function personName(
   api: OpenClawPluginApi,
   id: string,
+  config: OpenClawConfig = api.config,
 ): Promise<string> {
   if (!id.startsWith("user:"))
-    return await characterName(api, api.config, id).catch(() => id);
+    return await characterName(api, config, id).catch(() => id);
   const user = api.pluginConfig?.user as
     { readonly id?: string; readonly name?: string } | undefined;
   return id === (user?.id ?? "user:sensei") ? (user?.name ?? "Sensei") : id;

@@ -100,6 +100,9 @@ async function setup(
       },
     },
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
   const clock = new Clock({
     initialTime: "2026-10-23T08:00:00Z",
     defaultSpeed: 0,

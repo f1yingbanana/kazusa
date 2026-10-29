@@ -11,6 +11,9 @@ export const MOCKABLE: ReadonlySet<Domain> = new Set<Domain>([
   "status",
   "timeline",
   "desires",
+  "places",
+  "location",
+  "stage",
 ]);
 
 /**

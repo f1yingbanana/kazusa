@@ -35,6 +35,12 @@ function sample() {
   for (const listener of tickListeners) listener();
 }
 
+/** Sim time right now, for stamping an event (not for rendering: use `useSimNow`). */
+export function readSimNow(): number {
+  const anchor = clockStore.get();
+  return anchor ? simTimeAt(anchor.clock, Date.now(), anchor.offset) : Date.now();
+}
+
 function subscribeTicker(listener: () => void) {
   tickListeners.add(listener);
   const unsubscribeClock = clockStore.subscribe(sample);

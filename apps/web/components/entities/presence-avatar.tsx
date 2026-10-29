@@ -15,7 +15,7 @@ const SIZES = {
 
 export type PresenceSize = keyof typeof SIZES
 
-export type PresenceState = 'idle' | 'thinking' | 'composing' | 'unknown'
+export type PresenceState = 'idle' | 'thinking' | 'composing' | 'offstage' | 'unknown'
 
 /** Ring state from structured fields only (D7). Never from task text. */
 export function presenceState(
@@ -23,6 +23,7 @@ export function presenceState(
   status: CharacterStatus | undefined,
 ): PresenceState {
   if (kind === 'npc' || !status || status.brain === 'unknown') return 'unknown'
+  if (!status.onstage) return 'offstage'
   if (status.composingIn.length > 0) return 'composing'
   if (status.brain === 'thinking') return 'thinking'
   return 'idle'
@@ -32,6 +33,7 @@ const LABELS: Record<PresenceState, string> = {
   idle: 'Idle',
   thinking: 'Thinking',
   composing: 'Composing',
+  offstage: 'Offstage',
   unknown: 'State unknown',
 }
 
@@ -65,7 +67,7 @@ export function PresenceAvatar({
       role="img"
       aria-label={showRing ? `${name}, ${LABELS[state].toLowerCase()}` : name}
     >
-      <Avatar className="size-full">
+      <Avatar className={cn('size-full', state === 'offstage' && 'opacity-45 grayscale')}>
         {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
         <AvatarFallback className="text-[length:inherit]">{initials(name)}</AvatarFallback>
       </Avatar>
@@ -77,6 +79,7 @@ export function PresenceAvatar({
               'pointer-events-none absolute -inset-0.5 rounded-full border',
               state === 'idle' && 'border-muted-foreground/35',
               state === 'unknown' && 'border-dashed border-muted-foreground/50',
+              state === 'offstage' && 'border-dotted border-muted-foreground/60',
               state === 'thinking' && 'border-primary/25',
               state === 'composing' && 'border-2 border-primary',
             )}

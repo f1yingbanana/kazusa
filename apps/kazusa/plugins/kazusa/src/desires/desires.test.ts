@@ -13,6 +13,7 @@ import {
   afterwardsParameter,
   feelingsLine,
   levelsAt,
+  resumeAfter,
   startEffects,
   type DesireRecord,
 } from "./desires.ts";
@@ -136,6 +137,23 @@ describe("desire levels", () => {
     expect(levelsAt(config, delayed, minutes(75)).satiety).toBe(80.5);
     expect(levelsAt(config, delayed, minutes(90)).satiety).toBe(100);
   });
+
+  it("resumes after offstage time from where it stopped", () => {
+    const meal = startEffects(
+      config,
+      recordWithSatiety(25),
+      { id: "meal", until: minutes(30) },
+      { satiety: "full" },
+    );
+    // Offstage at minute 15, back a day later: the meal's last 15 minutes are
+    // still ahead, and nothing drained meanwhile.
+    const back = minutes(15 + 24 * 60);
+    const resumed = resumeAfter(config, meal, minutes(15), back);
+    expect(resumed.anchorAt).toBe(back);
+    expect(resumed.levels.satiety).toBe(62.5);
+    expect(levelsAt(config, resumed, back + 15 * 60_000).satiety).toBe(100);
+    expect(resumeAfter(config, resumed, back, back)).toBe(resumed);
+  });
 });
 
 describe("desire rendering", () => {
@@ -210,6 +228,9 @@ describe("registerDesires", () => {
         methods[name] = handler;
       }),
     } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
     const clock = {
       init: vi.fn(async () => {}),
       time: () => now,

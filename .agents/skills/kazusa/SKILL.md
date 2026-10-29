@@ -775,7 +775,7 @@ connect these modules in process.
   (one judgment per group, its first member standing for it), judges `notice`,
   writes the sighting to the observer's ledger (`location.noticed`), and returns
   its text, naming the group and its huddle address ("You see Airi
-  `kurimura-airi` and Natsu `yutori-natsu`, talking (chat:huddle:…), here."). A
+  `airi-kurimura` and Natsu `natsu-yutori`, talking (chat:huddle:…), here."). A
   standing observer adds standing people to their record's `noticed`, which a
   move clears. Someone passing through (either side mid-trip) is still sighted,
   judged, delivered and kept in the ledger, so "I saw you zoom by" works, but
@@ -784,32 +784,83 @@ connect these modules in process.
   their activity and huddle; `inCompany` (in a huddle, or someone noticed here)
   selects the `in-person` skill. Noted for optimization: busy places mean many
   `notice` judgments, uncapped for now. Overhearing is a later feature.
-- **RPC** operator `location.place`; **read models** `GET /kazusa/places`,
-  `GET /kazusa/locations`.
+- **RPC** operator `location.place`; **player moves** `POST /kazusa/move`
+  `{ placeId }` (who moves comes from config; the player has no tasks, so they
+  go straight there through the same `place()`: seen arriving and leaving, out
+  of their huddles); **read models** `GET /kazusa/places`,
+  `GET /kazusa/locations`; **SSE** `location` on every record write (place, trip
+  start, arrival, `noticed` change) and `journal` for each confirmed sighting
+  (`location.noticed`; the timeline reads it back from the observer's `:tasks`
+  ledger metadata like any task row).
 - **Known gap**: a lease started before Location existed has no `where`, so its
   holder is treated as at `home` until their next `start_task`.
 
+### 3.7 `src/stage/` — Onstage and Offstage
+
+- A character is **offstage** when they aren't simulated, to save cost with a
+  large cast. One retained `"stage"` keyed store, `{ onstage, since }` per
+  character; no record means `stage.defaultOnstage` (default `true`). Players
+  are always onstage. Every registration reads the same store; no mirror.
+- Offstage, nothing happens to them: Perception's `drainState` holds their inbox
+  unjudged (like a paused clock), Taskman projects no wake and the idle
+  supervisor skips them, and Location leaves them out of `participants()`,
+  `placeOf` (nobody can speak to them aloud) and sightings (`presentAt`). Texts
+  still reach their ledgers and wait.
+- `stageControl` (`stage/register.ts`) runs the effects. Going off: interrupt
+  speech, drop the wake, `location.exit` (seen leaving, out of huddles). Coming
+  back: desires resume from where they were (`resumeAfter`), `location.enter`
+  (record re-sent, seen coming in), wake re-projected (the overdue lease checks
+  in at once), inbox drained. A turn already running finishes; the gates hold
+  back what it sets off.
+- `POST /kazusa/character/stage` `{ ids, onstage }` (one group per request);
+  `CharacterStatus.onstage` and `offstageSince`; capability `stage`.
+
 ## 4. Engineering & Zero-Build Conventions
 
-- **Character Tool Surface (`openclaw.json` `tools`)**: characters get an
-  explicit `tools.allow` list, never a profile: `start_task`, `delay_task`,
+- **Character Tool Surface (`tools.profile` + `tools.alsoAllow`)**: characters
+  inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
   `send_message`, `list_chats`, `manage_chat`, `memory_search`, `memory_get`,
   `read`, `edit`, `write` (`MEMORY.md` and the personal wiki), `view_image`.
-  `tools.deny` keeps `group:sessions` and `message`, and adds `apply_patch`
-  because allowing `write` implicitly enables it. `tools.toolSearch: false`:
-  with a dozen tools, Tool Search's three control tools cost more than they
-  save, and models route calls through its generic `tool_call`.
-  `tools.codeMode.enabled: false` for the same reason: models whose catalog
-  prefers code mode (GLM-5.3-flash) otherwise get every tool behind one `exec`,
-  and live Airi looped `exec("return \"NO_REPLY\"")` for five minutes, holding a
-  Gateway stop open. `clock_*` stay registered for operators but are not allowed
-  for characters. Everything a roleplaying character must not reach is excluded
-  by omission: shell, web, browser, UI, nodes/computer, Gateway/plugin
-  management, media generation, goals, `ask_user`, and `session_status` (whose
-  presence also adds a "use `session_status` for the exact time" line to the
-  system prompt). A deployment widens the surface in its own `openclaw.json`
-  (`tools.allow`, or per character `agents.entries.<id>.tools.allow`); a tool
-  from a new plugin is unavailable until allowed there.
+  `tools.deny` keeps `group:sessions`, `message`, and `gateway` (the updater
+  included in `minimal`). `tools.exec.applyPatch.enabled: false` prevents
+  implicit patch access from `write`; ARONA explicitly enables it in her native
+  exec override. `tools.toolSearch: false`: with a dozen tools, Tool Search's
+  three control tools cost more than they save, and models route calls through
+  its generic `tool_call`. `tools.codeMode.enabled: false` for the same reason:
+  models whose catalog prefers code mode (GLM-5.3-flash) otherwise get every
+  tool behind one `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for
+  five minutes, holding a Gateway stop open. `clock_*` stay registered for
+  operators but are not allowed for characters. Everything a roleplaying
+  character must not reach is excluded by omission: shell, web, browser, UI,
+  nodes/computer, Gateway/plugin management, media generation, goals,
+  `ask_user`, and `session_status` (whose presence also adds a "use
+  `session_status` for the exact time" line to the system prompt). A deployment
+  widens the surface in its own `openclaw.json` (global profile plus
+  `alsoAllow`, or a per-agent profile/allowlist); a tool from a new plugin is
+  unavailable until allowed there.
+- **System console**: this deployment selects ARONA with native
+  `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
+  global policy and workspace-only file access, without per-agent tool entries.
+  Only the system console selects `full` with its explicit admin allowlist:
+  character tools, web search/fetch, workspace-only patches, and clock controls.
+  Shell execution, code execution and `openclaw` delegation are denied; native
+  `cwd` selects `apps/kazusa` for coding while identity/memory remain in her
+  character workspace. File tools enforce that coding directory. Its `.agents`
+  workspace symlink exposes these architecture guides without adding a
+  workspace-root `AGENTS.md`. Use native `skills_read` for complete installed
+  guides; ordinary file reads through an escaping symlink remain blocked.
+  Perception admits its input immediately, even paused; Messaging uses wall-time
+  pacing, and its message, chat-management and task tools skip the pause wait.
+  Simulation time, task deadlines and ordinary characters remain frozen.
+  Offstage and custody gates still apply. See
+  [ARONA administration](../../../apps/kazusa/docs/arona-admin.md) for
+  coordinated database repair, her prompt-governed location boundary, and native
+  roster refresh. Retained consumers use the host-injected
+  `api.runtime.config.current()` rather than retaining `api.config` for live
+  agent/identity/workspace lookups. Character and agent roster responses expose
+  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
+  rows and direct-chat rows. Never infer administrator status from a name or
+  biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from
@@ -897,5 +948,7 @@ Load these reference files on demand when working on their specific subsystem:
   admission, steering, deferred attention, or moving task wakes behind the gate.
 - `references/phases_and_testing.md` — Read when planning milestone deliverables
   across Phases 0–5 or designing integration test suites.
-- [`apps/kazusa/docs/location.md`](../../../apps/kazusa/docs/location.md) — Read
-  when working on the map, positions, travel, huddles or encounters.
+- `references/location.md` — Read when working on the map, positions, travel,
+  huddles or encounters.
+- `references/memory.md` — Read when implementing context retrieval, character
+  memories, character contexts related things.

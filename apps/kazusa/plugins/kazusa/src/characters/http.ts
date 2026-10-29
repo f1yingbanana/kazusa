@@ -1,13 +1,19 @@
+import { currentConfig } from "../current-config.ts";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type {
+  OpenClawConfig,
+  OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
 import {
   type CharacterDetail,
   type CharacterDetailResponse,
   type CharacterStatus,
   type CharacterSummary,
   type CharactersResponse,
+  StagePayloadSchema,
+  type StageResponse,
 } from "@kazusa/client";
 import { z } from "zod";
 import type { Perception } from "../perception/perception.ts";
@@ -16,7 +22,13 @@ import type { Messaging } from "../messaging/messaging.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { TaskmanService } from "../taskman/register.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
-import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
+import { localAvatarUrl, registerAvatarHttp } from "./avatar.ts";
+import type { Stage } from "../stage/stage.ts";
+import {
+  createRouteRegistrar,
+  readJsonBody,
+  sendJson,
+} from "../http/helpers.ts";
 
 const USER = z.object({
   id: z
@@ -48,6 +60,7 @@ const IDENTITY_FRONTMATTER = z
 export async function loadCharacterData(
   api: OpenClawPluginApi,
   agentId: string,
+  config: OpenClawConfig = api.config,
 ): Promise<{
   name: string;
   avatarUrl?: string;
@@ -68,16 +81,13 @@ export async function loadCharacterData(
   let bodyMarkdown = "";
 
   // 1. Check configured agent identity in OpenClaw
-  const configured = api.runtime.agent.resolveAgentIdentity(
-    api.config,
-    agentId,
-  );
+  const configured = api.runtime.agent.resolveAgentIdentity(config, agentId);
   if (configured?.name?.trim()) name = configured.name.trim();
 
   // 2. Read IDENTITY.md from agent workspace
   try {
     const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
-      api.config,
+      config,
       agentId,
     );
     const text = await readFile(path.join(workspace, "IDENTITY.md"), "utf8");
@@ -109,7 +119,10 @@ export async function loadCharacterData(
     // Non-fatal if IDENTITY.md is missing or unreadable
   }
 
-  // 3. Fallback / augment with World Wiki card if present
+  // 3. An avatar image in the workspace beats the World Wiki card's URL
+  if (!avatarUrl) avatarUrl = await localAvatarUrl(api, agentId, config);
+
+  // 4. Fallback / augment with World Wiki card if present
   try {
     const cwd = process.cwd();
     const possiblePaths = [
@@ -159,11 +172,14 @@ export async function resolveCharacterStatus(
     readonly taskStore: TaskStore;
     readonly perception: Perception;
     readonly messaging: Messaging;
+    readonly stage: Pick<Stage, "isOnstage" | "lookup">;
   },
 ): Promise<CharacterStatus> {
-  const [task, brainState] = await Promise.all([
+  const [task, brainState, onstage, stageRecord] = await Promise.all([
     deps.taskStore.lookup(agentId),
     deps.perception.getBrainState(agentId),
+    deps.stage.isOnstage(agentId),
+    deps.stage.lookup(agentId),
   ]);
   const composingIn = deps.messaging.getComposingChats(agentId);
 
@@ -180,6 +196,8 @@ export async function resolveCharacterStatus(
     brain: brainState.brain,
     composingIn,
     queued: brainState.queued,
+    onstage,
+    ...(!onstage && stageRecord ? { offstageSince: stageRecord.since } : {}),
   };
 }
 
@@ -190,14 +208,20 @@ export function registerCharactersHttp(
     readonly perception: Perception;
     readonly messaging: Messaging;
     readonly broadcaster: KazusaRealtimeBroadcaster;
+    readonly stage: Pick<Stage, "isOnstage" | "lookup">;
+    /** Sends a character off or brings them back, with every effect. */
+    readonly setOnstage: (id: string, onstage: boolean) => Promise<void>;
   },
 ): void {
+  const getConfig = () => currentConfig(api);
   const user = USER.parse(api.pluginConfig?.user ?? {});
   const route = createRouteRegistrar(api);
+  registerAvatarHttp(api, route);
   const statusDeps = {
     taskStore: deps.taskman.store,
     perception: deps.perception,
     messaging: deps.messaging,
+    stage: deps.stage,
   };
 
   const broadcastStatus = async (agentId: string): Promise<void> => {
@@ -227,15 +251,17 @@ export function registerCharactersHttp(
   });
 
   route("characters", "GET", async (_req, res) => {
-    const agentIds = [...new Set(listAgentIds(api.config))];
+    const config = getConfig();
+    const agentIds = [...new Set(listAgentIds(config))];
     const characters: CharacterSummary[] = await Promise.all(
       agentIds.map(async (id) => {
-        const data = await loadCharacterData(api, id);
+        const data = await loadCharacterData(api, id, config);
         const status = await resolveCharacterStatus(id, statusDeps);
         return {
           id,
           name: data.name,
           kind: "agent",
+          isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
           avatarUrl: data.avatarUrl,
           occupation: data.occupation,
           affiliation: data.affiliation,
@@ -254,6 +280,27 @@ export function registerCharactersHttp(
     });
 
     sendJson(res, 200, { characters } satisfies CharactersResponse);
+  });
+
+  route("character/stage", "POST", async (req, res) => {
+    const { ids, onstage } = StagePayloadSchema.parse(await readJsonBody(req));
+    const roster = new Set(listAgentIds(getConfig()));
+    const unknown = ids.filter((id) => !roster.has(id));
+    if (unknown.length) {
+      sendJson(res, 404, {
+        error: `Character not found: ${unknown.join(", ")}`,
+      });
+      return;
+    }
+    // One at a time: each change moves people and conversations others see.
+    const statuses: Record<string, CharacterStatus> = {};
+    for (const id of new Set(ids)) {
+      await deps.setOnstage(id, onstage);
+      const status = await resolveCharacterStatus(id, statusDeps);
+      deps.broadcaster.broadcast({ type: "status", characterId: id, status });
+      statuses[id] = status;
+    }
+    sendJson(res, 200, { statuses } satisfies StageResponse);
   });
 
   route("character", "GET", async (req, res) => {
@@ -278,18 +325,20 @@ export function registerCharactersHttp(
       return;
     }
 
-    const agentIds = new Set(listAgentIds(api.config));
+    const config = getConfig();
+    const agentIds = new Set(listAgentIds(config));
     if (!agentIds.has(id)) {
       sendJson(res, 404, { error: `Character not found: ${id}` });
       return;
     }
 
-    const data = await loadCharacterData(api, id);
+    const data = await loadCharacterData(api, id, config);
     const status = await resolveCharacterStatus(id, statusDeps);
     const character: CharacterDetail = {
       id,
       name: data.name,
       kind: "agent",
+      isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
       avatarUrl: data.avatarUrl,
       occupation: data.occupation,
       affiliation: data.affiliation,

@@ -9,6 +9,7 @@ export interface KeyedStore<V> {
   /** Replaces all values (snapshot seed). */
   reset(entries: Iterable<readonly [string, V]>): void;
   values(): IterableIterator<V>;
+  entries(): IterableIterator<[string, V]>;
   subscribeKey(key: string, listener: () => void): () => void;
   /** Aggregate subscription; `version()` changes on every write. */
   subscribe(listener: () => void): () => void;
@@ -45,6 +46,7 @@ export function createKeyedStore<V>(): KeyedStore<V> {
       notify(touched);
     },
     values: () => data.values(),
+    entries: () => data.entries(),
     subscribeKey(key, listener) {
       let set = keyListeners.get(key);
       if (!set) keyListeners.set(key, (set = new Set()));

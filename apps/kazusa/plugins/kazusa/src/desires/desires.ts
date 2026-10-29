@@ -122,6 +122,30 @@ export function anchorAt(
 }
 
 /**
+ * Time that passed while the character was offstage never reached their body:
+ * levels resume from where they were at `from`, anchored at `to`, and the
+ * current task's effects keep the rest of their span.
+ */
+export function resumeAfter(
+  config: DesiresConfig,
+  record: DesireRecord,
+  from: number,
+  to: number,
+): DesireRecord {
+  const pausedAt = Math.max(from, record.anchorAt);
+  const gap = to - pausedAt;
+  if (gap <= 0) return record;
+  const held = anchorAt(config, record, pausedAt);
+  return {
+    ...held,
+    anchorAt: to,
+    ...(held.effects
+      ? { effects: { ...held.effects, until: held.effects.until + gap } }
+      : {}),
+  };
+}
+
+/**
  * Replace the effects of a record anchored now: each named desire moves toward
  * its state's level, arriving at the lease's `until`. Naming a desire's current
  * state means no change, so restating how you feel never props a desire up.

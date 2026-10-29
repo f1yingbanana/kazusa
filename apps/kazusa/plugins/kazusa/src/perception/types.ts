@@ -20,8 +20,8 @@ export interface AttentionDecision {
 
 /**
  * How an attention decision was reached, retained for debugging. `automatic`
- * skips the model (task deadlines and idle check-ins on an idle brain);
- * `fallback` admits attention because the model was unavailable.
+ * skips the model (the system console, or idle task check-ins); `fallback`
+ * admits attention because the model was unavailable.
  */
 export interface DecisionTrace {
   readonly source: "model" | "automatic" | "fallback";

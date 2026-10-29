@@ -43,6 +43,9 @@ function setup(dispatch: ReturnType<typeof vi.fn>) {
       agent: { session: { patchSessionEntry } },
     },
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
   return {
     deliver: registerBrainChannel(api, new AbortController().signal),
     patchSessionEntry,

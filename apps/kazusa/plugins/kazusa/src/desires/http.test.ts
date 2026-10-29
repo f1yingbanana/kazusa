@@ -22,6 +22,9 @@ function setup() {
       routes[opts.path] = opts.handler;
     }),
   } as unknown as OpenClawPluginApi;
+  Object.assign(api, {
+    runtime: { ...api.runtime, config: { current: () => api.config } },
+  });
   const config = DESIRES_CONFIG.parse({});
   const records = new Map<string, DesireRecord>([
     ["kazusa", anchorAt(config, undefined, T0)],

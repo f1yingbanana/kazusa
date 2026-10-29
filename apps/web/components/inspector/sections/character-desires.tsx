@@ -1,11 +1,11 @@
 'use client'
 
-import { ArrowDownRightIcon, ArrowUpRightIcon, TrendingDownIcon } from 'lucide-react'
+import { ArrowDownRightIcon, ArrowUpRightIcon, PauseIcon, TrendingDownIcon } from 'lucide-react'
 import type { DesireDefinition, DesireRecord, DesiresConfig } from '@kazusa/client'
 import { Fact } from '@/components/entities/fact'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useCharacter } from '@/hooks/use-characters'
+import { useCharacter, useCharacterStatus } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
 import { useDesireConfig, useDesireRecord } from '@/hooks/use-desires'
 import type { EntityRef } from '@/lib/state/entity-ref'
@@ -23,7 +23,10 @@ export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
   const isAgent = character?.kind === 'agent'
   const config = useDesireConfig()
   const record = useDesireRecord(isAgent ? entity.id : undefined)
+  const status = useCharacterStatus(isAgent ? entity.id : undefined)
   const now = useSimNow()
+  // Offstage, their body waits: levels stand where they were when they left.
+  const offstage = status?.onstage === false
 
   if (!isAgent) {
     return <p className="text-sm text-muted-foreground">Only simulated characters have desires.</p>
@@ -38,12 +41,14 @@ export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
     )
   }
 
-  const at = Math.max(now, record?.anchorAt ?? now)
-  const drop = nextDrop(config, record, at)
+  const at = Math.max(offstage ? (status.offstageSince ?? now) : now, record?.anchorAt ?? 0)
+  const drop = offstage ? undefined : nextDrop(config, record, at)
 
   return (
     <div className="flex flex-col gap-3">
-      {drop ? (
+      {offstage ? (
+        <Fact icon={PauseIcon}>Paused while offstage</Fact>
+      ) : drop ? (
         <Fact icon={TrendingDownIcon}>
           {desireLabel(drop.desire)} turns <span className="font-medium">{drop.state}</span> in{' '}
           <span className="font-mono tabular-nums">{formatSimDuration(drop.at - at)}</span>
@@ -55,7 +60,7 @@ export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
       ) : null}
       <ul className="flex flex-col gap-2.5">
         {config.catalog.map((desire) => (
-          <DesireRow key={desire.name} config={config} record={record} desire={desire} at={at} />
+          <DesireRow key={desire.name} config={config} record={record} desire={desire} at={at} paused={offstage} />
         ))}
       </ul>
     </div>
@@ -67,11 +72,14 @@ function DesireRow({
   record,
   desire,
   at,
+  paused,
 }: {
   config: DesiresConfig
   record: DesireRecord | undefined
   desire: DesireDefinition
   at: number
+  /** Offstage: nothing is moving, whatever the task planned. */
+  paused: boolean
 }) {
   const level = levelAt(config, record, desire, at)
   const index = stateIndex(config, level)
@@ -80,7 +88,7 @@ function DesireRow({
     0,
     config.states.findIndex(({ name }) => name === config.initial),
   )
-  const trend = trendOf(config, record, desire, at)
+  const trend = paused ? undefined : trendOf(config, record, desire, at)
   const label = desireLabel(desire.name)
   const TrendIcon = trend?.direction === 'down' ? ArrowDownRightIcon : ArrowUpRightIcon
 

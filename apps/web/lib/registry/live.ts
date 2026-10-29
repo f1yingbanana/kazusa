@@ -4,6 +4,7 @@ import {
   clockStore,
   desireStore,
   journalTailStore,
+  locationStore,
   statusStore,
 } from "@/lib/live/state";
 import type { LiveHandler } from "./types";
@@ -13,6 +14,7 @@ export interface LiveContext {
   readonly clock: typeof clockStore;
   readonly journalTail: typeof journalTailStore;
   readonly desires: typeof desireStore;
+  readonly locations: typeof locationStore;
   /** Called when a journal seq gap is detected; catch up with `timeline?after=`. */
   readonly onJournalGap?: (after: number) => void;
 }
@@ -22,6 +24,7 @@ export const defaultLiveContext: LiveContext = {
   clock: clockStore,
   journalTail: journalTailStore,
   desires: desireStore,
+  locations: locationStore,
 };
 
 /*
@@ -48,6 +51,9 @@ export const LIVE_HANDLERS: { [T in StreamEventType]?: LiveHandler<T> } = {
     if (current && current.anchorAt > event.record.anchorAt) return;
     ctx.desires.set(event.characterId, event.record);
   },
+  // Every write is a full record; positions follow from it and sim time.
+  location: (event, ctx) =>
+    ctx.locations.set(event.characterId, event.record),
 };
 
 export function dispatchLive(

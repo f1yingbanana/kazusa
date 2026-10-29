@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
@@ -12,6 +13,7 @@ import {
   feelingsLine,
   levelOf,
   levelsAt,
+  resumeAfter,
   startEffects,
   stateOf,
   isUnchanged,
@@ -32,6 +34,8 @@ export interface DesiresService {
   readonly taskExtension: TaskExtension;
   /** The `How you feel` line for a brain turn. */
   readonly feelings: (agentId: string, at: number) => Promise<string>;
+  /** Back from offstage: levels pick up from where they were at `from`. */
+  readonly resume: (agentId: string, from: number, to: number) => Promise<void>;
 }
 
 /** Validators bound to one world's catalog and states. */
@@ -66,6 +70,7 @@ export function registerDesires(
   api: OpenClawPluginApi,
   deps: { readonly clock: Clock },
 ): DesiresService {
+  const getConfig = () => currentConfig(api);
   const { clock } = deps;
   const config = DESIRES_CONFIG.parse(api.pluginConfig?.desires ?? {});
   const schemas = createSchemas(config);
@@ -142,7 +147,7 @@ export function registerDesires(
   };
 
   const isCharacter = (agentId: string): boolean =>
-    listAgentIds(api.config).includes(agentId);
+    listAgentIds(getConfig()).includes(agentId);
 
   api.registerGatewayMethod("desires.get", async ({ params, respond }) => {
     const parsed = schemas.get.safeParse(params);
@@ -212,6 +217,12 @@ export function registerDesires(
         config,
         levelsAt(config, await store.lookup(agentId), at),
       );
+    },
+    resume: async (agentId, from, to): Promise<void> => {
+      const record = await store.lookup(agentId);
+      if (!record) return;
+      const resumed = resumeAfter(config, record, from, to);
+      if (resumed !== record) await write(agentId, resumed);
     },
   };
 }

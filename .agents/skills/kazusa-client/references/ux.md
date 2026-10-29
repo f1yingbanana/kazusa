@@ -168,13 +168,33 @@ rehoused as a stage view.
   The list is virtualized, since observed chats can number in the thousands.
 - **The list is the Chats section's sidebar**, not part of the view. Below
   `lg` the view shows it as the first screen until a chat is open.
+- **Face to face vs. on the phone:** huddles (`type: "huddle"`) are listed
+  first under "In person at <place>", and the text chats under "Messages"
+  (no headings when there is no huddle). A huddle's header says "In person at
+  <place>", its composer offers **Say / Do**, it has no member management
+  (people join by speaking and leave by walking away), and its typing reads
+  "about to speak". Titles come from members when the server's title is just
+  a member id (`chatTitle`), so a DM shows the partner's name.
+- **Actions** (`type: "action"`) are narrated, never bubbled: one line in the
+  sender's lane, the name upright and the rest italic ("**Kazusa** leans
+  back. She sips her tea."). The text is stored without its subject, the
+  client supplies it (`actionLine`), so multi-sentence prose reads naturally,
+  and a model that names itself anyway or wraps the line in asterisks does
+  not produce a doubled name. A speech run right after the same sender's
+  action skips its name header. The list preview narrates actions the same
+  way ("Sensei waves", never "You waves") and prefixes group and huddle lines
+  with the speaker.
 - **Presence-aware header:** a DM shows the partner's presence ring and
-  current activity (task icon, "Reading · 34m left"; typing overrides it). A group
-  shows up to three stacked presence avatars and member first names
-  ("Sana, Ren, Mio +2"). A reply that hasn't come yet then has visible
-  context. Tapping the header opens the inspector: the character for a DM,
-  the chat for a group (members as roster rows with their activity). Member
-  management stays a separate icon button.
+  current activity (task icon, "Reading · 34m left"; typing overrides it). A
+  group shows up to three stacked presence avatars and member names. A reply
+  that hasn't come yet then has visible context. Tapping the header reopens
+  the inspector. Member management (groups only) stays a separate icon
+  button.
+- **The inspector follows the open chat:** opening a chat selects its subject
+  (the partner of a DM, otherwise the chat: members with their activity, and
+  a huddle's place). It is a quiet selection: below `xl` it does not pop the
+  inspector sheet over the chat. Selecting something else afterwards sticks;
+  a link that carries both `chats.id` and `sel` keeps its `sel`.
 - Deep links: `view=chats&chat=<chatId>&msg=<messageId>` scrolls to the message
   and highlights it. Timeline rows link here.
 
@@ -232,13 +252,24 @@ per-character swimlanes**.
 Entity-polymorphic and deliberately slim. Sections are registry entries. If a
 section starts growing tabs, the depth belongs in a stage view instead.
 
-**Character (first draft):**
+Start from the player's question for each section (the `kazusa` skill §0,
+perspective 2): what are they doing, how do they feel, what have they been up
+to, who are they. A section that answers none of these, or repeats another
+one, does not belong. Prefer one line of facts to a card; icons only where
+they tell kinds apart; no system jargon (ids, "stimuli", brain states the
+presence ring already shows).
 
-1. **Header:** presence avatar (large), name, role or occupation, affiliation,
-   kind (Simulated, NPC, Player), star toggle.
-2. **Now:** current task as a fact card (category icon and label, description,
-   started, ends, progress bar, `34m left`), brain state, the chats being
-   composed in.
+**Character:**
+
+1. **Header:** presence avatar (large), name (id on hover), occupation ·
+   affiliation, and "NPC"/"Player" only for those kinds. Icon buttons:
+   Message (DM) and star.
+2. **Now:** the task (category and times on one mono line with `34m left`,
+   description clamped to three lines, tap to expand, progress bar), then
+   where: the place with its area and how long they have been there, and who
+   else is there (people they have not noticed are dimmed, "Hasn't noticed
+   them" on hover); or, on a trip, "To <place> · arrives 20:40" and "Near
+   <place>, then <purpose>". Then "Writing in <chat>" while composing.
 3. **Desires:** one row per catalog desire in catalog order: prettified name
    (description on hover), a bar segmented at the world's state boundaries, and
    the state word the brain reads. Desires are background pressure, not a
@@ -249,19 +280,22 @@ section starts growing tabs, the depth belongs in a stage view instead.
    answers both "why did she pick this task?" and "what will she want next?".
    Levels are computed on the client from the closed-form record; no numbers
    are shown (they are in the meter's ARIA value).
-4. **Recent:** the last ~5 journal events for this actor (the Timeline
-   component, default kinds only, so no messages), plus "Open in Timeline".
-5. **Conversations:** chats this character is in, with a live dot. Click opens
-   them in Chats (observed if the player isn't a member).
-6. **Profile:** frontmatter fields (aliases, traits, role) as key/value facts,
+4. **Recent:** the last ~5 journal events for this actor (`RECENT_KINDS`: the
+   Timeline's defaults minus the `mind` facet, so neither messages nor
+   attention bookkeeping), plus "Open in Timeline".
+5. **About:** role, traits and aliases (not ones equal to the id or name),
    plus `bodyMarkdown` rendered verbatim in a collapsed block.
 
-**Chat:** members (presence avatars with activity), type, created, latest
-activity, "Open in Chats".
+The player's chats with a character are one tap away through Message and the
+Chats list, so there is no Conversations section.
 
-**Place (when the places domain exists):** structured status, allowed
-activities, connections (rendered from frontmatter), occupants, recent events
-there.
+**Chat:** type ("Group chat", "In person at <place>"), members as roster rows
+with their activity, "Open in Chats" unless it is already open.
+
+**Place:** area breadcrumb above the name, summary, aliases, description
+(collapsed), "Open in World"; Here now / Inside / On the way here; Getting
+around (parent, children, connections). Place chips inside place lists drop
+their pin.
 
 ## 9. Status bar
 

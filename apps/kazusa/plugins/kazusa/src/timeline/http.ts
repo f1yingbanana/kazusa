@@ -1,3 +1,4 @@
+import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
@@ -33,6 +34,7 @@ export function registerTimelineHttp(
     >;
   },
 ): void {
+  const getConfig = () => currentConfig(api);
   const route = createRouteRegistrar(api);
 
   route("timeline", "GET", async (req, res) => {
@@ -72,7 +74,7 @@ export function registerTimelineHttp(
     const wantsMessages =
       !kindsFilter?.length || kindsFilter.includes("message.sent");
 
-    const allAgentIds = [...new Set(listAgentIds(api.config))];
+    const allAgentIds = [...new Set(listAgentIds(getConfig()))];
     const targetAgents = actorsFilter
       ? allAgentIds.filter((id) => actorsFilter.includes(id))
       : allAgentIds;
@@ -91,7 +93,7 @@ export function registerTimelineHttp(
     for (const agentId of targetAgents) {
       try {
         const storePath = sessionsApi.resolveStorePath(
-          api.config.session?.store,
+          getConfig().session?.store,
           { agentId },
         );
         const readSessions = await sessionsApi.createSessionEntryListReader({

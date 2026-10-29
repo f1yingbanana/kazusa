@@ -1,7 +1,9 @@
+import { currentConfig } from "../current-config.ts";
 import { noteShutdown } from "../shutdown.ts";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readVisibleSessionTranscriptMessageEntries } from "openclaw/plugin-sdk/session-transcript-runtime";
+import type { ThinkingLevel } from "@kazusa/client";
 import type { PerceptionDelivery, PerceptionDeps } from "./perception.ts";
 
 const CHANNEL_ID = "kazusa";
@@ -101,10 +103,33 @@ export function adoptedByBrain(
   };
 }
 
+/**
+ * Sets the brain session's reasoning level to the world's. OpenClaw has no
+ * per-turn hook for it, and `agents.defaults.thinkingDefault` would sit below
+ * any session level, so the session carries it. `undefined` clears it: the
+ * model runs at its own default.
+ */
+async function applyThinking(
+  api: OpenClawPluginApi,
+  agentId: string,
+  level: ThinkingLevel | undefined,
+): Promise<void> {
+  await api.runtime.agent.session.patchSessionEntry({
+    agentId,
+    sessionKey: brainKey(agentId),
+    preserveActivity: true,
+    update: (entry) =>
+      entry.thinkingLevel === level ? null : { thinkingLevel: level },
+  });
+}
+
 export function registerBrainChannel(
   api: OpenClawPluginApi,
   signal: AbortSignal,
+  /** The reasoning level every character runs at (Models). */
+  thinking?: () => Promise<ThinkingLevel | undefined>,
 ): NonNullable<PerceptionDeps["deliver"]> {
+  const getConfig = () => currentConfig(api);
   api.registerChannel({ plugin: BRAIN_CHANNEL });
 
   const dispatch = async (
@@ -112,8 +137,9 @@ export function registerBrainChannel(
   ): Promise<void> => {
     signal.throwIfAborted();
     const sessionKey = brainKey(delivery.agentId);
+    if (thinking) await applyThinking(api, delivery.agentId, await thinking());
     await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
-      cfg: api.config,
+      cfg: getConfig(),
       ctx: {
         Provider: CHANNEL_ID,
         Surface: CHANNEL_ID,

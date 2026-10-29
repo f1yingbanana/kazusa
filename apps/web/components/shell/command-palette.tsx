@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { MessageSquareIcon, UsersIcon } from 'lucide-react'
+import { MapPinIcon } from 'lucide-react'
+import { chatIcon } from '@/components/entities/chips'
 import { PresenceAvatar } from '@/components/entities/presence-avatar'
 import {
   CommandDialog,
@@ -14,7 +15,9 @@ import {
 } from '@/components/ui/command'
 import { useCharacters } from '@/hooks/use-characters'
 import { useChats } from '@/hooks/use-chats'
+import { usePlaces } from '@/hooks/use-location'
 import { useNavigate } from '@/hooks/use-url-state'
+import { placeName } from '@/lib/location/places'
 import { STAGE_VIEWS } from '@/lib/registry/views'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
 
@@ -27,6 +30,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const navigate = useNavigate()
   const { characters } = useCharacters()
   const { chats } = useChats()
+  const places = usePlaces()
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -54,10 +58,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       open={open}
       onOpenChange={onOpenChange}
       title="Jump to anything"
-      description="Search sections, chats, and characters."
+      description="Search sections, chats, places, and characters."
     >
       <Command>
-        <CommandInput placeholder="Search characters, chats, sections" />
+        <CommandInput placeholder="Search characters, places, chats, sections" />
         <CommandList className="max-h-96">
           <CommandEmpty>Nothing matches.</CommandEmpty>
           <CommandGroup heading="Sections">
@@ -70,14 +74,34 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           </CommandGroup>
           {chats.length > 0 ? (
             <CommandGroup heading="Chats">
-              {chats.map((chat) => (
+              {chats.map((chat) => {
+                const Icon = chatIcon(chat.type)
+                return (
+                  <CommandItem
+                    key={chat.id}
+                    value={`chat ${chat.name} ${chat.id}`}
+                    onSelect={() => go({ view: 'chats', 'chats.id': chat.id })}
+                  >
+                    <Icon />
+                    <span className="truncate">{chat.name}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          ) : null}
+          {places && places.places.length > 0 ? (
+            <CommandGroup heading="Places">
+              {places.places.map((place) => (
                 <CommandItem
-                  key={chat.id}
-                  value={`chat ${chat.name} ${chat.id}`}
-                  onSelect={() => go({ view: 'chats', 'chats.id': chat.id })}
+                  key={place.id}
+                  value={`place ${place.name} ${place.aliases.join(' ')} ${place.id}`}
+                  onSelect={() => go({ sel: serializeEntityRef({ kind: 'place', id: place.id }) })}
                 >
-                  {chat.type === 'group' ? <UsersIcon /> : <MessageSquareIcon />}
-                  <span className="truncate">{chat.name}</span>
+                  <MapPinIcon />
+                  <span className="truncate">{place.name}</span>
+                  {place.parent ? (
+                    <span className="ml-auto truncate text-xs text-muted-foreground">{placeName(places, place.parent)}</span>
+                  ) : null}
                 </CommandItem>
               ))}
             </CommandGroup>

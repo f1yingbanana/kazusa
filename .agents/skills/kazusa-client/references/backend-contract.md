@@ -107,6 +107,65 @@ record changes only on `start_task`/`delay_task` and `desires.configure`, each
 pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 `kinds` excludes `message.sent` (the client default).
 
+### Built: models
+
+| Route                   | Request / response                                                                                                                                                                                                                                         | Backed by                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /kazusa/models`    | `ModelsResponse = { current?, configured?, thinking?, models: ModelOption[], providers: ModelProviderStatus[] }`. `current` is the picked model, else `configured` (`agents.defaults.model.primary`). `?refresh=1` asks providers for their catalogs again | Gateway `models.list` (`view: "default"`, first agent) + `agents.defaults.models` + the `"models"` store (`src/models/http.ts`) |
+| `POST /kazusa/model`    | `ModelSelectPayload = { ref }` → `ModelSelectResponse = { current }`. 404 for a ref outside the catalog, 409 for one without working credentials                                                                                                           | `"models"` store, key `world`: `{ model?, thinking? }` (`src/models/selection.ts`)                                              |
+| `POST /kazusa/thinking` | `ThinkingSelectPayload = { level: ThinkingLevel \| null }` → `ThinkingSelectResponse = { thinking? }`. `null` clears it; 409 for a level the current model lacks                                                                                           | Same record                                                                                                                     |
+
+All three routes register with `auth: "gateway"` (the Gateway checks the bearer
+token) because they dispatch `models.list` as the caller through
+`gateway-method-runtime`, which the manifest allows with
+`contracts.gatewayMethodDispatch: ["authenticated-request"]`.
+
+One model and one reasoning level for every character, stored together. The
+catalog is discovered by the provider plugins (OpenRouter and Venice list their
+models themselves), so the world config only pins a shortlist in
+`agents.defaults.models` (shown as "Pinned", with its `alias` as the display
+name). OpenClaw only prepares the catalogs of providers that a config model ref
+names, so each provider needs at least one pinned model before its other models
+appear (`venice/zai-org-glm-4.7` pins Venice). `decisionModel` is not part of
+this route. The domain is live-only: there is no mock catalog, and the picker
+hides without a Gateway.
+
+#### OpenClaw limitation: the pick does not live in `openclaw.json`
+
+OpenClaw reloads every plugin when a configured model ref changes. Its reload
+planner treats `agents.defaults.model.primary` (and `agents.entries.<id>.model`)
+as provider-auth relevant, so a switch retires and re-registers Kazusa, the
+provider plugins and the rest, each waiting out a 5 s drain, twice: about 10 s
+of stalled requests and brief 401s, measured 2026-10-29. `/model -g`,
+`/model -a`, `openclaw models set` and `config.patch` all write the same paths.
+Per-session overrides (`/model -s`, `sessions.patch`) avoid the reload but would
+have to follow every session of every character.
+
+So Kazusa keeps the pick in its own `"models"` store and applies it to the one
+session where character turns reach a model, `agent:<id>:brain` (Perception
+handles cron wakes and other sessions without a model call):
+
+- Model: the `before_model_resolve` hook returns `providerOverride` /
+  `modelOverride` for brain sessions (`src/models/register.ts`). It needs
+  `plugins.entries.kazusa.hooks.allowConversationAccess`.
+- Reasoning: OpenClaw has no per-turn hook for it, so the brain channel writes
+  `thinkingLevel` onto the brain session before each dispatch
+  (`registerBrainChannel`). Clearing it lets each model run at its own default.
+  A level the model lacks is remapped by OpenClaw to its nearest one.
+
+Consequences to design around:
+
+- OpenClaw's own surfaces (`openclaw models status`, the Control UI default)
+  still show `configured`. The picker's tooltip names it when they differ.
+- A turn already running finishes on the old model and level.
+- `openclaw.json` is never written by the picker, so it needs no prettier pass,
+  and editing `primary` by hand only matters while nothing is picked.
+- Each `ModelOption` carries the model's own `thinkingLevels` (OpenClaw's
+  `/think` ladder minus `ultra`, a harness mode rather than an effort; provider
+  labels: Z.AI calls `low` "on") and its `thinkingDefault`. Do not set
+  `agents.defaults.thinkingDefault`: `models.list` folds it into every model's
+  `thinkingDefault` and caches that until a refresh.
+
 `CharacterSummary` (draft):
 
 ```ts
@@ -114,7 +173,8 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
   id: string;                         // "alice" | "user:you" | NPC character_id
   name: string;
   kind: "agent" | "player" | "npc";   // agent = has workspace + roster entry
-  avatarUrl?: string;
+  isSystemAgent?: boolean;             // current native system-agent selection; render as ADMIN, never infer from identity prose
+  avatarUrl?: string;                 // IDENTITY.md avatarUrl, else /kazusa/avatar?id=… for <workspace>/avatar.<ext>
   occupation?: string;
   affiliation?: string;
   aliases: string[];
@@ -256,18 +316,19 @@ are skipped.
 
 ## 7. Capability matrix (today → first draft)
 
-| Domain                       | Today                                                                                                                                                                                                                                                   | Needed for live                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `clock`                      | Store + RPCs built; no HTTP                                                                                                                                                                                                                             | `/kazusa/world`, `POST /kazusa/clock`, SSE `clock`                       |
-| `characters`                 | `/kazusa/agents` (id, name, avatar)                                                                                                                                                                                                                     | `/kazusa/characters`, `/kazusa/character`                                |
-| `status`                     | `tasks` store built; typing built; brain busy/idle tracked inside Perception (drafted)                                                                                                                                                                  | Perception exposes read-only brain state + change callback; SSE `status` |
-| `chats`                      | Built                                                                                                                                                                                                                                                   | —                                                                        |
-| `observe`                    | Audience-filtered only                                                                                                                                                                                                                                  | `/kazusa/observe/*`, `scope=observer`                                    |
-| `timeline`                   | None                                                                                                                                                                                                                                                    | `src/journal/` + routes + SSE `journal`                                  |
-| `places`                     | Built: `GET /kazusa/places` (tree order, `PlacesResponse`)                                                                                                                                                                                              | Client wiring (World tree)                                               |
-| `location`                   | Built: `GET /kazusa/locations` (closed-form `LocationRecord`s, homes included); trips in `task.started` payloads (`where`, `from`, `arriveAt`, `usualMinutes`); in-person conversations are chats of type `huddle` (`chat:huddle:<id>`), many per place | SSE `location`; client wiring (in-person thread style)                   |
-| `desires`                    | Built: `/kazusa/desires`, SSE `desires`                                                                                                                                                                                                                 | —                                                                        |
-| `relationships`, `attention` | Schema only / drafted                                                                                                                                                                                                                                   | See the roadmap                                                          |
+| Domain                       | Today                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Needed for live                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `clock`                      | Store + RPCs built; no HTTP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `/kazusa/world`, `POST /kazusa/clock`, SSE `clock`                       |
+| `characters`                 | `/kazusa/agents` (id, name, avatar)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `/kazusa/characters`, `/kazusa/character`                                |
+| `status`                     | `tasks` store built; typing built; brain busy/idle tracked inside Perception (drafted)                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Perception exposes read-only brain state + change callback; SSE `status` |
+| `chats`                      | Built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | —                                                                        |
+| `observe`                    | Audience-filtered only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `/kazusa/observe/*`, `scope=observer`                                    |
+| `timeline`                   | None                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `src/journal/` + routes + SSE `journal`                                  |
+| `places`                     | Built: `GET /kazusa/places` (tree order, `PlacesResponse`); wired to the World tree, place inspector and palette                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                        |
+| `location`                   | Built: `GET /kazusa/locations` (closed-form `LocationRecord`s, homes included); SSE `location` (`{ characterId, record }`, one per record write); `location.noticed` journal events (observer's `:tasks` ledger, plus SSE `journal`); trips in `task.started` payloads (`where`, `from`, `arriveAt`, `usualMinutes`); in-person conversations are chats of type `huddle` (`chat:huddle:<id>`), many per place; `POST /kazusa/move` (`MovePayload` → `MoveResponse`) moves the player straight to a place; `SendPayload.aloud` speaks face to face | Client wiring (in-person thread style)                                   |
+| `desires`                    | Built: `/kazusa/desires`, SSE `desires`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | —                                                                        |
+| `models`                     | Built: `GET /kazusa/models`, `POST /kazusa/model`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | —                                                                        |
+| `relationships`, `attention` | Schema only / drafted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | See the roadmap                                                          |
 
 Until a domain is live, the client serves it from the mock source when mocks are
 enabled, with visible `Mock` tags (D10).

@@ -50,6 +50,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -83,6 +86,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -93,6 +99,41 @@ describe("startIdleSupervisor", () => {
 
       await vi.advanceTimersByTimeAsync(2500);
       expect(idleWake).toHaveBeenCalledWith("alice");
+
+      dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never checks in on an offstage character", async () => {
+    vi.useFakeTimers();
+    try {
+      const idleWake = vi.fn().mockResolvedValue(undefined);
+      const perception = {
+        getBrainState: vi.fn().mockResolvedValue({ brain: "idle", queued: 0 }),
+        idleWake,
+      } as unknown as Perception;
+      const api = {
+        config: { agents: { list: [{ id: "alice" }, { id: "bob" }] } },
+        logger: { warn: vi.fn() },
+      } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
+
+      const dispose = startIdleSupervisor(api, {
+        clock: createMockClock(1_000_000, 1),
+        store: createMockTaskStore(),
+        perception,
+        intervalMs: 10_000,
+        stage: {
+          onstage: async (ids) => ids.filter((id) => id !== "alice"),
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(idleWake.mock.calls).toEqual([["bob"]]);
 
       dispose();
     } finally {
@@ -124,6 +165,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -171,6 +215,9 @@ describe("startIdleSupervisor", () => {
         },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -209,6 +256,9 @@ describe("startIdleSupervisor", () => {
         },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -242,6 +292,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -275,6 +328,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
 
       const dispose = startIdleSupervisor(api, {
         clock,
@@ -307,6 +363,9 @@ describe("startIdleSupervisor", () => {
         config: { agents: { list: [{ id: "alice" }] } },
         logger: { warn: vi.fn() },
       } as unknown as OpenClawPluginApi;
+      Object.assign(api, {
+        runtime: { ...api.runtime, config: { current: () => api.config } },
+      });
       const cell: SupervisorCell = { running: false, lastTickAt: 0 };
       const stops = [1, 2, 3].map(() =>
         startIdleSupervisor(api, {

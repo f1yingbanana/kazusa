@@ -271,6 +271,17 @@
             "description": "Bubbles (said or done) one send_message may carry (default: 9)."
           }
         }
+      },
+      "stage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "defaultOnstage": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether a character never switched on or off is simulated. Set false for a large cast players pick from."
+          }
+        }
       }
     }
   },
@@ -284,6 +295,7 @@
       "send_message",
       "list_chats",
       "manage_chat"
-    ]
+    ],
+    "gatewayMethodDispatch": ["authenticated-request"]
   }
 }
