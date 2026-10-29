@@ -46,6 +46,25 @@ describe("mock world", () => {
     for (const event of desires)
       expect(StreamEventSchema.safeParse(event).success).toBe(true);
   });
+  it("places everyone on the map and moves them on task starts", () => {
+    const world = createMockWorld({ seed: 5, count: 30 });
+    const ids = new Set(world.places.map((place) => place.id));
+    for (const record of world.locations.values())
+      expect(ids.has(record.placeId)).toBe(true);
+    const events = advanceMockWorld(world, MOCK_WORLD_START + 600 * MINUTE, 30);
+    const moves = events.filter((e) => e.type === "location");
+    expect(moves.length).toBeGreaterThan(0);
+    for (const event of moves) {
+      expect(StreamEventSchema.safeParse(event).success).toBe(true);
+      const trip = event.type === "location" ? event.record.trip : undefined;
+      if (!trip) continue;
+      expect(ids.has(trip.to)).toBe(true);
+      expect(trip.legs[0].placeId).toBe(event.record.placeId);
+      expect(trip.legs.at(-1)).toEqual({ placeId: trip.to, at: trip.arriveAt });
+    }
+    for (const event of world.journal.slice(-40))
+      expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
 });
 
 describe("mock timeline query", () => {

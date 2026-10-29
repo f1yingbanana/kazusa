@@ -6,6 +6,8 @@ import type {
   CharacterStatus,
   CharacterSummary,
   DesiresResponse,
+  LocationsResponse,
+  PlacesResponse,
   WorldResponse,
 } from "@kazusa/client";
 import { useChats } from "@/hooks/use-chats";
@@ -14,8 +16,11 @@ import {
   desireConfigStore,
   desireStore,
   journalTailStore,
+  locationStore,
+  placesStore,
   statusStore,
 } from "@/lib/live/state";
+import { buildPlaceIndex } from "@/lib/location/places";
 import { dispatchLive } from "@/lib/registry/live";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { simTimeAt } from "@/lib/time/sim";
@@ -27,6 +32,12 @@ import {
 } from "./capabilities";
 import { fetchCharacters } from "./characters/http";
 import { DESIRES_KEY, fetchDesires } from "./desires/http";
+import {
+  LOCATIONS_KEY,
+  PLACES_KEY,
+  fetchLocations,
+  fetchPlaces,
+} from "./location/http";
 import { fetchWorld } from "./clock/http";
 import {
   MOCK_WORLD_START,
@@ -102,11 +113,30 @@ export function SourcesProvider({
     { revalidateOnFocus: false },
   );
 
+  // The map never changes while the Gateway runs; records arrive by SSE.
+  const livePlaces = useSWR<PlacesResponse, Error>(
+    resolved.places === "live"
+      ? ([PLACES_KEY, config.baseUrl, config.token ?? ""] as const)
+      : null,
+    () => fetchPlaces(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
+  );
+
+  const liveLocations = useSWR<LocationsResponse, Error>(
+    resolved.location === "live"
+      ? ([LOCATIONS_KEY, config.baseUrl, config.token ?? ""] as const)
+      : null,
+    () => fetchLocations(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
+  );
+
   const needsWorld =
     resolved.characters === "mock" ||
     resolved.status === "mock" ||
     resolved.timeline === "mock" ||
-    resolved.desires === "mock";
+    resolved.desires === "mock" ||
+    resolved.places === "mock" ||
+    resolved.location === "mock";
   const liveIds = liveCharacters.data?.map((c) => c.id).join("|");
 
   const world = useMemo(() => {
@@ -177,6 +207,26 @@ export function SourcesProvider({
       desireStore.reset([]);
     }
   }, [resolved.desires, world, liveDesires.data]);
+
+  useEffect(() => {
+    if (resolved.places === "mock" && world) {
+      placesStore.set(buildPlaceIndex(world.places));
+    } else if (resolved.places === "live" && livePlaces.data) {
+      placesStore.set(buildPlaceIndex(livePlaces.data.places));
+    } else if (resolved.places === "unavailable") {
+      placesStore.set(null);
+    }
+  }, [resolved.places, world, livePlaces.data]);
+
+  useEffect(() => {
+    if (resolved.location === "mock" && world) {
+      locationStore.reset(world.locations);
+    } else if (resolved.location === "live" && liveLocations.data) {
+      locationStore.reset(Object.entries(liveLocations.data.records));
+    } else if (resolved.location === "unavailable") {
+      locationStore.reset([]);
+    }
+  }, [resolved.location, world, liveLocations.data]);
 
   useEffect(() => {
     journalTailStore.set([]);

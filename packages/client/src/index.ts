@@ -449,6 +449,11 @@ export const LocationRecordSchema = z.object({
       usualMinutes: z.number(),
     })
     .optional(),
+  /**
+   * People this participant has noticed since getting here; cleared when they
+   * move. Observer-only: a Player lens redacts it.
+   */
+  noticed: z.array(z.string()).optional(),
 });
 export type LocationRecord = z.infer<typeof LocationRecordSchema>;
 
@@ -512,6 +517,10 @@ export const TaskStartedEventSchema = z.object({
     replacedTaskId: z.string().optional(),
     /** Location: the place id where the activity happens (a trip's destination). */
     where: z.string().optional(),
+    /** Location: the character's own words for a spot within `where`. */
+    spot: z.string().optional(),
+    /** Location: a trip toward somewhere off the map; they stayed at `where`. */
+    unknown: z.string().optional(),
     /** Location, trips only: origin place id, arrival, and the usual route time. */
     from: z.string().optional(),
     arriveAt: z.number().optional(),
@@ -608,6 +617,33 @@ export const AttentionDecidedEventSchema = z.object({
   }),
 });
 
+/**
+ * Location's `notice` judgment came out yes: the observer (`actors[0]`) saw
+ * `subjects` (a whole group, when they were talking together). Written to the
+ * observer's `:tasks` ledger. Word, probability and roll are observer-only.
+ */
+export const LocationNoticedEventSchema = z.object({
+  ...JournalBase,
+  kind: z.literal("location.noticed"),
+  payload: z.object({
+    subjects: z.array(z.string()),
+    placeId: z.string(),
+    /**
+     * `arrive`: the observer walked in on them; `comes`: they walked in on the
+     * observer; `cross`: paths crossed here; `meet`: passed going opposite ways
+     * between `placeId` and `between`.
+     */
+    moment: z.enum(["arrive", "comes", "cross", "meet"]),
+    between: z.string().optional(),
+    /** The subjects' huddle address, when they were talking together. */
+    huddle: z.string().optional(),
+    word: z.string(),
+    probability: z.number(),
+    roll: z.number(),
+    source: z.string(),
+  }),
+});
+
 export const JournalEventSchema = z.discriminatedUnion("kind", [
   TaskStartedEventSchema,
   TaskDelayedEventSchema,
@@ -617,6 +653,7 @@ export const JournalEventSchema = z.discriminatedUnion("kind", [
   ChatMembersChangedEventSchema,
   ClockChangedEventSchema,
   AttentionDecidedEventSchema,
+  LocationNoticedEventSchema,
 ]);
 export type JournalEvent = z.infer<typeof JournalEventSchema>;
 export type JournalKind = JournalEvent["kind"];
@@ -700,6 +737,18 @@ export const DesiresStreamEventSchema = z.object({
 export type DesiresStreamEvent = z.infer<typeof DesiresStreamEventSchema>;
 
 /**
+ * A participant's new closed-form position record (full replacement for that
+ * id): on every task-lease move, arrival, operator placement and change to who
+ * they have noticed.
+ */
+export const LocationStreamEventSchema = z.object({
+  type: z.literal("location"),
+  characterId: z.string(),
+  record: LocationRecordSchema,
+});
+export type LocationStreamEvent = z.infer<typeof LocationStreamEventSchema>;
+
+/**
  * `connected` with the observer-scope additions (journal high-water, status
  * seed).
  */
@@ -717,6 +766,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   JournalStreamEventSchema,
   ClockStreamEventSchema,
   DesiresStreamEventSchema,
+  LocationStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
 export type StreamEventType = StreamEvent["type"];

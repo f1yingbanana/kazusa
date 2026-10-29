@@ -3,6 +3,7 @@
 import { HashIcon, MapPinIcon, UsersIcon } from 'lucide-react'
 import { useChats } from '@/hooks/use-chats'
 import { useCharacter } from '@/hooks/use-characters'
+import { usePlace } from '@/hooks/use-location'
 import { useNavigate } from '@/hooks/use-url-state'
 import { useSources } from '@/lib/source/provider'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
@@ -56,10 +57,17 @@ export function ChatChip({ id, className }: { id: string; className?: string }) 
 }
 
 export function PlaceChip({ id, className }: { id: string; className?: string }) {
+  const place = usePlace(id)
+  const navigate = useNavigate()
   return (
-    <span className={cn(chipClass, 'hover:bg-transparent', className)}>
+    <button
+      type="button"
+      title={place?.summary}
+      className={cn(chipClass, className)}
+      onClick={() => navigate({ sel: serializeEntityRef({ kind: 'place', id }) })}
+    >
       <MapPinIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate">{id}</span>
-    </span>
+      <span className="truncate">{place?.name ?? id}</span>
+    </button>
   )
 }

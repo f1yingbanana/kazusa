@@ -24,6 +24,18 @@ const USER = z.object({
   name: z.string().trim().min(1).default("Sensei"),
 });
 
+/** Domains every Kazusa world serves; others depend on the world's data. */
+export const DEFAULT_CAPABILITIES: Readonly<
+  Partial<Record<Domain, Capability>>
+> = {
+  clock: "live",
+  chats: "live",
+  characters: "live",
+  status: "live",
+  timeline: "live",
+  desires: "live",
+};
+
 export function toClockState(clock: Clock): ClockState {
   const snapshot = clock.now();
   return {
@@ -63,14 +75,7 @@ export function registerClockHttp(
     const capabilities: Partial<Record<Domain, Capability>> =
       options?.getCapabilities
         ? options.getCapabilities()
-        : {
-            clock: "live",
-            chats: "live",
-            characters: "live",
-            status: "live",
-            timeline: "live",
-            desires: "live",
-          };
+        : DEFAULT_CAPABILITIES;
 
     sendJson(res, 200, {
       user,

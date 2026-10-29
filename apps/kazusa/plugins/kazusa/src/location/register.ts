@@ -12,10 +12,12 @@ import { createSkillLoader } from "../context-engine/skill-loader.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import type { Perception } from "../perception/perception.ts";
+import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { Stimulus } from "../stimulus.ts";
 import type { ActiveTask, TaskExtension } from "../taskman/types.ts";
 import type { Huddle } from "../messaging/messaging.ts";
 import { crossings } from "./encounters.ts";
+import { clientRecord } from "./http.ts";
 import { LOCATION_CONFIG, USER, type LocationConfig } from "./config.ts";
 import { judge } from "./judgment.ts";
 import {
@@ -178,9 +180,11 @@ export function registerLocation(
       readonly timestamp: number;
       readonly metadata: unknown;
     }) => Promise<void>;
+    /** Observer SSE: `location` on every record write, `journal` on sightings. */
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
   },
 ): LocationService {
-  const { clock } = deps;
+  const { clock, broadcaster } = deps;
   const appendLedger =
     deps.appendLedger ??
     ((entry) => appendLedgerEntry(api, { ...entry, stream: "tasks" }));
@@ -189,6 +193,15 @@ export function registerLocation(
     namespace: "location",
     retention: "retained",
   });
+  /** Every write goes through here, so observers see each one. */
+  const save = async (id: string, next: LocationRecord): Promise<void> => {
+    await store.register(id, next);
+    broadcaster?.broadcast({
+      type: "location",
+      characterId: id,
+      record: clientRecord(next),
+    });
+  };
   const world = loadWorld(config.wikiDir);
   const warn = (message: string): void => api.logger.warn(message);
   const skillLoader = createSkillLoader({
@@ -345,6 +358,7 @@ export function registerLocation(
    * judged when it happens.
    */
   const SIGHTING = "sighting";
+  const MOMENTS = ["cross", "arrive", "comes", "meet"] as const;
   const sight = async (
     observer: string,
     kind: "cross" | "arrive" | "comes" | "meet",
@@ -384,7 +398,7 @@ export function registerLocation(
   ): Promise<void> => {
     const current = await record(id);
     if (!current) return;
-    await store.register(id, {
+    await save(id, {
       ...current,
       noticed: [...new Set(change(current.noticed ?? []))],
     });
@@ -505,8 +519,9 @@ export function registerLocation(
     item: Stimulus,
   ): Promise<Stimulus | undefined> => {
     if (!world) return undefined;
-    const [prefix, kind, subject, placeId, , betweenId] = item.id.split("|");
+    const [prefix, rawKind, subject, placeId, , betweenId] = item.id.split("|");
     const place = placeId ? world.map.places.get(placeId) : undefined;
+    const kind = MOMENTS.find((moment) => moment === rawKind);
     if (prefix !== SIGHTING || !kind || !subject || !place) return undefined;
     const between =
       kind === "meet" && betweenId
@@ -621,23 +636,32 @@ export function registerLocation(
     if (!mine.passing && !theirs.passing) {
       await setNoticed(observer, (noticed) => [...noticed, ...present]);
     }
+    const payload = {
+      subjects: present,
+      placeId: place.id,
+      moment: kind,
+      ...(between ? { between: between.id } : {}),
+      ...(huddle ? { huddle: huddle.address } : {}),
+      word: judgment.word,
+      probability: judgment.probability,
+      roll: judgment.roll,
+      source: judgment.source,
+    };
     await appendLedger({
       agentId: observer,
       text,
       timestamp: at,
-      metadata: {
+      metadata: { kind: "location.noticed", payload },
+    });
+    broadcaster?.broadcast({
+      type: "journal",
+      event: {
+        seq: nextJournalSeq(),
+        simTime: at,
         kind: "location.noticed",
-        payload: {
-          subjects: present,
-          placeId: place.id,
-          moment: kind,
-          ...(between ? { between: between.id } : {}),
-          ...(huddle ? { huddle: huddle.address } : {}),
-          word: judgment.word,
-          probability: judgment.probability,
-          roll: judgment.roll,
-          source: judgment.source,
-        },
+        actors: [observer],
+        placeId: place.id,
+        payload,
       },
     });
     return { ...item, text };
@@ -678,7 +702,7 @@ export function registerLocation(
           const after = positionAt(move.record, at);
           // Staying put keeps what they have noticed here; moving clears it.
           const stays = after.kind === "at" && after.placeId === before;
-          await store.register(agentId, {
+          await save(agentId, {
             ...move.record,
             ...(stays && current?.noticed ? { noticed: current.noticed } : {}),
           });
@@ -749,7 +773,7 @@ export function registerLocation(
     const previous = await record(id);
     const was = previous && positionAt(previous, at);
     const placed: LocationRecord = { placeId, since: at };
-    await store.register(id, placed);
+    await save(id, placed);
     await moved(id, placed, was?.kind === "at" ? was.placeId : undefined, at);
     respond(
       true,
@@ -813,7 +837,7 @@ export function registerLocation(
       const arrival =
         stored && world && arrive(world.map, stored, clock.time());
       if (!arrival) return undefined;
-      await store.register(agentId, arrival.record);
+      await save(agentId, arrival.record);
       await moved(agentId, arrival.record, undefined, arrival.record.since);
       return arrival.note;
     },

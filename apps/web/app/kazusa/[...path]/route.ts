@@ -13,6 +13,8 @@ const ROUTES = new Map([
   ["typing", "POST"],
   ["timeline", "GET"],
   ["desires", "GET"],
+  ["places", "GET"],
+  ["locations", "GET"],
 ]);
 
 type Context = { params: Promise<{ path: string[] }> };

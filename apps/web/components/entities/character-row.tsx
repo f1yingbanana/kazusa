@@ -20,12 +20,15 @@ export const CharacterRow = memo(function CharacterRow({
   starred,
   onSelect,
   className,
+  trailing,
 }: {
   character: CharacterSummary
   selected: boolean
   starred: boolean
   onSelect: (id: string) => void
   className?: string
+  /** Replaces the remaining-time readout (e.g. an arrival time). */
+  trailing?: string
 }) {
   const status = useCharacterStatus(character.kind === 'agent' ? character.id : undefined)
   const now = useSimNow()
@@ -65,7 +68,9 @@ export const CharacterRow = memo(function CharacterRow({
             <span className="truncate">{activity}</span>
           </span>
         </span>
-        {task && now > 0 ? (
+        {trailing !== undefined ? (
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">{trailing}</span>
+        ) : task && now > 0 ? (
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
             {task.endAt > now ? formatSimDuration(task.endAt - now) : 'due'}
           </span>

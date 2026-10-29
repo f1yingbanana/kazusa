@@ -13,7 +13,9 @@ import type {
 } from "openclaw/plugin-sdk/decisions";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import { StreamEventSchema, type StreamEvent } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
+import { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { registerDesires } from "../desires/register.ts";
 import { registerTaskman } from "../taskman/register.ts";
 import { executeDelayTask, executeStartTask } from "../taskman/taskman.ts";
@@ -194,8 +196,12 @@ function setup() {
   stores.set("tasks", tasks);
   const desires = registerDesires(api, { clock });
   const sightings: { agentId: string; text: string; metadata: unknown }[] = [];
+  const broadcaster = new KazusaRealtimeBroadcaster();
+  const broadcasts: StreamEvent[] = [];
+  broadcaster.subscribe((event) => broadcasts.push(event));
   const location = registerLocation(api, {
     clock,
+    broadcaster,
     appendLedger: async ({ agentId, text, metadata }) => {
       sightings.push({ agentId, text, metadata });
     },
@@ -236,6 +242,7 @@ function setup() {
     evaluate,
     ledger,
     sightings,
+    broadcasts,
     context,
     call,
     card,
@@ -612,6 +619,66 @@ describe("location registration", () => {
     // A plan that changed by then does not happen.
     await call("location.place", { id: "kurimura-airi", placeId: "dorm" });
     expect(await location.confirm("kurimura-airi", crossing!)).toBeUndefined();
+  });
+
+  it("pushes every record write and sighting to observers, wire-valid", async () => {
+    const { context, location, call, setNow, broadcasts } = setup();
+    const received: Stimulus[] = [];
+    location.attachPerception({
+      receive: async (_agentId, stimulus) => {
+        received.push(stimulus);
+      },
+    });
+    await call("location.place", { id: "kurimura-airi", placeId: "school" });
+    expect(broadcasts.at(-1)).toEqual({
+      type: "location",
+      characterId: "kurimura-airi",
+      record: { placeId: "school", since: T0 },
+    });
+
+    await executeStartTask(
+      {
+        type: "traveling",
+        description: "Walking to the club",
+        duration: 14,
+        afterwards: {},
+        where: "club",
+      },
+      context(),
+    );
+    const moves = broadcasts.filter(
+      (event) => event.type === "location" && event.characterId === "kazusa",
+    );
+    expect(moves.at(-1)).toMatchObject({
+      record: { placeId: "room_kazusa", trip: { to: "club" } },
+    });
+
+    setNow(minutes(11));
+    const crossing = received.find(
+      ({ id }) => id === `sighting|cross|kazusa|school|${minutes(11)}`,
+    );
+    await location.confirm("kurimura-airi", crossing!);
+    expect(broadcasts.at(-1)).toMatchObject({
+      type: "journal",
+      event: {
+        kind: "location.noticed",
+        simTime: minutes(11),
+        actors: ["kurimura-airi"],
+        placeId: "school",
+        payload: { subjects: ["kazusa"], moment: "cross" },
+      },
+    });
+
+    setNow(minutes(14));
+    await location.settle("kazusa");
+    expect(broadcasts.at(-1)).toEqual({
+      type: "location",
+      characterId: "kazusa",
+      record: { placeId: "club", since: minutes(14) },
+    });
+    for (const event of broadcasts) {
+      expect(StreamEventSchema.safeParse(event).success).toBe(true);
+    }
   });
 
   it("foresees two people meeting head-on along one stretch, and confirms it", async () => {

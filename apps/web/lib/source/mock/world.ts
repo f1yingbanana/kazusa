@@ -6,11 +6,21 @@ import type {
   DesireRecord,
   DesiresConfig,
   JournalEvent,
+  LocationRecord,
+  Place,
   StreamEvent,
   TaskSummary,
 } from "@kazusa/client";
+import { positionAt } from "../../location/places";
 import { HOUR, MINUTE } from "../../time/sim";
 import { MOCK_DESIRES_CONFIG, mockDesireRecord } from "./desires";
+import {
+  MOCK_HANGOUTS,
+  MOCK_HOMES,
+  MOCK_PLACES,
+  MOCK_WORKPLACES,
+  mockTrip,
+} from "./places";
 
 /*
  * Deterministic placeholder world. Everything here is concept data for
@@ -320,9 +330,146 @@ export interface MockWorld {
   readonly desireConfig: DesiresConfig;
   /** Closed-form records, re-anchored on every mock task start. */
   readonly desires: Map<string, DesireRecord>;
+  readonly places: readonly Place[];
+  /** Closed-form position records, rewritten when a mock task moves someone. */
+  readonly locations: Map<string, LocationRecord>;
+  readonly homes: ReadonlyMap<string, string>;
+  readonly workplaces: ReadonlyMap<string, string>;
   readonly rng: Rng;
+  /** Separate stream so movement never shifts the rest of the mock world. */
+  readonly locationRng: Rng;
   nextSeq: number;
   taskCounter: number;
+}
+
+/** Where a mock activity happens; `undefined` keeps them where they are. */
+function destinationFor(
+  rng: Rng,
+  type: string,
+  home: string,
+  work: string,
+): string | undefined {
+  if (type === "sleeping") return home;
+  if (type === "working") return work;
+  const hangouts = MOCK_HANGOUTS[type];
+  if (hangouts && chance(rng, 0.7)) return pick(rng, hangouts);
+  return chance(rng, 0.3) ? home : undefined;
+}
+
+/**
+ * The move a mock task start implies, mirroring the plugin: a `traveling` task
+ * is the trip; anything else elsewhere walks over at the usual pace first, if
+ * the walk fits.
+ */
+function moveFor(
+  world: MockWorld,
+  id: string,
+  task: TaskSummary,
+):
+  | {
+      record: LocationRecord;
+      payload: Record<string, string | number>;
+    }
+  | undefined {
+  const current = world.locations.get(id);
+  const home = world.homes.get(id);
+  const work = world.workplaces.get(id);
+  if (!current || !home || !work) return undefined;
+  const position = positionAt(current, task.startedAt);
+  const here = position.kind === "at" ? position.placeId : position.near;
+  const to = destinationFor(world.locationRng, task.type, home, work);
+  if (to === undefined || to === here) {
+    return position.kind === "at"
+      ? { record: current, payload: { where: here } }
+      : {
+          record: { placeId: here, since: task.startedAt },
+          payload: { where: here },
+        };
+  }
+  const traveling = task.type === "traveling";
+  const walk = mockTrip({
+    from: here,
+    to,
+    taskId: task.id,
+    departAt: task.startedAt,
+    ...(traveling ? { arriveAt: task.endAt } : {}),
+  });
+  if (!walk?.trip || (!traveling && walk.trip.arriveAt >= task.endAt)) {
+    return {
+      record: { placeId: here, since: task.startedAt },
+      payload: { where: here },
+    };
+  }
+  const record: LocationRecord = traveling
+    ? walk
+    : {
+        ...walk,
+        trip: {
+          ...walk.trip,
+          purpose: {
+            description: task.description,
+            minutes: Math.round((task.endAt - walk.trip.arriveAt) / MINUTE),
+          },
+        },
+      };
+  return {
+    record,
+    payload: {
+      where: to,
+      from: here,
+      arriveAt: walk.trip.arriveAt,
+      usualMinutes: walk.trip.usualMinutes,
+    },
+  };
+}
+
+const LIKELIHOOD = [
+  ["likely", 0.75],
+  ["even", 0.5],
+  ["unlikely", 0.25],
+] as const;
+
+/** Sometimes a character staying put notices someone else standing there. */
+function noticeSomeone(
+  world: MockWorld,
+  observer: string,
+  at: number,
+  append: (draft: Draft) => void,
+) {
+  const rng = world.locationRng;
+  if (!chance(rng, 0.12)) return;
+  const record = world.locations.get(observer);
+  if (!record) return;
+  const standing = positionAt(record, at);
+  if (standing.kind !== "at") return;
+  const { placeId } = standing;
+  const others = [...world.locations]
+    .filter(([id, theirs]) => {
+      if (id === observer) return false;
+      const position = positionAt(theirs, at);
+      return position.kind === "at" && position.placeId === placeId;
+    })
+    .map(([id]) => id);
+  if (others.length === 0) return;
+  const [word, probability] = pick(rng, LIKELIHOOD);
+  append({
+    kind: "location.noticed",
+    simTime: at,
+    actors: [observer],
+    placeId,
+    payload: {
+      subjects:
+        others.length > 1 && chance(rng, 0.3)
+          ? others.slice(0, 2)
+          : [pick(rng, others)],
+      placeId,
+      moment: pick(rng, ["arrive", "comes"] as const),
+      word,
+      probability,
+      roll: Math.round(rng() * probability * 100) / 100,
+      source: "model",
+    },
+  });
 }
 
 function taskTemplate(rng: Rng, at: number) {
@@ -571,6 +718,36 @@ export function createMockWorld(
       );
   }
 
+  const locationRng = createRng((options.seed ?? 7) + 1);
+  const homes = new Map<string, string>();
+  const workplaces = new Map<string, string>();
+  const locations = new Map<string, LocationRecord>();
+  for (const [index, character] of characters.entries()) {
+    if (character.kind === "npc") continue;
+    const home =
+      character.kind === "player"
+        ? "boarding-house"
+        : MOCK_HOMES[index % MOCK_HOMES.length];
+    homes.set(character.id, home);
+    workplaces.set(
+      character.id,
+      (character.affiliation && MOCK_WORKPLACES[character.affiliation]) ||
+        pick(locationRng, MOCK_PLACES).id,
+    );
+    const task = current.get(character.id);
+    locations.set(character.id, {
+      placeId: task
+        ? (destinationFor(
+            locationRng,
+            task.type,
+            home,
+            workplaces.get(character.id)!,
+          ) ?? home)
+        : home,
+      since: task?.startedAt ?? 0,
+    });
+  }
+
   return {
     id: ++worldCounter,
     title: "Mock World",
@@ -583,7 +760,12 @@ export function createMockWorld(
     statuses,
     desireConfig: MOCK_DESIRES_CONFIG,
     desires,
+    places: MOCK_PLACES,
+    locations,
+    homes,
+    workplaces,
     rng,
+    locationRng,
     nextSeq: journal.length + 1,
     taskCounter: counter.taskCounter,
   };
@@ -614,7 +796,17 @@ export function advanceMockWorld(
     if (!status.task || status.task.endAt > now) continue;
     // Journal simTime is the clock at the mutation, like the real producer.
     const started = startTask(world, id, now, undefined);
+    const move = moveFor(world, id, started.task);
+    if (move && started.event.kind === "task.started") {
+      Object.assign(started.event.payload, move.payload);
+      started.event.placeId = String(move.payload.where);
+    }
     append(started.event);
+    if (move && move.record !== world.locations.get(id)) {
+      world.locations.set(id, move.record);
+      events.push({ type: "location", characterId: id, record: move.record });
+    }
+    if (move && !move.record.trip) noticeSomeone(world, id, now, append);
     world.statuses.set(id, { ...status, task: started.task });
     const record = mockDesireRecord(
       rng,

@@ -1,7 +1,18 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { BrainIcon, FolderIcon, ListFilterIcon, StarIcon, UsersIcon, type LucideIcon } from 'lucide-react'
+import {
+  BrainIcon,
+  CircleDashedIcon,
+  FolderIcon,
+  FootprintsIcon,
+  ListFilterIcon,
+  MapIcon,
+  MapPinIcon,
+  StarIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { CharacterRow } from '@/components/entities/character-row'
 import { MockTag } from '@/components/entities/source-state'
 import { taskIcon } from '@/components/entities/task-icon'
@@ -25,13 +36,16 @@ import { useWatchlist } from '@/lib/state/watchlist'
 import { cn } from '@/lib/utils'
 import {
   ALL_FOLDER,
-  DIMENSIONS,
   KIND_LABELS,
+  TRANSIT_FOLDER,
+  UNPLACED_FOLDER,
   WATCH_FOLDER,
   busySummary,
+  useDimensions,
   useWorldFolders,
   useWorldParams,
   type Dimension,
+  type Folder,
 } from './world-state'
 
 function FolderRow({
@@ -41,6 +55,8 @@ function FolderRow({
   hint,
   active,
   onOpen,
+  depth = 0,
+  compact = false,
 }: {
   icon: LucideIcon
   label: string
@@ -48,30 +64,56 @@ function FolderRow({
   hint?: string | null
   active: boolean
   onOpen: () => void
+  /** Place tree depth; each level indents one step. */
+  depth?: number
+  /** One line (hint beside the label), for long trees. */
+  compact?: boolean
 }) {
   return (
     <button
       type="button"
       aria-current={active ? 'true' : undefined}
       onClick={onOpen}
+      style={depth ? { paddingLeft: `${0.625 + depth * 0.875}rem` } : undefined}
       className={cn(
-        'flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent/70',
+        'flex w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors hover:bg-sidebar-accent/70',
+        compact ? 'h-9' : 'h-11',
         active && 'bg-sidebar-accent text-sidebar-accent-foreground',
       )}
     >
       <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm leading-tight">{label}</span>
+      <span className={cn('flex min-w-0 flex-1', compact ? 'items-baseline gap-2' : 'flex-col')}>
+        <span
+          className={cn(
+            'truncate text-sm leading-tight',
+            compact && 'max-w-full shrink-0',
+            count === 0 && 'text-muted-foreground',
+          )}
+        >
+          {label}
+        </span>
         {hint ? <span className="truncate font-mono text-[11px] leading-tight text-primary">{hint}</span> : null}
       </span>
-      <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
+      <span
+        className={cn(
+          'font-mono text-xs tabular-nums',
+          count === 0 ? 'text-muted-foreground/50' : 'text-muted-foreground',
+        )}
+      >
+        {count}
+      </span>
     </button>
   )
 }
 
-function groupIcon(by: Dimension, key: string): LucideIcon {
-  if (by === 'activity') return taskIcon(key === '__none' ? undefined : key)
+function groupIcon(by: Dimension, folder: Folder): LucideIcon {
+  if (by === 'activity') return taskIcon(folder.key === '__none' ? undefined : folder.key)
   if (by === 'brain') return BrainIcon
+  if (by === 'place') {
+    if (folder.key === TRANSIT_FOLDER) return FootprintsIcon
+    if (folder.key === UNPLACED_FOLDER) return CircleDashedIcon
+    return folder.isArea ? MapIcon : MapPinIcon
+  }
   return FolderIcon
 }
 
@@ -90,7 +132,8 @@ export function WorldSidebar({
   const navigate = useNavigate()
   const [selection, select] = useSelection()
   const watchlist = useWatchlist()
-  const { by, kind, folder: openFolder, folderParam } = useWorldParams()
+  const { by, defaultBy, kind, folder: openFolder, folderParam } = useWorldParams()
+  const dimensions = useDimensions()
   const folder = asFirstScreen && folderParam === null ? null : openFolder
   const { characters, groups, watched, everyone, isLoading, error } = useWorldFolders(by, kind)
   const [query, setQuery] = useState('')
@@ -101,7 +144,7 @@ export function WorldSidebar({
   )
   const watchSet = useMemo(() => new Set(watchlist), [watchlist])
   const selectedId = selection?.kind === 'character' ? selection.id : null
-  const customized = kind !== 'simulated' || by !== 'affiliation'
+  const customized = kind !== 'simulated' || by !== defaultBy
 
   function open(key: string) {
     navigate({ view: 'world', 'world.in': key })
@@ -119,7 +162,7 @@ export function WorldSidebar({
   // A group key only means something within its dimension; switching drops it.
   const groupOpen = folderParam !== null && folderParam !== ALL_FOLDER && folderParam !== WATCH_FOLDER
   function setBy(next: Dimension) {
-    navigate({ 'world.by': next === 'affiliation' ? null : next, ...(groupOpen ? { 'world.in': null } : {}) }, 'replace')
+    navigate({ 'world.by': next === defaultBy ? null : next, ...(groupOpen ? { 'world.in': null } : {}) }, 'replace')
   }
   function setKind(next: KindFilter) {
     navigate({ 'world.kind': next === 'simulated' ? null : next }, 'replace')
@@ -145,7 +188,7 @@ export function WorldSidebar({
             <DropdownMenuGroup>
               <DropdownMenuLabel>Folders by</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={by} onValueChange={(value) => setBy(value as Dimension)}>
-                {DIMENSIONS.map((d) => (
+                {dimensions.map((d) => (
                   <DropdownMenuRadioItem key={d.id} value={d.id}>
                     {d.label}
                   </DropdownMenuRadioItem>
@@ -214,21 +257,26 @@ export function WorldSidebar({
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pt-4 pb-1">
             <h3 className="font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              {DIMENSIONS.find((d) => d.id === by)?.label}
+              {dimensions.find((d) => d.id === by)?.label}
             </h3>
-            <MockTag requires={['characters', 'status']} />
+            <MockTag requires={by === 'place' ? ['characters', 'places', 'location'] : ['characters', 'status']} />
           </div>
           {groups.map((group) => (
             <FolderRow
               key={group.key}
-              icon={groupIcon(by, group.key)}
+              icon={groupIcon(by, group)}
               label={group.label}
               count={group.members.length}
               hint={busySummary(group.members)}
               active={folder === group.key}
               onOpen={() => open(group.key)}
+              depth={group.depth}
+              compact={by === 'place'}
             />
           ))}
+          {by === 'place' && groups.length === 0 ? (
+            <p className="px-2.5 py-2 text-sm text-muted-foreground">This world has no places yet.</p>
+          ) : null}
         </nav>
       )}
     </div>

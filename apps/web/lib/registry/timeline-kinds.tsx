@@ -3,6 +3,7 @@
 import {
   BrainIcon,
   ClockIcon,
+  EyeIcon,
   MessageSquareTextIcon,
   PencilLineIcon,
   PlayIcon,
@@ -11,7 +12,11 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import type { JournalEvent, JournalKind } from "@kazusa/client";
-import { CharacterChip, ChatChip } from "@/components/entities/chips";
+import {
+  CharacterChip,
+  ChatChip,
+  PlaceChip,
+} from "@/components/entities/chips";
 import { taskLabel } from "@/components/entities/task-icon";
 import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
 import type { TimelineKind } from "./types";
@@ -33,6 +38,14 @@ export const TIMELINE_KINDS: KindMap = {
           {" · "}
           {formatSimDuration(event.payload.duration * MINUTE)}
         </span>
+        {event.payload.where ? (
+          <>
+            <span className="text-muted-foreground">
+              {event.payload.from ? " · heading to " : " · at "}
+            </span>
+            <PlaceChip id={event.payload.where} />
+          </>
+        ) : null}
       </>
     ),
     thought: (event) =>
@@ -217,7 +230,54 @@ export const TIMELINE_KINDS: KindMap = {
     },
     target: (event) => ({ kind: "character", id: event.actors[0] }),
   },
+  "location.noticed": {
+    kind: "location.noticed",
+    label: "Noticed",
+    icon: EyeIcon,
+    facet: "social",
+    salience: "normal",
+    fact: (event) => {
+      const { subjects, placeId, moment, between, word } = event.payload;
+      return (
+        <>
+          <span className="text-muted-foreground">{NOTICED_LEAD[moment]} </span>
+          {subjects.slice(0, 3).map((id) => (
+            <CharacterChip key={id} id={id} />
+          ))}
+          {subjects.length > 3 ? (
+            <span className="font-mono text-xs text-muted-foreground">{` +${subjects.length - 3}`}</span>
+          ) : null}
+          <span className="text-muted-foreground">
+            {NOTICED_WHERE[moment]}{" "}
+          </span>
+          <PlaceChip id={placeId} />
+          {between ? (
+            <>
+              <span className="text-muted-foreground"> and </span>
+              <PlaceChip id={between} />
+            </>
+          ) : null}
+          <span className="font-mono text-xs text-muted-foreground">{` · ${word}`}</span>
+        </>
+      );
+    },
+    target: (event) => ({ kind: "place", id: event.payload.placeId }),
+  },
 };
+
+const NOTICED_LEAD = {
+  arrive: "Walked in on",
+  comes: "Saw",
+  cross: "Crossed paths with",
+  meet: "Passed",
+} as const;
+
+const NOTICED_WHERE = {
+  arrive: " at",
+  comes: " come into",
+  cross: " at",
+  meet: " between",
+} as const;
 
 /**
  * Pickup delays are often under a minute, which `formatSimDuration` floors to

@@ -6,7 +6,7 @@ import {
 import type { CharacterStatus } from "@kazusa/client";
 import { createDecisionContextAssembler } from "./context-engine/decision-sources.ts";
 import { registerClock } from "./clock/register.ts";
-import { registerClockHttp } from "./clock/http.ts";
+import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
 import { registerPerception } from "./perception/register.ts";
@@ -60,11 +60,19 @@ export default definePluginEntry({
       }),
     );
 
-    registerClockHttp(api, clock);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
-    const location = registerLocation(api, { clock });
+    const location = registerLocation(api, { clock, broadcaster });
     registerLocationHttp(api, { location });
+    // A world without places has no positions to serve.
+    registerClockHttp(api, clock, {
+      getCapabilities: () => ({
+        ...DEFAULT_CAPABILITIES,
+        ...(location.world
+          ? ({ places: "live", location: "live" } as const)
+          : {}),
+      }),
+    });
     const taskman = registerTaskman(api, {
       clock,
       broadcaster,
