@@ -21,6 +21,19 @@ Write one record to each participant's private view of the conversation:
 - Group keys: `agent:<owner>:chat:group:<group-id>`. Membership is resolved when
   a send is accepted. Each current member receives a private copy; membership
   never permits reading another agent's memories or backfilling older dialogue.
+- Huddle keys: `agent:<owner>:chat:huddle:<id>`, a face-to-face conversation at
+  one place (`kind: "huddle"`, id `huddle:<id>`, `placeId`). `send_message` with
+  `members` and `aloud: true` speaks to people at the sender's place (checked
+  through the `placeOf` dependency): it speaking aloud brings the people
+  addressed, and anyone they are talking with, into the speaker's huddle (groups
+  merge; a merged huddle keeps `mergedInto` so replies to its old address land
+  in the new one), or joins theirs, or starts one. Speaking into a huddle's
+  address at its place walks over to it and takes the speaker out of their other
+  one. `leavePlace` (called by Location on every move) removes the mover with a
+  `*leaves, heading toward …*` line to those still in it; moving to another
+  huddle posts `*moves to another conversation*`. A huddle with fewer than two
+  left dissolves. Same frozen-audience rule; `manage_chat` refuses huddles. See
+  `apps/kazusa/docs/location.md` §4.6.
 
 Authorship is the `senderIdentity`, never the role. The same rule applies to
 direct and group chats:
@@ -126,10 +139,20 @@ in the installed SDK is distinct from conformance to the latest rolling docs.
 - Start a chat and send its first message: `members` (other configured agent
   IDs), optional `title`, and `messages`. The sender is included automatically.
   One other member without a title reuses the canonical direct pair; otherwise
-  create a group. A title allows a two-person group. `messages` holds 1–8 chat
-  bubbles, each up to 4,000 characters; media is future work. The human HTTP
-  send keeps a single `text` per request. Absent stored titles are `null`, not
-  `undefined`, so retained records satisfy the native JSON state contract.
+  create a group. A title allows a two-person group. `messages` holds 1 to
+  `messaging.maxBubbles` (default 9) bubbles, each up to 4,000 characters: a
+  string (speech) or `{ text, type: "speech" | "action" }`. An action is done,
+  not said, in third person without the sender's name; it is kept only in a
+  place conversation (aloud or a `chat:huddle:` address) and silently dropped in
+  text chats. The canonical message stores the plain text and `type`; agent
+  ledgers, deliveries and `said`/`unsaid` read it as `*text*`, and the client
+  gets `type: "action"`. Face to face every bubble is split on `*…*` (those
+  segments are actions, the rest speech, asterisks stripped), so gestures typed
+  inline or inside an action arrive typed; text chats keep speech as typed.
+  System lines (leaving, moving to another conversation, `manage_chat` changes)
+  are actions too. Media is future work. The human HTTP send keeps a single
+  `text` per request. Absent stored titles are `null`, not `undefined`, so
+  retained records satisfy the native JSON state contract.
 
 The result includes the caller's `sessionKey` for later sends. Direct chat
 identity is derived from its sorted pair. Group identity is opaque and derived
@@ -160,11 +183,15 @@ manipulation tools to roleplay characters.
 - `add_members` or `remove_members` with only the affected `members`.
 - `leave` with no additional fields.
 
-Any current member may manage a group. Direct chats have fixed membership.
-Changes affect future sends. A removed member keeps its prior private ledger but
-cannot discover, manage, or submit new messages to the group. Joining creates an
-empty native session view and never copies earlier dialogue. An accepted message
-still finishes delivery to its original recipients after removal; replaying that
+Any current member may manage a group. Direct chats have fixed membership. Each
+change is announced in the group as a message from the actor
+(`*adds Natsu to the chat*`, `*removes …*`, `*leaves the chat*`,
+`*renames the chat to "…"*`): for those going, before they go; for those coming,
+once they are in. A replayed change is not announced twice. Changes affect
+future sends. A removed member keeps its prior private ledger but cannot
+discover, manage, or submit new messages to the group. Joining creates an empty
+native session view and never copies earlier dialogue. An accepted message still
+finishes delivery to its original recipients after removal; replaying that
 receipt is not acceptance of a new message.
 
 The retained native `chats` keyed store owns only shared routing metadata:
@@ -340,8 +367,8 @@ audiences, ledger copies and notifications are unchanged per bubble.
   already showed typing. Before each later bubble Messaging sets typing, then
   waits a simulated typing interval (`1s + 50ms/char`, capped at 8s) measured on
   the simulation clock: wall time is the remaining sim time divided by speed,
-  re-checked at most every 250ms. A paused clock (speed 0) sends the remaining
-  bubbles immediately rather than holding the brain turn open.
+  re-checked at most every 250ms. A paused clock (speed 0) holds the next bubble
+  until it runs again; the shutdown signal lets the rest go at once.
 - **Blocking tool.** `send_message` returns only after the last bubble or an
   interruption, so the brain stays busy and new stimuli are judged by
   `attention_allocation` with the current speech in Jev's state.

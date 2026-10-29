@@ -161,39 +161,77 @@ export class Clock {
   }
 }
 
+/** One wall-clock wait, cut short by either signal. */
+function pause(
+  ms: number,
+  signal: AbortSignal,
+  release?: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      release?.removeEventListener("abort", done);
+      resolve();
+    };
+    const onAbort = () => {
+      clearTimeout(timer);
+      release?.removeEventListener("abort", done);
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new Error("Simulation sleep aborted"),
+      );
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+    release?.addEventListener("abort", done, { once: true });
+  });
+}
+
 /**
  * Wait until `simMs` of simulation time has elapsed. Wall time follows the
  * current speed and is re-checked every `pollMs`, so speed changes and clock
- * advances apply mid-wait. Returns false without waiting further once the clock
- * is paused; callers decide what a frozen world means for them.
+ * advances apply mid-wait, and a paused clock holds the wait where it is.
+ * Returns false only when `release` lets go of a frozen wait (the Gateway is
+ * stopping); the caller then finishes at once.
  */
 export async function sleepSim(
   clock: Pick<Clock, "now">,
   simMs: number,
   signal: AbortSignal,
-  pollMs = 250,
+  options: { readonly release?: AbortSignal; readonly pollMs?: number } = {},
 ): Promise<boolean> {
+  const { release, pollMs = 250 } = options;
   const target = clock.now().simTime + simMs;
   for (;;) {
     signal.throwIfAborted();
     const { simTime, speed } = clock.now();
     if (simTime >= target) return true;
-    if (speed <= 0) return false;
-    const wait = Math.min(pollMs, Math.ceil((target - simTime) / speed));
-    await new Promise<void>((resolve, reject) => {
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(
-          signal.reason instanceof Error
-            ? signal.reason
-            : new Error("Simulation sleep aborted"),
-        );
-      };
-      const timer = setTimeout(() => {
-        signal.removeEventListener("abort", onAbort);
-        resolve();
-      }, wait);
-      signal.addEventListener("abort", onAbort, { once: true });
-    });
+    if (speed <= 0) {
+      if (release?.aborted) return false;
+      await pause(pollMs, signal, release);
+      continue;
+    }
+    await pause(
+      Math.min(pollMs, Math.ceil((target - simTime) / speed)),
+      signal,
+    );
+  }
+}
+
+/**
+ * Wait while the clock is paused: the world, and whoever acts in it, holds
+ * still until it runs again. `release` lets go at once (the Gateway is
+ * stopping), so the action happens at the paused moment.
+ */
+export async function untilRunning(
+  clock: Pick<Clock, "now">,
+  release?: AbortSignal,
+  pollMs = 250,
+): Promise<void> {
+  const never = new AbortController().signal;
+  while (clock.now().speed <= 0 && !release?.aborted) {
+    await pause(pollMs, never, release);
   }
 }

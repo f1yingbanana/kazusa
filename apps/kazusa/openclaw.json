@@ -2,10 +2,18 @@
   "agents": {
     "ownership": "explicit",
     "entries": {
-      "kazusa": { "workspace": "./workspaces/kazusa" },
-      "kurimura-airi": { "workspace": "./workspaces/kurimura-airi" },
-      "yoshimi": { "workspace": "./workspaces/yoshimi" },
-      "yutori-natsu": { "workspace": "./workspaces/yutori-natsu" }
+      "kazusa": {
+        "workspace": "./workspaces/kazusa"
+      },
+      "kurimura-airi": {
+        "workspace": "./workspaces/kurimura-airi"
+      },
+      "yoshimi": {
+        "workspace": "./workspaces/yoshimi"
+      },
+      "yutori-natsu": {
+        "workspace": "./workspaces/yutori-natsu"
+      }
     },
     "defaults": {
       "workspace": "./workspaces",
@@ -14,23 +22,29 @@
         "enabled": false
       },
       "models": {
-        "zai/glm-5.2": {
+        "zai/glm-5.3-flash": {
           "alias": "GLM"
         }
       },
       "model": {
-        "primary": "zai/glm-5.2"
+        "primary": "zai/glm-5.3-flash"
       },
       "decisionModel": "typesafe/jev-latest"
     }
   },
   "plugins": {
-    "allow": ["kazusa"],
+    "allow": [
+      "kazusa",
+      "zai",
+      "typesafe"
+    ],
     "slots": {
       "contextEngine": "kazusa"
     },
     "load": {
-      "paths": ["./plugins/kazusa"]
+      "paths": [
+        "./plugins/kazusa"
+      ]
     },
     "entries": {
       "kazusa": {
@@ -110,9 +124,14 @@
     },
     "port": 18789,
     "bind": "loopback",
-    "trustedProxies": ["127.0.0.1", "::1"],
+    "trustedProxies": [
+      "127.0.0.1",
+      "::1"
+    ],
     "controlUi": {
-      "allowedOrigins": ["*"]
+      "allowedOrigins": [
+        "*"
+      ]
     },
     "tailscale": {
       "mode": "off"
@@ -132,8 +151,15 @@
       "write",
       "view_image"
     ],
-    "deny": ["group:sessions", "message", "apply_patch"],
+    "deny": [
+      "group:sessions",
+      "message",
+      "apply_patch"
+    ],
     "toolSearch": false,
+    "codeMode": {
+      "enabled": false
+    },
     "sessions": {
       "visibility": "agent"
     }
@@ -158,12 +184,17 @@
       "experimental": {
         "sessionMemory": true
       },
-      "sources": ["memory", "sessions"]
+      "sources": [
+        "memory",
+        "sessions"
+      ]
     }
   },
   "skills": {
     "load": {
-      "extraDirs": ["./shared/skills"]
+      "extraDirs": [
+        "./shared/skills"
+      ]
     },
     "install": {
       "nodeManager": "npm"
@@ -202,9 +233,9 @@
     }
   },
   "wizard": {
-    "lastRunAt": "2026-10-21T07:59:47.007Z",
+    "lastRunAt": "2026-10-28T22:07:44.032Z",
     "lastRunVersion": "2026.10.5",
-    "lastRunCommand": "onboard",
+    "lastRunCommand": "doctor",
     "lastRunMode": "local"
   }
 }

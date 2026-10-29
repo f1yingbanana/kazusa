@@ -1,3 +1,4 @@
+import { personLabel } from "../person-label.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
@@ -32,6 +33,8 @@ export function formatEnvelopeRecord(params: {
   sessionKey: string;
   message: SessionCatalogTranscriptItem;
   timestamp: number;
+  /** Trusted names by id; never the catalog's own label. */
+  names?: ReadonlyMap<string, string>;
 }): string {
   const time = formatSimTime(params.timestamp);
   const text = params.message.text?.trim() ?? "";
@@ -45,6 +48,12 @@ export function formatEnvelopeRecord(params: {
   // Roles, dialogue, display names and peer keys are never author evidence.
   const sender = params.message.sender?.identity.id;
   const owner = params.sessionKey.split(":")[1];
-  const speaker = sender ? (sender === owner ? "(self)" : sender) : "unknown";
+  // The id attributes; the name beside it is only to read, and comes from the
+  // character's own identity, never the catalog's label.
+  const speaker = sender
+    ? sender === owner
+      ? "(self)"
+      : personLabel(params.names?.get(sender), sender)
+    : "unknown";
   return `\n\n[${speaker} ${time}] ${text}`;
 }

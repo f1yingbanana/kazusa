@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import YAML from "yaml";
 import { z } from "zod";
+import { sharedDir } from "../shared-dir.ts";
 
 export const MAX_GROUPED_SKILL_SCAN_DEPTH = 6;
 
@@ -275,10 +276,7 @@ export function createSkillLoader(
 
     // Priority 6: Bundled skills (shipped with install)
     // 6a. Kazusa packaged shared skills (context-conventions, task-lifecycle, etc.)
-    const kazusaPackagedDir = fileURLToPath(
-      new URL("../../../../shared/skills", import.meta.url),
-    );
-    roots.push(kazusaPackagedDir);
+    roots.push(sharedDir("skills"));
 
     // 6b. OpenClaw bundled skills
     const openclawBundledDir = resolveOpenClawBundledSkillsDir(baseCwd, env);

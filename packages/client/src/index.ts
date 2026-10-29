@@ -11,7 +11,8 @@ export const AgentSchema = z.object({
 });
 export type Agent = z.infer<typeof AgentSchema>;
 
-export const ChatTypeSchema = z.enum(["direct", "group"]);
+/** `huddle`: a face-to-face conversation at a place; it ends when all leave. */
+export const ChatTypeSchema = z.enum(["direct", "group", "huddle"]);
 export type ChatType = z.infer<typeof ChatTypeSchema>;
 
 export const ChatMessageSchema = z.object({
@@ -20,7 +21,10 @@ export const ChatMessageSchema = z.object({
   sequence: z.number(),
   senderId: z.string(),
   senderName: z.string(),
+  /** Plain text; for an action, what the sender does (render as done). */
   text: z.string(),
+  /** Absent: speech. An action is done where the sender is, in third person. */
+  type: z.enum(["speech", "action"]).optional(),
   timestamp: z.number(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
@@ -385,6 +389,100 @@ export const DesiresResponseSchema = z.object({
 export type DesiresResponse = z.infer<typeof DesiresResponseSchema>;
 
 /* ========================================================================== */
+/* Read model: places + locations (GET /kazusa/places, GET /kazusa/locations) */
+/* ========================================================================== */
+
+export const PlaceWaySchema = z.object({
+  /** Free-form (`walk`, `bike`, `monorail`); `walk` reads as on foot. */
+  by: z.string(),
+  minutes: z.number(),
+});
+
+/** A World Wiki place. Places form a tree through `parent`. */
+export const PlaceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  aliases: z.array(z.string()),
+  parent: z.string().optional(),
+  summary: z.string(),
+  /** Walking minutes to the parent's open space. */
+  entryMinutes: z.number(),
+  /** Two-way; declared once. The first way is the usual one. */
+  connections: z.array(
+    z.object({
+      to: z.string(),
+      ways: z.array(PlaceWaySchema),
+      note: z.string().optional(),
+    }),
+  ),
+  bodyMarkdown: z.string(),
+});
+export type Place = z.infer<typeof PlaceSchema>;
+
+/** Places in tree order: each area, then its places by name. */
+export const PlacesResponseSchema = z.object({ places: z.array(PlaceSchema) });
+export type PlacesResponse = z.infer<typeof PlacesResponseSchema>;
+
+/**
+ * A participant's position. Clients compute it at any sim time: at `placeId`
+ * until `trip.departAt`, passing `trip.legs` in order, at `trip.to` from
+ * `trip.arriveAt`.
+ */
+export const LocationRecordSchema = z.object({
+  placeId: z.string(),
+  /** Sim ms when they got there. */
+  since: z.number(),
+  trip: z
+    .object({
+      taskId: z.string(),
+      /**
+       * A walk over to do something there: what it was for and the minutes
+       * planned for it. The lease checks in on arrival.
+       */
+      purpose: z
+        .object({ description: z.string(), minutes: z.number() })
+        .optional(),
+      to: z.string(),
+      departAt: z.number(),
+      arriveAt: z.number(),
+      legs: z.array(z.object({ placeId: z.string(), at: z.number() })),
+      usualMinutes: z.number(),
+    })
+    .optional(),
+});
+export type LocationRecord = z.infer<typeof LocationRecordSchema>;
+
+/** Every placed character's and the player's record, homes included. */
+export const LocationsResponseSchema = z.object({
+  records: z.record(z.string(), LocationRecordSchema),
+});
+export type LocationsResponse = z.infer<typeof LocationsResponseSchema>;
+
+/* ========================================================================== */
+/* Read model: assembled brain context (GET /kazusa/context?id=)              */
+/* ========================================================================== */
+
+/**
+ * The situation message one brain turn was given, exactly as the model saw it
+ * (time, activity, Where you are, feelings, chats awaiting a reply). Earlier
+ * turns are in the transcript; skills are files.
+ */
+export const AssembledContextSchema = z.object({
+  simTime: z.number(),
+  situation: z.string(),
+  /** Whether the `in-person` skill was attached. */
+  inPerson: z.boolean(),
+  estimatedTokens: z.number(),
+});
+export type AssembledContext = z.infer<typeof AssembledContextSchema>;
+
+/** A character's last turns' contexts, newest first. */
+export const ContextResponseSchema = z.object({
+  contexts: z.array(AssembledContextSchema),
+});
+export type ContextResponse = z.infer<typeof ContextResponseSchema>;
+
+/* ========================================================================== */
 /* Read model: world journal (PROPOSED — src/journal/, GET /kazusa/timeline)  */
 /* ========================================================================== */
 
@@ -412,6 +510,12 @@ export const TaskStartedEventSchema = z.object({
     summary: z.string().optional(),
     monologue: z.string().optional(),
     replacedTaskId: z.string().optional(),
+    /** Location: the place id where the activity happens (a trip's destination). */
+    where: z.string().optional(),
+    /** Location, trips only: origin place id, arrival, and the usual route time. */
+    from: z.string().optional(),
+    arriveAt: z.number().optional(),
+    usualMinutes: z.number().optional(),
   }),
 });
 
@@ -424,6 +528,8 @@ export const TaskDelayedEventSchema = z.object({
     endAt: z.number(),
     reason: z.string().optional(),
     monologue: z.string().optional(),
+    /** Location, trips only: the new arrival time. */
+    arriveAt: z.number().optional(),
   }),
 });
 

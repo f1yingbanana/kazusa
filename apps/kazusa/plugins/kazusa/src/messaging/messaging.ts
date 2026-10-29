@@ -6,6 +6,7 @@ import type {
 import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
 import { sleepSim, type Clock } from "../clock/clock.ts";
+import { shutdownSignal } from "../shutdown.ts";
 import type { CurrentSpeech } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
 import type { Stimulus } from "../stimulus.ts";
@@ -13,6 +14,9 @@ import {
   DELIVERY_REQUEST,
   LIST_CHATS,
   SPEECH_REQUEST,
+  bubbleOf,
+  readAs,
+  splitFaceToFace,
   MANAGE_CHAT,
   PARTICIPANT_ID,
   chatSummary,
@@ -21,7 +25,9 @@ import {
   messagingId,
   ownChatSession,
   parseChatSession,
+  huddleAddress,
   type ChatConversation,
+  type ChatKind,
   type ChatSummary,
   type ManageChatParams,
   type SendMessageParams,
@@ -95,6 +101,7 @@ export interface SpeechResult {
 export interface AwaitingReply {
   readonly sessionKey: string;
   readonly sender: string;
+  readonly senderName: string;
   readonly timestamp: number;
 }
 
@@ -110,7 +117,7 @@ export interface MessageRef {
  */
 export interface ChatFacts {
   readonly sessionKey: string;
-  readonly kind: "direct" | "group";
+  readonly kind: ChatKind;
   readonly title: string | null;
   readonly memberCount: number;
   /** When this participant last spoke here, if ever (simulation time). */
@@ -137,6 +144,8 @@ interface Speech {
   readonly planId: string;
   readonly controller: AbortController;
   readonly params: SpeechParams;
+  /** Every bubble to be sent, as the listener reads it. */
+  readonly planned: readonly string[];
   readonly said: string[];
   sessionKey?: string;
 }
@@ -159,6 +168,7 @@ export function clientMessage(delivery: MessageDelivery): ChatMessage {
     senderId: delivery.sender,
     senderName: delivery.senderName,
     text: delivery.params.text,
+    ...(delivery.params.type === "action" ? { type: "action" } : {}),
     timestamp: delivery.timestamp,
   };
 }
@@ -177,6 +187,11 @@ export interface MessagingDeps {
   readonly conversations: StateStore<ChatConversation>;
   readonly outbox: RemovableStateStore<OutboxPlan>;
   readonly clock: Pick<Clock, "init" | "time" | "now">;
+  /**
+   * Lets go of speech frozen on a paused clock: the rest is said at once.
+   * Defaults to the process's shutdown signal.
+   */
+  readonly release?: AbortSignal;
   readonly ensureSession: (
     copy: Pick<MessageCopy, "agentId" | "sessionKey">,
     title: string,
@@ -188,6 +203,52 @@ export interface MessagingDeps {
   readonly publish: (copy: MessageCopy) => Promise<void>;
   readonly receive: (agentId: string, stimulus: Stimulus) => Promise<void>;
   readonly warn: (message: string) => void;
+  /**
+   * Where a participant stands now, or `undefined` while traveling. Huddles
+   * need it: you can only speak aloud to people where you are.
+   */
+  readonly placeOf?: (
+    participantId: string,
+  ) => Promise<
+    { readonly placeId: string; readonly title: string } | undefined
+  >;
+  /** A participant's display name, for membership lines; defaults to the id. */
+  readonly nameOf?: (participantId: string) => Promise<string>;
+  /** Shared by every instance in the process; each test gets its own. */
+  readonly state?: MessagingState;
+}
+
+/** A conversation going on at a place, as others there could see it. */
+export interface Huddle {
+  readonly address: string;
+  readonly members: readonly string[];
+}
+
+/**
+ * What every plugin instance in one process must see alike. OpenClaw registers
+ * the plugin more than once, and agent turns run on their own instance; with a
+ * copy each, a huddle left on one instance stayed joined on another.
+ */
+export interface MessagingState {
+  readonly serial: KeyedAsyncQueue;
+  readonly deliveries: Map<string, MessageDelivery>;
+  readonly chats: Map<string, ChatConversation>;
+  readonly notifying: Set<string>;
+  readonly flushing: Set<string>;
+  initialized: boolean;
+  sequence: number;
+}
+
+export function createMessagingState(): MessagingState {
+  return {
+    serial: new KeyedAsyncQueue(),
+    deliveries: new Map(),
+    chats: new Map(),
+    notifying: new Set(),
+    flushing: new Set(),
+    initialized: false,
+    sequence: 0,
+  };
 }
 
 /**
@@ -197,23 +258,53 @@ export interface MessagingDeps {
  * Brain admission runs outside that queue and never blocks the sending tool.
  */
 export class Messaging {
-  private readonly serial = new KeyedAsyncQueue();
   private readonly lifetime = new AbortController();
-  private readonly deliveries = new Map<string, MessageDelivery>();
-  private readonly chats = new Map<string, ChatConversation>();
-  private readonly notifying = new Set<string>();
-  private readonly flushing = new Set<string>();
+  private readonly shared: MessagingState;
   private readonly listeners = new Set<(event: MessagingEvent) => void>();
   private readonly speaking = new Map<string, Speech>();
+  /**
+   * A speaker says one thing after another: sends started together (parallel
+   * tool calls in one turn) queue here behind the one being said.
+   */
+  private readonly waitingSpeech = new Map<string, Set<Speech>>();
+  private readonly speechTail = new Map<string, Promise<void>>();
   private readonly typing = new Map<
     string,
     { event: TypingStreamEvent; runId?: string }
   >();
-  private initialized = false;
-  private sequence = 0;
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly deps: MessagingDeps) {}
+  constructor(private readonly deps: MessagingDeps) {
+    this.shared = deps.state ?? createMessagingState();
+  }
+
+  private get serial(): KeyedAsyncQueue {
+    return this.shared.serial;
+  }
+  private get deliveries(): Map<string, MessageDelivery> {
+    return this.shared.deliveries;
+  }
+  private get chats(): Map<string, ChatConversation> {
+    return this.shared.chats;
+  }
+  private get notifying(): Set<string> {
+    return this.shared.notifying;
+  }
+  private get flushing(): Set<string> {
+    return this.shared.flushing;
+  }
+  private get initialized(): boolean {
+    return this.shared.initialized;
+  }
+  private set initialized(value: boolean) {
+    this.shared.initialized = value;
+  }
+  private get sequence(): number {
+    return this.shared.sequence;
+  }
+  private set sequence(value: number) {
+    this.shared.sequence = value;
+  }
 
   readonly assertCurrent = (): void => this.lifetime.signal.throwIfAborted();
 
@@ -418,6 +509,7 @@ export class Messaging {
       const { kind, peerOrGroupId: peer } = parseChatSession(params.sessionKey);
       const chatId = conversationId(sender, params.sessionKey);
       const existing = this.chats.get(chatId);
+      if (kind === "huddle") return await this.joinHuddle(sender, existing);
       if (existing) {
         if (!existing.members.includes(sender))
           throw new Error(
@@ -452,6 +544,14 @@ export class Messaging {
       throw new Error(
         "Exclude yourself from members; the sender is added automatically.",
       );
+    if (params.aloud) {
+      return await this.startHuddle(
+        sender,
+        id,
+        others,
+        assertInvocationCurrent,
+      );
+    }
     const members = [sender, ...others].sort();
     this.validateMembers(members, configuredAgents);
     const kind =
@@ -578,18 +678,44 @@ export class Messaging {
       await this.init();
       assertInvocationCurrent?.();
       const chat = this.requireChat(agentId, params.sessionKey);
+      if (chat.kind === "huddle")
+        throw new Error(
+          "A conversation in person forms and ends on its own; to leave it, walk away.",
+        );
       if (chat.kind !== "group")
         throw new Error(
           "Direct chats have fixed membership; create a new group instead.",
         );
       let members = [...chat.members];
+      // Who is coming or going, as everyone in the chat is told.
+      let change: { readonly text: string; readonly going: boolean } | null =
+        null;
       if (params.action === "add_members") {
         this.validateMembers(params.members, configuredAgents);
+        const added = params.members.filter((id) => !members.includes(id));
         members = [...new Set([...members, ...params.members])].sort();
+        if (added.length)
+          change = {
+            text: `adds ${await this.namesOf(added)} to the chat`,
+            going: false,
+          };
       } else if (params.action === "remove_members") {
+        const removed = members.filter((id) => params.members.includes(id));
         members = members.filter((member) => !params.members.includes(member));
-      } else if (params.action === "leave")
+        if (removed.length)
+          change = {
+            text: `removes ${await this.namesOf(removed)} from the chat`,
+            going: true,
+          };
+      } else if (params.action === "leave") {
         members = members.filter((member) => member !== agentId);
+        change = { text: "leaves the chat", going: true };
+      } else if (params.title !== chat.title) {
+        change = {
+          text: `renames the chat to "${params.title}"`,
+          going: false,
+        };
+      }
       this.validateMembers(members);
       const updated: ChatConversation = {
         ...chat,
@@ -597,12 +723,293 @@ export class Messaging {
         title: params.action === "rename" ? params.title : chat.title,
         needsProjection: true,
       };
+      const key = [
+        chat.id,
+        agentId,
+        params.action,
+        ...members,
+        String(this.deps.clock.time()),
+      ];
+      // Those going hear it before they go; those coming, once they are in.
+      if (change?.going) await this.announce(chat, agentId, key, change.text);
       await this.saveChat(updated, assertInvocationCurrent);
+      if (change && !change.going)
+        await this.announce(updated, agentId, key, change.text);
       await this.projectChats();
+      await this.flushLedgers();
       return chatSummary(updated, agentId);
     });
+    this.notify();
     this.scheduleRetry();
     return result;
+  }
+
+  /** Where someone stands, required for anything said aloud. */
+  private async standingPlace(
+    who: string,
+  ): Promise<{ readonly placeId: string; readonly title: string }> {
+    const place = await this.deps.placeOf?.(who);
+    if (!place)
+      throw new Error(
+        "You're on your way, so nobody is close enough to hear. Text them instead.",
+      );
+    return place;
+  }
+
+  /**
+   * You talk in one huddle at a time: joining one by its address takes you out
+   * of the one you were in, as walking over to another group does.
+   */
+  private async leaveOtherHuddles(who: string, keep: string): Promise<void> {
+    for (const chat of [...this.chats.values()]) {
+      if (chat.kind !== "huddle" || chat.id === keep) continue;
+      if (!chat.members.includes(who)) continue;
+      await this.leaveHuddle(
+        chat,
+        who,
+        ["drift", who, chat.id, keep],
+        "moves to another conversation",
+      );
+    }
+  }
+
+  /**
+   * Someone goes, with a line to those still in it. A huddle needs two: the one
+   * left behind is no longer talking with anyone, so it dissolves. Runs inside
+   * the `messages` queue.
+   */
+  private async leaveHuddle(
+    chat: ChatConversation,
+    who: string,
+    key: readonly string[],
+    text: string,
+  ): Promise<void> {
+    await this.announce(chat, who, key, text);
+    const members = chat.members.filter((member) => member !== who);
+    await this.saveChat({
+      ...chat,
+      members: members.length < 2 ? [] : members,
+    });
+  }
+
+  /**
+   * Speaking aloud to people where you are brings them into your conversation,
+   * with whoever they are talking with: two groups merge into one, the way
+   * people turn and join in. Without a conversation of your own you join
+   * theirs, or a new one starts. Each of the others' old conversations points
+   * at the merged one, so a reply into it still lands there.
+   */
+  private async startHuddle(
+    sender: string,
+    id: string,
+    others: readonly string[],
+    assertInvocationCurrent?: () => void,
+  ): Promise<ChatConversation> {
+    const chatId = `huddle:${id}`;
+    const existing = this.chats.get(chatId);
+    if (existing) return existing;
+    const place = await this.standingPlace(sender);
+    for (const other of others) {
+      if ((await this.deps.placeOf?.(other))?.placeId !== place.placeId)
+        throw new Error(
+          `${other} isn't here, so they can't hear you. Text them instead.`,
+        );
+    }
+    const speakers = [sender, ...others];
+    const groups = [...this.chats.values()].filter(
+      (chat) =>
+        chat.kind === "huddle" &&
+        chat.placeId === place.placeId &&
+        chat.members.some((member) => speakers.includes(member)),
+    );
+    const base =
+      groups.find((chat) => chat.members.includes(sender)) ?? groups[0];
+    if (base) {
+      for (const group of groups) {
+        if (group.id !== base.id)
+          await this.saveChat({ ...group, members: [], mergedInto: base.id });
+      }
+      const merged: ChatConversation = {
+        ...base,
+        members: [
+          ...new Set([...speakers, ...groups.flatMap((chat) => chat.members)]),
+        ].sort(),
+        needsProjection: true,
+      };
+      await this.saveChat(merged, assertInvocationCurrent);
+      return merged;
+    }
+    const chat: ChatConversation = {
+      id: chatId,
+      kind: "huddle",
+      members: [sender, ...others].sort(),
+      title: `Talking at ${place.title}`,
+      placeId: place.placeId,
+      needsProjection: true,
+    };
+    await this.saveChat(chat, assertInvocationCurrent);
+    return chat;
+  }
+
+  /** Speaking into a huddle at your place joins it. */
+  private async joinHuddle(
+    sender: string,
+    addressed: ChatConversation | undefined,
+  ): Promise<ChatConversation> {
+    let chat = addressed;
+    while (chat?.mergedInto) chat = this.chats.get(chat.mergedInto);
+    if (!chat || chat.members.length === 0)
+      throw new Error("That conversation is over. Speak aloud to start one.");
+    if (!chat.members.includes(sender)) {
+      const place = await this.deps.placeOf?.(sender);
+      if (place?.placeId !== chat.placeId)
+        throw new Error(
+          "You aren't there, so nobody in it can hear you. Text them instead.",
+        );
+    }
+    if (chat.members.includes(sender)) return chat;
+    await this.leaveOtherHuddles(sender, chat.id);
+    const joined: ChatConversation = {
+      ...chat,
+      members: [...chat.members, sender].sort(),
+      needsProjection: true,
+    };
+    await this.saveChat(joined);
+    return joined;
+  }
+
+  /** The huddles going on at a place, for sightings and `With you`. */
+  async huddlesAt(placeId: string): Promise<Huddle[]> {
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      return [...this.chats.values()]
+        .filter(
+          (chat) =>
+            chat.kind === "huddle" &&
+            chat.placeId === placeId &&
+            chat.members.length > 0,
+        )
+        .map((chat) => ({
+          address: huddleAddress(chat.id),
+          members: [...chat.members],
+        }));
+    });
+  }
+
+  /**
+   * Someone left a place: they leave every huddle there with a line to those
+   * still in it ("_leaves, heading toward …_"). The last one out dissolves it;
+   * its history stays in each member's ledger.
+   */
+  async leavePlace(
+    who: string,
+    name: string,
+    placeId: string,
+    options: { readonly toward?: string; readonly at: number },
+  ): Promise<void> {
+    PARTICIPANT_ID.parse(who);
+    void name;
+    await this.serial.enqueue("messages", async () => {
+      await this.init();
+      for (const chat of [...this.chats.values()]) {
+        if (chat.kind !== "huddle" || chat.placeId !== placeId) continue;
+        if (!chat.members.includes(who)) continue;
+        await this.leaveHuddle(
+          chat,
+          who,
+          ["leave", who, chat.id, String(options.at)],
+          options.toward
+            ? `leaves, heading toward ${options.toward}`
+            : "leaves",
+        );
+      }
+      await this.projectChats();
+      await this.flushLedgers();
+    });
+    this.notify();
+    this.scheduleRetry();
+  }
+
+  /**
+   * Accept one message with its audience frozen to the chat's members now. Runs
+   * inside the `messages` queue.
+   */
+  private async accept(
+    sender: string,
+    senderName: string,
+    chat: ChatConversation,
+    id: string,
+    params: SendMessageParams,
+    assertInvocationCurrent?: () => void,
+  ): Promise<MessageDelivery> {
+    const timestamp = this.deps.clock.time();
+    const owners = [
+      sender,
+      ...chat.members.filter((member) => member !== sender),
+    ];
+    const copies: MessageCopy[] = owners
+      .filter((agentId) => !isUser(agentId))
+      .map((agentId) => ({
+        agentId,
+        sessionKey: chatSummary(chat, agentId).sessionKey,
+        role: agentId === sender ? "assistant" : "user",
+      }));
+    const delivery: MessageDelivery = {
+      id,
+      sequence: ++this.sequence,
+      sender,
+      senderName,
+      chatId: chat.id,
+      audience: owners,
+      params,
+      timestamp,
+      copies,
+    };
+    // A failed acceptance performs no ledger writes. Once accepted, delivery
+    // survives the invoking turn and can be completed by the plugin service.
+    await this.save(delivery, assertInvocationCurrent);
+    this.rememberDelivery(delivery);
+    this.clearTyping(sender, undefined, delivery.chatId);
+    this.emit({ type: "message", delivery });
+    return delivery;
+  }
+
+  private async nameOf(id: string): Promise<string> {
+    return (await this.deps.nameOf?.(id)) ?? id;
+  }
+
+  /**
+   * Tells a chat, in the actor's own voice, that its membership changed ("_adds
+   * Natsu_", "_leaves_"). `chat` is the audience: as it was for anyone going,
+   * as it is now for anyone coming. Runs inside the `messages` queue; a replay
+   * of the same change is a no-op.
+   */
+  private async announce(
+    chat: ChatConversation,
+    actor: string,
+    key: readonly string[],
+    text: string,
+  ): Promise<void> {
+    if (chat.members.length < 2 || !chat.members.includes(actor)) return;
+    const requestId = messagingId(["notice", ...key]);
+    const id = messagingId([actor, requestId]);
+    if (this.deliveries.has(id) || (await this.deps.store.lookup(id))) return;
+    // Something the actor does, not says: told as an action.
+    await this.accept(actor, await this.nameOf(actor), chat, id, {
+      sessionKey: chatSummary(chat, actor).sessionKey,
+      text,
+      type: "action",
+      requestId,
+      title: null,
+    });
+  }
+
+  /** "Natsu", "Airi and Natsu", "Airi, Natsu and Yoshimi". */
+  private async namesOf(ids: readonly string[]): Promise<string> {
+    const names = await Promise.all(ids.map((id) => this.nameOf(id)));
+    return names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
   }
 
   /** Persist acceptance or progress before publishing success to the caller. */
@@ -654,6 +1061,7 @@ export class Messaging {
     if (params.sessionKey) {
       params.sessionKey = ownChatSession(sender, params.sessionKey);
       delete params.members;
+      delete params.aloud;
       params.title = null;
     }
     const id = messagingId([sender, params.requestId]);
@@ -682,36 +1090,14 @@ export class Messaging {
           configuredAgents,
         );
         this.validateMembers(chat.members, configuredAgents);
-        const timestamp = this.deps.clock.time();
-        const owners = [
-          sender,
-          ...chat.members.filter((member) => member !== sender),
-        ];
-        const activeChat = chat;
-        const copies: MessageCopy[] = owners
-          .filter((agentId) => !isUser(agentId))
-          .map((agentId) => ({
-            agentId,
-            sessionKey: chatSummary(activeChat, agentId).sessionKey,
-            role: agentId === sender ? "assistant" : "user",
-          }));
-        delivery = {
-          id,
-          sequence: ++this.sequence,
+        delivery = await this.accept(
           sender,
           senderName,
-          chatId: chat.id,
-          audience: owners,
+          chat,
+          id,
           params,
-          timestamp,
-          copies,
-        };
-        // A failed acceptance performs no ledger writes. Once accepted, delivery
-        // survives the invoking turn and can be completed by the plugin service.
-        await this.save(delivery, assertInvocationCurrent);
-        this.rememberDelivery(delivery);
-        this.clearTyping(sender, undefined, delivery.chatId);
-        this.emit({ type: "message", delivery });
+          assertInvocationCurrent,
+        );
       }
       await this.projectChats();
       await this.flushLedgers();
@@ -776,23 +1162,62 @@ export class Messaging {
   ): Promise<SpeechResult> {
     const { sender, senderName, params } = plan;
     const { messages, requestId, ...target } = params;
+    // Actions are seen only where the speaker is; in a text chat they are
+    // dropped, so a model that adds one by habit changes nothing there. The
+    // original index keeps each bubble's identity stable across replays.
+    const inPlace =
+      target.aloud === true ||
+      Boolean(target.sessionKey?.match(/(?:^|:)chat:huddle:/));
+    const bubbles = messages.flatMap((bubble, at) => {
+      const typed = bubbleOf(bubble);
+      const pieces = inPlace
+        ? splitFaceToFace(typed)
+        : typed.type === "action"
+          ? []
+          : [typed];
+      // The first piece keeps the bubble's own identity; later ones extend it.
+      return pieces.map((piece, part) => ({
+        index: part === 0 ? String(at) : `${at}.${part}`,
+        ...piece,
+      }));
+    });
     const speech: Speech = {
       planId: plan.id,
       controller: new AbortController(),
       params,
+      planned: bubbles.map(readAs),
       said: [],
     };
-    if (live) {
-      this.speaking.get(sender)?.controller.abort();
-      this.speaking.set(sender, speech);
-    }
     const signal = AbortSignal.any([
       speech.controller.signal,
       this.lifetime.signal,
     ]);
     const sent: SendMessageResult[] = [];
     let paced = live;
+    let release: (() => void) | undefined;
+    const turn = live
+      ? new Promise<void>((resolve) => {
+          release = resolve;
+        })
+      : undefined;
     try {
+      if (live && turn) {
+        // Live, a later send cut off an earlier one from the same message
+        // before it said a word.
+        const before = this.speechTail.get(sender);
+        this.speechTail.set(sender, turn);
+        const waiting = this.waitingSpeech.get(sender) ?? new Set<Speech>();
+        this.waitingSpeech.set(sender, waiting);
+        waiting.add(speech);
+        try {
+          await before;
+        } finally {
+          waiting.delete(speech);
+        }
+        // Interrupted while waiting its turn: nothing to say or retain.
+        signal.throwIfAborted();
+        this.speaking.set(sender, speech);
+      }
       await this.init();
       if (live)
         await this.deps.outbox.register(plan.id, plan, {
@@ -801,12 +1226,13 @@ export class Messaging {
             assertInvocationCurrent?.();
           },
         });
-      for (const [index, text] of messages.entries()) {
+      for (const { index, text, type } of bubbles) {
         const first = sent[0];
         const bubble: SendMessageParams = {
           ...(first ? { sessionKey: first.sessionKey } : target),
           text,
-          requestId: messagingId([requestId, String(index)]),
+          ...(type === "action" ? { type } : {}),
+          requestId: messagingId([requestId, index]),
         };
         if (
           first &&
@@ -821,8 +1247,11 @@ export class Messaging {
             undefined,
             assertInvocationCurrent,
           );
-          // A paused world would hold the brain turn open indefinitely.
-          paced = await sleepSim(this.deps.clock, typingMs(text), signal);
+          // A paused world holds the next bubble; a stopping Gateway lets the
+          // rest go at once rather than wait on a frozen clock.
+          paced = await sleepSim(this.deps.clock, typingMs(text), signal, {
+            release: this.deps.release ?? shutdownSignal(),
+          });
         }
         signal.throwIfAborted();
         sent.push(
@@ -834,7 +1263,7 @@ export class Messaging {
             configuredAgents,
           ),
         );
-        speech.said.push(text);
+        speech.said.push(readAs({ text, type }));
         speech.sessionKey = sent[0].sessionKey;
       }
     } catch (error) {
@@ -847,9 +1276,12 @@ export class Messaging {
           await this.deps.outbox.delete(plan.id);
       } finally {
         if (this.speaking.get(sender) === speech) this.speaking.delete(sender);
+        release?.();
+        if (this.speechTail.get(sender) === turn)
+          this.speechTail.delete(sender);
       }
     }
-    const unsaid = messages.slice(sent.length);
+    const unsaid = bubbles.slice(sent.length).map(readAs);
     if (unsaid.length && sent[0])
       this.clearTyping(sender, undefined, sent[0].chatId);
     return {
@@ -861,7 +1293,7 @@ export class Messaging {
       sessionKey: sent[0]?.sessionKey ?? target.sessionKey ?? "",
       recipients: sent.at(-1)?.recipients ?? [],
       messageIds: sent.map((result) => result.messageId),
-      said: messages.slice(0, sent.length),
+      said: bubbles.slice(0, sent.length).map(readAs),
       unsaid,
     };
   }
@@ -871,11 +1303,19 @@ export class Messaging {
     return this.deliveries.has(id) || Boolean(await this.deps.store.lookup(id));
   }
 
-  /** Stop a character mid-speech; returns whether anything was being said. */
+  /**
+   * Stop a character mid-speech, and whatever they were about to say next;
+   * returns whether anything was being said.
+   */
   interrupt(agentId: string): boolean {
-    const speech = this.speaking.get(agentId);
-    speech?.controller.abort(new Error("Speech interrupted"));
-    return Boolean(speech);
+    const current = this.speaking.get(agentId);
+    const stopped = [
+      ...(current ? [current] : []),
+      ...(this.waitingSpeech.get(agentId) ?? []),
+    ];
+    for (const speech of stopped)
+      speech.controller.abort(new Error("Speech interrupted"));
+    return stopped.length > 0;
   }
 
   currentSpeech(agentId: string): CurrentSpeech | undefined {
@@ -884,7 +1324,7 @@ export class Messaging {
     return {
       ...(speech.sessionKey ? { sessionKey: speech.sessionKey } : {}),
       said: [...speech.said],
-      unsaid: speech.params.messages.slice(speech.said.length),
+      unsaid: speech.planned.slice(speech.said.length),
     };
   }
 
@@ -946,6 +1386,7 @@ export class Messaging {
           result.push({
             sessionKey,
             sender: latest.sender,
+            senderName: latest.senderName,
             timestamp: latest.timestamp,
           });
       }
@@ -970,7 +1411,7 @@ export class Messaging {
           {
             sessionKey: chatSummary(chat, agentId).sessionKey,
             kind: chat.kind,
-            title: chat.kind === "group" ? chat.title : null,
+            title: chat.kind === "direct" ? null : chat.title,
             memberCount: chat.members.length,
             lastSpokeAt: tail?.lastSpokeAt ?? null,
             unanswered: tail?.since.length ?? 0,
@@ -1125,7 +1566,8 @@ export class Messaging {
         id: delivery.id,
         sessionKey: copy.sessionKey,
         sender: delivery.sender,
-        text: delivery.params.text,
+        senderName: delivery.senderName,
+        text: readAs(delivery.params),
         timestamp: delivery.timestamp,
       });
       await this.serial.enqueue("messages", async () => {
@@ -1162,6 +1604,8 @@ export class Messaging {
     if (this.timer) clearTimeout(this.timer);
     this.typing.clear();
     this.speaking.clear();
+    this.waitingSpeech.clear();
+    this.speechTail.clear();
     this.listeners.clear();
   }
 }

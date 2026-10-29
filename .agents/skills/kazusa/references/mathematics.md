@@ -65,7 +65,9 @@ $$r = \frac{L^* - L_0}{t_{\text{end}} - t_0}\ \text{points/hour}$$
 
 and holds once it reaches $L^*$. Unlisted desires drain normally.
 
-- **An afterwards state equal to the current one means no change**, as a guard
+- **An afterwards state equal to the current one means no change**, and the
+  schema accepts an unchanged value (`fine→fine`) and drops it: rejecting it
+  only made the model retry `start_task` (live, 2026-10-28). It is also a guard
   for stale `from` states: a restated `fine` would otherwise prop desires up
   forever, and a restated `low` would raise a level at the bottom of `low`.
 - **Magnitude** comes from the chosen state, **speed** from the duration: a
@@ -130,35 +132,22 @@ reintroduce them without a concrete behavioral failure that needs them.
 
 ---
 
-## 3. Zero-LLM Encounter Gate
+## 3. Encounters: Judged, Not Computed
 
-When Agent $A$ and Agent $B$ are co-located at location $L$ (or co-commuting
-along transit corridor $C$), an encounter probability is evaluated in code:
+Encounter probability is no longer a formula. Code finds the moments two
+people's plans cross (one passes where the other is, or both pass the same place
+within `location.passWindowMinutes`); at that moment the decision model judges
+whether the observer notices, from the place's description, what each is doing,
+whether each is passing through, and the observer's card on the other. It
+answers with a likelihood word
+(`certain · likely · even · unlikely · no chance`), which `location.likelihood`
+maps to a probability, and a seeded roll decides, so runs replay. Each observer
+is judged on their own, so noticing can be one-way. See
+`apps/kazusa/docs/location.md` §4.4 and §4.5.
 
-$$P(\text{bump}) = \text{clamp}\Big(\big(0.01 + 0.94 \cdot (F_{AB} / 100)^{1.5}\big) \times M_L \times (1 - \text{shield}_A)(1 - \text{shield}_B),\; 0.0,\; 0.95\Big)$$
-
-### Variables:
-
-- $F_{AB} \in [0, 100]$: Familiarity between $A$ and $B$ from
-  `<workspace>/memory/relationships/<peer>.md` frontmatter. (If no file exists,
-  $F_{AB} = 0$).
-- $M_L \in [0.0, 1.0]$: `encounter_modifier` from
-  `shared/wiki/entities/places/<loc>.md` (e.g. `0.85` in a crowded cafe, `0.20`
-  in a quiet library stack, `0.0` in private dorm room).
-- $\text{shield}_A, \text{shield}_B \in [0.0, 1.0]$: `focus_shield` of current
-  `active_task` (e.g. `0.9` for studying or sleeping, `0.1` for casual
-  strolling).
-
-### Mathematical Properties:
-
-1. **Strangers ($F\_{AB} = 0$)**:
-   $$P(\text{bump}) = 0.01 \times M_L \times (1 - \text{shield}_A)(1 - \text{shield}_B) \le 0.01$$
-   _Over 99% of stranger interactions pass silently without waking agents or
-   consuming any LLM tokens._
-2. **Close Friends ($F\_{AB} = 80$, $M_L = 0.8$, low shields)**:
-   $$(0.01 + 0.94 \cdot (0.8)^{1.5}) \approx 0.01 + 0.67 = 0.68 \implies P(\text{bump}) \approx 0.68 \times 0.8 \times 0.9^2 \approx 0.44 \text{ to } 0.70$$
-   _Friends frequently notice each other and initiate spontaneous
-   conversations._
+The earlier closed-form gate (familiarity^1.5 × place modifier × focus shields)
+was dropped: it needed an `encounter_modifier` on every place and a numeric
+`focus_shield` per task, which descriptions and the judgment replace.
 
 ---
 

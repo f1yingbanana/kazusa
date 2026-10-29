@@ -96,8 +96,12 @@ latency under continuous traffic without fixing the scope failure.
 
 Native keyed-store values must be JSON. Delete absent optional run/context
 properties rather than writing explicit `undefined`; tests enforce that same
-contract. Recovery retains uncertain reservations and does not automatically
-repeat possibly adopted work.
+contract. Recovery never blindly repeats possibly adopted work: it checks each
+delivery still in custody against the brain transcript (`adoptedByBrain`). Found
+means the turn ran, so its stimuli become processed; missing means they return
+to pending. Only without that check does it quarantine (`stopped`). A restart
+tombstone on `:brain` is cleared by the brain channel, which then retries the
+handoff once (SKILL §3.4).
 
 - [Webhook and SDK helpers](https://docs.openclaw.ai/plugins/sdk-subpaths)
 - [Inbound debounce](https://docs.openclaw.ai/plugins/sdk-channel-inbound)
@@ -761,6 +765,7 @@ discrete categorical attention decisions directly:
 | Task extended during active turn        | If `delay_task` was called, stale deadline check is dropped when turn finishes.                   |
 | Decision model unavailable / error      | Fails open to `WAKE` (if idle) or `STEER` (if busy); never silently drops or stalls stimuli.      |
 | Process restart                         | Retained stimuli in `"perception"` store recovered; re-evaluates against live clock and task.     |
+| Restart mid-turn                        | Custody reconciled with the brain transcript; a tombstoned `:brain` is cleared and retried once.  |
 | Deferred chat when the task ends        | Delivered in the same turn as the deadline check-in (§12).                                        |
 | `STEER` while `send_message` is pacing  | Remaining bubbles are dropped; the tool returns said/unsaid before the steer is injected (§12.4). |
 | Explicit operator stop                  | Retains pending stimuli in store without immediately triggering an auto-wake.                     |

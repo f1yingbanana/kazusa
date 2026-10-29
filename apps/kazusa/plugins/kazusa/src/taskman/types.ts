@@ -40,6 +40,24 @@ export interface TaskTransition {
   readonly params: Readonly<Record<string, unknown>>;
 }
 
+/** What an extension will do once every extension accepted a transition. */
+export interface PreparedTaskCommit {
+  /** One sentence added to the ledger row and the tool result. */
+  readonly note?: string;
+  /** Structured fields merged into the ledger row's journal payload. */
+  readonly payload?: Readonly<Record<string, unknown>>;
+  /**
+   * Sim ms by which this lease needs a check-in (an arrival). The earliest one
+   * brings the lease's end forward; its one wake is the check-in.
+   */
+  readonly checkInAt?: number;
+  /**
+   * Writes the extension's own state against the final lease, before it is
+   * written.
+   */
+  commit(task: ActiveTask): Promise<void>;
+}
+
 /**
  * Another module's contribution to the task tools. Taskman stays ignorant of
  * what the parameters mean.
@@ -49,10 +67,13 @@ export interface TaskExtension {
   readonly startTaskParameters: Readonly<Record<string, unknown>>;
   /** The same properties for `delay_task`, which may refer to `start_task`. */
   readonly delayTaskParameters: Readonly<Record<string, unknown>>;
-  /** Which of the properties both tools require. */
+  /** Required properties; each tool requires only the ones it takes. */
   readonly required: readonly string[];
-  /** Runs before the lease is written; a thrown error fails the tool call. */
-  beforeCommit(transition: TaskTransition): Promise<void>;
+  /**
+   * Validates a lease about to be written, without writing anything. A thrown
+   * error fails the tool call, and no extension commits unless all accepted.
+   */
+  prepare(transition: TaskTransition): Promise<PreparedTaskCommit>;
 }
 
 /** Context passed to task tool execution. */
@@ -61,7 +82,9 @@ export interface ToolExecutionContext {
   readonly store: TaskStore;
   readonly clock: Pick<Clock, "time">;
   readonly minDuration: number;
-  readonly beforeCommit?: (transition: TaskTransition) => Promise<void>;
+  readonly prepare?: (
+    transition: TaskTransition,
+  ) => Promise<readonly PreparedTaskCommit[]>;
   readonly appendTaskLedgerEntry: (
     message: string,
     timestamp: number,
@@ -90,11 +113,34 @@ export interface DelayTaskParams {
   readonly monologue?: string;
 }
 
+/** `task.started` journal fields; extensions add their own beside them. */
+export interface TaskStartedPayload extends Readonly<Record<string, unknown>> {
+  readonly taskId: string;
+  readonly type: string;
+  readonly description: string;
+  readonly duration: number;
+  readonly endAt: number;
+  readonly summary?: string;
+  readonly monologue?: string;
+  readonly replacedTaskId?: string;
+}
+
+/** `task.delayed` journal fields; extensions add their own beside them. */
+export interface TaskDelayedPayload extends Readonly<Record<string, unknown>> {
+  readonly taskId: string;
+  readonly additionalMinutes: number;
+  readonly endAt: number;
+  readonly reason?: string;
+  readonly monologue?: string;
+}
+
 export type StartTaskResult =
   | {
       readonly success: true;
       readonly task: ActiveTask;
       readonly message: string;
+      /** The journal payload written with the ledger row. */
+      readonly payload: TaskStartedPayload;
     }
   | { readonly success: false; readonly message: string };
 
@@ -102,4 +148,6 @@ export interface DelayTaskResult {
   readonly success: boolean;
   readonly task?: ActiveTask;
   readonly message: string;
+  /** The journal payload written with the ledger row. */
+  readonly payload?: TaskDelayedPayload;
 }

@@ -11,6 +11,24 @@ export interface IdleSupervisorDeps {
   readonly intervalMs?: number;
   readonly maxAgentsPerTick?: number;
   readonly idleText?: string;
+  /** Shared by every registration in the process; each test gets its own. */
+  readonly cell?: SupervisorCell;
+}
+
+/**
+ * Every registration starts a supervisor, so they share one tick: with a timer
+ * each, idle characters got one check-in per registration.
+ */
+export interface SupervisorCell {
+  running: boolean;
+  lastTickAt: number;
+}
+
+const SHARED_SUPERVISOR = Symbol.for("kazusa.taskman.supervisor");
+
+export function sharedSupervisorCell(): SupervisorCell {
+  const scope = globalThis as { [SHARED_SUPERVISOR]?: SupervisorCell };
+  return (scope[SHARED_SUPERVISOR] ??= { running: false, lastTickAt: 0 });
 }
 
 /**
@@ -24,12 +42,14 @@ export function startIdleSupervisor(
   const intervalMs = deps.intervalMs ?? 60_000;
   const maxAgentsPerTick = deps.maxAgentsPerTick ?? 2;
   const idleText = deps.idleText;
+  const cell = deps.cell ?? { running: false, lastTickAt: 0 };
   let timer: ReturnType<typeof setInterval> | undefined;
-  let running = false;
 
   const tick = async (): Promise<void> => {
-    if (running) return;
-    running = true;
+    // Another registration ticked this interval already.
+    if (cell.running || Date.now() - cell.lastTickAt < intervalMs / 2) return;
+    cell.running = true;
+    cell.lastTickAt = Date.now();
     try {
       await deps.clock.init();
       const snapshot = deps.clock.now();
@@ -84,7 +104,7 @@ export function startIdleSupervisor(
     } catch (err: unknown) {
       api.logger.warn(`Taskman supervisor tick error: ${String(err)}`);
     } finally {
-      running = false;
+      cell.running = false;
     }
   };
 

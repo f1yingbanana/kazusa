@@ -258,6 +258,19 @@
             "description": "Display name of the human player."
           }
         }
+      },
+      "messaging": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxBubbles": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32,
+            "default": 9,
+            "description": "Bubbles (said or done) one send_message may carry (default: 9)."
+          }
+        }
       }
     }
   },

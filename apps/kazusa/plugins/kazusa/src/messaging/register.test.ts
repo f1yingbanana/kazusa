@@ -26,7 +26,7 @@ const directories: string[] = [];
 const instances: Messaging[] = [];
 const append = vi.mocked(appendSessionTranscriptMessageByIdentityStrict);
 
-async function setup() {
+async function setup(pluginConfig: Record<string, unknown> = {}) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "kazusa-message-"));
   directories.push(workspace);
   await writeFile(
@@ -60,6 +60,7 @@ async function setup() {
   // Partial SDK host, confined to the test boundary.
   const api = {
     config,
+    pluginConfig,
     agent: { events: { registerAgentEventSubscription } },
     registerTool,
     registerService,
@@ -119,6 +120,8 @@ async function setup() {
     return () => {};
   });
   const messaging = registerMessaging(api, {
+    // The test clock is paused; nothing here is about holding still.
+    release: AbortSignal.abort(),
     clock: {
       init: async () => {},
       time: () => 123456,
@@ -175,6 +178,10 @@ async function setup() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Each test is a fresh process: no world state left from the last one.
+  delete (globalThis as Record<symbol, unknown>)[
+    Symbol.for("kazusa.messaging.state")
+  ];
   append.mockImplementation(async ({ message }) => ({
     kind: "result",
     result: { messageId: message.idempotencyKey ?? "" },
@@ -226,6 +233,20 @@ describe("send_message SDK integration", () => {
     expect(tool.parameters.properties).not.toHaveProperty("requestId");
   });
 
+  it("offers up to the configured number of bubbles, nine by default", async () => {
+    const maxItems = (h: Awaited<ReturnType<typeof setup>>) =>
+      h.registerTool.mock.calls[0][0].create({})[0].parameters.properties
+        .messages.maxItems;
+    expect(maxItems(await setup())).toBe(9);
+    expect(maxItems(await setup({ messaging: { maxBubbles: 3 } }))).toBe(3);
+    await expect(
+      (await setup({ messaging: { maxBubbles: 3 } })).execute({
+        members: ["bob"],
+        messages: ["a", "b", "c", "d"],
+      }),
+    ).rejects.toThrow();
+  });
+
   it("registers discovery, send and group management as guarded tools", async () => {
     const h = await setup();
     expect(h.registerTool.mock.calls[0][1]).toEqual({
@@ -263,7 +284,8 @@ describe("send_message SDK integration", () => {
         ([params]) => params.preserveActivity,
       ),
     ).toBe(true);
-    expect(append).toHaveBeenCalledTimes(2);
+    // "Hello" to two, Bob's rename line to two, his line adding Carol to three.
+    expect(append).toHaveBeenCalledTimes(7);
     vi.spyOn(h.api.runtime.agent, "resolveAgentIdentity").mockReturnValue({
       name: "Bob",
     });
@@ -274,7 +296,7 @@ describe("send_message SDK integration", () => {
     expect(reply.details.recipients).toEqual(["alice", "carol"]);
     expect(
       append.mock.calls
-        .slice(2)
+        .slice(7)
         .map(([params]) => params.message.__openclaw?.senderId),
     ).toEqual(["bob", "bob", "bob"]);
   });

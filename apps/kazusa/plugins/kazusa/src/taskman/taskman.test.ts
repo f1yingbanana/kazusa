@@ -308,3 +308,39 @@ describe("Configurable task categories", () => {
     ]);
   });
 });
+
+describe("Taskman check-ins", () => {
+  it("ends the lease at the earliest check-in an extension asks for", async () => {
+    const { context, messages } = makeContext();
+    const commits: ActiveTask[] = [];
+    const result = await executeStartTask(
+      { type: "eating", description: "Lunch at the cafeteria", duration: 60 },
+      {
+        ...context,
+        prepare: async () => [
+          {
+            note: "You walk over first.",
+            checkInAt: Date.parse("2026-10-21T08:12:00.000Z"),
+            commit: async (task) => {
+              commits.push(task);
+            },
+          },
+          { commit: async (task) => void commits.push(task) },
+        ],
+      },
+    );
+    if (!result.success) throw new Error("Expected a start");
+    expect(result.task).toMatchObject({
+      endAt: "2026-10-21T08:12:00.000Z",
+      duration: 12,
+    });
+    // Every extension commits against the lease as written.
+    expect(commits.map(({ endAt }) => endAt)).toEqual([
+      "2026-10-21T08:12:00.000Z",
+      "2026-10-21T08:12:00.000Z",
+    ]);
+    expect(messages.at(-1)).toContain(
+      "You walk over first. Scheduled to conclude at 2026-10-21T08:12:00.000Z (12 minutes).",
+    );
+  });
+});

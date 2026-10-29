@@ -1,13 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import {
+  KeyedAsyncQueue,
+  type OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
-import { Perception } from "./perception.ts";
+import { Perception, type PerceptionDeps } from "./perception.ts";
 import type { PerceptionDecisionRecord } from "./types.ts";
-import { registerBrainChannel } from "./brain-channel.ts";
+import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 
 const LIFECYCLE = z.object({
   phase: z.enum(["start", "end", "error"]),
@@ -15,12 +18,29 @@ const LIFECYCLE = z.object({
   stopReason: z.string().optional(),
 });
 
+/** One lock per character for the whole process, like the clock cell. */
+const SHARED_PERCEPTION_QUEUE = Symbol.for("kazusa.perception.serial");
+
+function sharedPerceptionQueue(): KeyedAsyncQueue {
+  const scope = globalThis as { [SHARED_PERCEPTION_QUEUE]?: KeyedAsyncQueue };
+  return (scope[SHARED_PERCEPTION_QUEUE] ??= new KeyedAsyncQueue());
+}
+
+const PERCEPTION_RESUME = Symbol.for("kazusa.perception.resume");
+
 export function registerPerception(
   api: OpenClawPluginApi,
   deps: {
-    readonly clock: Pick<Clock, "time" | "init" | "now">;
+    readonly clock: Pick<Clock, "time" | "init" | "now" | "onClockChange">;
     readonly assembleDecisionContext?: DecisionContextAssembler;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
+    /**
+     * Settles what a lease's end means elsewhere (a trip arriving) and may
+     * return a line for the check-in ("You've arrived at …").
+     */
+    readonly onDeadline?: (agentId: string) => Promise<string | undefined>;
+    /** Confirms a foreseen stimulus when its moment comes. */
+    readonly confirm?: PerceptionDeps["confirm"];
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -47,8 +67,11 @@ export function registerPerception(
     clock: deps.clock,
     assertCurrent: () => lifetime.signal.throwIfAborted(),
     deliver: registerBrainChannel(api, lifetime.signal),
+    adopted: adoptedByBrain(api),
     assembleDecisionContext: deps.assembleDecisionContext,
     onDecision,
+    serial: sharedPerceptionQueue(),
+    ...(deps.confirm ? { confirm: deps.confirm } : {}),
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)
@@ -65,6 +88,23 @@ export function registerPerception(
     lifetime.abort();
     perception.dispose();
   });
+
+  // Nothing is handed over while the clock is paused; when it runs again,
+  // whatever waited is taken up. One listener per process, owned by the first
+  // registration (all share the lock and the store): live, a later per-turn
+  // registration had no decision runtime, and every resume fell back.
+  const resumer = globalThis as { [PERCEPTION_RESUME]?: () => void };
+  if (!resumer[PERCEPTION_RESUME]) {
+    const unsubscribe = deps.clock.onClockChange(async (now, before) => {
+      if (before.speed <= 0 && now.speed > 0) await perception.resume();
+    });
+    resumer[PERCEPTION_RESUME] = unsubscribe;
+    api.lifecycle.onDispose?.(() => {
+      if (resumer[PERCEPTION_RESUME] !== unsubscribe) return;
+      unsubscribe();
+      delete resumer[PERCEPTION_RESUME];
+    });
+  }
 
   // =========================================================================
   // 2. INGRESS HOOK: before_dispatch (Attention Admission & Claiming)
@@ -214,6 +254,7 @@ export function registerPerception(
   //   1. Cron Triggers (Task Heartbeat): Compares the character's active task lease
   //      in Taskman against simulated clock time. If the task has expired, calls
   //      `perception.deadline(agentId)` to enqueue a task completion stimulus and claims the turn.
+  //      `onDeadline` runs first, so a trip has arrived before the character wakes.
   //   2. Brain Sessions (Attended Thought Tracking): Captures `event.cleanedBody` via
   //      `perception.attending(owner.agentId, event.cleanedBody)`.
   // DESIGN FIT:
@@ -224,7 +265,15 @@ export function registerPerception(
     if (ctx.trigger === "cron" || ctx.jobId) {
       try {
         await deps.clock.init();
-        if (ctx.agentId) await perception.deadline(ctx.agentId);
+        if (ctx.agentId) {
+          const note = await deps
+            .onDeadline?.(ctx.agentId)
+            .catch((error: unknown) => {
+              api.logger.warn(`Perception onDeadline: ${String(error)}`);
+              return undefined;
+            });
+          await perception.deadline(ctx.agentId, note);
+        }
       } catch (error) {
         api.logger.warn(`Perception deadline: ${String(error)}`);
       }

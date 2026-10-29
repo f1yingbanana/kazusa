@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { startIdleSupervisor } from "./supervisor.ts";
+import { startIdleSupervisor, type SupervisorCell } from "./supervisor.ts";
 import type { ActiveTask, TaskStore } from "./types.ts";
 import type { Clock } from "../clock/clock.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -288,6 +288,40 @@ describe("startIdleSupervisor", () => {
       expect(idleWake).toHaveBeenCalledWith("alice", "Time to plan your day.");
 
       dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("wakes once per interval however many registrations started one", async () => {
+    // Live: each plugin registration ran its own supervisor, so an idle
+    // character got one check-in per registration.
+    vi.useFakeTimers();
+    try {
+      const idleWake = vi.fn().mockResolvedValue(undefined);
+      const perception = {
+        getBrainState: vi.fn().mockResolvedValue({ brain: "idle", queued: 0 }),
+        idleWake,
+      } as unknown as Perception;
+      const api = {
+        config: { agents: { list: [{ id: "alice" }] } },
+        logger: { warn: vi.fn() },
+      } as unknown as OpenClawPluginApi;
+      const cell: SupervisorCell = { running: false, lastTickAt: 0 };
+      const stops = [1, 2, 3].map(() =>
+        startIdleSupervisor(api, {
+          clock: createMockClock(1_000_000, 1),
+          store: createMockTaskStore(),
+          perception,
+          intervalMs: 10_000,
+          cell,
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(idleWake).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(idleWake).toHaveBeenCalledTimes(2);
+      for (const stop of stops) stop();
     } finally {
       vi.useRealTimers();
     }

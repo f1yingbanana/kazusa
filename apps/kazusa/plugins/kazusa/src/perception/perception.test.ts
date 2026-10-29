@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { stimulusKey } from "../stimulus.ts";
 import type { DecisionContextRequest } from "../context-engine/decision-context.ts";
@@ -40,6 +41,7 @@ function stimulus(
 
 type SetupOptions = Partial<PerceptionConfig> & {
   assembleDecisionContext?: PerceptionDeps["assembleDecisionContext"];
+  confirm?: PerceptionDeps["confirm"];
 };
 
 function setup(options: SetupOptions = {}) {
@@ -54,6 +56,7 @@ function setup(options: SetupOptions = {}) {
     }));
   const tasks = new Map<string, ActiveTask>();
   let simTime = NOW;
+  let speed = 1;
   const deliveries: PerceptionDelivery[] = [];
 
   const deliver = vi.fn<NonNullable<PerceptionDeps["deliver"]>>(
@@ -91,9 +94,10 @@ function setup(options: SetupOptions = {}) {
       })),
   };
 
+  const { confirm, ...configOptions } = options;
   const config = PERCEPTION_CONFIG.parse({
     coalesceWindowMs: 0, // synchronous draining for most tests
-    ...options,
+    ...configOptions,
   });
 
   const assembleDecisionContext: NonNullable<
@@ -142,7 +146,7 @@ function setup(options: SetupOptions = {}) {
     decisionStore,
     clock: {
       time: () => simTime,
-      now: () => ({ simTime, speed: 1, formatted: "" }),
+      now: () => ({ simTime, speed, formatted: "" }),
     },
     tasks: { lookup: async (id: string) => tasks.get(id) },
     config,
@@ -150,6 +154,7 @@ function setup(options: SetupOptions = {}) {
     deliver,
     evaluateDecision,
     assembleDecisionContext,
+    ...(confirm ? { confirm } : {}),
   };
 
   const router = new Perception(deps);
@@ -169,14 +174,18 @@ function setup(options: SetupOptions = {}) {
     deliver,
     evaluateDecision,
     snapshot,
-    restart: () => new Perception(deps),
+    restart: (extra: Partial<PerceptionDeps> = {}) =>
+      new Perception({ ...deps, ...extra }),
     setTime: (value: number) => {
       simTime = value;
+    },
+    setSpeed: (value: number) => {
+      speed = value;
     },
   };
 }
 
-function setupWake(options = {}) {
+function setupWake(options: SetupOptions = {}) {
   const h = setup(options);
   h.evaluateDecision.mockResolvedValue({
     status: "ok",
@@ -612,6 +621,36 @@ describe("Brain handoff custody", () => {
     expect(h.snapshot().stopped).toBe(true);
   });
 
+  // Live: a restart left characters quarantined until hand-edited.
+  const leftover = async (adopted: boolean) => {
+    const h = setupWake();
+    h.deliver.mockRejectedValueOnce(
+      new Error("Connection failed after possible acceptance"),
+    );
+    await expect(h.router.receive("alice", stimulus("a"))).rejects.toThrow(
+      "possible acceptance",
+    );
+    const check = vi.fn(async () => adopted);
+    await h.restart({ adopted: check }).recover();
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ ids: ["a"] }));
+    expect(h.snapshot().stopped).toBe(false);
+    return h;
+  };
+
+  it("on restart, counts a handoff the brain transcript has as done", async () => {
+    const h = await leftover(true);
+    // Its turn ran: never replayed.
+    expect(h.deliver).toHaveBeenCalledTimes(1);
+    expect(h.snapshot().pending).toEqual([]);
+    expect(h.snapshot().processedIds).toContain(stimulusKey(stimulus("a")));
+  });
+
+  it("on restart, hands over again what the brain never got", async () => {
+    const h = await leftover(false);
+    await vi.waitFor(() => expect(h.deliver).toHaveBeenCalledTimes(2));
+    expect(h.deliver.mock.calls[1][0].ids).toEqual(["a"]);
+  });
+
   it("does not interpret a successful return without adoption as acceptance", async () => {
     const h = setupWake();
     h.deliver.mockResolvedValueOnce();
@@ -949,6 +988,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         ids: ["a"],
       });
       expect(h.snapshot().pending).toHaveLength(0);
+      // Live: a busy STEER was recorded as a fallback ("unusable answer").
+      expect([...h.decisions.values()]).toEqual([
+        expect.objectContaining({ action: "STEER", source: "model" }),
+      ]);
     });
 
     it("honors QUEUE_NEXT independently of the rounded probability argmax", async () => {
@@ -1642,7 +1685,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       );
       expect(h.deliveries[0].message).toContain("Incoming chats:");
       expect(h.deliveries[0].message).toContain(
-        "- [bob Sat 2026-10-24 12:00] (chat:direct:bob): Can you help me?",
+        "- [`bob` Sat 2026-10-24 12:00] (chat:direct:bob): Can you help me?",
       );
       // No raw JSON stringification
       expect(h.deliveries[0].message).not.toContain("[kazusa\\u003a");
@@ -1914,5 +1957,127 @@ describe("Human reply timing and task boundaries", () => {
       mode: "steer",
       ids: ["I didn't actually go!"],
     });
+  });
+});
+
+describe("Foreseen stimuli", () => {
+  it("holds a stimulus until its moment, then keeps it only if confirmed", async () => {
+    const confirm = vi.fn<NonNullable<PerceptionDeps["confirm"]>>(
+      async (_agentId, item) =>
+        item.id === "seen"
+          ? { ...item, text: "Bob waves from across the courtyard." }
+          : undefined,
+    );
+    const h = setupWake({ readinessPollMs: 10, confirm });
+    const ahead = (id: string): Stimulus => ({
+      id,
+      sessionKey: "agent:alice:tasks",
+      sender: "bob",
+      text: `Bob crosses the courtyard (${id}).`,
+      timestamp: NOW + 60_000,
+      foreseen: true,
+    });
+    await h.router.receive("alice", ahead("seen"));
+    await h.router.receive("alice", ahead("gone"));
+    // Not happened yet: neither judged nor confirmed.
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+
+    h.setTime(NOW + 60_000);
+    await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["seen"]));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(h.deliveries[0]?.message).toContain(
+      "Seen around you:\n- [Sat 2026-10-24 12:01] Bob waves from across the courtyard.",
+    );
+    expect(h.snapshot().pending).toEqual([]);
+  });
+
+  it("wakes for a sighting outside the tool call that foresaw it", async () => {
+    // Live: foreseen during start_task, the timer woke inside that closed
+    // call, and the decision runtime and brain handoff refused.
+    const caller = new AsyncLocalStorage<string>();
+    const scopes: (string | undefined)[] = [];
+    const confirm = vi.fn<NonNullable<PerceptionDeps["confirm"]>>(
+      async (_agentId, item) => {
+        scopes.push(caller.getStore());
+        return item;
+      },
+    );
+    const h = setupWake({ readinessPollMs: 10, confirm });
+    await caller.run("start_task", () =>
+      h.router.receive("alice", {
+        id: "seen",
+        sessionKey: "agent:alice:tasks",
+        sender: "bob",
+        text: "Bob is here.",
+        timestamp: NOW + 60_000,
+        foreseen: true,
+      }),
+    );
+    h.setTime(NOW + 60_000);
+    await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["seen"]));
+    expect(scopes).toEqual([undefined]);
+  });
+
+  it("judges and hands over a burst outside the call that delivered it", async () => {
+    // Live: stimuli from a CLI `location.place` call were judged inside its
+    // scope after the client disconnected, and every decision fell back.
+    const caller = new AsyncLocalStorage<string>();
+    const scopes: (string | undefined)[] = [];
+    const h = setupWake({ coalesceWindowMs: 10 });
+    h.evaluateDecision.mockImplementation(async () => {
+      scopes.push(caller.getStore());
+      return {
+        status: "ok",
+        result: {
+          answers: { wake_decision: { type: "choice", choice: "WAKE" } },
+        },
+      };
+    });
+    await caller.run("location.place", () =>
+      h.router.receive("alice", stimulus("placed")),
+    );
+    await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["placed"]));
+    expect(scopes).toEqual([undefined]);
+  });
+
+  it("hands nothing over while the clock is paused, and takes it up on resume", async () => {
+    // Live: paused mid-meeting, four characters kept steering each other at
+    // one sim instant.
+    const h = setupWake();
+    h.setSpeed(0);
+    await h.router.receive("alice", stimulus("held"));
+    expect(h.deliveries).toEqual([]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect(h.snapshot().pending.map((item) => item.id)).toEqual(["held"]);
+    h.setSpeed(1);
+    await h.router.resume();
+    expect(h.deliveries[0]?.ids).toEqual(["held"]);
+  });
+
+  it("leaves a sighting that has not happened out of what was waiting", async () => {
+    const confirm = vi.fn<NonNullable<PerceptionDeps["confirm"]>>(
+      async (_agentId, item) => ({ ...item, text: "Bob waves." }),
+    );
+    const h = setup({ confirm });
+    // Live: picking up the phone for a queued chat handed over a crossing
+    // stamped a minute later, unconfirmed, with its placeholder text.
+    h.states.set("alice", {
+      pending: [
+        { ...stimulus("waiting"), action: "QUEUE_NEXT" },
+        {
+          id: "later",
+          sessionKey: "agent:alice:tasks",
+          sender: "bob",
+          text: "Bob is here.",
+          timestamp: NOW + 60_000,
+          foreseen: true,
+        },
+      ],
+    });
+    await h.router.ended("alice", "earlier", false);
+    expect(h.deliveries[0]?.ids).toEqual(["waiting"]);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(h.snapshot().pending.map((item) => item.id)).toEqual(["later"]);
   });
 });

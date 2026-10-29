@@ -19,7 +19,7 @@ export const CHAT_SESSION = z
   .string()
   .max(512)
   .regex(
-    /^(?:agent:(?:user:)?[a-z0-9][a-z0-9_-]*:)?chat:(?:direct|group):(?:user:)?[a-z0-9][a-z0-9_-]*$/,
+    /^(?:agent:(?:user:)?[a-z0-9][a-z0-9_-]*:)?chat:(?:direct|group|huddle):(?:user:)?[a-z0-9][a-z0-9_-]*$/,
   );
 export const TYPING = z.strictObject({
   sessionKey: CHAT_SESSION,
@@ -36,6 +36,12 @@ const MEMBERS = z
 const TITLE = z.string().trim().min(1).max(160);
 
 const CHAT_TARGET = z.strictObject({
+  aloud: z
+    .boolean()
+    .optional()
+    .describe(
+      "Speak aloud to members who are where you are, face to face, instead of texting them. They join your conversation there, with anyone they were talking with; with none of your own, you join theirs or start one. To walk over to another conversation instead, speak into its chat:huddle:... address.",
+    ),
   sessionKey: CHAT_SESSION.optional().describe(
     "Your chat address, from context or list_chats (e.g. chat:direct:bob); omit members and title.",
   ),
@@ -60,21 +66,92 @@ const TEXT = (max: number) =>
     .max(max)
     .refine((text) => text.trim().length > 0);
 
-const BUBBLES = z
-  .array(TEXT(4_000))
-  .min(1)
-  .max(8)
-  .describe(
-    "Your character's chat bubbles, in order, without speaker labels. They are typed and sent one at a time; you may be interrupted before later ones are sent.",
-  );
-export const SEND_MESSAGE = CHAT_TARGET.extend({ messages: BUBBLES }).refine(
-  ...HAS_TARGET,
-);
+/** What a message is: words, or something done where others can see it. */
+export const MESSAGE_TYPE = z.enum(["speech", "action"]);
+export type MessageType = z.infer<typeof MESSAGE_TYPE>;
+
+const BUBBLE = z.union([
+  TEXT(4_000),
+  z.strictObject({
+    text: TEXT(4_000),
+    type: MESSAGE_TYPE.optional().describe(
+      '"action" for something you do, written in third person without your name ("sets the textbook on the desk"). Actions are only seen where you are (speaking aloud, or a chat:huddle:... address); anywhere else they are dropped. Default "speech".',
+    ),
+  }),
+]);
+/** One bubble as a plain string (speech) or with its type. */
+export type Bubble = z.infer<typeof BUBBLE>;
+
+/** Absolute ceiling; the tool offers `messaging.maxBubbles`. */
+const MAX_BUBBLES = 32;
+
+const bubbles = (max: number) =>
+  z
+    .array(BUBBLE)
+    .min(1)
+    .max(max)
+    .describe(
+      "Your character's bubbles, in order, without speaker labels: what you say, and where you are, what you do. They are typed and sent one at a time; you may be interrupted before later ones are sent.",
+    );
+
+/** The `send_message` tool's arguments, with at most `maxBubbles` bubbles. */
+export const sendMessageSchema = (maxBubbles: number) =>
+  CHAT_TARGET.extend({ messages: bubbles(maxBubbles) }).refine(...HAS_TARGET);
 /** A paced multi-bubble send; the host adapter supplies its identity. */
 export const SPEECH_REQUEST = CHAT_TARGET.extend({
-  messages: BUBBLES,
+  messages: bubbles(MAX_BUBBLES),
   requestId: z.string().trim().min(1).max(128),
 }).refine(...HAS_TARGET);
+
+/** A bubble's words and type. */
+export function bubbleOf(bubble: Bubble): {
+  readonly text: string;
+  readonly type: MessageType;
+} {
+  return typeof bubble === "string"
+    ? { text: bubble, type: "speech" }
+    : { text: bubble.text, type: bubble.type ?? "speech" };
+}
+
+/**
+ * Face to face, a bubble's `*…*` segments are actions and the rest is speech,
+ * however the model typed it: live, characters wrote `{ "text": "*pushes the
+ * door open* Ahh~ warm sugar air…", "type": "action" }` and `"*steps in* Oh…"`
+ * as speech. An untyped action without asterisks is all action. Asterisks are
+ * stripped; empty pieces are dropped.
+ */
+export function splitFaceToFace(bubble: {
+  readonly text: string;
+  readonly type: MessageType;
+}): { readonly text: string; readonly type: MessageType }[] {
+  const pieces: { text: string; type: MessageType }[] = [];
+  const pattern = /\*([^*]+)\*/gu;
+  let last = 0;
+  const speech = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed) pieces.push({ text: trimmed, type: "speech" });
+  };
+  for (const match of bubble.text.matchAll(pattern)) {
+    speech(bubble.text.slice(last, match.index));
+    const action = match[1].trim();
+    if (action) pieces.push({ text: action, type: "action" });
+    last = match.index + match[0].length;
+  }
+  if (last === 0) {
+    const text = bubble.text.replace(/\*/gu, "").trim();
+    return text ? [{ text, type: bubble.type }] : [];
+  }
+  speech(bubble.text.slice(last));
+  return pieces;
+}
+
+/** How a character reads a message: an action between asterisks, as done. */
+export function readAs(params: {
+  readonly text: string;
+  readonly type?: MessageType;
+}): string {
+  return params.type === "action" ? `*${params.text}*` : params.text;
+}
 export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
 /**
  * One canonical message. Delivery identity is supplied by the host adapter,
@@ -82,6 +159,8 @@ export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
  */
 export const DELIVERY_REQUEST = CHAT_TARGET.extend({
   text: TEXT(32_000),
+  /** Absent: speech. */
+  type: MESSAGE_TYPE.optional(),
   requestId: z.string().trim().min(1).max(128),
 }).refine(...HAS_TARGET);
 export type SendMessageParams = z.infer<typeof DELIVERY_REQUEST>;
@@ -125,12 +204,23 @@ export const MANAGE_CHAT = z.discriminatedUnion("action", [
 ]);
 export type ManageChatParams = z.infer<typeof MANAGE_CHAT>;
 
+/**
+ * `huddle`: a face-to-face conversation among people at one place. It forms
+ * when someone speaks aloud, people join by speaking into it, walking away
+ * leaves it, and it dissolves when the last one goes.
+ */
+export type ChatKind = "direct" | "group" | "huddle";
+
 /** Shared routing metadata only; every member's transcript remains private. */
 export interface ChatConversation {
   readonly id: string;
-  readonly kind: "direct" | "group";
+  readonly kind: ChatKind;
   readonly members: readonly string[];
   readonly title: string | null;
+  /** A huddle's place. */
+  readonly placeId?: string;
+  /** A huddle merged into another (by speaking aloud across groups). */
+  readonly mergedInto?: string;
   /**
    * Detect conflicting retries of a group creation before its first send
    * commits.
@@ -142,7 +232,7 @@ export interface ChatConversation {
 /** A caller's address and current membership, without anyone else's history. */
 export interface ChatSummary {
   readonly sessionKey: string;
-  readonly kind: "direct" | "group";
+  readonly kind: ChatKind;
   readonly title: string;
   readonly members: readonly string[];
 }
@@ -154,19 +244,19 @@ export function messagingId(parts: readonly string[]): string {
 
 export interface ParsedChatSession {
   readonly owner?: string;
-  readonly kind: "direct" | "group";
+  readonly kind: ChatKind;
   readonly peerOrGroupId: string;
 }
 
 export function parseChatSession(sessionKey: string): ParsedChatSession {
   CHAT_SESSION.parse(sessionKey);
   const match = sessionKey.match(
-    /^(?:agent:((?:user:)?[a-z0-9][a-z0-9_-]*):)?chat:(direct|group):((?:user:)?[a-z0-9][a-z0-9_-]*)$/,
+    /^(?:agent:((?:user:)?[a-z0-9][a-z0-9_-]*):)?chat:(direct|group|huddle):((?:user:)?[a-z0-9][a-z0-9_-]*)$/,
   );
   if (!match) throw new Error("Invalid chat session key.");
   return {
     owner: match[1],
-    kind: match[2] as "direct" | "group",
+    kind: match[2] as ChatKind,
     peerOrGroupId: match[3],
   };
 }
@@ -184,7 +274,7 @@ export function ownChatSession(
     : `agent:${participantId}:chat:${parsed.kind}:${parsed.peerOrGroupId}`;
 }
 
-/** Direct pairs share one registry entry; groups retain their opaque identity. */
+/** Direct pairs share one registry entry; groups and huddles keep their own. */
 export function conversationId(
   participantId: string,
   sessionKey: string,
@@ -194,7 +284,12 @@ export function conversationId(
     throw new Error("Use your own chat session key.");
   return parsed.kind === "direct"
     ? `direct:${messagingId([participantId, parsed.peerOrGroupId].sort())}`
-    : `group:${parsed.peerOrGroupId}`;
+    : `${parsed.kind}:${parsed.peerOrGroupId}`;
+}
+
+/** The shorthand address of a huddle, the same for everyone. */
+export function huddleAddress(chatId: string): string {
+  return `chat:huddle:${chatId.slice("huddle:".length)}`;
 }
 
 /** Project shared routing metadata into this participant's private ledger key. */
@@ -203,7 +298,8 @@ export function chatSummary(
   participantId: string,
 ): ChatSummary {
   const peer = chat.members.find((member) => member !== participantId);
-  const suffix = chat.kind === "direct" ? peer : chat.id.slice("group:".length);
+  const suffix =
+    chat.kind === "direct" ? peer : chat.id.slice(`${chat.kind}:`.length);
   if (!suffix) throw new Error("Direct chat is missing its peer.");
   return {
     sessionKey: isUser(participantId)

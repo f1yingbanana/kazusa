@@ -51,11 +51,13 @@ manuscript writing that she forgets to eat.
     indexed by `agentId`.
   - `namespace: "desires"` (`DesireRecord`): One record per `agentId` (see
     below).
+  - `namespace: "location"` (`LocationRecord`): One record per character or
+    player id: where they are and any trip in progress (see below).
 - **Decoupling Architecture**:
   - Active tasks are stored directly in the plugin database and streamed to
     `agent:<agentId>:tasks`.
-  - Spatial location is managed by the spatial subsystem (`LOCATION.md` / World
-    Wiki places).
+  - Position is managed by `src/location/` in the `"location"` store; the map
+    itself is World Wiki places (§3.1).
   - Desires are managed by `src/desires/` in the `"desires"` store
     ([mathematics](mathematics.md) §1).
   - No `STATE.md` or `TASK.md` file parsing is required.
@@ -104,6 +106,33 @@ interface DesireRecord {
 
 A catalog desire missing from `levels` starts at the configured `initial`
 state's `level`; names no longer in the catalog are dropped on the next write.
+
+### Location Record Schema
+
+```typescript
+interface LocationRecord {
+  /** Where they are, or where the current trip started. */
+  placeId: string;
+  /** Sim ms when they got there. */
+  since: number;
+  /** Present from a trip's start until it is settled. */
+  trip?: {
+    taskId: string;
+    purpose?: { description: string; minutes: number }; // walking over: what for
+    to: string;
+    departAt: number;
+    arriveAt: number; // = the lease's endAt (walking over checks in on arrival)
+    legs: { placeId: string; at: number }[]; // every place passed, origin first
+    usualMinutes: number;
+  };
+  /** People noticed since arriving here (sightings); cleared on moving. */
+  noticed?: string[];
+}
+```
+
+A participant with no record is at the `home` on their world character card.
+Position is a pure function of sim time; the record changes only through task
+transitions, deadline settlement and the operator `location.place` RPC.
 
 ### Field Specifications
 
@@ -156,44 +185,61 @@ the simulation.
 ### 3.1 Objective Places (`shared/wiki/entities/places/<place_id>.md`)
 
 - **Location**: `shared/wiki/entities/places/<place_id>.md`
-- **Purpose**: Shared, objective physical setting facts, affordances, and
-  connection topology. Mutated only via in-world events or completed task
-  leases.
-- **Access**: Read by all agents via Context Engine (Tier 1 Spatial Perception &
-  Tier 3 Lazy Retrieval).
+- **Purpose**: Shared, objective physical setting facts and the map's topology.
+  Read once by `src/location/` at registration (a canon edit needs a Gateway
+  restart) and validated as one connected graph.
+- **Topology**: `parent` makes a tree of areas; every place, area or not, is
+  somewhere to stand (an area means its open space). Each child links to its
+  parent by walking `entry_minutes`. `connections` add two-way edges between any
+  two places, declared once on either page; the first of `ways` is the usual
+  one, and `by: walk` reads as on foot.
 
 ```markdown
 ---
 pageType: entity
 entityType: place
-id: entity.place.grocery_store
-place_id: grocery_store
-name: Willow Market & Grocery
-category: commercial
-status: OPERATIONAL # or DESTROYED, CLOSED, UNDER_RENOVATION
-encounter_modifier: 0.65
-allowed_activities: [shop_groceries, browse_items, work_cashier, talk]
+id: entity.place.sweets_club_room
+place_id: sweets_club_room
+name: Sweets Club Room
+parent: west_annex
+summary:
+  "Sunlit room that smells of vanilla; long table, oven, a fridge of milk
+  cartons."
+entry_minutes: 1
 connections:
-  - to: dorm_a
-    distance: "1.2 km slightly uphill along Willow Ave"
-    notes:
-      "Takes ~18-20 min walking with heavy grocery bags, ~12 min walking light,
-      or 5 min by bike/bus."
-  - to: cafe
-    distance: "250 m across Market Square"
-    notes: "A quick 3-4 min walk."
-  - to: school
-    distance: "900 m via College Path"
-    notes: "About 10-12 min on foot."
+  - to: trinity_dorm
+    ways:
+      - { by: walk, minutes: 10 }
+      - { by: bike, minutes: 4 }
+    note: "Paved path through the residential gardens."
 ---
 
-# Setting Description
+# Sweets Club Room
 
-A busy neighborhood grocery store and pharmacy with narrow aisles, a produce
-section by the entrance, and a checkout counter. Fluorescent lighting hums
-softly overhead. Fresh fruit crates line the front entryway, and the aroma of
-roasted coffee drifts from the bakery aisle.
+A charming, sunlit room in the West Annex, claimed and redecorated by the
+After-School Sweets Club.
 ```
+
+### Field Specifications
+
+- `place_id` (string, required): `^[a-z0-9][a-z0-9_-]*$`, unique; the id
+  characters use in `where`.
+- `name` (string, required): Display name, used in speech and situations.
+- `parent` (place id, optional): The area this place is inside; absent at top
+  level.
+- `summary` (string, required): One sentence shown in **Where you are**.
+- Body: the full description, shown to a character the first time they are
+  there (until they have a card for the place).
+- `entry_minutes` (number ≥ 0, default 1): Walking minutes to the parent's open
+  space.
+- `aliases` (strings, default `[]`): Other names people use; `where` resolves
+  ids, names and aliases.
+- There are no ownership, visibility or crowd flags. Whose a place is, how it
+  is kept, whether it is tucked away and how busy it gets belong in the body;
+  every entry is judged by the decision model with that description as
+  evidence (`location-judgment` skill).
+- `connections` (default `[]`): `{ to, ways: [{ by, minutes }], note? }`.
+- `status` and opening hours are not yet part of the schema.
 
 ### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)
 
@@ -225,6 +271,7 @@ role: SCHALE Advisor / Teacher
 personality_traits: [patient, empathetic, observant, dedicated]
 status: ACTIVE_IN_WORLD
 is_simulated_agent: false # Human player
+home: schale_office # where they are until they first move
 ---
 
 # Sensei
@@ -353,7 +400,32 @@ Characters own and update their own subjective Personal Wiki:
 3. **Tool Grounding**: Agents perform these updates via deterministic wiki tools
    (`wiki_update_entity` / `wiki_patch`), maintaining markdown integrity.
 
-### 4.2 Subjective Beliefs & Concepts (`workspaces/<id>/wiki/concepts/<concept_id>.md`)
+### 4.2 Subjective Place Cards (`workspaces/<id>/wiki/entities/places/<place_id>.md`)
+
+- **Purpose**: The character's mental map. Only places they know reach their
+  prompt (**Places you know**); the world wiki is never shown whole.
+- **Created** as a frontmatter-only stub by `src/location/` once the character
+  moves on from a place they had no card for (they have seen its whole
+  description by then); atomic, never overwriting a card they wrote first. The
+  character, or sleep consolidation, adds what they make of it. Cards for
+  places heard of carry `learned: told by <id>`. Known places are exactly these
+  cards.
+
+```markdown
+---
+pageType: entity
+entityType: place
+place_id: trinity_patisserie
+name: Pâtisserie de Trinity
+aliases: [the patisserie]
+learned: been there # or "told by kurimura-airi", "looked it up"
+first_visited_iso: "2026-10-27T16:14:00.000Z"
+---
+
+Airi always takes the window table. The strawberry tart sells out by four.
+```
+
+### 4.3 Subjective Beliefs & Concepts (`workspaces/<id>/wiki/concepts/<concept_id>.md`)
 
 - **Location**: `workspaces/<id>/wiki/concepts/<concept_id>.md` (e.g.
   `concepts/market_vandalism.md`)

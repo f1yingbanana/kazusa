@@ -155,9 +155,10 @@ describe("desire rendering", () => {
     expect(parameter.propertyNames.enum).toEqual(
       config.catalog.map(({ name }) => name),
     );
-    expect(parameter.additionalProperties.enum).toHaveLength(12);
+    expect(parameter.additionalProperties.enum).toHaveLength(16);
     expect(parameter.additionalProperties.enum).toContain("low→full");
-    expect(parameter.additionalProperties.enum).not.toContain("low→low");
+    // Unchanged is accepted (and means no change) rather than a retry.
+    expect(parameter.additionalProperties.enum).toContain("low→low");
     for (const { name, description } of config.catalog) {
       expect(parameter.description).toContain(`${name}: ${description}`);
     }
@@ -220,8 +221,9 @@ describe("registerDesires", () => {
       store: taskStore,
       clock: { time: () => now },
       minDuration: 10,
-      beforeCommit: (transition) =>
-        desires.taskExtension.beforeCommit(transition),
+      prepare: async (transition) => [
+        await desires.taskExtension.prepare(transition),
+      ],
       appendTaskLedgerEntry: async () => {},
     };
     const call = async (name: string, params: unknown) => {
@@ -286,6 +288,24 @@ describe("registerDesires", () => {
     const effects = desireStore.values.get("kazusa")?.effects;
     expect(effects?.until).toBe(minutes(60));
     expect(Object.keys(effects?.byDesire ?? {})).toEqual(["satiety", "social"]);
+  });
+
+  it("accepts an unchanged desire and leaves it out", async () => {
+    // Live: `fine→fine` was rejected by the schema and characters retried
+    // start_task several times.
+    const { desireStore, context } = setup();
+    const result = await executeStartTask(
+      {
+        type: "eating",
+        description: "Lunch",
+        duration: 30,
+        afterwards: { satiety: "fine→full", social: "fine→fine" },
+      },
+      context,
+    );
+    expect(result.success).toBe(true);
+    const effects = desireStore.values.get("kazusa")?.effects;
+    expect(Object.keys(effects?.byDesire ?? {})).toEqual(["satiety"]);
   });
 
   it("requires effects, accepting none as an empty object", async () => {

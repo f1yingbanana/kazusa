@@ -107,7 +107,8 @@ export function registerTimelineHttp(
             (key.rest === "tasks" ||
               (wantsMessages &&
                 (key.rest.startsWith("chat:direct:") ||
-                  key.rest.startsWith("chat:group:"))))
+                  key.rest.startsWith("chat:group:") ||
+                  key.rest.startsWith("chat:huddle:"))))
           );
         });
 

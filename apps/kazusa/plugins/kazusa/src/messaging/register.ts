@@ -15,57 +15,45 @@ import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import YAML from "yaml";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
+import { characterName, personName } from "../identity.ts";
 import { z } from "zod";
-import type { Clock } from "../clock/clock.ts";
+import { untilRunning, type Clock } from "../clock/clock.ts";
+import { shutdownSignal } from "../shutdown.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
+  createMessagingState,
+  type MessagingState,
   type MessageDelivery,
+  type MessagingDeps,
   type OutboxPlan,
 } from "./messaging.ts";
 import {
   AGENT_ID,
-  SEND_MESSAGE,
   LIST_CHATS,
   MANAGE_CHAT,
   isUser,
   messagingId,
+  readAs,
+  sendMessageSchema,
   type ChatConversation,
 } from "./conversations.ts";
 
-const IDENTITY = z.object({
-  agent_id: AGENT_ID.optional(),
-  name: z.string().trim().min(1),
+/** `plugins.entries.kazusa.config.messaging`. */
+const MESSAGING_CONFIG = z.strictObject({
+  /** Bubbles (said or done) one `send_message` may carry. */
+  maxBubbles: z.number().int().min(1).max(32).default(9),
 });
 
 /**
- * Resolve a character's display label from native identity or its own
- * workspace. Authorship always comes from the tool context; neither this label
- * nor file metadata can change which character is sending the message.
+ * One world per process: every registration's Messaging shares conversations,
+ * active deliveries and their queue (like the clock cell).
  */
-async function senderName(
-  api: OpenClawPluginApi,
-  config: OpenClawConfig,
-  agentId: string,
-): Promise<string> {
-  const configured = api.runtime.agent
-    .resolveAgentIdentity(config, agentId)
-    ?.name?.trim();
-  if (configured) return configured;
-  const workspace = api.runtime.agent.resolveAgentWorkspaceDir(config, agentId);
-  try {
-    const text = await readFile(path.join(workspace, "IDENTITY.md"), "utf8");
-    const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-    if (!frontmatter) return agentId;
-    const identity = IDENTITY.parse(YAML.parse(frontmatter[1]));
-    if (identity.agent_id && identity.agent_id !== agentId)
-      throw new Error("Character identity does not match the sending agent.");
-    return identity.name;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT")
-      return agentId;
-    throw error;
-  }
+const SHARED_MESSAGING_STATE = Symbol.for("kazusa.messaging.state");
+
+function sharedMessagingState(): MessagingState {
+  const scope = globalThis as { [SHARED_MESSAGING_STATE]?: MessagingState };
+  return (scope[SHARED_MESSAGING_STATE] ??= createMessagingState());
 }
 
 /** Read optional roster presentation without changing canonical authorship. */
@@ -75,7 +63,7 @@ async function rosterAgent(
 ): Promise<Agent> {
   const agent: Agent = {
     id: agentId,
-    name: await senderName(api, api.config, agentId),
+    name: await characterName(api, api.config, agentId),
   };
   try {
     const text = await readFile(
@@ -115,9 +103,19 @@ export function registerMessaging(
       Partial<Pick<Perception, "onAdopted" | "attachSpeech">>;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
+    /** Where a participant stands, for speaking aloud. */
+    readonly placeOf?: MessagingDeps["placeOf"];
+    /** Lets go of anything frozen on a paused clock; the process's shutdown. */
+    readonly release?: AbortSignal;
   },
 ): Messaging {
+  const release = deps.release ?? shutdownSignal();
+  const messagingConfig = MESSAGING_CONFIG.parse(
+    api.pluginConfig?.messaging ?? {},
+  );
+  const sendMessage = sendMessageSchema(messagingConfig.maxBubbles);
   const messaging = new Messaging({
+    state: sharedMessagingState(),
     store: api.runtime.state.openKeyedStore<MessageDelivery>({
       namespace: "messaging",
       retention: "retained",
@@ -131,6 +129,8 @@ export function registerMessaging(
       retention: "retained",
     }),
     clock: deps.clock,
+    release,
+    nameOf: (id) => personName(api, id),
     /** Create or label a passive ledger; this never starts an agent turn. */
     ensureSession: async (copy, title) => {
       messaging.assertCurrent();
@@ -177,7 +177,7 @@ export function registerMessaging(
           // identity only for user-role rows, so assistant rows read back as
           // unattributed.
           role: "user",
-          content: [{ type: "text", text: delivery.params.text }],
+          content: [{ type: "text", text: readAs(delivery.params) }],
           timestamp: delivery.timestamp,
           idempotencyKey: `kazusa:message:${delivery.id}:${copy.agentId}`,
           __openclaw: {
@@ -216,6 +216,7 @@ export function registerMessaging(
     },
     receive: (agentId, stimulus) => deps.perception.receive(agentId, stimulus),
     warn: (message) => api.logger.warn(message),
+    ...(deps.placeOf ? { placeOf: deps.placeOf } : {}),
   });
   api.lifecycle.onDispose?.(() => messaging.dispose());
   // Steering lands at the next tool boundary; an open send_message is that
@@ -239,7 +240,7 @@ export function registerMessaging(
               messageId: event.delivery.id,
               sequence: event.delivery.sequence,
               senderId: event.delivery.sender,
-              preview: event.delivery.params.text.slice(0, 100),
+              preview: readAs(event.delivery.params).slice(0, 100),
             },
           },
         });
@@ -281,7 +282,7 @@ export function registerMessaging(
     if (!delivery.sessionKeys?.length) return;
     try {
       const config = api.config;
-      const name = await senderName(api, config, delivery.agentId);
+      const name = await characterName(api, config, delivery.agentId);
       for (const sessionKey of delivery.sessionKeys) {
         await messaging.setTyping(
           delivery.agentId,
@@ -327,12 +328,13 @@ export function registerMessaging(
           // Speech is how characters act on most turns; keep its schema
           // visible instead of behind Tool Search.
           catalogMode: "direct-only",
-          description:
-            "Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural chat bubbles in messages; they are typed and sent one at a time. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.",
-          parameters: z.toJSONSchema(SEND_MESSAGE),
+          description: `Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. To speak aloud to people where you are, supply members with aloud: true, or use a chat:huddle:... address to join a conversation going on there. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural bubbles in messages, 1 to ${messagingConfig.maxBubbles}; they are typed and sent one at a time. Face to face, a bubble can also be an action, { "text": "sets the textbook on the desk", "type": "action" }: third person, without your name. Actions in a text chat are dropped. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.`,
+          parameters: z.toJSONSchema(sendMessage),
           async execute(toolCallId, input: unknown) {
+            // A paused world holds whoever acts in it.
+            await untilRunning(deps.clock, release);
             const { agentId, config, agents } = caller(context);
-            const params = SEND_MESSAGE.parse(input);
+            const params = sendMessage.parse(input);
             // A host replay reuses this identity; a new model call is a new send.
             // Session scoping prevents collisions when a brain is reset.
             const sessionId = z.string().trim().min(1).parse(context.sessionId);
@@ -340,7 +342,7 @@ export function registerMessaging(
             const requestId = messagingId([sessionId, callId]);
             const details = await messaging.speak(
               agentId,
-              await senderName(api, config, agentId),
+              await characterName(api, config, agentId),
               { ...params, requestId },
               context.assertInvocationCurrent,
               agents,
@@ -409,6 +411,7 @@ export function registerMessaging(
             additionalProperties: false,
           },
           async execute(_id, input: unknown) {
+            await untilRunning(deps.clock, release);
             const { agentId, agents } = caller(context);
             const result = await messaging.manageChat(
               agentId,
