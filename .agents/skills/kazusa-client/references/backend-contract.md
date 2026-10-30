@@ -111,7 +111,7 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 
 | Route                   | Request / response                                                                                                                                                                                                                                                               | Backed by                                                                                                                             |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /kazusa/models`    | Optional `agentId` and `refresh=1` query parameters. Returns `{ agentId?, overrides?: { model?, thinking? }, current?, configured?, thinking?, models, providers }`. `current` and `thinking` are effective choices; `configured` is the native primary for the requested scope. | Gateway `models.list` (`view: "default"`, requested agent or first agent for world requests), config shortlists, and `"models"` store |
+| `GET /kazusa/models`    | Optional `agentId` and `refresh=1` query parameters. Returns `{ agentId?, overrides?: { model?, thinking? }, current?, configured?, thinking?, models, providers }`. `current` and `thinking` are effective choices; `configured` is the native primary for the requested scope. `models` omits rows with `supportsTools: false`, so a stored `current` may be absent from it. | Gateway `models.list` (`view: "default"`, requested agent or first agent for world requests), config shortlists, and `"models"` store |
 | `POST /kazusa/model`    | `{ agentId?, ref: string \| null }` → `{ agentId?, current? }`. `null` clears this scope's choice. 404 for unknown agents or refs outside the target catalog; 409 for unavailable models.                                                                                        | `"models"` store, key `world` or `agent:<id>`: `{ model?, thinking? }`                                                                |
 | `POST /kazusa/thinking` | `{ agentId?, level: ThinkingLevel \| null }` → `{ agentId?, thinking? }`. `null` clears this scope's choice. 404 for unknown agents; 409 for a level the effective model lacks, or an effective model outside the target catalog.                                                | Same record                                                                                                                           |
 
@@ -138,8 +138,9 @@ Agent requests use that agent's catalog, credentials, and model policy, and
 merge its configured shortlist with the world shortlist. Writes are serialized
 per scope across plugin registrations so concurrent model/thinking updates do
 not overwrite each other. The existing Next proxy already forwards these paths,
-query parameters, and bodies. The frontend still uses world requests; per-agent
-UI controls are not implemented.
+query parameters, and bodies. The frontend sets world defaults in Settings →
+Models and per-agent choices in the inspector's Model section, which reads
+`overrides` to tell inherited values from explicit ones.
 
 The catalog is discovered by the provider plugins (OpenRouter and Venice list
 their models themselves), so the world config only pins a shortlist in
@@ -178,7 +179,7 @@ handles cron wakes and other sessions without a model call):
 Consequences to design around:
 
 - OpenClaw's own surfaces (`openclaw models status`, the Control UI default)
-  still show `configured`. The picker's tooltip names it when they differ.
+  still show `configured`. Settings → Models names it when they differ.
 - A turn already running finishes on the old model and level.
 - `openclaw.json` is never written by these routes. Editing a native primary
   only affects agents without an agent or world model choice.

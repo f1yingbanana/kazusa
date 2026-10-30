@@ -2,7 +2,18 @@ import { z } from "zod";
 export { STIMULUS, type Stimulus } from "../stimulus.ts";
 
 export const PERCEPTION_CONFIG = z.object({
-  coalesceWindowMs: z.number().int().min(0).max(5000).default(500),
+  maxModelCalls: z.number().int().min(1).max(100).default(12),
+  maxToolCalls: z.number().int().min(1).max(100).default(24),
+  maxRunSeconds: z.number().int().min(1).max(3600).default(300),
+  /** The system agent's jobs are projects, not one character's reaction. */
+  systemAgent: z
+    .object({
+      maxModelCalls: z.number().int().min(1).max(100).default(60),
+      maxToolCalls: z.number().int().min(1).max(100).default(100),
+      maxRunSeconds: z.number().int().min(1).max(3600).default(900),
+    })
+    .prefault({}),
+  coalesceWindowMs: z.number().int().min(0).max(60_000).default(10_000),
   maxBatchSize: z.number().int().min(1).max(100).default(16),
   maxBatchChars: z.number().int().min(32_000).max(256_000).default(48_000),
   decisionTimeoutMs: z.number().int().min(1).max(30_000).default(10_000),

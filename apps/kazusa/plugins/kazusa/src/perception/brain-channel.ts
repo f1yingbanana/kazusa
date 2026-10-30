@@ -1,3 +1,4 @@
+import { beginBrainRun, brainRunLimits } from "./run-limits.ts";
 import { currentConfig } from "../current-config.ts";
 import { noteShutdown } from "../shutdown.ts";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
@@ -143,59 +144,68 @@ export function registerBrainChannel(
         delivery.agentId,
         await thinking(delivery.agentId),
       );
-    await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
-      cfg: getConfig(),
-      ctx: {
-        Provider: CHANNEL_ID,
-        Surface: CHANNEL_ID,
-        AccountId: "default",
-        AgentId: delivery.agentId,
-        SessionKey: sessionKey,
-        From: "kazusa:perception",
-        To: sessionKey,
-        SenderId: "perception",
-        SenderIsBot: true,
-        ChatType: "direct",
-        // The delivery ID is custody metadata, not an in-world message ID.
-        // MessageSid is rendered into both the host room-event envelope and
-        // its model context. Retain identity in runId/ownerKey and provider
-        // metadata instead; Perception owns stimulus deduplication.
-        ProviderUpdateId: delivery.id,
-        Body: delivery.message,
-        BodyForAgent: delivery.message,
-        AmbientTranscriptBody: delivery.message,
-        CommandAuthorized: false,
-        // A routine notification is an ambient event, not a request to interrupt.
-        // Native room_event admission always queues behind a busy turn, even if
-        // it became busy after our idle check. Urgent input uses the configured
-        // steer queue. Neither path aborts/restarts the current thought.
-        InboundEventKind:
-          delivery.mode === "steer" ? "user_request" : "room_event",
-      },
-      replyOptions: {
-        runId: delivery.id,
-        abortSignal: signal,
-        turnAdoptionLifecycle: { ...lifecycle, abortSignal: signal },
-        sourceReplyDeliveryMode: "message_tool_only",
-        suppressTyping: true,
-        disableBlockStreaming: true,
-      },
-      dispatcherOptions: {
-        // The host owns the brain transcript. There is no automatic conversation
-        // recipient here; speech must use send_message. Returning null records a
-        // skipped payload, rather than pretending it was delivered somewhere.
-        transformReplyPayload: (payload) => {
-          if (payload.isError)
-            api.logger.warn(`Brain dispatch: ${payload.text}`);
-          return null;
+    const budget = beginBrainRun(api, delivery.agentId, delivery.id, signal);
+    try {
+      await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+        cfg: getConfig(),
+        ctx: {
+          Provider: CHANNEL_ID,
+          Surface: CHANNEL_ID,
+          AccountId: "default",
+          AgentId: delivery.agentId,
+          SessionKey: sessionKey,
+          From: "kazusa:perception",
+          To: sessionKey,
+          SenderId: "perception",
+          SenderIsBot: true,
+          ChatType: "direct",
+          // The delivery ID is custody metadata, not an in-world message ID.
+          // MessageSid is rendered into both the host room-event envelope and
+          // its model context. Retain identity in runId/ownerKey and provider
+          // metadata instead; Perception owns stimulus deduplication.
+          ProviderUpdateId: delivery.id,
+          Body: delivery.message,
+          BodyForAgent: delivery.message,
+          AmbientTranscriptBody: delivery.message,
+          CommandAuthorized: false,
+          // A routine notification is an ambient event, not a request to interrupt.
+          // Native room_event admission always queues behind a busy turn, even if
+          // it became busy after our idle check. Urgent input uses the configured
+          // steer queue. Neither path aborts/restarts the current thought.
+          InboundEventKind:
+            delivery.mode === "steer" ? "user_request" : "room_event",
         },
-        deliver: async () => {
-          throw new Error(
-            "Kazusa brain channel has no automatic outbound delivery",
-          );
+        replyOptions: {
+          runId: delivery.id,
+          abortSignal: budget.signal,
+          // Run limits own how long a brain thinks; the host's default turn
+          // timeout would otherwise end it first.
+          timeoutOverrideSeconds: brainRunLimits(api, delivery.agentId)
+            .maxRunSeconds,
+          turnAdoptionLifecycle: { ...lifecycle, abortSignal: budget.signal },
+          sourceReplyDeliveryMode: "message_tool_only",
+          suppressTyping: true,
+          disableBlockStreaming: true,
         },
-      },
-    });
+        dispatcherOptions: {
+          // The host owns the brain transcript. There is no automatic conversation
+          // recipient here; speech must use send_message. Returning null records a
+          // skipped payload, rather than pretending it was delivered somewhere.
+          transformReplyPayload: (payload) => {
+            if (payload.isError)
+              api.logger.warn(`Brain dispatch: ${payload.text}`);
+            return null;
+          },
+          deliver: async () => {
+            throw new Error(
+              "Kazusa brain channel has no automatic outbound delivery",
+            );
+          },
+        },
+      });
+    } finally {
+      budget.dispose();
+    }
   };
 
   return async (delivery, lifecycle): Promise<void> => {

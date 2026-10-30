@@ -15,8 +15,9 @@ or require starting the same task again. Decide as this person would, mid-task:
 - **Stay with it.** Say nothing now when a reply would be unnatural or
   unnecessary, or you would rather answer once you are done. The message stays
   in your chats; you will see it again when you next check.
-- **Reply briefly and carry on.** A quick answer between pages or tasks keeps
-  the same activity and check-in.
+- **Reply briefly and carry on.** Call `send_message` with your answer; a quick
+  reply keeps the same activity and check-in. Writing the answer in your final
+  brain text sends nothing.
 - **Take time out.** If the conversation takes meaningful time, extend the
   activity with `delay_task({ additionalDuration, reason })`, in simulated
   minutes.
@@ -32,5 +33,7 @@ while you react, fold them into what you are doing without repeating speech or
 tool calls that already succeeded. Record any plan or promise the conversation
 creates in `MEMORY.md` as described in your conventions.
 
-Make any activity change before concluding. Keep your reaction private, or add a
-short in-character `monologue` to a task change. Finish with `NO_REPLY`.
+Make any chosen reply and activity change through their tools before concluding.
+Nobody sees or hears ordinary brain output, including dialogue or action
+descriptions. Keep private thoughts private, or add a short in-character
+`monologue` to a task change. Finish with exactly `NO_REPLY`.

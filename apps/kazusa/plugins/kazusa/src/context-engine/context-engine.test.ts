@@ -80,6 +80,33 @@ function assemble(
   });
 }
 
+const assistantBase = {
+  role: "assistant",
+  timestamp: NOW,
+  api: "openai-completions",
+  provider: "test",
+  model: "test",
+  usage: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+} as const;
+
+function toolResult(toolCallId: string, text: string): Message {
+  return {
+    role: "toolResult",
+    timestamp: NOW,
+    toolCallId,
+    toolName: "read",
+    content: [{ type: "text", text }],
+    isError: false,
+  };
+}
+
 const CLOCK = `[${formatSimTime(NOW)}] Current simulation time\n\n`;
 
 describe("Context assembly", () => {
@@ -446,39 +473,130 @@ describe("Context assembly", () => {
       (sum, message) => sum + estimateTokens(message),
       0,
     );
-    const params = {
-      messages: [user("old stimulus"), ...toolTurn],
-      config: CONTEXT_ENGINE_CONFIG.parse({
-        brainMaxTokens,
-      }),
+    const finished: Message = {
+      ...assistantBase,
+      content: [{ type: "text", text: "NO_REPLY" }],
+      stopReason: "stop",
     };
-    expect((await assemble(params)).messages.slice(0, -1)).toEqual(toolTurn);
+    const earlier = [user("old stimulus"), ...toolTurn, finished];
+    const earlierTokens = earlier
+      .slice(1)
+      .reduce((sum, message) => sum + estimateTokens(message), 0);
+    const params = {
+      messages: [...earlier, user("new stimulus")],
+      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: earlierTokens }),
+    };
+    expect((await assemble(params)).messages.slice(0, -1)).toEqual([
+      ...toolTurn,
+      finished,
+      user("new stimulus"),
+    ]);
     expect(
       (
         await assemble({
           ...params,
-          config: { ...params.config, brainMaxTokens: brainMaxTokens - 1 },
+          config: { ...params.config, brainMaxTokens: earlierTokens - 1 },
         })
       ).messages.slice(0, -1),
-    ).toEqual([]);
+    ).toEqual([user("new stimulus")]);
     const steered = [
       ...toolTurn.slice(0, 2),
       user("another stimulus mid-tool"),
       ...toolTurn.slice(2),
+      finished,
     ];
-    expect(
-      (await assemble({ ...params, messages: steered })).messages.slice(0, -1),
-    ).toEqual([]);
     expect(
       (
         await assemble({
           ...params,
-          messages: steered,
-          config: { ...params.config, brainMaxTokens: brainMaxTokens + 100 },
+          messages: [...steered, user("new stimulus")],
         })
       ).messages.slice(0, -1),
-    ).toEqual(steered);
+    ).toEqual([user("new stimulus")]);
+    expect(
+      (
+        await assemble({
+          ...params,
+          messages: [...steered, user("new stimulus")],
+          config: { ...params.config, brainMaxTokens: earlierTokens + 100 },
+        })
+      ).messages.slice(0, -1),
+    ).toEqual([...steered, user("new stimulus")]);
   });
+
+  it("keeps the whole run in progress however small the allowance", async () => {
+    const run: Message[] = [
+      user("Create a character"),
+      {
+        ...assistantBase,
+        content: [
+          { type: "toolCall", id: "call-1", name: "read", arguments: {} },
+        ],
+        stopReason: "toolUse",
+      },
+      toolResult("call-1", "x".repeat(40_000)),
+      user("a steered stimulus"),
+      {
+        ...assistantBase,
+        content: [
+          { type: "toolCall", id: "call-2", name: "read", arguments: {} },
+        ],
+        stopReason: "toolUse",
+      },
+      toolResult("call-2", "the result the model is waiting on"),
+    ];
+    const { messages } = await assemble({
+      messages: run,
+      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: 0 }),
+    });
+    expect(messages.slice(0, -1)).toEqual(run);
+  });
+
+  it("continues a run cut off by its limits, unanswered tool calls and all", async () => {
+    const cutOff: Message[] = [
+      user("Create a character"),
+      {
+        ...assistantBase,
+        content: [
+          { type: "toolCall", id: "call-1", name: "read", arguments: {} },
+        ],
+        stopReason: "toolUse",
+      },
+    ];
+    const { messages } = await assemble({
+      messages: [...cutOff, user("Activity check-in")],
+      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: 0 }),
+    });
+    expect(messages.slice(0, -1)).toEqual([
+      ...cutOff,
+      user("Activity check-in"),
+    ]);
+  });
+
+  it("forgets a run's oldest results first when it outgrows the context", async () => {
+    const call = (id: string): Message => ({
+      ...assistantBase,
+      content: [{ type: "toolCall", id, name: "read", arguments: {} }],
+      stopReason: "toolUse",
+    });
+    const run: Message[] = [
+      user("Create a character"),
+      call("call-1"),
+      toolResult("call-1", "old ".repeat(10_000)),
+      call("call-2"),
+      toolResult("call-2", "new"),
+    ];
+    const { messages } = await assemble({
+      messages: run,
+      tokenBudget: 5_000,
+      config: CONTEXT_ENGINE_CONFIG.parse({}),
+    });
+    const results = messages.filter((message) => message.role === "toolResult");
+    expect(results).toHaveLength(2);
+    expect(JSON.stringify(results[0])).toContain("no longer have this result");
+    expect(results[1]).toEqual(run[4]);
+  });
+
 
   it("preserves native recovery summaries as whole brain history", async () => {
     const message: Message = {

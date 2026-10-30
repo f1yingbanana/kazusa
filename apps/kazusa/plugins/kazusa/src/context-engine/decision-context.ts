@@ -24,6 +24,8 @@ export interface DecisionContextRequest {
   readonly brainContext?: string;
   /** Speech still being delivered by send_message during a busy turn. */
   readonly currentSpeech?: CurrentSpeech;
+  /** Previously queued input, reconsidered against the reply just delivered. */
+  readonly queuedReview?: boolean;
   readonly incomingBundle: readonly Stimulus[];
   readonly pendingQueue: readonly Stimulus[];
   readonly signal?: AbortSignal;
@@ -147,6 +149,7 @@ export function assembleDecisionContext(
         }
       : null,
     brainStatus: params.brainStatus,
+    queuedReview: params.queuedReview ?? false,
     currentAttention:
       params.brainStatus === "busy_thinking"
         ? truncateText(
@@ -275,6 +278,7 @@ export function parsePerceptionSkill(
 export function buildDecisionQuestions(
   brainStatus: "idle" | "busy_thinking",
   rubric: PerceptionSkillRubric,
+  queuedReview = false,
 ): Record<string, DecisionQuestion> {
   const busy = brainStatus === "busy_thinking";
   const questionKey = busy ? "attention_allocation" : "wake_decision";
@@ -292,7 +296,7 @@ export function buildDecisionQuestions(
     },
   };
   // Asked in the same pass; Perception uses it only for an idle WAKE.
-  if (!busy)
+  if (!busy && !queuedReview)
     questions.response_latency = {
       type: "score",
       instructions: [
@@ -316,6 +320,10 @@ export function assembleDecisionBatch(
     typeof params.rubric === "object" && "instructions" in params.rubric
       ? params.rubric
       : parsePerceptionSkill(params.rubric);
-  const questions = buildDecisionQuestions(params.brainStatus, rubric);
+  const questions = buildDecisionQuestions(
+    params.brainStatus,
+    rubric,
+    params.queuedReview,
+  );
   return { state, questions };
 }

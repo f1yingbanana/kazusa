@@ -1,15 +1,14 @@
 {
   "agents": {
     "defaults": {
+      "timeoutSeconds": 180,
       "workspace": "./workspaces",
       "userTimezone": "UTC",
       "compaction": {
         "enabled": false
       },
       "models": {
-        "zai/glm-5.3-flash": {
-          "alias": "GLM"
-        },
+        "zai/glm-5.3-flash": {},
         "venice/zai-org-glm-4.7": {}
       },
       "model": {
@@ -21,7 +20,8 @@
       },
       "heartbeat": {
         "every": "0m"
-      }
+      },
+      "skipBootstrap": true
     },
     "ownership": "explicit",
     "entries": {
@@ -472,6 +472,7 @@
             "manage_chat",
             "memory_search",
             "memory_get",
+            "ls",
             "read",
             "edit",
             "write",
@@ -498,7 +499,7 @@
             "enabled": false
           }
         },
-        "skills": ["kazusa", "openclaw", "typescript"],
+        "skills": ["world-building", "kazusa", "openclaw", "typescript"],
         "cwd": "~/Documents/GitHub/kazusa/apps/kazusa"
       }
     }
@@ -534,7 +535,7 @@
             "decisionWikiMaxArticles": 4
           },
           "perception": {
-            "coalesceWindowMs": 500,
+            "coalesceWindowMs": 10000,
             "maxBatchSize": 16,
             "maxBatchChars": 48000,
             "decisionTimeoutMs": 10000
@@ -669,7 +670,8 @@
   },
   "skills": {
     "load": {
-      "extraDirs": ["./shared/skills", "../../.agents/skills"]
+      "extraDirs": ["./shared/skills", "../../.agents/skills"],
+      "watch": false
     },
     "install": {
       "nodeManager": "npm"

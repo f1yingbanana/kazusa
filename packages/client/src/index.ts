@@ -408,6 +408,17 @@ export type TaskSummary = z.infer<typeof TaskSummarySchema>;
 export const BrainStateSchema = z.enum(["idle", "thinking", "unknown"]);
 export type BrainState = z.infer<typeof BrainStateSchema>;
 
+/** Operator stop: target the character's current brain run. */
+export const BrainAbortPayloadSchema = z.strictObject({
+  agentId: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/),
+});
+export type BrainAbortPayload = z.infer<typeof BrainAbortPayloadSchema>;
+export const BrainAbortResponseSchema = z.object({
+  aborted: z.boolean(),
+  drained: z.boolean(),
+});
+export type BrainAbortResponse = z.infer<typeof BrainAbortResponseSchema>;
+
 /** Transient, structured state. Sent as full replacements per character. */
 export const CharacterStatusSchema = z.object({
   task: TaskSummarySchema.optional(),

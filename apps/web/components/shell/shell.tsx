@@ -14,7 +14,6 @@ import { onSidebarRequest } from '@/lib/state/sidebar-request'
 import { CommandPalette } from './command-palette'
 import { Inspector } from './inspector'
 import { SectionRail, SectionTabs } from './section-nav'
-import { SettingsDialog } from './settings-dialog'
 import { Stage } from './stage'
 import { StatusBar } from './status-bar'
 import { TopBar } from './top-bar'
@@ -37,7 +36,6 @@ export function Shell() {
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [selection, select] = useSelection()
   const active = useActiveView()
   const view = useParam('view')
@@ -60,7 +58,7 @@ function Layout() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <TopBar onOpenPalette={() => setPaletteOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar onOpenPalette={() => setPaletteOpen(true)} />
       <div className="flex min-h-0 flex-1">
         <SectionRail onOpenPalette={() => setPaletteOpen(true)} />
         {Sidebar ? (
@@ -106,7 +104,6 @@ function Layout() {
       </Sheet>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
 }

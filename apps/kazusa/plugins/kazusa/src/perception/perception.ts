@@ -1,5 +1,3 @@
-import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
-import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -19,25 +17,6 @@ import {
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
-
-/**
- * Runs a callback in the async context this module was loaded in, at Gateway
- * startup. A readiness timer armed during a tool call (a sighting foreseen by
- * someone's `start_task`) wakes long after that call closed; inside its scope,
- * the decision runtime and brain handoff refuse ("agent tool caller authority
- * is no longer active"), and the character is quarantined.
- */
-const outsideCallers = AsyncLocalStorage.snapshot();
-
-/**
- * Starts work that outlives its caller. `runDetachedWebhookWork` keeps Gateway
- * admission but not the caller's request scope, so work started from an RPC or
- * HTTP call is refused once that client disconnects ("Gateway caller authority
- * is no longer active"). Live, every stimulus from `location.place` fell back.
- */
-function detached<T>(run: () => Promise<T>): Promise<T> {
-  return outsideCallers(() => runDetachedWebhookWork(run));
-}
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
@@ -60,6 +39,8 @@ import {
  */
 export interface PendingItem extends Stimulus {
   action?: "QUEUE_NEXT";
+  /** Recheck chat coverage once the ongoing reply has finished. */
+  reviewAfterRun?: boolean;
   until?: { taskId?: string; notBefore?: number };
 }
 
@@ -140,6 +121,8 @@ export interface PerceptionDeps {
   readonly adopted?: (delivery: PerceptionDelivery) => Promise<boolean>;
   /** Whether the character is simulated. Absent: everyone is. */
   readonly onstage?: (agentId: string) => Promise<boolean>;
+  /** Live in-person conversation, validated against current membership. */
+  readonly realtime?: (agentId: string, item: Stimulus) => Promise<boolean>;
   readonly confirm?: (
     agentId: string,
     item: Stimulus,
@@ -208,6 +191,7 @@ export class Perception {
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
+  private readonly debounceReadyAt = new Map<string, number>();
   private readonly readinessTimers = new Map<string, NodeJS.Timeout>();
   private speech?: SpeechSource;
   private readonly adoptedListeners = new Set<
@@ -329,10 +313,18 @@ export class Perception {
       return;
     }
 
-    // Debounce incoming rapid-fire messages into a coalesced sensory bundle
-    if (this.config.coalesceWindowMs > 0) {
+    // In-person exchanges keep only a short burst window. An arriving huddle
+    // can bring an existing remote-message timer forward, never push it back.
+    const inPerson = await this.deps.realtime?.(agentId, stimulus);
+    const windowMs = inPerson
+      ? Math.min(this.config.coalesceWindowMs, 250)
+      : this.config.coalesceWindowMs;
+    if (windowMs > 0) {
       const existing = this.debounceTimers.get(agentId);
-      if (existing) return;
+      const readyAt = Date.now() + windowMs;
+      if (existing && readyAt >= (this.debounceReadyAt.get(agentId) ?? 0))
+        return;
+      existing?.();
       // Reserve while ingress still owns admission, including the time spent
       // waiting. A bare timer would inherit a request/tool scope that can close.
       // Keep the fixed first-arrival window: a quiet-period debouncer would
@@ -340,16 +332,24 @@ export class Perception {
       const ready = new Promise<boolean>((resolve) => {
         const timer = setTimeout(() => {
           this.debounceTimers.delete(agentId);
+          this.debounceReadyAt.delete(agentId);
           resolve(true);
-        }, this.config.coalesceWindowMs);
+        }, windowMs);
         this.debounceTimers.set(agentId, () => {
           clearTimeout(timer);
+          this.debounceReadyAt.delete(agentId);
           resolve(false);
         });
+        this.debounceReadyAt.set(agentId, readyAt);
       });
-      void detached(async () => {
-        if (await ready) await this.drain(agentId);
-      }).catch((error: unknown) => this.warn(error));
+      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
+        throw new Error("runInBackgroundContext not available");
+      }
+      void this.deps.api.lifecycle
+        ?.runInBackgroundContext?.(async () => {
+          if (await ready) await this.drain(agentId);
+        })
+        .catch((error: unknown) => this.warn(error));
     } else {
       await this.drain(agentId);
     }
@@ -678,9 +678,12 @@ export class Perception {
         : this.config.readinessPollMs;
     const timer = setTimeout(() => {
       this.readinessTimers.delete(agentId);
-      void detached(() => this.drain(agentId)).catch((error: unknown) =>
-        this.warn(error),
-      );
+      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
+        throw new Error("runInBackgroundContext not available");
+      }
+      void this.deps.api.lifecycle
+        ?.runInBackgroundContext?.(() => this.drain(agentId))
+        .catch((error: unknown) => this.warn(error));
     }, wait);
     timer.unref();
     this.readinessTimers.set(agentId, timer);
@@ -746,7 +749,18 @@ export class Perception {
         await this.save(agentId, state);
         continue;
       }
-      const fresh = happened;
+      const review = !busy
+        ? this.batch(
+            available.filter(
+              (item) =>
+                item.reviewAfterRun &&
+                item.timestamp <= now &&
+                this.isReady(item, task),
+            ),
+          )
+        : [];
+      const queuedReview = review.length > 0;
+      const fresh = queuedReview ? review : happened;
       if (!fresh.length) {
         await this.save(agentId, state);
         if (busy || !available.length) {
@@ -781,13 +795,31 @@ export class Perception {
         systemAgent ||
         (!busy && fresh.every((item) => item.deadline || item.idle))
           ? { action: "STEER", delayMs: 0, source: "automatic" }
-          : await this.classify(agentId, state, task, fresh, busy);
+          : await this.classify(
+              agentId,
+              state,
+              task,
+              fresh,
+              busy,
+              queuedReview,
+            );
       this.assertCurrent();
-      const { action, delayMs } = decision;
-      await this.recordDecision(agentId, decision, fresh, busy, task);
+      // In-person attention has no simulated phone-check delay. Keep Jev's
+      // choice: a person may still decline to engage or finish an activity.
+      const inPerson = this.deps.realtime;
+      const realtime =
+        decision.delayMs > 0 && inPerson
+          ? (
+              await Promise.all(fresh.map((item) => inPerson(agentId, item)))
+            ).some(Boolean)
+          : false;
+      const effective = realtime ? { ...decision, delayMs: 0 } : decision;
+      const { action, delayMs } = effective;
+      await this.recordDecision(agentId, effective, fresh, busy, task);
       // start_task/delay_task can execute while Jev is evaluating.
       const currentTask = await this.taskStore.lookup(agentId);
       const current = fresh.filter((item) => this.isCurrent(item, currentTask));
+      for (const item of current) delete item.reviewAfterRun;
       const stale = new Set(
         fresh
           .filter((item) => !this.isCurrent(item, currentTask))
@@ -819,7 +851,11 @@ export class Perception {
               ...available.filter(
                 (item) =>
                   this.isCurrent(item, currentTask) &&
-                  item.action === "QUEUE_NEXT",
+                  item.action === "QUEUE_NEXT" &&
+                  !item.reviewAfterRun &&
+                  !current.some(
+                    (entry) => stimulusKey(entry) === stimulusKey(item),
+                  ),
               ),
             ]);
         return this.reserve(
@@ -831,6 +867,12 @@ export class Perception {
       }
       const ignored = new Set<string>();
       for (const item of current) {
+        if (
+          busy &&
+          item.sessionKey.includes(":chat:") &&
+          (action === "QUEUE_NEXT" || action === "DEFER")
+        )
+          item.reviewAfterRun = true;
         if (action === "DEFER") {
           item.action = "QUEUE_NEXT";
           if (activeTask) item.until = { taskId: activeTask.id };
@@ -859,6 +901,7 @@ export class Perception {
     task: ActiveTask | undefined,
     bundle: PendingItem[],
     busy: boolean,
+    queuedReview = false,
   ): Promise<AttentionDecision & DecisionTrace> {
     const admit = (note: string) =>
       ({ action: "STEER", delayMs: 0, source: "fallback", note }) as const;
@@ -899,15 +942,19 @@ export class Perception {
           activeTask: task,
           brainStatus: busy ? "busy_thinking" : "idle",
           brainContext: state.brainContext,
+          queuedReview,
           ...(speech ? { currentSpeech: speech } : {}),
           incomingBundle: bundle,
           pendingQueue: state.pending
             .filter(
               (item) =>
-                item.action === "QUEUE_NEXT" ||
-                state.deliveries?.some((delivery) =>
-                  delivery.keys.includes(stimulusKey(item)),
-                ),
+                !bundle.some(
+                  (incoming) => stimulusKey(incoming) === stimulusKey(item),
+                ) &&
+                (item.action === "QUEUE_NEXT" ||
+                  state.deliveries?.some((delivery) =>
+                    delivery.keys.includes(stimulusKey(item)),
+                  )),
             )
             .slice(-16),
           signal,
@@ -922,7 +969,7 @@ export class Perception {
         return evaluate(batch, {
           agentId,
           purpose: `perception.${question}`,
-          rubricVersion: "5",
+          rubricVersion: "6",
           timeoutMs: this.config.decisionTimeoutMs,
           signal,
         });
@@ -945,6 +992,8 @@ export class Perception {
           outcome.status === "ok"
             ? outcome.result.answers.response_latency
             : undefined;
+        if (!busy && choice === "WAKE" && queuedReview)
+          return { action: "STEER", delayMs: 0, ...model };
         if (!busy && choice === "WAKE" && latency?.type === "score")
           return {
             action: "STEER",
@@ -1087,9 +1136,12 @@ export class Perception {
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
           // from inside the first host's adoption callback.
-          void detached(() => this.drain(delivery.agentId)).catch(
-            (error: unknown) => this.warn(error),
-          );
+          if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
+            throw new Error("runInBackgroundContext not available");
+          }
+          void this.deps.api.lifecycle
+            ?.runInBackgroundContext?.(() => this.drain(delivery.agentId))
+            .catch((error: unknown) => this.warn(error));
         },
         onDeferred: () => {
           // The host may retain this callback past dispatch's return. Keep our
@@ -1112,19 +1164,24 @@ export class Perception {
       };
       // Start outside the state lock, and observe the full dispatch promise even
       // after ingress has returned. Errors after adoption must never replay tools.
-      void detached(async () => {
-        this.assertCurrent();
-        if (!this.deps.deliver)
-          throw new Error("Perception requires a brain delivery adapter");
-        await this.deps.deliver(delivery, lifecycle);
-        if (!adopted && !deferred && !failed) {
-          reportFailure(
-            new Error(
-              `Brain dispatch returned without adoption: ${delivery.id}`,
-            ),
-          );
-        }
-      }).catch((error: unknown) => reportFailure(error));
+      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
+        throw new Error("runInBackgroundContext not available");
+      }
+      void this.deps.api.lifecycle
+        ?.runInBackgroundContext?.(async () => {
+          this.assertCurrent();
+          if (!this.deps.deliver)
+            throw new Error("Perception requires a brain delivery adapter");
+          await this.deps.deliver(delivery, lifecycle);
+          if (!adopted && !deferred && !failed) {
+            reportFailure(
+              new Error(
+                `Brain dispatch returned without adoption: ${delivery.id}`,
+              ),
+            );
+          }
+        })
+        .catch((error: unknown) => reportFailure(error));
     });
   }
 
@@ -1203,6 +1260,7 @@ export class Perception {
     this.brainStateListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();
+    this.debounceReadyAt.clear();
     for (const timer of this.readinessTimers.values()) clearTimeout(timer);
     this.readinessTimers.clear();
   }

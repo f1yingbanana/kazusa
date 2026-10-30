@@ -11,6 +11,7 @@ import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
 import { registerPerception } from "./perception/register.ts";
+import { registerBrainHttp } from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
 import { registerLocation } from "./location/register.ts";
@@ -117,8 +118,17 @@ export default definePluginEntry({
       onDeadline: location.settle,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
+      realtime: async (agentId, item) => {
+        if (!item.sessionKey.includes(":chat:")) return false;
+        return (
+          (
+            await messagingRef.current?.chatFacts(agentId, [item.sessionKey])
+          )?.some((chat) => chat.kind === "huddle") ?? false
+        );
+      },
       thinking: async (agentId) => (await models.read(agentId)).thinking,
     });
+    registerBrainHttp(api);
     location.attachPerception(perception);
 
     const stopSupervisor = taskman.attachSupervisor(perception);

@@ -1,6 +1,7 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useNavigate } from '@/hooks/use-url-state'
 import { useRealtime } from '@/lib/live/realtime-provider'
 import { useKazusaConfig } from '@/lib/state/config-store'
 import { cn } from '@/lib/utils'
@@ -15,10 +16,16 @@ const LABELS = {
 export function ConnectionStatusItem() {
   const { status } = useRealtime()
   const { baseUrl } = useKazusaConfig()
+  const navigate = useNavigate()
 
   return (
     <Tooltip>
-      <TooltipTrigger render={<span />} className="inline-flex items-center gap-1.5">
+      <TooltipTrigger
+        render={
+          <button type="button" onClick={() => navigate({ view: 'settings', 'settings.tab': 'connection' })} />
+        }
+        className="inline-flex items-center gap-1.5 rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
         <span
           aria-hidden
           className={cn(

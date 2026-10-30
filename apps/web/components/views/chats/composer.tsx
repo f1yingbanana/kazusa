@@ -12,8 +12,6 @@ import {
 import { Kbd } from '@/components/ui/kbd'
 import type { MessageType } from '@/lib/source/chats/types'
 import { cn } from '@/lib/utils'
-import { ModelPicker } from './model-picker'
-import { ThinkingPicker } from './thinking-picker'
 
 const MODES = [
   { type: 'speech', label: 'Say', icon: MessageCircleIcon },
@@ -124,21 +122,16 @@ export function Composer({
             <span aria-hidden>+</span>
             <Kbd>Enter</Kbd> new line
           </InputGroupText>
-          {/* The model and reasoning level are the world's, not this chat's. */}
-          <div className="ml-auto flex min-w-0 items-center gap-0.5">
-            <ModelPicker />
-            <ThinkingPicker />
-            <InputGroupButton
-              type="submit"
-              size="icon-sm"
-              variant="default"
-              className="ml-1 rounded-full"
-              disabled={!canSend}
-            >
-              <ArrowUpIcon />
-              <span className="sr-only">Send message</span>
-            </InputGroupButton>
-          </div>
+          <InputGroupButton
+            type="submit"
+            size="icon-sm"
+            variant="default"
+            className="ml-auto rounded-full"
+            disabled={!canSend}
+          >
+            <ArrowUpIcon />
+            <span className="sr-only">Send message</span>
+          </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
     </form>

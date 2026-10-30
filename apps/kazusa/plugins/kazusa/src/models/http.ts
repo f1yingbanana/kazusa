@@ -41,6 +41,7 @@ const ModelsListResultSchema = z.object({
         .optional(),
       contextWindow: z.number().int().optional(),
       reasoning: z.boolean().optional(),
+      supportsTools: z.boolean().optional(),
       thinkingLevels: z
         .array(z.object({ id: z.string(), label: z.string() }))
         .optional(),
@@ -146,24 +147,30 @@ export function registerModelsHttp(
         : resolveAgentConfig(config, targetId)?.models),
     };
     const selected = await deps.selection.read(targetId);
-    const models = result.models.map((model): ModelOption => {
-      const ref = `${model.provider}/${model.id}`;
-      return {
-        ref,
-        provider: model.provider,
-        id: model.id,
-        name: model.name,
-        alias: model.alias ?? shortlist[ref]?.alias,
-        pinned: ref in shortlist,
-        available: model.available !== false,
-        unavailableReason: model.unavailableReason,
-        contextWindow: model.contextWindow,
-        reasoning: model.reasoning,
-        thinkingLevels: thinkingOptions(model.thinkingLevels),
-        thinkingDefault: ThinkingLevelSchema.safeParse(model.thinkingDefault)
-          .data,
-      };
-    });
+    // Characters act through tools, so a model that can't call them can't run a
+    // brain. Absent means supported, as in OpenClaw's own check. `models.list`
+    // reports no output modality, so text output can't be checked here; OpenClaw's
+    // OpenRouter discovery and models.dev import skip non-text models themselves.
+    const models = result.models
+      .filter((model) => model.supportsTools !== false)
+      .map((model): ModelOption => {
+        const ref = `${model.provider}/${model.id}`;
+        return {
+          ref,
+          provider: model.provider,
+          id: model.id,
+          name: model.name,
+          alias: model.alias ?? shortlist[ref]?.alias,
+          pinned: ref in shortlist,
+          available: model.available !== false,
+          unavailableReason: model.unavailableReason,
+          contextWindow: model.contextWindow,
+          reasoning: model.reasoning,
+          thinkingLevels: thinkingOptions(model.thinkingLevels),
+          thinkingDefault: ThinkingLevelSchema.safeParse(model.thinkingDefault)
+            .data,
+        };
+      });
     return {
       ...(targetId === undefined
         ? {}

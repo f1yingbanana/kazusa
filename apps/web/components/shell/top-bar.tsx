@@ -1,6 +1,6 @@
 'use client'
 
-import { FastForwardIcon, PauseIcon, SearchIcon, Settings2Icon } from 'lucide-react'
+import { FastForwardIcon, PauseIcon, SearchIcon } from 'lucide-react'
 import { MockTag } from '@/components/entities/source-state'
 import { Button } from '@/components/ui/button'
 import {
@@ -96,16 +96,10 @@ function SpeedControls() {
 }
 
 /**
- * Global time and settings only. Sections live on the rail (or the bottom tab
- * bar on phones); feature controls live inside their section.
+ * Global time only. Sections, Settings included, live on the rail (or the
+ * bottom tab bar on phones); feature controls live inside their section.
  */
-export function TopBar({
-  onOpenPalette,
-  onOpenSettings,
-}: {
-  onOpenPalette: () => void
-  onOpenSettings: () => void
-}) {
+export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-sidebar px-3">
       {/* World title comes from GET /kazusa/world once it exists (D1). */}
@@ -132,13 +126,6 @@ export function TopBar({
             Observer
           </TooltipTrigger>
           <TooltipContent>Lens: omniscient observer. Player lens comes later.</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={onOpenSettings} />}>
-            <Settings2Icon />
-            <span className="sr-only">Connection settings</span>
-          </TooltipTrigger>
-          <TooltipContent>Connection settings</TooltipContent>
         </Tooltip>
       </div>
     </header>

@@ -12,6 +12,7 @@ import { Perception, type PerceptionDeps } from "./perception.ts";
 import type { PerceptionDecisionRecord } from "./types.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
+import { registerBrainRunLimits } from "./run-limits.ts";
 
 const LIFECYCLE = z.object({
   phase: z.enum(["start", "end", "error"]),
@@ -44,11 +45,13 @@ export function registerPerception(
     readonly confirm?: PerceptionDeps["confirm"];
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
+    readonly realtime?: PerceptionDeps["realtime"];
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
   },
 ): Perception {
   const lifetime = new AbortController();
+  const endBrainRun = registerBrainRunLimits(api);
   // Each decision is persisted by Perception in the "perception" store, which
   // the timeline reads; this only broadcasts it to live observers.
   const onDecision = (
@@ -78,6 +81,7 @@ export function registerPerception(
     serial: sharedPerceptionQueue(),
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
+    ...(deps.realtime ? { realtime: deps.realtime } : {}),
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)
@@ -216,8 +220,8 @@ export function registerPerception(
   // - On "start": Transitions Perception to Busy mode, recording `state.brainRun`.
   //   Incoming stimuli will now be classified by Jev as STEER (interrupt) vs QUEUE_NEXT vs IGNORE.
   // - On "end" / "error" / "aborted": Transitions Perception back to Idle mode.
-  //   Automatically triggers a single consolidated batch drain of all queued stimuli
-  //   accumulated while the brain was thinking, without redundant Jev re-evaluations.
+  //   Reviews queued chat coverage against the completed reply, then drains
+  //   the remaining stimuli as one consolidated batch.
   // DESIGN FIT:
   // Synchronizes physical brain thinking states with attention gating without polling.
   // =========================================================================
@@ -236,6 +240,7 @@ export function registerPerception(
           api.logger.warn(`Perception started error: ${String(err)}`);
         }
       } else {
+        endBrainRun(event.runId);
         try {
           await perception.ended(
             owner.agentId,

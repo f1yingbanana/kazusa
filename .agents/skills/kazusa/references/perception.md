@@ -77,8 +77,13 @@ appends brain/chat transcripts to manufacture admission.
 
 OpenClaw scopes async work to its owner. Returning HTTP success or resolving
 Perception ingress does not keep a detached timer/model run alive. Use the
-installed `runDetachedWebhookWork` helper for these concrete lifetime
-boundaries:
+owning instance's native `api.lifecycle.runInBackgroundContext` composed with
+`runDetachedWebhookWork` (`src/background-work.ts`) for these concrete lifetime
+boundaries. The native lifecycle runner drops request/tool context while
+preserving current plugin bindings; the webhook helper reserves Gateway work
+admission. Neither a bare webhook helper nor a module-load
+`AsyncLocalStorage.snapshot()` supplies both guarantees. Module loading can
+itself happen inside a request, so a snapshot can restore expired authority.
 
 - Messaging reserves notification work before its HTTP/tool caller returns.
 - Perception reserves a scope spanning the whole coalescing wait and drain.

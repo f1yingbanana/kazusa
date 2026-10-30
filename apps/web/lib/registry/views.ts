@@ -1,5 +1,12 @@
-import { GlobeIcon, ListIcon, MessagesSquareIcon } from "lucide-react";
+import {
+  GlobeIcon,
+  ListIcon,
+  MessagesSquareIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { ChatsPanel } from "@/components/views/chats/chats-panel";
+import { SettingsSidebar } from "@/components/views/settings/settings-sidebar";
+import { SettingsView } from "@/components/views/settings/settings-view";
 import { ChatsUnreadBadge } from "@/components/views/chats/chats-unread-badge";
 import { ChatsView } from "@/components/views/chats/chats-view";
 import { TimelineSidebar } from "@/components/views/timeline/timeline-sidebar";
@@ -37,6 +44,16 @@ export const STAGE_VIEWS: readonly StageView[] = [
     requires: ["timeline"],
     component: TimelineView,
     sidebar: TimelineSidebar,
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: SettingsIcon,
+    order: 100,
+    requires: [],
+    component: SettingsView,
+    sidebar: SettingsSidebar,
+    placement: "end",
   },
 ];
 

@@ -156,11 +156,11 @@ in the installed SDK is distinct from conformance to the latest rolling docs.
 
 The result includes the caller's `sessionKey` for later sends. Direct chat
 identity is derived from its sorted pair. Group identity is opaque and derived
-from the sender and an internal delivery ID. The adapter derives that ID from
-the brain session UUID and host tool-call ID. Replaying the same host invocation
-does not create another group; a fresh model call does, even with identical
-arguments. Titles are labels, not identities; changing a title never changes a
-key.
+from the sender and an internal delivery ID. The adapter generates a fresh
+server-owned UUID for every tool execution, independent of the provider's
+reusable tool-call IDs. Each execution creates a new group, even with identical
+arguments; recovery of a retained send reuses its original group. Titles are
+labels, not identities; changing a title never changes a key.
 
 `list_chats({ query? })` returns only the caller's current memberships with its
 own session keys, titles, and member IDs. It reads routing metadata, not
@@ -202,8 +202,9 @@ shared membership. Title changes project `displayName` with `preserveActivity`
 so renaming does not pretend a new message arrived. Failed projections remain
 pending and retry after restart. Removed members' old views remain unchanged. A
 creation whose first delivery acceptance fails may leave discoverable empty
-routing metadata; replaying the same host invocation reuses it. There is no
-cross-store atomic transaction.
+routing metadata; an internal retry with the retained request ID reuses it.
+Re-executing the tool starts a new send. There is no cross-store atomic
+transaction.
 
 ## Human player integration (`user:`)
 
@@ -309,20 +310,25 @@ Likewise, a committed record may still need its attention notification. Stable
 IDs, retained unfinished work, and frozen audiences address those concrete gaps.
 They do not promise a read receipt, an immediate reply, or exactly-once
 thinking. No settled-result cache is needed; durable message lookup handles
-replays.
+internal delivery retries.
 
 The retained native `messaging` store records intent before any append and
 tracks session identity, committed message ID, publication, and attention
-notification for each copy. The model supplies no request ID: the adapter hashes
-the host's brain session UUID and tool-call ID into an internal `requestId`,
-scoped again to the sender. Require both host IDs rather than inventing a random
-fallback. Host replays reuse the original message, timestamp, and frozen
-audience, including after membership edits. Changing arguments under that same
-invocation is rejected. A fresh model call is a new message; identical text is
-not sufficient evidence of a retry. Delivery retries run automatically from
-retained state without another agent call. Per-copy native idempotency keys
-survive partial failures and restarts. Exact-session appends reject a rebound
-ledger instead of silently writing into a replacement session.
+notification for each copy. The model supplies no request ID: the adapter
+creates a fresh server-owned UUID inside each tool execution, scoped again to
+the sender. Provider tool-call IDs are correlation metadata and may repeat
+within one brain session; never use them for durable deduplication. Re-executing
+the tool accepts a new send, even with identical text or a reused call ID. This
+avoids rejecting valid speech and requiring another model call. A host replay
+after acceptance persists but before its result is recorded can therefore
+duplicate a send; this is an accepted tradeoff, not an exactly-once invocation
+guarantee.
+
+Delivery retries run automatically from retained state without another agent
+call. They reuse the accepted message, timestamp, frozen audience and per-copy
+native idempotency keys, including across membership edits, partial failures and
+restarts. Exact-session appends reject a rebound ledger instead of silently
+writing into a replacement session.
 
 A single write queue serializes membership edits and send acceptance, then
 orders copies by acceptance. A failed copy blocks later writes to that ledger
@@ -331,20 +337,23 @@ settlement (`isDeliverySettled`). The service resumes retained work at startup
 and retries pending work without invoking an LLM. Disposal cancels retries and
 guards further writes.
 
-Replays consult the retained message even after hundreds of newer sends and
-across restarts. Conflicting arguments under the same host invocation are
-rejected. Client message events fire on new canonical acceptance, not on a host
-replay. They are best-effort invalidations; clients recover missed events by
-reading history rather than requiring another durable event-delivery log.
+Internal retries consult the retained message even after hundreds of newer sends
+and across restarts. Conflicting payloads under the same internal request ID are
+rejected. Client message events fire on new canonical acceptance, not on an
+internal retry. They are best-effort invalidations; clients recover missed
+events by reading history rather than requiring another durable event-delivery
+log.
 
 After a recipient copy commits, messaging publishes its native transcript update
 and directly submits its unchanged text, stable sender ID, message ID, and
 original timestamp to `perception.receive()`. It never dispatches a turn to a
 chat session or routes its own notification back through `before_dispatch`.
 Notifications run outside the write queue and are not awaited by the sending
-tool: recipient turns can themselves send messages without deadlocking.
-`runDetachedWebhookWork` reserves notification work before the HTTP/tool owner
-returns, and retry timers enter a fresh detached scope. Perception independently
+tool: recipient turns can themselves send messages without deadlocking. The
+owning instance's `api.lifecycle.runInBackgroundContext` clears caller context,
+and `runDetachedWebhookWork` reserves notification work before the HTTP/tool
+owner returns (`src/background-work.ts`). Retry timers use the same pair. A bare
+webhook helper does not clear Gateway caller authority. Perception independently
 owns the delayed coalescer and full brain dispatch scopes; a bare
 fire-and-forget promise can inherit a closed host scope even in this entirely
 local system.
@@ -380,8 +389,8 @@ audiences, ledger copies and notifications are unchanged per bubble.
 - **Crash recovery.** The plan is retained in the `outbox` store at the start of
   the call and deleted when it completes or is interrupted. On startup,
   `resume()` sends every bubble of a surviving plan immediately; bubbles that
-  were already sent are replays of their stable IDs. A host replay of the tool
-  call behaves the same way but keeps pacing for bubbles not yet sent.
+  were already sent are replays of their stable IDs. Re-executing the tool is
+  instead a new send with a new server-owned identity.
 - **One outbox per character.** A new `send_message` from the same character
   aborts an older one still pacing.
 

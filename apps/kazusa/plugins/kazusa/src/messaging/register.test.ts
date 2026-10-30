@@ -68,7 +68,10 @@ async function setup(
     registerTool,
     registerService,
     registerHttpRoute,
-    lifecycle: { onDispose: dispose },
+    lifecycle: {
+      onDispose: dispose,
+      runInBackgroundContext: <T>(run: () => T): T => run(),
+    },
     logger: { warn: vi.fn() },
     runtime: {
       state: {
@@ -251,37 +254,45 @@ describe("send_message SDK integration", () => {
     await peer;
     expect(finished).toBe(true);
   });
-  it("deduplicates host replays without model-supplied IDs and scopes calls to the brain session", async () => {
+  it("accepts new sends when the same tool instance receives a reused provider call ID", async () => {
     const h = await setup();
     const input = { members: ["bob"], title: "Tea", messages: ["Hello"] };
-    const first = await h.executeTool("send_message", input, {}, "same-call");
-    const replay = await h.executeTool("send_message", input, {}, "same-call");
-    expect(replay.details).toEqual(first.details);
-    expect(replay.details).not.toHaveProperty("requestId");
-    expect(append).toHaveBeenCalledTimes(2);
-    expect(h.chats.size).toBe(1);
-    await expect(
-      h.executeTool(
-        "send_message",
-        { ...input, messages: ["Changed"] },
-        {},
-        "same-call",
-      ),
-    ).rejects.toThrow("different message");
-    const fresh = await h.executeTool("send_message", input, {}, "new-call");
-    expect(fresh.details.messageIds[0]).not.toBe(first.details.messageIds[0]);
-    const reset = await h.executeTool(
-      "send_message",
-      input,
-      { sessionId: "new-brain-session" },
-      "same-call",
-    );
-    expect(reset.details.messageIds[0]).not.toBe(first.details.messageIds[0]);
+    const tool = h.registerTool.mock.calls[0][0].create({
+      agentId: "alice",
+      sessionKey: "agent:alice:brain",
+      sessionId: "alice-brain-session",
+      assertInvocationCurrent: vi.fn(),
+    })[0];
+    const first = await tool.execute("call_0", input);
+    const changed = await tool.execute("call_0", {
+      ...input,
+      messages: ["Changed"],
+    });
+    const repeated = await tool.execute("call_0", input);
+    expect(first.details.said).toEqual(["Hello"]);
+    expect(changed.details.said).toEqual(["Changed"]);
+    expect(repeated.details.said).toEqual(["Hello"]);
+    expect(
+      new Set([
+        first.details.messageIds[0],
+        changed.details.messageIds[0],
+        repeated.details.messageIds[0],
+      ]).size,
+    ).toBe(3);
+    expect(append).toHaveBeenCalledTimes(6);
     expect(h.chats.size).toBe(3);
+  });
+
+  it("owns send identity without requiring a brain UUID or model-supplied ID", async () => {
+    const h = await setup();
+    const input = { members: ["bob"], messages: ["Hello"] };
+    const result = await h.execute(input, { sessionId: undefined });
+    expect(result.details.status).toBe("delivered");
+    expect(result.details).not.toHaveProperty("requestId");
     await expect(
       h.execute({ ...input, requestId: "model-id" }),
     ).rejects.toThrow();
-    await expect(h.execute(input, { sessionId: undefined })).rejects.toThrow();
+    expect(append).toHaveBeenCalledTimes(2);
     const tool = h.registerTool.mock.calls[0][0].create({})[0];
     expect(tool.parameters.properties).not.toHaveProperty("requestId");
   });

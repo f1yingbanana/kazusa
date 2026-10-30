@@ -98,8 +98,14 @@ Each column narrows the one before it: **rail** (where) → **section sidebar**
 
 - **Rail** (`md` and up): one icon per registered `StageView`, a tooltip with
   its label, an accent bar on the current section, and an optional count
-  badge (Chats unread). The ⌘K search icon sits at the bottom. Below `md` the
-  same entries render as a bottom tab bar.
+  badge (Chats unread). The ⌘K search icon and the Settings gear sit at the
+  bottom. Below `md` the same entries render as a bottom tab bar, Settings
+  last.
+- **Settings** is a section like any other: its sidebar lists categories
+  (Connection, Models), the stage shows one page of titled blocks, and below
+  `lg` the category list is the first screen. World defaults live here;
+  per-character overrides live in the inspector, and each side links to the
+  other.
 - **Section sidebar:** each `StageView` registers its own `sidebar`. There are
   no sidebar tabs, and a sidebar never shows another section's content.
   Sidebars share one toolbar shape: search (the count lives in the
@@ -285,6 +291,9 @@ presence ring already shows).
    attention bookkeeping), plus "Open in Timeline".
 5. **About:** role, traits and aliases (not ones equal to the id or name),
    plus `bodyMarkdown` rendered verbatim in a collapsed block.
+6. **Model** (live agents only): chat model and reasoning level, each saying
+   whether it follows the world default or was chosen for this character,
+   with "Use world default" to undo a choice.
 
 The player's chats with a character are one tap away through Message and the
 Chats list, so there is no Conversations section.

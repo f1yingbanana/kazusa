@@ -254,6 +254,13 @@ describe("Bounded decision evidence", () => {
       "wake_decision",
       "response_latency",
     ]);
+    expect(Object.keys(buildDecisionQuestions("idle", rubric, true))).toEqual([
+      "wake_decision",
+    ]);
+    expect(rubric.instructions).toContain("currentSpeech.unsaid is a plan");
+    expect(assemble({ queuedReview: true })).toMatchObject({
+      queuedReview: true,
+    });
     expect(Object.keys(rubric.questions.wake_decision.criteria)).toEqual([
       "WAKE",
       "DEFER",

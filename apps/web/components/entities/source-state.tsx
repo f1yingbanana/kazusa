@@ -12,6 +12,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useNavigate } from '@/hooks/use-url-state'
 import { LEGACY_CAPABILITIES } from '@/lib/source/capabilities'
 import { useSources } from '@/lib/source/provider'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,7 @@ export function Unavailable({
   className?: string
 }) {
   const { resolved, reachable, backendError, retryBackend } = useSources()
+  const navigate = useNavigate()
   const missing = requires.filter((domain) => resolved[domain] === 'unavailable')
   const offline = !reachable && missing.some((domain) => LEGACY_CAPABILITIES[domain] === 'live')
 
@@ -65,9 +67,12 @@ export function Unavailable({
             {backendError?.message ?? 'The Gateway did not answer.'} Start the Gateway, or point Settings at it.
           </EmptyDescription>
         </EmptyHeader>
-        <EmptyContent>
+        <EmptyContent className="flex-row justify-center">
           <Button size="sm" variant="outline" onClick={retryBackend}>
             Retry
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => navigate({ view: 'settings', 'settings.tab': 'connection' })}>
+            Connection settings
           </Button>
         </EmptyContent>
       </Empty>

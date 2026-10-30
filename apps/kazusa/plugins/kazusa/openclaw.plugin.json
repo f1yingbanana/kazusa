@@ -1,6 +1,8 @@
 {
   "id": "kazusa",
-  "channels": ["kazusa"],
+  "channels": [
+    "kazusa"
+  ],
   "channelConfigs": {
     "kazusa": {
       "label": "Kazusa Brain",
@@ -25,7 +27,7 @@
             "default": 500,
             "type": "integer",
             "minimum": 0,
-            "maximum": 5000
+            "maximum": 60000
           },
           "maxBatchSize": {
             "default": 16,
@@ -44,6 +46,48 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 30000
+          },
+          "maxModelCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 12
+          },
+          "maxToolCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 24
+          },
+          "maxRunSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600,
+            "default": 300
+          },
+          "systemAgent": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "maxModelCalls": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 60
+              },
+              "maxToolCalls": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100
+              },
+              "maxRunSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600,
+                "default": 900
+              }
+            }
           }
         }
       },
@@ -145,8 +189,14 @@
                 "type": "string",
                 "default": "context-conventions"
               },
-              "lifecycle": { "type": "string", "default": "task-lifecycle" },
-              "interrupt": { "type": "string", "default": "task-interrupt" }
+              "lifecycle": {
+                "type": "string",
+                "default": "task-lifecycle"
+              },
+              "interrupt": {
+                "type": "string",
+                "default": "task-interrupt"
+              }
             }
           }
         },
@@ -163,15 +213,26 @@
           },
           "categories": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Allowed task categories presented to the LLM in start_task tool schema."
           },
           "supervisor": {
             "type": "object",
             "properties": {
-              "enabled": { "type": "boolean", "default": true },
-              "intervalMs": { "type": "number", "default": 60000 },
-              "maxAgentsPerTick": { "type": "integer", "default": 2 },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "intervalMs": {
+                "type": "number",
+                "default": 60000
+              },
+              "maxAgentsPerTick": {
+                "type": "integer",
+                "default": 2
+              },
               "idleText": {
                 "type": "string",
                 "default": "Activity check-in: no scheduled activity."
@@ -191,7 +252,11 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "min", "level"],
+              "required": [
+                "name",
+                "min",
+                "level"
+              ],
               "properties": {
                 "name": {
                   "type": "string",
@@ -222,7 +287,11 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "description", "drain"],
+              "required": [
+                "name",
+                "description",
+                "drain"
+              ],
               "properties": {
                 "name": {
                   "type": "string",
@@ -296,6 +365,8 @@
       "list_chats",
       "manage_chat"
     ],
-    "gatewayMethodDispatch": ["authenticated-request"]
+    "gatewayMethodDispatch": [
+      "authenticated-request"
+    ]
   }
 }
