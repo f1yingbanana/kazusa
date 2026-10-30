@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { registerModelsHttp, type ModelsDeps } from "./http.ts";
 import { createModelSelection, type ModelSelection } from "./selection.ts";
+import {
+  ModelsResponseSchema,
+  ModelSelectResponseSchema,
+  ThinkingSelectResponseSchema,
+} from "@kazusa/client";
 
 type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 
@@ -59,7 +64,7 @@ function setup(config: Record<string, unknown>) {
   } as unknown as OpenClawPluginApi;
   const selection = createModelSelection(memoryStore());
   const deps = {
-    list: vi.fn(async () => LIST),
+    list: vi.fn(async (_params: Parameters<ModelsDeps["list"]>[0]) => LIST),
     readConfig: () => config,
     selection,
   } satisfies ModelsDeps;
@@ -193,5 +198,151 @@ describe("registerModelsHttp", () => {
     });
     expect(unsupported.status).toBe(409);
     expect(await selection.read()).toEqual({ model: "zai/glm-5.3-flash" });
+  });
+
+  it("keeps per-agent choices isolated and returns explicit and inherited values", async () => {
+    const { routes, deps, selection } = setup(CONFIG);
+    await selection.update({ model: "zai/glm-5.3-flash", thinking: "low" });
+    const picked = await call(routes["/kazusa/model"], "POST", "/", {
+      agentId: "airi",
+      ref: "zai/glm-5.3",
+    });
+    expect(ModelSelectResponseSchema.parse(picked.body)).toEqual({
+      agentId: "airi",
+      current: "zai/glm-5.3",
+    });
+    expect(deps.list).toHaveBeenLastCalledWith({
+      agentId: "airi",
+      refresh: false,
+    });
+    const response = await call(
+      routes["/kazusa/models"],
+      "GET",
+      "/?agentId=airi&refresh=1",
+    );
+    const body = ModelsResponseSchema.parse(response.body);
+    expect(body).toMatchObject({
+      agentId: "airi",
+      current: "zai/glm-5.3",
+      thinking: "low",
+      overrides: { model: "zai/glm-5.3" },
+    });
+    expect(deps.list).toHaveBeenLastCalledWith({
+      agentId: "airi",
+      refresh: true,
+    });
+    expect(await selection.read("kazusa")).toEqual({
+      model: "zai/glm-5.3-flash",
+      thinking: "low",
+    });
+    const world = await call(routes["/kazusa/models"], "GET", "/");
+    expect(world.body.current).toBe("zai/glm-5.3-flash");
+    expect(world.body.agentId).toBeUndefined();
+  });
+
+  it("validates thinking against the agent's effective model and catalog", async () => {
+    const { routes, deps, selection } = setup(CONFIG);
+    // The same model can have different availability for another agent.
+    deps.list.mockImplementation(async ({ agentId }: { agentId: string }) => ({
+      ...LIST,
+      models: LIST.models.map((model) => ({
+        ...model,
+        available: agentId !== "airi",
+      })),
+    }));
+    const locked = await call(routes["/kazusa/model"], "POST", "/", {
+      agentId: "airi",
+      ref: "zai/glm-5.3-flash",
+    });
+    expect(locked.status).toBe(409);
+    expect(await selection.overrides("airi")).toEqual({});
+
+    deps.list.mockImplementation(async () => LIST);
+    await selection.update({ model: "zai/glm-5.3" });
+    await selection.update({ model: "zai/glm-5.3-flash" }, "airi");
+    const set = await call(routes["/kazusa/thinking"], "POST", "/", {
+      agentId: "airi",
+      level: "low",
+    });
+    expect(set.status).toBe(200);
+    expect(ThinkingSelectResponseSchema.parse(set.body)).toEqual({
+      agentId: "airi",
+      thinking: "low",
+    });
+    const unsupported = await call(routes["/kazusa/thinking"], "POST", "/", {
+      agentId: "kazusa",
+      level: "low",
+    });
+    expect(unsupported.status).toBe(409);
+    expect(await selection.read("kazusa")).toEqual({ model: "zai/glm-5.3" });
+  });
+
+  it("clears each override independently, returning the inherited choice", async () => {
+    const { routes, selection } = setup(CONFIG);
+    await selection.update({ model: "zai/glm-5.3-flash", thinking: "low" });
+    await selection.update({ model: "zai/glm-5.3", thinking: "off" }, "airi");
+    const model = await call(routes["/kazusa/model"], "POST", "/", {
+      agentId: "airi",
+      ref: null,
+    });
+    expect(model.body).toEqual({
+      agentId: "airi",
+      current: "zai/glm-5.3-flash",
+    });
+    expect(await selection.overrides("airi")).toEqual({ thinking: "off" });
+    const thinking = await call(routes["/kazusa/thinking"], "POST", "/", {
+      agentId: "airi",
+      level: null,
+    });
+    expect(thinking.body).toEqual({ agentId: "airi", thinking: "low" });
+    expect(await selection.overrides("airi")).toEqual({});
+    const world = await call(routes["/kazusa/model"], "POST", "/", {
+      ref: null,
+    });
+    expect(world.body).toEqual({ current: "zai/glm-5.3-flash" });
+    expect(await selection.read()).toEqual({ thinking: "low" });
+  });
+
+  it("reports native per-agent primaries before any plugin choice", async () => {
+    const { routes } = setup({
+      ...CONFIG,
+      agents: {
+        ...CONFIG.agents,
+        entries: {
+          kazusa: {},
+          airi: { model: { primary: "zai/glm-5.3" } },
+        },
+      },
+    });
+    const result = await call(
+      routes["/kazusa/models"],
+      "GET",
+      "/?agentId=airi",
+    );
+    expect(result.body).toMatchObject({
+      agentId: "airi",
+      current: "zai/glm-5.3",
+      configured: "zai/glm-5.3",
+      overrides: {},
+    });
+  });
+
+  it("rejects unknown agents on every route before reading a catalog or writing", async () => {
+    const { routes, deps, selection } = setup(CONFIG);
+    const responses = [
+      await call(routes["/kazusa/models"], "GET", "/?agentId=missing"),
+      await call(routes["/kazusa/model"], "POST", "/", {
+        agentId: "missing",
+        ref: null,
+      }),
+      await call(routes["/kazusa/thinking"], "POST", "/", {
+        agentId: "missing",
+        level: null,
+      }),
+    ];
+    expect(responses.map(({ status }) => status)).toEqual([404, 404, 404]);
+    expect(deps.list).not.toHaveBeenCalled();
+    expect(await selection.read()).toEqual({});
+    expect(await selection.overrides("missing")).toEqual({});
   });
 });

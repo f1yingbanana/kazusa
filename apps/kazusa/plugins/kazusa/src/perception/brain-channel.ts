@@ -104,10 +104,10 @@ export function adoptedByBrain(
 }
 
 /**
- * Sets the brain session's reasoning level to the world's. OpenClaw has no
- * per-turn hook for it, and `agents.defaults.thinkingDefault` would sit below
- * any session level, so the session carries it. `undefined` clears it: the
- * model runs at its own default.
+ * Sets the brain session's reasoning level to the agent's selection. OpenClaw
+ * has no per-turn hook for it, and `agents.defaults.thinkingDefault` would sit
+ * below any session level, so the session carries it. `undefined` clears it:
+ * the model runs at OpenClaw's configured or provider default.
  */
 async function applyThinking(
   api: OpenClawPluginApi,
@@ -126,8 +126,8 @@ async function applyThinking(
 export function registerBrainChannel(
   api: OpenClawPluginApi,
   signal: AbortSignal,
-  /** The reasoning level every character runs at (Models). */
-  thinking?: () => Promise<ThinkingLevel | undefined>,
+  /** The effective reasoning level for this character (Models). */
+  thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>,
 ): NonNullable<PerceptionDeps["deliver"]> {
   const getConfig = () => currentConfig(api);
   api.registerChannel({ plugin: BRAIN_CHANNEL });
@@ -137,7 +137,12 @@ export function registerBrainChannel(
   ): Promise<void> => {
     signal.throwIfAborted();
     const sessionKey = brainKey(delivery.agentId);
-    if (thinking) await applyThinking(api, delivery.agentId, await thinking());
+    if (thinking)
+      await applyThinking(
+        api,
+        delivery.agentId,
+        await thinking(delivery.agentId),
+      );
     await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
       cfg: getConfig(),
       ctx: {

@@ -26,7 +26,7 @@ export function registerModels(api: OpenClawPluginApi): ModelSelectionStore {
   api.on("before_model_resolve", async (_event, ctx) => {
     const owner = parseAgentSessionKey(ctx.sessionKey ?? "");
     if (owner?.rest !== "brain") return;
-    const { model } = await selection.read();
+    const { model } = await selection.read(owner.agentId);
     const ref = model ? splitModelRef(model) : undefined;
     if (!ref) return;
     return { providerOverride: ref.provider, modelOverride: ref.model };

@@ -45,7 +45,7 @@ export function registerPerception(
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
     /** The reasoning level each brain turn runs at (Models). */
-    readonly thinking?: () => Promise<ThinkingLevel | undefined>;
+    readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
   },
 ): Perception {
   const lifetime = new AbortController();

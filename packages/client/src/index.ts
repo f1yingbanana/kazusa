@@ -327,19 +327,30 @@ export const ModelProviderStatusSchema = z.object({
 });
 export type ModelProviderStatus = z.infer<typeof ModelProviderStatusSchema>;
 
-/** GET /kazusa/models. `?refresh=1` asks providers for their catalogs again. */
+/** Sparse choices for one scope; absent fields inherit their defaults. */
+export const ModelOverridesSchema = z.object({
+  model: ModelRefSchema.optional(),
+  thinking: ThinkingLevelSchema.optional(),
+});
+export type ModelOverrides = z.infer<typeof ModelOverridesSchema>;
+
+/** GET /kazusa/models. Optional `agentId`; `refresh=1` refreshes the catalog. */
 export const ModelsResponseSchema = z.object({
+  /** Absent: world defaults. Present: this agent's effective selection. */
+  agentId: z.string().optional(),
+  /** Only the agent's explicit choices, before world defaults are applied. */
+  overrides: ModelOverridesSchema.optional(),
   /**
-   * The model every character runs on: the one picked here, else `configured`.
+   * The effective primary: agent choice, then world choice, then `configured`.
    * Kazusa applies it per turn, not through `openclaw.json`.
    */
   current: ModelRefSchema.optional(),
-  /** `agents.defaults.model.primary`, used until a model is picked. */
+  /** Native configured primary for this scope, used until a model is picked. */
   configured: ModelRefSchema.optional(),
   /**
-   * The reasoning level picked for every character. Absent: each model runs at
-   * its own default. A level the model lacks is remapped by OpenClaw to the
-   * nearest one it has.
+   * The effective reasoning choice: agent, then world. Absent: OpenClaw's
+   * default. A level the model lacks is remapped by OpenClaw to the nearest one
+   * it has.
    */
   thinking: ThinkingLevelSchema.optional(),
   models: z.array(ModelOptionSchema),
@@ -347,20 +358,28 @@ export const ModelsResponseSchema = z.object({
 });
 export type ModelsResponse = z.infer<typeof ModelsResponseSchema>;
 
-/** POST /kazusa/model. Sets the model for every character. */
-export const ModelSelectPayloadSchema = z.object({ ref: ModelRefSchema });
+/** POST /kazusa/model. Omit `agentId` for world defaults; `null` inherits. */
+export const ModelSelectPayloadSchema = z.object({
+  agentId: z.string().min(1).optional(),
+  ref: ModelRefSchema.nullable(),
+});
 export type ModelSelectPayload = z.infer<typeof ModelSelectPayloadSchema>;
 
-export const ModelSelectResponseSchema = z.object({ current: ModelRefSchema });
+export const ModelSelectResponseSchema = z.object({
+  agentId: z.string().optional(),
+  current: ModelRefSchema.optional(),
+});
 export type ModelSelectResponse = z.infer<typeof ModelSelectResponseSchema>;
 
-/** POST /kazusa/thinking. `null` goes back to each model's own default. */
+/** POST /kazusa/thinking. Omit `agentId` for world defaults; `null` inherits. */
 export const ThinkingSelectPayloadSchema = z.object({
+  agentId: z.string().min(1).optional(),
   level: ThinkingLevelSchema.nullable(),
 });
 export type ThinkingSelectPayload = z.infer<typeof ThinkingSelectPayloadSchema>;
 
 export const ThinkingSelectResponseSchema = z.object({
+  agentId: z.string().optional(),
   thinking: ThinkingLevelSchema.optional(),
 });
 export type ThinkingSelectResponse = z.infer<

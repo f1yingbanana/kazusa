@@ -1,4 +1,9 @@
-import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
+import type { ServerResponse } from "node:http";
+import {
+  listAgentIds,
+  resolveAgentConfig,
+  resolveAgentEffectiveModelPrimary,
+} from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { dispatchGatewayMethod } from "openclaw/plugin-sdk/gateway-method-runtime";
 import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
@@ -62,21 +67,10 @@ export interface ModelsDeps {
   readonly selection: ModelSelectionStore;
 }
 
-function defaultsOf(config: Config) {
-  return (
-    config as {
-      agents?: {
-        defaults?: {
-          model?: string | { primary?: string };
-          models?: Record<string, { alias?: string } | undefined>;
-        };
-      };
-    }
-  ).agents?.defaults;
-}
-
-function primaryOf(config: Config): string | undefined {
-  const model = defaultsOf(config)?.model;
+function primaryOf(config: Config, agentId?: string): string | undefined {
+  if (agentId !== undefined)
+    return resolveAgentEffectiveModelPrimary(config, agentId);
+  const model = config.agents?.defaults?.model;
   return typeof model === "string" ? model : model?.primary;
 }
 
@@ -107,7 +101,7 @@ const gatewayDeps: Omit<ModelsDeps, "selection"> = {
 };
 
 /**
- * One model and reasoning level for every character, kept in Kazusa's selection
+ * World defaults plus per-agent choices, kept in Kazusa's selection
  * (`selection.ts`) and falling back to `openclaw.json`. The catalog comes from
  * the Gateway, which discovers provider models itself, so the world config only
  * lists the shortlist (`agents.defaults.models`) by hand.
@@ -120,17 +114,38 @@ export function registerModelsHttp(
   // `models.list` is dispatched as the caller, so the Gateway must authenticate.
   const route = createRouteRegistrar(api, { auth: "gateway" });
 
-  const catalog = async (refresh: boolean): Promise<ModelsResponse> => {
+  const knownScope = (
+    agentId: string | undefined,
+    res: ServerResponse,
+  ): boolean => {
+    if (
+      agentId === undefined ||
+      listAgentIds(deps.readConfig()).includes(agentId)
+    )
+      return true;
+    sendJson(res, 404, { error: `Unknown agent: ${agentId}.` });
+    return false;
+  };
+
+  const catalog = async (
+    refresh: boolean,
+    targetId?: string,
+  ): Promise<ModelsResponse> => {
     const config = deps.readConfig();
-    // Without an agent the Gateway can't tell whose catalog to read; all
-    // characters share the defaults, so any one of them will do.
-    const [agentId] = listAgentIds(config);
+    // Agent-scoped requests must use that agent's credentials and model policy.
+    // World requests retain the first configured agent's catalog view.
+    const agentId = targetId ?? listAgentIds(config)[0];
     if (!agentId) throw new Error("No characters are configured.");
     const result = ModelsListResultSchema.parse(
       await deps.list({ agentId, refresh }),
     );
-    const shortlist = defaultsOf(config)?.models ?? {};
-    const selected = await deps.selection.read();
+    const shortlist = {
+      ...config.agents?.defaults?.models,
+      ...(targetId === undefined
+        ? {}
+        : resolveAgentConfig(config, targetId)?.models),
+    };
+    const selected = await deps.selection.read(targetId);
     const models = result.models.map((model): ModelOption => {
       const ref = `${model.provider}/${model.id}`;
       return {
@@ -150,8 +165,14 @@ export function registerModelsHttp(
       };
     });
     return {
-      current: selected.model ?? primaryOf(config),
-      configured: primaryOf(config),
+      ...(targetId === undefined
+        ? {}
+        : {
+            agentId: targetId,
+            overrides: await deps.selection.overrides(targetId),
+          }),
+      current: selected.model ?? primaryOf(config, targetId),
+      configured: primaryOf(config, targetId),
       thinking: selected.thinking,
       models,
       providers: result.providerOutcomes ?? [],
@@ -160,16 +181,33 @@ export function registerModelsHttp(
 
   route("models", "GET", async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const agentId = url.searchParams.get("agentId") ?? undefined;
+    if (!knownScope(agentId, res)) return;
     sendJson(
       res,
       200,
-      (await catalog(url.searchParams.has("refresh"))) satisfies ModelsResponse,
+      (await catalog(
+        url.searchParams.has("refresh"),
+        agentId,
+      )) satisfies ModelsResponse,
     );
   });
 
   route("model", "POST", async (req, res) => {
-    const { ref } = ModelSelectPayloadSchema.parse(await readJsonBody(req));
-    const model = (await catalog(false)).models.find(
+    const { ref, agentId } = ModelSelectPayloadSchema.parse(
+      await readJsonBody(req),
+    );
+    if (!knownScope(agentId, res)) return;
+    if (ref === null) {
+      await deps.selection.update({ model: undefined }, agentId);
+      const selected = await deps.selection.read(agentId);
+      sendJson(res, 200, {
+        ...(agentId === undefined ? {} : { agentId }),
+        current: selected.model ?? primaryOf(deps.readConfig(), agentId),
+      } satisfies ModelSelectResponse);
+      return;
+    }
+    const model = (await catalog(false, agentId)).models.find(
       (option) => option.ref === ref,
     );
     if (!model) {
@@ -182,30 +220,39 @@ export function registerModelsHttp(
       });
       return;
     }
-    await deps.selection.update({ model: ref });
-    sendJson(res, 200, { current: ref } satisfies ModelSelectResponse);
+    await deps.selection.update({ model: ref }, agentId);
+    sendJson(res, 200, {
+      ...(agentId === undefined ? {} : { agentId }),
+      current: ref,
+    } satisfies ModelSelectResponse);
   });
 
   route("thinking", "POST", async (req, res) => {
-    const { level } = ThinkingSelectPayloadSchema.parse(
+    const { level, agentId } = ThinkingSelectPayloadSchema.parse(
       await readJsonBody(req),
     );
+    if (!knownScope(agentId, res)) return;
     if (level) {
-      const { current, models } = await catalog(false);
+      const { current, models } = await catalog(false, agentId);
       const model = models.find((option) => option.ref === current);
-      if (
-        model &&
-        !model.thinkingLevels.some((option) => option.id === level)
-      ) {
+      if (!model) {
+        sendJson(res, 409, {
+          error: "The current model isn't in this agent's catalog.",
+        });
+        return;
+      }
+      if (!model.thinkingLevels.some((option) => option.id === level)) {
         sendJson(res, 409, {
           error: `${model.alias ?? model.name} can't think at "${level}".`,
         });
         return;
       }
     }
-    await deps.selection.update({ thinking: level ?? undefined });
+    await deps.selection.update({ thinking: level ?? undefined }, agentId);
+    const selected = await deps.selection.read(agentId);
     sendJson(res, 200, {
-      ...(level ? { thinking: level } : {}),
+      ...(agentId === undefined ? {} : { agentId }),
+      ...(selected.thinking ? { thinking: selected.thinking } : {}),
     } satisfies ThinkingSelectResponse);
   });
 }
