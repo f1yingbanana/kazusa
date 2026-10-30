@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { registerBrainChannel } from "./brain-channel.ts";
 import type { PerceptionDelivery } from "./perception.ts";
+import type { ThinkingLevel } from "@kazusa/client";
 
 const delivery: PerceptionDelivery = {
   id: "d1",
@@ -17,7 +18,10 @@ const lifecycle = { onAdopted: async () => {} } as unknown as Parameters<
   ReturnType<typeof registerBrainChannel>
 >[1];
 
-function setup(dispatch: ReturnType<typeof vi.fn>) {
+function setup(
+  dispatch: ReturnType<typeof vi.fn>,
+  thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>,
+) {
   const patchSessionEntry = vi.fn(
     async (params: { update: (entry: Record<string, unknown>) => unknown }) => {
       patches.push(
@@ -47,7 +51,7 @@ function setup(dispatch: ReturnType<typeof vi.fn>) {
     runtime: { ...api.runtime, config: { current: () => api.config } },
   });
   return {
-    deliver: registerBrainChannel(api, new AbortController().signal),
+    deliver: registerBrainChannel(api, new AbortController().signal, thinking),
     patchSessionEntry,
     patches,
   };
@@ -90,5 +94,34 @@ describe("brain channel", () => {
     const h = setup(dispatch);
     await expect(h.deliver(delivery, lifecycle)).rejects.toThrow("offline");
     expect(h.patchSessionEntry).not.toHaveBeenCalled();
+  });
+
+  it("applies and clears thinking on the delivering agent's own brain", async () => {
+    const thinking = vi.fn(
+      async (agentId: string): Promise<ThinkingLevel | undefined> =>
+        agentId === "alice" ? "high" : undefined,
+    );
+    const h = setup(vi.fn().mockResolvedValue(undefined), thinking);
+    await h.deliver(delivery, lifecycle);
+    await h.deliver({ ...delivery, agentId: "bob" }, lifecycle);
+    expect(thinking.mock.calls).toEqual([["alice"], ["bob"]]);
+    expect(h.patchSessionEntry.mock.calls.map(([params]) => params)).toEqual([
+      expect.objectContaining({
+        agentId: "alice",
+        sessionKey: "agent:alice:brain",
+        preserveActivity: true,
+      }),
+      expect.objectContaining({
+        agentId: "bob",
+        sessionKey: "agent:bob:brain",
+        preserveActivity: true,
+      }),
+    ]);
+    expect(h.patches).toEqual([{ thinkingLevel: "high" }, null]);
+    // A previously explicit level is removed when the effective choice clears.
+    const update = h.patchSessionEntry.mock.calls[1]?.[0].update;
+    expect(update?.({ thinkingLevel: "high" })).toEqual({
+      thinkingLevel: undefined,
+    });
   });
 });

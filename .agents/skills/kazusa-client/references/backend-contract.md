@@ -109,20 +109,40 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 
 ### Built: models
 
-| Route                   | Request / response                                                                                                                                                                                                                                         | Backed by                                                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /kazusa/models`    | `ModelsResponse = { current?, configured?, thinking?, models: ModelOption[], providers: ModelProviderStatus[] }`. `current` is the picked model, else `configured` (`agents.defaults.model.primary`). `?refresh=1` asks providers for their catalogs again | Gateway `models.list` (`view: "default"`, first agent) + `agents.defaults.models` + the `"models"` store (`src/models/http.ts`) |
-| `POST /kazusa/model`    | `ModelSelectPayload = { ref }` → `ModelSelectResponse = { current }`. 404 for a ref outside the catalog, 409 for one without working credentials                                                                                                           | `"models"` store, key `world`: `{ model?, thinking? }` (`src/models/selection.ts`)                                              |
-| `POST /kazusa/thinking` | `ThinkingSelectPayload = { level: ThinkingLevel \| null }` → `ThinkingSelectResponse = { thinking? }`. `null` clears it; 409 for a level the current model lacks                                                                                           | Same record                                                                                                                     |
+| Route                   | Request / response                                                                                                                                                                                                                                                               | Backed by                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /kazusa/models`    | Optional `agentId` and `refresh=1` query parameters. Returns `{ agentId?, overrides?: { model?, thinking? }, current?, configured?, thinking?, models, providers }`. `current` and `thinking` are effective choices; `configured` is the native primary for the requested scope. | Gateway `models.list` (`view: "default"`, requested agent or first agent for world requests), config shortlists, and `"models"` store |
+| `POST /kazusa/model`    | `{ agentId?, ref: string \| null }` → `{ agentId?, current? }`. `null` clears this scope's choice. 404 for unknown agents or refs outside the target catalog; 409 for unavailable models.                                                                                        | `"models"` store, key `world` or `agent:<id>`: `{ model?, thinking? }`                                                                |
+| `POST /kazusa/thinking` | `{ agentId?, level: ThinkingLevel \| null }` → `{ agentId?, thinking? }`. `null` clears this scope's choice. 404 for unknown agents; 409 for a level the effective model lacks, or an effective model outside the target catalog.                                                | Same record                                                                                                                           |
 
 All three routes register with `auth: "gateway"` (the Gateway checks the bearer
 token) because they dispatch `models.list` as the caller through
 `gateway-method-runtime`, which the manifest allows with
 `contracts.gatewayMethodDispatch: ["authenticated-request"]`.
 
-One model and one reasoning level for every character, stored together. The
-catalog is discovered by the provider plugins (OpenRouter and Venice list their
-models themselves), so the world config only pins a shortlist in
+Each field resolves independently: **agent choice → world choice → native
+OpenClaw default**. Omit `agentId` to read or change world defaults. An agent
+record contains only explicit choices; clearing either field inherits the world
+value again, and clearing a world field returns to native defaults. `overrides`
+appears only on agent reads so a future UI can distinguish inherited values from
+explicit choices. For example:
+
+```text
+GET  /kazusa/models?agentId=airi-kurimura
+POST /kazusa/model     { "agentId": "airi-kurimura", "ref": "venice/qwen3-235b-a22b-thinking-2507" }
+POST /kazusa/thinking  { "agentId": "airi-kurimura", "level": "high" }
+POST /kazusa/model     { "agentId": "airi-kurimura", "ref": null }
+```
+
+Agent requests use that agent's catalog, credentials, and model policy, and
+merge its configured shortlist with the world shortlist. Writes are serialized
+per scope across plugin registrations so concurrent model/thinking updates do
+not overwrite each other. The existing Next proxy already forwards these paths,
+query parameters, and bodies. The frontend still uses world requests; per-agent
+UI controls are not implemented.
+
+The catalog is discovered by the provider plugins (OpenRouter and Venice list
+their models themselves), so the world config only pins a shortlist in
 `agents.defaults.models` (shown as "Pinned", with its `alias` as the display
 name). OpenClaw only prepares the catalogs of providers that a config model ref
 names, so each provider needs at least one pinned model before its other models
@@ -141,25 +161,27 @@ of stalled requests and brief 401s, measured 2026-10-29. `/model -g`,
 Per-session overrides (`/model -s`, `sessions.patch`) avoid the reload but would
 have to follow every session of every character.
 
-So Kazusa keeps the pick in its own `"models"` store and applies it to the one
-session where character turns reach a model, `agent:<id>:brain` (Perception
+So Kazusa keeps the choices in its own `"models"` store and applies them to the
+one session where character turns reach a model, `agent:<id>:brain` (Perception
 handles cron wakes and other sessions without a model call):
 
-- Model: the `before_model_resolve` hook returns `providerOverride` /
-  `modelOverride` for brain sessions (`src/models/register.ts`). It needs
+- Model: the `before_model_resolve` hook resolves the brain session's agent and
+  returns its effective `providerOverride` / `modelOverride`
+  (`src/models/register.ts`). It needs
   `plugins.entries.kazusa.hooks.allowConversationAccess`.
 - Reasoning: OpenClaw has no per-turn hook for it, so the brain channel writes
-  `thinkingLevel` onto the brain session before each dispatch
-  (`registerBrainChannel`). Clearing it lets each model run at its own default.
-  A level the model lacks is remapped by OpenClaw to its nearest one.
+  the target agent's effective `thinkingLevel` onto its brain session before
+  each dispatch (`registerBrainChannel`). Without a world or agent choice,
+  clearing the session field restores OpenClaw's configured/provider default. A
+  level the model lacks is remapped by OpenClaw to its nearest one.
 
 Consequences to design around:
 
 - OpenClaw's own surfaces (`openclaw models status`, the Control UI default)
   still show `configured`. The picker's tooltip names it when they differ.
 - A turn already running finishes on the old model and level.
-- `openclaw.json` is never written by the picker, so it needs no prettier pass,
-  and editing `primary` by hand only matters while nothing is picked.
+- `openclaw.json` is never written by these routes. Editing a native primary
+  only affects agents without an agent or world model choice.
 - Each `ModelOption` carries the model's own `thinkingLevels` (OpenClaw's
   `/think` ladder minus `ultra`, a harness mode rather than an effort; provider
   labels: Z.AI calls `low` "on") and its `thinkingDefault`. Do not set

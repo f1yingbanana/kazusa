@@ -1,10 +1,10 @@
 import type { ThinkingLevel } from "@kazusa/client";
+import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
 import type { StateStore } from "../state.ts";
 
 /**
- * The model and reasoning level every character runs on. Unset fields fall back
- * to `openclaw.json`: `agents.defaults.model.primary` for the model, and each
- * model's own default for reasoning.
+ * Sparse model and reasoning choices for the world or one agent. Agent fields
+ * inherit the world's choices, then OpenClaw's native defaults.
  *
  * This lives in plugin state rather than `openclaw.json` because OpenClaw
  * treats any change to a configured model ref as a provider change and reloads
@@ -17,31 +17,53 @@ export interface ModelSelection {
   readonly thinking?: ThinkingLevel;
 }
 
-const KEY = "world";
+const WORLD_KEY = "world";
+const scopeKey = (agentId?: string): string =>
+  agentId === undefined ? WORLD_KEY : `agent:${agentId}`;
+
+// Plugin registrations share the retained store, so serialize their patches too.
+const QUEUE = Symbol.for("kazusa.models.serial");
+function sharedQueue(): KeyedAsyncQueue {
+  const scope = globalThis as { [QUEUE]?: KeyedAsyncQueue };
+  return (scope[QUEUE] ??= new KeyedAsyncQueue());
+}
 
 export interface ModelSelectionStore {
-  readonly read: () => Promise<ModelSelection>;
+  readonly read: (agentId?: string) => Promise<ModelSelection>;
+  /** This agent's explicit choices, without inherited world values. */
+  readonly overrides: (agentId: string) => Promise<ModelSelection>;
   /** Merges `patch`; an `undefined` field goes back to its fallback. */
-  readonly update: (patch: ModelSelection) => Promise<ModelSelection>;
+  readonly update: (
+    patch: ModelSelection,
+    agentId?: string,
+  ) => Promise<ModelSelection>;
 }
 
 export function createModelSelection(
   store: StateStore<ModelSelection>,
 ): ModelSelectionStore {
-  const read = async (): Promise<ModelSelection> =>
-    (await store.lookup(KEY)) ?? {};
+  const own = async (agentId?: string): Promise<ModelSelection> =>
+    (await store.lookup(scopeKey(agentId))) ?? {};
+  const read = async (agentId?: string): Promise<ModelSelection> => {
+    const world = await own();
+    return agentId === undefined
+      ? world
+      : { ...world, ...(await own(agentId)) };
+  };
   return {
     read,
-    update: async (patch) => {
-      const merged = { ...(await read()), ...patch };
-      // Drop cleared fields so the record says only what was chosen.
-      const next: ModelSelection = {
-        ...(merged.model ? { model: merged.model } : {}),
-        ...(merged.thinking ? { thinking: merged.thinking } : {}),
-      };
-      await store.register(KEY, next);
-      return next;
-    },
+    overrides: own,
+    update: (patch, agentId) =>
+      sharedQueue().enqueue(scopeKey(agentId), async () => {
+        const merged = { ...(await own(agentId)), ...patch };
+        // Drop cleared fields so the record says only what was chosen.
+        const next: ModelSelection = {
+          ...(merged.model ? { model: merged.model } : {}),
+          ...(merged.thinking ? { thinking: merged.thinking } : {}),
+        };
+        await store.register(scopeKey(agentId), next);
+        return next;
+      }),
   };
 }
 

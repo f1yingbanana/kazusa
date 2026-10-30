@@ -5,7 +5,10 @@ import type { ModelSelection } from "./selection.ts";
 
 type Hook = (event: unknown, ctx: { sessionKey?: string }) => Promise<unknown>;
 
-function setup(selected: ModelSelection) {
+function setup(
+  selected: ModelSelection,
+  agents: Record<string, ModelSelection> = {},
+) {
   const hooks: Record<string, Hook> = {};
   const api = {
     config: {},
@@ -16,7 +19,8 @@ function setup(selected: ModelSelection) {
     runtime: {
       state: {
         openKeyedStore: () => ({
-          lookup: async () => selected,
+          lookup: async (key: string) =>
+            key === "world" ? selected : agents[key],
           register: vi.fn(),
           entries: async () => [],
         }),
@@ -47,5 +51,22 @@ describe("registerModels", () => {
     expect(
       await unpicked({ prompt: "" }, { sessionKey: "agent:airi:brain" }),
     ).toBeUndefined();
+  });
+
+  it("resolves the brain's owner independently of other agents", async () => {
+    const hook = setup(
+      { model: "venice/qwen3" },
+      {
+        "agent:airi": { model: "openrouter/anthropic/claude-opus" },
+      },
+    );
+    expect(await hook({}, { sessionKey: "agent:airi:brain" })).toEqual({
+      providerOverride: "openrouter",
+      modelOverride: "anthropic/claude-opus",
+    });
+    expect(await hook({}, { sessionKey: "agent:kazusa:brain" })).toEqual({
+      providerOverride: "venice",
+      modelOverride: "qwen3",
+    });
   });
 });

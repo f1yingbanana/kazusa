@@ -117,7 +117,7 @@ export default definePluginEntry({
       onDeadline: location.settle,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
-      thinking: async () => (await models.read()).thinking,
+      thinking: async (agentId) => (await models.read(agentId)).thinking,
     });
     location.attachPerception(perception);
 
