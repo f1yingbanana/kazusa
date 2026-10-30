@@ -3,8 +3,7 @@ import type {
   MessagesResponse,
   TypingStreamEvent,
 } from "@kazusa/client";
-import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guards";
-import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
+import { KeyedAsyncQueue, OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { sleepSim, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
 import type { CurrentSpeech } from "../perception/types.ts";
@@ -16,7 +15,6 @@ import {
   SPEECH_REQUEST,
   bubbleOf,
   readAs,
-  splitFaceToFace,
   MANAGE_CHAT,
   PARTICIPANT_ID,
   chatSummary,
@@ -183,6 +181,7 @@ function isDeliverySettled(delivery: MessageDelivery): boolean {
 }
 
 export interface MessagingDeps {
+  readonly api: OpenClawPluginApi;
   readonly store: StateStore<MessageDelivery>;
   readonly conversations: StateStore<ChatConversation>;
   readonly outbox: RemovableStateStore<OutboxPlan>;
@@ -570,7 +569,7 @@ export class Messaging {
         existing.creationFingerprint !== creationFingerprint
       )
         throw new Error(
-          "Host tool call already belongs to a different chat creation.",
+          "Request ID already belongs to a different chat creation.",
         );
       if (!existing.members.includes(sender))
         throw new Error("You are no longer a member of this chat.");
@@ -1070,15 +1069,13 @@ export class Messaging {
       this.assertCurrent();
       assertInvocationCurrent?.();
       // Settled messages leave RAM, not history. Always consult the canonical
-      // record before accepting a host replay with today's membership/time.
+      // record before retrying a delivery with today's membership/time.
       let delivery =
         this.deliveries.get(id) ?? (await this.deps.store.lookup(id));
       let chat: ChatConversation | undefined;
       if (delivery) {
         if (JSON.stringify(delivery.params) !== JSON.stringify(params)) {
-          throw new Error(
-            "Host tool call already belongs to a different message.",
-          );
+          throw new Error("Request ID already belongs to a different message.");
         }
         chat = this.chats.get(delivery.chatId);
       } else {
@@ -1134,6 +1131,7 @@ export class Messaging {
     assertInvocationCurrent?: () => void,
     configuredAgents?: ReadonlySet<string>,
     systemAgentId?: string,
+    abortSignal?: AbortSignal,
   ): Promise<SpeechResult> {
     PARTICIPANT_ID.parse(sender);
     const params = SPEECH_REQUEST.parse(input);
@@ -1148,6 +1146,7 @@ export class Messaging {
       assertInvocationCurrent,
       configuredAgents,
       systemAgentId,
+      abortSignal,
     );
   }
 
@@ -1162,6 +1161,7 @@ export class Messaging {
     assertInvocationCurrent?: () => void,
     configuredAgents?: ReadonlySet<string>,
     systemAgentId?: string,
+    abortSignal?: AbortSignal,
   ): Promise<SpeechResult> {
     const { sender, senderName, params } = plan;
     const { messages, requestId, ...target } = params;
@@ -1173,12 +1173,8 @@ export class Messaging {
       Boolean(target.sessionKey?.match(/(?:^|:)chat:huddle:/));
     const bubbles = messages.flatMap((bubble, at) => {
       const typed = bubbleOf(bubble);
-      const pieces = inPlace
-        ? splitFaceToFace(typed)
-        : typed.type === "action"
-          ? []
-          : [typed];
-      // The first piece keeps the bubble's own identity; later ones extend it.
+      const pieces = !inPlace && typed.type === "action" ? [] : [typed];
+      // Message type is authoritative; Markdown never changes speech into actions.
       return pieces.map((piece, part) => ({
         index: part === 0 ? String(at) : `${at}.${part}`,
         ...piece,
@@ -1194,6 +1190,7 @@ export class Messaging {
     const signal = AbortSignal.any([
       speech.controller.signal,
       this.lifetime.signal,
+      ...(abortSignal ? [abortSignal] : []),
     ]);
     const sent: SendMessageResult[] = [];
     let paced = live;
@@ -1276,7 +1273,8 @@ export class Messaging {
         speech.sessionKey = sent[0].sessionKey;
       }
     } catch (error) {
-      if (!speech.controller.signal.aborted) throw error;
+      if (!speech.controller.signal.aborted && !abortSignal?.aborted)
+        throw error;
     } finally {
       try {
         // Keep the plan only for a later generation to flush; forget it before
@@ -1544,7 +1542,11 @@ export class Messaging {
         // Retain an independent host scope before the HTTP/tool caller returns.
         // Perception may dispatch a reply which sends again: never await that
         // work from send() or while holding the ledger/state queue.
-        void runDetachedWebhookWork(() => this.notifyCopy(delivery, copy))
+        if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
+          throw new Error("runInBackgroundContext not available");
+        }
+        void this.deps.api.lifecycle
+          ?.runInBackgroundContext?.(() => this.notifyCopy(delivery, copy))
           .catch((error: unknown) => this.warn(error))
           .finally(() => {
             this.notifying.delete(key);
@@ -1595,9 +1597,9 @@ export class Messaging {
     if (!pending) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void runDetachedWebhookWork(() => this.resume()).catch((error: unknown) =>
-        this.warn(error),
-      );
+      void this.deps.api.lifecycle
+        ?.runInBackgroundContext?.(() => this.resume())
+        .catch((error: unknown) => this.warn(error));
     }, 1000);
     this.timer.unref();
   }

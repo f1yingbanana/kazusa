@@ -12,10 +12,6 @@ vi.mock("openclaw/plugin-sdk/core", () => ({
   buildMemorySystemPromptAddition: vi.fn(
     () => "Use memory_search for older memories.",
   ),
-  delegateCompactionToRuntime: vi.fn(async () => ({
-    ok: true,
-    compacted: false,
-  })),
 }));
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
@@ -122,6 +118,30 @@ async function setup(
 }
 
 describe("Native context-engine registration", () => {
+  it.each(["preflight_required", "manual", "context_overflow"])(
+    "owns context management and skips %s compaction without accessing ledgers",
+    async (forceReason) => {
+      const { engine, service, readHistory, lookupTask } = await setup();
+      expect(engine.info.ownsCompaction).toBe(true);
+      const result = await engine.compact({
+        sessionId: "brain",
+        sessionKey: "agent:alice:brain",
+        tokenBudget: 1_000,
+        currentTokenCount: 100_000,
+        force: true,
+        runtimeContext: { forceReason },
+      });
+      expect(result).toEqual({
+        ok: true,
+        compacted: false,
+        reason: "Nothing to compact: Kazusa selects context during assembly.",
+      });
+      expect(readHistory).not.toHaveBeenCalled();
+      expect(lookupTask).not.toHaveBeenCalled();
+      expect(await service.recentContexts("alice")).toEqual([]);
+    },
+  );
+
   it("retrieves the character's dated relationship card from the pending perception", async () => {
     const workspace = await fs.mkdtemp(
       path.join(os.tmpdir(), "kazusa-brain-context-"),
@@ -416,10 +436,10 @@ describe("Native context-engine registration", () => {
       sessionKey: "agent:alice:brain",
       messages: [],
       prompt:
-        "Incoming interrupt. [kazusa:skill=task-lifecycle] [kazusa:skill=../../secret]",
+        "Incoming interrupt. [kazusa:skill=task-lifecycle] [kazusa:skill=../../untrusted_skill_marker_f13f]",
     });
     expect(result.systemPromptAddition).toContain("# Kazusa Task Interrupt");
-    expect(result.systemPromptAddition).not.toContain("secret");
+    expect(result.systemPromptAddition).not.toContain("untrusted_skill_marker_f13f");
     expect(result.systemPromptAddition).not.toContain(
       "# Kazusa Task Lifecycle",
     );

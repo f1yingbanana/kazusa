@@ -30,13 +30,26 @@ const LIST = {
       thinkingDefault: "off",
       tags: ["default", "configured"],
     },
-    { id: "glm-5.3", name: "GLM-5.3", provider: "zai", available: true },
+    {
+      id: "glm-5.3",
+      name: "GLM-5.3",
+      provider: "zai",
+      available: true,
+      supportsTools: true,
+    },
     {
       id: "anthropic/claude-opus",
       name: "Claude Opus",
       provider: "openrouter",
       available: false,
       unavailableReason: "missing-auth",
+    },
+    {
+      id: "hermes-3",
+      name: "Hermes 3",
+      provider: "venice",
+      available: true,
+      supportsTools: false,
     },
   ],
   providerOutcomes: [{ provider: "zai", status: "ready" }],
@@ -174,6 +187,23 @@ describe("registerModelsHttp", () => {
     });
     expect(locked.status).toBe(409);
     expect(locked.body.error).toContain("missing-auth");
+    expect(await selection.read()).toEqual({});
+  });
+
+  it("leaves out models that can't call tools, for every scope", async () => {
+    const { routes, selection } = setup(CONFIG);
+    for (const url of ["/", "/?agentId=airi"]) {
+      const { body } = await call(routes["/kazusa/models"], "GET", url);
+      const refs = ModelsResponseSchema.parse(body).models.map(
+        (model) => model.ref,
+      );
+      expect(refs).toContain("zai/glm-5.3");
+      expect(refs).not.toContain("venice/hermes-3");
+    }
+    const picked = await call(routes["/kazusa/model"], "POST", "/", {
+      ref: "venice/hermes-3",
+    });
+    expect(picked.status).toBe(404);
     expect(await selection.read()).toEqual({});
   });
 

@@ -28,7 +28,10 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
     on,
     registerChannel,
     logger: { info: vi.fn(), warn: vi.fn() },
-    lifecycle: { onDispose: dispose },
+    lifecycle: {
+      onDispose: dispose,
+      runInBackgroundContext: <T>(run: () => T): T => run(),
+    },
     agent: { events: { registerAgentEventSubscription: subscription } },
     runtime: {
       channel: {
@@ -245,7 +248,10 @@ describe("Perception host integration", () => {
       on: vi.fn(),
       registerChannel: vi.fn(),
       logger: { info: vi.fn(), warn: vi.fn() },
-      lifecycle: { onDispose: vi.fn() },
+      lifecycle: {
+        onDispose: vi.fn(),
+        runInBackgroundContext: <T>(run: () => T): T => run(),
+      },
       agent: { events: { registerAgentEventSubscription: vi.fn() } },
       runtime: {
         channel: {

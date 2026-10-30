@@ -59,6 +59,11 @@ function setup(
   const publish = vi.fn(async () => {});
   const warn = vi.fn();
   const messaging = new Messaging({
+    api: {
+      lifecycle: {
+        runInBackgroundContext: async (run: () => Promise<unknown>) => run(),
+      },
+    } as unknown as import("openclaw/plugin-sdk/core").OpenClawPluginApi,
     ...(state ? { state } : {}),
     store: {
       lookup: async (key) => structuredClone(retained.get(key)),
@@ -1147,6 +1152,39 @@ describe("paced speech", () => {
     expect(h.messaging.interrupt("alice")).toBe(false);
   });
 
+  it("cancels remaining bubbles immediately when the native run aborts on a paused clock", async () => {
+    const gateway = new AbortController();
+    const invocation = new AbortController();
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      gateway.signal,
+    );
+    const pending = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["One", "Two"]),
+      undefined,
+      undefined,
+      undefined,
+      invocation.signal,
+    );
+    await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
+    invocation.abort(new Error("Operator stopped run"));
+    expect(await pending).toMatchObject({
+      status: "interrupted",
+      said: ["One"],
+      unsaid: ["Two"],
+    });
+    expect(texts(h.retained)).toEqual(["One"]);
+    expect(h.outbox.size).toBe(0);
+    expect(await h.messaging.getTyping("bob")).toEqual([]);
+  });
+
   it("holds the next bubble while the world is paused, and goes on when it runs", async () => {
     // Live: paused mid-meeting, every bubble went out at once and four
     // characters talked a hundred lines at one sim instant.
@@ -1389,7 +1427,7 @@ describe("huddles", () => {
       ],
     });
     expect(face.said).toEqual([
-      "*sets the textbook on the desk*",
+      "[type=action] sets the textbook on the desk",
       "Here you go.",
     ]);
     const stored = [...h.retained.values()].sort(
@@ -1403,7 +1441,9 @@ describe("huddles", () => {
     await vi.waitFor(() =>
       expect(h.receive).toHaveBeenCalledWith(
         "bob",
-        expect.objectContaining({ text: "*sets the textbook on the desk*" }),
+        expect.objectContaining({
+          text: "[type=action] sets the textbook on the desk",
+        }),
       ),
     );
     expect(clientMessage(stored[0])).toMatchObject({
@@ -1421,33 +1461,38 @@ describe("huddles", () => {
     expect(h.retained.size).toBe(3);
   });
 
-  it("splits starred gestures from words face to face, and leaves texts as typed", async () => {
-    // Live: "*pushes the cafe door open* Ahh~ warm sugar air…" sent as one
-    // action, read back as "**pushes … *".
+  it("preserves emphasis as speech and trusts explicit action types face to face", async () => {
     const h = setup();
     h.places.set("alice", "club").set("bob", "club");
     const face = await h.messaging.speak("alice", "ALICE", {
-      requestId: "mixed",
+      requestId: "typed",
       members: ["bob"],
       aloud: true,
       messages: [
-        { text: "*pushes the door open* Warm in here!", type: "action" },
-        "*sits down* Okay. *sighs*",
+        "I *really* mean it",
+        "That is **important**!",
+        { text: "sets down the book", type: "action" },
       ],
     });
     expect(face.said).toEqual([
-      "*pushes the door open*",
-      "Warm in here!",
-      "*sits down*",
-      "Okay.",
-      "*sighs*",
+      "I *really* mean it",
+      "That is **important**!",
+      "[type=action] sets down the book",
     ]);
-    const text = await h.messaging.speak("alice", "ALICE", {
-      requestId: "texted",
-      members: ["bob"],
-      messages: ["*hugs* see you"],
-    });
-    expect(text.said).toEqual(["*hugs* see you"]);
+    const delivered = [...h.retained.values()].filter(
+      (message) => message.sender === "alice",
+    );
+    expect(delivered.map(clientMessage)).toMatchObject([
+      { text: "I *really* mean it" },
+      { text: "That is **important**!" },
+      { text: "sets down the book", type: "action" },
+    ]);
+    expect(
+      delivered
+        .slice(0, 2)
+        .map(clientMessage)
+        .every((message) => message.type !== "action"),
+    ).toBe(true);
   });
 
   it("starts a huddle only with people where the speaker is", async () => {
@@ -1556,7 +1601,7 @@ describe("huddles", () => {
       expect(h.receive).toHaveBeenCalledWith(
         "alice",
         expect.objectContaining({
-          text: "*leaves, heading toward Main Gate*",
+          text: "[type=action] leaves, heading toward Main Gate",
         }),
       ),
     );
@@ -1587,7 +1632,9 @@ describe("huddles", () => {
     await vi.waitFor(() =>
       expect(h.receive).toHaveBeenCalledWith(
         "alice",
-        expect.objectContaining({ text: "*moves to another conversation*" }),
+        expect.objectContaining({
+          text: "[type=action] moves to another conversation",
+        }),
       ),
     );
     await expect(

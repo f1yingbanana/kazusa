@@ -1,10 +1,12 @@
 import {
+  BrainAbortResponseSchema,
+  type BrainAbortResponse,
   CharacterDetailResponseSchema,
   CharactersResponseSchema,
   type CharacterDetail,
   type CharacterSummary,
 } from "@kazusa/client";
-import { buildUrl, request } from "../http";
+import { buildUrl, request, postJson } from "../http";
 
 export async function fetchCharacters(
   baseUrl: string,
@@ -29,4 +31,19 @@ export async function fetchCharacterDetail(
     token,
   );
   return CharacterDetailResponseSchema.parse(data).character;
+}
+
+/** Stop current generation; delivered messages and pending input are retained. */
+export async function abortCharacterBrain(
+  baseUrl: string,
+  agentId: string,
+  token?: string,
+): Promise<BrainAbortResponse> {
+  return BrainAbortResponseSchema.parse(
+    await postJson<unknown>(
+      buildUrl(baseUrl, "/kazusa/brain/abort"),
+      { agentId },
+      token,
+    ),
+  );
 }

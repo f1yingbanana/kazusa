@@ -232,8 +232,11 @@ connect these modules in process.
   belongs in keyed stores.
 - **Timers keep their creator's async context**: a `setTimeout` armed inside a
   tool call runs later "inside" that call (OpenClaw then treats its work as the
-  tool's). Wrap callbacks in a context captured at module load
-  (`AsyncLocalStorage.snapshot()`, Perception's `outsideCallers`).
+  tool's). Use the owning instance's native
+  `api.lifecycle.runInBackgroundContext` for background callbacks; compose it
+  with `runDetachedWebhookWork` for Gateway work that outlives ingress
+  (`src/background-work.ts`). Never capture a module-load async snapshot:
+  plugins can load inside a request, preserving its expired caller authority.
 - **A paused clock freezes the world.** Perception judges and hands over nothing
   while the clock is stopped (`drainState` returns early; `resume()` runs on the
   clock's restart, from a listener owned by the first registration: a per-turn
@@ -375,10 +378,10 @@ connect these modules in process.
   token bloat. Character workspaces must strictly contain only identity
   (`SOUL.md`, `IDENTITY.md`), qualitative memory (`MEMORY.md`), and subjective
   wiki entries (`wiki/`).
-- Retains recent complete brain turns (`recentBrainHistory`, bounded by
-  `brainMaxTokens`, default 2000; can be set to 0 for pure ledger runs) to
-  guarantee tool-call/result atomicity & error recovery, in-flight steering
-  boundary preservation, and reasoning continuity.
+- Always retains the run in progress whole (`recentBrainHistory`), plus recent
+  complete earlier turns (bounded by `brainMaxTokens`, default 2000; can be set
+  to 0 for pure ledger runs) to guarantee tool-call/result atomicity & error
+  recovery, in-flight steering boundary preservation, and reasoning continuity.
 - Uses native `readSessionTranscriptCatalogPage` in newest-first pages of up to
   200 items, stopping at the simulation-time cutoff. There is no total message
   count cap. Skip undated/invalid timestamps; empty pages with a continuation
@@ -421,9 +424,11 @@ connect these modules in process.
   facts (default maximum three cards / 1200 tokens). Only the owner's wiki is
   eligible. Reuse native workspace bootstrap; keep generic assistant outreach
   instructions and stale machine-state tables out of character workspace files.
-- Uses OpenClaw's native token estimator. Proactive compaction is disabled;
-  manual/overflow recovery still delegates to OpenClaw. Windowing is not
-  summarization and never deletes ledger history.
+- Uses OpenClaw's native token estimator and owns context management
+  (`ownsCompaction: true`). Assembly windows original records; `compact()`
+  returns a benign "Nothing to compact" skip for preflight, manual and overflow
+  requests. Never delegate to runtime summarization or report a fabricated token
+  reduction. Windowing never deletes ledger history.
 - Chat keys distinguish `agent:<id>:chat:direct:<peer-id>` from
   `agent:<id>:chat:group:<group-id>`. Read only the owner's streams.
 - **State-selected character skills**: Always inject the full body of
@@ -842,8 +847,10 @@ connect these modules in process.
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
   Only the system console selects `full` with its explicit admin allowlist:
-  character tools, web search/fetch, workspace-only patches, and clock controls.
-  Shell execution, code execution and `openclaw` delegation are denied; native
+  character tools, `ls`, web search/fetch, workspace-only patches, and clock
+  controls. Her runs have their own limits (`perception.systemAgent`). For every
+  character, near the limits only `send_message` still runs, so a run can report
+  before it ends. Shell execution, code execution and `openclaw` delegation are denied; native
   `cwd` selects `apps/kazusa` for coding while identity/memory remain in her
   character workspace. File tools enforce that coding directory. Its `.agents`
   workspace symlink exposes these architecture guides without adding a
@@ -852,10 +859,11 @@ connect these modules in process.
   Perception admits its input immediately, even paused; Messaging uses wall-time
   pacing, and its message, chat-management and task tools skip the pause wait.
   Simulation time, task deadlines and ordinary characters remain frozen.
-  Offstage and custody gates still apply. See
-  [ARONA administration](../../../apps/kazusa/docs/arona-admin.md) for
-  coordinated database repair, her prompt-governed location boundary, and native
-  roster refresh. Retained consumers use the host-injected
+  Offstage and custody gates still apply. How she works is in her `SOUL.md`; the
+  common jobs (characters, wikis, places) are the `world-building` skill in her
+  workspace (`workspaces/arona/skills/`), selected by her per-agent `skills`.
+  That folder is the one exception to what a character workspace holds. Retained
+  consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
   agent/identity/workspace lookups. Character and agent roster responses expose
   `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World

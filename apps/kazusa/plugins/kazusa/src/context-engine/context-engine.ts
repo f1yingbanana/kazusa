@@ -17,40 +17,82 @@ import {
 type Message = Parameters<ContextEngine["assemble"]>[0]["messages"][number];
 
 /** Keep whole prior turns so trimming cannot orphan a tool call or result. */
-function recentBrainHistory(messages: Message[], budget: number): Message[] {
-  const boundaries = new Set<number>();
-  const pending = new Set<string>();
+const FORGOTTEN_RESULT =
+  "[You no longer have this result in mind. Look again if you still need it.]";
+
+function callsTools(message: Message): boolean {
+  return (
+    message.role === "assistant" &&
+    Array.isArray(message.content) &&
+    message.content.some((block) => block.type === "toolCall")
+  );
+}
+
+/**
+ * The run in progress, then earlier whole turns within `budget`. A model has
+ * nothing else to remember its own tool results by, so the run is never cut by
+ * `budget`: only when it outgrows `capacity` do its oldest results go.
+ */
+function recentBrainHistory(
+  messages: Message[],
+  budget: number,
+  capacity: number,
+): Message[] {
+  // A run ends with an assistant message that calls no tools. One cut off by
+  // the run limits has none, so the next run continues from what it did.
+  const runStart =
+    messages.findLastIndex(
+      (message) => message.role === "assistant" && !callsTools(message),
+    ) + 1;
+  let runTokens = messages
+    .slice(runStart)
+    .reduce((sum, message) => sum + estimateTokens(message), 0);
+  const run = messages.slice(runStart).map((message): Message => {
+    if (runTokens <= capacity || message.role !== "toolResult") return message;
+    const forgotten: Message = {
+      ...message,
+      content: [{ type: "text", text: FORGOTTEN_RESULT }],
+    };
+    runTokens -= estimateTokens(message) - estimateTokens(forgotten);
+    return forgotten;
+  });
+
+  // A steered user message can occur between a tool call and its result. Such
+  // a message is not a safe place to cut the prior turn. A call that never got
+  // a result holds nothing open.
+  const calledAt = new Map<string, number>();
+  const unsafe = new Set<number>();
   for (const [index, message] of messages.entries()) {
-    // A steered user message can occur between a tool call and its result.
-    // Such a message is not a safe place to cut the prior turn.
-    if (
-      pending.size === 0 &&
-      (message.role === "user" ||
-        message.role === "compactionSummary" ||
-        message.role === "branchSummary")
-    ) {
-      boundaries.add(index);
-    }
     if (message.role === "assistant" && Array.isArray(message.content)) {
       for (const block of message.content) {
-        if (block.type === "toolCall") pending.add(block.id);
+        if (block.type === "toolCall") calledAt.set(block.id, index);
       }
     } else if (message.role === "toolResult") {
-      pending.delete(message.toolCallId);
+      const called = calledAt.get(message.toolCallId) ?? index;
+      for (let inside = called + 1; inside < index; inside++)
+        unsafe.add(inside);
     }
   }
-  let start = messages.length;
+  const earlierBudget = Math.min(budget, capacity - runTokens);
+  let start = runStart;
   let tokens = 0;
   let turnTokens = 0;
-  for (let index = messages.length - 1; index >= 0; index--) {
-    turnTokens += estimateTokens(messages[index]);
-    if (!boundaries.has(index)) continue;
-    if (tokens + turnTokens > budget) break;
+  for (let index = runStart - 1; index >= 0; index--) {
+    const message = messages[index];
+    turnTokens += estimateTokens(message);
+    if (
+      unsafe.has(index) ||
+      (message.role !== "user" &&
+        message.role !== "compactionSummary" &&
+        message.role !== "branchSummary")
+    )
+      continue;
+    if (tokens + turnTokens > earlierBudget) break;
     tokens += turnTokens;
     turnTokens = 0;
     start = index;
   }
-  return messages.slice(start);
+  return [...messages.slice(start, runStart), ...run];
 }
 
 /**
@@ -181,7 +223,8 @@ export async function assembleContext(params: {
   let remaining = budget - systemPromptTokens - situationTokens;
   const history = recentBrainHistory(
     run.messages,
-    Math.min(config.brainMaxTokens, remaining),
+    config.brainMaxTokens,
+    remaining,
   );
   remaining -= history.reduce(
     (sum, message) => sum + estimateTokens(message),

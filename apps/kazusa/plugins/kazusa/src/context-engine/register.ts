@@ -2,7 +2,6 @@ import { currentConfig } from "../current-config.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import {
   buildMemorySystemPromptAddition,
-  delegateCompactionToRuntime,
   type OpenClawPluginApi,
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
@@ -101,7 +100,7 @@ function createContextEngine(
     info: {
       id: "kazusa",
       name: "Kazusa character context",
-      ownsCompaction: false,
+      ownsCompaction: true,
       hostRequirements: {
         "agent-run": { requiredCapabilities: ["assemble-before-prompt"] },
       },
@@ -118,9 +117,17 @@ function createContextEngine(
     async commitTurn() {
       return { status: "committed" };
     },
-    // Proactive compaction is disabled in world config. Retain native manual
-    // and overflow recovery instead of pretending a no-op freed any capacity.
-    compact: delegateCompactionToRuntime,
+    // Assembly windows the original records; summarizing the brain cannot
+    // shrink the ledgers it retrieves. The host also calls this for preflight,
+    // manual requests and overflow recovery. Report a benign skip, never a
+    // fabricated token reduction or a runtime summarization pass.
+    async compact() {
+      return {
+        ok: true,
+        compacted: false,
+        reason: "Nothing to compact: Kazusa selects context during assembly.",
+      };
+    },
     async assemble(params) {
       const sessionKey = params.sessionKey;
       const owner = parseAgentSessionKey(sessionKey ?? "");

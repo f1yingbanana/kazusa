@@ -35,7 +35,6 @@ import {
   LIST_CHATS,
   MANAGE_CHAT,
   isUser,
-  messagingId,
   readAs,
   sendMessageSchema,
   type ChatConversation,
@@ -120,6 +119,7 @@ export function registerMessaging(
   );
   const sendMessage = sendMessageSchema(messagingConfig.maxBubbles);
   const messaging = new Messaging({
+    api,
     state: sharedMessagingState(),
     store: api.runtime.state.openKeyedStore<MessageDelivery>({
       namespace: "messaging",
@@ -335,16 +335,18 @@ export function registerMessaging(
           catalogMode: "direct-only",
           description: `Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. To speak aloud to people where you are, supply members with aloud: true, or use a chat:huddle:... address to join a conversation going on there. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural bubbles in messages, 1 to ${messagingConfig.maxBubbles}; they are typed and sent one at a time. Face to face, a bubble can also be an action, { "text": "sets the textbook on the desk", "type": "action" }: third person, without your name. Actions in a text chat are dropped. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.`,
           parameters: z.toJSONSchema(sendMessage),
-          async execute(toolCallId, input: unknown) {
+          async execute(_toolCallId, input: unknown, signal?: AbortSignal) {
             const { agentId, config, agents } = caller(context);
             if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
-              await untilRunning(deps.clock, release);
+              await untilRunning(
+                deps.clock,
+                signal ? AbortSignal.any([release, signal]) : release,
+              );
             const params = sendMessage.parse(input);
-            // A host replay reuses this identity; a new model call is a new send.
-            // Session scoping prevents collisions when a brain is reset.
-            const sessionId = z.string().trim().min(1).parse(context.sessionId);
-            const callId = z.string().trim().min(1).parse(toolCallId);
-            const requestId = messagingId([sessionId, callId]);
+            // Provider call IDs can repeat within one brain session. Each
+            // execution accepts a new send; retained delivery/outbox records
+            // own retries without another model call.
+            const requestId = generateSecureUuid();
             const details = await messaging.speak(
               agentId,
               await characterName(api, config, agentId),
@@ -352,6 +354,7 @@ export function registerMessaging(
               context.assertInvocationCurrent,
               agents,
               config.agents?.defaults?.systemAgent?.agentId,
+              signal,
             );
             // Message hashes are bookkeeping, not something the character reads.
             const { messageIds: _messageIds, ...speech } = details;

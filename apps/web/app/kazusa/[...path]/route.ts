@@ -21,6 +21,7 @@ const ROUTES = new Map([
   ["models", "GET"],
   ["model", "POST"],
   ["thinking", "POST"],
+  ["brain/abort", "POST"],
 ]);
 
 type Context = { params: Promise<{ path: string[] }> };
