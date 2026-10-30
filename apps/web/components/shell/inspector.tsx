@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/empty'
 import { useSelection } from '@/hooks/use-url-state'
 import { INSPECTOR_SECTIONS } from '@/lib/registry/inspector'
+import type { InspectorSection as InspectorSectionEntry } from '@/lib/registry/types'
 import { satisfies } from '@/lib/source/capabilities'
 import { useSources } from '@/lib/source/provider'
+import type { EntityRef } from '@/lib/state/entity-ref'
 
 const KIND_LABEL = { character: 'Character', chat: 'Chat', place: 'Place' } as const
 
@@ -56,22 +58,31 @@ export function Inspector() {
           <p className="p-4 text-sm text-muted-foreground">{`Nothing to show for this ${selection.kind} yet.`}</p>
         ) : (
           sections.map((section) => (
-            <section
-              key={section.id}
-              aria-label={section.title || KIND_LABEL[selection.kind]}
-              className="flex flex-col gap-2 border-b px-4 py-4 last:border-b-0"
-            >
-              {section.title ? (
-                <h3 className="flex items-center justify-between gap-2 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                  {section.title}
-                  <MockTag requires={section.requires} />
-                </h3>
-              ) : null}
-              <section.component entity={selection} />
-            </section>
+            <SectionFrame key={section.id} section={section} entity={selection} />
           ))
         )}
       </div>
     </div>
+  )
+}
+
+const appliesToAll = () => true
+
+function SectionFrame({ section, entity }: { section: InspectorSectionEntry; entity: EntityRef }) {
+  const useApplies = section.useApplies ?? appliesToAll
+  if (!useApplies(entity)) return null
+  return (
+    <section
+      aria-label={section.title || KIND_LABEL[entity.kind]}
+      className="flex flex-col gap-2 border-b px-4 py-4 last:border-b-0"
+    >
+      {section.title ? (
+        <h3 className="flex items-center justify-between gap-2 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {section.title}
+          <MockTag requires={section.requires} />
+        </h3>
+      ) : null}
+      <section.component entity={entity} />
+    </section>
   )
 }

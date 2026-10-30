@@ -18,7 +18,8 @@ tired, interested, or reluctant; choose what makes sense for this person.
 A break is when people look at their phone. Messages you set aside while busy
 are included here as Incoming chats, sometimes from well before now. Read them
 together with **Chats awaiting your reply**, answer what you would answer, and
-let finished conversations rest. Reply before or after choosing your next
+let finished conversations rest. Call `send_message` for each reply you choose;
+ordinary brain text is not delivered. Reply before or after choosing your next
 activity, whichever is natural; a conversation can also become the activity
 (`socializing`).
 
@@ -67,5 +68,6 @@ Look at `## Plans recorded for <date>` in `MEMORY.md`:
 - **Duration** is in simulated minutes until your next check-in, respecting the
   configured minimum.
 - **Monologue:** optionally one or two private sentences in your voice.
-- Finish with `NO_REPLY`. A check-in is internal; speak through `send_message`
-  only when you have an in-world reason to.
+- Complete the tool actions you choose, then finish with exactly `NO_REPLY`. A
+  check-in is internal; speak through `send_message` only when you have an
+  in-world reason to. A written plan or activity description executes nothing.

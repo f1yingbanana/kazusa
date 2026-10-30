@@ -1,4 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+type BackgroundWork = <T>(run: () => Promise<T>) => Promise<T>;
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { stimulusKey } from "../stimulus.ts";
@@ -41,9 +42,11 @@ function stimulus(
 }
 
 type SetupOptions = Partial<PerceptionConfig> & {
+  backgroundWork?: BackgroundWork;
   assembleDecisionContext?: PerceptionDeps["assembleDecisionContext"];
   confirm?: PerceptionDeps["confirm"];
   onstage?: PerceptionDeps["onstage"];
+  realtime?: PerceptionDeps["realtime"];
   systemAgentId?: string;
 };
 
@@ -97,7 +100,14 @@ function setup(options: SetupOptions = {}) {
       })),
   };
 
-  const { confirm, onstage, systemAgentId, ...configOptions } = options;
+  const {
+    backgroundWork = async (run) => run(),
+    confirm,
+    onstage,
+    realtime,
+    systemAgentId,
+    ...configOptions
+  } = options;
   const config = PERCEPTION_CONFIG.parse({
     coalesceWindowMs: 0, // synchronous draining for most tests
     ...configOptions,
@@ -159,22 +169,24 @@ function setup(options: SetupOptions = {}) {
     assembleDecisionContext,
     ...(confirm ? { confirm } : {}),
     ...(onstage ? { onstage } : {}),
-    ...(systemAgentId
-      ? {
-          api: {
-            runtime: {
-              config: {
-                current: () => ({
-                  agents: {
-                    defaults: { systemAgent: { agentId: systemAgentId } },
-                  },
-                }),
+    ...(realtime ? { realtime } : {}),
+    api: {
+      lifecycle: { runInBackgroundContext: backgroundWork },
+      runtime: {
+        config: {
+          current: () => ({
+            agents: {
+              defaults: {
+                ...(systemAgentId
+                  ? { systemAgent: { agentId: systemAgentId } }
+                  : {}),
               },
             },
-            logger: { info: vi.fn(), warn: vi.fn() },
-          } as unknown as OpenClawPluginApi,
-        }
-      : {}),
+          }),
+        },
+      },
+      logger: { info: vi.fn(), warn: vi.fn() },
+    } as unknown as OpenClawPluginApi,
   };
 
   const router = new Perception(deps);
@@ -1481,7 +1493,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.snapshot().pending[0].id).toBe("important-1");
     });
 
-    it("automatically delivers queued stimuli on turn completion without a redundant Jev evaluation", async () => {
+    it("reviews queued stimuli once against the completed reply before delivery", async () => {
       const h = setup();
       await h.router.started("alice", "run-1");
 
@@ -1515,11 +1527,15 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.deliver).not.toHaveBeenCalled();
       expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
 
-      // Now active turn concludes
+      // The original reply did not cover this request; the review keeps it.
+      h.evaluateDecision.mockResolvedValueOnce({
+        status: "ok",
+        result: {
+          answers: { wake_decision: { type: "choice", choice: "WAKE" } },
+        },
+      });
       await h.router.ended("alice", "run-1", false);
-
-      // Delivers immediately without calling evaluateDecision again!
-      expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
+      expect(h.evaluateDecision).toHaveBeenCalledTimes(2);
       expect(h.deliver).toHaveBeenCalledTimes(1);
       expect(h.deliveries[0]).toMatchObject({
         mode: "followup",
@@ -1553,6 +1569,15 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         },
       }));
       const customDeps = {
+        api: {
+          lifecycle: {
+            runInBackgroundContext: async <T>(
+              run: () => Promise<T>,
+            ): Promise<T> => run(),
+          },
+          runtime: { config: { current: () => ({}) } },
+          logger: { info: vi.fn(), warn: vi.fn() },
+        } as unknown as OpenClawPluginApi,
         stateStore: {
           lookup: async (key: string) => structuredClone(h.states.get(key)),
           register: async (key: string, value: PerceptionState) => {
@@ -2023,7 +2048,11 @@ describe("Foreseen stimuli", () => {
         return item;
       },
     );
-    const h = setupWake({ readinessPollMs: 10, confirm });
+    const h = setupWake({
+      readinessPollMs: 10,
+      confirm,
+      backgroundWork: async (run) => caller.exit(run),
+    });
     await caller.run("start_task", () =>
       h.router.receive("alice", {
         id: "seen",
@@ -2044,7 +2073,10 @@ describe("Foreseen stimuli", () => {
     // scope after the client disconnected, and every decision fell back.
     const caller = new AsyncLocalStorage<string>();
     const scopes: (string | undefined)[] = [];
-    const h = setupWake({ coalesceWindowMs: 10 });
+    const h = setupWake({
+      coalesceWindowMs: 10,
+      backgroundWork: async (run) => caller.exit(run),
+    });
     h.evaluateDecision.mockImplementation(async () => {
       scopes.push(caller.getStore());
       return {
@@ -2162,5 +2194,106 @@ describe("Foreseen stimuli", () => {
     expect(h.deliveries[0]?.ids).toEqual(["waiting"]);
     expect(confirm).not.toHaveBeenCalled();
     expect(h.snapshot().pending.map((item) => item.id)).toEqual(["later"]);
+  });
+});
+
+describe("Conversation coverage review", () => {
+  const answer = (question: string, choice: string) => ({
+    status: "ok",
+    result: {
+      answers: { [question]: { type: "choice", choice } },
+    },
+  });
+  it("discards a queued greeting already covered by the completed reply", async () => {
+    const requests: DecisionContextRequest[] = [];
+    const assemble = vi.fn(
+      async (
+        _id: string,
+        request: DecisionContextRequest,
+      ): Promise<DecisionBatch> => {
+        requests.push(request);
+        return {
+          state: {},
+          questions: {
+            [request.brainStatus === "idle"
+              ? "wake_decision"
+              : "attention_allocation"]: { type: "choice", criteria: {} },
+          },
+        };
+      },
+    );
+    const h = setup({ assembleDecisionContext: assemble });
+    await h.router.started("alice", "reply-1");
+    h.evaluateDecision.mockResolvedValueOnce(
+      answer("attention_allocation", "QUEUE_NEXT"),
+    );
+    const greeting = stimulus("hello-again", "alice", "Hello");
+    await h.router.receive("alice", greeting);
+    expect(h.snapshot().pending[0].reviewAfterRun).toBe(true);
+    h.evaluateDecision.mockResolvedValueOnce(answer("wake_decision", "IGNORE"));
+    await h.router.ended("alice", "reply-1", false);
+    expect(h.deliver).not.toHaveBeenCalled();
+    expect(h.snapshot().pending).toEqual([]);
+    expect(h.snapshot().ignoredIds).toContain(stimulusKey(greeting));
+    expect(requests[1]).toMatchObject({
+      queuedReview: true,
+      incomingBundle: [{ id: "hello-again" }],
+      pendingQueue: [],
+    });
+    await h.router.drain("alice");
+    expect(h.evaluateDecision).toHaveBeenCalledTimes(2);
+  });
+  it("preserves a new question and delivers it once without another latency delay", async () => {
+    const h = setup();
+    await h.router.started("alice", "reply-1");
+    h.evaluateDecision.mockResolvedValueOnce(
+      answer("attention_allocation", "QUEUE_NEXT"),
+    );
+    await h.router.receive(
+      "alice",
+      stimulus("new-question", "alice", "Hello, are you still there?"),
+    );
+    h.evaluateDecision.mockResolvedValueOnce(answer("wake_decision", "WAKE"));
+    await h.router.ended("alice", "reply-1", false);
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0].ids).toEqual(["new-question"]);
+    expect(h.snapshot().pending).toEqual([]);
+  });
+  it("preserves queued input when the coverage judge is unavailable", async () => {
+    const h = setup();
+    await h.router.started("alice", "reply-1");
+    h.evaluateDecision.mockResolvedValueOnce(
+      answer("attention_allocation", "QUEUE_NEXT"),
+    );
+    await h.router.receive("alice", stimulus("uncertain"));
+    h.evaluateDecision.mockResolvedValueOnce({
+      status: "unavailable",
+      reason: "timeout",
+    });
+    await h.router.ended("alice", "reply-1", false);
+    expect(h.deliveries[0].ids).toEqual(["uncertain"]);
+  });
+  it("brings a remote coalescing window forward for a verified huddle and never resets it", async () => {
+    vi.useFakeTimers();
+    const h = setupWake({
+      coalesceWindowMs: 10000,
+      realtime: async (_id, item) => item.sessionKey.includes(":huddle:"),
+    });
+    try {
+      await h.router.receive("alice", stimulus("remote"));
+      await vi.advanceTimersByTimeAsync(100);
+      const local = {
+        ...stimulus("local"),
+        sessionKey: "agent:alice:chat:huddle:present",
+      };
+      await h.router.receive("alice", local);
+      await vi.advanceTimersByTimeAsync(100);
+      await h.router.receive("alice", { ...local, id: "local-2" });
+      await vi.advanceTimersByTimeAsync(150);
+      expect(h.deliveries[0].ids).toEqual(["remote", "local", "local-2"]);
+    } finally {
+      h.router.dispose();
+      vi.useRealTimers();
+    }
   });
 });

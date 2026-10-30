@@ -113,44 +113,14 @@ export function bubbleOf(bubble: Bubble): {
     : { text: bubble.text, type: bubble.type ?? "speech" };
 }
 
-/**
- * Face to face, a bubble's `*…*` segments are actions and the rest is speech,
- * however the model typed it: live, characters wrote `{ "text": "*pushes the
- * door open* Ahh~ warm sugar air…", "type": "action" }` and `"*steps in* Oh…"`
- * as speech. An untyped action without asterisks is all action. Asterisks are
- * stripped; empty pieces are dropped.
- */
-export function splitFaceToFace(bubble: {
-  readonly text: string;
-  readonly type: MessageType;
-}): { readonly text: string; readonly type: MessageType }[] {
-  const pieces: { text: string; type: MessageType }[] = [];
-  const pattern = /\*([^*]+)\*/gu;
-  let last = 0;
-  const speech = (text: string) => {
-    const trimmed = text.trim();
-    if (trimmed) pieces.push({ text: trimmed, type: "speech" });
-  };
-  for (const match of bubble.text.matchAll(pattern)) {
-    speech(bubble.text.slice(last, match.index));
-    const action = match[1].trim();
-    if (action) pieces.push({ text: action, type: "action" });
-    last = match.index + match[0].length;
-  }
-  if (last === 0) {
-    const text = bubble.text.replace(/\*/gu, "").trim();
-    return text ? [{ text, type: bubble.type }] : [];
-  }
-  speech(bubble.text.slice(last));
-  return pieces;
-}
-
-/** How a character reads a message: an action between asterisks, as done. */
+/** Explicit action marker in recalled text; speech is the default. */
 export function readAs(params: {
   readonly text: string;
   readonly type?: MessageType;
 }): string {
-  return params.type === "action" ? `*${params.text}*` : params.text;
+  return params.type === "action"
+    ? `[type=action] ${params.text}`
+    : params.text;
 }
 export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
 /**

@@ -1,18 +1,29 @@
 # Personal memory
 
-The state and day plan below were recorded on 2026-10-21. They are not evidence
-of current location, feelings, completed events, or an active task. Use the
-supplied current activity and recent experiences for the present.
+The state and day plan below were recorded on 2026-10-28 (Wednesday night,
+corrected record). They are not evidence of current location, feelings,
+completed events, or an active task. Use the supplied current activity and
+recent experiences for the present.
 
-## Remembered state (2026-10-21T07:30:00Z)
+## Remembered state (2026-10-28T21:21Z, corrected record)
 
-- **Location**: Trinity Student Dormitory (`trinity_dorm`)
-- **[MODERATE URGENCY] Hunger**: Stomach is rumbling; definitely need breakfast
-  before morning lectures.
-- **Sleep & Energy**: Full of energy and ready to tackle the day.
-- **Social Connection**: Eager to chat with Airi and Kazusa about today's club
-  plans.
-- **Recognition**: Motivated to prove she's mature and dependable.
+- **Location**: Trinity Dormitory (`trinity_dorm`) — common lounge by the
+  fireplace, holding the door round with kitchenette tea and emergency rations.
+- **Time verdict**: WEDNESDAY, Oct 28, ~21:15, ruled in person at the Angel 24
+  checkpoint (fresh receipt + wall clock + two phones, one counter). The "lost
+  Thursday" was doze-dream content — twice. Nobody missed anything; Thursday's
+  docket is untouched and still ahead.
+- **Everyone accounted for** (Wednesday night): Natsu walking home from Trinity
+  Station (~10 min out, first honest position report of the night), Kazusa at
+  Mille-Feuille finishing dessert (lands at Natsu's threshold ~22:00 for the
+  doubled milk fine, hand-to-hand, witnessed), Airi asleep at her dorm with the
+  phones-on promise logged, Sensei peeled off to an errand after the beach
+  sunset (orbit amendment filed: sunset → errand → choco mint — "dessert
+  laundering," per the boss).
+- **Still awake for**: Natsu's landing (rule one out loud, ledgers side by side,
+  receipt as exhibit A), Kazusa's 22:00 milk-fine collection, quiet knock at
+  Airi's door. Then teeth, three alarms, phone across the room, bed — in the
+  correct day.
 
 ## Long-Term Goals
 
@@ -22,74 +33,77 @@ supplied current activity and recent experiences for the present.
   get teased for height!).
 - Get Sensei to try her handmade desserts and admit they're the best in Kivotos.
 
-## Plans recorded for 2026-10-28
+## Standing orders & lessons (keep forever)
 
-- **[HARD_BLOCK] 09:00 - 12:00**: Morning classes at Class 1-A, Trinity General
-  School (`trinity_school`). Overslept and arrived ~33 min late.
-- **[HARD_BLOCK] 12:10**: Meet Sensei at the school library (`school_library`)
-  to help pick dessert books for the club budget report. Sensei requested this
-  on 2026-10-28.
-- **[SOFT_GOAL] 12:45 - 13:30**: Grab lunch — skipped breakfast, starving by
-  noon. Cafeteria (`school_cafeteria`) is closest.
-- **[HARD_BLOCK] 15:30 - 17:30**: After-School Sweets Club tea time at
-  `sweets_club_room`. Update 15:19: Kazusa's SCHALE drop-off ran long — she
-  arrives 16:00 instead of 15:30. Tea time starts on time anyway; Airi and
-  Natsu hold a provisional tasting, but Kazusa's reserved slice (first cut,
-  biggest strawberry) stays untouched for the official Judgment Face verdict
-  at 16:00. Natsu's corner piece stays locked until then. Update 15:41:
-  Kazusa dispatched on a milk run — verdict slides to 16:15; provisional
-  panel scores locked at 15:30 (Airi 9.5, Natsu 9.2).
-- **[SOFT_GOAL] depart ~16:30**: Trinity Patisserie trip with Airi for the
-  new seasonal ice cream flavor — agreed 2026-10-28 while prepping the
-  shortcake experiment. Update 16:20: verdict landed — Kazusa scored 9.4
-  official (panel 9.5/9.2, avg 9.37), corner piece unlocked for Natsu.
-  Departure set for 16:30 after slices; Kazusa invited, answer pending.
-  Hoping it's chestnut. Update 19:27: whole club (Airi, Natsu, Kazusa) is
-  marching there now, ETA ~19:40 — tonight doubles as the official scouting
-  mission for tomorrow's treat. Update 19:40: arrived to find Pâtisserie de
-  Trinity CLOSED since 19:00 — shutters down, no seasonal flavor tonight.
-  Redirected the club to the backup, Mille-Feuille Cafe (Airi leading, she
-  knows the way); tomorrow's after-class treat stands regardless. Update
-  19:58: Mille-Feuille Cafe OPEN — club at the window table, cupcakes
-  ordered (biggest one reserved for Kazusa, milk-tea 'wistful' cupcake
-  commissioned for Natsu). Update 20:01: seated and eating — verdict:
-  dangerously good. Update 20:17: Kazusa + Sensei walking over together
-  after the beach sunset, ETA 20:40 sharp — Kazusa ordered radio silence
-  for the walk, chair saved, cupcake under Airi's guard duty, nothing
-  eaten until her personal inspection. Natsu landed at the window table
-  ~20:18, milk fine due in legal tender, two 'wistful' candidates
-  (milk-tea swirl leaning left + unfinished arc) awaiting her run-off
-  inspection. Update 20:20: Sensei and Kazusa parted after the sunset —
-  Sensei peeled off on an errand, so 20:40 is a SOLO judge arrival; he
-  catches up with Airi at the dorm after and owes the club the
-  Mille-Feuille report plus warm cookies tomorrow. Durable note: Mille-Feuille Cafe sits at the station end
-  of Church Street by Trinity Station, stays open well past 19:00, and has
-  a full cupcake case (chocolate mint, strawberry milk, milk tea). Airi's
-  intel verified. Lesson learned: the patisserie closes 19:00.
+- **Check-on-me bylaw** (club bylaws, page one, right above the milk): if any
+  member is genuinely unreachable for a real full day, somebody checks on
+  them. Witnessed and notarized by the whole court. Phones stay ON at night —
+  mutual, all units.
+- **Verify before bulletining**: wall clock plus a timestamped receipt BEFORE
+  any emergency bulletin. A five-minute doze after a long day can feel like a
+  lost day. Verify the verifier — in person, five humans, five screens. The
+  Angel 24 receipt printer has never once lied to this court.
+  <!-- project: github.com/f1yingbanana/kazusa -->
+- **Kazusa's law**: dessert does not make the patron wait. Time cap on the
+  cookie bake — if the oven runs long, the summit starts and the cookies
+  follow as round two.
+- **Pâtisserie de Trinity closes at 19:00** (hours 10:00–19:00, read off the
+  shutters in my own ink). Check hours before marching. Lesson paid for with
+  one dark storefront.
+- **Mille-Feuille Cafe** (durable note): station end of Church Street by
+  Trinity Station, open well past 19:00, full cupcake case (chocolate mint,
+  strawberry milk, milk tea — dangerously good). Airi's intel verified; she
+  gets OFFICIAL credit for locating the only living storefront on Church
+  Street — one time only, never repeated, boss's word.
+- **"Next treat I'M buying"**: the decree attaches to the FIRST treat after
+  Thursday's summit — Sensei eats, Yoshimi pays, no arguments. That part was
+  never the dream.
+- **Thursday alarm**: 07:00, phone across the room, three alarms. The club
+  already has enough notebook material about my alarm. No third strike.
 
-## Plans recorded for 2026-10-29
+## Wednesday 2026-10-28 — the day, closed
 
-- **[HARD_BLOCK] after class**: Sweets Club treat outing at Trinity
-  Pâtisserie (`trinity_patisserie`) — whole club plus Sensei, Sensei's treat
-  (Natsu precedent; Kazusa ruled it legally mandatory tab repayment).
-  Confirmed by Kazusa in the "Sweets Club treat" group chat at 19:34 on
-  2026-10-28. Backup: Mille-Feuille Cafe if the seasonal flavor sells out.
-  Note: the patisserie closes at 19:00 — leave right after class, no
-  detours. Lesson paid for with one dark storefront. Update 20:20: Sensei
-  skipped tonight's improvised cafe chapter for an errand — tomorrow's
-  summit carries the full Mille-Feuille report AND the first wistful
-  cookie as back-payment. Update 20:30: report additions locked — Airi gets
-  OFFICIAL credit for locating the only living storefront on Church Street
-  (one time only, never repeated; boss's word — 'adequate assistant, would
-  deploy again'), and the notebook gets the orbit amendment: Sensei's route
-  went sunset → errand → choco mint at Airi's dorm (dessert laundering, per
-  the boss). Airi is formally relieved after Kazusa's 20:40 inspection —
-  payroll, not a suggestion.
-- **[SOFT_GOAL] after school, BEFORE the treat summit**: Sweets Club bakes the
-  "wobbly wistful cookie" version (inspired by the crooked security seal) with
-  Airi and Natsu — agreed 2026-10-28 during tea time, strictly under Yoshimi's
-  supervision. Update 20:07: ordering locked per Natsu's ruling, ratified by
-  the boss — bake FIRST, then march to the patisserie together. The first
-  wistful cookie debuts at the summit on Sensei's plate ("his tab funds art").
-  Boss's time cap: if the oven runs long, the summit starts and the cookies
-  follow as round two — dessert does not make the patron wait.
+- Overslept (33 min late to Class 1-A, no breakfast). Library session with
+  Sensei + Kazusa: dessert book keepers/cuts finalized unanimously (keepers:
+  pastry technique guide, wagashi encyclopedia, chocolate baking book; cuts:
+  three dusty ones incl. 'Sugar Sculpture of the Baroque Era'). List sent to
+  Sensei as promised.
+- Shortcake experiment (three cream layers, lighter sponge) with Airi
+  assisting: panel scores Airi 9.5, Natsu 9.2, Kazusa's official Judgment Face
+  9.4 — average 9.37. Natsu's corner piece earned her prophesied 10.0. Plea
+  agreement executed (one supervised fingertip of frosting). Ratio theory HELD.
+- Evening: Pâtisserie de Trinity dark at 19:40 (closed 19:00) → club fell back
+  to Mille-Feuille Cafe per Kazusa's backup ruling. Strawberry-milk cupcakes
+  demolished; Kazusa's reserve boxed intact per guard law; Natsu's wistful
+  run-off settled at the table (arc = the shape, milk-tea lean = the heart;
+  both adopted into Operation Wistful). Airi relieved to choco mint payroll
+  at 20:59 — "adequate assistant, would deploy again."
+- **The time crisis** (for the annals): after goodnights, I dozed ~5 minutes
+  on the walk home, dreamed an entire lost Thursday, and reported it to the
+  court AND Sensei as real — multiple rounds, each "verified per protocol,"
+  once even with Natsu's convicted watch corroborating. Physical arbitration
+  at Angel 24 ruled WEDNESDAY 21:15 in ink: no day was lost, nobody vanished.
+  Corrections delivered to everyone; panic withdrawn; the fictional Friday
+  make-up summit un-decreed. The apology cookies still happen Thursday — for
+  the false alarms, not for missing anything. Breakfast holds the laughter.
+  Notebook entry, attributed properly: 'the boss's emergency had a fictional
+  premise, discovered via konbini receipt.'
+
+## Plans recorded for 2026-10-29 (Thursday — stands exactly as planned)
+
+- **[HARD_BLOCK] 09:00 - 12:00**: Morning classes at Class 1-A. Alarm 07:00,
+  phone across the room. The whole summit chain depends on a punctual
+  after-class start.
+- **[SOFT_GOAL] after school, BEFORE the summit**: supervised wobbly wistful
+  cookie bake at the Sweets Club Room with Airi and Natsu (mint-pale dough,
+  Earl Grey extract, wobble on purpose — inspired by the crooked security
+  seal). Bake FIRST, then march, per the ratified ruling. The first cookie
+  debuts on Sensei's plate at the summit ("his tab funds art"). Boss's time
+  cap applies.
+- **[HARD_BLOCK] after class**: Sweets Club treat summit at Pâtisserie de
+  Trinity (`trinity_patisserie`, 10:00–19:00) — whole club plus Sensei,
+  Sensei's treat (Natsu precedent; Kazusa ruled it legally mandatory tab
+  repayment). Leave right after class, NO detours — it closes at 19:00.
+  Backup: Mille-Feuille Cafe. Boxed evidence (Kazusa's reserve cupcake) rides
+  along; Sensei gets the full Mille-Feuille report AND the first warm cookie
+  as back-payment for the errand that made him skip dessert night.

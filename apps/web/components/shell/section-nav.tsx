@@ -5,50 +5,52 @@ import { Kbd } from '@/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useActiveView } from '@/hooks/use-active-view'
 import { useNavigate } from '@/hooks/use-url-state'
+import type { StageView } from '@/lib/registry/types'
 import { STAGE_VIEWS } from '@/lib/registry/views'
 import { cn } from '@/lib/utils'
 
 const SECTIONS = [...STAGE_VIEWS].sort((a, b) => a.order - b.order)
+const WORLD_SECTIONS = SECTIONS.filter((view) => view.placement !== 'end')
+const APP_SECTIONS = SECTIONS.filter((view) => view.placement === 'end')
 
-/** Vertical icon rail (md and up). Picks the section; the section owns the sidebar. */
+function RailItem({ view, current, onSelect }: { view: StageView; current: boolean; onSelect: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<button type="button" aria-current={current ? 'page' : undefined} onClick={onSelect} />}
+        className={cn(
+          'relative flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          current && 'bg-accent text-foreground',
+        )}
+      >
+        {current ? <span aria-hidden className="absolute top-2.5 bottom-2.5 -left-2 w-0.5 rounded-full bg-primary" /> : null}
+        <view.icon className="size-5" />
+        <span className="sr-only">{view.label}</span>
+        {view.badge ? (
+          <span className="absolute -top-0.5 -right-0.5">
+            <view.badge />
+          </span>
+        ) : null}
+      </TooltipTrigger>
+      <TooltipContent side="right">{view.label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * Vertical icon rail (md and up). Picks the section; the section owns the
+ * sidebar. The world's sections sit at the top; the app's own (Settings) at
+ * the bottom, under search.
+ */
 export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
   const active = useActiveView()
   const navigate = useNavigate()
 
   return (
     <nav aria-label="Sections" className="hidden w-14 shrink-0 flex-col items-center gap-1 border-r py-2 md:flex">
-      {SECTIONS.map((view) => {
-        const current = view.id === active.id
-        return (
-          <Tooltip key={view.id}>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-current={current ? 'page' : undefined}
-                  onClick={() => navigate({ view: view.id })}
-                />
-              }
-              className={cn(
-                'relative flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                current && 'bg-accent text-foreground',
-              )}
-            >
-              {current ? (
-                <span aria-hidden className="absolute top-2.5 bottom-2.5 -left-2 w-0.5 rounded-full bg-primary" />
-              ) : null}
-              <view.icon className="size-5" />
-              <span className="sr-only">{view.label}</span>
-              {view.badge ? (
-                <span className="absolute -top-0.5 -right-0.5">
-                  <view.badge />
-                </span>
-              ) : null}
-            </TooltipTrigger>
-            <TooltipContent side="right">{view.label}</TooltipContent>
-          </Tooltip>
-        )
-      })}
+      {WORLD_SECTIONS.map((view) => (
+        <RailItem key={view.id} view={view} current={view.id === active.id} onSelect={() => navigate({ view: view.id })} />
+      ))}
 
       <div className="flex-1" />
 
@@ -65,6 +67,10 @@ export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
           <Kbd>⌘K</Kbd>
         </TooltipContent>
       </Tooltip>
+
+      {APP_SECTIONS.map((view) => (
+        <RailItem key={view.id} view={view} current={view.id === active.id} onSelect={() => navigate({ view: view.id })} />
+      ))}
     </nav>
   )
 }

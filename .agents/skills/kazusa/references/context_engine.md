@@ -56,6 +56,13 @@ ignores `session.mainKey`, so it cannot rename the default `main` session into
 - The owner's personal wiki: retrieve relevant impressions using the pending
   perception, preserve recorded dates, and inject bounded whole cards as
   subjective recollections. No world-wiki or other-character private retrieval.
+- The run in progress (`recentBrainHistory`): always whole, including across
+  steered messages, or the model forgets its own tool results between calls.
+  Live, a 2000-token cap on it left every run with a large result re-reading
+  the same files until it hit its limits. A run ends at an assistant message
+  with no tool calls, so one cut off by its limits carries into the next. Only
+  when it outgrows the whole context do its oldest tool results go, replaced
+  by a note to look again.
 - Prior complete brain turns (`recentBrainHistory`): A bounded continuity
   allowance (`brainMaxTokens`, default 2000; can be set to `0` for pure
   stateless ledger-driven runs). Retaining prior turns serves three functions:
@@ -116,7 +123,7 @@ Settings under `plugins.entries.kazusa.config.contextEngine`:
 
 | Setting                   | Default | Meaning                                                           |
 | ------------------------- | ------- | ----------------------------------------------------------------- |
-| `brainMaxTokens`          | 2000    | Maximum recent complete brain turns; unused space goes to ledgers |
+| `brainMaxTokens`          | 2000    | Maximum earlier complete brain turns (the run in progress is outside it); unused space goes to ledgers |
 | `shortTermHours`          | 24      | Strict simulated-time window; may be increased                    |
 | `personalWikiMaxTokens`   | 1200    | Maximum whole personal-recollection cards                         |
 | `personalWikiMaxArticles` | 3       | Maximum relevant personal cards                                   |
@@ -336,18 +343,24 @@ salience:
 
 ## Compaction and lifecycle
 
-Windowing selects context without modifying stored history. It does not need an
-LLM summary pass. World config sets `agents.defaults.compaction.enabled: false`
-to disable proactive threshold compaction and optional maintenance. Native
-manual `/compact` and overflow recovery remain available via
-`ownsCompaction: false` and `delegateCompactionToRuntime`.
+Windowing selects context without modifying stored history. Kazusa owns the
+entire context lifecycle (`ownsCompaction: true`) and never delegates to an LLM
+summary pass. World config also keeps
+`agents.defaults.compaction.enabled: false` to disable optional host
+maintenance. Assembly uses the native token budget and supplies the
+authoritative prompt; the existing 24-hour ledger window may legitimately
+produce an expensive request.
 
-Short cognitive turns should normally fit. A huge tool result, long active turn,
-or oversized prompt can still need recovery; disabling all recovery would turn
-these into context-overflow failures. Brain compaction does not compact the
-separate task/chat ledgers, and disabling it does not stop raw transcripts
-growing on disk. Memory consolidation into `MEMORY.md` is a separate future
-workflow, not a compaction side effect we rely on.
+OpenClaw can still invoke `compact()` for reply preflight, manual `/compact` or
+provider overflow recovery. Return
+`{ ok: true, compacted: false, reason: "Nothing to compact: Kazusa selects context during assembly." }`.
+The host recognizes "nothing to compact" as a benign skip, allowing preflight to
+continue without a summary, transcript rewrite or fabricated token reduction. An
+unexplained no-op reason can instead make required preflight fail. Provider
+overflow is not repaired by summarizing the brain: fix the assembly or active
+turn that exceeded its budget. Raw transcripts and separate task/chat ledgers
+remain intact and keep growing on disk. Memory consolidation into `MEMORY.md` is
+a separate future workflow, not a compaction side effect we rely on.
 
 OpenClaw persists native agent transcripts, including private projections of
 canonical messages in the retained `messaging` store. The context engine creates
