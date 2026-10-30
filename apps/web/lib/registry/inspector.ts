@@ -1,5 +1,6 @@
 import { CharacterDesiresSection } from "@/components/inspector/sections/character-desires";
 import { CharacterHeaderSection } from "@/components/inspector/sections/character-header";
+import { CharacterModelSection } from "@/components/inspector/sections/character-model";
 import { CharacterNowSection } from "@/components/inspector/sections/character-now";
 import { CharacterProfileSection } from "@/components/inspector/sections/character-profile";
 import { CharacterRecentSection } from "@/components/inspector/sections/character-recent";
@@ -7,6 +8,7 @@ import { ChatSummarySection } from "@/components/inspector/sections/chat-summary
 import { PlaceHeaderSection } from "@/components/inspector/sections/place-header";
 import { PlacePeopleSection } from "@/components/inspector/sections/place-people";
 import { PlaceWaysSection } from "@/components/inspector/sections/place-ways";
+import { useRunsOnModel } from "@/hooks/use-models";
 import type { InspectorSection } from "./types";
 
 /**
@@ -20,6 +22,7 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
   { id: "character.desires", entity: "character", title: "Desires", order: 15, requires: ["characters", "desires"], component: CharacterDesiresSection },
   { id: "character.recent", entity: "character", title: "Recent", order: 20, requires: ["timeline"], component: CharacterRecentSection },
   { id: "character.profile", entity: "character", title: "About", order: 40, requires: ["characters"], component: CharacterProfileSection },
+  { id: "character.model", entity: "character", title: "Model", order: 50, requires: ["characters", "models"], component: CharacterModelSection, useApplies: useRunsOnModel },
   { id: "chat.summary", entity: "chat", title: "", order: 0, requires: [], component: ChatSummarySection },
   { id: "place.header", entity: "place", title: "", order: 0, requires: ["places"], component: PlaceHeaderSection },
   { id: "place.people", entity: "place", title: "", order: 10, requires: ["places", "location", "characters"], component: PlacePeopleSection },

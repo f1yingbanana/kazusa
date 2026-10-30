@@ -30,6 +30,11 @@ export interface StageView {
   readonly sidebar?: ComponentType<SectionSidebarProps>;
   /** Small count on the rail icon (e.g. unread). Renders nothing when zero. */
   readonly badge?: ComponentType;
+  /**
+   * `end` pins the icon to the bottom of the rail with the app's own tools
+   * (Settings), apart from the world's sections. Defaults to `start`.
+   */
+  readonly placement?: "start" | "end";
 }
 
 export interface InspectorSection {
@@ -39,6 +44,22 @@ export interface InspectorSection {
   readonly order: number;
   readonly requires: readonly Domain[];
   readonly component: ComponentType<{ readonly entity: EntityRef }>;
+  /**
+   * A hook narrowing the section to some entities of its kind (only live
+   * agents have a model). Always the same hook for a section, so it is called
+   * unconditionally. Defaults to every entity.
+   */
+  readonly useApplies?: (entity: EntityRef) => boolean;
+}
+
+/** One page of the Settings section, listed in its sidebar. */
+export interface SettingsCategory {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  readonly icon: LucideIcon;
+  readonly order: number;
+  readonly component: ComponentType;
 }
 
 export interface StatusItem {
