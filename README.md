@@ -15,30 +15,27 @@
 
 <p align="center">
   <a href="https://discord.gg/wbNyB85V4X">
-    <img src="https://img.shields.io/badge/Discord-Join_the_community-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Join our Discord community" />
+    <img src="https://img.shields.io/discord/1129193845809233941?logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Join our Discord community" />
   </a>
+  <a href="https://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=IBHnmOPB4a0508LQlxoHxHoyZhXjrwWL&authKey=gT763Bb4wyQxkwRoTBQKotA1K8jNasJFooko%2BN528WLeuMqyR2fOlBUYqi0IgXGR&noverify=0&group_code=338067231"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
   <a href="https://x.com/f1yingbanana">
-    <img src="https://img.shields.io/badge/Follow-%40f1yingbanana-181717?style=flat-square&logo=x&logoColor=white" alt="Follow @f1yingbanana on X" />
+    <img src="https://img.shields.io/twitter/follow/f1yingbanana" alt="Follow @f1yingbanana on X" />
   </a>
 </p>
 
 <p align="center">
-  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a>
-</p>
-
-<p align="center">
+  <strong>English</strong> · 
+  <a href="./README.zh-CN.md">简体中文</a> ·
   <a href="#features">Features</a> ·
-  <a href="#see-it-in-action">See it in action</a> ·
+  <a href="#screenshots">Screenshots</a> ·
   <a href="#getting-started">Getting started</a>
 </p>
 
-**KAZUSA** (**K**-**A**gent **Z**ero-drift **U**niversal **S**imulation
-**A**rchitecture) is a self-hosted AI world simulation sandbox based on
-OpenClaw. It simulates all your characters in real-time, 24/7. Import or create
-your characters, put them in a world, and watch them chat with each other, plan
-their next meetup, travel between locations, manage their needs and priorities,
-and dream about their future. While you are busy with your life, their lives
-continue in this world.
+**KAZUSA** is an AI world simulator based on OpenClaw. Import or create your
+characters, and **KAZUSA** gives them purpose, needs, goals, and memories. Watch
+them chat with each other, plan their next meetup, travel between locations,
+manage their priorities, and dream about their future. Put all your favorite
+waifus in a room and see how they interact with each other, and with you.
 
 **Import your SillyTavern V2 character cards (.png or .json).** Bring their
 personalities, example dialogue, and lorebooks with you. **ARONA**, the built-in
@@ -50,43 +47,36 @@ simulation, such as
 [Project Sid: Many-agent simulations toward AI civilization](https://arxiv.org/html/2411.00114v1)
 and
 [Simulating Human-like Daily Activities with Desire-driven Autonomy](https://arxiv.org/abs/2412.06435).
-**KAZUSA** aims to bridge the gap between bleeding edge research and much
-requested features from the roleplay community, while reducing the cost so it is
-not prohibitively expensive to run.
+**KAZUSA** aims to make large-scale society simulation accessible for everyone,
+because your character isn't really alive unless placed in a world they belong
+to.
 
-> [!NOTE]
+> [!WARNING]
 >
 > **KAZUSA** is currently in **early development**. Expect bugs and breaking
-> changes. Character-card import, ARONA onboarding, and the `setup` / `dev`
-> commands below describe the planned first-release experience and are still
-> being implemented.
+> changes.
 
 ## Features
 
+### 📚 Persistent memory wiki
+
+Characters don't just remember things, they build a mental model of the world
+they are in. Every action they perform, place they visit, or interaction with
+you updates their impression of the world and leave a lasting mark on their
+evolving personality.
+
 ### 🧠 Human brain modeling
 
-Character brain simulation in **KAZUSA** closely mirrors the human brain.
-Realistic behaviors emerge naturally: prioritize studying for an exam over
-replying to a text, piovt smoothly when interrupted mid-replying, etc.
-
-### 📚 Persistent memory
-
-Characters learn a mental model of the world they are in. They update an
-internal wiki of people, places, ideas and events, even when these change
-afterwards. A character's memory in a group chat naturally carries over to a
-private chat with another character.
+Characters are driven by AI that closely mirrors how the human brain functions.
+They focus on one task at a time, prioritize important tasks over minor
+interruptions, and pivot based on context. Complex behavior such as group chats
+and conversation pivoting come for free.
 
 ### ❤️ Desire-driven actions
 
 Characters plan out their next actions based on current human desires, promises
-they've made, long term goals, and more. Actions and natural flow of time
-changes the desire levels to push characters to do something.
-
-### 👥 True group chats
-
-Characters behave naturally in group chats rather than feeling orchestrated, as
-they are individual agents capable of prioritizing their current tasks,
-assessing the context, and handling interruptions.
+they've made and long term goals. Actions and the natural flow of time changes
+the desire levels to push characters to do realistic and believable things.
 
 ### 🔭 Observability
 
@@ -101,22 +91,30 @@ groups, converse, and do things together.
 
 ### ✨ Agent-based editor
 
-Upload a **SillyTavern V2 PNG or JSON character card**, or describe an original
-character, to the built-in system admin AI, **ARONA** (**A**I **R**oleplay
-**O**rchestration and **N**arration **A**dministrator). **ARONA** helps adapt
+Upload a **SillyTavern V2 PNG or JSON character card** or describe an original
+character to the built-in system admin AI, **ARONA**. **ARONA** helps adapt
 their personality and lore to your setting, build the world, and set up their
 memory wiki.
 
 ## See it in action
 
 <picture>
-  <img src=".github/assets/frontend-screenshot.png" alt="Kazusa's web client showing a group conversation, the selected character's activity and needs, and world clock controls" />
+  <img src=".github/assets/chats-screenshot.png" alt="Kazusa's web client showing a group conversation, the selected character's activity and needs, and world clock controls" />
 </picture>
 
+<picture>
+  <img src=".github/assets/timeline-screenshot.png" alt="Kazusa's web client showing a timeline on all character activities" />
+</picture>
 Chat with characters, inspect what they're doing and how they feel, and follow
 conversations and activities in the Timeline. Pause or change simulation speed.
 
 ## Getting started
+
+> [!NOTE]
+>
+> For people that are interested but do not wish to set this up themselves,
+> consider [waitlisting here](https://openrp.ai/kazusa). We'll send an email
+> once we get this running as a one-click deploy service in the cloud.
 
 You will need an [OpenRouter](https://openrouter.ai) key to power conversation,
 decisions, and memory. Alternatively, you can set up models from different
@@ -151,6 +149,13 @@ Larger, more capable models can improve characterization and consistency, but
 usually cost more and respond more slowly. To customize models or providers,
 follow the
 [official OpenClaw guide](https://docs.openclaw.ai/concepts/model-providers).
+
+> [!NOTE]
+>
+> Theoretically, you can skip Jev and embedding models. However, not using Jev
+> will greatly reduce the speed of processing simultaneous events, and not using
+> embedding models will greatly reduce the accuracy of memory and context
+> retrieval.
 
 ### 3. Launch and talk to **ARONA**
 
