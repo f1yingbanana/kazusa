@@ -7,140 +7,145 @@
 </p>
 
 <p align="center">
-  <b>让你的赛博老婆、老公们，在一个 24/7 实时运转的世界里活起来。</b>
+  <b>
+    让你的赛博老婆与老公们在一个实时运转的世界里活起来。
+  </b>
 </p>
 
 <p align="center">
   <a href="https://discord.gg/wbNyB85V4X">
-    <img src="https://img.shields.io/badge/Discord-%E5%8A%A0%E5%85%A5%E7%A4%BE%E5%8C%BA-5865F2?style=flat-square&logo=discord&logoColor=white" alt="加入 Discord 社区" />
+    <img src="https://img.shields.io/discord/1129193845809233941?logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Join our Discord community" />
   </a>
+  <a href="https://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=IBHnmOPB4a0508LQlxoHxHoyZhXjrwWL&authKey=gT763Bb4wyQxkwRoTBQKotA1K8jNasJFooko%2BN528WLeuMqyR2fOlBUYqi0IgXGR&noverify=0&group_code=338067231"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
   <a href="https://x.com/f1yingbanana">
-    <img src="https://img.shields.io/badge/%E5%85%B3%E6%B3%A8-%40f1yingbanana-181717?style=flat-square&logo=x&logoColor=white" alt="在 X 上关注 @f1yingbanana" />
+    <img src="https://img.shields.io/twitter/follow/f1yingbanana" alt="Follow @f1yingbanana on X" />
   </a>
 </p>
 
 <p align="center">
-  <a href="./README.md">English</a> · <strong>简体中文</strong>
-</p>
-
-<p align="center">
-  <a href="#功能亮点">功能亮点</a> ·
-  <a href="#实机效果">实机效果</a> ·
+  <a href="./README.md">English</a> · 
+  <strong>简体中文</strong> ·
+  <a href="#功能亮点">功能</a> ·
+  <a href="#实机截图">实机截图</a> ·
   <a href="#快速上手">快速上手</a>
 </p>
 
-**KAZUSA**（**K**-**A**gent **Z**ero-drift **U**niversal **S**imulation
-**A**rchitecture）是一个基于 OpenClaw、可以自行部署的 AI 世界模拟沙盒。它让你的所有角色在同一个世界里 24/7 实时生活。把角色导入或捏出来，放进世界，看他们互相聊天、约见面、奔走于不同地点之间、根据自己的需求计划事项，甚至畅想未来。你忙你的时候，他们在你创造的虚拟世界里过着他们的生活。
-
-**直接导入 SillyTavern（酒馆）V2 角色卡（.png 或 .json）。**
-人设、对话示例和世界书都能一起带过来。内置的系统管理员智能体 **ARONA**
-会帮你把现有角色和设定变成一个会自行运转的世界。
-
-**KAZUSA** 的设计参考了 AI 智能体与社会模拟领域的前沿研究，例如
-[《生成式智能体：人类行为的交互式模拟》](https://arxiv.org/abs/2304.03442)、
-[《Project Sid：迈向 AI 文明的多智能体模拟》](https://arxiv.org/html/2411.00114v1)
-和[《用欲望驱动的自主行为模拟人类日常活动》](https://arxiv.org/abs/2412.06435)。
 **KAZUSA**
-希望把前沿 AI 研究变成角色扮演玩家一直想要的功能，同时控制运行成本，让养一个世界不至于烧穿钱包。
+是一个基于 OpenClaw 构建的 AI 世界模拟器。导入或创建你的角色，**KAZUSA**
+会赋予他们目标、需求、理想与记忆。看着他们互相聊天、约好下次见面的时间、在不同地点之间奔走、管理各自事务的优先级，甚至畅想未来。把你最喜欢的“老婆”们放进同一个房间，看看她们彼此之间、以及和你之间会擦出怎样的火花。
 
-> [!NOTE]
+**直接导入你的 SillyTavern（酒馆）V2 角色卡（.png 或 .json）。**
+把他们的人设、对话示例和世界书一并带过来。内置的系统管理员智能体 **ARONA**
+会帮你把现有数据变成一个生机勃勃的世界。
+
+**KAZUSA** 的构建基于 AI 智能体与社会模拟领域的顶尖研究论文，例如
+[《Generative Agents: Interactive Simulacra of Human Behavior》](https://arxiv.org/abs/2304.03442)、[《Project Sid: Many-agent simulations toward AI civilization》](https://arxiv.org/html/2411.00114v1)
+以及
+[《Simulating Human-like Daily Activities with Desire-driven Autonomy》](https://arxiv.org/abs/2412.06435)。**KAZUSA**
+旨在让大规模社会模拟触手可及——因为只有当角色置身于属于他们的世界中时，他们才算真正活了过来。
+
+> [!WARNING]
 >
-> **KAZUSA**
-> 目前处于**早期开发阶段**，会有 Bug，也会有不兼容更新。角色卡导入、ARONA 新手引导，以及下方的
-> `setup` / `dev` 命令，描述的是首个版本的目标体验，目前还在施工中。
+> **KAZUSA** 目前处于**早期开发阶段**。可能会遇到 Bug 和不兼容的更新。
 
 ## 功能亮点
 
-### 🧠 拟人化思考机制
+### 📚 持久记忆 Wiki
 
-**KAZUSA**
-以接近真人的方式模拟角色的思考过程，让一些很有“人味”的行为自然出现：考前忙着复习，消息推迟回；回复打到一半收到新消息，会及时审查旧的回复是否还有发出去的必要、做出修改。
+角色不只是简单地记住事情，他们会在脑海中构建对所处世界的认知模型。他们执行的每一个动作、造访的每一个地点，或是与你的每一次互动，都会更新他们对世界的印象，并在他们不断演化的性格中留下持久的印记。
 
-### 📚 持久记忆
+### 🧠 类人脑建模
 
-角色会逐渐形成自己对世界的理解。他们会维护一份记忆 Wiki，记录人物、地点、想法和事件，事情有变化也会更新。群聊里形成的记忆，换到和另一个角色私聊时也能接得上。
+角色由高度还原人类大脑运作机制的 AI 驱动。他们一次专注于一项任务，在面对次要打扰时优先处理重要事项，并根据上下文灵活转变话题。像群聊和对话自然切换这类复杂行为，都能水到渠成地实现。
 
-### ❤️ 欲望驱动的自主行动
+### ❤️ 欲望驱动的行动
 
-角色会根据当下的本能需求、约定过的事、长期目标等，规划接下来的行动。他们做了什么、时间过去了多久，都会改变各种欲望值，推动他们去做下一件事。
+角色会根据当下的人类本能需求、许下的承诺以及长期目标来规划接下来的行动。具体的行动和时间的自然流逝会改变各项欲望数值，推动角色做出真实可信的举动。
 
-### 👥 真正的群聊
+### 🔭 全景可观测性
 
-每个角色都是独立的智能体，会给自己的任务排优先级、判断聊天上下文，也会处理中途插入的新情况。所以群聊更像一群有自己的事要忙的人在聊天，互动也更自然。
-
-### 🔭 行为与状态可视化
-
-你可以随时查看每个角色在忙什么，并在时间线里看到所有角色的计划、结果和想法。他们的小剧场，随时可以围观。
+你可以完全掌握每个角色的一举一动。通过时间线（Timeline）查看所有角色的计划、行动结果与内心想法。
 
 ### ✈️ 移动与偶遇
 
-角色生活在你定义的空间里，会按照自己的计划和日常安排，沿着地图合理地移动。他们会自然碰面、结伴、聊天，然后一起做点什么。
+角色存在于你定义的物理空间中，并会根据自己的计划和日常作息在地图上合乎逻辑地移动。他们会自然地偶遇彼此、结伴同行、交谈，并一起做各种各样的事。
 
-### ✨ 聊天式角色与世界编辑
+### ✨ 智能体驱动的编辑器
 
-上传一张 **SillyTavern V2
-PNG 或 JSON 角色卡**，或者描述一个原创角色，交给内置系统管理员 **ARONA**（**A**I
-**R**oleplay **O**rchestration and **N**arration
-**A**dministrator，AI 角色扮演编排与叙事管理员）。 **ARONA**
-会帮你把人设和背景融入当前设定，搭建世界，并建立角色的记忆 Wiki。
+上传一张 **SillyTavern V2 PNG 或 JSON 角色卡**，或者向内置的系统管理员 AI
+**ARONA** 描述一个原创角色。**ARONA**
+会协助你将他们的人设和背景故事适配到你的世界观中，搭建场景，并初始化他们的记忆 Wiki。
 
-## 实机效果
+## 实机截图
 
 <picture>
-  <img src=".github/assets/frontend-screenshot.png" alt="Kazusa 网页客户端：群聊、所选角色的活动与需求，以及世界时钟控制" />
+  <img src=".github/assets/chats-screenshot.png" alt="Kazusa 网页客户端：展示群聊、所选角色的活动与需求，以及世界时钟控制" />
 </picture>
 
-和角色聊天，看看他们在做什么、状态如何，再到时间线里围观对话和活动。你也可以暂停模拟，或调整时间流逝的速度。
+<picture>
+  <img src=".github/assets/timeline-screenshot.png" alt="Kazusa 网页客户端：展示所有角色活动的时间线" />
+</picture>
+
+与角色聊天，查看他们正在做什么、心情如何，并在时间线中追踪对话与活动动态。你还可以随时暂停模拟或调整时间流逝的速度。
 
 ## 快速上手
 
-准备一个 [OpenRouter](https://openrouter.ai)
-API 密钥，就能用来驱动对话、决策和记忆。你也可以手动配置不同供应商的模型，分别使用对应的 API 密钥。下面的流程，自己跑或者交给你的 AI 跑都行。
+> [!NOTE]
+>
+> 如果你对项目感兴趣但不想自己部署，可以[在这里加入候补名单](https://openrp.ai/kazusa)。等我们上线一键部署的云端服务后，会第一时间发邮件通知你。
+
+首先需要一个 [OpenRouter](https://openrouter.ai)
+密钥来驱动对话、决策和记忆功能。这里你也可以手动配置来自不同服务商的模型并使用对应的 API 密钥。你可以自己按照以下流程操作，也可以直接交给 AI 来跑。
 
 ### 1. 安装
 
-需要先安装 **Node.js 24.16+（24.x）或 26.1+**，以及 **Git**。
+你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及 **Git**。
 
 ```bash
-git clone https://github.com/f1yingbanana/kazusa.git
+git clone [https://github.com/f1yingbanana/kazusa.git](https://github.com/f1yingbanana/kazusa.git)
 cd kazusa
 npm ci
+
 ```
 
-### 2. 填入 API 密钥
+### 2. 输入你的 API 密钥
 
-创建一个
-[OpenRouter API 密钥](https://openrouter.ai/keys)，给账户充值，然后运行：
+创建一个 [OpenRouter API 密钥](https://openrouter.ai/keys)，为账户充值后运行：
 
 ```bash
 npm run setup
+
 ```
 
-在安装向导的提示处粘贴你的密钥，接受默认对话模型，或选择其他**支持工具调用**的模型。安装向导会用同一个密钥，预设
-**TypeSafe Jev** 作为决策模型、 **text-embedding-3-small**
-作为记忆检索的向量模型，连接好前端，并初始化好 **ARONA**。
+在安装引导提示中粘贴你的密钥，接受默认的对话模型，或选择其他支持工具调用的模型。安装会使用同一个密钥预先配置好用于决策的
+**TypeSafe Jev** 和用于记忆检索的 **text-embedding-3-small**，连接前端，并初始化
+**ARONA**。
 
-能力更强的大模型，通常更擅长维持人设和前后连贯，但也往往更贵、回复更慢。想自定义模型或供应商，可以参考
+参数更大、能力更强的模型可以提升角色还原度和前后一致性，但成本更高、响应更慢。如需自定义模型或服务商，请参考
 [OpenClaw 官方指南](https://docs.openclaw.ai/concepts/model-providers)。
 
-### 3. 启动，找 **ARONA** 聊天
+> [!NOTE]
+>
+> 理论上是可以不用Jev和embedding的，但是不用前者会大大降低处理多线程事件的速度，后者会大大降低概念搜索的准确度
+
+### 3. 启动并与 **ARONA** 对话
 
 ```bash
 npm run dev
 ```
 
-这会同时启动 Gateway 和网页前端。打开 **http://localhost:3000**，
-在角色列表里选择 **ARONA**，点击 **Message（发消息）**。附上一张
-**.png 或 .json 角色卡**，试着说：
+这会同时启动前后端。在浏览器打开 **http://localhost:3000**，在角色列表中选择
+**ARONA**，然后点击 **Message**。附上一张 **.png 或 .json 角色卡**，试着发送：
 
-> 帮我导入这个角色，再围绕 TA 搭一个小世界。先问问我想要什么设定，然后帮 TA 建好记忆 Wiki。
+> 帮我导入这个角色，并围绕 TA 搭建一个小世界。先问我关于世界观设定的问题，然后帮 TA 设置好记忆 Wiki。
 
-你也可以描述原创角色，让 ARONA 先写一份初稿，再自己修改角色的 `IDENTITY.md` 或
-`SOUL.md` 文件。
+你也可以直接描述原创角色，让 ARONA 先生成一份初稿，之后再手动编辑他们的
+`IDENTITY.md` 或 `SOUL.md` 文件。
 
-## 一起来建设
+## 参与共建
 
-一起搭一个你也想待着的世界吧。原创角色、小型世界观，或是一段暴露了角色反应不自然的对话，都和代码贡献一样有价值。欢迎[提个 Issue](https://github.com/f1yingbanana/kazusa/issues)，说说发生了什么、你期待什么样的表现；也可以先给仓库点个**星星**，蹲后续更新。
+一起来塑造一个你也想沉浸其中的世界吧。原创角色示例、小型世界观设定，或是能暴露出角色反应不自然的对话场景，对我们来说非常宝贵。欢迎[提交问题](/issues)
+告诉我们发生了什么以及你想要得到什么样的预期效果，或者点个免费的星星以追踪开发进度。
 
 ## 相关项目
 
