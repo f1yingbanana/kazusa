@@ -12,6 +12,7 @@ import { registerClock } from "./clock/register.ts";
 import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
+import { createJevProvider } from "./decisions/jev.ts";
 import { registerPerception } from "./perception/register.ts";
 import { registerBrainHttp } from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
@@ -40,6 +41,7 @@ export default definePluginEntry({
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
     rememberRegistration(api);
+    api.registerDecisionProvider(createJevProvider());
     registerHostPromptEdits(
       api,
       currentConfig(api).agents?.defaults?.systemAgent?.agentId,

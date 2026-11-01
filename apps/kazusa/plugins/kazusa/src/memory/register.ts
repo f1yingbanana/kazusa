@@ -78,15 +78,11 @@ export const MEMORY_CONFIG = z.strictObject({
   /** Secrets stay in the environment; absent means keywords only. */
   embedding: z
     .strictObject({
-      baseUrlEnv: z.string().default("AZURE_OPENAI_URL"),
-      apiKeyEnv: z.string().default("AZURE_OPENAI_API_KEY"),
-      model: z.string().default("text-embedding-3-small"),
+      baseUrl: z.string().default("https://openrouter.ai/api/v1"),
+      apiKeyEnv: z.string().default("OPENROUTER_API_KEY"),
+      model: z.string().default("openai/text-embedding-3-small"),
     })
-    .default({
-      baseUrlEnv: "AZURE_OPENAI_URL",
-      apiKeyEnv: "AZURE_OPENAI_API_KEY",
-      model: "text-embedding-3-small",
-    }),
+    .prefault({}),
 });
 
 export interface MemoryPrefetch {
@@ -211,12 +207,14 @@ export function registerMemory(
     api.logger.warn(message);
   };
 
-  const baseUrl = process.env[config.embedding.baseUrlEnv];
   const apiKey = process.env[config.embedding.apiKeyEnv];
-  const embedder: Embedder | undefined =
-    baseUrl && apiKey
-      ? openAiEmbedder({ baseUrl, apiKey, model: config.embedding.model })
-      : undefined;
+  const embedder: Embedder | undefined = apiKey
+    ? openAiEmbedder({
+        baseUrl: config.embedding.baseUrl,
+        apiKey,
+        model: config.embedding.model,
+      })
+    : undefined;
   /** One background embed at a time; a turn never waits for it. */
   let embedding = false;
   const embedInBackground = (agentId: string): void => {

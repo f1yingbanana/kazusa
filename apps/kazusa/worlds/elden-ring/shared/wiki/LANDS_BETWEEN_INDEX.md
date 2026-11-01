@@ -1,0 +1,656 @@
+# The Lands Between: full index
+
+## Map
+
+- Limgrave `limgrave`
+  - The First Step `first_step`
+    - Stranded Graveyard `stranded_graveyard`
+  - Church of Elleh `church_of_elleh`
+  - Gatefront Ruins `gatefront_ruins`
+  - Agheel Lake `agheel_lake`
+  - Dragon-Burnt Ruins `dragon_burnt_ruins`
+  - Summonwater Village `summonwater_village`
+  - Warmaster's Shack `warmasters_shack`
+  - Saintsbridge `saintsbridge`
+  - Stormhill `stormhill`
+    - Stormhill Shack `stormhill_shack`
+    - The Stormgate `stormgate`
+    - Stormhill Evergaol `stormhill_evergaol`
+    - Deathtouched Catacombs `deathtouched_catacombs`
+    - Limgrave Tower Bridge `limgrave_tower_bridge`
+    - Divine Tower of Limgrave `divine_tower_limgrave`
+    - Stormfoot Catacombs `stormfoot_catacombs`
+    - Stormveil Castle `stormveil_castle`
+      - Stormveil Main Gate `stormveil_main_gate`
+      - Gateside Chamber `gateside_chamber`
+      - Stormveil Cliffside `stormveil_cliffside`
+      - Rampart Tower `rampart_tower`
+      - Liftside Chamber `liftside_chamber`
+      - Secluded Cell `secluded_cell`
+      - Stormveil Great Courtyard `stormveil_courtyard`
+      - Godrick's Great Hall `godricks_hall`
+      - Stormveil Chapel `stormveil_chapel`
+    - Castleward Tunnel `castleward_tunnel`
+    - Limgrave Colosseum `limgrave_colosseum`
+  - Mistwood `mistwood`
+    - Mistwood Ruins `mistwood_ruins`
+    - Minor Erdtree (Mistwood) `minor_erdtree_mistwood`
+    - Fort Haight `fort_haight`
+    - Third Church of Marika `third_church_of_marika`
+    - Siofra River Well `siofra_river_well`
+    - Forest Lookout Tower `forest_lookout_tower`
+  - Church of Dragon Communion `church_of_dragon_communion`
+  - Coastal Cave `coastal_cave`
+  - Seaside Ruins `seaside_ruins`
+  - Murkwater Cave `murkwater_cave`
+  - Murkwater Catacombs `murkwater_catacombs`
+  - Groveside Cave `groveside_cave`
+  - Limgrave Tunnels `limgrave_tunnels`
+  - Fringefolk Hero's Grave `fringefolk_heros_grave`
+  - Artist's Shack (Limgrave) `artists_shack_limgrave`
+  - Highroad Cave `highroad_cave`
+  - Waypoint Ruins `waypoint_ruins`
+  - Forlorn Hound Evergaol `forlorn_hound_evergaol`
+- Chapel of Anticipation `chapel_of_anticipation`
+- Weeping Peninsula `weeping_peninsula`
+  - Bridge of Sacrifice `bridge_of_sacrifice`
+  - Castle Morne `castle_morne`
+    - Castle Morne Rampart `castle_morne_rampart`
+    - Castle Morne Lift `castle_morne_lift`
+    - Morne's Inner Keep `morne_inner_keep`
+    - Morne Moangrave `morne_moangrave`
+  - Ailing Village `ailing_village`
+  - Church of Pilgrimage `church_of_pilgrimage`
+  - Fourth Church of Marika `fourth_church_of_marika`
+  - Oridys's Rise `oridys_rise`
+  - Tombsward Catacombs `tombsward_catacombs`
+  - Earthbore Cave `earthbore_cave`
+  - Morne Tunnel `morne_tunnel`
+  - Witchbane Ruins `witchbane_ruins`
+  - Demi-Human Forest Ruins `demi_human_forest_ruins`
+  - Isolated Merchant's Shack (Peninsula) `isolated_merchants_shack_weeping`
+  - Weeping Evergaol `weeping_evergaol`
+  - Minor Erdtree (Peninsula) `minor_erdtree_weeping`
+  - Impaler's Catacombs `impalers_catacombs`
+  - Tombsward Cave `tombsward_cave`
+  - Callu Baptismal Church `callu_baptismal_church`
+- Liurnia of the Lakes `liurnia`
+  - Lake-Facing Cliffs `lake_facing_cliffs`
+  - Liurnia Lake Shore `liurnia_lake_shore`
+  - Laskyar Ruins `laskyar_ruins`
+  - Stillwater Cave `stillwater_cave`
+  - Lakeside Crystal Cave `lakeside_crystal_cave`
+  - Boilprawn Shack `boilprawn_shack`
+  - Scenic Isle `scenic_isle`
+  - Gate Town Bridge `gate_town_bridge`
+  - Academy Gate Town `academy_gate_town`
+  - Stargazers' Ruins `stargazers_ruins_liurnia`
+  - Academy of Raya Lucaria `raya_lucaria`
+    - Main Academy Gate `main_academy_gate`
+    - South Raya Lucaria Gate `south_raya_lucaria_gate`
+    - East Raya Lucaria Gate `east_raya_lucaria_gate`
+    - Schoolhouse Classroom `schoolhouse_classroom`
+    - Debate Parlor `debate_parlor`
+    - Church of the Cuckoo `church_of_the_cuckoo`
+    - Academy Rooftops `academy_rooftops`
+    - Academy Crystal Cave `academy_crystal_cave`
+    - Raya Lucaria Grand Library `grand_library`
+  - Caria Manor `caria_manor`
+    - Road to the Manor `road_to_the_manor`
+    - Main Caria Manor Gate `main_caria_manor_gate`
+    - Manor Upper Level `manor_upper_level`
+    - Manor Lower Level `manor_lower_level`
+    - Royal Moongazing Grounds `royal_moongazing_grounds`
+    - The Three Sisters `three_sisters`
+      - Ranni's Rise `ranni_s_rise`
+      - Seluvis's Rise `seluvis_rise`
+        - Seluvis's Secret Room `seluvis_secret_room`
+      - Renna's Rise `rennas_rise`
+  - Chelona's Rise `chelonas_rise`
+  - Testu's Rise `testus_rise`
+  - Carian Study Hall `carian_study_hall`
+  - Liurnia Tower Bridge `liurnia_tower_bridge`
+  - Divine Tower of Liurnia `divine_tower_liurnia`
+  - Church of Irith `church_of_irith`
+  - Temple Quarter `temple_quarter`
+  - Frenzied Flame Village `frenzied_flame_village`
+    - Frenzy-Flaming Tower `frenzy_flaming_tower`
+  - Church of Vows `church_of_vows`
+  - Bellum Highway `bellum_highway`
+  - Bellum Church `bellum_church`
+  - Grand Lift of Dectus `grand_lift_of_dectus`
+  - Converted Tower `converted_tower`
+  - Converted Fringe Tower `converted_fringe_tower`
+  - Revenger's Shack `revengers_shack`
+  - Slumbering Wolf's Shack `slumbering_wolfs_shack`
+  - Artist's Shack (Liurnia) `artists_shack_liurnia`
+  - Lunar Estate Ruins `lunar_estate_ruins`
+  - Kingsrealm Ruins `kingsrealm_ruins`
+  - Moonfolk Ruins `moonfolk_ruins`
+  - Purified Ruins `purified_ruins`
+  - Fallen Ruins of the Lake `fallen_ruins_of_the_lake`
+  - Foot of the Four Belfries `foot_of_the_four_belfries`
+  - The Four Belfries `the_four_belfries`
+  - Ainsel River Well `ainsel_river_well`
+  - Deep Ainsel Well `deep_ainsel_well`
+  - Road's End Catacombs `road_s_end_catacombs`
+  - Cliffbottom Catacombs `cliffbottom_catacombs`
+  - Black Knife Catacombs `black_knife_catacombs`
+  - Village of the Albinaurics `village_of_the_albinaurics`
+  - Royal Grave Evergaol `royal_grave_evergaol`
+  - Cuckoo's Evergaol `cuckoos_evergaol`
+  - Jarburg `jarburg`
+  - Malefactor's Evergaol `malefactors_evergaol`
+  - Church of Inhibition `church_of_inhibition`
+  - Rose Church `rose_church`
+- Moonlight Altar `moonlight_altar`
+  - Cathedral of Manus Celes `cathedral_of_manus_celes`
+  - Ringleader's Evergaol `ringleaders_evergaol`
+- Altus Plateau `altus_plateau`
+  - Ruin-Strewn Precipice `ruin_strewn_precipice`
+  - Writheblood Ruins `writheblood_ruins`
+  - Erdtree-Gazing Hill `erdtree_gazing_hill`
+  - Altus Highway Junction `altus_highway_junction`
+  - Dectus Lift Landing `grand_lift_landing`
+  - Lux Ruins `lux_ruins`
+  - Stormcaller Church `stormcaller_church`
+  - Woodfolk Ruins `woodfolk_ruins`
+  - Forest-Spanning Greatbridge `forest_spanning_greatbridge`
+  - Bower of Bounty `bower_of_bounty`
+  - Perfumer's Ruins `perfumers_ruins`
+  - Perfumer's Grotto `perfumers_grotto`
+  - Second Church of Marika `second_church_of_marika`
+  - Sainted Hero's Grave `sainted_heros_grave`
+  - Sealed Tunnel `sealed_tunnel`
+  - Divine Tower of West Altus `divine_tower_west_altus`
+  - Dominula, Windmill Village `windmill_village`
+    - Windmill Heights `windmill_heights`
+  - Wyndham Ruins `wyndham_ruins`
+  - Sage's Cave `sages_cave`
+  - Altus Tunnel `altus_tunnel`
+  - Old Altus Tunnel `old_altus_tunnel`
+  - Rampartside Path `rampartside_path`
+  - Capital Outskirts `capital_outskirts`
+    - Outer Wall Phantom Tree `outer_wall_phantom_tree`
+    - Outer Wall Battleground `outer_wall_battleground`
+    - Minor Erdtree (Capital Outskirts) `minor_erdtree_outskirts`
+    - Auriza Hero's Grave `auriza_heros_grave`
+    - Hermit Merchant's Shack `hermit_merchants_shack`
+    - Capital Rampart `fortified_manor_gate`
+  - Leyndell, Royal Capital `leyndell`
+    - Avenue Balcony `avenue_balcony`
+    - East Capital Rampart `east_capital_rampart`
+    - West Capital Rampart `west_capital_rampart`
+    - Lower Capital Church `lower_capital_church`
+    - Fortified Manor `fortified_manor`
+      - Queen's Bedchamber `queens_bedchamber`
+    - Erdtree Sanctuary `erdtree_sanctuary`
+    - Elden Throne `elden_throne`
+    - Leyndell Colosseum `leyndell_colosseum`
+    - Corpse of Gransax `gransax_carcass`
+    - Subterranean Shunning-Grounds `subterranean_shunning_grounds`
+      - Underground Roadside `underground_roadside`
+      - Forsaken Depths `forsaken_depths`
+      - Frenzied Flame Proscription `frenzied_flame_proscription`
+      - Cathedral of the Forsaken `cathedral_of_the_forsaken`
+      - Leyndell Catacombs `leyndell_catacombs`
+  - Mt. Gelmir `mt_gelmir`
+    - First Mt. Gelmir Campsite `first_mt_gelmir_campsite`
+    - Ninth Mt. Gelmir Campsite `ninth_mt_gelmir_campsite`
+    - Corpse-Stench Shack `corpse_stench_shack`
+    - Minor Erdtree (Mt. Gelmir) `minor_erdtree_gelmir`
+    - Craftsman's Shack `craftsmans_shack`
+    - Volcano Cave `volcano_cave`
+    - Fort Laiedd `fort_laiedd`
+    - Seethewater Terminus `seethewater_terminus`
+    - Hermit Village `hermit_village`
+      - Azur's Ledge `primeval_azur_ledge`
+    - Gelmir Hero's Grave `gelmir_heros_grave`
+    - Road of Iniquity `road_of_iniquity_side_path`
+    - Volcano Manor `volcano_manor`
+      - Guest Hall `volcano_manor_guest_hall`
+      - Audience Pathway `audience_pathway`
+      - Rykard's Cavern `rykards_cavern`
+      - Temple of Eiglay `temple_of_eiglay`
+      - Prison Town Church `prison_town_church`
+      - Subterranean Inquisition Chamber `subterranean_inquisition_chamber`
+  - The Shaded Castle `shaded_castle`
+    - Shaded Castle Ramparts `shaded_castle_ramparts`
+    - Shaded Castle Inner Gate `shaded_castle_inner_gate`
+    - Castellan's Hall `castellans_hall`
+- Inside the Erdtree `erdtree_interior`
+- Divine Bridge `divine_bridge`
+- Forbidden Lands `forbidden_lands`
+  - Divine Tower of East Altus `divine_tower_east_altus`
+  - Grand Lift of Rold `grand_lift_of_rold`
+- Caelid `caelid`
+  - Smoldering Wall `smoldering_wall`
+  - Smoldering Church `smoldering_church`
+  - Rotview Balcony `rotview_balcony`
+  - Fort Gael `fort_gael`
+  - Gael Tunnel `gael_tunnel`
+  - Caelem Ruins `caelem_ruins`
+  - Caelid Catacombs `caelid_catacombs`
+  - Minor Erdtree (Caelid) `minor_erdtree_caelid`
+  - Cathedral of Dragon Communion `cathedral_of_dragon_communion`
+  - Sellia Gateway `sellia_gateway`
+  - Swamp of Aeonia `swamp_of_aeonia`
+    - Heart of Aeonia `heart_of_aeonia`
+    - Aeonia Swamp Shore `aeonia_swamp_shore`
+  - Sellia, Town of Sorcery `sellia_town`
+    - Sellia Backstreets `sellia_backstreets`
+    - Chair-Crypt of Sellia `chair_crypt_of_sellia`
+    - Sellia Under-Stair `sellia_under_stair`
+    - Sellia Hideaway `sellia_hideaway`
+  - Sellia Crystal Tunnel `sellia_crystal_tunnel`
+  - Church of the Plague `church_of_the_plague`
+  - Gowry's Shack `gowrys_shack`
+  - Shack of the Rotting `shack_of_the_rotting`
+  - Street of Sages Ruins `street_of_sages_ruins`
+  - Caelid Waypoint Ruins `caelid_waypoint_ruins`
+  - Redmane Castle `redmane_castle`
+    - Impassable Greatbridge `impassable_greatbridge`
+    - Redmane Castle Plaza `redmane_plaza`
+    - Chamber Outside the Plaza `chamber_outside_plaza`
+  - Abandoned Cave `abandoned_cave`
+  - Gaol Cave `gaol_cave`
+  - Sellia Evergaol `sellia_evergaol`
+  - Caelid Colosseum `caelid_colosseum`
+  - Divine Tower of Caelid `divine_tower_caelid`
+- Wailing Dunes `wailing_dunes`
+  - War-Dead Catacombs `war_dead_catacombs`
+- Isolated Divine Tower `isolated_divine_tower`
+- Greyoll's Dragonbarrow `dragonbarrow`
+  - Fort Faroth `fort_faroth`
+  - Bestial Sanctum `bestial_sanctum`
+  - Dragonbarrow Cave `dragonbarrow_cave`
+  - Lenne's Rise `lennes_rise`
+  - Farum Greatbridge `farum_greatbridge`
+  - Isolated Merchant's Shack (Dragonbarrow)
+    `isolated_merchants_shack_dragonbarrow`
+- Mountaintops of the Giants `mountaintops_of_giants`
+  - Zamor Ruins `zamor_ruins`
+  - Giant-Conquering Hero's Grave `giant_conquering_heros_grave`
+  - Giants' Gravepost `giants_gravepost`
+  - Church of Repose `church_of_repose`
+  - First Church of Marika `first_church_of_marika`
+  - Foot of the Forge `foot_of_the_forge`
+  - Flame Peak `flame_peak`
+    - Forge of the Giants `forge_of_the_giants`
+  - Stargazers' Ruins (Mountaintops) `stargazers_ruins`
+  - Shack of the Lofty `shack_of_the_lofty`
+  - Ancient Snow Valley Ruins `ancient_snow_valley_ruins`
+  - Freezing Lake `freezing_lake`
+    - Spiritcaller Cave `spiritcaller_cave`
+  - Guardians' Garrison `guardians_garrison`
+  - Castle Sol `castle_sol`
+    - Castle Sol Main Gate `castle_sol_main_gate`
+    - Church of the Eclipse `church_of_the_eclipse`
+    - Castle Sol Rooftop `castle_sol_rooftop`
+  - Lord Contender's Evergaol `lord_contenders_evergaol`
+  - Minor Erdtree (Mountaintops) `minor_erdtree_mountaintops`
+  - Whiteridge Road `whiteridge_road`
+- Consecrated Snowfield `consecrated_snowfield`
+  - Inner Consecrated Snowfield `inner_consecrated_snowfield`
+  - Yelough Anix Ruins `yelough_anix_ruins`
+  - Yelough Anix Tunnel `yelough_anix_tunnel`
+  - Cave of the Forlorn `cave_of_the_forlorn`
+  - Consecrated Snowfield Catacombs `consecrated_snowfield_catacombs`
+  - Apostate Derelict `apostate_derelict`
+  - Ordina, Liturgical Town `ordina_liturgical_town`
+  - Hidden Path to the Haligtree `hidden_path_to_the_haligtree`
+- Miquella's Haligtree `haligtree`
+  - Haligtree Canopy `haligtree_canopy`
+  - Haligtree Town `haligtree_town`
+    - Haligtree Town Plaza `haligtree_town_plaza`
+  - Haligtree Promenade `haligtree_promenade`
+  - Elphael, Brace of the Haligtree `elphael`
+    - Prayer Room `prayer_room`
+    - Elphael Inner Wall `elphael_inner_wall`
+    - Drainage Channel `drainage_channel`
+    - Haligtree Roots `haligtree_roots`
+- Crumbling Farum Azula `crumbling_farum_azula`
+  - Crumbling Beast Grave `crumbling_beast_grave`
+  - Dragon Temple `dragon_temple`
+    - Dragon Temple Altar `dragon_temple_altar`
+    - Dragon Temple Rooftop `dragon_temple_rooftop`
+  - Beside the Great Bridge `beside_the_great_bridge`
+  - Sanctum of the Black Blade `malikeths_sanctum`
+  - Dragonlord's Seat `placidusax_nest`
+- Siofra River `siofra_river`
+  - Siofra River Bank `siofra_river_bank`
+  - Worshippers' Woods `worshippers_woods`
+  - Ancestral Woods `ancestral_woods`
+    - Hallowhorn Grounds `hallowhorn_grounds`
+- Nokron, Eternal City `nokron_eternal_city`
+  - Siofra Aqueduct `siofra_aqueduct`
+  - Aqueduct-Facing Cliffs `aqueduct_facing_cliffs`
+  - Night's Sacred Ground `nights_sacred_ground`
+  - Silver Tear Chamber `mimic_tear_chamber`
+- Ainsel River `ainsel_river`
+  - Ainsel River Main `ainsel_river_main`
+  - Nokstella, Eternal City `nokstella`
+    - Grand Cloister `grand_cloister`
+  - Uhl Palace Ruins `uhl_palace_ruins`
+- Lake of Rot `lake_of_rot`
+  - Astel's Chamber `astels_lair`
+- Deeproot Depths `deeproot_depths`
+  - Great Waterfall Crest `great_waterfall_crest`
+  - Across the Roots `across_the_roots`
+  - Nameless Eternal City `nameless_eternal_city`
+  - Prince of Death's Throne `prince_of_deaths_throne`
+- Mohgwyn Palace `mohgwyn_palace`
+  - Palace Approach Ledge-Road `palace_approach_ledge_road`
+  - Mohgwyn Dynasty Mausoleum `mohgwyn_dynasty_mausoleum`
+  - Cocoon of the Empyrean `cocoon_of_the_empyrean`
+- Roundtable Hold `roundtable_hold`
+  - The Round Table `roundtable_great_hall`
+  - Hewg's Forge `hewgs_forge`
+  - Gideon's Study `gideons_study`
+  - Chamber of the Two Fingers `two_fingers_chamber`
+  - Twin Maiden Husks' Alcove `twin_maiden_husks_room`
+  - Fia's Chamber `fia_bedchamber`
+  - D's Alcove `d_alcove`
+  - The Hold's Cellar `roundtable_cellar`
+- The Scribe's Loft `scribes_loft`
+- Gravesite Plain `gravesite_plain`
+  - Miquella's Arm `gravesite_arrival`
+  - Scorched Ruins `scorched_ruins`
+  - Main Gate Cross `main_gate_cross`
+  - Three-Path Cross `three_path_cross`
+  - Ellac River Cave `ellac_river_cave`
+  - Ellac Greatbridge `ellac_greatbridge`
+  - Belurat, Tower Settlement `belurat`
+    - Belurat Gaol `belurat_gaol`
+    - Small Private Altar `belurat_small_altar`
+    - Theatre of the Divine Beast `theatre_of_the_divine_beast`
+  - Castle Ensis `castle_ensis`
+    - Castle Front `castle_front`
+    - Ensis Moongazing Grounds `ensis_moongazing_grounds`
+    - Castle-Lord's Chamber `castle_lords_chamber`
+- Cerulean Coast `cerulean_coast`
+  - Cerulean Coast Cross `cerulean_coast_cross`
+  - Finger Ruins of Rhia `finger_ruins_of_rhia`
+  - Stone Coffin Fissure `stone_coffin_fissure`
+    - Garden of Deep Purple `garden_of_deep_purple`
+    - Fissure Depths `fissure_depths`
+  - Charo's Hidden Grave `charos_hidden_grave`
+  - Dragon's Pit `dragons_pit`
+- Jagged Peak `jagged_peak`
+  - Foot of the Jagged Peak `foot_of_the_jagged_peak`
+  - Grand Altar of Dragon Communion `grand_altar_of_dragon_communion`
+  - Jagged Peak Summit `jagged_peak_summit`
+- Scadu Altus `scadu_altus`
+  - Fort of Reprimand `fort_of_reprimand`
+  - Scadu Altus West `scadu_altus_west`
+  - Highroad Cross `highroad_cross`
+  - Moorth Ruins `moorth_ruins`
+  - Bonny Village `bonny_village`
+    - Bonny Gaol `bonny_gaol`
+  - Ruined Forge of Starfall Past `ruined_forge_of_starfall_past`
+  - Ruined Forge Lava Intake `ruined_forge_lava_intake`
+  - Church of Benediction `church_of_benediction`
+  - Church of the Crusade `church_of_the_crusade`
+  - Recluses' River `recluses_river`
+  - Village of Flies `village_of_flies`
+  - Cathedral of Manus Metyr `cathedral_of_manus_metyr`
+    - Finger Ruins of Miyr `finger_ruins_of_miyr`
+- Ancient Ruins of Rauh `ancient_ruins_of_rauh`
+  - Rauh Ruins West `rauh_ruins_west`
+  - Rauh Ruins East `rauh_ruins_east`
+  - Church of the Bud `church_of_the_bud`
+- Rauh Base `rauh_base`
+  - Ancient Ruins Base `ancient_ruins_base`
+  - Rabbath's Rise `rabbaths_rise`
+  - Scorpion River Catacombs `scorpion_river_catacombs`
+- Shadow Keep `shadow_keep`
+  - Main Gate Plaza `main_gate_plaza`
+  - Shadow Keep Main Gate `shadow_keep_main_gate`
+  - West Rampart `west_rampart`
+  - Specimen Storehouse `specimen_storehouse`
+    - Storehouse, Seventh Floor `storehouse_seventh_floor`
+  - Messmer's Dark Chamber `messmers_dark_chamber`
+  - Shadow Keep, Church District `church_district`
+    - Sunken Chapel `sunken_chapel`
+    - Tree-Worship Sanctum `tree_worship_sanctum`
+- Scaduview `scaduview`
+  - Scadutree Base `scadutree_base`
+  - Shaman Village `shaman_village`
+  - Hinterland `hinterland`
+    - Finger Ruins of Dheo `finger_ruins_of_dheo`
+- Abyssal Woods `abyssal_woods`
+  - Divided Falls `divided_falls`
+  - Midra's Manse `midras_manse`
+    - Manse Hall `manse_hall`
+    - Discussion Chamber `discussion_chamber`
+    - Midra's Library `midras_library`
+- Enir-Ilim `enir_ilim`
+  - First Rise `first_rise`
+  - Spiral Rise `spiral_rise`
+  - Cleansing Chamber Anteroom `cleansing_chamber_anteroom`
+  - Divine Gatefront Staircase `divine_gatefront_staircase`
+  - Gate of Divinity `gate_of_divinity`
+
+## Simulated characters (113)
+
+- Queen Marika the Eternal `queen-marika`, golden_order, starts at
+  `erdtree_interior`
+- Godfrey, First Elden Lord `godfrey`, tarnished, starts at `rampartside_path`
+- Margit, the Fell Omen `margit`, leyndell_royal_capital, starts at `stormgate`
+- Mohg, Lord of Blood `mohg`, mohgwyn_dynasty, starts at
+  `cocoon_of_the_empyrean`
+- Godrick the Grafted `godrick`, stormveil_court, starts at `godricks_hall`
+- Starscourge Radahn `radahn`, redmanes, starts at `wailing_dunes`
+- Rykard, Lord of Blasphemy `rykard`, recusants, starts at `rykards_cavern`
+- Ranni the Witch `ranni`, carian_royal_family, starts at `ranni_s_rise`
+- Rennala, Queen of the Full Moon `rennala`, carian_royal_family, starts at
+  `grand_library`
+- Malenia, Blade of Miquella `malenia`, haligtree_order, starts at
+  `haligtree_roots`
+- Miquella the Kind `miquella`, haligtree_order, starts at
+  `divine_gatefront_staircase`
+- St. Trina `st-trina`, haligtree_order, starts at `garden_of_deep_purple`
+- Messmer the Impaler `messmer`, messmer_army, starts at `messmers_dark_chamber`
+- Melina `melina`, golden_order, starts at `first_step`
+- Gurranq, Beast Clergyman `gurranq`, realm_farum_azula, starts at
+  `bestial_sanctum`
+- Rellana, Twin Moon Knight `rellana`, messmer_army, starts at
+  `castle_lords_chamber`
+- Sir Gideon Ofnir, the All-Knowing `gideon-ofnir`, roundtable, starts at
+  `gideons_study`
+- Finger Reader Enia `finger-reader-enia`, finger_readers, starts at
+  `two_fingers_chamber`
+- Smithing Master Hewg `smithing-master-hewg`, roundtable, starts at
+  `hewgs_forge`
+- Sorcerer Rogier `sorcerer-rogier`, roundtable, starts at `stormveil_chapel`
+- Fia, Deathbed Companion `fia`, deathbed_companions, starts at `fia_bedchamber`
+- D, Hunter of the Dead `d-hunter-of-the-dead`, hunters_of_dead, starts at
+  `d_alcove`
+- D, Beholder of Death `d-beholder-of-death`, hunters_of_dead, starts at
+  `siofra_aqueduct`
+- Nepheli Loux `nepheli-loux`, roundtable, starts at `secluded_cell`
+- Kenneth Haight `kenneth-haight`, house_haight, starts at `mistwood_ruins`
+- Gatekeeper Gostoc `gatekeeper-gostoc`, stormveil_court, starts at
+  `gateside_chamber`
+- Roderika `roderika`, stormveil_court, starts at `stormhill_shack`
+- The Dung Eater `dung-eater`, roundtable, starts at `roundtable_cellar`
+- Knight Diallos `knight-diallos`, house_hoslow, starts at `academy_gate_town`
+- The Twin Maiden Husks `twin-maiden-husks`, finger_readers, starts at
+  `twin_maiden_husks_room`
+- Brother Corhyn `brother-corhyn`, golden_order, starts at
+  `roundtable_great_hall`
+- Goldmask `goldmask`, golden_order, starts at `altus_highway_junction`
+- Ensha of the Royal Remains `ensha`, roundtable, starts at `gideons_study`
+- Vyke, the Dragonspear `vyke`, roundtable, starts at `lord_contenders_evergaol`
+- Tanith, Volcano Manor Proprietress `tanith`, recusants, starts at
+  `volcano_manor_guest_hall`
+- Rya `rya`, recusants, starts at `laskyar_ruins`
+- Knight Bernahl `knight-bernahl`, recusants, starts at `warmasters_shack`
+- Patches `patches`, tarnished, starts at `murkwater_cave`
+- Juno Hoslow `juno-hoslow`, house_hoslow, starts at `shack_of_the_lofty`
+- Inquisitor Ghiza `inquisitor-ghiza`, recusants, starts at
+  `subterranean_inquisition_chamber`
+- Recusant Henricus `recusant-henricus`, recusants, starts at
+  `limgrave_colosseum`
+- Rileigh the Idle `rileigh`, confessors, starts at `old_altus_tunnel`
+- Old Knight Istvan `old-knight-istvan`, tarnished, starts at
+  `limgrave_colosseum`
+- Vargram the Raging Wolf `vargram`, roundtable, starts at `fortified_manor`
+- Blaidd the Half-Wolf `blaidd`, ranni_followers, starts at `mistwood_ruins`
+- War Counselor Iji `iji`, ranni_followers, starts at `road_to_the_manor`
+- Preceptor Seluvis `seluvis`, ranni_followers, starts at `seluvis_rise`
+- Pidia, Carian Servant `pidia`, carian_royal_family, starts at
+  `manor_lower_level`
+- Loretta, Knight of the Haligtree `loretta`, haligtree_order, starts at
+  `haligtree_promenade`
+- Latenna the Albinauric `latenna`, haligtree_order, starts at
+  `slumbering_wolfs_shack`
+- Old Albus `albus`, albinaurics, starts at `village_of_the_albinaurics`
+- Sorceress Sellen `sellen`, academy_of_raya_lucaria, starts at `waypoint_ruins`
+- Castellan Jerren `jerren`, redmanes, starts at `redmane_plaza`
+- Sorcerer Thops `thops`, academy_of_raya_lucaria, starts at `church_of_irith`
+- Preceptor Miriam `preceptor-miriam`, carian_royal_family, starts at
+  `carian_study_hall`
+- Primeval Sorcerer Lusat `lusat`, academy_of_raya_lucaria, starts at
+  `sellia_hideaway`
+- Primeval Sorcerer Azur `azur`, academy_of_raya_lucaria, starts at
+  `primeval_azur_ledge`
+- Sage Gowry `gowry`, servants_of_rot, starts at `gowrys_shack`
+- Millicent `millicent`, servants_of_rot, starts at `church_of_the_plague`
+- Alexander, Warrior Jar `alexander`, jar_folk, starts at `saintsbridge`
+- Jar-Bairn `jar-bairn`, jar_folk, starts at `jarburg`
+- The Great-Jar `great-jar`, jar_folk, starts at `caelid_colosseum`
+- Boc the Seamster `boc`, demi_humans, starts at `agheel_lake`
+- Merchant Kalé `kale`, great_caravans, starts at `church_of_elleh`
+- White Mask Varré `varre`, mohgwyn_dynasty, starts at `first_step`
+- Irina of Morne `irina`, morne_garrison, starts at `bridge_of_sacrifice`
+- Castellan Edgar `edgar`, morne_garrison, starts at `morne_inner_keep`
+- Bloody Finger Hunter Yura `yura`, hunters_of_dead, starts at `seaside_ruins`
+- Eleonora, Violet Bloody Finger `eleonora`, mohgwyn_dynasty, starts at
+  `second_church_of_marika`
+- Shabriri `shabriri`, frenzied_flame, starts at `zamor_ruins`
+- Lightseeker Hyetta `hyetta`, frenzied_flame, starts at `lake_facing_cliffs`
+- Anastasia, Tarnished-Eater `anastasia`, recusants, starts at
+  `corpse_stench_shack`
+- Bloody Finger Nerijus `nerijus`, mohgwyn_dynasty, starts at
+  `murkwater_catacombs`
+- Blackguard Big Boggart `big-boggart`, tarnished, starts at `boilprawn_shack`
+- Miriel, Pastor of Vows `miriel`, golden_order, starts at `church_of_vows`
+- Perfumer Tricia `tricia`, perfumers, starts at `perfumers_ruins`
+- Maleigh Marais `maleigh-marais`, house_marais, starts at `castellans_hall`
+- Elemer of the Briar `elemer`, house_marais, starts at `castellans_hall`
+- Commander O'Neil `oneil`, redmanes, starts at `heart_of_aeonia`
+- Commander Niall `niall`, banished_knights, starts at `castle_sol_rooftop`
+- Chief Guardian Arghanthy `arghanthy`, fire_monks, starts at
+  `guardians_garrison`
+- Adan, Thief of Fire `adan`, fire_monks, starts at `malefactors_evergaol`
+- Alecto, Black Knife Ringleader `alecto`, black_knives, starts at
+  `ringleaders_evergaol`
+- Godefroy the Grafted `godefroy`, stormveil_court, starts at `fortified_manor`
+- Ancient Dragon Lansseax `lansseax`, ancient_dragon_cult, starts at
+  `rampartside_path`
+- Dragon Communion Priest `dragon-priest`, ancient_dragon_cult, starts at
+  `church_of_dragon_communion`
+- Dragonlord Placidusax `placidusax`, realm_farum_azula, starts at
+  `placidusax_nest`
+- Esgar, Priest of Blood `esgar`, mohgwyn_dynasty, starts at
+  `leyndell_catacombs`
+- Necromancer Garris `garris`, tarnished, starts at `sages_cave`
+- Needle Knight Leda `leda`, haligtree_order, starts at `gravesite_arrival`
+- Sir Ansbach `ansbach`, haligtree_order, starts at `gravesite_arrival`
+- Redmane Freyja `freyja`, redmanes, starts at `three_path_cross`
+- The Hornsent `hornsent`, hornsent_people, starts at `three_path_cross`
+- Thiollier `thiollier`, haligtree_order, starts at `cerulean_coast_cross`
+- Moore `moore`, haligtree_order, starts at `main_gate_cross`
+- Igon `igon`, ancient_dragon_cult, starts at `ruined_forge_lava_intake`
+- Fire Knight Queelign `queelign`, messmer_army, starts at `belurat`
+- Count Ymir `count-ymir`, two_fingers, starts at `cathedral_of_manus_metyr`
+- Jolán, Swordhand of Night `jolan`, two_fingers, starts at
+  `cathedral_of_manus_metyr`
+- Dryleaf Dane `dryleaf-dane`, haligtree_order, starts at `moorth_ruins`
+- Hornsent Grandam `hornsent-grandam`, hornsent_people, starts at
+  `belurat_small_altar`
+- Romina, Saint of the Bud `romina`, hornsent_people, starts at
+  `church_of_the_bud`
+- Commander Gaius `gaius`, messmer_army, starts at `west_rampart`
+- Sage Midra `midra`, frenzied_flame, starts at `midras_library`
+- Jori, Elder Inquisitor `jori`, hornsent_people, starts at `abyssal_woods`
+- Dragon Communion Priestess `dragon-communion-priestess`, ancient_dragon_cult,
+  starts at `grand_altar_of_dragon_communion`
+- Bayle the Dread `bayle`, ancient_dragon_cult, starts at `jagged_peak_summit`
+- Vyke's Finger Maiden `vykes-maiden`, finger_readers, starts at
+  `church_of_inhibition`
+- The Keeper of the Forbidden Lands `finger-reader-crone`, finger_readers,
+  starts at `grand_lift_of_rold`
+- Bloody Finger Okina `okina`, mohgwyn_dynasty, starts at `church_of_repose`
+- Lionel the Lionhearted `lionel`, deathbed_companions, starts at
+  `nameless_eternal_city`
+- Magnus the Beast Claw `magnus`, recusants, starts at `writheblood_ruins`
+- Great Horned Tragoth `tragoth`, tarnished, starts at `ruin_strewn_precipice`
+
+## Background characters (64)
+
+- Radagon of the Golden Order `radagon`
+- Godwyn the Golden `godwyn`
+- Morgott, the Omen King `morgott`
+- Maliketh, the Black Blade `maliketh`
+- The Two Fingers `two-fingers`
+- The Three Fingers `three-fingers`
+- Lanya `lanya`
+- Dolores the Sleeping Arrow `dolores`
+- Black Knife Tiche `tiche`
+- Bloodhound Knight Darriwil `darriwil`
+- Phillia, Towering Little Sister `phillia`
+- Boc's Mother `boc-mother`
+- Lichdragon Fortissax `fortissax`
+- Ancient Dragon Gransax `gransax`
+- Elder Dragon Greyoll `greyoll`
+- Flying Dragon Agheel `agheel`
+- Glintstone Dragon Adula `adula`
+- Glintstone Dragon Smarag `smarag`
+- Borealis the Freezing Fog `borealis`
+- Decaying Ekzykes `ekzykes`
+- Astel, Naturalborn of the Void `astel`
+- The Last Fire Giant `fire-giant`
+- The Elden Beast `elden-beast`
+- Metyr, Mother of Fingers `metyr`
+- Torrent `torrent`
+- Leonard `leonard`
+- Swordhand of Night Anna `anna`
+- Yuri `yuri`
+- Nanaya `nanaya`
+- Fire Knight Salza `salza`
+- Serosh `serosh`
+- Bernahl's Finger Maiden `bernahls-maiden`
+- Finger Maiden Therolina `therolina`
+- Errant Sorcerer Wilhelm `wilhelm`
+- Mad Tongue Alberich `alberich`
+- Inaba, the White Reeds `inaba`
+- Crucible Knight Ordovis `ordovis`
+- Crucible Knight Siluria `siluria`
+- Crucible Knight Devonia `devonia`
+- Black Knight Garrew `garrew`
+- Black Knight Commander Andreas `andreas`
+- Fire Knight Wego `wego`
+- Fire Knight Kood `kood`
+- Curseblade Labirith `labirith`
+- Spellmachinist Rabbath `rabbath`
+- Fire Knight Hilde `hilde`
+- The Storm Lord `storm-lord`
+- The Blind Swordsman `blind-swordsman`
+- The Gloam-Eyed Queen `gloam-eyed-queen`
+- The Base Serpent `base-serpent`
+- Rosus, Usher of Death `rosus`
+- The Twinbird `twinbird`
+- Grafted Scion `grafted-scion`
+- Leonine Misbegotten `leonine-misbegotten`
+- The Godskin Apostle `godskin-apostle`
+- The Godskin Noble `godskin-noble`
+- The Mimic Tear `mimic-tear`
+- The Regal Ancestor Spirit `regal-ancestor`
+- The Fell Twins `fell-twins`
+- Divine Beast Dancing Lion `dancing-lion`
+- The Putrescent Knight `putrescent-knight`
+- The Scadutree Avatar `scadutree-avatar`
+- The Nomadic Merchants `nomadic-merchants`
+- Stranded Souls `stranded-souls`

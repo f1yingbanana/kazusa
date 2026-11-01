@@ -96,53 +96,34 @@
 >
 > 如果你对项目感兴趣但不想自己部署，可以[在这里加入候补名单](https://openrp.ai/kazusa)。等我们上线一键部署的云端服务后，会第一时间发邮件通知你。
 
-首先需要一个 [OpenRouter](https://openrouter.ai)
-密钥来驱动对话、决策和记忆功能。这里你也可以手动配置来自不同服务商的模型并使用对应的 API 密钥。你可以自己按照以下流程操作，也可以直接交给 AI 来跑。
-
-### 1. 安装
-
-你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及 **Git**。
+你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及
+**Git**，并使用 macOS、Linux 或 WSL。然后只需运行一条命令：
 
 ```bash
-git clone [https://github.com/f1yingbanana/kazusa.git](https://github.com/f1yingbanana/kazusa.git)
-cd kazusa
-npm ci
-
+git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 ```
 
-### 2. 输入你的 API 密钥
+它会安装所有依赖，并在 **http://localhost:3000** 打开引导页面，依次询问：
 
-创建一个 [OpenRouter API 密钥](https://openrouter.ai/keys)，为账户充值后运行：
+1. **世界**：碧蓝档案、艾尔登法环，或者和内置系统管理员 **ARONA**
+   一起从零搭建的空世界。
+2. **登场角色和故事开始的时间**（仅现成的世界需要）。
+3. **[OpenRouter API 密钥](https://openrouter.ai/keys)**：同时驱动对话、决策（**TypeSafe
+   Jev**）和记忆检索（**text-embedding-3-small**）。引导页面也说明了如何分别配置不同的服务商。
 
-```bash
-npm run setup
+你的世界保存在
+`apps/kazusa/world/`，不会被提交。想重新开始，停止 Kazusa 并删除该文件夹即可。之后随时运行
+`npm run dev` 回来，按一次 Ctrl+C 停止。
 
-```
+### 与 **ARONA** 对话
 
-在安装引导提示中粘贴你的密钥，接受默认的对话模型，或选择其他支持工具调用的模型。安装会使用同一个密钥预先配置好用于决策的
-**TypeSafe Jev** 和用于记忆检索的 **text-embedding-3-small**，连接前端，并初始化
-**ARONA**。
-
-参数更大、能力更强的模型可以提升角色还原度和前后一致性，但成本更高、响应更慢。如需自定义模型或服务商，请参考
-[OpenClaw 官方指南](https://docs.openclaw.ai/concepts/model-providers)。
-
-> [!NOTE]
->
-> 理论上是可以不用Jev和embedding的，但是不用前者会大大降低处理多线程事件的速度，后者会大大降低概念搜索的准确度
-
-### 3. 启动并与 **ARONA** 对话
-
-```bash
-npm run dev
-```
-
-这会同时启动前后端。在浏览器打开 **http://localhost:3000**，在角色列表中选择
-**ARONA**，然后点击 **Message**。附上一张 **.png 或 .json 角色卡**，试着发送：
+在角色列表中选择 **ARONA**，然后点击 **Message**。附上一张
+**.png 或 .json 角色卡**，试着发送：
 
 > 帮我导入这个角色，并围绕 TA 搭建一个小世界。先问我关于世界观设定的问题，然后帮 TA 设置好记忆 Wiki。
 
 你也可以直接描述原创角色，让 ARONA 先生成一份初稿，之后再手动编辑他们的
-`IDENTITY.md` 或 `SOUL.md` 文件。
+`IDENTITY.md` 或 `SOUL.md` 文件。你可以随时在 **Settings** 中更换对话模型。
 
 ## 参与共建
 

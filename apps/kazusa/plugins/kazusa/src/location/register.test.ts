@@ -616,6 +616,7 @@ describe("location registration", () => {
   it("takes an offstage character out of the world, seen leaving", async () => {
     const stage = createStage(createInMemoryStore<StageRecord>(), {
       defaultOnstage: true,
+      cast: [],
     });
     const { call, location, stores } = setup({ stage });
     const received: Stimulus[] = [];

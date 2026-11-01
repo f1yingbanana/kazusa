@@ -151,7 +151,7 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "baseUrlEnv": {
+              "baseUrl": {
                 "type": "string"
               },
               "apiKeyEnv": {
@@ -415,6 +415,21 @@
           }
         }
       },
+      "clock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "description": "Simulation time a new world starts at (ISO 8601). Default: now."
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Speed a new world starts at; 0 starts it paused. Default: 1."
+          }
+        }
+      },
       "stage": {
         "type": "object",
         "additionalProperties": false,
@@ -423,12 +438,32 @@
             "type": "boolean",
             "default": true,
             "description": "Whether a character never switched on or off is simulated. Set false for a large cast players pick from."
+          },
+          "cast": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Characters onstage from the start even when defaultOnstage is false."
           }
         }
       }
     }
   },
+  "decisionModels": [
+    {
+      "provider": "jev",
+      "id": "jev-latest",
+      "name": "Jev",
+      "capabilities": {
+        "questionTypes": ["boolean", "choice", "score"],
+        "maxQuestions": 256,
+        "maxChoiceAlternatives": 255,
+        "maxScoreLevels": 10,
+        "confidence": "provider-specific"
+      }
+    }
+  ],
   "contracts": {
+    "decisionProviders": ["jev"],
     "tools": [
       "clock_now",
       "clock_set_speed",

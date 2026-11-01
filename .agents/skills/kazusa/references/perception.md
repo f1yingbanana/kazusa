@@ -33,9 +33,9 @@ Kazusa refactors Perception to use OpenClaw's native **Decision Model API**:
   categorical logits.
 - **Verbatim Stimulus Preservation**: Stimuli admitted to the brain pass through
   completely intact. No hallucinations, omissions, or generative paraphrasing.
-- **Supported Providers**: TypeSafe AI Jev (`typesafe/jev-latest`,
-  `typesafe/jev-1.13.0`), local Kev (ONNX/GGUF), or OpenClaw-hosted decision
-  endpoints.
+- **Provider**: `jev/jev-latest` (`src/decisions/jev.ts`), hosted Jev through a
+  `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY`. Any other OpenClaw decision
+  provider works through `agents.defaults.decisionModel`.
 
 ---
 

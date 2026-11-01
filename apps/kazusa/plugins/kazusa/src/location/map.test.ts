@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { LOCATION_CONFIG } from "./config.ts";
 import {
   buildMap,
   describeTravel,
@@ -202,10 +201,12 @@ Body text.
     );
   });
 
-  const wikiDir = LOCATION_CONFIG.parse({}).wikiDir;
-  it.skipIf(!existsSync(`${wikiDir}/entities/places`))(
-    "loads the local World Wiki",
-    () => {
+  it.each(["blue-archive", "elden-ring", "starter"])(
+    "loads the %s world's wiki",
+    (id) => {
+      const wikiDir = fileURLToPath(
+        new URL(`../../../../worlds/${id}/shared/wiki`, import.meta.url),
+      );
       const world = loadWorld(wikiDir);
       expect(world?.map.places.size).toBeGreaterThan(0);
       for (const home of world?.homes.values() ?? []) {

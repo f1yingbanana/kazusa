@@ -127,11 +127,6 @@ export async function loadCharacterData(
     const cwd = process.cwd();
     const possiblePaths = [
       path.join(cwd, "shared/wiki/entities/characters", `${agentId}.md`),
-      path.join(
-        cwd,
-        "apps/kazusa/shared/wiki/entities/characters",
-        `${agentId}.md`,
-      ),
     ];
     for (const wikiPath of possiblePaths) {
       try {

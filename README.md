@@ -117,62 +117,39 @@ World timeline showing character actions, and location details:
 > consider [waitlisting here](https://openrp.ai/kazusa). We'll send an email
 > once we get this running as a one-click deploy service in the cloud.
 
-You will need an [OpenRouter](https://openrouter.ai) key to power conversation,
-decisions, and memory. Alternatively, you can set up models from different
-providers with different API keys manually. You or your coding agent can follow
-this setup flow.
-
-### 1. Install
-
-You'll need **Node.js 24.16+ (24.x) or 26.1+** and **Git**.
+You'll need **Node.js 24.16+ (24.x) or 26.1+**, **Git**, and macOS, Linux or
+WSL. Then run one command:
 
 ```bash
-git clone https://github.com/f1yingbanana/kazusa.git
-cd kazusa
-npm ci
+git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 ```
 
-### 2. Enter your API key
+It installs everything and opens a guide at **http://localhost:3000** that asks
+for:
 
-Create an [OpenRouter API key](https://openrouter.ai/keys), add credits to your
-account, then run:
+1. **A world**: Blue Archive, Elden Ring, or an empty one you build with
+   **ARONA**, the built-in system admin.
+2. **Who is onstage and when the story begins**, for the ready-made worlds.
+3. **An [OpenRouter API key](https://openrouter.ai/keys)**, which powers
+   conversation, decisions (**TypeSafe Jev**) and memory search
+   (**text-embedding-3-small**). The guide also explains how to set up separate
+   providers instead.
 
-```bash
-npm run setup
-```
+Your world lives in `apps/kazusa/world/`, which is never committed. To start
+again, stop Kazusa and delete that folder. Run `npm run dev` whenever you want
+to come back, and press Ctrl+C once to stop.
 
-Paste your key into the setup prompt and accept the default conversational
-model, or choose another **tool-capable** model. Setup preconfigures **TypeSafe
-Jev** for decisions and **text-embedding-3-small** for memory search using that
-same key, connects the frontend, and prepares **ARONA**.
+### Talk to **ARONA**
 
-Larger, more capable models can improve characterization and consistency, but
-usually cost more and respond more slowly. To customize models or providers,
-follow the
-[official OpenClaw guide](https://docs.openclaw.ai/concepts/model-providers).
-
-> [!NOTE]
->
-> Theoretically, you can skip Jev and embedding models. However, not using Jev
-> will greatly reduce the speed of processing simultaneous events, and not using
-> embedding models will greatly reduce the accuracy of memory and context
-> retrieval.
-
-### 3. Launch and talk to **ARONA**
-
-```bash
-npm run dev
-```
-
-This starts the Gateway and frontend together. Open **http://localhost:3000**,
-select **ARONA** in the character roster, and click **Message**. Attach a **.png
+Select **ARONA** in the character roster and click **Message**. Attach a **.png
 or .json character card** and try:
 
 > Import this character and help me build a small world around them. Ask me
 > about the setting, then set up their memory wiki.
 
 You can also describe original characters and ask ARONA to create a draft, then
-hand edit their IDENTITY.md or SOUL.md files.
+hand edit their IDENTITY.md or SOUL.md files. You can change the conversational
+model at any time in **Settings**.
 
 ## Build with us
 

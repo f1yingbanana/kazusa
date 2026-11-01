@@ -6,3 +6,6 @@ dist
 build
 .next
 .git
+
+# Written by `next dev`; reformatting it only makes the next run dirty the tree.
+apps/web/AGENTS.md

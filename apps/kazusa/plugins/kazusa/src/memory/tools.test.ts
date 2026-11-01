@@ -45,7 +45,6 @@ beforeEach(() => {
         wikiDir: path.join(root, "world"),
         anchors: WORLDS.saltmere.anchors,
         embedding: {
-          baseUrlEnv: "KAZUSA_NO_URL",
           apiKeyEnv: "KAZUSA_NO_KEY",
           model: "m",
         },

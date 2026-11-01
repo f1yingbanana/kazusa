@@ -30,12 +30,26 @@ function sharedClockCell(): ClockCell {
 }
 
 /** Registers Clock's tools, Gateway methods, and persistence hooks. */
+/** `plugins.entries.kazusa.config.clock`: where a new world's time begins. */
+const CLOCK_CONFIG = z.strictObject({
+  startAt: z.iso.datetime().optional(),
+  speed: z.number().nonnegative().optional(),
+});
+
 export function registerClock(api: OpenClawPluginApi): Clock {
   const store = api.runtime.state.openKeyedStore<ClockPersistedRecord>({
     namespace: "clock",
     retention: "retained",
   });
-  const clock = new Clock({ store, cell: sharedClockCell() });
+  const { startAt, speed } = CLOCK_CONFIG.parse(
+    (api.pluginConfig as { clock?: unknown } | undefined)?.clock ?? {},
+  );
+  const clock = new Clock({
+    store,
+    cell: sharedClockCell(),
+    initialTime: startAt,
+    defaultSpeed: speed,
+  });
 
   api.registerTool({
     name: "clock_now",
