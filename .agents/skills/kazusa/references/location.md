@@ -119,11 +119,12 @@ deferred (§5).
 space), `entry_minutes` (walk to the parent, default 1), `connections` (two-way,
 declared once, `ways` with the usual one first; `walk` reads as on foot). The
 body is the full description: whose a place is, how it is kept, how busy it
-gets. Character cards carry `home`. Loaded once at registration and validated
-loudly (unknown parents, cycles, bad or duplicate connections, a disconnected
-graph, unknown homes); a world without places disables Location. The local
-working set has 22 places (school, dorm with a room per character, Church
-Street, SCHALE); the wiki is git-ignored test data.
+gets. Character cards carry `home`. A file watcher keeps them current, so a new
+place needs no reload. A broken edit (unknown parents, cycles, bad or duplicate
+connections, a disconnected graph, unknown homes) keeps the last good map, and
+only a map broken from the start throws. A world without places disables
+Location. The local working set has 22 places (school, dorm with a room per
+character, Church Street, SCHALE); the wiki lives in `worlds/<id>/`.
 
 ### 4.2 Position and travel
 

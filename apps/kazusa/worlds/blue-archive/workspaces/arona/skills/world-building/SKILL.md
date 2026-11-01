@@ -46,16 +46,12 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Personal wiki, `MEMORY.md`, `SOUL.md`         | That character's coming turns               |
 | `IDENTITY.md`                                 | Coming turns, and the client's next refresh |
 | Adding to `agents.entries` in `openclaw.json` | By itself, but it can interrupt your turn   |
-| Any place, or a `home` on a character card    | Only after the user reloads the plugin      |
+| Any place, or a `home` on a character card    | Within a second, once the map loads         |
 | Concept pages                                 | Coming turns                                |
 
-The reload command is for the user, since you cannot run it:
-`openclaw plugins reload kazusa --wait`. If it doesn't take, they restart the
-Gateway. Always say when one is needed.
-
-**A broken map stops the whole location system on the next reload.** An unknown
-`home`, `parent` or connection target breaks every character, not just one.
-Check each id you use with `ls` before writing it.
+**A broken map changes nothing.** An unknown `home`, `parent` or connection
+target keeps the whole map as it was until it's fixed. After changing a place or
+a `home`, run `wiki_lint` with no agent: it names what's broken.
 
 ## Creating a character
 
@@ -106,7 +102,7 @@ the user what you chose. Don't stop to ask.
    alone.
 
 Once registered, a character is onstage and costs model calls unless the user
-takes them offstage. They start at `home` after the reload.
+takes them offstage. They start at `home`.
 
 ## Editing a character
 
@@ -269,23 +265,10 @@ it is, how it is kept and how busy it gets.
 
 Before finishing, check that the `parent` and every `to` exist, that nothing
 connects to itself or twice to the same place, that no `parent` chain loops, and
-that the new place can be reached from the rest of the map. Then tell the user
-to reload the plugin.
-
-## Not built yet
-
-The memory module is designed but not implemented. Write in the formats above,
-since they are what it will read, but don't promise what it will do:
-
-- Concept pages, `community`, `renown`, `Known by:`, `## History` and `· news`
-  have no effect on characters yet. If a character must know something now, put
-  it in their `MEMORY.md` or personal wiki too.
-- `wiki_lint`, `knowledge_explain`, `memory_consolidate` and `memory_restore`
-  don't exist yet, even if the `kazusa` guide mentions them. Check your work by
-  reading the files back.
+that the new place can be reached from the rest of the map. Then run
+`wiki_lint`.
 
 ## Finishing
 
 Read back what you wrote, then tell the user through `send_message`: the files
-you created or changed, the choices you made, anything skipped, and whether a
-reload is needed.
+you created or changed, the choices you made, and anything skipped.

@@ -113,7 +113,7 @@ export function SourcesProvider({
     { revalidateOnFocus: false },
   );
 
-  // The map never changes while the Gateway runs; records arrive by SSE.
+  // SSE `places` revalidates this when the map changes; records arrive by SSE.
   const livePlaces = useSWR<PlacesResponse, Error>(
     resolved.places === "live"
       ? ([PLACES_KEY, config.baseUrl, config.token ?? ""] as const)

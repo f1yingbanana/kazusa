@@ -11,7 +11,7 @@ import {
   visibleFrom,
   type Place,
 } from "./map.ts";
-import { loadWorld } from "./register.ts";
+import { loadWorld } from "./world.ts";
 
 /** A place with defaults; `id` doubles as a readable name. */
 function place(id: string, extra: Partial<Omit<Place, "id">> = {}): Place {

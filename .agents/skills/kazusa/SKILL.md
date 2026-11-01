@@ -746,9 +746,12 @@ connect these modules in process.
   `summary`, `parent`, `entry_minutes`, `connections` (two-way, declared once;
   `ways`, the first is usual), optional client `map`; the body is the full
   description. A tree through `parent`; every place is somewhere to stand.
-  Loaded once at registration and validated loudly; a world without places
-  disables Location. `visibleFrom` = parent, children, siblings, connection
-  ends.
+  `sharedWorld` (`world.ts`): one watcher per process keeps the map current, so
+  a new place or `home` needs no reload and SSE `places` tells clients to
+  refetch. A broken edit keeps the last good map and warns, and `wiki_lint`
+  names the problem; only a map broken from the start throws. A world without
+  places disables Location. `visibleFrom` = parent, children, siblings,
+  connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's
   cards, `workspaces/<id>/wiki/entities/places/<place_id>.md`. **Visit loop**:
   with no card, **Where you are** shows the whole description; starting the next

@@ -32,6 +32,7 @@ import {
 } from "./embeddings.ts";
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
+import { lintMap } from "../location/world.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
 import type { Certainty, HistoryLine, Page } from "./page.ts";
 import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
@@ -400,7 +401,10 @@ export function registerMemory(
       const world = index.world();
       return agentId
         ? lintPersonal(agentId, index.personal(agentId).values(), world)
-        : lintWorld(world);
+        : [
+            ...lintWorld(world),
+            ...lintMap(config.wikiDir ?? sharedDir("wiki")),
+          ];
     },
     explain: (agentId, pageId) => {
       const world = index.world();

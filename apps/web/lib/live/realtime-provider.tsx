@@ -12,7 +12,7 @@ import {
 import { useSWRConfig } from "swr";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
-import { isLocationsKey } from "@/lib/source/location/http";
+import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
 import {
   OBSERVED_MESSAGES_KEY,
   observedChatsKey,
@@ -66,6 +66,7 @@ const OBSERVER_EVENTS = [
   "clock",
   "desires",
   "location",
+  "places",
   "observed",
 ] as const;
 const PLAYER_EVENTS = ["message", "typing", "connected", "chats"] as const;
@@ -248,6 +249,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             }));
           });
           break;
+        case "places":
+          // A new home moves whoever hasn't gone anywhere yet.
+          void mutate(isPlacesKey);
+          void mutate(isLocationsKey);
+          break;
         case "observed":
           if (data.event.type === "message") handleObservedMessage(data.event);
           else if (data.event.type === "typing") handleTyping(data.event);
@@ -259,8 +265,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           if ("statuses" in data && data.statuses) {
             statusStore.reset(Object.entries(data.statuses));
           }
-          // Desire records changed while disconnected are only in the snapshot.
+          // Desire records and the map changed while disconnected are only in the
+          // snapshot.
           void mutate(isDesiresKey);
+          void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey(config));
           // Journal events are not replayed, so read what the stream missed.

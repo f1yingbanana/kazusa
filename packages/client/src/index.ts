@@ -979,6 +979,10 @@ export const LocationStreamEventSchema = z.object({
 });
 export type LocationStreamEvent = z.infer<typeof LocationStreamEventSchema>;
 
+/** The world's map changed on disk: refetch `GET /kazusa/places`. */
+export const PlacesStreamEventSchema = z.object({ type: z.literal("places") });
+export type PlacesStreamEvent = z.infer<typeof PlacesStreamEventSchema>;
+
 /**
  * What happens in chats the player isn't in, wrapped so it is never applied as
  * the player's own: a message, someone composing, or a change to the chat
@@ -1013,6 +1017,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   ClockStreamEventSchema,
   DesiresStreamEventSchema,
   LocationStreamEventSchema,
+  PlacesStreamEventSchema,
   ObservedStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
