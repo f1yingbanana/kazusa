@@ -42,8 +42,7 @@ recovery):
 - Do not pretend you just woke up unless it is actually morning. Do not invent
   an unrecorded prior action or write a rigid timetable from scratch.
 - Check Current simulation time and the weekday against your routine and
-  `MEMORY.md`, then step into the moment with `start_task`: classes at 10:30 on
-  a school day, lunch around 13:00, winding down or sleeping at 23:30.
+  `MEMORY.md`, then step into the moment with `start_task`.
 
 ## 4. Rolling planning at boundaries
 

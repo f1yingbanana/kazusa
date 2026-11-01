@@ -4,8 +4,10 @@ entityType: place
 place_id: church_street
 name: "Church Street"
 learned: been there
+seen: 2026-10-29
 ---
 
 # Church Street
 
-The shopping street below the school: the patisserie, Angel 24, the arcade, the station.
+The shopping street below the school: the patisserie, Angel 24, the arcade, the
+station.

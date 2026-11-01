@@ -1,4 +1,5 @@
 import {
+  BookOpenIcon,
   GlobeIcon,
   ListIcon,
   MessagesSquareIcon,
@@ -11,11 +12,13 @@ import { ChatsUnreadBadge } from "@/components/views/chats/chats-unread-badge";
 import { ChatsView } from "@/components/views/chats/chats-view";
 import { TimelineSidebar } from "@/components/views/timeline/timeline-sidebar";
 import { TimelineView } from "@/components/views/timeline/timeline-view";
+import { WikiSidebar } from "@/components/views/wiki/wiki-sidebar";
+import { WikiView } from "@/components/views/wiki/wiki-view";
 import { WorldSidebar } from "@/components/views/world/world-sidebar";
 import { WorldView } from "@/components/views/world/world-view";
 import type { StageView } from "./types";
 
-/** Slots reserved for later: `social`, `wiki` (see references/roadmap.md). */
+/** Slot reserved for later: `social` (see references/roadmap.md). */
 export const STAGE_VIEWS: readonly StageView[] = [
   {
     id: "world",
@@ -44,6 +47,15 @@ export const STAGE_VIEWS: readonly StageView[] = [
     requires: ["timeline"],
     component: TimelineView,
     sidebar: TimelineSidebar,
+  },
+  {
+    id: "wiki",
+    label: "Wiki",
+    icon: BookOpenIcon,
+    order: 30,
+    requires: ["wiki"],
+    component: WikiView,
+    sidebar: WikiSidebar,
   },
   {
     id: "settings",

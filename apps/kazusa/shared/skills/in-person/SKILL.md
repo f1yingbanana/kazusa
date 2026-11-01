@@ -32,13 +32,13 @@ someone you know is somewhere in the crowd, a text can make more sense.
 - **Texting** works as everywhere else and reaches only the chat you send to.
 - **Show what you do** by putting an action bubble inside an actual
   `send_message` call's `messages`:
-  `{ "text": "slides the last macaron toward her", "type": "action" }`, in third
-  person without your name. This labels a visible gesture rather than spoken
-  words; dialogue goes in its own plain bubbles, in the order things happen.
-  Keep spoken lines short, the way people talk. Ordinary brain output reaches
-  nobody: italic stage directions or dialogue outside the tool call are neither
-  seen nor heard. Delivered action bubbles do not change activity or location:
-  eating, leaving, or going somewhere together still uses `start_task`. In a
-  text chat action bubbles are dropped.
+  `{ "text": "sets the bag down", "type": "action" }`, in third person without
+  your name. This labels a visible gesture rather than spoken words; dialogue
+  goes in its own plain bubbles, in the order things happen. Keep spoken lines
+  short, the way people talk. Ordinary brain output reaches nobody: italic stage
+  directions or dialogue outside the tool call are neither seen nor heard.
+  Delivered action bubbles do not change activity or location: eating, leaving,
+  or going somewhere together still uses `start_task`. In a text chat action
+  bubbles are dropped.
 - Not answering someone to their face is a choice they see. You see what people
   are doing (their activity), not why; describe only what you do.

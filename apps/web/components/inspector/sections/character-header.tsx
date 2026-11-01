@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  EyeIcon,
   MapPinIcon,
   MessageCircleIcon,
   SpeechIcon,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCharacter, useCharacterStatus } from "@/hooks/use-characters";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
+import { useObservedChat } from "@/hooks/use-observed-chats";
 import { useNavigate } from "@/hooks/use-url-state";
 import { useSources } from "@/lib/source/provider";
 import type { EntityRef } from "@/lib/state/entity-ref";
@@ -35,6 +37,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const standing = position?.kind === "at" ? position.placeId : undefined;
   const there = usePlace(standing);
   const offstage = useCharacterStatus(entity.id)?.onstage === false;
+  const { available: canObserve } = useObservedChat(null);
 
   if (!character) {
     return (
@@ -133,6 +136,29 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
                 <span className="sr-only">{`Message ${character.name}`}</span>
               </TooltipTrigger>
               <TooltipContent>Message</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {canMessage && canObserve ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() =>
+                      navigate({
+                        view: "chats",
+                        "chats.member": character.id,
+                        "chats.id": null,
+                      })
+                    }
+                  />
+                }
+              >
+                <EyeIcon />
+                <span className="sr-only">{`Peek at ${character.name}'s chats`}</span>
+              </TooltipTrigger>
+              <TooltipContent>Peek at their chats</TooltipContent>
             </Tooltip>
           ) : null}
           <Button

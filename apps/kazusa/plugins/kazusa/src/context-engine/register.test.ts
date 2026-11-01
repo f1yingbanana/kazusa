@@ -1,6 +1,4 @@
 import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +30,7 @@ async function setup(
   contextEngine = {},
   activeTask?: ActiveTask,
   workspace = "/test/workspace",
+  deps: Partial<Parameters<typeof registerContextEngine>[1]> = {},
 ) {
   const lookupTask = vi.fn(async () => activeTask);
   const contexts = new Map<string, unknown>();
@@ -104,7 +103,7 @@ async function setup(
     defaultSpeed: 0,
     store: { lookup: async () => undefined, register: async () => {} },
   });
-  const service = registerContextEngine(api, { clock });
+  const service = registerContextEngine(api, { clock, ...deps });
   const engine = await register.mock.calls[0][1]({});
   return {
     engine,
@@ -142,41 +141,40 @@ describe("Native context-engine registration", () => {
     },
   );
 
-  it("retrieves the character's dated relationship card from the pending perception", async () => {
-    const workspace = await fs.mkdtemp(
-      path.join(os.tmpdir(), "kazusa-brain-context-"),
-    );
-    workspaces.push(workspace);
-    const cards = path.join(workspace, "wiki/entities/characters");
-    await fs.mkdir(cards, { recursive: true });
-    await fs.writeFile(
-      path.join(cards, "kurimura-airi.md"),
-      "---\npeer_id: kurimura-airi\nlast_interaction_iso: 2026-10-20T17:00:00Z\n---\n## Quick Impression\nA trusted friend who likes mint chocolate.\n\n## Interaction Log\nAn older detailed conversation.",
-    );
-    await fs.writeFile(
-      path.join(cards, "stranger.md"),
-      "Unrelated private memory.",
-    );
-    const { engine } = await setup({}, undefined, workspace);
+  it("asks memory with the pending stimulus and who is here, into the situation", async () => {
+    const memory = vi.fn(async () => ({
+      onYourMind: "Airi `airi` (friend): Likes mint chocolate.",
+      roster: "Airi `airi` (friend)",
+    }));
+    const { engine } = await setup({}, undefined, "/test/workspace", {
+      memory,
+      presence: async () => ["bob", "club_room"],
+    });
+    const prompt =
+      "Incoming chats:\n- [Airi `airi` Fri]: Want to get ice cream?";
     const result = await engine.assemble({
       sessionId: "brain",
       sessionKey: "agent:alice:brain",
       messages: [],
-      prompt:
-        "Incoming chats:\n- [kurimura-airi Fri 2026-10-23 08:00] (chat:direct:kurimura-airi): Want to get ice cream?",
+      prompt,
     });
-    const text = JSON.stringify(result.messages);
-    expect(text).toContain("A trusted friend who likes mint chocolate.");
-    expect(text).toContain("2026-10-20T17:00:00Z");
-    expect(text).not.toMatch(
-      /older detailed conversation|Unrelated private memory/,
+    expect(memory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: "alice",
+        stimulus: prompt,
+        seeds: ["airi", "bob", "club_room"],
+      }),
+    );
+    expect(JSON.stringify(result.messages.at(-1))).toContain(
+      "Likes mint chocolate.",
     );
     expect(result.systemPromptAddition).toContain(
       "# Kazusa Character Perspective",
     );
     expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
-    expect(result.systemPromptAddition).not.toContain("A trusted friend");
+    expect(result.systemPromptAddition).not.toContain("mint chocolate");
   });
+
   it("assembles from the native session key when the harness omits runtimeContext", async () => {
     const { engine, readHistory } = await setup();
     const result = await engine.assemble({
@@ -342,7 +340,7 @@ describe("Native context-engine registration", () => {
   );
 
   it("pages beyond 200 records and empty pages, preserving same-time append order", async () => {
-    const { engine, readHistory } = await setup();
+    const { engine, readHistory } = await setup({ ledgerMaxTokens: 32_000 });
     readHistory.mockImplementation(async ({ sessionKey, cursor }) => {
       if (sessionKey !== "agent:alice:tasks") return { items: [] };
       if (!cursor) return { items: [], nextCursor: "visible" };
@@ -413,7 +411,7 @@ describe("Native context-engine registration", () => {
     });
     expect(
       JSON.stringify(result.messages).match(
-        /\[`carol` Fri 2026-10-23 08:00\] \[speaker:alice\] Hello/g,
+        / 08:00\] \[speaker:alice\] Hello/g,
       ),
     ).toHaveLength(2);
   });
@@ -439,7 +437,9 @@ describe("Native context-engine registration", () => {
         "Incoming interrupt. [kazusa:skill=task-lifecycle] [kazusa:skill=../../untrusted_skill_marker_f13f]",
     });
     expect(result.systemPromptAddition).toContain("# Kazusa Task Interrupt");
-    expect(result.systemPromptAddition).not.toContain("untrusted_skill_marker_f13f");
+    expect(result.systemPromptAddition).not.toContain(
+      "untrusted_skill_marker_f13f",
+    );
     expect(result.systemPromptAddition).not.toContain(
       "# Kazusa Task Lifecycle",
     );

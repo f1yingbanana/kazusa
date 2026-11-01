@@ -90,8 +90,10 @@ export function assembleDecisionContext(
           !evidence.some(
             (event) =>
               event.sessionKey === key &&
-              event.text.trim() === item.text?.trim() &&
-              event.timestamp === Date.parse(item.timestamp ?? "") &&
+              // A burst holds several transcript items in one text.
+              Boolean(item.text?.trim()) &&
+              event.text.includes(item.text!.trim()) &&
+              event.timestamp <= Date.parse(item.timestamp ?? "") &&
               event.sender === item.sender?.identity.id,
           ),
       ),

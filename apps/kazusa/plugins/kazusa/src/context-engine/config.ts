@@ -4,10 +4,9 @@ const allowance = (value: number) =>
   z.number().int().min(0).max(32_000).default(value);
 
 export const CONTEXT_ENGINE_CONFIG = z.strictObject({
-  brainMaxTokens: z.number().int().nonnegative().default(2_000),
   shortTermHours: z.number().min(24).default(24),
-  personalWikiMaxTokens: allowance(1_200),
-  personalWikiMaxArticles: z.number().int().min(0).max(20).default(3),
+  /** Past records in a turn; `recall` is for anything older. */
+  ledgerMaxTokens: allowance(3_000),
   decisionMaxTokens: z.number().int().min(2_000).max(32_000).default(8_000),
   decisionShortTermHours: z.number().positive().default(4),
   decisionIdentityMaxTokens: allowance(600),

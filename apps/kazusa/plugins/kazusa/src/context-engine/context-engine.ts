@@ -7,6 +7,7 @@ import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
 
+import type { AssembledContext } from "@kazusa/client";
 export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import {
@@ -16,83 +17,23 @@ import {
 } from "./format.ts";
 type Message = Parameters<ContextEngine["assemble"]>[0]["messages"][number];
 
-/** Keep whole prior turns so trimming cannot orphan a tool call or result. */
-const FORGOTTEN_RESULT =
-  "[You no longer have this result in mind. Look again if you still need it.]";
-
-function callsTools(message: Message): boolean {
-  return (
-    message.role === "assistant" &&
-    Array.isArray(message.content) &&
-    message.content.some((block) => block.type === "toolCall")
-  );
-}
-
 /**
- * The run in progress, then earlier whole turns within `budget`. A model has
- * nothing else to remember its own tool results by, so the run is never cut by
- * `budget`: only when it outgrows `capacity` do its oldest results go.
+ * What of the brain transcript the model sees: only the turn under way. Past
+ * turns are in the records, and replaying them teaches the model to copy its
+ * own tool calls. When the host gives a `prompt`, it appends the turn itself
+ * after what we return, so `messages` holds nothing current.
  */
-function recentBrainHistory(
+function brainHistory(
   messages: Message[],
-  budget: number,
-  capacity: number,
-): Message[] {
-  // A run ends with an assistant message that calls no tools. One cut off by
-  // the run limits has none, so the next run continues from what it did.
-  const runStart =
-    messages.findLastIndex(
-      (message) => message.role === "assistant" && !callsTools(message),
-    ) + 1;
-  let runTokens = messages
-    .slice(runStart)
-    .reduce((sum, message) => sum + estimateTokens(message), 0);
-  const run = messages.slice(runStart).map((message): Message => {
-    if (runTokens <= capacity || message.role !== "toolResult") return message;
-    const forgotten: Message = {
-      ...message,
-      content: [{ type: "text", text: FORGOTTEN_RESULT }],
-    };
-    runTokens -= estimateTokens(message) - estimateTokens(forgotten);
-    return forgotten;
-  });
-
-  // A steered user message can occur between a tool call and its result. Such
-  // a message is not a safe place to cut the prior turn. A call that never got
-  // a result holds nothing open.
-  const calledAt = new Map<string, number>();
-  const unsafe = new Set<number>();
-  for (const [index, message] of messages.entries()) {
-    if (message.role === "assistant" && Array.isArray(message.content)) {
-      for (const block of message.content) {
-        if (block.type === "toolCall") calledAt.set(block.id, index);
-      }
-    } else if (message.role === "toolResult") {
-      const called = calledAt.get(message.toolCallId) ?? index;
-      for (let inside = called + 1; inside < index; inside++)
-        unsafe.add(inside);
-    }
-  }
-  const earlierBudget = Math.min(budget, capacity - runTokens);
-  let start = runStart;
-  let tokens = 0;
-  let turnTokens = 0;
-  for (let index = runStart - 1; index >= 0; index--) {
-    const message = messages[index];
-    turnTokens += estimateTokens(message);
-    if (
-      unsafe.has(index) ||
-      (message.role !== "user" &&
-        message.role !== "compactionSummary" &&
-        message.role !== "branchSummary")
-    )
-      continue;
-    if (tokens + turnTokens > earlierBudget) break;
-    tokens += turnTokens;
-    turnTokens = 0;
-    start = index;
-  }
-  return [...messages.slice(start, runStart), ...run];
+  prompt: string | undefined,
+): { readonly summaries: Message[]; readonly turn: Message[] } {
+  const summaries = messages.filter(
+    (message) =>
+      message.role === "compactionSummary" || message.role === "branchSummary",
+  );
+  if (prompt) return { summaries, turn: [] };
+  const start = messages.findLastIndex((message) => message.role === "user");
+  return { summaries, turn: start < 0 ? [] : messages.slice(start) };
 }
 
 /**
@@ -113,7 +54,10 @@ export async function assembleContext(params: {
   >;
   readonly simTime: number;
   readonly activeTask: ActiveTask | null;
-  readonly personalWiki?: readonly string[];
+  /** What comes to mind this turn, rendered verbatim. */
+  readonly onYourMind?: string;
+  /** The people they know, rendered verbatim. */
+  readonly roster?: string;
   /** Chats whose latest visible message came from someone else. */
   readonly awaitingReplies?: readonly {
     readonly sessionKey: string;
@@ -131,7 +75,12 @@ export async function assembleContext(params: {
   readonly names?: ReadonlyMap<string, string>;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
-}): ReturnType<ContextEngine["assemble"]> {
+}): Promise<
+  Awaited<ReturnType<ContextEngine["assemble"]>> & {
+    readonly breakdown: NonNullable<AssembledContext["breakdown"]>;
+    readonly situationText: string;
+  }
+> {
   const { config, run, skillLoader } = params;
   const resolutionContext = {
     agentId: params.agentId,
@@ -202,6 +151,8 @@ export async function assembleContext(params: {
       ...(params.whereabouts
         ? ["", "### Where you are", params.whereabouts]
         : []),
+      ...(params.onYourMind ? ["", "### On your mind", params.onYourMind] : []),
+      ...(params.roster ? ["", "### People you know", params.roster] : []),
       ...(params.feelings ? ["", "### How you feel", params.feelings] : []),
       ...(params.awaitingReplies?.length
         ? [
@@ -221,75 +172,61 @@ export async function assembleContext(params: {
     throw new Error("Kazusa context budget cannot fit current activity.");
   }
   let remaining = budget - systemPromptTokens - situationTokens;
-  const history = recentBrainHistory(
-    run.messages,
-    config.brainMaxTokens,
-    remaining,
-  );
+  const brain = brainHistory(run.messages, run.prompt);
+  const history = [...brain.summaries, ...brain.turn];
   remaining -= history.reduce(
     (sum, message) => sum + estimateTokens(message),
     0,
   );
 
-  const articles: string[] = [];
-  let wikiBudget = Math.min(config.personalWikiMaxTokens, remaining);
-  for (const article of (params.personalWiki ?? []).slice(
-    0,
-    config.personalWikiMaxArticles,
-  )) {
-    const text = `### Personal recollection\n${article}`;
-    const tokens = estimateTokens({
-      role: "user",
-      content: text,
-      timestamp: params.simTime,
-    });
-    if (tokens > wikiBudget) continue;
-    articles.push(text);
-    wikiBudget -= tokens;
-    remaining -= tokens;
-  }
-
   // No source quotas or additional clipping beyond the native catalog's display
   // projection. Skip records that cannot fit rather than cutting their text.
   const cutoff = params.simTime - config.shortTermHours * 3_600_000;
-  const selected = packLedgerRecords({
+  const recordsText = renderLedgerRecords({
     sessionsContext: params.sessionsContext,
     simTime: params.simTime,
     cutoff,
-    tokenBudget: remaining,
+    tokenBudget: Math.min(remaining, config.ledgerMaxTokens),
     ...(params.names ? { names: params.names } : {}),
   });
 
-  // Recollections and ledgers share one message that leads with our own
-  // sim-time stamp: the host stamps any message without one, in its own format.
-  const background = [
-    ...articles,
-    ...[...selected].map(
-      ([key, records]) =>
-        `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
-    ),
-  ];
-  const context: Message[] = background.length
+  // Leads with our own sim-time stamp: the host stamps any message without one,
+  // in its own format.
+  // Stamped with where it starts, not now: an unchanging first line keeps the
+  // whole block in the provider's cache, and any stamp stops the host's own.
+  const recordsDay = recordsText.match(/\(\w{3} (\d{4}-\d{2}-\d{2})\)/)?.[1];
+  const recordsFrom = recordsDay ? Date.parse(`${recordsDay}T00:00:00Z`) : NaN;
+  const stamp = Number.isFinite(recordsFrom) ? recordsFrom : params.simTime;
+  const context: Message[] = recordsText
     ? [
         {
           role: "user",
-          content: [
-            `[${formatSimTime(params.simTime)}] Recollections and recent records`,
-            ...background,
-          ].join("\n\n"),
-          timestamp: params.simTime,
+          content: `[${formatSimTime(stamp)}] What you remember of the last while\n\n${recordsText}`,
+          timestamp: stamp,
         },
       ]
     : [];
   // The host appends the pending turn after this history. Never replay ledger
   // records as assistant/tool messages or persist these synthetic context views.
-  const messages = [...context, ...history, situation];
+  // The situation comes before the turn under way: last, it reads as a new
+  // prompt after every tool result, and the model answers all over again.
+  const messages = [...context, ...brain.summaries, situation, ...brain.turn];
   return {
     messages,
     estimatedTokens:
       messages.reduce((sum, message) => sum + estimateTokens(message), 0) +
       systemPromptTokens,
     systemPromptAddition,
+    situationText:
+      typeof situation.content === "string"
+        ? situation.content
+        : JSON.stringify(situation.content),
+    breakdown: {
+      skills: systemPromptTokens,
+      situation: situationTokens,
+      history: history.reduce((sum, m) => sum + estimateTokens(m), 0),
+      records: context.reduce((sum, m) => sum + estimateTokens(m), 0),
+    },
   };
 }
 
@@ -353,6 +290,143 @@ export function packLedgerRecords(params: {
     used += cost;
   }
   return selected;
+}
+
+/** The speaker, time and any group header around one record's text. */
+const RECORD_OVERHEAD_TOKENS = 20;
+
+/**
+ * Their records, oldest first, so new ones only ever append and the provider's
+ * prompt cache survives. When the budget trims, the start snaps forward to a
+ * sim hour, so it also stays put between turns. Whole records only.
+ */
+export function renderLedgerRecords(params: {
+  readonly sessionsContext: Readonly<
+    Record<string, readonly SessionCatalogTranscriptItem[]>
+  >;
+  readonly simTime: number;
+  readonly cutoff: number;
+  readonly tokenBudget: number;
+  readonly names?: ReadonlyMap<string, string>;
+}): string {
+  const { sessionsContext, simTime, cutoff, tokenBudget } = params;
+  const records = Object.entries(sessionsContext)
+    .flatMap(([sessionKey, messages]) =>
+      messages.flatMap((message) => {
+        const timestamp = Date.parse(message.timestamp ?? "");
+        return (message.type === "userMessage" ||
+          message.type === "agentMessage") &&
+          message.text?.trim() &&
+          Number.isFinite(timestamp) &&
+          timestamp >= cutoff &&
+          timestamp <= simTime
+          ? [{ sessionKey, message, timestamp }]
+          : [];
+      }),
+    )
+    .sort(
+      (a, b) =>
+        a.timestamp - b.timestamp || a.sessionKey.localeCompare(b.sessionKey),
+    );
+  const cost = (at: number): number =>
+    estimateTokens({
+      role: "user",
+      content: fits[at].message.text ?? "",
+      timestamp: fits[at].timestamp,
+    }) + RECORD_OVERHEAD_TOKENS;
+  // A record that could never fit is skipped, not cut, and hides nothing older.
+  const fits = records.filter((record) => {
+    const size = estimateTokens({
+      role: "user",
+      content: record.message.text ?? "",
+      timestamp: record.timestamp,
+    });
+    return size + RECORD_OVERHEAD_TOKENS <= tokenBudget;
+  });
+  let start = 0;
+  let used = 0;
+  for (let at = fits.length - 1; at >= 0; at--) {
+    used += cost(at);
+    if (used <= tokenBudget) continue;
+    start = at + 1;
+    // Snap to the hour unless that throws away most of a busy hour.
+    const hour = 3_600_000;
+    const from = Math.ceil((fits[at].timestamp + 1) / hour) * hour;
+    let snapped = 0;
+    let index = fits.length;
+    while (index > start && fits[index - 1].timestamp >= from) {
+      index--;
+      snapped += cost(index);
+    }
+    if (snapped >= tokenBudget / 2) start = index;
+    break;
+  }
+  const lines: string[] = [];
+  let day = "";
+  let stream = "";
+  const named = new Set<string>();
+  for (const { sessionKey, message, timestamp } of fits.slice(start)) {
+    const header = formatSessionHeader(sessionKey);
+    const date = formatSimTime(timestamp).slice(0, 14);
+    if (date !== day || header !== stream) {
+      lines.push(`### ${header} (${date})`);
+      day = date;
+      stream = header;
+    }
+    lines.push(
+      formatEnvelopeRecord({
+        sessionKey,
+        message,
+        timestamp,
+        ...(params.names ? { names: params.names } : {}),
+        named,
+      }).trim(),
+    );
+  }
+  return lines.join("\n");
+}
+
+/**
+ * How far oldest-first records fit a budget: the time to read up to, so
+ * whatever doesn't fit stays unread for next time rather than being skipped.
+ * Always moves forward, even if one record alone is over budget.
+ */
+export function ledgerWindowEnd(params: {
+  readonly sessionsContext: Readonly<
+    Record<string, readonly SessionCatalogTranscriptItem[]>
+  >;
+  readonly since: number;
+  readonly now: number;
+  readonly tokenBudget: number;
+}): number {
+  const records = Object.entries(params.sessionsContext)
+    .flatMap(([sessionKey, messages]) =>
+      messages.flatMap((message) => {
+        const timestamp = Date.parse(message.timestamp ?? "");
+        return (message.type === "userMessage" ||
+          message.type === "agentMessage") &&
+          message.text?.trim() &&
+          timestamp >= params.since &&
+          timestamp <= params.now
+          ? [{ sessionKey, message, timestamp }]
+          : [];
+      }),
+    )
+    .sort((a, b) => a.timestamp - b.timestamp);
+  let used = 0;
+  let end: number | undefined;
+  for (const event of records) {
+    const content = formatEnvelopeRecord(event);
+    used += estimateTokens({
+      role: "user",
+      content,
+      timestamp: event.timestamp,
+    });
+    if (used > params.tokenBudget && end !== undefined && event.timestamp > end)
+      return end;
+    end = event.timestamp;
+  }
+  return params.now;
 }
 
 /**

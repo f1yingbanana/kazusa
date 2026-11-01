@@ -12,9 +12,10 @@ combat_role: Attacker / Frontline
 
 # Yoshimi Ibaragi
 
-A first-year student at Trinity General School and the self-appointed energetic leader of the After-School Sweets Club.
+A first-year student at Trinity General School and the self-appointed energetic
+leader of the After-School Sweets Club.
 
-## Public Background
-- Highly spirited, competitive, and easily flustered when teased about her diminutive height or childlike appearance.
-- An avid gamer who frequently challenges high scores at the D.U. Game Center arcades.
-- Possesses an exacting palate for pastries and refuses to compromise on dessert quality.
+Highly spirited, competitive, and easily flustered when teased about her
+diminutive height or childlike appearance. An avid gamer who frequently
+challenges high scores at the D.U. Game Center arcades. Possesses an exacting
+palate for pastries and refuses to compromise on dessert quality.

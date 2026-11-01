@@ -45,8 +45,8 @@ export interface InspectorSection {
   readonly requires: readonly Domain[];
   readonly component: ComponentType<{ readonly entity: EntityRef }>;
   /**
-   * A hook narrowing the section to some entities of its kind (only live
-   * agents have a model). Always the same hook for a section, so it is called
+   * A hook narrowing the section to some entities of its kind (only live agents
+   * have a model). Always the same hook for a section, so it is called
    * unconditionally. Defaults to every entity.
    */
   readonly useApplies?: (entity: EntityRef) => boolean;
@@ -81,6 +81,8 @@ export interface StageLink {
   readonly view: string;
   readonly params: Readonly<Record<string, string>>;
   readonly label: string;
+  /** Instead of `label` when it opens a chat the player isn't in. */
+  readonly observedLabel?: string;
 }
 
 export interface TimelineKind<K extends JournalKind = JournalKind> {
@@ -99,7 +101,9 @@ export interface TimelineKind<K extends JournalKind = JournalKind> {
   readonly fact: (event: JournalEventOf<K>) => ReactNode;
   readonly thought?: (event: JournalEventOf<K>) => ThoughtLine | undefined;
   readonly collapseKey?: (event: JournalEventOf<K>) => string | undefined;
-  readonly target?: (event: JournalEventOf<K>) => EntityRef | StageLink | undefined;
+  readonly target?: (
+    event: JournalEventOf<K>,
+  ) => EntityRef | StageLink | undefined;
 }
 
 /** Applies one SSE event type to client state. */

@@ -11,8 +11,9 @@ import type {
   DecisionBatch,
   DecisionOutcome,
 } from "openclaw/plugin-sdk/decisions";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import { resetStateCaches } from "../state.ts";
 import { StreamEventSchema, type StreamEvent } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
 import { KazusaRealtimeBroadcaster } from "../realtime.ts";
@@ -256,6 +257,8 @@ function setup(options: { readonly stage?: Stage } = {}) {
     },
   };
 }
+
+beforeEach(resetStateCaches);
 
 describe("location registration", () => {
   it("adds a short, required `where` to start_task only", () => {
@@ -635,6 +638,7 @@ describe("location registration", () => {
       since: T0,
       noticed: ["kurimura-airi"],
     });
+    resetStateCaches(); // Written behind the location module's cache.
     received.length = 0;
     const sighting: Stimulus = {
       id: `sighting|arrive|kurimura-airi|club|${T0}`,

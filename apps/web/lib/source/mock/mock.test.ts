@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   CharacterSummarySchema,
   JournalEventSchema,
+  MessagesResponseSchema,
+  ObservedChatsResponseSchema,
   StreamEventSchema,
 } from "@kazusa/client";
 import { MINUTE } from "../../time/sim";
+import { mockObservedChats, mockObservedMessages } from "./chats";
 import { applyClockAction } from "./clock";
 import { queryJournal } from "./timeline";
 import {
@@ -14,11 +17,47 @@ import {
   setMockStage,
 } from "./world";
 
+describe("mock observed chats", () => {
+  it("serves every chat with its latest message, wire-valid", () => {
+    const world = createMockWorld({ seed: 3 });
+    const { chats } = ObservedChatsResponseSchema.parse(
+      mockObservedChats(world),
+    );
+    expect(chats).toHaveLength(world.chats.length);
+    const busy = chats.find((chat) => chat.lastMessage);
+    expect(busy?.lastMessage?.senderId).toBeDefined();
+    expect(busy).not.toHaveProperty("sessionKey");
+  });
+
+  it("pages a chat's history oldest first, with no gaps or repeats", () => {
+    const world = createMockWorld({ seed: 3 });
+    const chatId = mockObservedChats(world).chats.find(
+      (chat) => chat.lastMessage,
+    )!.id;
+    const whole = mockObservedMessages(world, { chatId, limit: 1000 });
+    expect(whole.hasMore).toBe(false);
+
+    const pages: string[] = [];
+    let before: number | undefined;
+    for (;;) {
+      const page = MessagesResponseSchema.parse(
+        mockObservedMessages(world, { chatId, before, limit: 2 }),
+      );
+      pages.unshift(...page.messages.map((message) => message.id));
+      if (!page.hasMore) break;
+      before = page.nextCursor;
+    }
+    expect(pages).toEqual(whole.messages.map((message) => message.id));
+  });
+});
+
 describe("mock world", () => {
   it("is deterministic for a seed and sized for scale work", () => {
     const a = createMockWorld({ seed: 3 });
     const b = createMockWorld({ seed: 3 });
-    expect(a.characters.map((c) => c.id)).toEqual(b.characters.map((c) => c.id));
+    expect(a.characters.map((c) => c.id)).toEqual(
+      b.characters.map((c) => c.id),
+    );
     expect(a.journal.length).toBe(b.journal.length);
     expect(a.characters.length).toBeGreaterThanOrEqual(150);
   });
@@ -41,11 +80,15 @@ describe("mock world", () => {
   });
   it("keeps part of the cast offstage, nowhere and never advanced", () => {
     const world = createMockWorld({ seed: 5, count: 30 });
-    const off = [...world.statuses].filter(([, s]) => !s.onstage).map(([id]) => id);
+    const off = [...world.statuses]
+      .filter(([, s]) => !s.onstage)
+      .map(([id]) => id);
     expect(off.length).toBeGreaterThan(0);
     for (const id of off) expect(world.locations.has(id)).toBe(false);
     const events = advanceMockWorld(world, MOCK_WORLD_START + 600 * MINUTE, 30);
-    const touched = new Set(events.flatMap((e) => (e.type === "status" ? [e.characterId] : [])));
+    const touched = new Set(
+      events.flatMap((e) => (e.type === "status" ? [e.characterId] : [])),
+    );
     for (const id of off) expect(touched.has(id)).toBe(false);
 
     const [back] = off;
@@ -92,7 +135,10 @@ describe("mock timeline query", () => {
   const world = createMockWorld({ seed: 9, count: 40 });
   it("pages newest-first with a seq cursor and no overlap", () => {
     const first = queryJournal(world.journal, { limit: 25 });
-    const second = queryJournal(world.journal, { limit: 25, before: first.nextCursor });
+    const second = queryJournal(world.journal, {
+      limit: 25,
+      before: first.nextCursor,
+    });
     expect(first.hasMore).toBe(true);
     expect(first.events[0].seq).toBe(world.journal.at(-1)!.seq);
     expect(Math.max(...second.events.map((e) => e.seq))).toBeLessThan(
@@ -101,9 +147,18 @@ describe("mock timeline query", () => {
   });
   it("filters on the server side and catches up ascending with after", () => {
     const actor = world.characters[0].id;
-    const page = queryJournal(world.journal, { actors: [actor], kinds: ["task.started"] });
-    expect(page.events.every((e) => e.actors.includes(actor) && e.kind === "task.started")).toBe(true);
-    const tail = queryJournal(world.journal, { after: world.journal.length - 5 });
+    const page = queryJournal(world.journal, {
+      actors: [actor],
+      kinds: ["task.started"],
+    });
+    expect(
+      page.events.every(
+        (e) => e.actors.includes(actor) && e.kind === "task.started",
+      ),
+    ).toBe(true);
+    const tail = queryJournal(world.journal, {
+      after: world.journal.length - 5,
+    });
     expect(tail.events.map((e) => e.seq)).toEqual(
       world.journal.slice(-5).map((e) => e.seq),
     );
@@ -113,13 +168,19 @@ describe("mock timeline query", () => {
 describe("mock clock", () => {
   it("re-anchors before changing speed and advances forward", () => {
     const clock = { simTime: 0, speed: 60, updatedAt: 0 };
-    expect(applyClockAction(clock, { action: "set_speed", speed: 0 }, 1_000)).toEqual({
+    expect(
+      applyClockAction(clock, { action: "set_speed", speed: 0 }, 1_000),
+    ).toEqual({
       simTime: 60_000,
       speed: 0,
       updatedAt: 1_000,
     });
     expect(
-      applyClockAction({ ...clock, speed: 0 }, { action: "advance", minutes: 15 }, 5_000).simTime,
+      applyClockAction(
+        { ...clock, speed: 0 },
+        { action: "advance", minutes: 15 },
+        5_000,
+      ).simTime,
     ).toBe(15 * MINUTE);
   });
 });

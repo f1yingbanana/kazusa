@@ -12,9 +12,10 @@ combat_role: Support / Buffer
 
 # Airi Kurimura
 
-A gentle, sweet-natured first-year student at Trinity General School and core member of the After-School Sweets Club.
+A gentle, sweet-natured first-year student at Trinity General School and core
+member of the After-School Sweets Club.
 
-## Public Background
-- Renowned for her kindness, patient smile, and legendary, unwavering dedication to mint-chocolate confections.
-- Diligently coordinates club outings and manages the pantry in the Sweets Club room.
-- While her experimental flavor combinations occasionally cause panic among clubmates, her sincere warmth unites the group.
+Renowned for her kindness, patient smile, and legendary, unwavering dedication
+to mint-chocolate confections. Diligently coordinates club outings and manages
+the pantry in the Sweets Club room. While her experimental flavor combinations
+occasionally cause panic among clubmates, her sincere warmth unites the group.

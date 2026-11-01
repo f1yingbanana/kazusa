@@ -11,8 +11,10 @@ connections:
     ways:
       - { by: transit, minutes: 25 }
     note: "Approximate interdistrict travel time for the simulation."
+community: srt_special_academy
 ---
 
 # Usagi Park
 
-After SRT Special Academy closed, the members of RABBIT Platoon chose to live and protest in this park rather than abandon their academy.
+After SRT Special Academy closed, the members of RABBIT Platoon chose to live
+and protest in this park rather than abandon their academy.

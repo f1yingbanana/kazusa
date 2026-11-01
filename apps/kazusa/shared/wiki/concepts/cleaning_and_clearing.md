@@ -4,6 +4,7 @@ conceptType: lore
 id: concept.cleaning_and_clearing
 title: Cleaning & Clearing
 aliases: [C&C]
+community: millennium_science_school
 ---
 
 # Cleaning & Clearing

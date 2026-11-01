@@ -378,10 +378,10 @@ connect these modules in process.
   token bloat. Character workspaces must strictly contain only identity
   (`SOUL.md`, `IDENTITY.md`), qualitative memory (`MEMORY.md`), and subjective
   wiki entries (`wiki/`).
-- Always retains the run in progress whole (`recentBrainHistory`), plus recent
-  complete earlier turns (bounded by `brainMaxTokens`, default 2000; can be set
-  to 0 for pure ledger runs) to guarantee tool-call/result atomicity & error
-  recovery, in-flight steering boundary preservation, and reasoning continuity.
+- Replays no past brain turns (`brainHistory`): only the turn under way, which
+  the host appends itself when it passes `prompt`. Past turns live in the
+  ledgers. Replaying them cost 50-80k tokens a call and taught the model to copy
+  its own tool calls.
 - Uses native `readSessionTranscriptCatalogPage` in newest-first pages of up to
   200 items, stopping at the simulation-time cutoff. There is no total message
   count cap. Skip undated/invalid timestamps; empty pages with a continuation
@@ -420,10 +420,12 @@ connect these modules in process.
   internal task UUIDs and metadata. This survives a start outside the ledger
   window/budget. The ledger still supplies experiences and monologues; no
   separate `:thoughts`. Later successful tool results supersede the snapshot.
-- Relevant personal-wiki impressions are injected as dated beliefs, not world
-  facts (default maximum three cards / 1200 tokens). Only the owner's wiki is
-  eligible. Reuse native workspace bootstrap; keep generic assistant outreach
-  instructions and stale machine-state tables out of character workspace files.
+- **On your mind** and **People you know** come from `src/memory/` (see
+  [memory](references/memory.md)): retrieval over the character's own wiki and
+  the world pages their knowledge depth allows, rendered as beliefs, not world
+  facts, within `memory.maxTokens`. No other character's wiki is ever eligible.
+  Reuse native workspace bootstrap; keep generic assistant outreach instructions
+  and stale machine-state tables out of character workspace files.
 - Uses OpenClaw's native token estimator and owns context management
   (`ownsCompaction: true`). Assembly windows original records; `compact()`
   returns a benign "Nothing to compact" skip for preflight, manual and overflow
@@ -724,9 +726,9 @@ connect these modules in process.
   overwriting), after which only the summary shows; the character adds what they
   remember. **Places you know**: places named (names, aliases, card aliases) in
   the turn's prompt or `MEMORY.md`, then the nearest cards, capped
-  (`location.listLimit`). Fuzzy recall is the character's own `memory_search`;
-  memory-core's search has no public plugin API, and the world wiki must never
-  be added to `memory_search`.
+  (`location.listLimit`). Fuzzy recall is the character's own `recall` (see
+  [memory](references/memory.md)), which only reaches the world wiki at their
+  knowledge depth.
 - **State**: `"location"` store, one `LocationRecord` per character or player:
   `placeId`, `since`, optional `trip` (task id, destination, depart/arrive at
   the lease's end, places passed with sim times, usual minutes, and for walking
@@ -824,8 +826,8 @@ connect these modules in process.
 
 - **Character Tool Surface (`tools.profile` + `tools.alsoAllow`)**: characters
   inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
-  `send_message`, `list_chats`, `manage_chat`, `memory_search`, `memory_get`,
-  `read`, `edit`, `write` (`MEMORY.md` and the personal wiki), `view_image`.
+  `send_message`, `list_chats`, `manage_chat`, `recall`, `look_up`, `remember`,
+  `view_image`. Memory goes through tools, not files; ARONA keeps file access.
   `tools.deny` keeps `group:sessions`, `message`, and `gateway` (the updater
   included in `minimal`). `tools.exec.applyPatch.enabled: false` prevents
   implicit patch access from `write`; ARONA explicitly enables it in her native
@@ -850,20 +852,20 @@ connect these modules in process.
   character tools, `ls`, web search/fetch, workspace-only patches, and clock
   controls. Her runs have their own limits (`perception.systemAgent`). For every
   character, near the limits only `send_message` still runs, so a run can report
-  before it ends. Shell execution, code execution and `openclaw` delegation are denied; native
-  `cwd` selects `apps/kazusa` for coding while identity/memory remain in her
-  character workspace. File tools enforce that coding directory. Its `.agents`
-  workspace symlink exposes these architecture guides without adding a
-  workspace-root `AGENTS.md`. Use native `skills_read` for complete installed
-  guides; ordinary file reads through an escaping symlink remain blocked.
-  Perception admits its input immediately, even paused; Messaging uses wall-time
-  pacing, and its message, chat-management and task tools skip the pause wait.
-  Simulation time, task deadlines and ordinary characters remain frozen.
-  Offstage and custody gates still apply. How she works is in her `SOUL.md`; the
-  common jobs (characters, wikis, places) are the `world-building` skill in her
-  workspace (`workspaces/arona/skills/`), selected by her per-agent `skills`.
-  That folder is the one exception to what a character workspace holds. Retained
-  consumers use the host-injected
+  before it ends. Shell execution, code execution and `openclaw` delegation are
+  denied; native `cwd` selects `apps/kazusa` for coding while identity/memory
+  remain in her character workspace. File tools enforce that coding directory.
+  Its `.agents` workspace symlink exposes these architecture guides without
+  adding a workspace-root `AGENTS.md`. Use native `skills_read` for complete
+  installed guides; ordinary file reads through an escaping symlink remain
+  blocked. Perception admits its input immediately, even paused; Messaging uses
+  wall-time pacing, and its message, chat-management and task tools skip the
+  pause wait. Simulation time, task deadlines and ordinary characters remain
+  frozen. Offstage and custody gates still apply. How she works is in her
+  `SOUL.md`; the common jobs (characters, wikis, places) are the
+  `world-building` skill in her workspace (`workspaces/arona/skills/`), selected
+  by her per-agent `skills`. That folder is the one exception to what a
+  character workspace holds. Retained consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
   agent/identity/workspace lookups. Character and agent roster responses expose
   `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
@@ -875,12 +877,20 @@ connect these modules in process.
   adding its own envelope stamp; check-ins carry no extra stamp.
   `agents.defaults.userTimezone: "UTC"` covers anything the host still stamps.
   OpenClaw's retired `agents.defaults.envelopeTimestamp`/`envelopeElapsed` keys
-  are rejected by 2026.10.5. **Known gap**: the system prompt's
-  `## Temporal Context` (`Current date: <real date>`, `Time zone: UTC`) is built
-  from `Date.now()` with no config, hook or context-engine override (the
-  `before_prompt_build` `systemPrompt` result replaces the whole prompt). The
-  conventions skill tells characters that date is not their world's; removing it
-  needs an upstream option.
+  are rejected by 2026.10.5. The system prompt's `## Temporal Context` (the real
+  date) has no config, so `src/host-prompt.ts` removes it with
+  `api.registerTextTransforms`. The same file removes the host's assistant
+  framing for characters (`You are a personal assistant...`, `## Tooling`
+  through `## Documentation`, `## Messaging`, `## Runtime`, the machine's paths,
+  missing-file entries); the system agent keeps it. Those transforms have no
+  agent scope and also run over every message, so each one looks ahead for the
+  Runtime line, which only a system prompt has. It also removes the note the
+  host adds to room events ("Default: stay silent", "use message(action=send)"),
+  which reached the model on every delivery. An OpenClaw upgrade that renames
+  any of this brings it back: check a captured prompt after upgrading
+  (`llm_input` shows the system prompt after the edits, but messages only before
+  them; a `RegExp` subclass registered last as a transform sees what is actually
+  sent).
 
 - **Zero-Build Jiti Execution**: OpenClaw runs `./src/index.ts` directly via its
   runtime TypeScript loader. Never add a build step (`tsc --build`, `tsup`, or
@@ -959,4 +969,5 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/location.md` — Read when working on the map, positions, travel,
   huddles or encounters.
 - `references/memory.md` — Read when implementing context retrieval, character
-  memories, character contexts related things.
+  memories, character contexts related things. `references/memory-checklist.md`
+  tracks what is built and the live acceptance tests.

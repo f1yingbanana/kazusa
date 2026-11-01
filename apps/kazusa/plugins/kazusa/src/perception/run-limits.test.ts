@@ -5,6 +5,7 @@ import {
   brainRunLimits,
   registerBrainRunLimits,
 } from "./run-limits.ts";
+import { beginTurn } from "../turn.ts";
 
 const native = vi.hoisted(() => ({
   abort: vi.fn(() => true),
@@ -177,5 +178,71 @@ describe("brain run hard budgets", () => {
     h.tool("b");
     expect(h.tool("c")).toBeUndefined();
     expect(native.abort).not.toHaveBeenCalled();
+  });
+});
+
+describe("a run repeating itself", () => {
+  let speakers = 0;
+  const speaker = () => {
+    const agent = `alice-${++speakers}`;
+    const h = setup({ maxModelCalls: 9, maxToolCalls: 9, maxRunSeconds: 60 });
+    Object.assign(h.ctx, { agentId: agent });
+    beginTurn(agent);
+    h.start("model-1");
+    const say = (toolCallId: string, text: string, sessionKey = "chat:a") =>
+      h.call("before_tool_call", {
+        toolName: "send_message",
+        params: { sessionKey, messages: [{ text }] },
+        toolCallId,
+      });
+    return { ...h, agent, say };
+  };
+
+  it("does not deliver the same words twice to the same chat", () => {
+    const h = speaker();
+    expect(h.say("a", "hello there, you")).toBeUndefined();
+    expect(h.say("b", " hello there, you ")).toMatchObject({ block: true });
+  });
+
+  it("lets it say something new, or the same to someone else", () => {
+    const h = speaker();
+    expect(h.say("a", "hello there, you")).toBeUndefined();
+    expect(h.say("b", "and another thing")).toBeUndefined();
+    expect(h.say("c", "hello there, you", "chat:b")).toBeUndefined();
+  });
+
+  it("is not fooled by one call reaching the hook twice", () => {
+    const h = speaker();
+    expect(h.say("a", "hello there, you")).toBeUndefined();
+    expect(h.say("a", "hello there, you")).toBeUndefined();
+  });
+
+  it("reads bubbles written as plain strings", () => {
+    const h = speaker();
+    const say = (toolCallId: string, text: string) =>
+      h.call("before_tool_call", {
+        toolName: "send_message",
+        params: { sessionKey: "chat:a", messages: [text] },
+        toolCallId,
+      });
+    expect(say("a", "hello there, you")).toBeUndefined();
+    expect(say("b", "something else")).toBeUndefined();
+    expect(say("c", "hello there, you")).toMatchObject({ block: true });
+  });
+
+  it("may repeat something short", () => {
+    const h = speaker();
+    expect(h.say("a", "really?")).toBeUndefined();
+    expect(h.say("b", "really?")).toBeUndefined();
+  });
+
+  it("never stops the run for it, which would strand pending messages", () => {
+    const h = speaker();
+    const warn = vi.mocked(h.api.logger.warn);
+    h.say("a", "hello there, you");
+    for (const id of ["b", "c", "d"])
+      expect(h.say(id, "hello there, you")).toMatchObject({ block: true });
+    for (const id of ["e", "f", "g"]) h.tool(id, "start_task");
+    expect(warn).not.toHaveBeenCalled();
   });
 });

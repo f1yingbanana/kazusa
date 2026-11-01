@@ -30,12 +30,14 @@ export const DEFAULT_CAPABILITIES: Readonly<
 > = {
   clock: "live",
   chats: "live",
+  observe: "live",
   characters: "live",
   status: "live",
   timeline: "live",
   desires: "live",
   stage: "live",
   models: "live",
+  wiki: "live",
 };
 
 export function toClockState(clock: Clock): ClockState {

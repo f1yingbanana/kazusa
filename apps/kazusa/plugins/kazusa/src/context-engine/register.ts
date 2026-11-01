@@ -12,14 +12,17 @@ import type { StateStore } from "../state.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleContext,
+  ledgerWindowEnd,
+  renderLedgerRecords,
   readSessionStreams,
   type ContextEngine,
 } from "./context-engine.ts";
 import { createSkillLoader } from "./skill-loader.ts";
-import { readPersonalWiki } from "./decision-sources.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
 import { personName } from "../identity.ts";
+import type { MemoryPrefetch } from "../memory/register.ts";
+import { brainRequest, type RetrievalRequest } from "../memory/retrieve.ts";
 
 interface ContextEngineDeps {
   readonly clock: Clock;
@@ -41,6 +44,15 @@ interface ContextEngineDeps {
   ) => Promise<string | undefined>;
   /** Whether someone else is where the character is: face to face. */
   readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
+  /** Who and what is in front of them, for recognition. */
+  readonly presence?: (
+    agentId: string,
+    at: number,
+  ) => Promise<readonly string[]>;
+  /** What comes to mind this turn; absent means no memory module. */
+  readonly memory?: (
+    request: RetrievalRequest,
+  ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster">>;
 }
 
 /**
@@ -53,6 +65,17 @@ const RECENT_CONTEXTS = 20;
 export interface ContextEngineService {
   /** A character's last brain turns' contexts, newest first. */
   readonly recentContexts: (agentId: string) => Promise<AssembledContext[]>;
+  /** The oldest of their ledgers since `since` that fit, for sleep. */
+  readonly experiences: (
+    agentId: string,
+    since: number,
+    now: number,
+  ) => Promise<{
+    readonly text: string;
+    readonly speakers: readonly string[];
+    /** Records up to here were read; a backlog waits for the next sleep. */
+    readonly through: number;
+  }>;
 }
 
 export function registerContextEngine(
@@ -70,6 +93,97 @@ export function registerContextEngine(
   );
   return {
     recentContexts: async (agentId) => (await recent.lookup(agentId)) ?? [],
+    experiences: (agentId, since, now) =>
+      readExperiences(api, getConfig, agentId, since, now),
+  };
+}
+
+/** How much of a day sleep can take in. */
+const SLEEP_RECORD_TOKENS = 8_000;
+
+async function ownLedgers(
+  api: OpenClawPluginApi,
+  getConfig: () => OpenClawConfig,
+  agentId: string,
+): Promise<{
+  readonly storePath: string;
+  readonly streams: ReadonlyArray<{ readonly sessionKey: string }>;
+}> {
+  const sessions = api.runtime.agent.session;
+  const storePath = sessions.resolveStorePath(getConfig().session?.store, {
+    agentId,
+  });
+  const readSessions = await sessions.createSessionEntryListReader({
+    agentId,
+    storePath,
+  });
+  const snapshot = await readSessions();
+  // Skip the brain stream: the host passes active brain turns itself.
+  const streams = snapshot.entries.filter(({ sessionKey }) => {
+    const key = parseAgentSessionKey(sessionKey);
+    return (
+      key?.agentId === agentId &&
+      (key.rest === "tasks" ||
+        key.rest.startsWith("chat:direct:") ||
+        key.rest.startsWith("chat:group:") ||
+        key.rest.startsWith("chat:huddle:"))
+    );
+  });
+  return { storePath, streams };
+}
+
+async function readExperiences(
+  api: OpenClawPluginApi,
+  getConfig: () => OpenClawConfig,
+  agentId: string,
+  since: number,
+  now: number,
+): Promise<{
+  readonly text: string;
+  readonly speakers: readonly string[];
+  readonly through: number;
+}> {
+  const { storePath, streams } = await ownLedgers(api, getConfig, agentId);
+  const sessionsContext = await readSessionStreams({
+    agentId,
+    streams,
+    storePath,
+    pluginId: api.id,
+    now,
+    cutoff: since,
+  });
+  const through = ledgerWindowEnd({
+    sessionsContext,
+    since,
+    now,
+    tokenBudget: SLEEP_RECORD_TOKENS,
+  });
+  const speakers = [
+    ...new Set(
+      Object.values(sessionsContext).flatMap((items) =>
+        items.flatMap((item) =>
+          item.sender && Date.parse(item.timestamp ?? "") <= through
+            ? [item.sender.identity.id]
+            : [],
+        ),
+      ),
+    ),
+  ].filter((id) => id !== agentId);
+  const names = new Map(
+    await Promise.all(
+      speakers.map(async (id) => [id, await personName(api, id)] as const),
+    ),
+  );
+  return {
+    speakers,
+    through,
+    text: renderLedgerRecords({
+      sessionsContext,
+      simTime: through,
+      cutoff: since,
+      tokenBudget: Number.POSITIVE_INFINITY,
+      names,
+    }),
   };
 }
 
@@ -81,6 +195,8 @@ function createContextEngine(
     feelings,
     whereabouts,
     inCompany,
+    presence,
+    memory,
   }: ContextEngineDeps,
   recent: StateStore<AssembledContext[]>,
   getConfig: () => OpenClawConfig,
@@ -153,26 +269,11 @@ function createContextEngine(
       await clock.init();
       const now = clock.time();
       const cutoff = now - config.shortTermHours * 3_600_000;
-      const sessions = api.runtime.agent.session;
-      const storePath = sessions.resolveStorePath(getConfig().session?.store, {
-        agentId: brainAgentId,
-      });
-      const readSessions = await sessions.createSessionEntryListReader({
-        agentId: brainAgentId,
-        storePath,
-      });
-      const snapshot = await readSessions();
-      // Skip the brain stream: host already passed active brain turns in params.messages.
-      const streams = snapshot.entries.filter(({ sessionKey }) => {
-        const key = parseAgentSessionKey(sessionKey);
-        return (
-          key?.agentId === brainAgentId &&
-          (key.rest === "tasks" ||
-            key.rest.startsWith("chat:direct:") ||
-            key.rest.startsWith("chat:group:") ||
-            key.rest.startsWith("chat:huddle:"))
-        );
-      });
+      const { storePath, streams } = await ownLedgers(
+        api,
+        getConfig,
+        brainAgentId,
+      );
       const workspaceDir = api.runtime.agent.resolveAgentWorkspaceDir(
         getConfig(),
         brainAgentId,
@@ -180,7 +281,7 @@ function createContextEngine(
       const [
         sessionsContext,
         activeTask,
-        personalWiki,
+        here,
         awaiting,
         feeling,
         place,
@@ -195,12 +296,7 @@ function createContextEngine(
           cutoff,
         }),
         tasks.lookup(brainAgentId),
-        readPersonalWiki(
-          workspaceDir,
-          [],
-          params.prompt ?? "",
-          config.personalWikiMaxTokens ? config.personalWikiMaxArticles : 0,
-        ),
+        presence?.(brainAgentId, now) ?? [],
         awaitingReplies?.(brainAgentId, cutoff) ?? [],
         feelings?.(brainAgentId, now),
         whereabouts?.(brainAgentId, now, params.prompt ?? ""),
@@ -221,6 +317,16 @@ function createContextEngine(
           ),
         ),
       );
+      const recollection = await memory?.(
+        brainRequest({
+          agentId: brainAgentId,
+          prompt: params.prompt ?? "",
+          ...(activeTask ? { task: activeTask.description } : {}),
+          here,
+          awaiting: awaiting.map((chat) => chat.sender),
+          now,
+        }),
+      );
       const assembled = await assembleContext({
         run: params,
         names,
@@ -228,7 +334,8 @@ function createContextEngine(
         workspaceDir,
         sessionsContext,
         activeTask: activeTask ?? null,
-        personalWiki,
+        onYourMind: recollection?.onYourMind,
+        roster: recollection?.roster,
         awaitingReplies: awaiting,
         feelings: feeling,
         whereabouts: place,
@@ -237,9 +344,6 @@ function createContextEngine(
         config,
         skillLoader,
       });
-      // The situation message is always last (see assembleContext).
-      const last = assembled.messages.at(-1);
-      const situation = last && "content" in last ? last.content : undefined;
       try {
         const previous = (await recent.lookup(brainAgentId)) ?? [];
         await recent.register(
@@ -247,12 +351,10 @@ function createContextEngine(
           [
             {
               simTime: now,
-              situation:
-                typeof situation === "string"
-                  ? situation
-                  : JSON.stringify(situation),
+              situation: assembled.situationText,
               inPerson: company,
               estimatedTokens: assembled.estimatedTokens,
+              breakdown: assembled.breakdown,
             },
             ...previous,
           ].slice(0, RECENT_CONTEXTS),

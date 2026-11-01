@@ -9,7 +9,9 @@ connections:
     ways:
       - { by: walk, minutes: 15 }
     note: "Approximate travel time for the simulation."
-summary: "A small ramen stall run by Master Shiba and frequented by Abydos students."
+summary:
+  "A small ramen stall run by Master Shiba and frequented by Abydos students."
+community: abydos_high_school
 ---
 
 # Shiba Seki Ramen

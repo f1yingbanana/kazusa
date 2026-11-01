@@ -4,6 +4,7 @@ entityType: place
 place_id: school_courtyard
 name: "Rose Courtyard"
 learned: goes to school here
+seen: 2026-10-30
 ---
 
 # Rose Courtyard

@@ -4,6 +4,7 @@ conceptType: lore
 id: concept.tea_party
 title: Tea Party
 aliases: [Trinity Student Council]
+community: trinity_general_school
 ---
 
 # Tea Party

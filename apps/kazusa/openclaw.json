@@ -470,8 +470,13 @@
             "send_message",
             "list_chats",
             "manage_chat",
-            "memory_search",
-            "memory_get",
+            "recall",
+            "look_up",
+            "remember",
+            "wiki_lint",
+            "knowledge_explain",
+            "memory_consolidate",
+            "memory_restore",
             "ls",
             "read",
             "edit",
@@ -507,7 +512,8 @@
   "plugins": {
     "allow": ["kazusa", "zai", "typesafe", "venice", "openrouter", "parallel"],
     "slots": {
-      "contextEngine": "kazusa"
+      "contextEngine": "kazusa",
+      "memory": "none"
     },
     "load": {
       "paths": ["./plugins/kazusa"]
@@ -518,9 +524,11 @@
         "hooks": {
           "allowConversationAccess": true
         },
+        "subagent": {
+          "allowModelOverride": true
+        },
         "config": {
           "contextEngine": {
-            "brainMaxTokens": 2000,
             "shortTermHours": 24,
             "decisionMaxTokens": 8000,
             "decisionShortTermHours": 4,
@@ -533,6 +541,16 @@
             "decisionStimulusMaxTokens": 512,
             "decisionHistoryItems": 60,
             "decisionWikiMaxArticles": 4
+          },
+          "memory": {
+            "sleep": {
+              "enabled": true
+            },
+            "embedding": {
+              "baseUrlEnv": "AZURE_OPENAI_URL",
+              "apiKeyEnv": "AZURE_OPENAI_API_KEY",
+              "model": "text-embedding-3-small"
+            }
           },
           "perception": {
             "coalesceWindowMs": 10000,
@@ -623,11 +641,9 @@
       "send_message",
       "list_chats",
       "manage_chat",
-      "memory_search",
-      "memory_get",
-      "read",
-      "edit",
-      "write",
+      "recall",
+      "look_up",
+      "remember",
       "view_image"
     ],
     "fs": {
@@ -648,24 +664,6 @@
   "messages": {
     "queue": {
       "mode": "steer"
-    }
-  },
-  "memory": {
-    "search": {
-      "provider": "openai-compatible",
-      "model": "text-embedding-3-small",
-      "remote": {
-        "baseUrl": "${AZURE_OPENAI_URL}",
-        "apiKey": {
-          "source": "env",
-          "provider": "default",
-          "id": "AZURE_OPENAI_API_KEY"
-        }
-      },
-      "experimental": {
-        "sessionMemory": true
-      },
-      "sources": ["memory", "sessions"]
     }
   },
   "skills": {
@@ -716,7 +714,7 @@
     "internal": {
       "entries": {
         "session-memory": {
-          "enabled": true
+          "enabled": false
         }
       }
     }

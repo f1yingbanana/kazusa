@@ -19,10 +19,12 @@ import type {
   ChatsResponse,
   MessagesResponse,
 } from "@kazusa/client";
-import type { Chat, MessageType } from "@/lib/source/chats/types";
+import type { Chat, ChatInfo, MessageType } from "@/lib/source/chats/types";
 import type { KazusaConfig } from "@/lib/state/config-store";
 
-export function chatsKey(config: Pick<KazusaConfig, "baseUrl" | "userId" | "token">) {
+export function chatsKey(
+  config: Pick<KazusaConfig, "baseUrl" | "userId" | "token">,
+) {
   return [
     "kazusa/chats",
     config.baseUrl,
@@ -35,7 +37,7 @@ export function messagesCacheKey(config: KazusaConfig, chatId: string) {
   return unstable_serialize(messagesKeyGetter(config, chatId));
 }
 
-export function sortChats(chats: Chat[]) {
+export function sortChats<T extends ChatInfo>(chats: T[]) {
   return [...chats].sort(
     (a, b) => (b.lastMessage?.sequence ?? 0) - (a.lastMessage?.sequence ?? 0),
   );
@@ -47,11 +49,10 @@ export function sortChats(chats: Chat[]) {
  */
 export function useChatsResource() {
   const config = useKazusaConfig();
-  const resource = useSWR<
-    ChatsResponse,
-    Error,
-    ReturnType<typeof chatsKey>
-  >(chatsKey(config), ([, baseUrl]) => fetchChats(baseUrl, config.token));
+  const resource = useSWR<ChatsResponse, Error, ReturnType<typeof chatsKey>>(
+    chatsKey(config),
+    ([, baseUrl]) => fetchChats(baseUrl, config.token),
+  );
   const { data } = resource;
 
   useEffect(() => {
@@ -93,16 +94,22 @@ export function useChats() {
 
 export function useMessages(chatId: string | null) {
   const config = useKazusaConfig();
+  return usePagedMessages(messagesKeyGetter(config, chatId), (id, before) =>
+    fetchMessages(config.baseUrl, { chatId: id, before }, config.token),
+  );
+}
+
+/** Pages of one chat's history, merged and deduplicated, oldest first. */
+export function usePagedMessages<T extends MessagesResponse>(
+  getKey: ReturnType<typeof messagesKeyGetter>,
+  fetchPage: (chatId: string, before: number | null) => Promise<T>,
+  options?: { readonly refreshInterval?: number },
+) {
   const { data, error, isLoading, size, setSize, isValidating, mutate } =
-    useSWRInfinite<
-      MessagesResponse,
-      Error,
-      ReturnType<typeof messagesKeyGetter>
-    >(
-      messagesKeyGetter(config, chatId),
-      ([, baseUrl, , id, before]) =>
-        fetchMessages(baseUrl, { chatId: id, before }, config.token),
-      { revalidateFirstPage: true, revalidateOnFocus: false },
+    useSWRInfinite<T, Error, ReturnType<typeof messagesKeyGetter>>(
+      getKey,
+      ([, , , id, before]) => fetchPage(id, before),
+      { revalidateFirstPage: true, revalidateOnFocus: false, ...options },
     );
 
   const messages = useMemo(() => {
@@ -142,11 +149,9 @@ export function appendMessageToPages(
   return [{ ...first, messages: [...first.messages, message] }, ...rest];
 }
 
-export function updateChatPreview(
-  current: ChatsResponse | undefined,
-  chatId: string,
-  message: ChatMessage,
-) {
+export function updateChatPreview<
+  T extends { readonly chats: readonly ChatInfo[] },
+>(current: T | undefined, chatId: string, message: ChatMessage): T | undefined {
   if (!current) return current;
   return {
     ...current,

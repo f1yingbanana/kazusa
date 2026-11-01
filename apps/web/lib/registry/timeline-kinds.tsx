@@ -5,6 +5,7 @@ import {
   ClockIcon,
   EyeIcon,
   MessageSquareTextIcon,
+  MoonIcon,
   PencilLineIcon,
   PlayIcon,
   TimerResetIcon,
@@ -19,9 +20,21 @@ import {
 } from "@/components/entities/chips";
 import { taskLabel } from "@/components/entities/task-icon";
 import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
-import type { TimelineKind } from "./types";
+import type { StageLink, TimelineKind } from "./types";
 
 type KindMap = { [K in JournalKind]: TimelineKind<K> };
+
+function openChat(chatId: string, messageId?: string): StageLink {
+  return {
+    view: "chats",
+    params: {
+      "chats.id": chatId,
+      ...(messageId ? { "chats.msg": messageId } : {}),
+    },
+    label: "Open chat",
+    observedLabel: "Peek chat",
+  };
+}
 
 export const TIMELINE_KINDS: KindMap = {
   "task.started": {
@@ -95,14 +108,7 @@ export const TIMELINE_KINDS: KindMap = {
     ),
     target: (event) =>
       event.chatId
-        ? {
-            view: "chats",
-            params: {
-              "chats.id": event.chatId,
-              "chats.msg": event.payload.messageId,
-            },
-            label: "Open chat",
-          }
+        ? openChat(event.chatId, event.payload.messageId)
         : undefined,
   },
   "chat.created": {
@@ -131,8 +137,7 @@ export const TIMELINE_KINDS: KindMap = {
           <span className="font-mono text-xs text-muted-foreground">{` · ${event.payload.members.length} members`}</span>
         </>
       ),
-    target: (event) =>
-      event.chatId ? { kind: "chat", id: event.chatId } : undefined,
+    target: (event) => (event.chatId ? openChat(event.chatId) : undefined),
   },
   "chat.renamed": {
     kind: "chat.renamed",
@@ -147,6 +152,7 @@ export const TIMELINE_KINDS: KindMap = {
         <span className="font-medium">{event.payload.title}</span>
       </>
     ),
+    target: (event) => (event.chatId ? openChat(event.chatId) : undefined),
   },
   "chat.members_changed": {
     kind: "chat.members_changed",
@@ -182,6 +188,7 @@ export const TIMELINE_KINDS: KindMap = {
         ) : null}
       </>
     ),
+    target: (event) => (event.chatId ? openChat(event.chatId) : undefined),
   },
   "clock.changed": {
     kind: "clock.changed",
@@ -275,6 +282,29 @@ export const TIMELINE_KINDS: KindMap = {
     },
     target: (event) => ({ kind: "place", id: event.payload.placeId }),
   },
+  "memory.consolidated": {
+    kind: "memory.consolidated",
+    label: "Slept on it",
+    icon: MoonIcon,
+    facet: "mind",
+    salience: "normal",
+    fact: (event) => {
+      const { interrupted, pages, newPages } = event.payload;
+      return interrupted ? (
+        <span className="text-muted-foreground">
+          Sleep was broken; nothing kept
+        </span>
+      ) : (
+        <span className="text-muted-foreground">
+          {`Rethought ${pages.length} ${pages.length === 1 ? "thing" : "things"}${newPages.length ? `, ${newPages.length} new` : ""}`}
+        </span>
+      );
+    },
+    thought: (event) =>
+      event.payload.dream
+        ? { by: event.actors[0], text: event.payload.dream }
+        : undefined,
+  },
 };
 
 const NOTICED_LEAD = {
@@ -311,8 +341,8 @@ export const DEFAULT_TIMELINE_KINDS: readonly JournalKind[] =
 
 /**
  * The inspector's Recent: what the character did and ran into. Attention
- * bookkeeping (the `mind` facet) fires on every stimulus and would bury it;
- * it stays in the Timeline.
+ * bookkeeping (the `mind` facet) fires on every stimulus and would bury it; it
+ * stays in the Timeline.
  */
 export const RECENT_KINDS: readonly JournalKind[] = TIMELINE_KIND_LIST.filter(
   (kind) => !kind.hiddenByDefault && kind.facet !== "mind",

@@ -10,9 +10,10 @@ connections:
     ways:
       - { by: walk, minutes: 10 }
     note: "Approximate travel time for the simulation."
+renown: known
 ---
 
 # General Student Council Headquarters
 
-Administrative offices for the General Student Council and its departments.
-The council coordinates matters that cross academy districts.
+Administrative offices for the General Student Council and its departments. The
+council coordinates matters that cross academy districts.

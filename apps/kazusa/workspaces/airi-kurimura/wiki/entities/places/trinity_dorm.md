@@ -4,6 +4,7 @@ entityType: place
 place_id: trinity_dorm
 name: "Trinity Dormitory"
 learned: lives here
+seen: 2026-10-29
 ---
 
 # Trinity Dormitory

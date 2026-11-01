@@ -319,7 +319,7 @@ export function registerCharactersHttp(
           kind: "player",
           aliases: [],
           personalityTraits: [],
-          bodyMarkdown: "The Player / Sensei in Kivotos.",
+          bodyMarkdown: `The player, ${user.name}.`,
         },
       } satisfies CharacterDetailResponse);
       return;

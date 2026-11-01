@@ -4,14 +4,18 @@ entityType: place
 id: entity.place.wildhunt_school
 place_id: wildhunt_school
 name: "Wild Hunt Academy of Arts"
-summary: "An arts academy of studios and dormitories, dedicated to the pursuit of artistic expression."
+summary:
+  "An arts academy of studios and dormitories, dedicated to the pursuit of
+  artistic expression."
 connections:
   - to: central_transit_hub
     ways:
       - { by: transit, minutes: 40 }
     note: "Approximate interdistrict travel time for the simulation."
+community: wild_hunt_academy
 ---
 
 # Wild Hunt Academy of Arts
 
-Wild Hunt is an arts academy with a strong tradition of artistic training. Its Arts Council oversees school affairs and dormitory assignments.
+Wild Hunt is an arts academy with a strong tradition of artistic training. Its
+Arts Council oversees school affairs and dormitory assignments.

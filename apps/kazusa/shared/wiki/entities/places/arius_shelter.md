@@ -10,6 +10,7 @@ connections:
     ways:
       - { by: walk, minutes: 20 }
     note: "Approximate travel time for the simulation."
+community: arius_satellite_school
 ---
 
 # Arius Temporary Shelter

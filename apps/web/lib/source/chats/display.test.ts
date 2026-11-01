@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionLine, chatTitle, messagePreview } from "./display";
+import { actionLine, chatSubject, chatTitle, messagePreview } from "./display";
 import type { Chat } from "./types";
 
 const names: Record<string, string> = {
@@ -25,6 +25,15 @@ describe("chatTitle", () => {
   it("names a direct chat after the partner, not their id", () => {
     const dm = chat({ name: "kazusa", members: ["kazusa", "user:me"] });
     expect(chatTitle(dm, "user:me", nameOf)).toBe("Kazusa");
+  });
+
+  it("names a direct chat between two others after both of them", () => {
+    const dm = chat({ name: "", members: ["kazusa", "yutori-natsu"] });
+    expect(chatTitle(dm, "user:me", nameOf)).toBe("Kazusa & Yutori Natsu");
+    expect(chatSubject(dm, "user:me")).toEqual({ kind: "chat", id: "c" });
+    expect(
+      messagePreview({ text: "hi", senderId: "kazusa" }, dm, "user:me", nameOf),
+    ).toBe("Kazusa: hi");
   });
 
   it("names an untitled huddle after everyone else in it", () => {

@@ -78,15 +78,17 @@
 
 ## 实机截图
 
-<picture>
-  <img src=".github/assets/chats-screenshot.png" alt="Kazusa 网页客户端：展示群聊、所选角色的活动与需求，以及世界时钟控制" />
-</picture>
+群聊和人物详情面板：
 
 <picture>
-  <img src=".github/assets/timeline-screenshot.png" alt="Kazusa 网页客户端：展示所有角色活动的时间线" />
+  <img src=".github/assets/chats-screenshot.png" />
 </picture>
 
-与角色聊天，查看他们正在做什么、心情如何，并在时间线中追踪对话与活动动态。你还可以随时暂停模拟或调整时间流逝的速度。
+世界时间线上的人物活动记录，和地点详情面板：
+
+<picture>
+  <img src=".github/assets/timeline-screenshot.png" />
+</picture>
 
 ## 快速上手
 

@@ -8,8 +8,10 @@ aliases: ["Supplementary Lessons Club room"]
 parent: trinity_academic_hall
 entry_minutes: 3
 summary: "A classroom where the Make-Up Work Club studies together."
+community: make_up_work_club
 ---
 
 # Make-Up Work Club Room
 
-Hifumi, Azusa, Koharu and Hanako share lessons and help one another through the club’s work.
+Hifumi, Azusa, Koharu and Hanako share lessons and help one another through the
+club’s work.

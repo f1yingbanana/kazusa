@@ -3,14 +3,15 @@ pageType: concept
 conceptType: lore
 id: concept.decagrammaton_crisis
 title: Decagrammaton and the Steel Continent
+community: millennium_science_school
 ---
 
 # Decagrammaton and the Steel Continent
 
-Millennium's Super Phenomenon Task Force investigated Decagrammaton, an AI
-that sought to prove divinity through machines known as prophets. Himari, Eimi,
-Toki and Sensei followed the investigation through the ruins and encountered
-three engineers, Ein, Sof and Ohr, and their sister Malkuth.
+Millennium's Super Phenomenon Task Force investigated Decagrammaton, an AI that
+sought to prove divinity through machines known as prophets. Himari, Eimi, Toki
+and Sensei followed the investigation through the ruins and encountered three
+engineers, Ein, Sof and Ohr, and their sister Malkuth.
 
 The engineers created the expanding Steel Continent. Rio and Himari helped
 restore Kei, who joined Aris, the Game Development Department and the other

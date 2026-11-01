@@ -6,9 +6,13 @@ place_id: prefect_headquarters
 name: Prefect Team Headquarters
 parent: gehenna_school
 entry_minutes: 5
-summary: "A Gehenna command building where the Prefect Team plans operations and handles reports."
+summary:
+  "A Gehenna command building where the Prefect Team plans operations and
+  handles reports."
+community: prefect_team
 ---
 
 # Prefect Team Headquarters
 
-The Prefect Team uses this headquarters for administrative work, coordination and official audiences.
+The Prefect Team uses this headquarters for administrative work, coordination
+and official audiences.

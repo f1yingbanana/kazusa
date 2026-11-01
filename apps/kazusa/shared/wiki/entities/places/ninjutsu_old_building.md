@@ -8,8 +8,10 @@ aliases: ["38th Old School Building", "ninja club room"]
 parent: hyakkiyako_school
 entry_minutes: 12
 summary: "An old school building used for enthusiastic ninja practice."
+community: ninjutsu_research_department
 ---
 
 # Ninjutsu Research Department
 
-Michiru, Izuna and Tsukuyo meet in the 38th Old School Building to practice, try ideas and make videos about ninjas.
+Michiru, Izuna and Tsukuyo meet in the 38th Old School Building to practice, try
+ideas and make videos about ninjas.

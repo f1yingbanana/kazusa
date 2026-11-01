@@ -1,8 +1,6 @@
 {
   "id": "kazusa",
-  "channels": [
-    "kazusa"
-  ],
+  "channels": ["kazusa"],
   "channelConfigs": {
     "kazusa": {
       "label": "Kazusa Brain",
@@ -23,6 +21,12 @@
       "perception": {
         "type": "object",
         "properties": {
+          "maxConcurrentBrains": {
+            "default": 16,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
           "coalesceWindowMs": {
             "default": 500,
             "type": "integer",
@@ -91,26 +95,82 @@
           }
         }
       },
+      "memory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "wikiDir": {
+            "type": "string"
+          },
+          "maxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32000,
+            "default": 800
+          },
+          "rosterLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "default": 20
+          },
+          "sleep": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "minMinutes": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 180
+              },
+              "notesPerPage": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 30
+              }
+            }
+          },
+          "anchors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": ["heard of", "familiar", "intimate"]
+            }
+          },
+          "embedding": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "baseUrlEnv": {
+                "type": "string"
+              },
+              "apiKeyEnv": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
       "contextEngine": {
         "type": "object",
         "properties": {
-          "brainMaxTokens": {
-            "default": 2000,
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "personalWikiMaxTokens": {
-            "default": 1200,
+          "ledgerMaxTokens": {
             "type": "integer",
             "minimum": 0,
             "maximum": 32000
-          },
-          "personalWikiMaxArticles": {
-            "default": 3,
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 20
           },
           "shortTermHours": {
             "default": 24,
@@ -252,11 +312,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "name",
-                "min",
-                "level"
-              ],
+              "required": ["name", "min", "level"],
               "properties": {
                 "name": {
                   "type": "string",
@@ -287,11 +343,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "name",
-                "description",
-                "drain"
-              ],
+              "required": ["name", "description", "drain"],
               "properties": {
                 "name": {
                   "type": "string",
@@ -308,6 +360,28 @@
                 }
               }
             }
+          }
+        }
+      },
+      "world": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "How the client names this world.",
+        "properties": {
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "accent": { "type": "string" }
+        }
+      },
+      "observer": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "What the client may watch from outside the world.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Let the player read chats they aren't in. Nobody in the chat can tell."
           }
         }
       },
@@ -363,10 +437,15 @@
       "delay_task",
       "send_message",
       "list_chats",
-      "manage_chat"
+      "manage_chat",
+      "recall",
+      "look_up",
+      "remember",
+      "wiki_lint",
+      "knowledge_explain",
+      "memory_consolidate",
+      "memory_restore"
     ],
-    "gatewayMethodDispatch": [
-      "authenticated-request"
-    ]
+    "gatewayMethodDispatch": ["authenticated-request"]
   }
 }

@@ -11,6 +11,8 @@ import type {
   Chat,
   ChatsResponse,
   ManageChatResponse,
+  ObservedChat,
+  ObservedChatsResponse,
   SendResponse,
   StreamEvent,
 } from "@kazusa/client";
@@ -23,7 +25,11 @@ import {
   conversationId,
   type ChatSummary,
 } from "./conversations.ts";
-import { clientMessage, type Messaging } from "./messaging.ts";
+import {
+  clientMessage,
+  type Messaging,
+  type ObservedConversation,
+} from "./messaging.ts";
 
 const USER = z.object({
   id: z
@@ -101,6 +107,40 @@ function clientChat(summary: ChatSummary, viewer: string): Chat {
   };
 }
 
+/** No address: an observed chat can be read, never written to. */
+function observedChat({
+  chat,
+  members,
+  ended,
+  latest,
+}: ObservedConversation): ObservedChat {
+  return {
+    id: chat.id,
+    type: chat.kind,
+    // An untitled direct chat has no one viewpoint to title it from.
+    name: chat.title ?? "",
+    members: [...members],
+    ...(chat.placeId ? { placeId: chat.placeId } : {}),
+    ...(ended ? { ended } : {}),
+    ...(latest
+      ? {
+          lastMessage: {
+            text: latest.params.text,
+            timestamp: latest.timestamp,
+            sequence: latest.sequence,
+            senderId: latest.sender,
+            senderName: latest.senderName,
+            ...(latest.params.type === "action"
+              ? { type: "action" as const }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+const MAX_STREAM_BACKLOG_BYTES = 8 * 1024 * 1024;
+
 /** Single-player HTTP adapter. Caller identity comes from config, never JSON. */
 export function registerMessagingHttp(
   api: OpenClawPluginApi,
@@ -109,6 +149,8 @@ export function registerMessagingHttp(
   options?: {
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
+    /** Serve `/kazusa/observe/*`: reading chats the player isn't in. */
+    readonly observer?: boolean;
   },
 ): void {
   const getConfig = () => currentConfig(api);
@@ -203,6 +245,27 @@ export function registerMessagingHttp(
       await messaging.getChatHistory({ ...params, userId: user.id }),
     );
   });
+  if (options?.observer) {
+    route("observe/chats", "GET", async (_req, res) => {
+      const chats = await messaging.observeChats(user.id);
+      sendJson(res, 200, {
+        chats: chats.map(observedChat),
+      } satisfies ObservedChatsResponse);
+    });
+    route("observe/messages", "GET", async (req, res) => {
+      sendJson(
+        res,
+        200,
+        await messaging.observeChatHistory(
+          HISTORY.parse(
+            Object.fromEntries(
+              new URL(req.url ?? "/", "http://localhost").searchParams,
+            ),
+          ),
+        ),
+      );
+    });
+  }
   route("send", "POST", async (req, res) => {
     const params = DELIVERY_REQUEST.parse(await readJsonBody(req));
     const result = await messaging.send(
@@ -265,16 +328,19 @@ export function registerMessagingHttp(
     // This closes the connect/read race without a retained event log.
     const buffered: StreamEvent[] = [];
     let ready = false;
+    const send = (chunk: string): void => {
+      if (res.destroyed || res.writableEnded) return;
+      // A full socket buffer only asks for patience. A client that stays behind
+      // is dropped instead of held in memory; it reconnects and catches up.
+      if (res.writableLength > MAX_STREAM_BACKLOG_BYTES) res.destroy();
+      else res.write(chunk);
+    };
     const write = (event: StreamEvent): void => {
-      if (res.destroyed) return;
       if (!ready) {
         buffered.push(event);
         return;
       }
-      if (
-        !res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
-      )
-        res.end();
+      send(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
     };
     const unsubscribeMessaging = messaging.onEvent((event) => {
       if (event.type === "message") {
@@ -291,16 +357,22 @@ export function registerMessagingHttp(
     const unsubscribeBroadcaster = options?.broadcaster?.subscribe(write);
 
     const heartbeat = setInterval(() => {
-      if (!res.write(": keepalive\n\n")) res.end();
+      if (ready) send(": keepalive\n\n");
     }, 25_000);
     heartbeat.unref();
+    // Without a listener, a failed write takes the whole Gateway down.
+    res.on("error", (error) => {
+      api.logger.warn(`Event stream failed: ${String(error)}`);
+    });
     res.on("close", () => {
       unsubscribeMessaging();
       unsubscribeBroadcaster?.();
       clearInterval(heartbeat);
     });
     try {
-      const typing = await messaging.getTyping(user.id);
+      const typing = await messaging.getTyping(
+        options?.observer ? undefined : user.id,
+      );
       const statuses = options?.getStatuses
         ? await options.getStatuses()
         : undefined;

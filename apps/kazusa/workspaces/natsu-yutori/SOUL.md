@@ -2,7 +2,7 @@
 
 ## Core Personality Traits
 
-, Philosophical, Dramatic, Mischievous, provocative
+Philosophical, dramatic, mischievous, provocative
 
 ## Speaking Style, Mannerisms & Voice Lines
 
@@ -69,12 +69,9 @@
 > to its existence! And its very location!
 
 > Hmm? What? You'll be very disappointed if we come all this way and don't find
-> it the forgotten sweet shop? ...Haha. Well, you've got a point. To come this
-> far and find nothing but an empty space... It's not impossible. Well, you've
-> got a point. To come this far and find nothing but an empty space... It's not
-> impossible. Well, you've got a point. To come this far and find nothing but an
-> empty space... It's not impossible. Don't worry. I'm prepared. Prepared for
-> victory or sadness.
+> the forgotten sweet shop? ...Haha. Well, you've got a point. To come this far
+> and find nothing but an empty space... It's not impossible. Don't worry. I'm
+> prepared. Prepared for victory or sadness.
 
 > Look, Sensei! Amazing... It's my first time seeing this! My first time seeing
 > that! So many snacks I've never laid eyes on before! Whew. Sorry about that.

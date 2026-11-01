@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
   readSessionTranscriptCatalogPage,
@@ -6,6 +6,9 @@ import {
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { registerTimelineHttp } from "./http.ts";
 import type { Clock } from "../clock/clock.ts";
+import { resetLedgerJournal, withJournalSeq } from "../realtime.ts";
+
+beforeEach(resetLedgerJournal);
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
   readSessionTranscriptCatalogPage: vi.fn(),
@@ -102,7 +105,22 @@ describe("registerTimelineHttp", () => {
     });
 
     const clock = createMockClock();
-    registerTimelineHttp(api, { clock });
+    registerTimelineHttp(api, {
+      clock,
+      messages: async () => [
+        {
+          id: "canonical-1",
+          sequence: 7,
+          sender: "alice",
+          senderName: "Alice",
+          chatId: "direct:abc",
+          audience: ["alice", "bob", "user:sensei"],
+          params: { text: "Hello Sensei!", requestId: "r", title: null },
+          timestamp: 1_000_300,
+          copies: [],
+        },
+      ],
+    });
 
     expect(api.registerHttpRoute).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/kazusa/timeline", match: "exact" }),
@@ -155,18 +173,6 @@ describe("registerTimelineHttp", () => {
           ],
         } as never;
       }
-      if (opts.sessionKey.includes("chat:direct:")) {
-        return {
-          items: [
-            {
-              id: "chat-msg-1",
-              timestamp: new Date(1_000_300).toISOString(),
-              text: "Hello Sensei!",
-              sender: { identity: { id: "alice" } },
-            },
-          ],
-        } as never;
-      }
       return { items: [] };
     });
 
@@ -194,6 +200,17 @@ describe("registerTimelineHttp", () => {
 
     // Newest-first order check
     expect(parsed.events[0].kind).toBe("message.sent");
+    // One canonical row per message, addressed so a client can open its chat.
+    expect(parsed.events[0]).toMatchObject({
+      chatId: "direct:abc",
+      actors: ["alice", "bob", "user:sensei"],
+      payload: {
+        messageId: "canonical-1",
+        sequence: 7,
+        senderId: "alice",
+        preview: "Hello Sensei!",
+      },
+    });
     expect(parsed.events[1].kind).toBe("task.delayed");
     expect(parsed.events[2].kind).toBe("task.started");
 
@@ -389,5 +406,22 @@ describe("registerTimelineHttp", () => {
       payload: { delayMs: 94_000, choice: "WAKE" },
     });
     expect(parsed.events[0].payload).not.toHaveProperty("wallTime");
+  });
+});
+
+describe("withJournalSeq", () => {
+  const event = {
+    simTime: 1_798_804_234_568,
+    kind: "task.started",
+    actors: ["blaidd"],
+    payload: { taskId: "a" },
+  };
+
+  it("sorts by sim time and is stable for one event", () => {
+    expect(withJournalSeq(event).seq).toBe(withJournalSeq({ ...event }).seq);
+    expect(
+      withJournalSeq({ ...event, simTime: event.simTime + 1 }).seq,
+    ).toBeGreaterThan(withJournalSeq(event).seq);
+    expect(Number.isSafeInteger(withJournalSeq(event).seq)).toBe(true);
   });
 });

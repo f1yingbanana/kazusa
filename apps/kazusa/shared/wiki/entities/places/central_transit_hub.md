@@ -9,7 +9,10 @@ connections:
   - to: schale_office
     ways:
       - { by: transit, minutes: 35 }
-    note: "Estimated transfer from central D.U. to the SCHALE tower on its outskirts."
+    note:
+      "Estimated transfer from central D.U. to the SCHALE tower on its
+      outskirts."
+renown: known
 ---
 
 # Kivotos Central Transit Hub

@@ -8,8 +8,11 @@ aliases: ["Justice Realization Committee headquarters"]
 parent: trinity_school
 entry_minutes: 6
 summary: "The headquarters of Trinity’s Justice Task Force."
+community: justice_task_force
 ---
 
 # Justice Task Force Headquarters
 
-Tsurugi, Hasumi, Mashiro and Ichika help maintain order through the Justice Task Force. Its offices are a place for reports, patrol coordination and official work.
+Tsurugi, Hasumi, Mashiro and Ichika help maintain order through the Justice Task
+Force. Its offices are a place for reports, patrol coordination and official
+work.

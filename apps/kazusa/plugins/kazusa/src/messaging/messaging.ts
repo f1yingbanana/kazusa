@@ -1,3 +1,4 @@
+import { inBackground } from "../background.ts";
 import type {
   ChatMessage,
   MessagesResponse,
@@ -37,6 +38,18 @@ export interface GetChatHistoryInput {
   readonly userId: string;
   readonly before?: number;
   readonly limit?: number;
+}
+
+/** A page of any chat's history, whoever heard it. */
+export type ObserveHistoryInput = Omit<GetChatHistoryInput, "userId">;
+
+/** A conversation as an observer sees it, from outside. */
+export interface ObservedConversation {
+  readonly chat: ChatConversation;
+  /** Who is in it, or who was, once it has ended. */
+  readonly members: readonly string[];
+  readonly ended: boolean;
+  readonly latest?: MessageDelivery;
 }
 
 export interface MessageCopy {
@@ -168,6 +181,22 @@ export function clientMessage(delivery: MessageDelivery): ChatMessage {
     text: delivery.params.text,
     ...(delivery.params.type === "action" ? { type: "action" } : {}),
     timestamp: delivery.timestamp,
+  };
+}
+
+/** One journal row per canonical message, for history and live events alike. */
+export function messageJournal(delivery: MessageDelivery) {
+  return {
+    simTime: delivery.timestamp,
+    kind: "message.sent" as const,
+    actors: [...new Set([delivery.sender, ...delivery.audience])],
+    chatId: delivery.chatId,
+    payload: {
+      messageId: delivery.id,
+      sequence: delivery.sequence,
+      senderId: delivery.sender,
+      preview: readAs(delivery.params).slice(0, 100),
+    },
   };
 }
 
@@ -394,8 +423,11 @@ export class Messaging {
     return chatIds;
   }
 
-  /** Reconnecting clients recover only current, visible composition signals. */
-  async getTyping(viewer: string): Promise<TypingStreamEvent[]> {
+  /**
+   * Reconnecting clients recover only current, visible composition signals; an
+   * observer (no `viewer`) sees all of them.
+   */
+  async getTyping(viewer?: string): Promise<TypingStreamEvent[]> {
     return this.serial.enqueue("messages", async () => {
       await this.init();
       return [...this.typing.values()]
@@ -404,7 +436,7 @@ export class Messaging {
           const members = this.chats.get(event.chatId)?.members ?? [];
           return (
             (!event.expiresAt || event.expiresAt > Date.now()) &&
-            members.includes(viewer) &&
+            (viewer === undefined || members.includes(viewer)) &&
             members.includes(event.senderId)
           );
         });
@@ -630,32 +662,112 @@ export class Messaging {
       await this.init();
       assertInvocationCurrent?.();
 
-      // Records are keyed by stable message ID, not a chat/sequence index.
-      // Filter audience before paging so invisible messages cannot hide an
-      // older eligible page across a leave/rejoin interval.
-      const entries = await this.deps.store.entries();
-      const eligible = entries
-        .map(({ value }) => value)
+      return await this.historyPage(chatId, before, limit, (message) =>
+        message.audience.includes(input.userId),
+      );
+    });
+  }
+
+  /**
+   * Any chat's history regardless of audience, for an observer outside the
+   * world. Reads only: it changes no membership and nobody in the chat can
+   * tell.
+   */
+  async observeChatHistory(
+    input: ObserveHistoryInput,
+  ): Promise<MessagesResponse> {
+    const limit = Math.max(1, Math.min(input.limit ?? 30, 100));
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      return await this.historyPage(
+        input.chatId,
+        input.before,
+        limit,
+        () => true,
+      );
+    });
+  }
+
+  /** Runs inside the `messages` queue. */
+  private async historyPage(
+    chatId: string,
+    before: number | undefined,
+    limit: number,
+    visible: (message: MessageDelivery) => boolean,
+  ): Promise<MessagesResponse> {
+    // Records are keyed by stable message ID, not a chat/sequence index.
+    // Filter audience before paging so invisible messages cannot hide an
+    // older eligible page across a leave/rejoin interval.
+    const entries = await this.deps.store.entries();
+    const eligible = entries
+      .map(({ value }) => value)
+      .filter(
+        (message) =>
+          message.chatId === chatId &&
+          visible(message) &&
+          (before === undefined || message.sequence < before),
+      )
+      .sort((a, b) => b.sequence - a.sequence);
+    const hasMore = eligible.length > limit;
+    const page = eligible.slice(0, limit);
+    page.sort((a, b) => a.sequence - b.sequence);
+
+    const messages = page.map(clientMessage);
+
+    const nextCursor =
+      hasMore && page.length > 0 ? page[0].sequence : undefined;
+    return {
+      messages,
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Every conversation `viewer` is not in, newest first. A dissolved huddle
+   * stays readable, named by who took part. One scan of retained history, so it
+   * costs the same however many chats there are.
+   */
+  async observeChats(viewer: string): Promise<ObservedConversation[]> {
+    PARTICIPANT_ID.parse(viewer);
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      const latest = new Map<string, MessageDelivery>();
+      const heard = new Map<string, Set<string>>();
+      for (const { value: message } of await this.deps.store.entries()) {
+        const current = latest.get(message.chatId);
+        if (!current || current.sequence < message.sequence)
+          latest.set(message.chatId, message);
+        const people = heard.get(message.chatId) ?? new Set<string>();
+        for (const id of message.audience) people.add(id);
+        heard.set(message.chatId, people);
+      }
+      return [...this.chats.values()]
         .filter(
-          (message) =>
-            message.chatId === chatId &&
-            message.audience.includes(input.userId) &&
-            (before === undefined || message.sequence < before),
+          (chat) =>
+            !chat.members.includes(viewer) &&
+            (chat.members.length > 0 || latest.has(chat.id)),
         )
-        .sort((a, b) => b.sequence - a.sequence);
-      const hasMore = eligible.length > limit;
-      const page = eligible.slice(0, limit);
-      page.sort((a, b) => a.sequence - b.sequence);
+        .map((chat) => {
+          const ended = chat.members.length === 0;
+          return {
+            chat,
+            ended,
+            members: ended
+              ? [...(heard.get(chat.id) ?? [])].sort()
+              : chat.members,
+            ...(latest.has(chat.id) ? { latest: latest.get(chat.id) } : {}),
+          };
+        })
+        .sort((a, b) => (b.latest?.sequence ?? 0) - (a.latest?.sequence ?? 0));
+    });
+  }
 
-      const messages = page.map(clientMessage);
-
-      const nextCursor =
-        hasMore && page.length > 0 ? page[0].sequence : undefined;
-      return {
-        messages,
-        nextCursor,
-        hasMore,
-      };
+  /** All retained messages, for the world journal. */
+  async messageLog(): Promise<MessageDelivery[]> {
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      return (await this.deps.store.entries()).map(({ value }) => value);
     });
   }
 
@@ -1542,16 +1654,17 @@ export class Messaging {
         // Retain an independent host scope before the HTTP/tool caller returns.
         // Perception may dispatch a reply which sends again: never await that
         // work from send() or while holding the ledger/state queue.
-        if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
-          throw new Error("runInBackgroundContext not available");
-        }
-        void this.deps.api.lifecycle
-          ?.runInBackgroundContext?.(() => this.notifyCopy(delivery, copy))
-          .catch((error: unknown) => this.warn(error))
-          .finally(() => {
-            this.notifying.delete(key);
-            this.scheduleRetry();
-          });
+        inBackground(
+          this.deps.api,
+          () =>
+            this.notifyCopy(delivery, copy).finally(() => {
+              this.notifying.delete(key);
+              this.scheduleRetry();
+            }),
+          (error) => {
+            this.warn(error);
+          },
+        );
       }
     }
   }
@@ -1597,9 +1710,13 @@ export class Messaging {
     if (!pending) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.deps.api.lifecycle
-        ?.runInBackgroundContext?.(() => this.resume())
-        .catch((error: unknown) => this.warn(error));
+      inBackground(
+        this.deps.api,
+        () => this.resume(),
+        (error) => {
+          this.warn(error);
+        },
+      );
     }, 1000);
     this.timer.unref();
   }

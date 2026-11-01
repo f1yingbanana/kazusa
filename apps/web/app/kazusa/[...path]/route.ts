@@ -7,6 +7,8 @@ const ROUTES = new Map([
   ["agents", "GET"],
   ["chats", "GET"],
   ["messages", "GET"],
+  ["observe/chats", "GET"],
+  ["observe/messages", "GET"],
   ["events", "GET"],
   ["send", "POST"],
   ["chats/manage", "POST"],
@@ -22,6 +24,12 @@ const ROUTES = new Map([
   ["model", "POST"],
   ["thinking", "POST"],
   ["brain/abort", "POST"],
+  ["wiki", "GET"],
+  ["wiki/page", "GET"],
+  ["wiki/lint", "GET"],
+  ["knowledge/explain", "GET"],
+  ["memory/runs", "GET"],
+  ["memory/preview", "GET"],
 ]);
 
 type Context = { params: Promise<{ path: string[] }> };

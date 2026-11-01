@@ -11,7 +11,7 @@ import { untilRunning } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
-import { nextJournalSeq } from "../realtime.ts";
+import { withJournalSeq } from "../realtime.ts";
 import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
 import { sharedSupervisorCell, startIdleSupervisor } from "./supervisor.ts";
@@ -380,13 +380,12 @@ export function registerTaskman(
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
-          event: {
-            seq: nextJournalSeq(),
+          event: withJournalSeq({
             simTime: clock.time(),
             kind: "task.started",
             actors: [agentId],
             payload: result.payload,
-          },
+          }),
         });
       }
       return {
@@ -438,13 +437,12 @@ export function registerTaskman(
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
-          event: {
-            seq: nextJournalSeq(),
+          event: withJournalSeq({
             simTime: clock.time(),
             kind: "task.delayed",
             actors: [agentId],
             payload: result.payload,
-          },
+          }),
         });
       }
       return {

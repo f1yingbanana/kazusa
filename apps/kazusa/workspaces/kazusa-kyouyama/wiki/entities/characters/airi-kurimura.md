@@ -1,26 +1,30 @@
 ---
-peer_id: airi-kurimura
 name: Airi Kurimura
-relation_type: close_friend
-familiarity: 85
-affinity: 90
-trust: 90
-last_interaction_iso: "2026-10-20T17:00:00Z"
+relation: close friend
+seen: 2026-10-20
 ---
-
-## Quick Impression
 
 Airi is the calmest and sweetest member of the After-School Sweets Club. Seeing
 her genuinely enjoying sweets as an ordinary high school girl was what inspired
 me to leave behind my gang days as "Cath Palug" and enroll at Trinity. She never
 judges me and always brings a soothing, kind presence to our group.
 
-- **Open Threads**: Airi mentioned wanting to try the new chocolate mint parfait
-  at Trinity Patisserie later this week.
+## What they think of me
 
-## Interaction Log
+Thinks better of me than I deserve, and has no idea how much she changed my
+life. If she ever saw Cath Palug up close she might be afraid. (suspect)
 
-- **2026-10-20**: Shared tea and cream puffs in the club room after school; Airi
-  laughed when Yoshimi got excited about baking molds.
-- **2026-10-18**: Walked back from lectures together; Airi gave me a
-  mint-flavored cookie she baked.
+## Open threads
+
+- Airi mentioned wanting to try the new chocolate mint parfait at Trinity
+  Patisserie later this week.
+
+## Notes
+
+- 2026-10-30 · seen it · sure — Airi left the Main Gate heading toward Church
+  Street to meet me at Trinity Pâtisserie for ice cream after our cancelled
+  duel. (seen it)
+- 2026-10-20 · seen it · sure — Shared tea and cream puffs in the club room
+  after school; Airi laughed when Yoshimi got excited about baking molds.
+- 2026-10-18 · seen it · sure — Walked back from lectures together; Airi gave me
+  a mint-flavored cookie she baked.

@@ -17,7 +17,8 @@ describe("per-domain source resolution", () => {
     expect(resolved.characters).toBe("live");
     expect(resolved.status).toBe("mock");
     expect(resolved.timeline).toBe("mock");
-    expect(resolved.observe).toBe("unavailable");
+    expect(resolved.observe).toBe("mock");
+    expect(resolved.relationships).toBe("unavailable");
   });
   it("falls back to mocks for mockable domains when the backend is unreachable", () => {
     const resolved = resolveSources({
@@ -50,7 +51,7 @@ describe("per-domain source resolution", () => {
       mocks: "auto",
     });
     expect(satisfies(resolved, ["chats", "timeline"])).toBe(true);
-    expect(satisfies(resolved, ["observe"])).toBe(false);
+    expect(satisfies(resolved, ["relationships"])).toBe(false);
     expect(isMocked(resolved, ["chats", "timeline"])).toBe(true);
     expect(isMocked(resolved, ["chats"])).toBe(false);
   });

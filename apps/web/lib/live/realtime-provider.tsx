@@ -13,16 +13,24 @@ import { useSWRConfig } from "swr";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
 import { isLocationsKey } from "@/lib/source/location/http";
+import {
+  OBSERVED_MESSAGES_KEY,
+  observedChatsKey,
+} from "@/lib/source/observe/http";
+import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import {
   parseStreamEvent,
+  type ObservedChatsResponse,
   type ChatsResponse,
   type MessageStreamEvent,
   type MessagesResponse,
   type TypingStreamEvent,
   type StreamEvent,
 } from "@kazusa/client";
+import { unstable_serialize } from "swr/infinite";
 import { dispatchLive } from "@/lib/registry/live";
+import { fetchTimeline } from "@/lib/source/timeline/http";
 import { statusStore } from "./state";
 import {
   appendMessageToPages,
@@ -58,10 +66,14 @@ const OBSERVER_EVENTS = [
   "clock",
   "desires",
   "location",
+  "observed",
 ] as const;
 const PLAYER_EVENTS = ["message", "typing", "connected", "chats"] as const;
 const RETRY_MIN_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
+/** Huddles form and dissolve often, and this list costs a read of all history. */
+const OBSERVED_REFRESH_MS = 2_000;
+const JOURNAL_CATCH_UP = 200;
 
 function parseEvent(raw: string): StreamEvent | null {
   return parseStreamEvent(raw);
@@ -94,6 +106,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     let source: EventSource | null = null;
     let retryTimer: number | undefined;
     let retryDelay = RETRY_MIN_MS;
+    let observedRefresh: number | undefined;
     setStatus("connecting");
     const seenMessages = new Set<string>();
     setTypingByChat({});
@@ -147,6 +160,43 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const refreshObserved = () => {
+      observedRefresh ??= window.setTimeout(() => {
+        observedRefresh = undefined;
+        void mutate(observedChatsKey(config));
+      }, OBSERVED_REFRESH_MS);
+    };
+
+    const observedMessagesKey = (chatId: string) =>
+      unstable_serialize(
+        messagesKeyGetter(config, chatId, OBSERVED_MESSAGES_KEY),
+      );
+
+    /** Someone else's chat: no unread, nothing of the player's changes. */
+    const handleObservedMessage = ({ chatId, message }: MessageStreamEvent) => {
+      if (seenMessages.has(message.id)) return;
+      seenMessages.add(message.id);
+      clearTypist(chatId, message.senderId);
+      void mutate(
+        observedMessagesKey(chatId),
+        (pages?: MessagesResponse[]) => appendMessageToPages(pages, message),
+        { revalidate: false },
+      );
+      let knownChat = true;
+      void mutate(
+        observedChatsKey(config),
+        (current?: ObservedChatsResponse) => {
+          if (current && !current.chats.some((chat) => chat.id === chatId)) {
+            knownChat = false;
+          }
+          return updateChatPreview(current, chatId, message);
+        },
+        { revalidate: false },
+      ).then(() => {
+        if (!knownChat) refreshObserved();
+      });
+    };
+
     const handleTyping = (event: TypingStreamEvent) => {
       if (event.senderId === userId) return;
       if (!event.isTyping) {
@@ -184,8 +234,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         case "chats":
           void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
             if (!current) return;
-            setTypingByChat((typing) =>
-              Object.fromEntries(
+            // Only the player's chats are checked; others' typists stay.
+            setTypingByChat((typing) => ({
+              ...typing,
+              ...Object.fromEntries(
                 current.chats.map((chat) => [
                   chat.id,
                   (typing[chat.id] ?? []).filter((person) =>
@@ -193,8 +245,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                   ),
                 ]),
               ),
-            );
+            }));
           });
+          break;
+        case "observed":
+          if (data.event.type === "message") handleObservedMessage(data.event);
+          else if (data.event.type === "typing") handleTyping(data.event);
+          else refreshObserved();
           break;
         case "connected":
           setTypingByChat({});
@@ -205,6 +262,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           // Desire records changed while disconnected are only in the snapshot.
           void mutate(isDesiresKey);
           void mutate(isLocationsKey);
+          void mutate(observedChatsKey(config));
+          // Journal events are not replayed, so read what the stream missed.
+          void fetchTimeline(baseUrl, { limit: JOURNAL_CATCH_UP }, token).then(
+            ({ events }) => {
+              for (const event of events)
+                dispatchLive({ type: "journal", event });
+            },
+            () => {},
+          );
+          if (activeChatRef.current)
+            void mutate(observedMessagesKey(activeChatRef.current));
           // Always refresh: messages can arrive between the initial GET and SSE.
           void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
             for (const chat of current?.chats ?? [])
@@ -257,6 +325,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       window.clearTimeout(retryTimer);
+      window.clearTimeout(observedRefresh);
       disconnect();
     };
     // config fields are listed explicitly so a new object identity does not reconnect.

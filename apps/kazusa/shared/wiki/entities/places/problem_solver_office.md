@@ -4,12 +4,14 @@ entityType: place
 id: entity.place.problem_solver_office
 place_id: problem_solver_office
 name: Problem Solver 68 Office
-summary: "A modest rented office with a desk, sofa, paperwork and the agency's emblem."
+summary:
+  "A modest rented office with a desk, sofa, paperwork and the agency's emblem."
 connections:
   - to: central_transit_hub
     ways:
       - { by: transit, minutes: 20 }
     note: "Approximate travel time for the simulation."
+community: problem_solver_68
 ---
 
 # Problem Solver 68 Office

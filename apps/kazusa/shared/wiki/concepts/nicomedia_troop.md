@@ -3,8 +3,10 @@ pageType: concept
 conceptType: lore
 id: concept.nicomedia_troop
 title: Nicomedia Troop
+community: arius_satellite_school
 ---
 
 # Nicomedia Troop
 
-The Nicomedia Troop is an Arius student group founded by Subaru Kakehashi to help organize and protect younger students as their community rebuilds.
+The Nicomedia Troop is an Arius student group founded by Subaru Kakehashi to
+help organize and protect younger students as their community rebuilds.

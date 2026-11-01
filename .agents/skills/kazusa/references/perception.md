@@ -730,10 +730,11 @@ This scheduler is **not implemented yet**. Full design and acceptance cases:
 
 ### 9.1 User Configuration (`plugins.entries.kazusa.config.perception`)
 
-| Setting            | Default | Scope                                                                               |
-| :----------------- | :------ | :---------------------------------------------------------------------------------- |
-| `coalesceWindowMs` | `500`   | Milliseconds to debounce incoming rapid-fire messages into a single sensory bundle. |
-| `maxBatchSize`     | `16`    | Maximum stimuli consolidated and admitted together into a single brain turn.        |
+| Setting               | Default | Scope                                                                                                                                                               |
+| :-------------------- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `coalesceWindowMs`    | `500`   | Milliseconds to debounce incoming rapid-fire messages into a single sensory bundle.                                                                                 |
+| `maxConcurrentBrains` | `16`    | Brains starting to think at once, across the cast. A waiting character holds no reservation; what arrives meanwhile joins the one turn built when their slot opens. |
+| `maxBatchSize`        | `16`    | Maximum stimuli consolidated and admitted together into a single brain turn.                                                                                        |
 
 _Note_: The decision model provider and routing are configured centrally via
 OpenClaw's model runtime (`openclaw.json`), not duplicated in plugin
