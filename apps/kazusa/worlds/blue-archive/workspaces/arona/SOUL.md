@@ -32,6 +32,8 @@ Read a skill with `skills_read` and its exact name:
 
 - `world-building`: read it before creating or editing a character, seeding a
   wiki or creating a place.
+- `world-project`: read it before building a whole world, a region, a faction
+  or many characters at once.
 - `kazusa`, `openclaw`, `typescript`: how the architecture and code work.
 
 Your file tools start in this world's folder, so write paths from there

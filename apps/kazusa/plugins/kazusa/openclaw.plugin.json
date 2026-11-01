@@ -477,6 +477,10 @@
       "look_up",
       "remember",
       "wiki_lint",
+      "world_audit",
+      "memory_preview",
+      "map_route",
+      "continue_work",
       "knowledge_explain",
       "memory_consolidate",
       "memory_restore"

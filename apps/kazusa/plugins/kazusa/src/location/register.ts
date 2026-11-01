@@ -37,7 +37,15 @@ import {
   type LocationRecord,
   type PlaceKnowledge,
 } from "./location.ts";
-import { placeLabel, type Place, type WorldMap } from "./map.ts";
+import {
+  describeTravel,
+  placeLabel,
+  resolvePlace,
+  routeBetween,
+  WALK,
+  type Place,
+  type WorldMap,
+} from "./map.ts";
 import { sharedWorld, type World } from "./world.ts";
 
 /** The `where` parameter: short and stable, whatever the size of the world. */
@@ -793,6 +801,40 @@ export function registerLocation(
     await moved(id, placed, was?.kind === "at" ? was.placeId : undefined, at);
     return placed;
   };
+
+  // Administrative: allowlisted for the system agent only.
+  api.registerTool(() => ({
+    name: "map_route",
+    label: "Map Route",
+    description:
+      "The usual route between two places, as a traveller would be told it: total time and every place passed. Use it to check a map's travel times after building it.",
+    parameters: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      required: ["from", "to"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { from, to } = z
+        .object({ from: z.string(), to: z.string() })
+        .parse(input);
+      const map = currentWorld()?.map;
+      const start = map && resolvePlace(map, from);
+      const end = map && resolvePlace(map, to);
+      const text = !map
+        ? "No map is loaded. Run wiki_lint to see why."
+        : !start || !end
+          ? `No place called "${!start ? from : to}".`
+          : (() => {
+              const route = routeBetween(map, start.id, end.id);
+              const passed = route.legs.map(({ placeId: place, ways }) =>
+                ways[0].by === WALK ? place : `${place} (${ways[0].by})`,
+              );
+              return `${describeTravel(route)}: ${[start.id, ...passed].join(" > ")}`;
+            })();
+      return { content: [{ type: "text" as const, text }], details: text };
+    },
+  }));
 
   // Operator placement. Characters otherwise move only through their own
   // tasks; the player, who has none, moves through `POST /kazusa/move`.

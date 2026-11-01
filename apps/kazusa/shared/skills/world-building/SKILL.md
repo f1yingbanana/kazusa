@@ -12,6 +12,10 @@ description:
 Everything here is a Markdown edit with your file tools, except one line of
 `openclaw.json`. Requests come from the user only.
 
+For one character, place or page, this skill is enough. For anything bigger (a
+whole world, a region, a faction, many characters, building from a wiki), read
+`world-project` first: it covers how to do that across many runs.
+
 ## Two wikis
 
 - **World Wiki (`shared/wiki/`)** is what is true. Characters never write it
@@ -52,6 +56,12 @@ below for anything new, and don't rewrite old pages unless the user asks.
 **A broken map changes nothing.** An unknown `home`, `parent` or connection
 target keeps the whole map as it was until it's fixed. After changing a place or
 a `home`, run `wiki_lint` with no agent: it names what's broken.
+
+**Every id is shared.** Characters, places and concepts share one namespace of
+ids, and of names and aliases too. Two pages with one id hide each other, and a
+generic alias such as "the gate" can send someone to the wrong place. Use
+`wiki_lint`, `world_audit` (who's connected to whom), `map_route` (travel times)
+and `memory_preview` (what someone would recall) to check your work.
 
 ## Creating a character
 

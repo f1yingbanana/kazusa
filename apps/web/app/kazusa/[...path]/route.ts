@@ -24,6 +24,8 @@ const ROUTES = new Map([
   ["model", "POST"],
   ["thinking", "POST"],
   ["brain/abort", "POST"],
+  ["brain/trace", "GET"],
+  ["usage", "GET"],
   ["wiki", "GET"],
   ["wiki/page", "GET"],
   ["wiki/lint", "GET"],

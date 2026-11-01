@@ -55,6 +55,12 @@ export function lintWorld(world: WorldModel): LintFinding[] {
     if (!page.lead && !page.summary)
       add("warning", page.id, "no summary or lead");
   }
+  for (const [id, first, second] of world.duplicates)
+    add(
+      "error",
+      id,
+      `two pages share this id (${first}, ${second}): one hides the other, so rename one`,
+    );
   for (const [alias, owners] of world.collisions())
     add(
       "warning",

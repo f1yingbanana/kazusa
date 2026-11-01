@@ -94,6 +94,23 @@ gets the same `Clock` module through HTTP (§3).
 | `GET /kazusa/observe/chats`      | Params: `query?`, `member?`. Returns all canonical chats with members and latest preview                                                                                                                | `chats` + `messaging` stores, audience-agnostic                                                    |
 | `GET /kazusa/observe/messages`   | Same shape as `/kazusa/messages`, any chat                                                                                                                                                              | `messaging` store                                                                                  |
 
+### Built: brain trace and usage
+
+- `GET /kazusa/brain/trace?id=<agent>&limit=<1-100>` → `BrainTraceResponse`.
+  Folds the visible `agent:<id>:brain` transcript with
+  `readVisibleSessionTranscriptMessageEntries`: a turn is one
+  `__openclaw.runId`, each assistant message is one LLM call with the `usage`,
+  `model` and `provider` the host recorded. Only the current session; text is
+  clipped at 8000 characters. A tool call with no result may still have run.
+- `GET /kazusa/usage?days=<1-3650>` → `UsageResponse`, projected from
+  `sessions.usage` with `agentScope: "all"`, called through
+  `callGatewayFromCli` (`openclaw/plugin-sdk/gateway-runtime`). `partial` means
+  OpenClaw's cost cache isn't `fresh`. During Gateway warm-up the call can return
+  400 "Session stores changed"; SWR's retry covers it.
+- Coverage: both read session transcripts. Decision-provider calls
+  (`perception.*`) and `subagent.complete` (memory sleep) have no transcript of
+  their own, so neither surface shows them unless the host records them.
+
 ### Built: desires
 
 | Route                 | Response                                                                                                                                                                   | Backed by                                                           |

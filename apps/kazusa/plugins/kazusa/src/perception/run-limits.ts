@@ -187,6 +187,7 @@ export function registerBrainRunLimits(
     const { maxModelCalls, maxToolCalls, maxRunSeconds } = state.limits;
     if (
       event.toolName !== "send_message" &&
+      event.toolName !== "continue_work" &&
       (state.tools.size >= maxToolCalls ||
         state.models.size >= maxModelCalls - WRAP_UP_MODEL_CALLS ||
         Date.now() - state.startedAt >=

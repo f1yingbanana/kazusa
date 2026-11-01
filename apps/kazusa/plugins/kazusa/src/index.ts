@@ -14,7 +14,10 @@ import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
 import { createJevProvider } from "./decisions/jev.ts";
 import { registerPerception } from "./perception/register.ts";
-import { registerBrainHttp } from "./perception/http.ts";
+import {
+  registerBrainHttp,
+  registerBrainTraceHttp,
+} from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
 import { registerLocation } from "./location/register.ts";
@@ -33,6 +36,7 @@ import {
   sharedBroadcaster,
 } from "./realtime.ts";
 import { registerTimelineHttp } from "./timeline/http.ts";
+import { registerUsageHttp } from "./usage/http.ts";
 import { registerStage, stageControl } from "./stage/register.ts";
 
 export default definePluginEntry({
@@ -144,6 +148,7 @@ export default definePluginEntry({
     });
     contextRef.current = context;
     registerContextHttp(api, { context });
+    registerUsageHttp(api);
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
@@ -174,6 +179,7 @@ export default definePluginEntry({
       thinking: async (agentId) => (await models.read(agentId)).thinking,
     });
     registerBrainHttp(api);
+    registerBrainTraceHttp(api);
     location.attachPerception(perception);
 
     const stopSupervisor = taskman.attachSupervisor(perception);

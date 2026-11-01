@@ -13,6 +13,10 @@
         "remember",
         "wiki_lint",
         "knowledge_explain",
+        "world_audit",
+        "memory_preview",
+        "map_route",
+        "continue_work",
         "memory_consolidate",
         "memory_restore",
         "ls",
@@ -41,7 +45,7 @@
         "enabled": false
       }
     },
-    "skills": ["world-building", "kazusa", "openclaw", "typescript"]
+    "skills": ["world-building", "world-project", "kazusa", "openclaw", "typescript"]
   },
   "config": {
     "agents": {

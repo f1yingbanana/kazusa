@@ -228,6 +228,8 @@ export const DomainSchema = z.enum([
   "stage",
   "models",
   "wiki",
+  "brain",
+  "usage",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -434,6 +436,106 @@ export const BrainAbortResponseSchema = z.object({
   drained: z.boolean(),
 });
 export type BrainAbortResponse = z.infer<typeof BrainAbortResponseSchema>;
+
+/** What one model call reported. Absent counters were not reported. */
+export const BrainUsageSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number(),
+  cacheWrite: z.number(),
+  reasoning: z.number().optional(),
+  total: z.number(),
+  cost: z.number().optional(),
+});
+export type BrainUsage = z.infer<typeof BrainUsageSchema>;
+
+export const BrainStepSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("thinking"), text: z.string() }),
+  z.object({ type: z.literal("text"), text: z.string() }),
+  z.object({
+    type: z.literal("tool"),
+    id: z.string(),
+    name: z.string(),
+    /** Pretty-printed arguments. */
+    input: z.string(),
+    /** Absent when the transcript holds no result; the call may still have run. */
+    result: z.string().optional(),
+    isError: z.boolean().optional(),
+  }),
+]);
+export type BrainStep = z.infer<typeof BrainStepSchema>;
+
+/** One LLM call. Times here are real time: this is a debug view of the host. */
+export const BrainCallSchema = z.object({
+  id: z.string(),
+  at: z.number().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  stopReason: z.string().optional(),
+  error: z.string().optional(),
+  usage: BrainUsageSchema.optional(),
+  steps: z.array(BrainStepSchema),
+});
+export type BrainCall = z.infer<typeof BrainCallSchema>;
+
+/** One run of the brain: what woke it, then every LLM call of the chain. */
+export const BrainTurnSchema = z.object({
+  id: z.string(),
+  at: z.number().optional(),
+  prompts: z.array(z.string()),
+  calls: z.array(BrainCallSchema),
+  usage: BrainUsageSchema.optional(),
+});
+export type BrainTurn = z.infer<typeof BrainTurnSchema>;
+
+/** The brain session's latest turns, newest first. */
+export const BrainTraceResponseSchema = z.object({
+  turns: z.array(BrainTurnSchema),
+  total: z.number(),
+});
+export type BrainTraceResponse = z.infer<typeof BrainTraceResponseSchema>;
+
+const UsageTotalsSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number(),
+  cacheWrite: z.number(),
+  totalTokens: z.number(),
+  totalCost: z.number(),
+  /** Calls with no known price; `totalCost` leaves them out. */
+  missingCostEntries: z.number(),
+});
+export type UsageTotals = z.infer<typeof UsageTotalsSchema>;
+
+/** OpenClaw's own session-derived report (`sessions.usage`), for all agents. */
+export const UsageResponseSchema = z.object({
+  startDate: z.string(),
+  endDate: z.string(),
+  totals: UsageTotalsSchema,
+  sessionCount: z.number(),
+  messages: z.object({
+    total: z.number(),
+    toolCalls: z.number(),
+    errors: z.number(),
+  }),
+  byAgent: z.array(
+    z.object({ agentId: z.string(), totals: UsageTotalsSchema }),
+  ),
+  byModel: z.array(
+    z.object({
+      provider: z.string().optional(),
+      model: z.string().optional(),
+      count: z.number(),
+      totals: UsageTotalsSchema,
+    }),
+  ),
+  daily: z.array(
+    z.object({ date: z.string(), tokens: z.number(), cost: z.number() }),
+  ),
+  /** True while OpenClaw is still reading history, so the totals are partial. */
+  partial: z.boolean(),
+});
+export type UsageResponse = z.infer<typeof UsageResponseSchema>;
 
 /** Transient, structured state. Sent as full replacements per character. */
 export const CharacterStatusSchema = z.object({

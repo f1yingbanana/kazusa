@@ -66,6 +66,7 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
         runEmbeddedAgent,
       },
     },
+    registerTool: vi.fn(),
   } as unknown as OpenClawPluginApi;
   Object.assign(api, {
     runtime: { ...api.runtime, config: { current: () => api.config } },
@@ -265,6 +266,7 @@ describe("Perception host integration", () => {
           }),
         },
       },
+      registerTool: vi.fn(),
     } as unknown as OpenClawPluginApi;
     Object.assign(api, {
       runtime: { ...api.runtime, config: { current: () => api.config } },

@@ -33,6 +33,7 @@ import {
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
 import { lintMap } from "../location/world.ts";
+import { auditWorld, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
 import type { Certainty, HistoryLine, Page } from "./page.ts";
 import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
@@ -116,6 +117,7 @@ export interface MemoryService {
   ) => readonly string[];
   readonly entities: (request: RetrievalRequest) => readonly Entity[];
   readonly lint: (agentId?: string) => readonly LintFinding[];
+  readonly audit: () => WorldAudit;
   readonly explain: (agentId: string, pageId?: string) => unknown;
   readonly sleep: ReturnType<typeof createSleep>;
 }
@@ -397,6 +399,15 @@ export function registerMemory(
         .slice(0, limit)
         .map((entity) => renderEntity(entity, nameOf)),
     entities: (request) => retrieve(index, request),
+    audit: () => {
+      const config = currentConfig(api);
+      return auditWorld(
+        index.world(),
+        Object.keys(config.agents?.entries ?? {}),
+        (agentId) => index.personal(agentId),
+        config.agents?.defaults?.systemAgent?.agentId,
+      );
+    },
     lint: (agentId) => {
       const world = index.world();
       return agentId
@@ -640,6 +651,44 @@ export function registerMemory(
     async execute(_id: string, input: unknown) {
       const { agent } = z.object({ agent: z.string().optional() }).parse(input);
       return textResult(service.lint(agent));
+    },
+  });
+  api.registerTool({
+    name: "world_audit",
+    label: "World Audit",
+    description:
+      "Counts for the whole world, plus what lint can't see: characters with no relationships, separate social groups, and how the map divides.",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    async execute() {
+      return textResult(service.audit());
+    },
+  });
+  api.registerTool({
+    name: "memory_preview",
+    label: "Memory Preview",
+    description:
+      "What a character would have come to mind if they read `text` now, with no model call. Use it to check that someone knows what they should and no more.",
+    parameters: {
+      type: "object",
+      properties: { agent: { type: "string" }, text: { type: "string" } },
+      required: ["agent", "text"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { agent, text } = z
+        .object({ agent: z.string(), text: z.string() })
+        .parse(input);
+      const { onYourMind, ids } = await service.prefetch({
+        agentId: agent,
+        stimulus: text,
+        seeds: [],
+        now: Date.now(),
+      });
+      return textResult({ onYourMind, ids });
     },
   });
   api.registerTool({

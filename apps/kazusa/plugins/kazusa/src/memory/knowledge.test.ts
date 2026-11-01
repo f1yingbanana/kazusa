@@ -144,3 +144,22 @@ describe("lintWorld", () => {
     );
   });
 });
+
+describe("duplicate page ids", () => {
+  it("are an error, because one page hides the other", () => {
+    const concept = parsePage(
+      "---\nsummary: A group.\n---\n\n# Manor\n\nLead.",
+      "concepts/manor.md",
+    );
+    const place = parsePage(
+      "---\nplace_id: manor\nname: Manor\nsummary: A house.\n---\n\n# Manor\n\nLead.",
+      "entities/places/manor.md",
+    );
+    const messages = lintWorld(new WorldModel([concept, place])).map(
+      (finding) => finding.message,
+    );
+    expect(
+      messages.some((message) => message.startsWith("two pages share this id")),
+    ).toBe(true);
+  });
+});

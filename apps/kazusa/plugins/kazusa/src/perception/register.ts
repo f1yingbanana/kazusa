@@ -10,10 +10,12 @@ import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { Perception, type PerceptionDeps } from "./perception.ts";
-import type { PerceptionDecisionRecord } from "./types.ts";
+import { PERCEPTION_CONFIG, type PerceptionDecisionRecord } from "./types.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 import { registerBrainRunLimits } from "./run-limits.ts";
+import { inBackground } from "../background.ts";
+import { requestContinuation, takeContinuation } from "./continue.ts";
 import { BrainSlots } from "./brain-slots.ts";
 
 const LIFECYCLE = z.object({
@@ -132,6 +134,69 @@ export function registerPerception(
       delete resumer[PERCEPTION_RESUME];
     });
   }
+
+  // The system agent's long jobs: a fresh run once this one has ended.
+  const limits = PERCEPTION_CONFIG.parse(api.pluginConfig?.perception ?? {});
+  api.registerTool({
+    contextVersion: 2,
+    create: (context) => [
+      {
+        name: "continue_work",
+        label: "Continue Work",
+        description:
+          "For a job too big for one run: start a fresh run as soon as this one ends. It remembers nothing of this run except your files and `note`, so save your progress first. Stops working after many runs in a row without the user speaking.",
+        parameters: {
+          type: "object",
+          properties: {
+            note: {
+              type: "string",
+              description: "What to do next, and which file holds the plan.",
+            },
+          },
+          required: ["note"],
+          additionalProperties: false,
+        },
+        async execute(_id: string, input: unknown) {
+          const { note } = z.object({ note: z.string().min(1) }).parse(input);
+          const accepted =
+            !!context.agentId &&
+            requestContinuation(
+              context.agentId,
+              note,
+              limits.systemAgent.maxContinuations,
+            );
+          const text = accepted
+            ? "A fresh run starts when this one ends. Finish your turn now."
+            : "No more runs without the user. Tell them where things stand and that they can say continue.";
+          return { content: [{ type: "text" as const, text }], details: text };
+        },
+      },
+    ],
+  });
+  api.on("agent_end", (_event, ctx) => {
+    const agentId = ctx.agentId;
+    const note = agentId && takeContinuation(agentId);
+    if (!agentId || !note) return;
+    // After the host has marked the brain idle, so this is a run of its own.
+    const timer = setTimeout(() => {
+      inBackground(
+        api,
+        () =>
+          perception.receive(agentId, {
+            id: `continue:${agentId}:${randomUUID()}`,
+            sessionKey: `agent:${agentId}:tasks`,
+            sender: "kazusa:taskman",
+            text: `Carry on with your work: ${note}`,
+            idle: true,
+            timestamp: deps.clock.time(),
+          }),
+        (error) => {
+          api.logger.warn(`Perception: continue_work failed: ${String(error)}`);
+        },
+      );
+    }, 2_000);
+    timer.unref();
+  });
 
   // =========================================================================
   // 2. INGRESS HOOK: before_dispatch (Attention Admission & Claiming)

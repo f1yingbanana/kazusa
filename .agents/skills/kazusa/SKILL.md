@@ -899,9 +899,12 @@ connect these modules in process.
   pause wait. Simulation time, task deadlines and ordinary characters remain
   frozen. Offstage and custody gates still apply. How she works is in her
   `SOUL.md`; the common jobs (characters, wikis, places) are the
-  `world-building` skill in her workspace (`workspaces/arona/skills/`), selected
-  by her per-agent `skills`. That folder is the one exception to what a
-  character workspace holds. Retained consumers use the host-injected
+  `world-building` skill, and whole worlds are `world-project`. Both live in
+  `shared/skills/`, so every world's system agent gets them, selected by her
+  per-agent `skills` in `worlds/base.json`. Long jobs survive the run limits
+  through a project file and `continue_work`, which starts a fresh run once this
+  one ends (`perception/continue.ts`), up to
+  `perception.systemAgent.maxContinuations` runs without the user speaking. Retained consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
   agent/identity/workspace lookups. Character and agent roster responses expose
   `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
