@@ -56,28 +56,16 @@ ignores `session.mainKey`, so it cannot rename the default `main` session into
 - The owner's personal wiki: retrieve relevant impressions using the pending
   perception, preserve recorded dates, and inject bounded whole cards as
   subjective recollections. No world-wiki or other-character private retrieval.
-- The run in progress (`recentBrainHistory`): always whole, including across
-  steered messages, or the model forgets its own tool results between calls.
-  Live, a 2000-token cap on it left every run with a large result re-reading
-  the same files until it hit its limits. A run ends at an assistant message
-  with no tool calls, so one cut off by its limits carries into the next. Only
-  when it outgrows the whole context do its oldest tool results go, replaced
-  by a note to look again.
-- Prior complete brain turns (`recentBrainHistory`): A bounded continuity
-  allowance (`brainMaxTokens`, default 2000; can be set to `0` for pure
-  stateless ledger-driven runs). Retaining prior turns serves three functions:
-  1. **Tool-Loop Atomicity & Error Recovery**: When a tool call errors or fails
-     validation, the error is recorded only in `:brain`; ledgers record only
-     settled successes. Without brain history, the agent would suffer amnesia
-     regarding failed attempts.
-  2. **In-Flight Steering Boundaries**: When an urgent stimulus interrupts an
-     ongoing turn (`queue.mode = "steer"`), prior brain messages preserve
-     in-flight cognitive intent across the steering boundary.
-  3. **Reasoning Continuity**: Retains provider-level thinking/CoT blocks for
-     models supporting extended reasoning. Settled actions and monologues are
-     already recorded in `:tasks` and `:chat:*`; setting `brainMaxTokens: 0`
-     eliminates duplicate tool-call text when pure ledger-driven operation is
-     preferred.
+- The turn under way (`brainHistory`), and no past brain turns. With `prompt`
+  set, `messages` holds only history from before this turn, and the host appends
+  the turn itself after what `assemble` returns, on every model call. Without
+  it, the turn is cut from `messages` at the last user message.
+
+  Past turns are in the ledgers, which record settled actions. Replaying them
+  was measured live on 2026-10-31: 66k tokens a call against 13k, and double
+  sends in 18 of 24 runs against 3 of 24, since the model copies its recent tool
+  calls. The cost is that a failed tool call in an earlier turn is forgotten;
+  the character finds out again if it matters.
 
 ## Time convention
 
@@ -121,12 +109,11 @@ successful task-tool result supersedes the snapshot.
 
 Settings under `plugins.entries.kazusa.config.contextEngine`:
 
-| Setting                   | Default | Meaning                                                           |
-| ------------------------- | ------- | ----------------------------------------------------------------- |
-| `brainMaxTokens`          | 2000    | Maximum earlier complete brain turns (the run in progress is outside it); unused space goes to ledgers |
-| `shortTermHours`          | 24      | Strict simulated-time window; may be increased                    |
-| `personalWikiMaxTokens`   | 1200    | Maximum whole personal-recollection cards                         |
-| `personalWikiMaxArticles` | 3       | Maximum relevant personal cards                                   |
+| Setting                   | Default | Meaning                                        |
+| ------------------------- | ------- | ---------------------------------------------- |
+| `shortTermHours`          | 24      | Strict simulated-time window; may be increased |
+| `personalWikiMaxTokens`   | 1200    | Maximum whole personal-recollection cards      |
+| `personalWikiMaxArticles` | 3       | Maximum relevant personal cards                |
 
 1. Parse the native assembly `params.sessionKey` for the owner and `:brain`
    suffix. This is the authoritative identity, including tool continuations. Do
@@ -176,10 +163,9 @@ reserves, prompt overhead, and provider usage. Keep native
 `agents.defaults.contextTokens`, `bootstrapMaxChars`, and
 `bootstrapTotalMaxChars` for their respective limits. Kazusa does not impose an
 artificial token ceiling; it partitions the host-provided `tokenBudget` across
-mandatory system additions/current activity, recent brain continuity
-(`brainMaxTokens`), bounded personal recollections, and multi-session ledgers.
-New tool results can grow the active turn after initial assembly; this is not a
-hard per-request token guarantee.
+mandatory system additions/current activity, bounded personal recollections, and
+multi-session ledgers. New tool results can grow the active turn after initial
+assembly; this is not a hard per-request token guarantee.
 
 ## State-selected skill resolution (SkillLoader)
 

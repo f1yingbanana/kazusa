@@ -1,24 +1,34 @@
 ---
-peer_id: kazusa-kyouyama
 name: Kazusa Kyouyama
-relation_type: close_friend
-familiarity: 80
-affinity: 82
-trust: 80
-last_interaction_iso: "2026-10-20T17:00:00Z"
+relation: "close friend"
+seen: 2026-10-20
 ---
 
-## Quick Impression
+Still cool and aloof, but surprisingly helpful. She voted to cut that terrible
+Baroque book immediately. She's reliable when it counts and actually reads the
+club materials.
 
-Kazusa acts all cool, quiet, and aloof, but she has a massive sweet tooth for
-macarons and gets flustered so easily! I always tell her to lighten up so she
-doesn't end up brawling like in her past, but she's genuinely kind and reliable
-when things get serious.
+## What they think of me
 
-- **Open Threads**: Waiting for her honest review of my new strawberry tart.
+Sees me as a bossy kid who lectures her. She'd never admit she listens. (think
+so)
 
-## Interaction Log
+## Open threads
 
-- **2026-10-20**: Had tea together in the club room; watched Kazusa glare at
-  Natsu for making delinquent jokes.
-- **2026-10-18**: Shared macarons at the courtyard bench after morning classes.
+- Waiting for her honest review of my new strawberry tart.
+- Need to make it up to her for the late library session.
+
+## See also
+
+[[user:sensei]] [[airi-kurimura]]
+
+## Notes
+
+- 2026-10-30 · seen it · sure — Voted to cut the 'Sugar Sculpture of the Baroque
+  Era' book without hesitation.
+- 2026-10-30 · seen it · sure — Helped finalize the budget report at the
+  library.
+- 2026-10-20 · seen it · sure — Had tea together in the club room; watched
+  Kazusa glare at Natsu for making delinquent jokes.
+- 2026-10-18 · seen it · sure — Shared macarons at the courtyard bench after
+  morning classes.

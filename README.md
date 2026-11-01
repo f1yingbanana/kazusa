@@ -8,8 +8,7 @@
 
 <p align="center">
   <b>
-    Bring your waifus and husbandos (multiple) alive in a real-time, 24/7 living
-    world.
+    Bring your waifus and husbandos alive in a real-time, 24/7 living world.
   </b>
 </p>
 
@@ -96,17 +95,19 @@ character to the built-in system admin AI, **ARONA**. **ARONA** helps adapt
 their personality and lore to your setting, build the world, and set up their
 memory wiki.
 
-## See it in action
+## Screenshots
+
+Group chat and the character state inspector:
 
 <picture>
-  <img src=".github/assets/chats-screenshot.png" alt="Kazusa's web client showing a group conversation, the selected character's activity and needs, and world clock controls" />
+  <img src=".github/assets/chats-screenshot.png"/>
 </picture>
 
+World timeline showing character actions, and location details:
+
 <picture>
-  <img src=".github/assets/timeline-screenshot.png" alt="Kazusa's web client showing a timeline on all character activities" />
+  <img src=".github/assets/timeline-screenshot.png"/>
 </picture>
-Chat with characters, inspect what they're doing and how they feel, and follow
-conversations and activities in the Timeline. Pause or change simulation speed.
 
 ## Getting started
 

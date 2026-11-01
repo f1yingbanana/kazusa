@@ -3,6 +3,7 @@ pageType: concept
 conceptType: lore
 id: concept.arius_squad
 title: Arius Squad
+community: arius_satellite_school
 ---
 
 # Arius Squad

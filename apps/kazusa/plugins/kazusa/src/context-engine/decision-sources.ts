@@ -5,10 +5,9 @@ import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
 import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
-import YAML from "yaml";
-import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { ChatFacts } from "../messaging/messaging.ts";
+import type { MemoryService } from "../memory/register.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleDecisionBatch,
@@ -60,144 +59,6 @@ export async function readCharacterFiles(
   return { identity, soul, memory };
 }
 
-const WIKI_LABELS = z.object({
-  name: z.string().optional(),
-  title: z.string().optional(),
-  aliases: z.array(z.string()).optional(),
-  peer_id: z.string().optional(),
-  last_interaction_iso: z.string().optional(),
-  last_updated_iso: z.string().optional(),
-});
-
-/**
- * Sender cards first, then literal titles/aliases mentioned in the evidence.
- * Only this character's beliefs are eligible; no world-wiki lookup.
- */
-export async function readPersonalWiki(
-  workspace: string,
-  senders: readonly string[],
-  text: string,
-  limit: number,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  if (!limit) return [];
-  const root = path.join(workspace, "wiki");
-  try {
-    if (!(await fs.lstat(root)).isDirectory()) return [];
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT")
-      return [];
-    throw error;
-  }
-  const matches: Array<{ score: number; name: string; body: string }> = [];
-  const queue = [root];
-  let inspected = 0;
-  const query = text.toLocaleLowerCase();
-  const add = async (filename: string, sender = false): Promise<void> => {
-    signal?.throwIfAborted();
-    const raw = await readText(filename, signal);
-    if (!raw) return;
-    const frontmatter = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-    let labels: z.infer<typeof WIKI_LABELS> = {};
-    if (frontmatter) {
-      try {
-        const parsed = WIKI_LABELS.safeParse(YAML.parse(frontmatter[1]));
-        if (parsed.success) labels = parsed.data;
-      } catch {
-        /* A malformed card still has its filename and body. */
-      }
-    }
-    const name = path.relative(root, filename);
-    const aliases = [
-      path.basename(filename, ".md"),
-      path.basename(filename, ".md").replace(/[_-]/g, " "),
-      labels.name,
-      labels.title,
-      labels.peer_id,
-      labels.peer_id?.startsWith("user:")
-        ? labels.peer_id.slice("user:".length)
-        : undefined,
-      ...(labels.aliases ?? []),
-    ].filter((label): label is string => Boolean(label));
-    const isSenderMatch =
-      sender || Boolean(labels.peer_id && senders.includes(labels.peer_id));
-    const score = isSenderMatch
-      ? 100
-      : aliases.filter((label) => {
-          const phrase = label.trim();
-          return (
-            phrase.length >= 2 &&
-            new RegExp(
-              `(?:^|[^\\p{L}\\p{N}])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^\\p{L}\\p{N}])`,
-              "iu",
-            ).test(query)
-          );
-        }).length;
-    if (!score) return;
-    const body = raw.slice(frontmatter?.[0].length ?? 0);
-    const impression = body.match(
-      /^## Quick Impression\s*\r?\n([\s\S]*?)(?=^## |$(?![\s\S]))/m,
-    )?.[1];
-    const recordedAt = labels.last_interaction_iso ?? labels.last_updated_iso;
-    matches.push({
-      score,
-      name,
-      body: [
-        `### ${name}`,
-        ...(recordedAt ? [`Memory date: ${recordedAt}`] : []),
-        impression ?? body,
-      ].join("\n"),
-    });
-  };
-  const senderPaths = new Set(
-    senders
-      .filter((id) => /^(?:user:)?[a-z0-9][a-z0-9_-]*$/.test(id))
-      .map((id) => {
-        const fileId = id.startsWith("user:") ? id.slice("user:".length) : id;
-        return path.join(root, "entities", "characters", `${fileId}.md`);
-      }),
-  );
-  // Exact sender lookup must not be crowded out by the general scan cap.
-  try {
-    if (
-      (await fs.lstat(path.join(root, "entities"))).isDirectory() &&
-      (await fs.lstat(path.join(root, "entities", "characters"))).isDirectory()
-    ) {
-      for (const filename of [...senderPaths].slice(0, 32))
-        await add(filename, true);
-    }
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
-      throw error;
-  }
-  // Traversal skips symlinked directories as well as files.
-  while (queue.length && inspected < 256) {
-    signal?.throwIfAborted();
-    const directory = queue.shift();
-    if (!directory) break;
-    const entries = await fs.readdir(directory, { withFileTypes: true });
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (++inspected > 256) break;
-      const filename = path.join(directory, entry.name);
-      if (
-        entry.isDirectory() &&
-        path.relative(root, filename).split(path.sep).length < 6
-      )
-        queue.push(filename);
-      else if (
-        entry.isFile() &&
-        entry.name.endsWith(".md") &&
-        !senderPaths.has(filename)
-      )
-        await add(filename);
-    }
-  }
-  return matches
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, limit)
-    .map((item) => item.body);
-}
-
 export function createDecisionContextAssembler(
   api: OpenClawPluginApi,
   deps: {
@@ -208,6 +69,8 @@ export function createDecisionContextAssembler(
       agentId: string,
       sessionKeys: readonly string[],
     ) => Promise<readonly ChatFacts[]>;
+    /** What comes to mind about these stimuli, one string per thing. */
+    readonly recollections?: MemoryService["recollections"];
   },
 ): DecisionContextAssembler {
   const getConfig = () => currentConfig(api);
@@ -292,12 +155,16 @@ export function createDecisionContextAssembler(
           }),
         ),
         readCharacterFiles(workspace, request.signal),
-        readPersonalWiki(
-          workspace,
-          stimuli.map((item) => item.sender),
-          stimuli.map((item) => item.text).join("\n"),
-          config.decisionWikiMaxArticles,
-          request.signal,
+        Promise.resolve(
+          deps.recollections?.(
+            {
+              agentId,
+              stimulus: stimuli.map((item) => item.text).join("\n"),
+              seeds: stimuli.map((item) => item.sender),
+              now: deps.clock.time(),
+            },
+            config.decisionWikiMaxArticles,
+          ) ?? [],
         ),
         skillLoader.loadSkillDocument("perception", {
           agentId,

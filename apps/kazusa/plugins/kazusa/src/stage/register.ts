@@ -1,14 +1,18 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
+import { cachedStore } from "../state.ts";
 import { STAGE_CONFIG, createStage, type Stage } from "./stage.ts";
 
 /** Opens the `"stage"` store. Every registration reads the same records. */
 export function registerStage(api: OpenClawPluginApi): Stage {
   return createStage(
-    api.runtime.state.openKeyedStore({
-      namespace: "stage",
-      retention: "retained",
-    }),
+    cachedStore(
+      "stage",
+      api.runtime.state.openKeyedStore({
+        namespace: "stage",
+        retention: "retained",
+      }),
+    ),
     STAGE_CONFIG.parse(api.pluginConfig?.stage ?? {}),
   );
 }

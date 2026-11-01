@@ -11,6 +11,7 @@ export const MOCKABLE: ReadonlySet<Domain> = new Set<Domain>([
   "status",
   "timeline",
   "desires",
+  "observe",
   "places",
   "location",
   "stage",
@@ -18,7 +19,8 @@ export const MOCKABLE: ReadonlySet<Domain> = new Set<Domain>([
 
 /**
  * What today's plugin serves, until `GET /kazusa/world` reports capabilities.
- * `characters` is live through the `/kazusa/agents` adapter (id, name, avatar).
+ * `characters` is live through the `/kazusa/agents` adapter (id, name,
+ * avatar).
  */
 export const LEGACY_CAPABILITIES: Partial<Record<Domain, Capability>> = {
   characters: "live",

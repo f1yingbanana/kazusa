@@ -3,8 +3,11 @@ pageType: concept
 conceptType: lore
 id: concept.chinese_alchemy_study_club
 title: Chinese Alchemy Study Club
+community: shanhaijing_senior_secondary_school
 ---
 
 # Chinese Alchemy Study Club
 
-Shanhaijing’s Chinese Alchemy Study Club conducts experimental research. Saya Yakushi is a researcher associated with the club and has helped develop medicine for Kisaki.
+Shanhaijing’s Chinese Alchemy Study Club conducts experimental research. Saya
+Yakushi is a researcher associated with the club and has helped develop medicine
+for Kisaki.

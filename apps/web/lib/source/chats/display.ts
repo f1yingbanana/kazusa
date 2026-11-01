@@ -1,6 +1,6 @@
 import type { ChatMessage } from "@kazusa/client";
 import type { EntityRef } from "../../state/entity-ref";
-import type { Chat } from "./types";
+import type { ChatInfo } from "./types";
 
 type NameOf = (id: string) => string;
 
@@ -12,12 +12,29 @@ export function listNames(names: readonly string[], max = 3): string {
 }
 
 /**
+ * The player's own direct chat: one other voice, so it needs no names. A direct
+ * chat between two others, read from outside, has two.
+ */
+export function isOneOnOne(chat: ChatInfo, userId: string): boolean {
+  return (
+    chat.type === "direct" &&
+    chat.members.filter((id) => id !== userId).length <= 1
+  );
+}
+
+/**
  * The server titles an untitled chat by the first other member's id (a direct
  * chat always, a huddle usually), so those are named from their members.
  */
-export function chatTitle(chat: Chat, userId: string, nameOf: NameOf): string {
+export function chatTitle(
+  chat: ChatInfo,
+  userId: string,
+  nameOf: NameOf,
+): string {
   const others = chat.members.filter((id) => id !== userId);
   if (chat.name && !chat.members.includes(chat.name)) return chat.name;
+  if (chat.type === "direct" && others.length > 1)
+    return others.map(nameOf).join(" & ");
   if (chat.type === "direct") return others[0] ? nameOf(others[0]) : chat.name;
   return listNames(others.map(nameOf)) || "Just you";
 }
@@ -27,8 +44,8 @@ export function chatTitle(chat: Chat, userId: string, nameOf: NameOf): string {
  * otherwise the chat itself (members, and a huddle's place). A draft group has
  * nothing to show yet.
  */
-export function chatSubject(chat: Chat, userId: string): EntityRef | null {
-  if (chat.type === "direct") {
+export function chatSubject(chat: ChatInfo, userId: string): EntityRef | null {
+  if (isOneOnOne(chat, userId)) {
     const partner = chat.members.find((id) => id !== userId);
     return partner ? { kind: "character", id: partner } : null;
   }
@@ -63,7 +80,7 @@ export function actionLine(
 export function messagePreview(
   message: Pick<ChatMessage, "text" | "type"> &
     Partial<Pick<ChatMessage, "senderId" | "senderName">>,
-  chat: Chat,
+  chat: ChatInfo,
   userId: string,
   nameOf: NameOf,
 ): string {
@@ -75,5 +92,5 @@ export function messagePreview(
     return line.subject + line.rest;
   }
   if (message.senderId === userId) return `You: ${message.text}`;
-  return chat.type === "direct" ? message.text : `${name}: ${message.text}`;
+  return isOneOnOne(chat, userId) ? message.text : `${name}: ${message.text}`;
 }

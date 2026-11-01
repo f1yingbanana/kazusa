@@ -3,12 +3,18 @@ import type { Chat as ServerChat, ChatMessage } from "@kazusa/client";
 /**
  * UI View Models
  *
- * Wire DTOs and Zod schemas belong strictly in `@kazusa/client`.
- * This file defines only local, client-specific presentation state.
+ * Wire DTOs and Zod schemas belong strictly in `@kazusa/client`. This file
+ * defines only local, client-specific presentation state.
  */
 
-/** A conversation in the UI. New/draft conversations stay local until their first message is sent. */
+/**
+ * A conversation in the UI. New/draft conversations stay local until their
+ * first message is sent.
+ */
 export type Chat = ServerChat & { draft?: boolean };
+
+/** What any chat shows, including one read from outside, which has no address. */
+export type ChatInfo = Omit<Chat, "sessionKey"> & { ended?: boolean };
 
 /** Optimistic message pending server acknowledgement and sequence numbering. */
 export type PendingMessage = Omit<ChatMessage, "sequence"> & {

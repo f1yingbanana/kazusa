@@ -1008,6 +1008,120 @@ describe("conversation routing and management", () => {
   });
 });
 
+describe("observing chats from outside", () => {
+  it("reads any chat in full, whoever it was said to, and pages by sequence", async () => {
+    const h = setup();
+    const first = await h.send({ requestId: "a", text: "one" });
+    await h.send({ requestId: "b", sessionKey: first.sessionKey, text: "two" });
+    await h.send({
+      requestId: "c",
+      sessionKey: first.sessionKey,
+      text: "three",
+    });
+
+    const page = await h.messaging.observeChatHistory({
+      chatId: first.chatId,
+      limit: 2,
+    });
+    expect(page.messages.map((message) => message.text)).toEqual([
+      "two",
+      "three",
+    ]);
+    expect(page.hasMore).toBe(true);
+    const older = await h.messaging.observeChatHistory({
+      chatId: first.chatId,
+      before: page.nextCursor,
+    });
+    expect(older.messages.map((message) => message.text)).toEqual(["one"]);
+    // A participant's own view still ends at their frozen audience.
+    expect(
+      await h.messaging.getChatHistory({
+        chatId: first.chatId,
+        userId: "user:sensei",
+      }),
+    ).toMatchObject({ messages: [] });
+  });
+
+  it("changes nothing: no membership, no copies, no notifications", async () => {
+    const h = setup();
+    const first = await h.send();
+    // Let delivery finish, so only a read could change anything from here.
+    await vi.waitFor(() => {
+      expect([...h.retained.values()][0].copies[1].notified).toBe(true);
+    });
+    const chatsBefore = structuredClone([...h.chats]);
+    const retainedBefore = structuredClone([...h.retained]);
+    h.append.mockClear();
+    h.receive.mockClear();
+    const emitted: unknown[] = [];
+    h.messaging.onEvent((event) => emitted.push(event));
+
+    await h.messaging.observeChats("user:sensei");
+    await h.messaging.observeChatHistory({ chatId: first.chatId });
+
+    expect([...h.chats]).toEqual(chatsBefore);
+    expect([...h.retained]).toEqual(retainedBefore);
+    expect(h.append).not.toHaveBeenCalled();
+    expect(h.receive).not.toHaveBeenCalled();
+    expect(emitted).toEqual([]);
+  });
+
+  it("lists chats the viewer isn't in, newest first, with no chat of theirs", async () => {
+    const h = setup();
+    const older = await h.send({ requestId: "dm", text: "hi bob" });
+    const newer = await h.send({
+      requestId: "group",
+      members: ["bob", "carol"],
+      title: "Study",
+      text: "hi both",
+    });
+    await h.send(
+      { requestId: "mine", members: ["alice"], text: "hello" },
+      "user:sensei",
+    );
+
+    const observed = await h.messaging.observeChats("user:sensei");
+    expect(observed.map(({ chat }) => chat.id)).toEqual([
+      newer.chatId,
+      older.chatId,
+    ]);
+    expect(observed[0]).toMatchObject({
+      ended: false,
+      members: ["alice", "bob", "carol"],
+      latest: { sender: "alice", params: { text: "hi both" } },
+    });
+  });
+
+  it("keeps a dissolved huddle readable, named by who took part", async () => {
+    const h = setup();
+    h.places.set("alice", "park");
+    h.places.set("bob", "park");
+    const huddle = await h.send({ aloud: true, text: "nice day" });
+    await h.messaging.leavePlace("alice", "Alice", "park", { at: 1 });
+
+    const [ended] = await h.messaging.observeChats("user:sensei");
+    expect(ended).toMatchObject({
+      ended: true,
+      members: ["alice", "bob"],
+      chat: { id: huddle.chatId, kind: "huddle", members: [], placeId: "park" },
+    });
+    expect(
+      (await h.messaging.observeChatHistory({ chatId: huddle.chatId })).messages
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("reports everyone composing to an observer, and only theirs to a member", async () => {
+    const h = setup();
+    const result = await h.send();
+    await h.messaging.setTyping("alice", "Alice", result.sessionKey, true);
+    expect(await h.messaging.getTyping()).toMatchObject([
+      { chatId: result.chatId, senderId: "alice" },
+    ]);
+    expect(await h.messaging.getTyping("user:sensei")).toEqual([]);
+  });
+});
+
 describe("composition presence", () => {
   it("is explicit, scoped to current members and cleared on acceptance", async () => {
     const h = setup();

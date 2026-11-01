@@ -32,7 +32,7 @@ import { usePlace } from "@/hooks/use-location";
 import { formatListTimestamp } from "@/lib/format";
 import type { Agent } from "@kazusa/client";
 import { messagePreview } from "@/lib/source/chats/display";
-import type { Chat } from "@/lib/source/chats/types";
+import type { Chat, ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ChatAvatar } from "./chat-avatar";
 import { useRealtime, type Typist } from "@/lib/live/realtime-provider";
@@ -46,6 +46,7 @@ export function ChatList({
   selectedChatId,
   onSelect,
   onNewGroup,
+  quietWhenEmpty = false,
 }: {
   chats: Chat[];
   agentsById: ReadonlyMap<string, Agent>;
@@ -55,6 +56,8 @@ export function ChatList({
   selectedChatId: string | null;
   onSelect: (chatId: string) => void;
   onNewGroup: () => void;
+  /** Something follows this list, so an empty one needn't fill the panel. */
+  quietWhenEmpty?: boolean;
 }) {
   const { typingByChat, unreadByChat } = useRealtime();
   const simNow = useSimNow();
@@ -69,6 +72,8 @@ export function ChatList({
           chat.lastMessage?.text.toLowerCase().includes(normalized),
       )
     : chats;
+
+  if (filtered.length === 0 && quietWhenEmpty) return null;
 
   if (chats.length === 0) {
     return (
@@ -184,7 +189,7 @@ function ListSection({
   );
 }
 
-function ChatRow({
+export function ChatRow({
   chat,
   agentsById,
   userId,
@@ -195,7 +200,7 @@ function ChatRow({
   simNow,
   onSelect,
 }: {
-  chat: Chat;
+  chat: ChatInfo;
   agentsById: ReadonlyMap<string, Agent>;
   userId: string;
   nameOf: (id: string) => string;
@@ -221,6 +226,7 @@ function ChatRow({
       className={cn(
         "w-full cursor-pointer text-left hover:bg-sidebar-accent/70",
         isActive && "bg-sidebar-accent hover:bg-sidebar-accent",
+        chat.ended && "opacity-70",
       )}
     >
       <ItemMedia aria-hidden>

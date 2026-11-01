@@ -109,11 +109,11 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 
 ### Built: models
 
-| Route                   | Request / response                                                                                                                                                                                                                                                               | Backed by                                                                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Route                   | Request / response                                                                                                                                                                                                                                                                                                                                                             | Backed by                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /kazusa/models`    | Optional `agentId` and `refresh=1` query parameters. Returns `{ agentId?, overrides?: { model?, thinking? }, current?, configured?, thinking?, models, providers }`. `current` and `thinking` are effective choices; `configured` is the native primary for the requested scope. `models` omits rows with `supportsTools: false`, so a stored `current` may be absent from it. | Gateway `models.list` (`view: "default"`, requested agent or first agent for world requests), config shortlists, and `"models"` store |
-| `POST /kazusa/model`    | `{ agentId?, ref: string \| null }` → `{ agentId?, current? }`. `null` clears this scope's choice. 404 for unknown agents or refs outside the target catalog; 409 for unavailable models.                                                                                        | `"models"` store, key `world` or `agent:<id>`: `{ model?, thinking? }`                                                                |
-| `POST /kazusa/thinking` | `{ agentId?, level: ThinkingLevel \| null }` → `{ agentId?, thinking? }`. `null` clears this scope's choice. 404 for unknown agents; 409 for a level the effective model lacks, or an effective model outside the target catalog.                                                | Same record                                                                                                                           |
+| `POST /kazusa/model`    | `{ agentId?, ref: string \| null }` → `{ agentId?, current? }`. `null` clears this scope's choice. 404 for unknown agents or refs outside the target catalog; 409 for unavailable models.                                                                                                                                                                                      | `"models"` store, key `world` or `agent:<id>`: `{ model?, thinking? }`                                                                |
+| `POST /kazusa/thinking` | `{ agentId?, level: ThinkingLevel \| null }` → `{ agentId?, thinking? }`. `null` clears this scope's choice. 404 for unknown agents; 409 for a level the effective model lacks, or an effective model outside the target catalog.                                                                                                                                              | Same record                                                                                                                           |
 
 All three routes register with `auth: "gateway"` (the Gateway checks the bearer
 token) because they dispatch `models.list` as the caller through
@@ -210,7 +210,13 @@ Consequences to design around:
 }
 ```
 
-**Observer gating.** `/kazusa/observe/*` and `scope=observer` are gated by
+**Built, as:** `observe/chats` lists chats the player is not in (no params, no
+`sessionKey`; a dissolved chat has `ended` and `members` = who took part);
+`observe/messages` reads any chat; SSE `observed` wraps
+`message`/`typing`/`chats` on the one stream (there is no `scope` param);
+capability `observe`.
+
+**Observer gating.** `/kazusa/observe/*` and the `observed` event are gated by
 plugin config `observer.enabled`. It defaults to `true`, because this is a local
 single-player client and observation is the product. Real authorization stays
 deferred, as in `client.md`. Observed reads never mutate membership and never
@@ -292,7 +298,7 @@ messaging: a canonical record for clients, with projections for agents.
 
 ```ts
 {
-  seq: number;              // monotonic, assigned at append
+  seq: number;              // simTime * 1000 + hash of the event's identity; stable live and reread
   simTime: number;          // epoch ms, from the clock at the mutation
   kind: JournalKind;        // discriminant
   actors: string[];         // character ids involved (filter key)

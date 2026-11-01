@@ -87,6 +87,21 @@ export const MessagesResponseSchema = z.object({
 });
 export type MessagesResponse = z.infer<typeof MessagesResponseSchema>;
 
+/**
+ * GET /kazusa/observe/chats: conversations the player is not in. Read-only, so
+ * there is no address to send to. `ended`: nobody is left in it (a huddle that
+ * dissolved); `members` are then the people who were.
+ */
+export const ObservedChatSchema = ChatSchema.omit({ sessionKey: true }).extend({
+  ended: z.boolean().optional(),
+});
+export type ObservedChat = z.infer<typeof ObservedChatSchema>;
+
+export const ObservedChatsResponseSchema = z.object({
+  chats: z.array(ObservedChatSchema),
+});
+export type ObservedChatsResponse = z.infer<typeof ObservedChatsResponseSchema>;
+
 /** POST /kazusa/send */
 export const SendPayloadSchema = z
   .object({
@@ -212,6 +227,7 @@ export const DomainSchema = z.enum([
   "desires",
   "stage",
   "models",
+  "wiki",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -667,6 +683,15 @@ export const AssembledContextSchema = z.object({
   /** Whether the `in-person` skill was attached. */
   inPerson: z.boolean(),
   estimatedTokens: z.number(),
+  /** Estimated tokens by part; the host's own prompt is on top of these. */
+  breakdown: z
+    .object({
+      skills: z.number(),
+      situation: z.number(),
+      history: z.number(),
+      records: z.number(),
+    })
+    .optional(),
 });
 export type AssembledContext = z.infer<typeof AssembledContextSchema>;
 
@@ -681,7 +706,7 @@ export type ContextResponse = z.infer<typeof ContextResponseSchema>;
 /* ========================================================================== */
 
 const JournalBase = {
-  /** Monotonic, assigned at append. Orders events; timestamps don't. */
+  /** Orders events: sim time first, stable for the same event live and reread. */
   seq: z.number().int().nonnegative(),
   /** Epoch-ms sim time at the mutation. */
   simTime: z.number(),
@@ -833,6 +858,22 @@ export const LocationNoticedEventSchema = z.object({
   }),
 });
 
+export const MemoryConsolidatedEventSchema = z.object({
+  ...JournalBase,
+  kind: z.literal("memory.consolidated"),
+  payload: z.object({
+    /** Empty when `interrupted`: nothing was applied. */
+    runId: z.string(),
+    from: z.number(),
+    to: z.number(),
+    pages: z.array(z.string()),
+    newPages: z.array(z.string()),
+    notes: z.number(),
+    interrupted: z.boolean(),
+    dream: z.string().optional(),
+  }),
+});
+
 export const JournalEventSchema = z.discriminatedUnion("kind", [
   TaskStartedEventSchema,
   TaskDelayedEventSchema,
@@ -843,6 +884,7 @@ export const JournalEventSchema = z.discriminatedUnion("kind", [
   ClockChangedEventSchema,
   AttentionDecidedEventSchema,
   LocationNoticedEventSchema,
+  MemoryConsolidatedEventSchema,
 ]);
 export type JournalEvent = z.infer<typeof JournalEventSchema>;
 export type JournalKind = JournalEvent["kind"];
@@ -938,6 +980,21 @@ export const LocationStreamEventSchema = z.object({
 export type LocationStreamEvent = z.infer<typeof LocationStreamEventSchema>;
 
 /**
+ * What happens in chats the player isn't in, wrapped so it is never applied as
+ * the player's own: a message, someone composing, or a change to the chat
+ * list.
+ */
+export const ObservedStreamEventSchema = z.object({
+  type: z.literal("observed"),
+  event: z.discriminatedUnion("type", [
+    MessageStreamEventSchema,
+    TypingStreamEventSchema,
+    ChatsStreamEventSchema,
+  ]),
+});
+export type ObservedStreamEvent = z.infer<typeof ObservedStreamEventSchema>;
+
+/**
  * `connected` with the observer-scope additions (journal high-water, status
  * seed).
  */
@@ -956,6 +1013,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   ClockStreamEventSchema,
   DesiresStreamEventSchema,
   LocationStreamEventSchema,
+  ObservedStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
 export type StreamEventType = StreamEvent["type"];
@@ -990,3 +1048,99 @@ export function parseStreamEvent(raw: unknown): StreamEvent | null {
     return null;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Read model: wiki (GET /kazusa/wiki, /wiki/page, /wiki/lint, /memory/runs)  */
+/* -------------------------------------------------------------------------- */
+
+export const WikiKindSchema = z.enum(["place", "person", "concept", "day"]);
+export type WikiKind = z.infer<typeof WikiKindSchema>;
+
+export const WikiListItemSchema = z.object({
+  id: z.string(),
+  kind: WikiKindSchema,
+  name: z.string(),
+  summary: z.string(),
+});
+export type WikiListItem = z.infer<typeof WikiListItemSchema>;
+
+/** One wiki's pages: the world's without `agent`, a character's with it. */
+export const WikiListResponseSchema = z.object({
+  pages: z.array(WikiListItemSchema),
+});
+export type WikiListResponse = z.infer<typeof WikiListResponseSchema>;
+
+export const WikiPageSchema = WikiListItemSchema.extend({
+  aliases: z.array(z.string()),
+  /** The lead, verbatim Markdown. */
+  lead: z.string(),
+  sections: z.array(
+    z.object({
+      title: z.string(),
+      text: z.string(),
+      knownBy: z.array(z.string()),
+    }),
+  ),
+  notes: z.array(
+    z.object({
+      date: z.string(),
+      source: z.string(),
+      certainty: z.string(),
+      text: z.string(),
+    }),
+  ),
+  history: z.array(
+    z.object({ date: z.string(), news: z.boolean(), text: z.string() }),
+  ),
+  openThreads: z.array(z.string()),
+  theyThinkOfMe: z.string().optional(),
+  relation: z.string().optional(),
+  community: z.string().optional(),
+  renown: z.string().optional(),
+  knownBy: z.array(z.string()),
+  seen: z.string().optional(),
+});
+export type WikiPage = z.infer<typeof WikiPageSchema>;
+
+export const KnowledgeSchema = z.object({
+  depth: z.enum(["none", "heard of", "familiar", "intimate"]),
+  why: z.string(),
+});
+export type Knowledge = z.infer<typeof KnowledgeSchema>;
+
+/** One thing: canon, what `agent` makes of it, and how well they know it. */
+export const WikiPageResponseSchema = z.object({
+  world: WikiPageSchema.optional(),
+  personal: WikiPageSchema.optional(),
+  knowledge: KnowledgeSchema.optional(),
+});
+export type WikiPageResponse = z.infer<typeof WikiPageResponseSchema>;
+
+export const WikiLintResponseSchema = z.object({
+  findings: z.array(
+    z.object({
+      level: z.enum(["error", "warning"]),
+      page: z.string(),
+      message: z.string(),
+    }),
+  ),
+});
+export type WikiLintResponse = z.infer<typeof WikiLintResponseSchema>;
+
+/** Sleep passes, newest first, with each file before and after. */
+export const MemoryRunsResponseSchema = z.object({
+  runs: z.array(
+    z.object({
+      id: z.string(),
+      at: z.number(),
+      files: z.array(
+        z.object({
+          path: z.string(),
+          before: z.string().nullable(),
+          after: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+export type MemoryRunsResponse = z.infer<typeof MemoryRunsResponseSchema>;

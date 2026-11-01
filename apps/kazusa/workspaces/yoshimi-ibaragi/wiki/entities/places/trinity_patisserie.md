@@ -4,6 +4,7 @@ entityType: place
 place_id: trinity_patisserie
 name: "Pâtisserie de Trinity"
 learned: been there
+seen: 2026-10-30
 ---
 
 # Pâtisserie de Trinity

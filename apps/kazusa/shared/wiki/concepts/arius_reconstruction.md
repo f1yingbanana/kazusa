@@ -3,6 +3,7 @@ pageType: concept
 conceptType: lore
 id: concept.arius_reconstruction
 title: Arius Reconstruction and the Comprehensive Exam
+community: arius_satellite_school
 ---
 
 # Arius Reconstruction and the Comprehensive Exam

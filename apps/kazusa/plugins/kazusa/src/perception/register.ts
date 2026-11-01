@@ -1,3 +1,4 @@
+import { beginTurn } from "../turn.ts";
 import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -7,12 +8,13 @@ import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
-import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { Perception, type PerceptionDeps } from "./perception.ts";
 import type { PerceptionDecisionRecord } from "./types.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 import { registerBrainRunLimits } from "./run-limits.ts";
+import { BrainSlots } from "./brain-slots.ts";
 
 const LIFECYCLE = z.object({
   phase: z.enum(["start", "end", "error"]),
@@ -22,6 +24,13 @@ const LIFECYCLE = z.object({
 
 /** One lock per character for the whole process, like the clock cell. */
 const SHARED_PERCEPTION_QUEUE = Symbol.for("kazusa.perception.serial");
+
+// Every plugin registration in the process shares one limit.
+const SLOTS = Symbol.for("kazusa.brain.slots.v2");
+function sharedBrainSlots(): BrainSlots {
+  const scope = globalThis as { [SLOTS]?: BrainSlots };
+  return (scope[SLOTS] ??= new BrainSlots());
+}
 
 function sharedPerceptionQueue(): KeyedAsyncQueue {
   const scope = globalThis as { [SHARED_PERCEPTION_QUEUE]?: KeyedAsyncQueue };
@@ -48,6 +57,8 @@ export function registerPerception(
     readonly realtime?: PerceptionDeps["realtime"];
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
+    /** Something woke them, or broke into what they were doing. */
+    readonly onAwoken?: (agentId: string) => void;
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -58,16 +69,21 @@ export function registerPerception(
     agentId: string,
     record: PerceptionDecisionRecord,
   ): void => {
+    if (
+      record.source !== "automatic" &&
+      record.action !== "DEFER" &&
+      record.action !== "IGNORE"
+    )
+      deps.onAwoken?.(agentId);
     const { simTime, wallTime: _wallTime, stimulusIds, ...rest } = record;
     deps.broadcaster?.broadcast({
       type: "journal",
-      event: {
-        seq: nextJournalSeq(),
+      event: withJournalSeq({
         simTime,
         actors: [agentId],
         kind: "attention.decided",
         payload: { ...rest, stimulusIds: [...stimulusIds] },
-      },
+      }),
     });
   };
   const perception = new Perception({
@@ -79,6 +95,7 @@ export function registerPerception(
     assembleDecisionContext: deps.assembleDecisionContext,
     onDecision,
     serial: sharedPerceptionQueue(),
+    slots: sharedBrainSlots(),
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
     ...(deps.realtime ? { realtime: deps.realtime } : {}),
@@ -297,6 +314,7 @@ export function registerPerception(
     ) {
       return { handled: true };
     }
+    beginTurn(owner.agentId);
     await perception.attending(owner.agentId, event.cleanedBody);
   });
 

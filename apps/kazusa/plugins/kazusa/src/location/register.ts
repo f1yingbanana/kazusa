@@ -12,9 +12,10 @@ import { personLabel } from "../person-label.ts";
 import { createSkillLoader } from "../context-engine/skill-loader.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { appendLedgerEntry } from "../ledger.ts";
+import { cachedStore } from "../state.ts";
 import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
-import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { Stimulus } from "../stimulus.ts";
 import type { ActiveTask, TaskExtension } from "../taskman/types.ts";
 import type { Huddle } from "../messaging/messaging.ts";
@@ -150,6 +151,11 @@ export interface LocationService {
   readonly place: (id: string, placeId: string) => Promise<LocationRecord>;
   /** Whether the character is talking with or has noticed someone here. */
   readonly inCompany: (agentId: string, at: number) => Promise<boolean>;
+  /** Their place and the people they know are here, for recognition. */
+  readonly presence: (
+    agentId: string,
+    at: number,
+  ) => Promise<readonly string[]>;
   /** Where a participant stands now, or `undefined` while traveling. */
   readonly placeOf: (
     id: string,
@@ -199,6 +205,20 @@ export function registerLocation(
     }) => Promise<void>;
     /** Observer SSE: `location` on every record write, `journal` on sightings. */
     readonly broadcaster?: KazusaRealtimeBroadcaster;
+    /** World events here since they last saw it, in the world's words. */
+    readonly placeChanges?: (
+      agentId: string,
+      placeId: string,
+      at: number,
+    ) => readonly string[];
+    /** They took the place in: moved on from it, seen what there was to see. */
+    readonly visited?: (agentId: string, placeId: string, at: number) => void;
+    /** Their own cards this text brings up, beyond the names it contains. */
+    readonly rememberedPlaces?: (
+      agentId: string,
+      text: string,
+      at: number,
+    ) => readonly string[];
     /** Offstage characters are nowhere. Absent: everyone is onstage. */
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
   },
@@ -209,10 +229,13 @@ export function registerLocation(
     deps.appendLedger ??
     ((entry) => appendLedgerEntry(api, { ...entry, stream: "tasks" }));
   const config = LOCATION_CONFIG.parse(api.pluginConfig?.location ?? {});
-  const store = api.runtime.state.openKeyedStore<LocationRecord>({
-    namespace: "location",
-    retention: "retained",
-  });
+  const store = cachedStore(
+    "location",
+    api.runtime.state.openKeyedStore<LocationRecord>({
+      namespace: "location",
+      retention: "retained",
+    }),
+  );
   /** Every write goes through here, so observers see each one. */
   const save = async (id: string, next: LocationRecord): Promise<void> => {
     await store.register(id, next);
@@ -259,6 +282,7 @@ export function registerLocation(
     if (!workspace || !place) return;
     try {
       await writePlaceStub(workspace, place, at);
+      deps.visited?.(id, placeId, at);
     } catch (error: unknown) {
       warn(`Location: could not start a card for ${placeId}: ${String(error)}`);
     }
@@ -699,14 +723,13 @@ export function registerLocation(
     });
     broadcaster?.broadcast({
       type: "journal",
-      event: {
-        seq: nextJournalSeq(),
+      event: withJournalSeq({
         simTime: at,
         kind: "location.noticed",
         actors: [observer],
         placeId: place.id,
         payload,
-      },
+      }),
     });
     return { ...item, text };
   };
@@ -788,9 +811,13 @@ export function registerLocation(
     };
     return {
       known: new Set(cards.map(({ placeId }) => placeId)),
-      named: [...new Set([...namedIn(evidence), ...namedIn(memory)])].filter(
-        (id) => map.places.has(id),
-      ),
+      named: [
+        ...new Set([
+          ...(deps.rememberedPlaces?.(agentId, evidence, clock.time()) ?? []),
+          ...namedIn(evidence),
+          ...namedIn(memory),
+        ]),
+      ].filter((id) => map.places.has(id)),
     };
   };
 
@@ -906,7 +933,7 @@ export function registerLocation(
             }),
         );
       }
-      return renderWhereabouts(
+      const rendered = renderWhereabouts(
         world.map,
         current,
         at,
@@ -915,6 +942,13 @@ export function registerLocation(
         company,
         ownHuddle,
       );
+      const changes =
+        position?.kind === "at"
+          ? (deps.placeChanges?.(agentId, position.placeId, at) ?? [])
+          : [];
+      return changes.length
+        ? `${rendered}\nSince you were last here: ${changes.join(" ")}`
+        : rendered;
     },
     settle: async (agentId) => {
       const stored = await store.lookup(agentId);
@@ -939,6 +973,23 @@ export function registerLocation(
           (id) => id !== agentId && (current?.noticed ?? []).includes(id),
         )
       );
+    },
+    presence: async (agentId, at) => {
+      const current = await record(agentId);
+      const position = current && positionAt(current, at);
+      if (position?.kind !== "at") return [];
+      const here = await occupants(position.placeId, at);
+      const huddle = (await huddlesAt(position.placeId)).find(({ members }) =>
+        members.includes(agentId),
+      );
+      const known = new Set([
+        ...(current?.noticed ?? []),
+        ...(huddle?.members ?? []),
+      ]);
+      return [
+        ...here.filter((id) => id !== agentId && known.has(id)),
+        position.placeId,
+      ];
     },
     placeOf: async (id) => {
       if (!world) return undefined;

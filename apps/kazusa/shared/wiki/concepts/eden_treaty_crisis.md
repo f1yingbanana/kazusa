@@ -3,6 +3,7 @@ pageType: concept
 conceptType: lore
 id: concept.eden_treaty_crisis
 title: Eden Treaty Crisis
+renown: known
 ---
 
 # Eden Treaty Crisis

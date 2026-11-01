@@ -3,6 +3,7 @@ pageType: concept
 conceptType: lore
 id: concept.srt_closure_crisis
 title: SRT Closure and the RABBIT Platoon
+community: srt_special_academy
 ---
 
 # SRT Closure and the RABBIT Platoon

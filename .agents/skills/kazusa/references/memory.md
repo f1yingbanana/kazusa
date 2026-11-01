@@ -1,9 +1,10 @@
 # Memory, Knowledge & Sleep
 
-Status (2026-10-29): design, not implemented. Supersedes `memory-and-sleep.md`.
-Designed in the order set by the kazusa skill §0: simulation, then player, then
-prompt. §4–§6 are written for the people who use it (content creator, ARONA, the
-character); §7 is the engine.
+Status (2026-10-30): built; sleep is off by default and untested on a real
+model. See [the checklist](memory-checklist.md). Supersedes
+`memory-and-sleep.md`. Designed in the order set by the kazusa skill §0:
+simulation, then player, then prompt. §4–§6 are written for the people who use
+it (content creator, ARONA, the character); §7 is the engine.
 
 Goal: a character knows what someone in their position would know, recognizes
 people and places without being asked, can try to remember or look something up,
@@ -89,7 +90,7 @@ workspaces/<agent_id>/                PERSONAL (the character's mind)
     ├── concepts/<id>.md              views on world concepts, or their own
     └── days/<YYYY-MM-DD>.md          one per sim day, written in sleep
 
-.state/kazusa/memory-index.sqlite     derived index (cache, rebuildable)
+.state/kazusa/memory-vectors.sqlite   embeddings (cache, rebuildable)
 ```
 
 A page's id is its filename. A personal page with the same id as a world page is
@@ -184,8 +185,9 @@ My go-to for strawberry milk after club. Lately I'm not sure it'll last.
 - **Day pages** (`days/<date>.md`): `summary` (one line), `touched: [ids]`
   (people, places and concepts of the day, which become graph edges), the gist
   as the lead, optional `## Dream`.
-- **`MEMORY.md`**: `## Lately` (who I am these days), `## Goals`, `## Plans`
-  (promises with dates). No machine state (location, hunger).
+- **`MEMORY.md`**: `## Lately` (who I am these days), `## Long-Term Goals`,
+  `## Plans recorded for <date>` (promises). No machine state (location,
+  hunger).
 
 ### 3.3 Knowledge depth
 
@@ -193,14 +195,18 @@ My go-to for strawberry milk after club. Lately I'm not sure it'll last.
 computed in code as the **highest** of:
 
 1. **Anchors** from the character's world card. A page is under an anchor if the
-   anchor is the page itself or appears on its `parent`/`community` chain.
+   anchor is the page itself or appears on its `parent`/`community` chain. The
+   fields are a world's own (`memory.anchors`): a city and a guild, a company
+   and a team. The default is `club` (intimate) and `school` (familiar).
 
    | Anchor                             | Depth    |
    | ---------------------------------- | -------- |
-   | `club`                             | intimate |
+   | the world's `memory.anchors`       | as given |
    | home area (the `parent` of `home`) | intimate |
-   | `school`                           | familiar |
    | `knows: { <page id>: <depth> }`    | as given |
+
+   An explicit `renown: local` means its own community only: being in the same
+   company does not reach another team's `local` project.
 
 2. **Renown** for everyone else: `private` and `local` give none, `known` gives
    heard of, `famous` gives familiar. Defaults: places `local`, characters
@@ -257,9 +263,8 @@ so)
 
 ## 4. Content creator: doing things
 
-Everything is a Markdown edit. Changes are live within about a second (the file
-watcher reindexes changed chunks only). World data is gitignored in this repo:
-keep your world in its own folder or repository for history.
+Everything is a Markdown edit. Changes reach the next turn, with no restart. The
+world and workspaces are tracked in git, so every edit has a diff and history.
 
 **Create a new world**
 
@@ -382,11 +387,11 @@ when you were last here.").
 
 **Tools** (replacing `memory_search`, `memory_get`, `read`, `edit`, `write`):
 
-| Tool                                         | Does                                                                                                                              |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `recall(query)`                              | Searches their own wiki, days and `MEMORY.md`, plus world pages at their depth. Returns L1, labelled "yours" or "everyone knows". |
-| `look_up(topic)`                             | Searches world pages with renown `known` or `famous`, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.           |
-| `remember(about, note, source?, certainty?)` | Appends one dated note now. `about` is a name or id (an unknown person starts a page) or `me` (`MEMORY.md` plans).                |
+| Tool                                              | Does                                                                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `recall(query)`                                   | Searches their own wiki, days and `MEMORY.md`, plus world pages at their depth. Returns L1, labelled "yours" or "everyone knows".                |
+| `look_up(topic)`                                  | Searches world pages with renown `known` or `famous`, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.                          |
+| `remember(about, note, source?, certainty?, on?)` | Appends one dated note now. `about` is a name or id (something unknown starts a page) or `me` (`MEMORY.md`, under `## Plans recorded for <on>`). |
 
 **Conventions** (`context-conventions`, about 120 tokens): people and things you
 know come to mind here; when something is on the tip of your tongue, `recall`
@@ -395,6 +400,13 @@ it; speak from memory, never as someone reading notes; during the day,
 promise, a shock); sleep sorts out the rest. Plus the second-order belief
 paragraph from §3.5, also in `in-person`.
 
+**A turn is one moment** (`src/turn.ts`): at most one activity per run, blocked
+in code, and a character may still talk or look things up after it. At most two
+lookups per run. A send that repeats this run's words is blocked. Records are
+capped (`contextEngine.ledgerMaxTokens`, 3000) and append-only, past brain turns
+are not replayed, and the situation sits before the turn under way, so tool
+results stay last and the model doesn't answer its own prompt twice.
+
 ## 7. The engine (`src/memory/`)
 
 ### 7.1 Pages and index
@@ -402,21 +414,19 @@ paragraph from §3.5, also in `in-person`.
 - **Parser** (Zod): front matter, layers, sections with `Known by:`, notes,
   history, links (`[[id]]`, backticked ids, front-matter references). Shared by
   both wikis and lint.
-- **Index**: one process-wide cell (`Symbol.for("kazusa.memory")`) owning
-  `.state/kazusa/memory-index.sqlite` through the SDK's `node:sqlite` opener:
-  - `pages` (id, scope `world` | `agent:<id>`, path, hash, layers, community
-    chain, renown, known_by);
-  - `chunks` (L0, L1, each section, each note) with an FTS5 table (BM25) and an
-    embedding BLOB;
-  - `aliases` (name/alias → id) and `edges` (parent, connections, community,
-    home, school, club, `touched`, links).
-- **Embeddings** through OpenClaw's configured provider
-  (`plugin-sdk/memory-core-host-engine-embeddings`, `memory.search` config),
-  cached by chunk hash. Vectors are compared by brute-force cosine over the
-  eligible set (a few thousand chunks); `sqlite-vec` (SDK loader) if it grows.
-- **Freshness**: full hash scan at startup; one recursive watcher on
-  `shared/wiki` and `workspaces/*/{wiki,MEMORY.md}`, debounced 500 ms; our own
-  writes update the index synchronously. A model change re-embeds everything.
+- **Index** (`index.ts`): one process-wide cell (`Symbol.for("kazusa.memory")`)
+  holding parsed pages by scope (`world` | `agent:<id>`) and an in-memory FTS5
+  table of chunks (L0, L1, each bullet or paragraph of a section, each note).
+  Names and edges are read from the parsed pages.
+- **Embeddings** (`embeddings.ts`): an OpenAI-compatible `/embeddings` call with
+  the plugin's `memory.embedding` settings, cached by chunk hash in
+  `.state/kazusa/memory-vectors.sqlite`. New chunks embed in the background; a
+  turn only waits for its own query (3 s at most, then keywords only). Vectors
+  are compared by brute-force cosine over the world and that character's pages.
+- **Freshness**: no watcher. Each retrieval stats that character's wiki, and the
+  world at most once a second, and re-reads what changed, so an edit reaches the
+  next turn. This avoids a watcher owner under repeated plugin registration and
+  recursive watching on Linux. A model change re-embeds everything.
 - **Depth** is computed per (character, page) from the index and cached until
   either page or the character's card changes.
 
@@ -437,6 +447,7 @@ decision context for Perception.
    | Keywords | BM25 over the stimulus                                                                                                                  |
    | Semantic | embedding of stimulus + task description (one provider call per brain turn)                                                             |
    | Graph    | one hop from seeds and mentions; personal edges before world edges                                                                      |
+   | News     | `· news` from the last 3 sim days on pages they could know (2 at most)                                                                  |
    | Salience | open threads, recent `seen`/notes (sim time), today's day page                                                                          |
 
 3. **Fuse** by weighted reciprocal rank; seeds are pinned.
@@ -457,10 +468,11 @@ mental-map rule (known places are exactly the cards) is unchanged.
 ### 7.3 Contact
 
 - **Place**: Location already shows the full description when there is no card.
-  New: if the world page has `## History` lines dated after the card's `seen`,
-  **Where you are** states them in world words; code then sets `seen` and
-  appends a `seen it · sure` note. Stub creation stays in Location.
-- **People seen**: the lead of their world card.
+  If the world page has `## History` lines dated after the card's `seen`,
+  **Where you are** adds "Since you were last here:". Assembly may be retried,
+  so nothing is written then: moving on to the next activity sets `seen` and
+  appends a `seen it · sure` note, with the stub.
+- **People seen**: the lead of their world card, whatever their depth.
 - **Hearsay** needs no mechanism: chats and huddles are in the ledgers with
   attributed senders, and sleep turns them into `told by` notes.
 
@@ -481,20 +493,22 @@ survives.
 
 ### 7.5 Sleep consolidation
 
-- **Trigger**: a Taskman `afterCommit` extension. A task whose category is in
+- **Trigger**: a Taskman extension's `commit`. A task whose category is in
   `memory.sleep.categories` (default `["sleeping"]`) and planned for at least
-  `memory.sleep.minMinutes` (180) starts a pass. Taskman stays ignorant of what
-  sleep means.
+  `memory.sleep.minMinutes` (180) starts a pass, once a world sets
+  `memory.sleep.enabled`, because it sends their records to the model. Taskman
+  stays ignorant of what sleep means.
 - **Runner**: `api.runtime.subagent.complete` with the character's model, one
   tool-free call, no session, no ledger; `:brain` stays free so Perception keeps
   working.
 - **Instructions**: `shared/skills/sleep-consolidation/SKILL.md`.
+- **Records**: oldest first up to 8,000 tokens; the watermark moves only as far
+  as what was read, so a backlog waits for the next sleep instead of being lost.
 - **Input** (one message, about 8–12k tokens): name and a `SOUL.md` excerpt; the
-  desires line; every ledger record since the watermark (dropping the oldest
-  over budget); `MEMORY.md`; the full personal pages of every entity in the
-  records or rendered that day; ids and summaries of the rest; pages over the
-  note cap with their oldest notes marked _fading_. No world text beyond what
-  the records show.
+  desires line; those records; `MEMORY.md`; the full personal pages of every
+  entity in the records or rendered that day; ids and summaries of the rest;
+  pages over the note cap with their oldest notes marked _fading_. No world text
+  beyond what the records show.
 - **Output** (Zod), operations not files:
 
   ```ts
@@ -524,8 +538,9 @@ survives.
   view of them. Invalid items are dropped and logged, not the whole pass.
 - **Apply**: preimages of every touched file and the watermark go to a
   `"memory"` keyed store (one run id); operations per §7.4; fading notes past
-  `memory.notesPerPage` (default 30) are removed once their page's view was
-  rewritten; the day page is written (a second sleep the same day appends).
+  `memory.notesPerPage` (default 30) (except `always known` ones) are removed
+  once their page's view was rewritten; the day page is written (a second sleep
+  the same day appends).
 - **Surface**: a `memory.dream` row in `:tasks` at the sim time the pass ends; a
   `memory.consolidated` journal event (agent, window, run id, pages and notes
   changed, new pages, `interrupted`).
@@ -594,8 +609,7 @@ and `references/context_engine.md`.
    file: operations plus the hash check (§7.4).
 5. **Depth correctness.** Defaults that surprise the author. The explainer is
    the mitigation; without it, authoring by rules is just a different headache.
-6. **Plumbing.** One watcher under repeated plugin registration, recursive
-   watching on Linux, embedding latency in the turn path (lexical fallback on
+6. **Plumbing.** Embedding latency in the turn path (lexical fallback on
    failure), a full re-embed on model change.
 
 Not hard: BM25 (FTS5), vectors at this scale, the graph from front matter, the
@@ -610,7 +624,6 @@ note format.
   provider factory signatures.
 - Are the anchor depths right (school → familiar)? Tune after backfill with the
   footprint view.
-- Should `look_up` cost time (a short task) rather than being free?
 
 ## 12. Decision log
 
@@ -636,3 +649,11 @@ note format.
   This keeps interactions from going uniformly polite and alike, and it costs
   only a section and a skill paragraph because personal wikis are already
   private and asymmetric.
+- **Beliefs shadow canon** (2026-10-30): a personal lead replaces the world's
+  lead in the prompt, even when both exist. Showing both would quietly correct
+  wrong beliefs and spend tokens; `recall` and experience are how a character
+  learns.
+- **`look_up` is instant**: a quick check inside the turn, logged to `:tasks`.
+- **`plugins.slots.memory: "none"`, not our plugin**: claiming the slot would
+  mean building a host memory capability for features we removed on purpose.
+  `skipBootstrap` only stops files being created, not read.

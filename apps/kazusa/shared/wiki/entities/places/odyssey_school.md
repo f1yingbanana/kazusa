@@ -10,9 +10,11 @@ connections:
     ways:
       - { by: transit, minutes: 55 }
     note: "Approximate travel time for the simulation."
+community: odyssey_school
+renown: known
 ---
 
 # Odyssey Maritime High School
 
-A maritime academy whose students include a diving club. The water is central
-to their training and work.
+A maritime academy whose students include a diving club. The water is central to
+their training and work.

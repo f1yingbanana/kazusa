@@ -33,8 +33,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSimNow } from "@/hooks/use-clock";
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
-import { actionLine } from "@/lib/source/chats/display";
-import type { Chat, PendingMessage } from "@/lib/source/chats/types";
+import { actionLine, isOneOnOne } from "@/lib/source/chats/display";
+import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
 import type { Typist } from "@/lib/live/realtime-provider";
@@ -96,6 +96,7 @@ function buildRuns(messages: DisplayMessage[], simNow: number) {
 
 export function MessageList({
   chat,
+  observed = false,
   messages,
   pending,
   typists,
@@ -108,7 +109,9 @@ export function MessageList({
   resolve,
   userId,
 }: {
-  chat: Chat;
+  chat: ChatInfo;
+  /** Read from outside: the empty state doesn't invite the player to speak. */
+  observed?: boolean;
   messages: ChatMessage[];
   pending: PendingMessage[];
   typists: Typist[];
@@ -122,8 +125,9 @@ export function MessageList({
   userId: string;
 }) {
   const simNow = useSimNow();
-  // Huddles and groups both need names on lines; only a DM has one voice.
-  const isGroup = chat.type !== "direct";
+  // Huddles and groups both need names on lines; only your own DM has one voice.
+  const isGroup = !isOneOnOne(chat, userId);
+  const empty = observed ? EMPTY_OBSERVED : EMPTY[chat.type];
   const runs = buildRuns([...messages, ...pending], simNow);
   const pendingById = new Map(pending.map((message) => [message.id, message]));
 
@@ -176,10 +180,8 @@ export function MessageList({
                     <EmptyMedia variant="icon">
                       <SparklesIcon />
                     </EmptyMedia>
-                    <EmptyTitle>{EMPTY[chat.type].title(chat.name)}</EmptyTitle>
-                    <EmptyDescription>
-                      {EMPTY[chat.type].description}
-                    </EmptyDescription>
+                    <EmptyTitle>{empty.title(chat.name)}</EmptyTitle>
+                    <EmptyDescription>{empty.description}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               </MessageScrollerItem>
@@ -337,6 +339,11 @@ const EMPTY = {
     title: () => "Nobody has spoken yet",
     description: "You are talking face to face: everyone here can hear you.",
   },
+} as const;
+
+const EMPTY_OBSERVED = {
+  title: () => "Nothing said yet",
+  description: "Messages appear here as they are sent.",
 } as const;
 
 /**

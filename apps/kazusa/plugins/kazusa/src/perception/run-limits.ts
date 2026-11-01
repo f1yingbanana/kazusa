@@ -4,6 +4,15 @@ import {
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
+import {
+  ALREADY_SAID,
+  LOOKUP_NAMES,
+  MAX_LOOKUPS,
+  NO_MORE_LOOKUPS,
+  repeatsItself,
+  SECOND_ACTIVITY,
+  turnOf,
+} from "../turn.ts";
 import { PERCEPTION_CONFIG } from "./types.ts";
 
 /** Model calls kept back so a run can still say where things stand. */
@@ -47,11 +56,11 @@ const RUNS = Symbol.for("kazusa.brain.run-limits");
 const OWNERS = Symbol.for("kazusa.brain.run-limit-owners");
 function sessionOwners(): Map<string, string> {
   const scope = globalThis as { [OWNERS]?: Map<string, string> };
-  return (scope[OWNERS] ??= new Map());
+  return (scope[OWNERS] ??= new Map<string, string>());
 }
 function activeRuns(): Map<string, BrainRun> {
   const scope = globalThis as { [RUNS]?: Map<string, BrainRun> };
-  return (scope[RUNS] ??= new Map());
+  return (scope[RUNS] ??= new Map<string, BrainRun>());
 }
 
 /** The native dispatcher owns this signal through the complete run lifetime. */
@@ -144,6 +153,23 @@ export function registerBrainRunLimits(
       state.expire(`${state.limits.maxModelCalls} model calls`);
   });
   api.on("before_tool_call", (event, ctx) => {
+    if (ctx.agentId) {
+      const turn = turnOf(ctx.agentId);
+      if (
+        event.toolName === "send_message" &&
+        repeatsItself(turn, event.params, ctx.toolCallId ?? event.toolCallId)
+      )
+        return { block: true, blockReason: ALREADY_SAID };
+      if (LOOKUP_NAMES.has(event.toolName)) {
+        if (turn.lookups >= MAX_LOOKUPS)
+          return { block: true, blockReason: NO_MORE_LOOKUPS };
+        turn.lookups++;
+      }
+      if (event.toolName === "start_task" || event.toolName === "delay_task") {
+        if (turn.activity) return { block: true, blockReason: SECOND_ACTIVITY };
+        turn.activity = true;
+      }
+    }
     const runId = ctx.runId ?? event.runId;
     const state = runId ? activeRuns().get(runId) : undefined;
     if (!state) return;

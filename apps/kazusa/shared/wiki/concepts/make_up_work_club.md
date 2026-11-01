@@ -4,6 +4,7 @@ conceptType: lore
 id: concept.make_up_work_club
 title: Make-Up Work Club
 aliases: [Supplementary Lessons Department, Remedial Class]
+community: trinity_general_school
 ---
 
 # Make-Up Work Club

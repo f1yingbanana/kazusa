@@ -24,7 +24,9 @@ import { shutdownSignal } from "../shutdown.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
+  clientMessage,
   createMessagingState,
+  messageJournal,
   type MessagingState,
   type MessageDelivery,
   type MessagingDeps,
@@ -96,7 +98,7 @@ async function rosterAgent(
  * group management together so agents never need to reconstruct membership.
  */
 import type { CharacterStatus } from "@kazusa/client";
-import { nextJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 
 export function registerMessaging(
   api: OpenClawPluginApi,
@@ -106,6 +108,8 @@ export function registerMessaging(
       Partial<Pick<Perception, "onAdopted" | "attachSpeech">>;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
+    /** Let the player read chats they aren't in (`observer.enabled`). */
+    readonly observer?: boolean;
     /** Where a participant stands, for speaking aloud. */
     readonly placeOf?: MessagingDeps["placeOf"];
     /** Lets go of anything frozen on a paused clock; the process's shutdown. */
@@ -235,18 +239,30 @@ export function registerMessaging(
       if (event.type === "message") {
         deps.broadcaster?.broadcast({
           type: "journal",
+          event: withJournalSeq(messageJournal(event.delivery)),
+        });
+      }
+      if (!deps.observer) return;
+      // The player's own chats already reach them by the audience-filtered
+      // stream. A chat-list change goes both ways: joining one leaves this list.
+      if (event.type === "chats") {
+        deps.broadcaster?.broadcast({
+          type: "observed",
+          event: { type: "chats" },
+        });
+      } else if (event.type === "typing") {
+        if (!event.audience.some(isUser))
+          deps.broadcaster?.broadcast({
+            type: "observed",
+            event: event.typing,
+          });
+      } else if (!event.delivery.audience.some(isUser)) {
+        deps.broadcaster?.broadcast({
+          type: "observed",
           event: {
-            seq: nextJournalSeq(),
-            simTime: event.delivery.timestamp,
-            kind: "message.sent",
-            actors: [event.delivery.sender, ...event.delivery.audience],
+            type: "message",
             chatId: event.delivery.chatId,
-            payload: {
-              messageId: event.delivery.id,
-              sequence: event.delivery.sequence,
-              senderId: event.delivery.sender,
-              preview: readAs(event.delivery.params).slice(0, 100),
-            },
+            message: clientMessage(event.delivery),
           },
         });
       }
@@ -447,6 +463,7 @@ export function registerMessaging(
     {
       broadcaster: deps.broadcaster,
       getStatuses: deps.getStatuses,
+      ...(deps.observer ? { observer: true } : {}),
     },
   );
   return messaging;

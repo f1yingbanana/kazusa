@@ -31,7 +31,7 @@ If you were cut off mid-message, the `send_message` result shows what you said
 and what stayed unsaid; react to the interruption first. If more messages arrive
 while you react, fold them into what you are doing without repeating speech or
 tool calls that already succeeded. Record any plan or promise the conversation
-creates in `MEMORY.md` as described in your conventions.
+creates with `remember`, as described in your conventions.
 
 Make any chosen reply and activity change through their tools before concluding.
 Nobody sees or hears ordinary brain output, including dialogue or action

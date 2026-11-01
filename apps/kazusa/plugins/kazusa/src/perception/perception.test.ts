@@ -24,6 +24,7 @@ import {
   type PerceptionDelivery,
   type PerceptionState,
 } from "./perception.ts";
+import { BrainSlots } from "./brain-slots.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
@@ -35,7 +36,8 @@ function stimulus(
   return {
     id,
     sessionKey: `agent:${agentId}:chat:direct:bob`,
-    sender: "bob",
+    // Distinct senders, so only the burst tests fold messages together.
+    sender: `sender-${id}`,
     text,
     timestamp: NOW,
   };
@@ -227,6 +229,122 @@ function setupWake(options: SetupOptions = {}) {
   });
   return h;
 }
+
+describe("Brain slots", () => {
+  it("merges what arrives while waiting into one turn when a slot opens", async () => {
+    const h = setupWake({ maxConcurrentBrains: 1 });
+    let finishBob = (): void => {};
+    h.deliver.mockImplementationOnce(async (delivery, lifecycle) => {
+      h.deliveries.push(structuredClone(delivery));
+      await lifecycle.onAdopted();
+      await new Promise<void>((resolve) => {
+        finishBob = resolve;
+      });
+    });
+    await h.router.receive("bob", {
+      ...stimulus("bob-1"),
+      sessionKey: "agent:bob:tasks",
+    });
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+
+    await h.router.receive("alice", stimulus("first"));
+    await h.router.receive("alice", stimulus("second"));
+    await vi.waitFor(() =>
+      expect(h.snapshot().pending.map((item) => item.id)).toEqual([
+        "first",
+        "second",
+      ]),
+    );
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.snapshot().deliveries).toBeUndefined();
+
+    finishBob();
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(2));
+    expect(h.deliveries[1].agentId).toBe("alice");
+    expect(h.deliveries[1].ids).toEqual(["first", "second"]);
+  });
+
+  it("gives the slot back when there is nothing to hand over", async () => {
+    const slots = new BrainSlots();
+    expect(slots.acquire("a", 1, () => {})).toBe(true);
+    const granted = vi.fn();
+    expect(slots.acquire("b", 1, granted)).toBe(false);
+    expect(slots.acquire("b", 1, granted)).toBe(false);
+    slots.release("a", 1);
+    expect(granted).toHaveBeenCalledTimes(1);
+    expect(slots.acquire("b", 1, granted)).toBe(true);
+    slots.release("b", 1);
+    expect(slots.acquire("c", 1, () => {})).toBe(true);
+  });
+});
+
+describe("Decision fallback", () => {
+  const group = (id: string): Stimulus => ({
+    ...stimulus(id),
+    sessionKey: "agent:alice:chat:group:guild",
+  });
+
+  it("defers a group chat when the decision fails", async () => {
+    const h = setup();
+    h.tasks.set("alice", {
+      id: "work",
+      summary: "Working",
+      startAt: new Date(NOW).toISOString(),
+      endAt: new Date(NOW + 3_600_000).toISOString(),
+    } as unknown as ActiveTask);
+    h.evaluateDecision.mockRejectedValue(new Error("overloaded"));
+    await h.router.receive("alice", group("a"));
+    expect(h.deliver).not.toHaveBeenCalled();
+    expect(h.snapshot().pending[0].action).toBe("QUEUE_NEXT");
+  });
+
+  it("still admits a direct chat when the decision fails", async () => {
+    const h = setup();
+    h.evaluateDecision.mockRejectedValue(new Error("overloaded"));
+    await h.router.receive("alice", stimulus("a"));
+    expect(h.deliveries[0].ids).toEqual(["a"]);
+  });
+});
+
+describe("Message bursts", () => {
+  const chat = "agent:alice:chat:direct:bob";
+  const message = (id: string, timestamp: number, sender = "bob") => ({
+    ...stimulus(id),
+    sessionKey: chat,
+    sender,
+    text: `text ${id}`,
+    timestamp,
+  });
+
+  it("folds a sender's burst into one item and adopts every message", async () => {
+    const h = setupWake({ coalesceWindowMs: 60_000 });
+    await h.router.receive("alice", message("a", NOW));
+    await h.router.receive("alice", message("b", NOW + 30_000));
+    await h.router.receive("alice", message("b", NOW + 30_000));
+    expect(h.snapshot().pending).toHaveLength(1);
+    expect(h.snapshot().pending[0].text).toBe("text a\ntext b");
+
+    await h.router.drain("alice");
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(h.deliveries[0].keys).toHaveLength(2);
+    const noticed = await h.router.noticed("alice");
+    expect(noticed({ id: "b", sessionKey: chat })).toBe(true);
+  });
+
+  it("keeps apart other senders, later messages and sent items", async () => {
+    const h = setupWake({ coalesceWindowMs: 60_000 });
+    await h.router.receive("alice", message("a", NOW));
+    await h.router.receive("alice", message("b", NOW + 1_000, "carol"));
+    await h.router.receive("alice", message("c", NOW + 2_000));
+    await h.router.receive("alice", message("d", NOW + 200_000));
+    expect(h.snapshot().pending.map((item) => item.id)).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
+  });
+});
 
 describe("Attention regression cases", () => {
   it("admits newly accepted evidence before an idle backlog fills the batch", async () => {
@@ -468,7 +586,7 @@ describe("Attention regression cases", () => {
     expect(h.deliveries).toHaveLength(1);
     await h.router.receive("alice", {
       ...item,
-      sessionKey: "agent:alice:chat:group:club",
+      sessionKey: "agent:alice:chat:direct:carol",
     });
     expect(h.deliveries).toHaveLength(2);
     expect(h.deliveries[0].message).toContain("Sat 2026-10-24 11:57");
@@ -1720,10 +1838,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
     it("formats delivery message as human and LLM-readable markdown envelope without raw JSON", async () => {
       const h = setup();
-      await h.router.receive(
-        "alice",
-        stimulus("chat-msg", "alice", "Can you help me?"),
-      );
+      await h.router.receive("alice", {
+        ...stimulus("chat-msg", "alice", "Can you help me?"),
+        sender: "bob",
+      });
 
       expect(h.deliveries[0].message).not.toContain(
         "[kazusa:skill=task-interrupt]",
@@ -2288,7 +2406,11 @@ describe("Conversation coverage review", () => {
       };
       await h.router.receive("alice", local);
       await vi.advanceTimersByTimeAsync(100);
-      await h.router.receive("alice", { ...local, id: "local-2" });
+      await h.router.receive("alice", {
+        ...local,
+        id: "local-2",
+        sender: "someone-else",
+      });
       await vi.advanceTimersByTimeAsync(150);
       expect(h.deliveries[0].ids).toEqual(["remote", "local", "local-2"]);
     } finally {

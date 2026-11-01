@@ -4,12 +4,15 @@ entityType: place
 id: entity.place.schale_residence
 place_id: schale_residence
 name: SCHALE Residence Hall
-summary: "A shared SCHALE area where visiting students can rest, study and use facilities."
+summary:
+  "A shared SCHALE area where visiting students can rest, study and use
+  facilities."
 connections:
   - to: schale_office
     ways:
       - { by: walk, minutes: 3 }
     note: "Approximate travel time for the simulation."
+renown: known
 ---
 
 # SCHALE Residence Hall

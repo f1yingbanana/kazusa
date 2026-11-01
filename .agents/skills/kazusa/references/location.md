@@ -98,8 +98,8 @@ deferred (§5).
   - or, on the way: "On your way from … to …; near … now. Arriving …".
 - **Sightings** arrive as interruptions under "Seen around you": "You see Airi
   `airi-kurimura` and Natsu `natsu-yutori`, talking (chat:huddle:…) here.",
-  "Kazusa `kazusa-kyouyama` comes in.", "On your way through Rose Courtyard, you notice
-  …", "Kazusa `kazusa-kyouyama` leaves, heading toward School."
+  "Kazusa `kazusa-kyouyama` comes in.", "On your way through Rose Courtyard, you
+  notice …", "Kazusa `kazusa-kyouyama` leaves, heading toward School."
 - **Arrival check-ins** carry "You've arrived at …. You came here for "…",
   planning about 45 min. Carry on with it, or change your mind."
 - **Skills.** `context-conventions` explains Where you are, With you, Seen
@@ -156,8 +156,8 @@ Known places are exactly the character's cards
 alias matching in the turn's input and `MEMORY.md`, then distance. With no card
 the whole description shows; starting the next activity from that place writes a
 frontmatter-only stub (atomic, never overwriting). Fuzzy recall is the
-character's own `memory_search`; memory-core's search has no public plugin API,
-and the world wiki must never be added to `memory_search`.
+character's own `recall` (see [memory](memory.md)), which only reaches the world
+wiki at their knowledge depth.
 
 ### 4.4 Judgments
 
@@ -216,9 +216,8 @@ and by those coming once they are in.
 
 - **Location** (`src/location/`): map, positions, knowledge, judgments,
   sightings, `where`, `placeOf`, `settle`, `confirm`, `whereabouts`,
-  `inCompany`, operator RPC `location.place`, `POST /kazusa/move` (the
-  player), `GET /kazusa/places`,
-  `GET /kazusa/locations`.
+  `inCompany`, operator RPC `location.place`, `POST /kazusa/move` (the player),
+  `GET /kazusa/places`, `GET /kazusa/locations`.
 - **Taskman** knows no places: extensions `prepare` (validate, maybe
   `checkInAt`) and `commit(task)` against the final lease; one cron job per
   character.
@@ -243,13 +242,13 @@ and by those coming once they are in.
   groups with someone the observer has a card for first.
 - **Relevance**: better than literal matching for **Places you know**, through
   the memory retriever ([memory](memory.md) §7.2).
-- **Player trips**: the player has no lease, so for now they go straight
-  there (`POST /kazusa/move`, the same `place()` as the operator's
-  `location.place`): those there may notice them come in, and leaving takes
-  them out of their huddles. Speaking aloud (`/kazusa/send` with `aloud`) then
-  brings the people addressed, and anyone they are talking with, into the
-  player's huddle. Walking (a trip without a lease, settled by a timer or the
-  next request) is still open.
+- **Player trips**: the player has no lease, so for now they go straight there
+  (`POST /kazusa/move`, the same `place()` as the operator's `location.place`):
+  those there may notice them come in, and leaving takes them out of their
+  huddles. Speaking aloud (`/kazusa/send` with `aloud`) then brings the people
+  addressed, and anyone they are talking with, into the player's huddle. Walking
+  (a trip without a lease, settled by a timer or the next request) is still
+  open.
 - **Walking together**: sharing a trip and talking on the way.
 - **Client** (Phase 5): place tree, in-transit, place inspector, huddle threads,
   map renderer, Player lens, an SSE `location` event, and the `location.noticed`

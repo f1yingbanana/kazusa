@@ -4,6 +4,7 @@ entityType: place
 place_id: school_cafeteria
 name: "Cafeteria"
 learned: goes to school here
+seen: 2026-10-29
 ---
 
 # Cafeteria

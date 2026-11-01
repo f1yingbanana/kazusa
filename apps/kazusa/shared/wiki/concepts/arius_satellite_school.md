@@ -3,6 +3,8 @@ pageType: concept
 conceptType: lore
 id: concept.arius_satellite_school
 title: Arius Satellite School
+community: kivotos_overview
+renown: known
 ---
 
 # Arius Satellite School

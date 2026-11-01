@@ -10,8 +10,11 @@ connections:
     ways:
       - { by: transit, minutes: 30 }
     note: "Approximate travel time for the simulation."
+community: arius_satellite_school
 ---
 
 # Arius Satellite School
 
-Arius is a secluded academy with a difficult history. Its students are working to rebuild their community; access and the route to the school are not common knowledge.
+Arius is a secluded academy with a difficult history. Its students are working
+to rebuild their community; access and the route to the school are not common
+knowledge.

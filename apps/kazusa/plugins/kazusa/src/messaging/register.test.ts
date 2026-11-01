@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { Socket } from "node:net";
@@ -14,6 +15,10 @@ import {
   publishSessionTranscriptUpdateByIdentity,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  MessagesResponseSchema,
+  ObservedChatsResponseSchema,
+} from "@kazusa/client";
 import type { Messaging, MessageDelivery } from "./messaging.ts";
 import { registerMessaging } from "./register.ts";
 
@@ -28,7 +33,10 @@ const append = vi.mocked(appendSessionTranscriptMessageByIdentityStrict);
 
 async function setup(
   pluginConfig: Record<string, unknown> = {},
-  options: Pick<Parameters<typeof registerMessaging>[1], "release"> = {},
+  options: Pick<
+    Parameters<typeof registerMessaging>[1],
+    "release" | "observer" | "broadcaster"
+  > = {},
 ) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "kazusa-message-"));
   directories.push(workspace);
@@ -550,6 +558,163 @@ describe("send_message SDK integration", () => {
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     event("error", "run-1");
     expect(await h.messaging.getTyping("bob")).toEqual([]);
+  });
+
+  it("forwards what happens in others' chats to observers, wrapped as observed", async () => {
+    const broadcast = vi.fn();
+    const h = await setup(
+      {},
+      {
+        observer: true,
+        broadcaster: { broadcast, subscribe: vi.fn(() => () => {}) } as never,
+      },
+    );
+    const observed = () =>
+      broadcast.mock.calls
+        .map(([event]) => event)
+        .filter((event) => event.type === "observed")
+        .map((event) => event.event);
+
+    const theirs = await h.messaging.send("alice", "Alice", {
+      requestId: "agents-only",
+      members: ["bob"],
+      text: "between us",
+    });
+    expect(observed()).toEqual(
+      expect.arrayContaining([
+        { type: "chats" },
+        expect.objectContaining({
+          type: "message",
+          chatId: theirs.chatId,
+          message: expect.objectContaining({ text: "between us" }),
+        }),
+      ]),
+    );
+    await h.messaging.setTyping("alice", "Alice", theirs.sessionKey, true);
+    expect(observed()).toContainEqual(
+      expect.objectContaining({ type: "typing", isTyping: true }),
+    );
+
+    // The player's own chats reach them by the audience-filtered stream.
+    broadcast.mockClear();
+    const mine = await h.messaging.send("user:sensei", "Sensei", {
+      requestId: "player",
+      members: ["alice"],
+      text: "hello",
+    });
+    expect(observed().map((event) => event.type)).toEqual(["chats"]);
+    await h.messaging.setTyping(
+      "alice",
+      "Alice",
+      "agent:alice:chat:direct:user:sensei",
+      true,
+    );
+    expect(observed().map((event) => event.type)).toEqual(["chats"]);
+    expect(mine.chatId).toBeDefined();
+  });
+
+  it("serves observed chats and any chat's history only when observing is on", async () => {
+    const off = await setup();
+    expect(off.routes.has("/kazusa/observe/chats")).toBe(false);
+    expect(off.routes.has("/kazusa/observe/messages")).toBe(false);
+
+    const h = await setup({}, { observer: true });
+    const theirs = await h.messaging.send("alice", "Alice", {
+      requestId: "agents-only",
+      members: ["bob"],
+      text: "between us",
+    });
+    await h.messaging.send("user:sensei", "Sensei", {
+      requestId: "player",
+      members: ["alice"],
+      text: "hello",
+    });
+    async function get(routePath: string, url = routePath) {
+      const route = h.routes.get(routePath);
+      if (!route) throw new Error(`Missing route: ${routePath}`);
+      let body = "";
+      await route.handler(
+        Object.assign(Readable.from([]), {
+          method: "GET",
+          url,
+          headers: {},
+          socket: new Socket(),
+        }) as unknown as IncomingMessage,
+        {
+          writeHead: () => {},
+          setHeader: () => {},
+          end: (data: string) => {
+            body = data;
+          },
+        } as unknown as ServerResponse,
+      );
+      return JSON.parse(body) as unknown;
+    }
+
+    const parsedChats = ObservedChatsResponseSchema.parse(
+      await get("/kazusa/observe/chats"),
+    );
+    expect(parsedChats.chats).toEqual([
+      expect.objectContaining({
+        id: theirs.chatId,
+        type: "direct",
+        name: "",
+        members: ["alice", "bob"],
+        lastMessage: expect.objectContaining({
+          text: "between us",
+          senderId: "alice",
+        }),
+      }),
+    ]);
+    expect(parsedChats.chats[0]).not.toHaveProperty("sessionKey");
+    expect(
+      MessagesResponseSchema.parse(
+        await get(
+          "/kazusa/observe/messages",
+          `/kazusa/observe/messages?chatId=${theirs.chatId}`,
+        ),
+      ).messages.map((message) => message.text),
+    ).toEqual(["between us"]);
+  });
+
+  it("keeps an event stream open through backpressure", async () => {
+    const h = await setup();
+    const route = h.routes.get("/kazusa/events");
+    if (!route) throw new Error("Missing route: /kazusa/events");
+    const chunks: string[] = [];
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+      writableEnded: false,
+      writableLength: 0,
+      setHeader: () => {},
+      writeHead: () => {},
+      // A full socket buffer: Node keeps the chunk and returns false.
+      write: (chunk: string) => {
+        chunks.push(chunk);
+        return false;
+      },
+      end: () => {
+        res.writableEnded = true;
+      },
+      destroy: () => {
+        res.destroyed = true;
+      },
+    });
+    const req = Object.assign(Readable.from([]), {
+      method: "GET",
+      url: "/kazusa/events",
+      headers: {},
+      socket: new Socket(),
+    });
+    await route.handler(
+      req as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+    );
+    expect(chunks[0]).toContain("event: connected");
+    expect(res.writableEnded).toBe(false);
+    // Unhandled, this event would end the process.
+    expect(res.listenerCount("error")).toBeGreaterThan(0);
+    res.emit("close");
   });
 
   it("registers Gateway HTTP routes and handles chats, messages, and send", async () => {

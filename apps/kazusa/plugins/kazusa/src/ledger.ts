@@ -6,6 +6,7 @@ import {
   appendSessionTranscriptMessageByIdentityStrict,
   publishSessionTranscriptUpdateByIdentity,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { recordLedgerRows, type LedgerJournalRow } from "./realtime.ts";
 
 /**
  * Passive per-character ledgers written outside a chat. Every ledger is
@@ -79,4 +80,9 @@ export async function appendLedgerEntry(
     ...identity,
     update: { messageId: appended.result.messageId },
   });
+  const journal = metadata as Partial<LedgerJournalRow> | undefined;
+  if (journal?.kind && journal.payload)
+    recordLedgerRows(agentId, [
+      { simTime: timestamp, kind: journal.kind, payload: journal.payload },
+    ]);
 }

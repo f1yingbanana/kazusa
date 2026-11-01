@@ -5,13 +5,13 @@ import { toast } from "sonner";
 import { useCharacters } from "@/hooks/use-characters";
 import { readSimNow } from "@/hooks/use-clock";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
+import { useParticipantResolver } from "@/hooks/use-participants";
 import { setTyping } from "@/lib/source/chats/http";
 import type {
   Chat,
   MessageType,
   PendingMessage,
 } from "@/lib/source/chats/types";
-import { resolveParticipant } from "./chat-avatar";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
 import { MembersSheet } from "./members-sheet";
@@ -27,7 +27,7 @@ export function ChatView({
   onBack: () => void;
   onSent: (chat: Chat) => void;
 }) {
-  const { characters, byId: agentsById } = useCharacters();
+  const { characters } = useCharacters();
   const agents = characters.filter((character) => character.kind === "agent");
   const { config, send, commitSentMessage, refreshChats } = useChatActions();
   const { typingByChat } = useRealtime();
@@ -37,19 +37,7 @@ export function ChatView({
 
   const typists = typingByChat[chat.id] ?? [];
 
-  const resolve = useCallback(
-    (id: string, fallbackName?: string) => {
-      const participant = resolveParticipant(id, agentsById, {
-        userId: config.userId,
-        userName: config.userName,
-      });
-      if (!participant.isAgent && !participant.isSelf && fallbackName) {
-        return { ...participant, name: fallbackName };
-      }
-      return participant;
-    },
-    [agentsById, config.userId, config.userName],
-  );
+  const resolve = useParticipantResolver();
 
   const deliver = useCallback(
     async (message: PendingMessage) => {

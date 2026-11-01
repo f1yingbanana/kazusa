@@ -1,3 +1,4 @@
+import { inBackground } from "../background.ts";
 import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -20,6 +21,7 @@ import type { StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
+import { ONLY_WHAT_YOU_KNOW } from "../turn.ts";
 import { z } from "zod";
 import {
   PERCEPTION_CONFIG,
@@ -32,6 +34,7 @@ import {
   type SpeechSource,
   type Stimulus,
 } from "./types.ts";
+import { BrainSlots } from "./brain-slots.ts";
 
 /**
  * `QUEUE_NEXT` marks attention already approved. `until` holds it back: it is
@@ -42,7 +45,19 @@ export interface PendingItem extends Stimulus {
   /** Recheck chat coverage once the ongoing reply has finished. */
   reviewAfterRun?: boolean;
   until?: { taskId?: string; notBefore?: number };
+  /** Keys of the later messages of a burst, whose text is in this item. */
+  burstKeys?: string[];
+  /** When the burst's latest message was sent. */
+  burstAt?: number;
 }
+
+/** A sender's messages this close together in sim time are one thing to read. */
+const BURST_WINDOW_MS = 60_000;
+
+const keysOf = (item: PendingItem): string[] => [
+  stimulusKey(item),
+  ...(item.burstKeys ?? []),
+];
 
 const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 
@@ -96,6 +111,8 @@ export interface PerceptionDeps {
     delivery: PerceptionDelivery,
     lifecycle: NonNullable<GetReplyOptions["turnAdoptionLifecycle"]>,
   ) => Promise<void>;
+  /** Shared by every registration in the process; absent: this one's own. */
+  readonly slots?: BrainSlots;
   readonly evaluateDecision?: DecisionRuntimeV1["evaluate"];
   readonly assembleDecisionContext?: DecisionContextAssembler;
   /** Observes each recorded decision; must not throw or block routing. */
@@ -169,6 +186,8 @@ function formatDeliveryMessage(
   // reach the character, and a deadline's text names the planned time.
   for (const item of [...deadlineItems, ...idleItems]) parts.push(item.text);
 
+  if (chatItems.length || sightings.length) parts.push(ONLY_WHAT_YOU_KNOW);
+
   // OpenClaw stamps each user turn at the LLM boundary with its wall-clock
   // write time in the host timezone, unless the text already opens with a
   // `[... YYYY-MM-DD HH:mm` envelope. Lead with simulation time so the character
@@ -183,6 +202,7 @@ function formatDeliveryMessage(
  */
 export class Perception {
   private readonly serial: KeyedAsyncQueue;
+  private readonly slots: BrainSlots;
   private readonly api?: OpenClawPluginApi;
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
@@ -205,6 +225,7 @@ export class Perception {
     this.deps = deps;
     this.api = deps.api;
     this.serial = deps.serial ?? new KeyedAsyncQueue();
+    this.slots = deps.slots ?? new BrainSlots();
 
     this.config = PERCEPTION_CONFIG.parse(
       this.deps.config ?? this.api?.pluginConfig?.perception ?? {},
@@ -266,8 +287,8 @@ export class Perception {
           return;
         }
 
-        const alreadyPending = state.pending.some(
-          (item) => stimulusKey(item) === stimulusKey(stimulus),
+        const alreadyPending = state.pending.some((item) =>
+          keysOf(item).includes(stimulusKey(stimulus)),
         );
         if (alreadyPending) {
           // If the stimulus is already pending and the handoff was explicitly stopped
@@ -287,7 +308,12 @@ export class Perception {
         }
 
         if (!state.deliveries?.length) state.stopped = false;
-        state.pending.push(stimulus);
+        const burst = this.burstFor(state, stimulus);
+        if (burst) {
+          burst.text = `${burst.text}\n${stimulus.text}`;
+          burst.burstKeys = [...(burst.burstKeys ?? []), stimulusKey(stimulus)];
+          burst.burstAt = stimulus.timestamp;
+        } else state.pending.push(stimulus);
         pendingCount = state.pending.filter(
           (item) =>
             !item.action &&
@@ -342,14 +368,15 @@ export class Perception {
         });
         this.debounceReadyAt.set(agentId, readyAt);
       });
-      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
-        throw new Error("runInBackgroundContext not available");
-      }
-      void this.deps.api.lifecycle
-        ?.runInBackgroundContext?.(async () => {
+      inBackground(
+        this.deps.api,
+        async () => {
           if (await ready) await this.drain(agentId);
-        })
-        .catch((error: unknown) => this.warn(error));
+        },
+        (error) => {
+          this.warn(error);
+        },
+      );
     } else {
       await this.drain(agentId);
     }
@@ -678,12 +705,13 @@ export class Perception {
         : this.config.readinessPollMs;
     const timer = setTimeout(() => {
       this.readinessTimers.delete(agentId);
-      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
-        throw new Error("runInBackgroundContext not available");
-      }
-      void this.deps.api.lifecycle
-        ?.runInBackgroundContext?.(() => this.drain(agentId))
-        .catch((error: unknown) => this.warn(error));
+      inBackground(
+        this.deps.api,
+        () => this.drain(agentId),
+        (error) => {
+          this.warn(error);
+        },
+      );
     }, wait);
     timer.unref();
     this.readinessTimers.set(agentId, timer);
@@ -784,12 +812,14 @@ export class Perception {
         }
         // Picking up the phone shows everything that was waiting, but not
         // what has not happened yet.
-        return this.reserve(
-          agentId,
-          state,
-          this.batch(available.filter((item) => item.timestamp <= now)),
-          "followup",
+        const waiting = this.batch(
+          available.filter((item) => item.timestamp <= now),
         );
+        if (!systemAgent && !this.takeSlot(agentId, waiting)) {
+          await this.save(agentId, state);
+          return;
+        }
+        return this.reserve(agentId, state, waiting, "followup");
       }
       const decision: AttentionDecision & DecisionTrace =
         systemAgent ||
@@ -858,6 +888,10 @@ export class Perception {
                   ),
               ),
             ]);
+        if (!busy && !systemAgent && !this.takeSlot(agentId, admitted)) {
+          await this.save(agentId, state);
+          return;
+        }
         return this.reserve(
           agentId,
           state,
@@ -878,7 +912,7 @@ export class Perception {
           if (activeTask) item.until = { taskId: activeTask.id };
         } else if (action === "QUEUE_NEXT" || item.deadline || item.idle)
           item.action = "QUEUE_NEXT";
-        else ignored.add(stimulusKey(item));
+        else for (const key of keysOf(item)) ignored.add(key);
       }
       state.pending = state.pending.filter(
         (item) => !ignored.has(stimulusKey(item)),
@@ -903,8 +937,14 @@ export class Perception {
     busy: boolean,
     queuedReview = false,
   ): Promise<AttentionDecision & DecisionTrace> {
+    // With no judgment to go on, a group chat can wait; anything else may not.
+    const fallback = bundle.every((item) =>
+      item.sessionKey.includes(":chat:group:"),
+    )
+      ? "DEFER"
+      : "STEER";
     const admit = (note: string) =>
-      ({ action: "STEER", delayMs: 0, source: "fallback", note }) as const;
+      ({ action: fallback, delayMs: 0, source: "fallback", note }) as const;
     const assemble = this.deps.assembleDecisionContext;
     const api = this.api;
     const evaluate =
@@ -969,7 +1009,7 @@ export class Perception {
         return evaluate(batch, {
           agentId,
           purpose: `perception.${question}`,
-          rubricVersion: "6",
+          rubricVersion: "7",
           timeoutMs: this.config.decisionTimeoutMs,
           signal,
         });
@@ -1005,7 +1045,7 @@ export class Perception {
       }
       if (outcome.status !== "ok") {
         this.warn(
-          `Decision unavailable: ${outcome.reason}; admitting attention`,
+          `Decision unavailable: ${outcome.reason}; falling back to ${fallback}`,
         );
         return admit(`decision unavailable: ${outcome.reason}`);
       }
@@ -1020,13 +1060,63 @@ export class Perception {
     }
   }
 
+  /** The unread item this message continues, if the sender is mid-burst. */
+  private burstFor(
+    state: PerceptionState,
+    stimulus: Stimulus,
+  ): PendingItem | undefined {
+    if (!stimulus.sessionKey.includes(":chat:")) return undefined;
+    const last = state.pending.findLast(
+      (item) => item.sessionKey === stimulus.sessionKey,
+    );
+    if (
+      !last ||
+      last.sender !== stimulus.sender ||
+      last.reviewAfterRun ||
+      state.deliveries?.some((delivery) =>
+        delivery.keys.includes(stimulusKey(last)),
+      ) ||
+      stimulus.timestamp - (last.burstAt ?? last.timestamp) > BURST_WINDOW_MS ||
+      last.text.length + stimulus.text.length >= this.config.maxBatchChars
+    )
+      return undefined;
+    return last;
+  }
+
+  /**
+   * False when every brain slot is taken. What was admitted stays approved and
+   * unreserved, so the turn built when their slot opens can include it.
+   */
+  private takeSlot(agentId: string, admitted: PendingItem[]): boolean {
+    const limit = this.config.maxConcurrentBrains;
+    const held = this.slots.acquire(agentId, limit, () => {
+      inBackground(
+        this.deps.api,
+        async () => {
+          try {
+            await this.drain(agentId);
+          } finally {
+            // Nothing to hand over after all: stale, paused or sent offstage.
+            if (!this.slots.isDispatching(agentId))
+              this.slots.release(agentId, limit);
+          }
+        },
+        (error) => {
+          this.warn(error);
+        },
+      );
+    });
+    if (!held) for (const item of admitted) item.action = "QUEUE_NEXT";
+    return held;
+  }
+
   private async reserve(
     agentId: string,
     state: PerceptionState,
     bundle: PendingItem[],
     mode: PerceptionDelivery["mode"],
   ): Promise<PerceptionDelivery> {
-    const keys = bundle.map(stimulusKey);
+    const keys = bundle.flatMap(keysOf);
     const sessionKeys = [
       ...new Set(
         bundle
@@ -1051,6 +1141,7 @@ export class Perception {
       sessionKeys,
       message: formatDeliveryMessage(bundle, mode, this.deps.clock.time()),
     };
+    if (mode === "followup") this.slots.dispatch(agentId);
     state.deliveries = [...(state.deliveries ?? []), delivery];
     await this.save(agentId, state);
     return delivery;
@@ -1136,12 +1227,13 @@ export class Perception {
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
           // from inside the first host's adoption callback.
-          if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
-            throw new Error("runInBackgroundContext not available");
-          }
-          void this.deps.api.lifecycle
-            ?.runInBackgroundContext?.(() => this.drain(delivery.agentId))
-            .catch((error: unknown) => this.warn(error));
+          inBackground(
+            this.deps.api,
+            () => this.drain(delivery.agentId),
+            (error) => {
+              this.warn(error);
+            },
+          );
         },
         onDeferred: () => {
           // The host may retain this callback past dispatch's return. Keep our
@@ -1164,15 +1256,21 @@ export class Perception {
       };
       // Start outside the state lock, and observe the full dispatch promise even
       // after ingress has returned. Errors after adoption must never replay tools.
-      if (!this.deps.api?.lifecycle?.runInBackgroundContext) {
-        throw new Error("runInBackgroundContext not available");
-      }
-      void this.deps.api.lifecycle
-        ?.runInBackgroundContext?.(async () => {
-          this.assertCurrent();
-          if (!this.deps.deliver)
-            throw new Error("Perception requires a brain delivery adapter");
-          await this.deps.deliver(delivery, lifecycle);
+      inBackground(
+        this.deps.api,
+        async () => {
+          try {
+            this.assertCurrent();
+            if (!this.deps.deliver)
+              throw new Error("Perception requires a brain delivery adapter");
+            await this.deps.deliver(delivery, lifecycle);
+          } finally {
+            if (delivery.mode === "followup")
+              this.slots.release(
+                delivery.agentId,
+                this.config.maxConcurrentBrains,
+              );
+          }
           if (!adopted && !deferred && !failed) {
             reportFailure(
               new Error(
@@ -1180,8 +1278,11 @@ export class Perception {
               ),
             );
           }
-        })
-        .catch((error: unknown) => reportFailure(error));
+        },
+        (error) => {
+          reportFailure(error);
+        },
+      );
     });
   }
 

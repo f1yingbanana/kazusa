@@ -3,7 +3,11 @@ import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
 import { describe, expect, it, vi } from "vitest";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
-import { assembleContext, type ContextEngine } from "./context-engine.ts";
+import {
+  assembleContext,
+  ledgerWindowEnd,
+  type ContextEngine,
+} from "./context-engine.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 
@@ -62,6 +66,7 @@ function assemble(
   overrides: Partial<Parameters<typeof assembleContext>[0]> & {
     messages?: Message[];
     tokenBudget?: number;
+    prompt?: string;
   } = {},
 ): ReturnType<typeof assembleContext> {
   return assembleContext({
@@ -70,6 +75,7 @@ function assemble(
       sessionId: "brain",
       messages: overrides.messages ?? [],
       tokenBudget: overrides.tokenBudget,
+      prompt: overrides.prompt,
     },
     sessionsContext: {},
     activeTask: null,
@@ -96,18 +102,12 @@ const assistantBase = {
   },
 } as const;
 
-function toolResult(toolCallId: string, text: string): Message {
-  return {
-    role: "toolResult",
-    timestamp: NOW,
-    toolCallId,
-    toolName: "read",
-    content: [{ type: "text", text }],
-    isError: false,
-  };
-}
-
 const CLOCK = `[${formatSimTime(NOW)}] Current simulation time\n\n`;
+
+const withoutSituation = (messages: readonly unknown[]): unknown[] =>
+  messages.filter(
+    (message) => !JSON.stringify(message).includes("] Current simulation time"),
+  );
 
 describe("Context assembly", () => {
   it("does not let incoming text select system skills", async () => {
@@ -162,14 +162,12 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Hello Alice");
-    expect(text).toContain("[(self) Fri 2026-10-23 12:00] Hello Bob");
-    expect(text).toContain("[`carol` Fri 2026-10-23 12:00] Hello everyone");
-    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Welcome");
-    expect(text).toContain("[`bob` Fri 2026-10-23 12:00] Role is not identity");
-    expect(text).toContain(
-      "[(self) Fri 2026-10-23 12:00] Metadata identifies self",
-    );
+    expect(text).toContain("[`bob` 12:00] Hello Alice");
+    expect(text).toContain("[you 12:00] Hello Bob");
+    expect(text).toContain("[`carol` 12:00] Hello everyone");
+    expect(text).toContain("[`bob` 12:00] Welcome");
+    expect(text).toContain("[`bob` 12:00] Role is not identity");
+    expect(text).toContain("[you 12:00] Metadata identifies self");
   });
 
   it("uses metadata in both chat kinds, never names or speaker tags in dialogue", async () => {
@@ -182,10 +180,8 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[`carol` Fri 2026-10-23 12:00] bob: A quotation");
-    expect(text).toContain(
-      "[`bob` Fri 2026-10-23 12:00] [speaker:alice] A quotation",
-    );
+    expect(text).toContain("[`carol` 12:00] bob: A quotation");
+    expect(text).toContain("[`bob` 12:00] [speaker:alice] A quotation");
     expect(text).not.toContain("Display name, not identity");
   });
 
@@ -202,14 +198,10 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
+    expect(text).toContain("[unknown 12:00] [speaker:bob] Legacy message");
+    expect(text).toContain("[unknown 12:00] carol: Legacy message");
     expect(text).toContain(
-      "[unknown Fri 2026-10-23 12:00] [speaker:bob] Legacy message",
-    );
-    expect(text).toContain(
-      "[unknown Fri 2026-10-23 12:00] carol: Legacy message",
-    );
-    expect(text).toContain(
-      "[unknown Fri 2026-10-23 12:00] Outgoing without projected metadata",
+      "[unknown 12:00] Outgoing without projected metadata",
     );
   });
 
@@ -250,11 +242,8 @@ describe("Context assembly", () => {
     expect(text.indexOf("reading experience")).toBeLessThan(
       text.indexOf("latest experience"),
     );
-    expect(text.match(/### tasks/gu)).toHaveLength(1);
-    expect(text).toContain(`[${formatSimTime(NOW - 3)}] reading experience`);
-    expect(text).not.toContain(
-      `[(self) ${formatSimTime(NOW - 3)}] reading experience`,
-    );
+    expect(text).toMatch(/\[\d\d:\d\d\] reading experience/);
+    expect(text).not.toContain("[you");
     expect(text).toContain("chat:group:club");
     // Every assembled message opens with a sim-time stamp, so the host adds
     // none of its own.
@@ -438,165 +427,66 @@ describe("Context assembly", () => {
     );
   });
 
-  it("keeps a complete recent tool turn and drops whole older turns", async () => {
-    const toolTurn: Message[] = [
-      user("recent stimulus"),
-      {
-        role: "assistant",
-        timestamp: NOW,
-        content: [
-          { type: "toolCall", id: "call-1", name: "start_task", arguments: {} },
-        ],
-        api: "openai-completions",
-        provider: "test",
-        model: "test",
-        stopReason: "toolUse",
-        usage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 0,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-        },
-      },
-      {
-        role: "toolResult",
-        timestamp: NOW,
-        toolCallId: "call-1",
-        toolName: "start_task",
-        content: [{ type: "text", text: "Started reading" }],
-        isError: false,
-      },
-    ];
-    const brainMaxTokens = toolTurn.reduce(
-      (sum, message) => sum + estimateTokens(message),
-      0,
-    );
-    const finished: Message = {
+  describe("brain history", () => {
+    const call: Message = {
       ...assistantBase,
-      content: [{ type: "text", text: "NO_REPLY" }],
-      stopReason: "stop",
-    };
-    const earlier = [user("old stimulus"), ...toolTurn, finished];
-    const earlierTokens = earlier
-      .slice(1)
-      .reduce((sum, message) => sum + estimateTokens(message), 0);
-    const params = {
-      messages: [...earlier, user("new stimulus")],
-      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: earlierTokens }),
-    };
-    expect((await assemble(params)).messages.slice(0, -1)).toEqual([
-      ...toolTurn,
-      finished,
-      user("new stimulus"),
-    ]);
-    expect(
-      (
-        await assemble({
-          ...params,
-          config: { ...params.config, brainMaxTokens: earlierTokens - 1 },
-        })
-      ).messages.slice(0, -1),
-    ).toEqual([user("new stimulus")]);
-    const steered = [
-      ...toolTurn.slice(0, 2),
-      user("another stimulus mid-tool"),
-      ...toolTurn.slice(2),
-      finished,
-    ];
-    expect(
-      (
-        await assemble({
-          ...params,
-          messages: [...steered, user("new stimulus")],
-        })
-      ).messages.slice(0, -1),
-    ).toEqual([user("new stimulus")]);
-    expect(
-      (
-        await assemble({
-          ...params,
-          messages: [...steered, user("new stimulus")],
-          config: { ...params.config, brainMaxTokens: earlierTokens + 100 },
-        })
-      ).messages.slice(0, -1),
-    ).toEqual([...steered, user("new stimulus")]);
-  });
-
-  it("keeps the whole run in progress however small the allowance", async () => {
-    const run: Message[] = [
-      user("Create a character"),
-      {
-        ...assistantBase,
-        content: [
-          { type: "toolCall", id: "call-1", name: "read", arguments: {} },
-        ],
-        stopReason: "toolUse",
-      },
-      toolResult("call-1", "x".repeat(40_000)),
-      user("a steered stimulus"),
-      {
-        ...assistantBase,
-        content: [
-          { type: "toolCall", id: "call-2", name: "read", arguments: {} },
-        ],
-        stopReason: "toolUse",
-      },
-      toolResult("call-2", "the result the model is waiting on"),
-    ];
-    const { messages } = await assemble({
-      messages: run,
-      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: 0 }),
-    });
-    expect(messages.slice(0, -1)).toEqual(run);
-  });
-
-  it("continues a run cut off by its limits, unanswered tool calls and all", async () => {
-    const cutOff: Message[] = [
-      user("Create a character"),
-      {
-        ...assistantBase,
-        content: [
-          { type: "toolCall", id: "call-1", name: "read", arguments: {} },
-        ],
-        stopReason: "toolUse",
-      },
-    ];
-    const { messages } = await assemble({
-      messages: [...cutOff, user("Activity check-in")],
-      config: CONTEXT_ENGINE_CONFIG.parse({ brainMaxTokens: 0 }),
-    });
-    expect(messages.slice(0, -1)).toEqual([
-      ...cutOff,
-      user("Activity check-in"),
-    ]);
-  });
-
-  it("forgets a run's oldest results first when it outgrows the context", async () => {
-    const call = (id: string): Message => ({
-      ...assistantBase,
-      content: [{ type: "toolCall", id, name: "read", arguments: {} }],
+      content: [
+        { type: "toolCall", id: "t1", name: "send_message", arguments: {} },
+      ],
       stopReason: "toolUse",
+    };
+    const result: Message = {
+      role: "toolResult",
+      toolCallId: "t1",
+      toolName: "send_message",
+      content: [{ type: "text", text: "delivered" }],
+      isError: false,
+      timestamp: NOW,
+    };
+    const past = [user("an earlier delivery"), call, result];
+
+    it("replays no past turns when the host appends the current one", async () => {
+      const { messages } = await assemble({
+        messages: past,
+        prompt: "the delivery now",
+      });
+      expect(JSON.stringify(messages)).not.toContain("an earlier delivery");
+      expect(messages).not.toContainEqual(call);
     });
-    const run: Message[] = [
-      user("Create a character"),
-      call("call-1"),
-      toolResult("call-1", "old ".repeat(10_000)),
-      call("call-2"),
-      toolResult("call-2", "new"),
-    ];
-    const { messages } = await assemble({
-      messages: run,
-      tokenBudget: 5_000,
-      config: CONTEXT_ENGINE_CONFIG.parse({}),
+
+    it("keeps only the turn under way when the messages hold it", async () => {
+      const now = user("the delivery now");
+      const { messages } = await assemble({
+        messages: [...past, now, call, result],
+      });
+      expect(JSON.stringify(messages)).not.toContain("an earlier delivery");
+      expect(messages.slice(-3)).toEqual([now, call, result]);
     });
-    const results = messages.filter((message) => message.role === "toolResult");
-    expect(results).toHaveLength(2);
-    expect(JSON.stringify(results[0])).toContain("no longer have this result");
-    expect(results[1]).toEqual(run[4]);
   });
 
+  it("keeps the situation ahead of the run in progress, so tool results stay last", async () => {
+    const call: Message = {
+      ...assistantBase,
+      content: [
+        { type: "toolCall", id: "t1", name: "send_message", arguments: {} },
+      ],
+      stopReason: "toolUse",
+    };
+    const result: Message = {
+      role: "toolResult",
+      toolCallId: "t1",
+      toolName: "send_message",
+      content: [{ type: "text", text: "delivered" }],
+      isError: false,
+      timestamp: NOW,
+    };
+    const now = user("the delivery now");
+    const { messages } = await assemble({ messages: [now, call, result] });
+    expect(messages.at(-1)).toEqual(result);
+    expect(JSON.stringify(messages.at(-4))).toContain(
+      "Current simulation time",
+    );
+  });
 
   it("preserves native recovery summaries as whole brain history", async () => {
     const message: Message = {
@@ -606,7 +496,7 @@ describe("Context assembly", () => {
       timestamp: NOW,
     };
     expect(
-      (await assemble({ messages: [message] })).messages.slice(0, -1),
+      withoutSituation((await assemble({ messages: [message] })).messages),
     ).toEqual([message]);
   });
 
@@ -647,38 +537,19 @@ describe("Context assembly", () => {
     },
   );
 
-  it("packs whole personal recollections within their budget and leaves room for recent events", async () => {
-    const personalWiki = [
-      "oversized ".repeat(1_000),
-      "Bob is a friend.",
-      "Not selected.",
-    ];
+  it("puts what comes to mind and the people they know in the situation", async () => {
     const result = await assemble({
-      personalWiki,
-      tokenBudget: 500,
-      config: CONTEXT_ENGINE_CONFIG.parse({
-        personalWikiMaxTokens: 60,
-        personalWikiMaxArticles: 2,
-      }),
-      sessionsContext: {
-        "agent:alice:chat:direct:bob": [incoming("Meet at noon?", "bob")],
-      },
+      onYourMind: "Bob `bob` (friend): Reliable.",
+      roster: "Bob `bob` (friend)",
     });
-    const text = JSON.stringify(result.messages);
-    expect(text).toContain("### Personal recollection\\nBob is a friend.");
-    expect(text).not.toMatch(/oversized|Not selected/);
-    expect(text).toContain("Meet at noon?");
-    expect(result.estimatedTokens).toBeLessThanOrEqual(500);
-    expect(
-      JSON.stringify(
-        (
-          await assemble({
-            personalWiki,
-            config: CONTEXT_ENGINE_CONFIG.parse({ personalWikiMaxTokens: 0 }),
-          })
-        ).messages,
-      ),
-    ).not.toContain("Personal recollection");
+    const situation = JSON.stringify(result.messages.at(-1));
+    expect(situation).toContain(
+      "### On your mind\\nBob `bob` (friend): Reliable.",
+    );
+    expect(situation).toContain("### People you know\\nBob `bob` (friend)");
+    expect(JSON.stringify((await assemble({})).messages)).not.toContain(
+      "On your mind",
+    );
   });
 
   it("defaults to 24 simulated hours, permits more, and rejects removed config", () => {
@@ -729,5 +600,54 @@ describe("Context assembly", () => {
     expect(result.systemPromptAddition).toContain(
       "Skill content for my-lifecycle",
     );
+  });
+});
+
+describe("ledgerWindowEnd", () => {
+  const item = (at: number, text: string) =>
+    ({
+      type: "agentMessage",
+      timestamp: new Date(at).toISOString(),
+      text,
+    }) as never;
+  const sessionsContext = {
+    "agent:a:tasks": [
+      item(1_000, "x".repeat(400)),
+      item(2_000, "y".repeat(400)),
+      item(3_000, "z".repeat(400)),
+    ],
+  };
+
+  it("reads everything when it fits", () => {
+    expect(
+      ledgerWindowEnd({
+        sessionsContext,
+        since: 0,
+        now: 9_000,
+        tokenBudget: 100_000,
+      }),
+    ).toBe(9_000);
+  });
+
+  it("stops at the oldest that fit, leaving the rest for later", () => {
+    expect(
+      ledgerWindowEnd({
+        sessionsContext,
+        since: 0,
+        now: 9_000,
+        tokenBudget: 150,
+      }),
+    ).toBeLessThan(3_000);
+  });
+
+  it("always moves forward past one oversized record", () => {
+    expect(
+      ledgerWindowEnd({
+        sessionsContext,
+        since: 0,
+        now: 9_000,
+        tokenBudget: 1,
+      }),
+    ).toBe(1_000);
   });
 });
