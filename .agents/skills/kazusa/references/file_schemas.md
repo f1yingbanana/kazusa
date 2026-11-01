@@ -231,16 +231,16 @@ After-School Sweets Club.
 - `parent` (place id, optional): The area this place is inside; absent at top
   level.
 - `summary` (string, required): One sentence shown in **Where you are**.
-- Body: the full description, shown to a character the first time they are
-  there (until they have a card for the place).
+- Body: the full description, shown to a character the first time they are there
+  (until they have a card for the place).
 - `entry_minutes` (number ≥ 0, default 1): Walking minutes to the parent's open
   space.
 - `aliases` (strings, default `[]`): Other names people use; `where` resolves
   ids, names and aliases.
-- There are no ownership, visibility or crowd flags. Whose a place is, how it
-  is kept, whether it is tucked away and how busy it gets belong in the body;
-  every entry is judged by the decision model with that description as
-  evidence (`location-judgment` skill).
+- There are no ownership, visibility or crowd flags. Whose a place is, how it is
+  kept, whether it is tucked away and how busy it gets belong in the body; every
+  entry is judged by the decision model with that description as evidence
+  (`location-judgment` skill).
 - `connections` (default `[]`): `{ to, ways: [{ by, minutes }], note? }`.
 - `status` and opening hours are not yet part of the schema.
 
@@ -410,9 +410,8 @@ Characters own and update their own subjective Personal Wiki:
 - **Created** as a frontmatter-only stub by `src/location/` once the character
   moves on from a place they had no card for (they have seen its whole
   description by then); atomic, never overwriting a card they wrote first. The
-  character, or sleep consolidation, adds what they make of it. Cards for
-  places heard of carry `learned: told by <id>`. Known places are exactly these
-  cards.
+  character, or sleep consolidation, adds what they make of it. Cards for places
+  heard of carry `learned: told by <id>`. Known places are exactly these cards.
 
 ```markdown
 ---
@@ -553,9 +552,8 @@ on my quartet exposition.
   strictly contain only persona/identity files (`SOUL.md`, `IDENTITY.md`),
   reflections (`MEMORY.md`), memories (`memory/`), and subjective personal
   beliefs (`wiki/`).
-- Local developer overrides and test rosters are defined in
-  `openclaw.local.json` via `"$include": ["./openclaw.json"]` and kept
-  git-ignored.
+- A world's roster and overrides live in `worlds/<id>/` and `worlds/base.json`;
+  the setup guide writes them into the git-ignored `world/openclaw.json`.
 
 ---
 

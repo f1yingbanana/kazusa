@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { LOCATION_CONFIG } from "./config.ts";
 import {
   buildMap,
   describeTravel,
@@ -12,7 +11,7 @@ import {
   visibleFrom,
   type Place,
 } from "./map.ts";
-import { loadWorld } from "./register.ts";
+import { loadWorld } from "./world.ts";
 
 /** A place with defaults; `id` doubles as a readable name. */
 function place(id: string, extra: Partial<Omit<Place, "id">> = {}): Place {
@@ -145,7 +144,7 @@ Body text.
       ],
       "declared twice",
     ],
-    [[place("a"), place("b")], "unreachable from a: b"],
+    [[place("a"), place("b")], "the map is 2 separate parts"],
     [[place("a"), place("a")], "duplicate place a"],
   ])("rejects a broken map (%#)", (places, problem) => {
     expect(() => buildMap(places)).toThrow(problem);
@@ -202,10 +201,12 @@ Body text.
     );
   });
 
-  const wikiDir = LOCATION_CONFIG.parse({}).wikiDir;
-  it.skipIf(!existsSync(`${wikiDir}/entities/places`))(
-    "loads the local World Wiki",
-    () => {
+  it.each(["blue-archive", "elden-ring", "starter"])(
+    "loads the %s world's wiki",
+    (id) => {
+      const wikiDir = fileURLToPath(
+        new URL(`../../../../worlds/${id}/shared/wiki`, import.meta.url),
+      );
       const world = loadWorld(wikiDir);
       expect(world?.map.places.size).toBeGreaterThan(0);
       for (const home of world?.homes.values() ?? []) {

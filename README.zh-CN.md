@@ -8,7 +8,7 @@
 
 <p align="center">
   <b>
-    让你的赛博老婆与老公们在一个实时运转的世界里活起来。
+    让你的赛博老婆老公们在一个实时运转的世界里活起来。
   </b>
 </p>
 
@@ -30,23 +30,26 @@
   <a href="#快速上手">快速上手</a>
 </p>
 
-**KAZUSA**
-是一个基于 OpenClaw 构建的 AI 世界模拟器。导入或创建你的角色，**KAZUSA**
-会赋予他们目标、需求、理想与记忆。看着他们互相聊天、约好下次见面的时间、在不同地点之间奔走、管理各自事务的优先级，甚至畅想未来。把你最喜欢的“老婆”们放进同一个房间，看看她们彼此之间、以及和你之间会擦出怎样的火花。
+**KAZUSA** 是一个基于 OpenClaw 构建的 AI 世界模拟器。**KAZUSA**
+赋予你的角色目标、需求、理想与记忆。你可以看着他们聊天、约好下次哪里见面、在不同地点之间奔走、优先处理各自事务，甚至畅想他们的未来。把你最喜欢的角色一同放进一个房间，看看他们彼此之间、以及和你之间会发生什么故事吧。
 
-**直接导入你的 SillyTavern（酒馆）V2 角色卡（.png 或 .json）。**
-把他们的人设、对话示例和世界书一并带过来。内置的系统管理员智能体 **ARONA**
-会帮你把现有数据变成一个生机勃勃的世界。
+**直接导入你的角色卡。**
+把他们的人设、对话示例和世界设定一并带过来加入你的世界。内置的系统管理员
+**ARONA** 会帮你把现有数据变成一个可运行的鲜活世界。
 
-**KAZUSA** 的构建基于 AI 智能体与社会模拟领域的顶尖研究论文，例如
+**或者直接手搓一个完整的世界。** 你只管提需求，**ARONA**
+就会自己去查资料、把你的专属世界搭建起来：角色、人际关系、地点、设定、秘密……一句话全搞定。
+
+**KAZUSA** 的构建基于 AI 智能体与社会模拟领域的顶尖论文，例如
 [《Generative Agents: Interactive Simulacra of Human Behavior》](https://arxiv.org/abs/2304.03442)、[《Project Sid: Many-agent simulations toward AI civilization》](https://arxiv.org/html/2411.00114v1)
 以及
 [《Simulating Human-like Daily Activities with Desire-driven Autonomy》](https://arxiv.org/abs/2412.06435)。**KAZUSA**
-旨在让大规模社会模拟触手可及——因为只有当角色置身于属于他们的世界中时，他们才算真正活了过来。
+旨在让普通人也能跑上大规模社会模拟器——因为只有被放在属于他们的世界里，你的角色才真正地活了过来。
 
 > [!WARNING]
 >
-> **KAZUSA** 目前处于**早期开发阶段**。可能会遇到 Bug 和不兼容的更新。
+> **KAZUSA**
+> 目前处于**早期开发阶段**。可能会遇到各种奇奇怪怪的 Bug 和不兼容的破坏性更新。
 
 ## 功能亮点
 
@@ -72,9 +75,9 @@
 
 ### ✨ 智能体驱动的编辑器
 
-上传一张 **SillyTavern V2 PNG 或 JSON 角色卡**，或者向内置的系统管理员 AI
-**ARONA** 描述一个原创角色。**ARONA**
-会协助你将他们的人设和背景故事适配到你的世界观中，搭建场景，并初始化他们的记忆 Wiki。
+内置的系统管理员 **ARONA**
+能帮你修改现有角色，或者从零手搓新角色。随口说出你的脑洞、想搭建的世界、或者对现有世界的修改建议，**ARONA**
+都能直接帮你一键搞定。
 
 ## 实机截图
 
@@ -96,58 +99,61 @@
 >
 > 如果你对项目感兴趣但不想自己部署，可以[在这里加入候补名单](https://openrp.ai/kazusa)。等我们上线一键部署的云端服务后，会第一时间发邮件通知你。
 
-首先需要一个 [OpenRouter](https://openrouter.ai)
-密钥来驱动对话、决策和记忆功能。这里你也可以手动配置来自不同服务商的模型并使用对应的 API 密钥。你可以自己按照以下流程操作，也可以直接交给 AI 来跑。
-
-### 1. 安装
-
-你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及 **Git**。
+你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及
+**Git**。打开终端运行（或者直接甩给你的 AI 帮你跑）：
 
 ```bash
-git clone [https://github.com/f1yingbanana/kazusa.git](https://github.com/f1yingbanana/kazusa.git)
-cd kazusa
-npm ci
-
+git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 ```
 
-### 2. 输入你的 API 密钥
+它会自动装好一切，并在 **http://localhost:3000** 帮你初始化你的世界：
 
-创建一个 [OpenRouter API 密钥](https://openrouter.ai/keys)，为账户充值后运行：
+1. **选择一个世界**：从示例世界中挑选一个，或者选择空白世界让你自由发挥。
+2. **登场角色与故事起始时间**：对于示例世界，挑选哪些角色在世界启动时主动登场推演。
+3. **一个
+   [OpenRouter API 密钥](https://openrouter.ai/keys)**：用于生成对话、决策和记忆搜索。你也可以分别设定自己的 AI 供应商。
 
-```bash
-npm run setup
+你的世界数据存放在 `apps/kazusa/world/`。需要重新设置的话，只要按 Ctrl +
+C 停止 Kazusa，把那个文件夹删掉即可。重新跑 `npm run dev` 就会初始化。
+
+### 与 **ARONA** 对话
+
+**ARONA** 是内置的系统管理员智能体，专门带你一起搭建世界。
+
+你可以向 **ARONA**
+描述原创角色并让它生成一份初稿，之后直接在本地硬盘上手动编辑他们的 `IDENTITY.md`
+或 `SOUL.md` 文件（位于 `world/workspaces/[character-id]/` 下）。
+
+你甚至可以让 **ARONA**
+从零直接手搓一个完整的世界。如下例生成一个**东方**的世界：
 
 ```
-
-在安装引导提示中粘贴你的密钥，接受默认的对话模型，或选择其他支持工具调用的模型。安装会使用同一个密钥预先配置好用于决策的
-**TypeSafe Jev** 和用于记忆检索的 **text-embedding-3-small**，连接前端，并初始化
-**ARONA**。
-
-参数更大、能力更强的模型可以提升角色还原度和前后一致性，但成本更高、响应更慢。如需自定义模型或服务商，请参考
-[OpenClaw 官方指南](https://docs.openclaw.ai/concepts/model-providers)。
+Create the world of Touhou Project. Examine the level of detail in the world
+examples in apps/kazusa/worlds/: the settings, characters, locations, and memory
+wikis. We need to recreate the same level of detail. Search online for your
+source of information. Report your progress at each stage.
+```
 
 > [!NOTE]
 >
-> 理论上是可以不用Jev和embedding的，但是不用前者会大大降低处理多线程事件的速度，后者会大大降低概念搜索的准确度
+> 想围观 **ARONA**
+> 的实时进度，可以点击她角色详情侧边栏上的**大脑**图标，窥探她的内心思考过程。
 
-### 3. 启动并与 **ARONA** 对话
+为了安全起见，新创建的角色默认都是候场状态（off-stage）。你可以让 **ARONA**
+把这些角色请上台，或者自己在 World 页里手动切换。
 
-```bash
-npm run dev
-```
-
-这会同时启动前后端。在浏览器打开 **http://localhost:3000**，在角色列表中选择
-**ARONA**，然后点击 **Message**。附上一张 **.png 或 .json 角色卡**，试着发送：
-
-> 帮我导入这个角色，并围绕 TA 搭建一个小世界。先问我关于世界观设定的问题，然后帮 TA 设置好记忆 Wiki。
-
-你也可以直接描述原创角色，让 ARONA 先生成一份初稿，之后再手动编辑他们的
-`IDENTITY.md` 或 `SOUL.md` 文件。
+> [!NOTE]
+>
+> 你也可以用 **Claude Code**
+> 或者其他的编程 AI 来做这件事。仓库自带了它所需的所有技能。一般这还会更快，因为编程 AI 在上网搜索和编写文件方面会比 OpenClaw 的更加高效。
 
 ## 参与共建
 
-一起来塑造一个你也想沉浸其中的世界吧。原创角色示例、小型世界观设定，或是能暴露出角色反应不自然的对话场景，对我们来说非常宝贵。欢迎[提交问题](/issues)
-告诉我们发生了什么以及你想要得到什么样的预期效果，或者点个免费的星星以追踪开发进度。
+一起来塑造一个你也想沉浸其中的世界吧。原创角色示例、小型世界观设定，或是能暴露出角色反应不自然的对话场景，对我们来说都和代码一样宝贵。欢迎[提交 Issue](https://github.com/f1yingbanana/kazusa/issues)
+告诉我们发生了什么以及你期望的反应。
+
+欢迎给本仓库**点个 Star（点颗星星）**关注最新进展，也可以[加入我们的 Discord](https://discord.gg/wbNyB85V4X)
+一起交流探讨。
 
 ## 相关项目
 

@@ -8,6 +8,8 @@ export const STAGE_CONFIG = z.strictObject({
    * players to pick from sets this to `false`.
    */
   defaultOnstage: z.boolean().default(true),
+  /** Onstage from the start even when `defaultOnstage` is `false`. */
+  cast: z.array(z.string().min(1)).default([]),
 });
 
 export type StageConfig = z.infer<typeof STAGE_CONFIG>;
@@ -44,14 +46,16 @@ export interface Stage {
 const isUser = (id: string): boolean => id.startsWith("user:");
 
 export function createStage(store: StageStore, config: StageConfig): Stage {
+  const startsOnstage = (id: string): boolean =>
+    config.defaultOnstage || config.cast.includes(id);
   const isOnstage = async (id: string): Promise<boolean> =>
-    isUser(id) || ((await store.lookup(id))?.onstage ?? config.defaultOnstage);
+    isUser(id) || ((await store.lookup(id))?.onstage ?? startsOnstage(id));
   return {
     isOnstage,
     async presentAt(id, at) {
       if (isUser(id)) return true;
       const record = await store.lookup(id);
-      if (!record) return config.defaultOnstage;
+      if (!record) return startsOnstage(id);
       // Before coming on, they were off; before going off, it is unknown here
       // and anything still waiting from then is let through.
       return record.onstage ? at >= record.since : at < record.since;

@@ -168,8 +168,6 @@ file-parsing overhead.
 
 ```text
 apps/kazusa/
-├── openclaw.json                       # Framework config (plugins.load.paths: ["./plugins/kazusa"])
-├── openclaw.local.json                 # Git-ignored local dev/test agent overlay
 ├── package.json                        # @openrp-ai/kazusa
 ├── plugins/kazusa/                     # @kazusa/plugin — unified zero-build TypeScript plugin
 │   ├── openclaw.plugin.json
@@ -185,23 +183,55 @@ apps/kazusa/
 │       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs, GET /kazusa/desires
 │       ├── location/                   # World map, "location" store, task `where`, location.* RPCs, GET /kazusa/places|locations
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
+│       ├── decisions/                  # `jev/jev-latest`: hosted Jev through an OpenRouter or TypeSafe key
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
-├── shared/
-│   ├── wiki/                           # WORLD WIKI (objective truth)
-│   │   ├── entities/{places,characters}/<id>.md
-│   │   ├── concepts/<topic>.md
-│   │   └── reports/
-│   └── skills/<skill_name>/SKILL.md    # Shared behavioral workflows resolved via kazusa:skill markers
-├── workspaces/<agent_id>/              # Per-agent workspace
-│   ├── SOUL.md | IDENTITY.md | MEMORY.md
-│   ├── memory/YYYY-MM-DD.md
-│   └── wiki/                           # PERSONAL WIKI (subjective beliefs)
-│       ├── entities/{characters,places}/<id>.md
-│       ├── concepts/<id>.md | syntheses/ | reports/
-└── .state/                             # Underlying SQLite backing for OpenClaw keyed stores
+├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
+├── worlds/                             # Read-only templates: base.json, <id>/{world.json,shared,workspaces}
+└── world/                              # Git-ignored live world copied by the setup guide; the Gateway's cwd
+    ├── openclaw.json                   # Written last by the guide; its existence means setup is done
+    ├── shared/wiki/                    # WORLD WIKI (objective truth)
+    │   ├── entities/{places,characters}/<id>.md
+    │   ├── concepts/<topic>.md
+    │   └── reports/
+    ├── workspaces/<agent_id>/          # Per-agent workspace
+    │   ├── SOUL.md | IDENTITY.md | MEMORY.md
+    │   ├── memory/YYYY-MM-DD.md
+    │   └── wiki/                       # PERSONAL WIKI (subjective beliefs)
+    │       ├── entities/{characters,places}/<id>.md
+    │       ├── concepts/<id>.md | syntheses/ | reports/
+    └── .state/                         # SQLite backing for keyed stores; .env holds provider keys and the Gateway token
 
 ```
+
+### Worlds, Setup and Providers
+
+- **Templates and the live world**: `worlds/<id>/` are read-only templates
+  (`world.json`, `shared/wiki`, `workspaces`, optionally `shared/skills`);
+  `worlds/base.json` is the config every world shares. The setup guide
+  (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
+  is the Gateway's cwd, so playing never touches the repo. A new world, or a
+  change to one, goes in its template; templates hold no simulation history.
+- **`npm run dev`** (`scripts/dev.mjs`) installs what's missing and runs the
+  frontend. The guide only asks what's missing and writes `world/openclaw.json`
+  last, so its existence means setup is done; that is what starts the Gateway.
+- **Keys** live in `world/.state/.env`, the only `.env` OpenClaw takes provider
+  keys from (it ignores them in the cwd's `.env`, without warning). It is read
+  once at Gateway start. `openclaw.json` edits apply by themselves.
+- **Gateway token**: required even on loopback, because without it any website
+  can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
+  `.env`, and hands it to the frontend's proxy. Plugin routes read it from
+  config or `OPENCLAW_GATEWAY_TOKEN` (`resolveAuthToken`); nobody sees it.
+- **One OpenRouter key covers everything**: chat (`openrouter/...`), embeddings
+  (`memory.embedding`: `baseUrl`, `apiKeyEnv`, `model`), and Jev. OpenClaw's
+  `typesafe` plugin can't reach OpenRouter (fixed endpoint, loopback-only
+  `baseUrl`, strict response check), so `src/decisions/jev.ts` provides
+  `jev/jev-latest`: a `TYPESAFE_API_KEY` wins, otherwise `OPENROUTER_API_KEY`.
+  OpenRouter requires non-empty `instructions` on every question.
+- **A world's first moments** come from config the guide writes: `stage.cast`
+  and `stage.defaultOnstage: false` for who is simulated, `clock.startAt` and
+  `clock.speed: 0` so a chosen cast starts paused. The cast picker's tags are
+  the world's `memory.anchors` read off its character cards.
 
 ## 3. Unified Plugin Architecture & Module Boundaries
 
@@ -543,7 +573,7 @@ connect these modules in process.
   admission interleavings, state compilation, and test specifications.
 - **Decision Model Paradigm**: Uses OpenClaw's native
   `api.runtime.decisions.evaluate({ state, questions }, { agentId, purpose: "perception" })`
-  powered by TypeSafe AI's Jev (`typesafe/jev-latest`, local Kev, or ONNX).
+  powered by Jev (`jev/jev-latest`, Kazusa's own provider in `src/decisions/`).
   Evaluates categorical choices in a single forward pass (~70–200ms latency,
   zero generated output tokens, $0.042/1M input tokens).
 - **Universal Gate (Both Idle & Busy Brains)**: All incoming stimuli are
@@ -716,9 +746,12 @@ connect these modules in process.
   `summary`, `parent`, `entry_minutes`, `connections` (two-way, declared once;
   `ways`, the first is usual), optional client `map`; the body is the full
   description. A tree through `parent`; every place is somewhere to stand.
-  Loaded once at registration and validated loudly; a world without places
-  disables Location. `visibleFrom` = parent, children, siblings, connection
-  ends.
+  `sharedWorld` (`world.ts`): one watcher per process keeps the map current, so
+  a new place or `home` needs no reload and SSE `places` tells clients to
+  refetch. A broken edit keeps the last good map and warns, and `wiki_lint`
+  names the problem; only a map broken from the start throws. A world without
+  places disables Location. `visibleFrom` = parent, children, siblings,
+  connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's
   cards, `workspaces/<id>/wiki/entities/places/<place_id>.md`. **Visit loop**:
   with no card, **Where you are** shows the whole description; starting the next
@@ -808,6 +841,9 @@ connect these modules in process.
   large cast. One retained `"stage"` keyed store, `{ onstage, since }` per
   character; no record means `stage.defaultOnstage` (default `true`). Players
   are always onstage. Every registration reads the same store; no mirror.
+- `stage.cast` lists who starts onstage when `defaultOnstage` is `false`; the
+  setup guide writes the player's pick there, and `clock.startAt` and
+  `clock.speed` for when and how a new world's time begins.
 - Offstage, nothing happens to them: Perception's `drainState` holds their inbox
   unjudged (like a paused clock), Taskman projects no wake and the idle
   supervisor skips them, and Location leaves them out of `participants()`,
@@ -863,9 +899,13 @@ connect these modules in process.
   pause wait. Simulation time, task deadlines and ordinary characters remain
   frozen. Offstage and custody gates still apply. How she works is in her
   `SOUL.md`; the common jobs (characters, wikis, places) are the
-  `world-building` skill in her workspace (`workspaces/arona/skills/`), selected
-  by her per-agent `skills`. That folder is the one exception to what a
-  character workspace holds. Retained consumers use the host-injected
+  `world-building` skill, and whole worlds are `world-project`. Both live in
+  `.agents/skills/`, so coding agents working in this repo get them as well as
+  every world's system agent, who selects them by her per-agent `skills` in
+  `worlds/base.json`. Long jobs survive the run limits
+  through a project file and `continue_work`, which starts a fresh run once this
+  one ends (`perception/continue.ts`), up to
+  `perception.systemAgent.maxContinuations` runs without the user speaking. Retained consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
   agent/identity/workspace lookups. Character and agent roster responses expose
   `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World

@@ -32,6 +32,8 @@ import {
 } from "./embeddings.ts";
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
+import { lintMap } from "../location/world.ts";
+import { auditWorld, workspacesBeside, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
 import type { Certainty, HistoryLine, Page } from "./page.ts";
 import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
@@ -78,15 +80,11 @@ export const MEMORY_CONFIG = z.strictObject({
   /** Secrets stay in the environment; absent means keywords only. */
   embedding: z
     .strictObject({
-      baseUrlEnv: z.string().default("AZURE_OPENAI_URL"),
-      apiKeyEnv: z.string().default("AZURE_OPENAI_API_KEY"),
-      model: z.string().default("text-embedding-3-small"),
+      baseUrl: z.string().default("https://openrouter.ai/api/v1"),
+      apiKeyEnv: z.string().default("OPENROUTER_API_KEY"),
+      model: z.string().default("openai/text-embedding-3-small"),
     })
-    .default({
-      baseUrlEnv: "AZURE_OPENAI_URL",
-      apiKeyEnv: "AZURE_OPENAI_API_KEY",
-      model: "text-embedding-3-small",
-    }),
+    .prefault({}),
 });
 
 export interface MemoryPrefetch {
@@ -119,6 +117,7 @@ export interface MemoryService {
   ) => readonly string[];
   readonly entities: (request: RetrievalRequest) => readonly Entity[];
   readonly lint: (agentId?: string) => readonly LintFinding[];
+  readonly audit: () => WorldAudit;
   readonly explain: (agentId: string, pageId?: string) => unknown;
   readonly sleep: ReturnType<typeof createSleep>;
 }
@@ -211,12 +210,14 @@ export function registerMemory(
     api.logger.warn(message);
   };
 
-  const baseUrl = process.env[config.embedding.baseUrlEnv];
   const apiKey = process.env[config.embedding.apiKeyEnv];
-  const embedder: Embedder | undefined =
-    baseUrl && apiKey
-      ? openAiEmbedder({ baseUrl, apiKey, model: config.embedding.model })
-      : undefined;
+  const embedder: Embedder | undefined = apiKey
+    ? openAiEmbedder({
+        baseUrl: config.embedding.baseUrl,
+        apiKey,
+        model: config.embedding.model,
+      })
+    : undefined;
   /** One background embed at a time; a turn never waits for it. */
   let embedding = false;
   const embedInBackground = (agentId: string): void => {
@@ -398,11 +399,29 @@ export function registerMemory(
         .slice(0, limit)
         .map((entity) => renderEntity(entity, nameOf)),
     entities: (request) => retrieve(index, request),
+    audit: () => {
+      const config = currentConfig(api);
+      const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
+      // Registering comes last, and applies only once its run has ended. A cast
+      // still on disk has to count, or the audit passes with nobody to check.
+      const onDisk = systemAgent
+        ? workspacesBeside(workspaceOf(systemAgent))
+        : [];
+      return auditWorld(
+        index.world(),
+        [...new Set([...Object.keys(config.agents?.entries ?? {}), ...onDisk])],
+        (agentId) => index.personal(agentId),
+        systemAgent,
+      );
+    },
     lint: (agentId) => {
       const world = index.world();
       return agentId
         ? lintPersonal(agentId, index.personal(agentId).values(), world)
-        : lintWorld(world);
+        : [
+            ...lintWorld(world),
+            ...lintMap(config.wikiDir ?? sharedDir("wiki")),
+          ];
     },
     explain: (agentId, pageId) => {
       const world = index.world();
@@ -638,6 +657,44 @@ export function registerMemory(
     async execute(_id: string, input: unknown) {
       const { agent } = z.object({ agent: z.string().optional() }).parse(input);
       return textResult(service.lint(agent));
+    },
+  });
+  api.registerTool({
+    name: "world_audit",
+    label: "World Audit",
+    description:
+      "Counts for the whole world, plus what lint can't see: characters with no relationships, separate social groups, and how the map divides.",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    async execute() {
+      return textResult(service.audit());
+    },
+  });
+  api.registerTool({
+    name: "memory_preview",
+    label: "Memory Preview",
+    description:
+      "What a character would have come to mind if they read `text` now, with no model call. Use it to check that someone knows what they should and no more.",
+    parameters: {
+      type: "object",
+      properties: { agent: { type: "string" }, text: { type: "string" } },
+      required: ["agent", "text"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { agent, text } = z
+        .object({ agent: z.string(), text: z.string() })
+        .parse(input);
+      const { onYourMind, ids } = await service.prefetch({
+        agentId: agent,
+        stimulus: text,
+        seeds: [],
+        now: Date.now(),
+      });
+      return textResult({ onYourMind, ids });
     },
   });
   api.registerTool({

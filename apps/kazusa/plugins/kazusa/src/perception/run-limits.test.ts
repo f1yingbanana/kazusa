@@ -41,7 +41,7 @@ function setup(
       },
     },
   } as unknown as OpenClawPluginApi;
-  const finish = registerBrainRunLimits(api);
+  const finish = registerBrainRunLimits(api, () => 0);
   const ctx = {
     runId,
     sessionKey: "agent:alice:brain",

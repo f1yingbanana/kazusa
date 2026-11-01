@@ -1,0 +1,15 @@
+{
+  "title": "Start from scratch",
+  "description": "An empty world and ARONA, your system admin. Describe your world or give her a SillyTavern card, and she builds it with you.",
+  "systemAgent": "arona",
+  "kazusa": {
+    "user": {
+      "id": "user:player",
+      "name": "Player"
+    },
+    "world": {
+      "title": "New World",
+      "summary": "A world waiting to be written."
+    }
+  }
+}

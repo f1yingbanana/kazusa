@@ -36,10 +36,11 @@ send group messages through native `chat.send` or read UI history through native
 
 The Next route `app/kazusa/[...path]/route.ts` forwards the fixed API paths to
 the Gateway on the same origin, including SSE. `KAZUSA_GATEWAY_URL` selects the
-upstream; an optional server-only `OPENCLAW_GATEWAY_TOKEN` is forwarded without
-exposing it in browser configuration. Current plugin routes use `auth: "plugin"`
-with the fixed single-player identity. Authentication remains a separate
-deferred requirement; the proxy is not a login system.
+upstream; the server-only `OPENCLAW_GATEWAY_TOKEN` is forwarded without exposing
+it in browser configuration, and `scripts/dev.mjs` supplies both. It binds the
+frontend to loopback, since the proxy adds the token. Current plugin routes use
+`auth: "plugin"` with the fixed single-player identity and refuse requests
+without the token. The proxy is not a login system.
 
 | Route                                            | Contract                                                                                                                                                                                       |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

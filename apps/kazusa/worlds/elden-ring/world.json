@@ -1,0 +1,38 @@
+{
+  "title": "Elden Ring",
+  "description": "The Lands Between, at the moment the Tarnished return. 114 characters, with The Scribe as your system admin.",
+  "systemAgent": "scribe",
+  "defaultGroup": "roundtable",
+  "kazusa": {
+    "user": {
+      "id": "user:tarnished",
+      "name": "Tarnished"
+    },
+    "world": {
+      "title": "The Lands Between",
+      "summary": "The Elden Ring is shattered, and grace is calling the Tarnished home.",
+      "accent": "#c9a227"
+    },
+    "taskman": {
+      "categories": [
+        "sleeping",
+        "traveling",
+        "eating",
+        "studying",
+        "working",
+        "socializing",
+        "having fun",
+        "praying",
+        "fighting",
+        "keeping watch",
+        "miscellaneous"
+      ]
+    },
+    "memory": {
+      "anchors": {
+        "faction": "intimate",
+        "realm": "familiar"
+      }
+    }
+  }
+}

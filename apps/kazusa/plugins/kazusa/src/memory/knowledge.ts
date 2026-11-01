@@ -60,11 +60,17 @@ export class WorldModel {
   readonly pages: ReadonlyMap<string, Page>;
   private readonly names = new Map<string, string[]>();
   readonly anchorFields: Anchors;
+  /** Two pages with one id: only the last is reachable. */
+  readonly duplicates: Array<readonly [string, string, string]> = [];
 
   constructor(pages: Iterable<Page>, anchors: Anchors = DEFAULT_ANCHORS) {
     this.anchorFields = anchors;
     const byId = new Map<string, Page>();
-    for (const page of pages) byId.set(page.id, page);
+    for (const page of pages) {
+      const other = byId.get(page.id);
+      if (other) this.duplicates.push([page.id, other.kind, page.kind]);
+      byId.set(page.id, page);
+    }
     this.pages = byId;
     for (const page of byId.values()) {
       for (const name of [page.id, page.name, ...page.aliases]) {

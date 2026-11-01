@@ -18,8 +18,23 @@ function memoryStore(): StageStore {
 }
 
 describe("stage", () => {
+  it("keeps a chosen cast onstage when others start off", async () => {
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: false,
+      cast: ["airi"],
+    });
+    expect(await stage.isOnstage("airi")).toBe(true);
+    expect(await stage.isOnstage("natsu")).toBe(false);
+    expect(await stage.presentAt("airi", 0)).toBe(true);
+    await stage.set("airi", false, 10);
+    expect(await stage.isOnstage("airi")).toBe(false);
+  });
+
   it("uses the configured default until a character is switched", async () => {
-    const stage = createStage(memoryStore(), { defaultOnstage: false });
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: false,
+      cast: [],
+    });
     expect(await stage.isOnstage("airi")).toBe(false);
     expect(await stage.isOnstage("user:sensei")).toBe(true);
     await stage.set("airi", true, T0);
@@ -31,7 +46,10 @@ describe("stage", () => {
   });
 
   it("knows who was present at a moment around the last change", async () => {
-    const stage = createStage(memoryStore(), { defaultOnstage: true });
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: true,
+      cast: [],
+    });
     await stage.set("airi", false, T0);
     expect(await stage.presentAt("airi", T0 - 1)).toBe(true);
     expect(await stage.presentAt("airi", T0)).toBe(false);
@@ -43,7 +61,10 @@ describe("stage", () => {
 
 describe("stageControl", () => {
   function setup() {
-    const stage = createStage(memoryStore(), { defaultOnstage: true });
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: true,
+      cast: [],
+    });
     let now = T0;
     const calls: string[] = [];
     const effects: StageEffects = {

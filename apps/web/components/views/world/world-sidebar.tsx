@@ -38,7 +38,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useStage } from '@/hooks/use-stage'
 import { useNavigate, useSelection } from '@/hooks/use-url-state'
+import { serializeEntityRef } from '@/lib/state/entity-ref'
 import { filterCharacters, type KindFilter } from '@/lib/state/grouping'
+import { markQuietSelection } from '@/lib/state/inspector-request'
 import type { SectionSidebarProps } from '@/lib/registry/types'
 import { useWatchlist } from '@/lib/state/watchlist'
 import { cn } from '@/lib/utils'
@@ -236,8 +238,11 @@ export function WorldSidebar({
   const selectedId = selection?.kind === 'character' ? selection.id : null
   const customized = kind !== 'characters' || by !== defaultBy
 
-  function open(key: string) {
-    navigate({ view: 'world', 'world.in': key })
+  /** Opening a place also shows its details, without covering the list on narrow screens. */
+  function open(key: string, placeId?: string) {
+    const sel = placeId ? serializeEntityRef({ kind: 'place', id: placeId }) : undefined
+    if (sel) markQuietSelection(sel)
+    navigate({ view: 'world', 'world.in': key, ...(sel ? { sel } : {}) })
     onNavigated?.()
   }
 
@@ -368,7 +373,7 @@ export function WorldSidebar({
               count={group.members.length}
               hint={busySummary(group.members)}
               active={folder === group.key}
-              onOpen={() => open(group.key)}
+              onOpen={() => open(group.key, group.placeId)}
               depth={group.depth}
               compact={by === 'place'}
               {...stageProps(group.key, group.label)}

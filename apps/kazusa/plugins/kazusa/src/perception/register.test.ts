@@ -1,10 +1,14 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { requestContinuation, takeContinuation } from "./continue.ts";
 import { registerPerception } from "./register.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
-function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
+function setup(
+  onDeadline?: (agentId: string) => Promise<string | undefined>,
+  onRunFailed?: (agentId: string, error: string) => Promise<void>,
+) {
   const stores = new Map<string, Map<string, unknown>>();
   const on = vi.fn();
   const subscription = vi.fn();
@@ -66,6 +70,7 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
         runEmbeddedAgent,
       },
     },
+    registerTool: vi.fn(),
   } as unknown as OpenClawPluginApi;
   Object.assign(api, {
     runtime: { ...api.runtime, config: { current: () => api.config } },
@@ -77,7 +82,11 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
     now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
     onClockChange: () => () => {},
   };
-  const perception = registerPerception(api, { clock, onDeadline });
+  const perception = registerPerception(api, {
+    clock,
+    onDeadline,
+    onRunFailed,
+  });
 
   const hook = (name: string) =>
     on.mock.calls.find(([registered]) => registered === name)?.[1];
@@ -205,6 +214,59 @@ describe("Perception host integration", () => {
     expect(result).toBeUndefined();
   });
 
+  describe("a system agent's failed run", () => {
+    const failing = () => {
+      const onRunFailed = vi.fn(async () => {});
+      const h = setup(undefined, onRunFailed);
+      Object.assign(h.api.config, {
+        agents: { defaults: { systemAgent: { agentId: "alice" } } },
+      });
+      const { handle } = h.subscription.mock.calls[0][0];
+      const event = (data: Record<string, unknown>, agent = "alice") =>
+        handle({
+          sessionKey: `agent:${agent}:brain`,
+          runId: "run-1",
+          data,
+        });
+      return { h, onRunFailed, event };
+    };
+
+    it("tells the user and stops, not handing off into the same failure", async () => {
+      const { h, onRunFailed, event } = failing();
+      requestContinuation("alice", "the places", 5);
+      await event({ phase: "error", error: "billing error" });
+      expect(onRunFailed).toHaveBeenCalledWith("alice", "billing error");
+      expect(takeContinuation("alice")).toBeUndefined();
+      expect(h.dispatchBrain).not.toHaveBeenCalled();
+    });
+
+    it("reports the same failure once, until a run gets through", async () => {
+      const { onRunFailed, event } = failing();
+      await event({ phase: "error", error: "billing error" });
+      await event({ phase: "error", error: "billing error" });
+      expect(onRunFailed).toHaveBeenCalledTimes(1);
+      await event({ phase: "end" });
+      await event({ phase: "error", error: "billing error" });
+      expect(onRunFailed).toHaveBeenCalledTimes(2);
+    });
+
+    it("remembers an error reported while finishing", async () => {
+      const { onRunFailed, event } = failing();
+      await event({ phase: "finishing", error: "billing error" });
+      expect(onRunFailed).not.toHaveBeenCalled();
+      await event({ phase: "end" });
+      expect(onRunFailed).toHaveBeenCalledWith("alice", "billing error");
+    });
+
+    it("stays quiet when someone stopped the run, or for a character", async () => {
+      const { onRunFailed, event } = failing();
+      await event({ phase: "error", error: "stopped", aborted: true });
+      await event({ phase: "error", error: "billing error" }, "bob");
+      await event({ phase: "end" });
+      expect(onRunFailed).not.toHaveBeenCalled();
+    });
+  });
+
   it("tracks brain active lifecycle in real-time", async () => {
     const h = setup();
     const eventHandler = h.subscription.mock.calls[0][0];
@@ -265,6 +327,7 @@ describe("Perception host integration", () => {
           }),
         },
       },
+      registerTool: vi.fn(),
     } as unknown as OpenClawPluginApi;
     Object.assign(api, {
       runtime: { ...api.runtime, config: { current: () => api.config } },

@@ -17,6 +17,8 @@ export const STIMULUS = z.object({
     .object({ taskId: z.string(), endAt: z.iso.datetime() })
     .optional(),
   idle: z.boolean().optional(),
+  /** An `idle` stimulus that still stands during an activity: a job's next run. */
+  resume: z.boolean().optional(),
   /**
    * Submitted ahead of its `timestamp` (a crossing foreseen when a trip was
    * planned). Held until then, and kept only if its producer confirms it still

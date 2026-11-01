@@ -1,0 +1,220 @@
+{
+  "systemAgent": {
+    "tools": {
+      "profile": "full",
+      "allow": [
+        "start_task",
+        "delay_task",
+        "send_message",
+        "list_chats",
+        "manage_chat",
+        "recall",
+        "look_up",
+        "remember",
+        "wiki_lint",
+        "knowledge_explain",
+        "world_audit",
+        "memory_preview",
+        "map_route",
+        "continue_work",
+        "memory_consolidate",
+        "memory_restore",
+        "ls",
+        "read",
+        "edit",
+        "write",
+        "view_image",
+        "web_fetch",
+        "clock_now",
+        "clock_set_speed",
+        "clock_advance",
+        "apply_patch"
+      ],
+      "deny": ["exec", "process", "code_execution", "openclaw"],
+      "exec": {
+        "security": "deny",
+        "applyPatch": {
+          "enabled": true,
+          "workspaceOnly": false
+        }
+      },
+      "fs": {
+        "workspaceOnly": false
+      },
+      "elevated": {
+        "enabled": false
+      }
+    },
+    "skills": ["world-building", "world-project", "kazusa", "openclaw", "typescript"]
+  },
+  "config": {
+    "agents": {
+      "defaults": {
+        "timeoutSeconds": 180,
+        "workspace": "./workspaces",
+        "userTimezone": "UTC",
+        "compaction": {
+          "enabled": false
+        },
+        "models": {
+          "openrouter/z-ai/glm-5.3-flash": {},
+          "openrouter/z-ai/glm-5.3": {}
+        },
+        "model": {
+          "primary": "openrouter/z-ai/glm-5.3-flash"
+        },
+        "decisionModel": "jev/jev-latest",
+        "heartbeat": {
+          "every": "0m"
+        },
+        "skipBootstrap": true
+      },
+      "ownership": "explicit",
+      "entries": {}
+    },
+    "plugins": {
+      "allow": ["kazusa", "openrouter"],
+      "slots": {
+        "contextEngine": "kazusa",
+        "memory": "none"
+      },
+      "load": {
+        "paths": ["../plugins/kazusa"]
+      },
+      "entries": {
+        "kazusa": {
+          "enabled": true,
+          "hooks": {
+            "allowConversationAccess": true
+          },
+          "subagent": {
+            "allowModelOverride": true
+          },
+          "config": {
+            "contextEngine": {
+              "shortTermHours": 24,
+              "decisionMaxTokens": 8000,
+              "decisionShortTermHours": 4,
+              "decisionIdentityMaxTokens": 600,
+              "decisionSoulMaxTokens": 1000,
+              "decisionMemoryMaxTokens": 1000,
+              "decisionBrainMaxTokens": 800,
+              "decisionHistoryMaxTokens": 1600,
+              "decisionWikiMaxTokens": 800,
+              "decisionStimulusMaxTokens": 512,
+              "decisionHistoryItems": 60,
+              "decisionWikiMaxArticles": 4
+            },
+            "memory": {
+              "sleep": {
+                "enabled": true
+              },
+              "embedding": {
+                "baseUrl": "https://openrouter.ai/api/v1",
+                "apiKeyEnv": "OPENROUTER_API_KEY",
+                "model": "openai/text-embedding-3-small"
+              }
+            },
+            "perception": {
+              "coalesceWindowMs": 10000,
+              "maxBatchSize": 16,
+              "maxBatchChars": 48000,
+              "decisionTimeoutMs": 10000
+            }
+          }
+        },
+        "anthropic": {
+          "config": {
+            "sessionCatalog": {
+              "enabled": false
+            }
+          }
+        },
+        "codex": {
+          "config": {
+            "sessionCatalog": {
+              "enabled": false
+            }
+          }
+        },
+        "openrouter": {
+          "enabled": true
+        }
+      }
+    },
+    "gateway": {
+      "mode": "local",
+      "auth": {
+        "mode": "token"
+      },
+      "port": 18789,
+      "bind": "loopback",
+      "trustedProxies": ["127.0.0.1", "::1"],
+      "tailscale": {
+        "mode": "off"
+      }
+    },
+    "tools": {
+      "deny": ["group:sessions", "message", "gateway"],
+      "toolSearch": false,
+      "codeMode": {
+        "enabled": false
+      },
+      "sessions": {
+        "visibility": "agent"
+      },
+      "profile": "minimal",
+      "alsoAllow": [
+        "start_task",
+        "delay_task",
+        "send_message",
+        "list_chats",
+        "manage_chat",
+        "recall",
+        "look_up",
+        "remember",
+        "view_image"
+      ],
+      "fs": {
+        "workspaceOnly": true
+      },
+      "exec": {
+        "applyPatch": {
+          "enabled": false
+        }
+      }
+    },
+    "messages": {
+      "queue": {
+        "mode": "steer"
+      }
+    },
+    "skills": {
+      "load": {
+        "extraDirs": [
+          "./shared/skills",
+          "../shared/skills",
+          "../../../.agents/skills"
+        ],
+        "watch": false
+      },
+      "install": {
+        "nodeManager": "npm"
+      },
+      "workshop": {
+        "autonomous": {
+          "mode": "off"
+        }
+      }
+    },
+    "hooks": {
+      "internal": {
+        "entries": {
+          "session-memory": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  }
+}

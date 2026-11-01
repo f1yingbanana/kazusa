@@ -74,3 +74,19 @@ export function formatTypingLabel(names: string[], doing = "typing") {
   if (names.length === 2) return `${names[0]} and ${names[1]} are ${doing}`;
   return `${names[0]} and ${names.length - 1} others are ${doing}`;
 }
+
+const COMPACT_TOKENS = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/** "12.3K". */
+export function formatTokens(tokens: number) {
+  return COMPACT_TOKENS.format(tokens);
+}
+
+/** Small model costs need more digits than a price tag: "$0.0008", "$1.24". */
+export function formatCost(usd: number) {
+  if (usd === 0) return "$0";
+  return `$${usd.toFixed(usd < 1 ? 4 : 2)}`;
+}

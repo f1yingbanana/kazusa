@@ -7,6 +7,7 @@ import {
   SpeechIcon,
   StarIcon,
 } from "lucide-react";
+import { CharacterBrainButton } from "./character-brain";
 import { CharacterStopButton } from "./character-stop";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,10 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
         ) : null}
         <div className="flex shrink-0 items-center gap-1 -ml-1.5 mt-2">
           {character.kind === "agent" ? (
-            <CharacterStopButton id={character.id} name={character.name} />
+            <>
+              <CharacterBrainButton id={character.id} name={character.name} />
+              <CharacterStopButton id={character.id} name={character.name} />
+            </>
           ) : null}
           {canMessage && together ? (
             <Tooltip>

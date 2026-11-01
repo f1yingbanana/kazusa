@@ -1,0 +1,16 @@
+{
+  "title": "Blue Archive",
+  "description": "The students of Kivotos, from Trinity to Millennium. 145 characters, with ARONA as your system admin.",
+  "systemAgent": "arona",
+  "defaultGroup": "After-School Sweets Club",
+  "kazusa": {
+    "user": {
+      "id": "user:sensei",
+      "name": "Sensei"
+    },
+    "world": {
+      "title": "Kivotos",
+      "summary": "Students, schools, and one very busy Sensei."
+    }
+  }
+}

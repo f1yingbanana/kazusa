@@ -1,8 +1,5 @@
 # Runtime state and databases
 .state/
 
-# Local OpenClaw config overrides
-*.local.json
-openclaw.json.last-good
-openclaw.local.json
-workspaces/*/memory
+# The live world, copied from worlds/ by the setup guide. Playing writes to it.
+/world/

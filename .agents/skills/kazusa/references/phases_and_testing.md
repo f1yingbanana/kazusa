@@ -17,8 +17,8 @@ executed directly by OpenClaw at runtime with **zero build step**.
 
 ```text
 apps/kazusa/ (or repository root)
-├── openclaw.json
-├── openclaw.local.json               # Local overlay for test agents & dev settings (GIT-IGNORED)
+├── worlds/                           # Read-only world templates; the guide copies one to world/
+├── world/                            # The live world (GIT-IGNORED), with openclaw.json and .state/
 ├── package.json
 ├── tsconfig.json
 ├── plugins/                          # Direct TypeScript plugins (ZERO BUILD STEP)
@@ -232,8 +232,8 @@ apps/kazusa/ (or repository root)
     persists them to the owner's subjective ledger (`agent:<id>:chat:*`) with
     `[speaker:<id>]` prefix, and registers the stimulus.
   - **Jev Decision Model Evaluation**: Calls `api.runtime.decisions.evaluate`
-    using TypeSafe AI's Jev (`typesafe/jev-latest` or local Kev) to evaluate
-    incoming stimuli in a single sub-100ms forward pass without output tokens.
+    using Jev (`jev/jev-latest`) to evaluate incoming stimuli in a single
+    sub-100ms forward pass without output tokens.
   - **Universal Gate (Both Idle & Busy)**:
     - _Idle_: Evaluates `["WAKE", "IGNORE"]` against the character's active task
       (e.g., sleeping, reading). Casual chatter while sleeping is ignored,

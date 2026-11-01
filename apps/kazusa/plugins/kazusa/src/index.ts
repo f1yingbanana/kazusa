@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
 import { currentConfig } from "./current-config.ts";
+import { characterName } from "./identity.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
   definePluginEntry,
@@ -12,8 +14,12 @@ import { registerClock } from "./clock/register.ts";
 import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
+import { createJevProvider } from "./decisions/jev.ts";
 import { registerPerception } from "./perception/register.ts";
-import { registerBrainHttp } from "./perception/http.ts";
+import {
+  registerBrainHttp,
+  registerBrainTraceHttp,
+} from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
 import { registerLocation } from "./location/register.ts";
@@ -32,6 +38,7 @@ import {
   sharedBroadcaster,
 } from "./realtime.ts";
 import { registerTimelineHttp } from "./timeline/http.ts";
+import { registerUsageHttp } from "./usage/http.ts";
 import { registerStage, stageControl } from "./stage/register.ts";
 
 export default definePluginEntry({
@@ -40,6 +47,7 @@ export default definePluginEntry({
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
     rememberRegistration(api);
+    api.registerDecisionProvider(createJevProvider());
     registerHostPromptEdits(
       api,
       currentConfig(api).agents?.defaults?.systemAgent?.agentId,
@@ -142,6 +150,7 @@ export default definePluginEntry({
     });
     contextRef.current = context;
     registerContextHttp(api, { context });
+    registerUsageHttp(api);
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
@@ -170,8 +179,32 @@ export default definePluginEntry({
         );
       },
       thinking: async (agentId) => (await models.read(agentId)).thinking,
+      onRunFailed: async (agentId, error) => {
+        const messaging = messagingRef.current;
+        const chat = (
+          await messaging?.listChats(agentId, { query: "user:" })
+        )?.find((item) => item.kind === "direct");
+        if (!messaging || !chat) return;
+        const config = currentConfig(api);
+        await messaging.speak(
+          agentId,
+          await characterName(api, config, agentId),
+          {
+            sessionKey: chat.sessionKey,
+            messages: [
+              `Something went wrong and I had to stop: ${error}`,
+              "What I'd saved is safe. Say continue when it's sorted and I'll pick up from there.",
+            ],
+            requestId: randomUUID(),
+          },
+          undefined,
+          undefined,
+          config.agents?.defaults?.systemAgent?.agentId,
+        );
+      },
     });
     registerBrainHttp(api);
+    registerBrainTraceHttp(api);
     location.attachPerception(perception);
 
     const stopSupervisor = taskman.attachSupervisor(perception);

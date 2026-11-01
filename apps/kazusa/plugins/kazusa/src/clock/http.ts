@@ -38,6 +38,8 @@ export const DEFAULT_CAPABILITIES: Readonly<
   stage: "live",
   models: "live",
   wiki: "live",
+  brain: "live",
+  usage: "live",
 };
 
 export function toClockState(clock: Clock): ClockState {

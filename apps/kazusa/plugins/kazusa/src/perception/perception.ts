@@ -1,3 +1,4 @@
+import { resetContinuations } from "./continue.ts";
 import { inBackground } from "../background.ts";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -269,6 +270,7 @@ export class Perception {
 
   async receive(agentId: string, input: Stimulus): Promise<void> {
     const stimulus = STIMULUS.parse(input);
+    if (stimulus.sender.startsWith("user:")) resetContinuations(agentId);
     if (
       !stimulus.sessionKey.startsWith(`agent:${agentId}:chat:`) &&
       stimulus.sessionKey !== `agent:${agentId}:tasks`
@@ -659,7 +661,9 @@ export class Perception {
 
   private isCurrent(item: Stimulus, task?: ActiveTask): boolean {
     if (item.idle) {
-      return !task || Date.parse(task.endAt) <= this.deps.clock.time();
+      return (
+        item.resume || !task || Date.parse(task.endAt) <= this.deps.clock.time()
+      );
     }
     if (!item.deadline) return true;
     return (

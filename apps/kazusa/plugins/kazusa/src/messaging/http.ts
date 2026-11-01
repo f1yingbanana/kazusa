@@ -16,6 +16,7 @@ import type {
   SendResponse,
   StreamEvent,
 } from "@kazusa/client";
+import { checkAuth, resolveAuthToken } from "../http/helpers.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   TYPING,
@@ -61,39 +62,6 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
     "Access-Control-Allow-Origin": "*",
   });
   res.end(JSON.stringify(data));
-}
-
-function resolveAuthToken(api: OpenClawPluginApi): string | undefined {
-  const auth = (
-    api.config as {
-      gateway?: {
-        auth?: {
-          token?: string;
-        };
-      };
-    }
-  )?.gateway?.auth;
-  if (typeof auth?.token === "string" && auth.token.trim().length > 0) {
-    return auth.token.trim();
-  }
-  return undefined;
-}
-
-function checkAuth(req: IncomingMessage, expectedToken?: string): boolean {
-  if (!expectedToken) return true;
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-    if (match && match[1] === expectedToken) return true;
-  }
-  try {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const queryToken = url.searchParams.get("token");
-    if (queryToken && queryToken === expectedToken) return true;
-  } catch {
-    // Ignore URL parse errors
-  }
-  return false;
 }
 
 function clientChat(summary: ChatSummary, viewer: string): Chat {

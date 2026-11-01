@@ -37,7 +37,7 @@ export function resolveAuthToken(api: OpenClawPluginApi): string | undefined {
   if (typeof auth?.token === "string" && auth.token.trim().length > 0) {
     return auth.token.trim();
   }
-  return undefined;
+  return process.env.OPENCLAW_GATEWAY_TOKEN?.trim() || undefined;
 }
 
 export function checkAuth(

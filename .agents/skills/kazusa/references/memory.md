@@ -400,12 +400,12 @@ it; speak from memory, never as someone reading notes; during the day,
 promise, a shock); sleep sorts out the rest. Plus the second-order belief
 paragraph from §3.5, also in `in-person`.
 
-**A turn is one moment** (`src/turn.ts`): at most one activity per run, blocked
-in code, and a character may still talk or look things up after it. At most two
-lookups per run. A send that repeats this run's words is blocked. Records are
-capped (`contextEngine.ledgerMaxTokens`, 3000) and append-only, past brain turns
-are not replayed, and the situation sits before the turn under way, so tool
-results stay last and the model doesn't answer its own prompt twice.
+**A turn is one moment** (`src/turn.ts`): at most one activity per 2 minutes,
+blocked in code, and a character may still talk or look things up after it. At
+most two lookups per run. A send that repeats this run's words is blocked.
+Records are capped (`contextEngine.ledgerMaxTokens`, 3000) and append-only, past
+brain turns are not replayed, and the situation sits before the turn under way,
+so tool results stay last and the model doesn't answer its own prompt twice.
 
 ## 7. The engine (`src/memory/`)
 

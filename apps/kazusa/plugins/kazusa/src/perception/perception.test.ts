@@ -1939,6 +1939,31 @@ describe("Human reply timing and task boundaries", () => {
     expect(latencyMs(1, [], () => 0.5)).toBe(0);
   });
 
+  it("drops a check-in during an activity, but not a job's next run", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.tasks.set("alice", study());
+    const idle = {
+      sessionKey: "agent:alice:tasks",
+      sender: "kazusa:taskman",
+      idle: true,
+      timestamp: NOW,
+    };
+    await h.router.receive("alice", {
+      ...idle,
+      id: "check-in",
+      text: "Activity check-in",
+    });
+    expect(h.deliver).not.toHaveBeenCalled();
+    await h.router.receive("alice", {
+      ...idle,
+      id: "next-run",
+      text: "Carry on with your work: the places",
+      resume: true,
+    });
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0].ids).toEqual(["next-run"]);
+  });
+
   it("defers a message until the activity ends and delivers it with the check-in", async () => {
     const h = setup({ assembleDecisionContext });
     h.tasks.set("alice", study());

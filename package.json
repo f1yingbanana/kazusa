@@ -10,6 +10,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "openclaw": "npm run --workspace=@openrp-ai/kazusa openclaw",
     "gateway": "npm run --workspace=@openrp-ai/kazusa gateway",
     "status": "npm run --workspace=@openrp-ai/kazusa status",

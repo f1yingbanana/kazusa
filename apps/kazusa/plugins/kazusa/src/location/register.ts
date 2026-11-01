@@ -1,5 +1,5 @@
 import { currentConfig } from "../current-config.ts";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -10,7 +10,6 @@ import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
 import { createSkillLoader } from "../context-engine/skill-loader.ts";
-import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -39,65 +38,15 @@ import {
   type PlaceKnowledge,
 } from "./location.ts";
 import {
-  buildMap,
-  parsePlace,
+  describeTravel,
   placeLabel,
+  resolvePlace,
+  routeBetween,
+  WALK,
   type Place,
   type WorldMap,
 } from "./map.ts";
-
-/** The map plus where each participant lives. */
-export interface World {
-  readonly map: WorldMap;
-  readonly homes: ReadonlyMap<string, string>;
-}
-
-const CHARACTER_HOME = z.object({
-  character_id: z.string().optional(),
-  home: z.string().optional(),
-});
-
-const markdownFiles = (dir: string): string[] =>
-  existsSync(dir)
-    ? readdirSync(dir)
-        .filter((file) => file.endsWith(".md"))
-        .sort()
-    : [];
-
-/**
- * Reads the World Wiki once. Returns `undefined` for a world without places,
- * and throws for a broken map: that is an operator error, never a character's.
- */
-export function loadWorld(wikiDir: string): World | undefined {
-  const placesDir = path.join(wikiDir, "entities", "places");
-  const files = markdownFiles(placesDir);
-  if (files.length === 0) return undefined;
-  const map = buildMap(
-    files.map((file) => {
-      try {
-        return parsePlace(readFileSync(path.join(placesDir, file), "utf8"));
-      } catch (error: unknown) {
-        throw new Error(`Invalid place ${file}: ${String(error)}`, {
-          cause: error,
-        });
-      }
-    }),
-  );
-  const homes = new Map<string, string>();
-  const charactersDir = path.join(wikiDir, "entities", "characters");
-  for (const file of markdownFiles(charactersDir)) {
-    const { data } = readFrontmatter(
-      readFileSync(path.join(charactersDir, file), "utf8"),
-      CHARACTER_HOME,
-    );
-    if (data.home === undefined) continue;
-    if (!map.places.has(data.home)) {
-      throw new Error(`Character ${file}: unknown home ${data.home}`);
-    }
-    homes.set(data.character_id ?? file.slice(0, -".md".length), data.home);
-  }
-  return { map, homes };
-}
+import { sharedWorld, type World } from "./world.ts";
 
 /** The `where` parameter: short and stable, whatever the size of the world. */
 function whereParameter(config: LocationConfig) {
@@ -245,8 +194,11 @@ export function registerLocation(
       record: clientRecord(next),
     });
   };
-  const world = loadWorld(config.wikiDir);
   const warn = (message: string): void => api.logger.warn(message);
+  const currentWorld = sharedWorld(config.wikiDir, {
+    warn,
+    onChange: () => broadcaster?.broadcast({ type: "places" }),
+  });
   const skillLoader = createSkillLoader({
     config: getConfig(),
     pluginRootDir: api.rootDir,
@@ -268,7 +220,7 @@ export function registerLocation(
   const record = async (id: string): Promise<LocationRecord | undefined> => {
     const stored = await store.lookup(id);
     if (stored) return stored;
-    const home = world?.homes.get(id);
+    const home = currentWorld()?.homes.get(id);
     return home === undefined ? undefined : { placeId: home, since: 0 };
   };
   const cardsOf = async (id: string): Promise<PlaceCard[]> => {
@@ -278,7 +230,7 @@ export function registerLocation(
   /** First time standing somewhere starts a card in the personal wiki. */
   const remember = async (id: string, placeId: string, at: number) => {
     const workspace = workspaceOf(id);
-    const place = world?.map.places.get(placeId);
+    const place = currentWorld()?.map.places.get(placeId);
     if (!workspace || !place) return;
     try {
       await writePlaceStub(workspace, place, at);
@@ -288,7 +240,7 @@ export function registerLocation(
     }
   };
 
-  if (!world) {
+  if (!currentWorld()) {
     warn(
       `Location: no places under ${config.wikiDir}; characters have no positions.`,
     );
@@ -314,7 +266,7 @@ export function registerLocation(
       current ? positionAt(current, at) : undefined,
     );
     const task = await tasks.lookup(id);
-    const home = world?.homes.get(id);
+    const home = currentWorld()?.homes.get(id);
     return {
       id,
       name: await displayName(id),
@@ -365,7 +317,9 @@ export function registerLocation(
   const label = async (id: string): Promise<string> =>
     personLabel(await displayName(id), id);
   const nameOfPlace = (id: string | undefined): string | undefined =>
-    id === undefined ? undefined : (world?.map.places.get(id)?.name ?? id);
+    id === undefined
+      ? undefined
+      : (currentWorld()?.map.places.get(id)?.name ?? id);
 
   /** Who stands at a place at `at`, the asker included. */
   const occupants = async (placeId: string, at: number): Promise<string[]> => {
@@ -502,6 +456,7 @@ export function registerLocation(
     before: string | undefined,
     at: number,
   ): Promise<void> => {
+    const world = currentWorld();
     if (!world) return;
     const position = positionAt(current, at);
     const after = position.kind === "at" ? position.placeId : undefined;
@@ -576,6 +531,7 @@ export function registerLocation(
     observer: string,
     item: Stimulus,
   ): Promise<Stimulus | undefined> => {
+    const world = currentWorld();
     if (!world) return undefined;
     const [prefix, rawKind, subject, placeId, , betweenId] = item.id.split("|");
     const place = placeId ? world.map.places.get(placeId) : undefined;
@@ -734,7 +690,7 @@ export function registerLocation(
     return { ...item, text };
   };
 
-  const taskExtension: TaskExtension | undefined = world && {
+  const taskExtension: TaskExtension | undefined = currentWorld() && {
     startTaskParameters: { where: whereParameter(config) },
     delayTaskParameters: {},
     required: ["where"],
@@ -750,8 +706,10 @@ export function registerLocation(
       const current = await record(agentId);
       // Where they have been until now; moving on means they took it in.
       const standing = current ? positionAt(current, at) : undefined;
+      const map = currentWorld()?.map;
+      if (!map) throw new Error("This world has no places.");
       const move = await planTransition(
-        world.map,
+        map,
         current,
         transition,
         typeof where === "string" ? where : "",
@@ -830,7 +788,7 @@ export function registerLocation(
     placeId: string,
   ): Promise<LocationRecord> => {
     if (!everyone().includes(id)) throw new Error(`No participant ${id}.`);
-    if (!world?.map.places.has(placeId))
+    if (!currentWorld()?.map.places.has(placeId))
       throw new Error(`No place called ${placeId}.`);
     await clock.init();
     const at = clock.time();
@@ -843,6 +801,40 @@ export function registerLocation(
     await moved(id, placed, was?.kind === "at" ? was.placeId : undefined, at);
     return placed;
   };
+
+  // Administrative: allowlisted for the system agent only.
+  api.registerTool(() => ({
+    name: "map_route",
+    label: "Map Route",
+    description:
+      "The usual route between two places, as a traveller would be told it: total time and every place passed. Use it to check a map's travel times after building it.",
+    parameters: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      required: ["from", "to"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { from, to } = z
+        .object({ from: z.string(), to: z.string() })
+        .parse(input);
+      const map = currentWorld()?.map;
+      const start = map && resolvePlace(map, from);
+      const end = map && resolvePlace(map, to);
+      const text = !map
+        ? "No map is loaded. Run wiki_lint to see why."
+        : !start || !end
+          ? `"${!start ? from : to}" isn't on the map in use. If you've written that page, the new map may be invalid, and the last good one stays in use until it's fixed: run wiki_lint.`
+          : (() => {
+              const route = routeBetween(map, start.id, end.id);
+              const passed = route.legs.map(({ placeId: place, ways }) =>
+                ways[0].by === WALK ? place : `${place} (${ways[0].by})`,
+              );
+              return `${describeTravel(route)}: ${[start.id, ...passed].join(" > ")}`;
+            })();
+      return { content: [{ type: "text" as const, text }], details: text };
+    },
+  }));
 
   // Operator placement. Characters otherwise move only through their own
   // tasks; the player, who has none, moves through `POST /kazusa/move`.
@@ -877,12 +869,15 @@ export function registerLocation(
   });
 
   return {
-    ...(world ? { world } : {}),
+    get world() {
+      return currentWorld();
+    },
     ...(taskExtension ? { taskExtension } : {}),
     record,
     participants,
     place,
     exit: async (id, at) => {
+      const world = currentWorld();
       if (!world) return;
       const current = await record(id);
       if (!current) return;
@@ -891,6 +886,7 @@ export function registerLocation(
       if (current.noticed?.length) await save(id, { ...current, noticed: [] });
     },
     enter: async (id, at) => {
+      const world = currentWorld();
       if (!world) return;
       const current = await record(id);
       if (!current) return;
@@ -899,6 +895,7 @@ export function registerLocation(
       await moved(id, current, undefined, at);
     },
     whereabouts: async (agentId, at, evidence) => {
+      const world = currentWorld();
       if (!world) return undefined;
       const current = await record(agentId);
       const position = current && positionAt(current, at);
@@ -952,6 +949,7 @@ export function registerLocation(
     },
     settle: async (agentId) => {
       const stored = await store.lookup(agentId);
+      const world = currentWorld();
       const arrival =
         stored && world && arrive(world.map, stored, clock.time());
       if (!arrival) return undefined;
@@ -992,6 +990,7 @@ export function registerLocation(
       ];
     },
     placeOf: async (id) => {
+      const world = currentWorld();
       if (!world) return undefined;
       // Nobody can speak to someone offstage, nor they to anyone.
       if (deps.stage && !(await deps.stage.isOnstage(id))) return undefined;
