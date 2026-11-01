@@ -20,6 +20,8 @@ const ROUTES = new Map([
   ["move", "POST"],
   ["character/stage", "POST"],
   ["avatar", "GET"],
+  ["profile", "GET"],
+  ["profile/save", "POST"],
   ["models", "GET"],
   ["model", "POST"],
   ["thinking", "POST"],

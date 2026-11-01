@@ -26,6 +26,7 @@ import { registerLocation } from "./location/register.ts";
 import { registerLocationHttp } from "./location/http.ts";
 import { registerMemory } from "./memory/register.ts";
 import { registerModels } from "./models/register.ts";
+import { registerProfile } from "./profile/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import {
@@ -251,6 +252,7 @@ export default definePluginEntry({
     // `With you`, and takes people out of them when they walk away.
     location.attachConversations(messaging);
 
+    registerProfile(api);
     registerCharactersHttp(api, {
       taskman,
       perception,

@@ -117,7 +117,7 @@ export function ConnectionSettings() {
 
   return (
     <div className="flex flex-col">
-      <SettingsSection title="Gateway" description="The client talks to your Kazusa server through this app's proxy. The server supplies your player identity.">
+      <SettingsSection title="Gateway" description="The client talks to your Kazusa server through this app's proxy.">
         <GatewayStatus />
         <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
           <FieldGroup>
@@ -187,19 +187,6 @@ export function ConnectionSettings() {
             </Button>
           </div>
         </form>
-      </SettingsSection>
-
-      <SettingsSection title="You" description="Your player identity comes from the server and can't be edited here.">
-        <FieldGroup className="sm:flex-row">
-          <Field>
-            <FieldLabel htmlFor="user-name">Display name</FieldLabel>
-            <Input id="user-name" value={config.userName} readOnly />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="user-id">User ID</FieldLabel>
-            <Input id="user-id" className="font-mono" value={config.userId} readOnly />
-          </Field>
-        </FieldGroup>
       </SettingsSection>
     </div>
   )

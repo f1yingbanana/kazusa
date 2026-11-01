@@ -1,6 +1,7 @@
-import { BoxesIcon, ChartColumnIcon, PlugIcon } from "lucide-react";
+import { BoxesIcon, ChartColumnIcon, PlugIcon, UserIcon } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
+import { ProfileSettings } from "@/components/views/settings/profile-settings";
 import { UsageSettings } from "@/components/views/settings/usage-settings";
 import type { SettingsCategory } from "./types";
 
@@ -13,6 +14,14 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     icon: PlugIcon,
     order: 0,
     component: ConnectionSettings,
+  },
+  {
+    id: "profile",
+    label: "Profile",
+    description: "Your description in the World Wiki",
+    icon: UserIcon,
+    order: 5,
+    component: ProfileSettings,
   },
   {
     id: "models",

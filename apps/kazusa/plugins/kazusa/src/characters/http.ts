@@ -29,6 +29,7 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
+import { playerWikiDir, readPlayerPage } from "../profile/page.ts";
 
 const USER = z.object({
   id: z
@@ -314,7 +315,9 @@ export function registerCharactersHttp(
           kind: "player",
           aliases: [],
           personalityTraits: [],
-          bodyMarkdown: `The player, ${user.name}.`,
+          bodyMarkdown:
+            (await readPlayerPage(playerWikiDir(api), user.id))?.about ||
+            `The player, ${user.name}.`,
         },
       } satisfies CharacterDetailResponse);
       return;

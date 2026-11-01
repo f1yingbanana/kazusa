@@ -227,6 +227,7 @@ export const DomainSchema = z.enum([
   "desires",
   "stage",
   "models",
+  "profile",
   "wiki",
   "brain",
   "usage",
@@ -375,6 +376,23 @@ export const ModelsResponseSchema = z.object({
   providers: z.array(ModelProviderStatusSchema),
 });
 export type ModelsResponse = z.infer<typeof ModelsResponseSchema>;
+
+/** GET /kazusa/profile: who the player is. Only `about` can be edited. */
+export const ProfileResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Their World Wiki page, under its title. */
+  about: z.string(),
+  /** That page, relative to the world's `shared` folder. */
+  wikiPage: z.string(),
+});
+export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
+
+/** POST /kazusa/profile/save. Answers with the new profile. */
+export const ProfileSavePayloadSchema = z.object({
+  about: z.string().max(20_000),
+});
+export type ProfileSavePayload = z.infer<typeof ProfileSavePayloadSchema>;
 
 /** POST /kazusa/model. Omit `agentId` for world defaults; `null` inherits. */
 export const ModelSelectPayloadSchema = z.object({

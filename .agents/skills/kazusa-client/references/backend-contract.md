@@ -124,6 +124,17 @@ record changes only on `start_task`/`delay_task` and `desires.configure`, each
 pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 `kinds` excludes `message.sent` (the client default).
 
+### Built: profile
+
+- `GET /kazusa/profile` returns `{ id, name, about, wikiPage }`.
+- `POST /kazusa/profile/save` takes `{ about }` and returns the same.
+
+`about` is the body of the player's World Wiki page under
+`shared/wiki/entities/characters/`; the front matter and title are left as
+written, and a missing page is created. `id` and `name` stay read-only: they
+come from `plugins.entries.kazusa.config.user`, because chats, personal wiki
+pages and the stored position are all keyed by the id.
+
 ### Built: models
 
 | Route                   | Request / response                                                                                                                                                                                                                                                                                                                                                             | Backed by                                                                                                                             |

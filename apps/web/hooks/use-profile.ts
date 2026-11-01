@@ -1,0 +1,51 @@
+"use client";
+
+import { useCallback } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import type { ProfileResponse } from "@kazusa/client";
+import {
+  PROFILE_KEY,
+  fetchProfile,
+  saveProfile,
+} from "@/lib/source/profile/http";
+import { useSources } from "@/lib/source/provider";
+import { useKazusaConfig } from "@/lib/state/config-store";
+
+/** The inspector shows the same description. */
+function isCharacterKey(key: unknown): boolean {
+  return Array.isArray(key) && key[0] === "kazusa/character";
+}
+
+/** The player's own profile. Only live: a mock world has no wiki to write to. */
+export function useProfile() {
+  const { resolved } = useSources();
+  const config = useKazusaConfig();
+  const { mutate: mutateMatching } = useSWRConfig();
+  const enabled = resolved.profile === "live";
+
+  const resource = useSWR<ProfileResponse, Error>(
+    enabled
+      ? ([PROFILE_KEY, config.baseUrl, config.token ?? ""] as const)
+      : null,
+    () => fetchProfile(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
+  );
+  const { mutate } = resource;
+
+  /** Throws if the server refuses, so the form can stay as it is. */
+  const save = useCallback(
+    async (about: string): Promise<void> => {
+      const saved = await saveProfile(config.baseUrl, { about }, config.token);
+      await mutate(saved, { revalidate: false });
+      void mutateMatching(isCharacterKey);
+    },
+    [config.baseUrl, config.token, mutate, mutateMatching],
+  );
+
+  return {
+    enabled,
+    data: resource.data,
+    error: resource.error,
+    save,
+  };
+}
