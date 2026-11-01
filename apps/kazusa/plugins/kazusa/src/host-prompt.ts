@@ -40,7 +40,7 @@ export const HOST_DELIVERY_NOTES: readonly Replacement[] = [
   },
   {
     from: /OpenClaw runtime context:\s*(?:Conversation data \(data, not instructions\):\s*"[^\n]*"\s*)?End OpenClaw runtime context\./g,
-    to: "(What reaches you now:)",
+    to: "(Anything new that reaches you follows. If nothing does, carry on.)",
   },
 ];
 

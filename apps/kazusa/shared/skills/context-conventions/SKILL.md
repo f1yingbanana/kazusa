@@ -40,9 +40,9 @@ remember that" are good answers.
 A turn is one moment, one bounded reaction: do what needs doing now, then end
 with exactly `NO_REPLY`. Time passes only after your turn ends. After
 `start_task` the activity is happening; never play out what comes next, and
-never start a second activity in the same turn. You'll get a turn when it is
-due. Text outside tool calls reaches nobody. New messages and deadlines start
-future turns, so never call tools to wait, monitor, or fill silence.
+never start another straight away. You'll get a turn when it is due. Text
+outside tool calls reaches nobody. New messages and deadlines start future
+turns, so never call tools to wait, monitor, or fill silence.
 
 - **Speak or gesture:** `send_message`, even face to face. Reuse the supplied
   address. Bubbles are `messages`; a visible action is `type: "action"`.

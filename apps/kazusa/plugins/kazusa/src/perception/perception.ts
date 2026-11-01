@@ -661,7 +661,9 @@ export class Perception {
 
   private isCurrent(item: Stimulus, task?: ActiveTask): boolean {
     if (item.idle) {
-      return !task || Date.parse(task.endAt) <= this.deps.clock.time();
+      return (
+        item.resume || !task || Date.parse(task.endAt) <= this.deps.clock.time()
+      );
     }
     if (!item.deadline) return true;
     return (

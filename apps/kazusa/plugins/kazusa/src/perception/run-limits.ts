@@ -6,6 +6,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
 import {
   ALREADY_SAID,
+  chooseActivity,
   LOOKUP_NAMES,
   MAX_LOOKUPS,
   NO_MORE_LOOKUPS,
@@ -139,6 +140,7 @@ function brainRun(
 
 export function registerBrainRunLimits(
   api: OpenClawPluginApi,
+  simTime: () => number,
 ): (runId: string) => void {
   api.on("model_call_started", (event, ctx) => {
     const state = brainRun(
@@ -166,8 +168,10 @@ export function registerBrainRunLimits(
         turn.lookups++;
       }
       if (event.toolName === "start_task" || event.toolName === "delay_task") {
-        if (turn.activity) return { block: true, blockReason: SECOND_ACTIVITY };
-        turn.activity = true;
+        const now = { wall: Date.now(), sim: simTime() };
+        const callId = ctx.toolCallId ?? event.toolCallId;
+        if (!chooseActivity(ctx.agentId, now, callId))
+          return { block: true, blockReason: SECOND_ACTIVITY };
       }
     }
     const runId = ctx.runId ?? event.runId;

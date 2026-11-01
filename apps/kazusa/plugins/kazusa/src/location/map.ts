@@ -163,9 +163,28 @@ export function buildMap(list: readonly Place[]): WorldMap {
         }
       }
     }
-    const stranded = [...places.keys()].filter((id) => !reached.has(id));
-    if (stranded.length > 0) {
-      problems.push(`unreachable from ${first}: ${stranded.join(", ")}`);
+    if (reached.size < places.size) {
+      const groups: string[][] = [];
+      const grouped = new Set<string>();
+      for (const start of places.keys()) {
+        if (grouped.has(start)) continue;
+        const group: string[] = [];
+        const stack = [start];
+        while (stack.length) {
+          const next = stack.pop()!;
+          if (grouped.has(next)) continue;
+          grouped.add(next);
+          group.push(next);
+          for (const { to } of edges.get(next) ?? []) stack.push(to);
+        }
+        groups.push(group);
+      }
+      groups.sort((a, b) => b.length - a.length);
+      problems.push(
+        `the map is ${groups.length} separate parts with no way between them, so give the smaller parts a \`parent\` or a connection: ${groups
+          .map((group) => `[${group.join(", ")}]`)
+          .join(" ")}`,
+      );
     }
   }
   if (problems.length > 0) {

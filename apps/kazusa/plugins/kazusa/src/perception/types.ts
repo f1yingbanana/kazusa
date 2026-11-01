@@ -8,9 +8,9 @@ export const PERCEPTION_CONFIG = z.object({
   /** The system agent's jobs are projects, not one character's reaction. */
   systemAgent: z
     .object({
-      maxModelCalls: z.number().int().min(1).max(100).default(60),
-      maxToolCalls: z.number().int().min(1).max(100).default(100),
-      maxRunSeconds: z.number().int().min(1).max(3600).default(900),
+      maxModelCalls: z.number().int().min(1).max(2000).default(500),
+      maxToolCalls: z.number().int().min(1).max(4000).default(1000),
+      maxRunSeconds: z.number().int().min(1).max(14_400).default(7200),
       /** Fresh runs `continue_work` may ask for before a person must speak. */
       maxContinuations: z.number().int().min(0).max(500).default(40),
     })

@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
 import { currentConfig } from "./current-config.ts";
+import { characterName } from "./identity.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
   definePluginEntry,
@@ -177,6 +179,29 @@ export default definePluginEntry({
         );
       },
       thinking: async (agentId) => (await models.read(agentId)).thinking,
+      onRunFailed: async (agentId, error) => {
+        const messaging = messagingRef.current;
+        const chat = (
+          await messaging?.listChats(agentId, { query: "user:" })
+        )?.find((item) => item.kind === "direct");
+        if (!messaging || !chat) return;
+        const config = currentConfig(api);
+        await messaging.speak(
+          agentId,
+          await characterName(api, config, agentId),
+          {
+            sessionKey: chat.sessionKey,
+            messages: [
+              `Something went wrong and I had to stop: ${error}`,
+              "What I'd saved is safe. Say continue when it's sorted and I'll pick up from there.",
+            ],
+            requestId: randomUUID(),
+          },
+          undefined,
+          undefined,
+          config.agents?.defaults?.systemAgent?.agentId,
+        );
+      },
     });
     registerBrainHttp(api);
     registerBrainTraceHttp(api);

@@ -30,15 +30,19 @@
   <a href="#getting-started">Getting started</a>
 </p>
 
-**KAZUSA** is an AI world simulator based on OpenClaw. Import or create your
-characters, and **KAZUSA** gives them purpose, needs, goals, and memories. Watch
-them chat with each other, plan their next meetup, travel between locations,
-manage their priorities, and dream about their future. Put all your favorite
-waifus in a room and see how they interact with each other, and with you.
+**KAZUSA** is an AI world simulator based on OpenClaw. **KAZUSA** gives your
+characters purpose, needs, goals, and memories. Watch them chat with each other,
+plan their next meetup, travel between locations, manage their priorities, and
+dream about their future. Put all your favorite characters in a room and see how
+they interact with each other, and with you.
 
-**Import your SillyTavern V2 character cards (.png or .json).** Bring their
-personalities, example dialogue, and lorebooks with you. **ARONA**, the built-in
+**Import your character cards.** Bring their personalities, example dialogue,
+and lorebooks with you and add them to your world. **ARONA**, the built-in
 system admin agent, helps turn your existing data into a living world.
+
+**Or ask for an entire world.** Describe anything, and **ARONA** will research
+it and set up your personal living world: characters, relationships, locations,
+lore, secrets, anything in one prompt.
 
 **KAZUSA** is built based on leading AI research papers on AI agents and society
 simulation, such as
@@ -90,10 +94,10 @@ groups, converse, and do things together.
 
 ### ✨ Agent-based editor
 
-Upload a **SillyTavern V2 PNG or JSON character card** or describe an original
-character to the built-in system admin AI, **ARONA**. **ARONA** helps adapt
-their personality and lore to your setting, build the world, and set up their
-memory wiki.
+The built-in system admin AI, **ARONA**, helps you edit your existing characters
+or build them from scratch. Simply describe an idea, a world you want to create,
+or how you want to change the existing world, and **ARONA** will deliver those
+changes.
 
 ## Screenshots
 
@@ -117,8 +121,8 @@ World timeline showing character actions, and location details:
 > consider [waitlisting here](https://openrp.ai/kazusa). We'll send an email
 > once we get this running as a one-click deploy service in the cloud.
 
-You'll need **Node.js 24.16+ (24.x) or 26.1+**, **Git**, and macOS, Linux or
-WSL. Then run one command:
+You'll need **Node.js 24.16+ (24.x) or 26.1+**, **Git**. Simply open a terminal
+and run (or ask your AI to do this for you):
 
 ```bash
 git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
@@ -127,37 +131,63 @@ git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 It installs everything and opens a guide at **http://localhost:3000** that asks
 for:
 
-1. **A world**: Blue Archive, Elden Ring, or an empty one you build with
-   **ARONA**, the built-in system admin.
-2. **Who is onstage and when the story begins**, for the ready-made worlds.
+1. **A world**: choose from a sample world, or an empty one for you to build
+   with.
+2. **Who is on-stage and when the story begins**, for the sample worlds, pick
+   which characters are actively simulated when the world starts.
 3. **An [OpenRouter API key](https://openrouter.ai/keys)**, which powers
-   conversation, decisions (**TypeSafe Jev**) and memory search
-   (**text-embedding-3-small**). The guide also explains how to set up separate
-   providers instead.
+   conversation, decisions and memory search. The guide also explains how to set
+   up separate providers instead.
 
-Your world lives in `apps/kazusa/world/`, which is never committed. To start
-again, stop Kazusa and delete that folder. Run `npm run dev` whenever you want
-to come back, and press Ctrl+C once to stop.
+Your world lives in `apps/kazusa/world/`. To start afresh, stop Kazusa with
+Ctrl + C and delete that folder. Run `npm run dev` again to reinitialize.
 
 ### Talk to **ARONA**
 
-Select **ARONA** in the character roster and click **Message**. Attach a **.png
-or .json character card** and try:
+**ARONA** is the built in system admin agent that will help you build your
+world.
 
-> Import this character and help me build a small world around them. Ask me
-> about the setting, then set up their memory wiki.
+You can describe original characters and ask ARONA to create a draft, then hand
+edit their IDENTITY.md or SOUL.md files on disk (located under
+world/workspaces/[character-id]/).
 
-You can also describe original characters and ask ARONA to create a draft, then
-hand edit their IDENTITY.md or SOUL.md files. You can change the conversational
-model at any time in **Settings**.
+You can also ask **ARONA** to create an entire world from scratch. For example,
+to create the world of **Touhou Project**:
+
+```
+Create the world of Touhou Project. Examine the level of detail in the world
+examples in apps/kazusa/worlds/: the settings, characters, locations, and memory
+wikis. We need to recreate the same level of detail. Search online for your
+source of information. Report your progress at each stage.
+```
+
+Depending on the complexity of the world you want to create, the research and
+creation process may run autonomously up to an hour or two. At the end you will
+get a fully working world with characters, locations and memories initialized.
+
+> [!NOTE]
+>
+> To view **ARONA**'s progress, click on the **Brain** icon on her character
+> details sidebar to read her thought process.
+
+As a safety precaution characters are off-stage when first created. You can ask
+**ARONA** to move these characters on-stage or do it yourself in the World Tab.
+
+> [!NOTE]
+>
+> You may also do this with **Claude Code** or another coding agent. The skills
+> it needs come with the repository. This may be faster as coding agents are
+> generally faster than OpenClaw at research and writing.
 
 ## Build with us
 
 Help shape a world you would want to spend time in. Original character examples,
 small settings, and scenes that expose an unnatural reaction are as useful as
 code. [Open an issue](https://github.com/f1yingbanana/kazusa/issues) with what
-happened and what you expected, or **star the repository** to follow
-development.
+happened and what you expected.
+
+Please star **star the repository** to follow development and
+[join our Discord](https://discord.gg/wbNyB85V4X) for discussions.
 
 ## Related projects
 

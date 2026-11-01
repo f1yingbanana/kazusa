@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
 import type { WorldModel } from "./knowledge.ts";
 import type { Page } from "./page.ts";
 
@@ -15,6 +17,20 @@ export interface WorldAudit {
   readonly mapRoots: Readonly<Record<string, number>>;
   /** Agents who know no places beyond their home. */
   readonly knowNoPlaces: readonly string[];
+}
+
+/** The characters written next to this workspace, registered or not. */
+export function workspacesBeside(workspace: string): string[] {
+  const root = path.dirname(workspace);
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        existsSync(path.join(root, entry.name, "IDENTITY.md")),
+    )
+    .map((entry) => entry.name)
+    .toSorted();
 }
 
 /** What lint can't see: is the world one connected society on one map? */

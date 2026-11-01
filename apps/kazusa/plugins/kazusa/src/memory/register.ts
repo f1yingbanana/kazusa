@@ -33,7 +33,7 @@ import {
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
 import { lintMap } from "../location/world.ts";
-import { auditWorld, type WorldAudit } from "./audit.ts";
+import { auditWorld, workspacesBeside, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
 import type { Certainty, HistoryLine, Page } from "./page.ts";
 import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
@@ -401,11 +401,17 @@ export function registerMemory(
     entities: (request) => retrieve(index, request),
     audit: () => {
       const config = currentConfig(api);
+      const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
+      // Registering comes last, and applies only once its run has ended. A cast
+      // still on disk has to count, or the audit passes with nobody to check.
+      const onDisk = systemAgent
+        ? workspacesBeside(workspaceOf(systemAgent))
+        : [];
       return auditWorld(
         index.world(),
-        Object.keys(config.agents?.entries ?? {}),
+        [...new Set([...Object.keys(config.agents?.entries ?? {}), ...onDisk])],
         (agentId) => index.personal(agentId),
-        config.agents?.defaults?.systemAgent?.agentId,
+        systemAgent,
       );
     },
     lint: (agentId) => {

@@ -1,3 +1,4 @@
+import { takeContinuation } from "./continue.ts";
 import {
   BrainAbortPayloadSchema,
   type BrainAbortResponse,
@@ -30,6 +31,8 @@ export function registerBrainHttp(api: OpenClawPluginApi): void {
       sendJson(res, 404, { error: `Unknown character: ${agentId}.` });
       return;
     }
+    // Stopping a run stops a long job too.
+    takeContinuation(agentId);
     const sessionKey = `agent:${agentId}:brain`;
     const sessionId = resolveActiveEmbeddedRunSessionId(sessionKey);
     const result = sessionId

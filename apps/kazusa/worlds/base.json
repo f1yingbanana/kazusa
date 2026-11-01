@@ -35,11 +35,11 @@
         "security": "deny",
         "applyPatch": {
           "enabled": true,
-          "workspaceOnly": true
+          "workspaceOnly": false
         }
       },
       "fs": {
-        "workspaceOnly": true
+        "workspaceOnly": false
       },
       "elevated": {
         "enabled": false

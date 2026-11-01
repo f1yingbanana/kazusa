@@ -166,6 +166,8 @@ Only these characters know this.
 - `Known by:` as the first line of a section limits it to those characters.
 - An undated edit is a retcon: it was always true. A dated line under
   `## History` is something that happened, and `· news` makes it public.
+- `## History` dates must be real (`2026-01-05`). The ancient past goes in an
+  ordinary section instead.
 
 ## Seeding a character's wiki
 

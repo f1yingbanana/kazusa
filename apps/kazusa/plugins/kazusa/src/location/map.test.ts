@@ -144,7 +144,7 @@ Body text.
       ],
       "declared twice",
     ],
-    [[place("a"), place("b")], "unreachable from a: b"],
+    [[place("a"), place("b")], "the map is 2 separate parts"],
     [[place("a"), place("a")], "duplicate place a"],
   ])("rejects a broken map (%#)", (places, problem) => {
     expect(() => buildMap(places)).toThrow(problem);

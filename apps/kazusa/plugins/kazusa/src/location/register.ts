@@ -824,7 +824,7 @@ export function registerLocation(
       const text = !map
         ? "No map is loaded. Run wiki_lint to see why."
         : !start || !end
-          ? `No place called "${!start ? from : to}".`
+          ? `"${!start ? from : to}" isn't on the map in use. If you've written that page, the new map may be invalid, and the last good one stays in use until it's fixed: run wiki_lint.`
           : (() => {
               const route = routeBetween(map, start.id, end.id);
               const passed = route.legs.map(({ placeId: place, ways }) =>

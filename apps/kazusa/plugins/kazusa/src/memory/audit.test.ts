@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { auditWorld } from "./audit.ts";
+import { auditWorld, workspacesBeside } from "./audit.ts";
 import { WorldModel } from "./knowledge.ts";
 import { parsePage, type Page } from "./page.ts";
 
@@ -40,5 +43,16 @@ describe("auditWorld", () => {
     expect(audit.socialGroups).toEqual([["ann", "bo"], ["cy"], ["ghost"]]);
     expect(audit.agentsWithoutCard).toEqual(["ghost", "admin"]);
     expect(audit.mapRoots).toEqual({ hall: 2 });
+  });
+
+  it("finds a cast that is written but not yet registered", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "audit-"));
+    for (const id of ["admin", "bo"]) {
+      mkdirSync(path.join(root, id));
+      writeFileSync(path.join(root, id, "IDENTITY.md"), "# Someone\n");
+    }
+    mkdirSync(path.join(root, "empty"));
+    expect(workspacesBeside(path.join(root, "admin"))).toEqual(["admin", "bo"]);
+    rmSync(root, { recursive: true });
   });
 });

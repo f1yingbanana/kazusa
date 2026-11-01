@@ -14,12 +14,13 @@ import { PERCEPTION_CONFIG, type PerceptionDecisionRecord } from "./types.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 import { registerBrainRunLimits } from "./run-limits.ts";
-import { inBackground } from "../background.ts";
+import { currentConfig } from "../current-config.ts";
 import { requestContinuation, takeContinuation } from "./continue.ts";
 import { BrainSlots } from "./brain-slots.ts";
 
 const LIFECYCLE = z.object({
-  phase: z.enum(["start", "end", "error"]),
+  phase: z.enum(["start", "finishing", "end", "error"]),
+  error: z.string().optional(),
   aborted: z.boolean().optional(),
   stopReason: z.string().optional(),
 });
@@ -57,6 +58,8 @@ export function registerPerception(
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
     readonly realtime?: PerceptionDeps["realtime"];
+    /** The system agent's run failed, so it can't say so itself. */
+    readonly onRunFailed?: (agentId: string, error: string) => Promise<void>;
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
     /** Something woke them, or broke into what they were doing. */
@@ -64,7 +67,7 @@ export function registerPerception(
   },
 ): Perception {
   const lifetime = new AbortController();
-  const endBrainRun = registerBrainRunLimits(api);
+  const endBrainRun = registerBrainRunLimits(api, () => deps.clock.time());
   // Each decision is persisted by Perception in the "perception" store, which
   // the timeline reads; this only broadcasts it to live observers.
   const onDecision = (
@@ -173,31 +176,6 @@ export function registerPerception(
       },
     ],
   });
-  api.on("agent_end", (_event, ctx) => {
-    const agentId = ctx.agentId;
-    const note = agentId && takeContinuation(agentId);
-    if (!agentId || !note) return;
-    // After the host has marked the brain idle, so this is a run of its own.
-    const timer = setTimeout(() => {
-      inBackground(
-        api,
-        () =>
-          perception.receive(agentId, {
-            id: `continue:${agentId}:${randomUUID()}`,
-            sessionKey: `agent:${agentId}:tasks`,
-            sender: "kazusa:taskman",
-            text: `Carry on with your work: ${note}`,
-            idle: true,
-            timestamp: deps.clock.time(),
-          }),
-        (error) => {
-          api.logger.warn(`Perception: continue_work failed: ${String(error)}`);
-        },
-      );
-    }, 2_000);
-    timer.unref();
-  });
-
   // =========================================================================
   // 2. INGRESS HOOK: before_dispatch (Attention Admission & Claiming)
   // WHAT OPENCLAW DOES:
@@ -307,6 +285,10 @@ export function registerPerception(
   // DESIGN FIT:
   // Synchronizes physical brain thinking states with attention gating without polling.
   // =========================================================================
+  // `finishing` can carry a run's error ahead of its final event.
+  const runErrors = new Map<string, string>();
+  // The last failure told to the user, until a run gets through.
+  const reported = new Map<string, string>();
   api.agent.events.registerAgentEventSubscription({
     id: "perception",
     streams: ["lifecycle"],
@@ -315,7 +297,9 @@ export function registerPerception(
       const data = LIFECYCLE.safeParse(event.data);
       if (!owner || !data.success || owner.rest !== "brain") return;
 
-      if (data.data.phase === "start") {
+      if (data.data.phase === "finishing") {
+        if (data.data.error) runErrors.set(event.runId, data.data.error);
+      } else if (data.data.phase === "start") {
         try {
           await perception.started(owner.agentId, event.runId);
         } catch (err: unknown) {
@@ -333,6 +317,49 @@ export function registerPerception(
           );
         } catch (err: unknown) {
           api.logger.warn(`Perception ended error: ${String(err)}`);
+        }
+        // Only here is the run truly over: `agent_end` also fires for each of
+        // the host's retries, and what arrives then joins the expired run.
+        const note = takeContinuation(owner.agentId);
+        const error = data.data.error ?? runErrors.get(event.runId);
+        runErrors.delete(event.runId);
+        const stoppedOnPurpose =
+          data.data.aborted === true || data.data.stopReason === "aborted";
+        if (error && !stoppedOnPurpose) {
+          // A fresh run would most likely fail the same way, so a person decides.
+          const systemAgent =
+            currentConfig(api).agents?.defaults?.systemAgent?.agentId;
+          if (
+            owner.agentId === systemAgent &&
+            reported.get(owner.agentId) !== error
+          )
+            try {
+              reported.set(owner.agentId, error);
+              await deps.onRunFailed?.(owner.agentId, error);
+            } catch (err: unknown) {
+              api.logger.warn(
+                `Perception: failed run not reported: ${String(err)}`,
+              );
+            }
+        } else {
+          if (!error) reported.delete(owner.agentId);
+          if (note) {
+            try {
+              await perception.receive(owner.agentId, {
+                id: `continue:${owner.agentId}:${randomUUID()}`,
+                sessionKey: `agent:${owner.agentId}:tasks`,
+                sender: "kazusa:taskman",
+                text: `Carry on with your work: ${note}`,
+                idle: true,
+                resume: true,
+                timestamp: deps.clock.time(),
+              });
+            } catch (err: unknown) {
+              api.logger.warn(
+                `Perception: continue_work failed: ${String(err)}`,
+              );
+            }
+          }
         }
       }
     },

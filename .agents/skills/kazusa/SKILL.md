@@ -900,8 +900,9 @@ connect these modules in process.
   frozen. Offstage and custody gates still apply. How she works is in her
   `SOUL.md`; the common jobs (characters, wikis, places) are the
   `world-building` skill, and whole worlds are `world-project`. Both live in
-  `shared/skills/`, so every world's system agent gets them, selected by her
-  per-agent `skills` in `worlds/base.json`. Long jobs survive the run limits
+  `.agents/skills/`, so coding agents working in this repo get them as well as
+  every world's system agent, who selects them by her per-agent `skills` in
+  `worlds/base.json`. Long jobs survive the run limits
   through a project file and `continue_work`, which starts a fresh run once this
   one ends (`perception/continue.ts`), up to
   `perception.systemAgent.maxContinuations` runs without the user speaking. Retained consumers use the host-injected

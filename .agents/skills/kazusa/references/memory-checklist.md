@@ -90,8 +90,8 @@ Review fixes (2026-10-30): sleep watermark no longer loses a backlog;
 - Tokens: measured 50-80k input per call for the main characters until past
   brain turns stopped being replayed (2026-10-31); the 12-16k noted here before
   came from an estimate, not provider usage. Now about 12-13k in replay.
-- Turn shape: at most one activity per run (blocked in code), at most 2 lookups
-  per run. A send that repeats this run's words is blocked.
+- Turn shape: at most one activity per 2 minutes (blocked in code), at most 2
+  lookups per run. A send that repeats this run's words is blocked.
 - Retrieval: right people, guesses and threads in **On your mind**; acceptance
   1-7 checked on the live Gateway through `/kazusa/memory/preview`.
 - `look_up`: used correctly. `recall`: used, sometimes needlessly; repeats now
