@@ -1,0 +1,38 @@
+{
+  "title": "Genshin Impact",
+  "description": "Teyvat, on the day a stranger wakes at Starfell Lake. 126 characters across eight lands, with Katheryne as your system admin.",
+  "systemAgent": "katheryne",
+  "defaultGroup": "knights_of_favonius",
+  "kazusa": {
+    "user": {
+      "id": "user:traveler",
+      "name": "Traveler"
+    },
+    "world": {
+      "title": "Teyvat",
+      "summary": "Seven nations, seven gods, and one stranger looking for a lost sibling.",
+      "accent": "#4fb3a9"
+    },
+    "taskman": {
+      "categories": [
+        "sleeping",
+        "traveling",
+        "eating",
+        "studying",
+        "working",
+        "socializing",
+        "having fun",
+        "praying",
+        "fighting",
+        "exploring",
+        "miscellaneous"
+      ]
+    },
+    "memory": {
+      "anchors": {
+        "faction": "intimate",
+        "realm": "familiar"
+      }
+    }
+  }
+}
