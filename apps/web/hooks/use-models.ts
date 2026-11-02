@@ -28,8 +28,7 @@ function describe(error: unknown) {
  * The Gateway's model catalog and one scope's model and reasoning level.
  * Without `agentId` that scope is the world default every character inherits;
  * with one, it is that character's effective choice (`overrides` says which
- * fields are its own). Only live: there is no mock catalog, so `enabled` is
- * false without a Gateway.
+ * fields are its own). `enabled` is false without a Gateway.
  */
 export function useModels(agentId?: string) {
   const { resolved } = useSources();
@@ -166,8 +165,7 @@ export function useModels(agentId?: string) {
 
 /**
  * Whether a character has a model of its own to choose: a live agent. Players
- * and NPCs never take a model turn, and mock agents are unknown to the
- * Gateway.
+ * and NPCs never take a model turn.
  */
 export function useRunsOnModel(entity: { readonly id: string }): boolean {
   const { resolved } = useSources();

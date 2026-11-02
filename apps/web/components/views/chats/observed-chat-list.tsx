@@ -3,7 +3,6 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRightIcon, EyeIcon } from "lucide-react";
-import { MockTag } from "@/components/entities/source-state";
 import { useSimNow } from "@/hooks/use-clock";
 import { useRealtime } from "@/lib/live/realtime-provider";
 import type { Agent } from "@kazusa/client";
@@ -84,7 +83,6 @@ export function ObservedChatList({
           />
           <EyeIcon aria-hidden className="size-3.5 shrink-0" />
           <span className="truncate">Other chats</span>
-          <MockTag requires={["observe"]} />
           <span className="ml-auto font-mono text-[11px] tabular-nums">
             {total}
           </span>

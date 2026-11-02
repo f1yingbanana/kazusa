@@ -5,11 +5,7 @@ import {
 } from "@kazusa/client";
 import { buildUrl, request } from "../http";
 
-/**
- * `GET /kazusa/timeline` per the proposed contract. Not reachable until the
- * plugin journal lands and `timeline` is added to the proxy allowlist; the
- * capability resolver keeps this domain on mock until then.
- */
+/** `GET /kazusa/timeline`. */
 export async function fetchTimeline(
   baseUrl: string,
   query: TimelineQuery,

@@ -29,6 +29,7 @@ import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
+import { registerWelcome } from "./messaging/welcome.ts";
 import {
   registerCharactersHttp,
   resolveCharacterStatus,
@@ -205,7 +206,10 @@ export default definePluginEntry({
       },
     });
     registerBrainHttp(api);
-    registerBrainTraceHttp(api);
+    registerBrainTraceHttp(
+      api,
+      async (agentId) => (await perception.getBrainState(agentId)).failure,
+    );
     location.attachPerception(perception);
 
     const stopSupervisor = taskman.attachSupervisor(perception);
@@ -247,6 +251,7 @@ export default definePluginEntry({
       observer,
     });
     messagingRef.current = messaging;
+    registerWelcome(api, messaging);
 
     // Huddles live in Messaging; Location reads them for sightings and
     // `With you`, and takes people out of them when they walk away.

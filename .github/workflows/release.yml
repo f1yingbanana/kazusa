@@ -1,0 +1,69 @@
+# Pushing a version tag (`v0.2.0` or `0.2.0`) publishes both installers. Running
+# it by hand from the Actions tab builds and checks them without publishing.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]*", "[0-9]*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # A Mac builds both: only it can make a disk image, and it can cross-install
+    # Windows. The bundled Node is whichever version runs the build.
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.19.0
+      - run: brew install makensis
+      - run: node scripts/package.mjs darwin-arm64 "${TAG#v}"
+      - run: node scripts/package.mjs win-x64 "${TAG#v}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers
+          path: |
+            dist/Kazusa-*.dmg
+            dist/Kazusa-Setup-*.exe
+          compression-level: 0
+
+  verify-windows:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: installers
+          path: installers
+      - shell: pwsh
+        run: |
+          $installer = (Get-ChildItem installers/Kazusa-Setup-*.exe).FullName
+          ./scripts/verify-installer.ps1 -Installer $installer
+
+  publish:
+    needs: verify-windows
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: installers
+          path: installers
+      - run: |
+          gh release create "$TAG" installers/Kazusa-*.dmg installers/Kazusa-Setup-*.exe \
+            --verify-tag --generate-notes --notes "These builds are unsigned.
+          **Windows:** choose More info, then Run anyway. To update, run the new installer and keep the same folder.
+          **Mac (Apple silicon):** drag Kazusa to Applications and open it. If macOS blocks it, go to System Settings > Privacy & Security and choose Open Anyway. To update, replace the app.
+          To quit, press Ctrl+C in Kazusa's terminal window and wait for it to finish."

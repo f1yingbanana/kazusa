@@ -31,12 +31,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useSimNow } from "@/hooks/use-clock";
+import { useFollowBottom } from "@/hooks/use-follow-bottom";
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
+import type { BrainActivity } from "@/lib/source/brain/activity";
 import { actionLine, isOneOnOne } from "@/lib/source/chats/display";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
+import { BrainActivityRows, BrainThinking } from "./tool-activity";
 import type { Typist } from "@/lib/live/realtime-provider";
 
 const RUN_GAP_MS = 5 * 60 * 1000;
@@ -55,7 +58,12 @@ type Run = {
   introduced: boolean;
 };
 
-function buildRuns(messages: DisplayMessage[], simNow: number) {
+function buildRuns(
+  messages: DisplayMessage[],
+  simNow: number,
+  /** Messages with something shown just before them start a new run. */
+  startsRun: ReadonlyMap<number, BrainActivity>,
+) {
   const runs: Run[] = [];
   let previous: DisplayMessage | null = null;
 
@@ -71,7 +79,8 @@ function buildRuns(messages: DisplayMessage[], simNow: number) {
       current.isAction === isAction &&
       previous.senderId === message.senderId &&
       message.timestamp - previous.timestamp < RUN_GAP_MS &&
-      !previous.status === !message.status;
+      !previous.status === !message.status &&
+      !("sequence" in message && startsRun.has(message.sequence));
 
     if (continues) {
       current.messages.push(message);
@@ -108,6 +117,8 @@ export function MessageList({
   onRetry,
   resolve,
   userId,
+  activity = [],
+  activityRunning = false,
 }: {
   chat: ChatInfo;
   /** Read from outside: the empty state doesn't invite the player to speak. */
@@ -123,19 +134,40 @@ export function MessageList({
   onRetry: (message: PendingMessage) => void;
   resolve: (id: string, fallbackName?: string) => Participant;
   userId: string;
+  /** The system admin's model calls, placed among its messages. */
+  activity?: readonly BrainActivity[];
+  activityRunning?: boolean;
 }) {
   const simNow = useSimNow();
+  // A long job grows inside the list, which message-by-message scrolling misses.
+  const follow = useFollowBottom(activity.length > 0 || activityRunning);
   // Huddles and groups both need names on lines; only your own DM has one voice.
   const isGroup = !isOneOnOne(chat, userId);
   const empty = observed ? EMPTY_OBSERVED : EMPTY[chat.type];
-  const runs = buildRuns([...messages, ...pending], simNow);
+  const activityBefore = new Map(
+    activity.flatMap((group) =>
+      group.beforeSequence === undefined
+        ? []
+        : [[group.beforeSequence, group] as const],
+    ),
+  );
+  const trailing = activity.filter(
+    (group) => group.beforeSequence === undefined,
+  );
+  const runs = buildRuns([...messages, ...pending], simNow, activityBefore);
   const pendingById = new Map(pending.map((message) => [message.id, message]));
 
   return (
     <MessageScrollerProvider autoScroll>
       <MessageScroller className="flex-1">
-        <MessageScrollerViewport>
-          <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4">
+        <MessageScrollerViewport
+          ref={follow.scroller}
+          onScroll={follow.onScroll}
+        >
+          <MessageScrollerContent
+            ref={follow.content}
+            className="mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4"
+          >
             {hasMore ? (
               <MessageScrollerItem
                 messageId="load-older"
@@ -191,9 +223,19 @@ export function MessageList({
               const participant = resolve(run.senderId, run.senderName);
               const isSelf = run.senderId === userId;
               const align = isSelf ? "end" : "start";
+              const first = run.messages[0];
+              const before =
+                first && "sequence" in first
+                  ? activityBefore.get(first.sequence)
+                  : undefined;
 
               return (
                 <Fragment key={run.key}>
+                  {before ? (
+                    <MessageScrollerItem messageId={before.key}>
+                      <BrainActivityRows activity={before} running={false} />
+                    </MessageScrollerItem>
+                  ) : null}
                   {run.dayLabel ? (
                     <MessageScrollerItem messageId={`day-${run.key}`}>
                       <Marker variant="separator" className="text-xs">
@@ -288,6 +330,18 @@ export function MessageList({
                 </Fragment>
               );
             })}
+
+            {trailing.map((group) => (
+              <MessageScrollerItem key={group.key} messageId={group.key}>
+                <BrainActivityRows activity={group} running={activityRunning} />
+              </MessageScrollerItem>
+            ))}
+
+            {activityRunning ? (
+              <MessageScrollerItem messageId="brain-thinking">
+                <BrainThinking />
+              </MessageScrollerItem>
+            ) : null}
 
             {typists.map((typist) => {
               const participant = resolve(typist.senderId, typist.senderName);

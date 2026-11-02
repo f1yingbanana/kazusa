@@ -1,28 +1,33 @@
 import { describe, expect, it } from "vitest";
-import type { DesireRecord } from "@kazusa/client";
-import { MOCK_DESIRES_CONFIG as config } from "../source/mock/desires";
-import {
-  desireLabel,
-  levelsAt,
-  nextDrop,
-  startEffects,
-  stateOf,
-  trendOf,
-} from "./desires";
+import type { DesireRecord, DesiresConfig } from "@kazusa/client";
+import { desireLabel, levelsAt, nextDrop, stateOf, trendOf } from "./desires";
 import { MINUTE } from "./sim";
+
+const config: DesiresConfig = {
+  states: [
+    { name: "depleted", min: 0, level: 10 },
+    { name: "low", min: 25, level: 35 },
+    { name: "fine", min: 50, level: 65 },
+    { name: "full", min: 80, level: 100 },
+  ],
+  initial: "fine",
+  catalog: [
+    { name: "energy", drain: 4, description: "" },
+    { name: "satiety", drain: 8, description: "" },
+    { name: "social", drain: 2, description: "" },
+  ],
+};
 
 const T0 = Date.parse("2026-10-27T08:00:00.000Z");
 const minutes = (n: number) => T0 + n * MINUTE;
 const desire = (name: string) => config.catalog.find((d) => d.name === name)!;
 
 function fresh(levels: Record<string, number> = {}): DesireRecord {
-  const record = startEffects(
-    config,
-    undefined,
-    { id: "t0", at: T0, until: T0 },
-    {},
-  );
-  return { ...record, levels: { ...record.levels, ...levels } };
+  return {
+    anchorAt: T0,
+    levels: { ...levelsAt(config, undefined, T0), ...levels },
+    drain: {},
+  };
 }
 
 describe("desire levels (mirrors the plugin's closed form)", () => {
@@ -39,26 +44,18 @@ describe("desire levels (mirrors the plugin's closed form)", () => {
   });
 
   it("moves toward the target by the planned end, then drains", () => {
-    const record = startEffects(
-      config,
-      fresh({ satiety: 25 }),
-      { id: "meal", at: T0, until: minutes(30) },
-      { satiety: "full" },
-    );
+    const record = {
+      ...fresh({ satiety: 25 }),
+      effects: {
+        taskId: "meal",
+        until: minutes(30),
+        byDesire: { satiety: { target: 100, rate: 150 } },
+      },
+    };
     expect(levelsAt(config, record, minutes(15)).satiety).toBe(62.5);
     expect(levelsAt(config, record, minutes(30)).satiety).toBe(100);
     expect(levelsAt(config, record, minutes(90)).satiety).toBe(92);
     expect(levelsAt(config, record, minutes(30)).energy).toBe(63);
-  });
-
-  it("treats a target in the current state as no change", () => {
-    const record = startEffects(
-      config,
-      fresh({ energy: 30 }),
-      { id: "late", at: T0, until: minutes(60) },
-      { energy: "low" },
-    );
-    expect(record.effects).toBeUndefined();
   });
 
   it("maps levels to states", () => {
@@ -71,12 +68,14 @@ describe("desire levels (mirrors the plugin's closed form)", () => {
 
 describe("desire trends and forecast", () => {
   it("reports where the current task is moving a desire", () => {
-    const record = startEffects(
-      config,
-      fresh({ satiety: 25 }),
-      { id: "meal", at: T0, until: minutes(30) },
-      { satiety: "full" },
-    );
+    const record = {
+      ...fresh({ satiety: 25 }),
+      effects: {
+        taskId: "meal",
+        until: minutes(30),
+        byDesire: { satiety: { target: 100, rate: 150 } },
+      },
+    };
     const trend = trendOf(config, record, desire("satiety"), minutes(10));
     expect(trend).toMatchObject({
       direction: "up",
@@ -100,12 +99,14 @@ describe("desire trends and forecast", () => {
       state: "low",
       at: minutes(112.5),
     });
-    const eating = startEffects(
-      config,
-      record,
-      { id: "meal", at: T0, until: minutes(30) },
-      { satiety: "full" },
-    );
+    const eating = {
+      ...fresh(),
+      effects: {
+        taskId: "meal",
+        until: minutes(30),
+        byDesire: { satiety: { target: 100, rate: 70 } },
+      },
+    };
     // Energy (4/h from 65) is next: 15 points → 3h45m.
     expect(nextDrop(config, eating, T0)?.desire).toBe("energy");
     expect(nextDrop(config, eating, T0)?.at).toBe(minutes(225));

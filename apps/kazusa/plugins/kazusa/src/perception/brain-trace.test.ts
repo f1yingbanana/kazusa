@@ -1,5 +1,6 @@
+import type { BrainTurn } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
-import { brainTurns } from "./brain-trace.ts";
+import { brainTurns, withFailure } from "./brain-trace.ts";
 
 const user = (entryId: string, content: unknown, timestamp = 1) => ({
   entryId,
@@ -119,5 +120,34 @@ describe("brainTurns", () => {
 
   it("has no turns for an empty transcript", () => {
     expect(brainTurns([])).toEqual([]);
+  });
+});
+
+describe("withFailure", () => {
+  const turn = (id: string, error?: string): BrainTurn => ({
+    id,
+    prompts: [],
+    calls: error ? [{ id: "c", error, steps: [] }] : [],
+  });
+  const failure = { error: "No API key", at: 9, runId: "run-2" };
+
+  it("adds nothing without a failure", () => {
+    expect(withFailure([turn("run-1")], undefined)).toEqual([turn("run-1")]);
+  });
+  it("marks the run it belongs to", () => {
+    expect(withFailure([turn("run-2")], failure)[0].error).toBe("No API key");
+  });
+  it("marks prompts that never reached a model call", () => {
+    const [waiting] = withFailure([turn("waiting:e1")], failure);
+    expect(waiting.error).toBe("No API key");
+  });
+  it("adds a turn when the transcript holds nothing for it", () => {
+    const turns = withFailure([turn("run-1")], failure);
+    expect(turns.map(({ id }) => id)).toEqual(["run-1", "run-2"]);
+    expect(turns[1].error).toBe("No API key");
+  });
+  it("doesn't repeat an error the host recorded", () => {
+    const turns = withFailure([turn("run-2", "401")], failure);
+    expect(turns[0].error).toBeUndefined();
   });
 });

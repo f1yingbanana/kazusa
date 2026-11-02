@@ -17,7 +17,7 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import { brainTurns } from "./brain-trace.ts";
+import { brainTurns, withFailure, type RunFailure } from "./brain-trace.ts";
 
 const DEFAULT_TRACE_TURNS = 20;
 const MAX_TRACE_TURNS = 100;
@@ -51,7 +51,10 @@ export function registerBrainHttp(api: OpenClawPluginApi): void {
 }
 
 /** The brain transcript as turns: thinking, tool calls, tokens and model. */
-export function registerBrainTraceHttp(api: OpenClawPluginApi): void {
+export function registerBrainTraceHttp(
+  api: OpenClawPluginApi,
+  failureOf: (agentId: string) => Promise<RunFailure | undefined>,
+): void {
   createRouteRegistrar(api)("brain/trace", "GET", async (req, res) => {
     const params = new URL(req.url ?? "/", "http://localhost").searchParams;
     const agentId = params.get("id") ?? "";
@@ -69,15 +72,18 @@ export function registerBrainTraceHttp(api: OpenClawPluginApi): void {
       sessionKey,
     });
     const sessionId = entry?.sessionId?.trim();
-    const turns = sessionId
-      ? brainTurns(
-          await readVisibleSessionTranscriptMessageEntries({
-            agentId,
-            sessionKey,
-            sessionId,
-          }),
-        )
-      : [];
+    const turns = withFailure(
+      sessionId
+        ? brainTurns(
+            await readVisibleSessionTranscriptMessageEntries({
+              agentId,
+              sessionKey,
+              sessionId,
+            }),
+          )
+        : [],
+      await failureOf(agentId),
+    );
     sendJson(res, 200, {
       turns: turns.slice(-limit).reverse(),
       total: turns.length,

@@ -62,9 +62,18 @@ const keysOf = (item: PendingItem): string[] => [
 
 const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 
+/** At is real time: this reports on the host, not the world. */
+export interface BrainFailure {
+  readonly error: string;
+  readonly at: number;
+  readonly runId: string;
+}
+
 export interface PerceptionState {
   pending: PendingItem[];
   brainRun?: string;
+  /** Why the latest run failed, until a run gets through. */
+  failure?: BrainFailure;
   brainContext?: string;
   /**
    * Retained until host adoption; an interrupted handoff must not be blindly
@@ -475,12 +484,34 @@ export class Perception {
   async getBrainState(agentId: string): Promise<{
     brain: "idle" | "thinking";
     queued: number;
+    failure?: BrainFailure;
   }> {
     const state = await this.store.lookup(agentId);
     return {
       brain: state?.brainRun ? "thinking" : "idle",
       queued: state?.pending?.length ?? 0,
+      ...(state?.failure ? { failure: state.failure } : {}),
     };
+  }
+
+  /** Records why a run failed, or with nothing, that one got through. */
+  async noteRunOutcome(agentId: string, failure?: BrainFailure): Promise<void> {
+    let queued = 0;
+    let brain: "idle" | "thinking" = "idle";
+    let changed = false;
+    await this.change(
+      agentId,
+      (state) => {
+        if (!failure && !state.failure) return;
+        if (failure) state.failure = failure;
+        else delete state.failure;
+        queued = state.pending.length;
+        brain = state.brainRun ? "thinking" : "idle";
+        changed = true;
+      },
+      false,
+    );
+    if (changed) this.notifyBrainState(agentId, brain, queued);
   }
 
   async started(agentId: string, runId: string): Promise<void> {

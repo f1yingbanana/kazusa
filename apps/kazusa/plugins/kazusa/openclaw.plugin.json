@@ -391,6 +391,13 @@
           }
         }
       },
+      "welcome": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 9,
+        "items": { "type": "string", "minLength": 1 },
+        "description": "What the system agent first says to the player, one chat bubble each. Sent once, on the world's first start, without a model call."
+      },
       "user": {
         "type": "object",
         "additionalProperties": false,

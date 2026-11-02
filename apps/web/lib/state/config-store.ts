@@ -1,7 +1,6 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { MockMode } from "@/lib/source/capabilities";
 
 export type KazusaConfig = {
   baseUrl: string;
@@ -9,23 +8,14 @@ export type KazusaConfig = {
   /** Supplied by the server (`/kazusa/chats` user); never hardcoded lore. */
   userId: string;
   userName: string;
-  mocks: MockMode;
 };
 
 const STORAGE_KEY = "kazusa:connection";
-const MOCK_MODES: readonly MockMode[] = ["auto", "all", "off"];
-
-function envMockMode(): MockMode {
-  const value = process.env.NEXT_PUBLIC_KAZUSA_MOCKS;
-  return MOCK_MODES.includes(value as MockMode) ? (value as MockMode) : "auto";
-}
-
 export const DEFAULT_CONFIG: KazusaConfig = {
   baseUrl: process.env.NEXT_PUBLIC_KAZUSA_API_URL ?? "",
   token: process.env.NEXT_PUBLIC_KAZUSA_TOKEN ?? "",
   userId: "user:you",
   userName: "You",
-  mocks: envMockMode(),
 };
 
 const listeners = new Set<() => void>();
@@ -48,10 +38,6 @@ function read(): KazusaConfig {
               "token" in saved && typeof saved.token === "string"
                 ? saved.token
                 : undefined,
-            mocks:
-              "mocks" in saved && MOCK_MODES.includes(saved.mocks as MockMode)
-                ? (saved.mocks as MockMode)
-                : DEFAULT_CONFIG.mocks,
           }
         : DEFAULT_CONFIG;
   } catch {
@@ -73,7 +59,6 @@ export function saveConfig(next: KazusaConfig) {
       JSON.stringify({
         baseUrl: next.baseUrl,
         token: next.token ?? "",
-        mocks: next.mocks,
       }),
     );
   } catch {

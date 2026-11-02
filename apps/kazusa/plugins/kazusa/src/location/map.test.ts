@@ -201,7 +201,7 @@ Body text.
     );
   });
 
-  it.each(["blue-archive", "elden-ring", "starter"])(
+  it.each(["blue-archive", "elden-ring", "genshin-impact", "starter"])(
     "loads the %s world's wiki",
     (id) => {
       const wikiDir = fileURLToPath(

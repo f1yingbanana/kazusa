@@ -325,6 +325,16 @@ export function registerPerception(
         runErrors.delete(event.runId);
         const stoppedOnPurpose =
           data.data.aborted === true || data.data.stopReason === "aborted";
+        try {
+          await perception.noteRunOutcome(
+            owner.agentId,
+            error && !stoppedOnPurpose
+              ? { error, at: Date.now(), runId: event.runId }
+              : undefined,
+          );
+        } catch (err: unknown) {
+          api.logger.warn(`Perception: run outcome not kept: ${String(err)}`);
+        }
         if (error && !stoppedOnPurpose) {
           // A fresh run would most likely fail the same way, so a person decides.
           const systemAgent =

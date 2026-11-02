@@ -8,7 +8,7 @@ import {
   chatIcon,
   useChatTitle,
 } from "@/components/entities/chips";
-import { MockTag, NeedsLine } from "@/components/entities/source-state";
+import { NeedsLine } from "@/components/entities/source-state";
 import { Button } from "@/components/ui/button";
 import { useCharacters } from "@/hooks/use-characters";
 import { useNavigate, useParam, useSelection } from "@/hooks/use-url-state";
@@ -66,7 +66,6 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
             {mine ? null : <span>{ended ? "· ended" : "· observed"}</span>}
           </p>
         </div>
-        {!mine ? <MockTag requires={["observe"]} /> : null}
       </div>
       <div className="-mx-2 flex flex-col">
         {members.map((id) => {

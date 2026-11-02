@@ -5,7 +5,6 @@ import type { ClockActionPayload } from "@kazusa/client";
 import { clockStore } from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
 import { executeClockAction } from "@/lib/source/clock/http";
-import { applyClockAction } from "@/lib/source/mock/clock";
 import { useSources } from "@/lib/source/provider";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { MINUTE, bucket, simTimeAt } from "@/lib/time/sim";
@@ -35,10 +34,15 @@ function sample() {
   for (const listener of tickListeners) listener();
 }
 
-/** Sim time right now, for stamping an event (not for rendering: use `useSimNow`). */
+/**
+ * Sim time right now, for stamping an event (not for rendering: use
+ * `useSimNow`).
+ */
 export function readSimNow(): number {
   const anchor = clockStore.get();
-  return anchor ? simTimeAt(anchor.clock, Date.now(), anchor.offset) : Date.now();
+  return anchor
+    ? simTimeAt(anchor.clock, Date.now(), anchor.offset)
+    : Date.now();
 }
 
 function subscribeTicker(listener: () => void) {
@@ -67,49 +71,25 @@ export function useSimNow(resolution = MINUTE) {
 }
 
 export function useClockActions() {
-  const { resolved, world } = useSources();
+  const { resolved } = useSources();
   const config = useKazusaConfig();
 
   const apply = useCallback(
     async (action: ClockActionPayload) => {
-      if (resolved.clock === "live") {
-        try {
-          const result = await executeClockAction(
-            config.baseUrl,
-            action,
-            config.token,
-          );
-          dispatchLive({ type: "clock", clock: result.clock });
-        } catch (error) {
-          console.error("Failed to execute clock action:", error);
-        }
-        return;
-      }
-      if (resolved.clock !== "mock") return;
-      const anchor = clockStore.get();
-      if (!anchor) return;
-      const next = applyClockAction(anchor.clock, action, Date.now());
-      dispatchLive({ type: "clock", clock: next });
-      if (world) {
-        const event = {
-          seq: world.nextSeq++,
-          simTime: next.simTime,
-          kind: "clock.changed" as const,
-          actors: [],
-          payload:
-            action.action === "set_speed"
-              ? { speed: action.speed }
-              : { advancedMinutes: action.minutes },
-        };
-        world.journal.push(event);
-        dispatchLive({ type: "journal", event });
+      if (resolved.clock !== "live") return;
+      try {
+        const result = await executeClockAction(
+          config.baseUrl,
+          action,
+          config.token,
+        );
+        dispatchLive({ type: "clock", clock: result.clock });
+      } catch (error) {
+        console.error("Failed to execute clock action:", error);
       }
     },
-    [resolved.clock, world, config.baseUrl, config.token],
+    [resolved.clock, config.baseUrl, config.token],
   );
 
-  return {
-    apply,
-    enabled: resolved.clock === "live" || resolved.clock === "mock",
-  };
+  return { apply, enabled: resolved.clock === "live" };
 }

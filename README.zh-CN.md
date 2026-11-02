@@ -99,6 +99,9 @@
 >
 > 如果你对项目感兴趣但不想自己部署，可以[在这里加入候补名单](https://openrp.ai/kazusa)。等我们上线一键部署的云端服务后，会第一时间发邮件通知你。
 
+**从 [Releases](https://github.com/f1yingbanana/kazusa/releases/latest)
+下载 Windows 或 Mac 安装包**，或者按下面的步骤用 npm 安装。
+
 你需要先安装 **Node.js 24.16+ (24.x) 或 26.1+** 以及
 **Git**。打开终端运行（或者直接甩给你的 AI 帮你跑）：
 

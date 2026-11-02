@@ -1,22 +1,28 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useCharacters } from "@/hooks/use-characters";
+import { useBrainTrace } from "@/hooks/use-brain";
+import { useCharacters, useCharacterStatus } from "@/hooks/use-characters";
 import { readSimNow } from "@/hooks/use-clock";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
 import { useParticipantResolver } from "@/hooks/use-participants";
+import { brainActivity } from "@/lib/source/brain/activity";
 import { setTyping } from "@/lib/source/chats/http";
 import type {
   Chat,
   MessageType,
   PendingMessage,
 } from "@/lib/source/chats/types";
+import { ChatFailure } from "./chat-failure";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
 import { MembersSheet } from "./members-sheet";
 import { MessageList } from "./message-list";
 import { useRealtime } from "@/lib/live/realtime-provider";
+
+/** The system admin's work is the player's to watch; a character's is theirs. */
+const ADMIN_TURNS = 20;
 
 export function ChatView({
   chat,
@@ -27,7 +33,7 @@ export function ChatView({
   onBack: () => void;
   onSent: (chat: Chat) => void;
 }) {
-  const { characters } = useCharacters();
+  const { characters, byId } = useCharacters();
   const agents = characters.filter((character) => character.kind === "agent");
   const { config, send, commitSentMessage, refreshChats } = useChatActions();
   const { typingByChat } = useRealtime();
@@ -36,6 +42,22 @@ export function ChatView({
   const [membersOpen, setMembersOpen] = useState(false);
 
   const typists = typingByChat[chat.id] ?? [];
+
+  const admin =
+    chat.type === "direct" && !chat.draft
+      ? chat.members.find((id) => byId.get(id)?.isSystemAgent)
+      : undefined;
+  const adminThinking = useCharacterStatus(admin)?.brain === "thinking";
+  const { data: adminTrace } = useBrainTrace(admin, ADMIN_TURNS, adminThinking);
+  const activity = useMemo(
+    () =>
+      adminTrace ? brainActivity(adminTrace.turns, messagesState.messages) : [],
+    [adminTrace, messagesState.messages],
+  );
+  const others = useMemo(
+    () => chat.members.filter((id) => id !== config.userId),
+    [chat.members, config.userId],
+  );
 
   const resolve = useParticipantResolver();
 
@@ -148,7 +170,11 @@ export function ChatView({
         onRetry={handleRetry}
         resolve={resolve}
         userId={config.userId}
+        activity={activity}
+        activityRunning={adminThinking}
       />
+
+      <ChatFailure members={others} />
 
       <Composer
         placeholder={

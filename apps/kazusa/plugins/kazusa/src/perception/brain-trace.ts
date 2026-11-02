@@ -5,6 +5,12 @@ import type {
   BrainUsage,
 } from "@kazusa/client";
 
+export interface RunFailure {
+  readonly error: string;
+  readonly at: number;
+  readonly runId: string;
+}
+
 /** One tool result or prompt can be a whole wiki page; the view only peeks. */
 const MAX_TEXT_CHARS = 8000;
 
@@ -177,4 +183,36 @@ export function brainTurns(rows: readonly TranscriptRow[]): BrainTurn[] {
   }
   if (prompts.length > 0) open(`waiting:${rows[rows.length - 1].entryId}`);
   return turns;
+}
+
+/**
+ * Puts the latest failed run where it happened. A run can fail before any model
+ * call is recorded, say on a missing or rejected key, and the transcript then
+ * holds nothing but its prompts; an error the host did record is already
+ * shown.
+ */
+export function withFailure(
+  turns: readonly BrainTurn[],
+  failure: RunFailure | undefined,
+): BrainTurn[] {
+  if (!failure) return [...turns];
+  const last = turns.at(-1);
+  const failed =
+    turns.find((turn) => turn.id === failure.runId) ??
+    (last?.id.startsWith("waiting:") ? last : undefined);
+  if (failed?.calls.some((call) => call.error)) return [...turns];
+  if (failed)
+    return turns.map((turn) =>
+      turn === failed ? { ...turn, error: failure.error } : turn,
+    );
+  return [
+    ...turns,
+    {
+      id: failure.runId,
+      at: failure.at,
+      prompts: [],
+      calls: [],
+      error: failure.error,
+    },
+  ];
 }

@@ -113,9 +113,9 @@ or have the user restart from `starter`.
 
 ## 3. Research
 
-**Pick one main source fast.** Try one or two wikis with a single fetch each,
-and choose the one with the most complete, reachable pages. Note it under
-Decisions.
+**Pick one main source fast.** Use `web_search` to find wikis and sources, which
+needs no key. Try one or two wikis with a single fetch each, and choose the one
+with the most complete, reachable pages. Note it under Decisions.
 
 Web pages are often blocked where a wiki's API isn't. For a MediaWiki or Fandom
 wiki, use these with `web_fetch`:

@@ -5,14 +5,8 @@ import useSWR from "swr";
 import type { MessagesResponse, ObservedChatsResponse } from "@kazusa/client";
 import { usePagedMessages, sortChats } from "@/hooks/use-chats";
 import { chatTitle } from "@/lib/source/chats/display";
-import { MESSAGE_PAGE_SIZE } from "@/lib/source/chats/http";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import {
-  mockObservedChats,
-  mockObservedMessages,
-} from "@/lib/source/mock/chats";
-import {
-  OBSERVED_CHATS_KEY,
   OBSERVED_MESSAGES_KEY,
   fetchObservedChats,
   fetchObservedMessages,
@@ -21,35 +15,20 @@ import {
 import { useSources } from "@/lib/source/provider";
 import { useKazusaConfig } from "@/lib/state/config-store";
 
-/** Live chats arrive by SSE; the mock world's journal just grows. */
-const MOCK_REFRESH_MS = 4_000;
-
 /**
  * The one read path for chats the player isn't in. Reads nothing in the world
  * and changes nothing; when the Player lens comes, redaction belongs here.
  */
 function useObservedResource() {
   const config = useKazusaConfig();
-  const { resolved, world } = useSources();
+  const { resolved } = useSources();
   const live = resolved.observe === "live";
-  // Mocks need a mock world; a lone mocked domain doesn't start one.
-  const mocked = resolved.observe === "mock" ? world : null;
   const resource = useSWR<ObservedChatsResponse, Error>(
-    live
-      ? observedChatsKey(config)
-      : mocked
-        ? ([OBSERVED_CHATS_KEY, "mock", mocked.id] as const)
-        : null,
-    () =>
-      mocked
-        ? mockObservedChats(mocked)
-        : fetchObservedChats(config.baseUrl, config.token),
-    {
-      revalidateOnFocus: false,
-      refreshInterval: mocked ? MOCK_REFRESH_MS : 0,
-    },
+    live ? observedChatsKey(config) : null,
+    () => fetchObservedChats(config.baseUrl, config.token),
+    { revalidateOnFocus: false },
   );
-  return { ...resource, available: live || Boolean(mocked) };
+  return { ...resource, available: live };
 }
 
 /** Chats the player isn't in, newest first, titled for display. */
@@ -90,24 +69,13 @@ export function useObservedChat(id: string | null | undefined) {
 
 export function useObservedMessages(chatId: string | null) {
   const config = useKazusaConfig();
-  const { resolved, world } = useSources();
-  const mocked = resolved.observe === "mock" ? world : null;
   return usePagedMessages<MessagesResponse>(
     messagesKeyGetter(config, chatId, OBSERVED_MESSAGES_KEY),
     (id, before) =>
-      mocked
-        ? Promise.resolve(
-            mockObservedMessages(mocked, {
-              chatId: id,
-              before,
-              limit: MESSAGE_PAGE_SIZE,
-            }),
-          )
-        : fetchObservedMessages(
-            config.baseUrl,
-            { chatId: id, before },
-            config.token,
-          ),
-    { refreshInterval: mocked ? MOCK_REFRESH_MS : 0 },
+      fetchObservedMessages(
+        config.baseUrl,
+        { chatId: id, before },
+        config.token,
+      ),
   );
 }

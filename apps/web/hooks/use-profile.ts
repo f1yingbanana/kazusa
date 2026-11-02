@@ -16,7 +16,7 @@ function isCharacterKey(key: unknown): boolean {
   return Array.isArray(key) && key[0] === "kazusa/character";
 }
 
-/** The player's own profile. Only live: a mock world has no wiki to write to. */
+/** The player's own profile. Only live. */
 export function useProfile() {
   const { resolved } = useSources();
   const config = useKazusaConfig();

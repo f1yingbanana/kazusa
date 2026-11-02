@@ -37,7 +37,9 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const position = usePosition(entity.id);
   const standing = position?.kind === "at" ? position.placeId : undefined;
   const there = usePlace(standing);
-  const offstage = useCharacterStatus(entity.id)?.onstage === false;
+  const status = useCharacterStatus(entity.id);
+  const offstage = status?.onstage === false;
+  const failure = status?.brain === "thinking" ? undefined : status?.failure;
   const { available: canObserve } = useObservedChat(null);
 
   if (!character) {
@@ -78,6 +80,11 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
         {subtitle ? (
           <p className="truncate text-sm text-muted-foreground mt-0.5">
             {subtitle}
+          </p>
+        ) : null}
+        {failure ? (
+          <p className="mt-1 text-sm wrap-anywhere text-destructive">
+            {`Latest turn failed: ${failure.error}`}
           </p>
         ) : null}
         <div className="flex shrink-0 items-center gap-1 -ml-1.5 mt-2">

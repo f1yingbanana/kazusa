@@ -25,6 +25,7 @@
         "write",
         "view_image",
         "web_fetch",
+        "web_search",
         "clock_now",
         "clock_set_speed",
         "clock_advance",
@@ -45,7 +46,13 @@
         "enabled": false
       }
     },
-    "skills": ["world-building", "world-project", "kazusa", "openclaw", "typescript"]
+    "skills": [
+      "world-building",
+      "world-project",
+      "kazusa",
+      "openclaw",
+      "typescript"
+    ]
   },
   "config": {
     "agents": {
@@ -73,13 +80,16 @@
       "entries": {}
     },
     "plugins": {
-      "allow": ["kazusa", "openrouter"],
+      "allow": ["kazusa", "openrouter", "parallel"],
       "slots": {
         "contextEngine": "kazusa",
         "memory": "none"
       },
       "load": {
-        "paths": ["../plugins/kazusa"]
+        "paths": [
+          "../plugins/kazusa",
+          "../../../node_modules/@openclaw/parallel-plugin"
+        ]
       },
       "entries": {
         "kazusa": {
@@ -137,6 +147,7 @@
             }
           }
         },
+        "parallel": { "enabled": true },
         "openrouter": {
           "enabled": true
         }
@@ -155,6 +166,7 @@
       }
     },
     "tools": {
+      "web": { "search": { "provider": "parallel-free" } },
       "deny": ["group:sessions", "message", "gateway"],
       "toolSearch": false,
       "codeMode": {

@@ -24,7 +24,29 @@ const GATEWAY_PORT = 18789;
 const WEB_PORT = 3000;
 const POLL_MS = 500;
 
-const bin = (name) => path.join(ROOT, "node_modules/.bin", name);
+// The installer ships a built frontend and its own Node (`scripts/package.mjs`).
+const PACKAGED = process.argv.includes("--packaged");
+
+// Run through Node, because `.bin` holds `.cmd` shims that Windows can't spawn.
+const NEXT = path.join(ROOT, "node_modules/next/dist/bin/next");
+const OPENCLAW = path.join(ROOT, "node_modules/openclaw/openclaw.mjs");
+// New worlds load this by path, so an older install has to pick it up.
+const PARALLEL = path.join(ROOT, "node_modules/@openclaw/parallel-plugin");
+const BROWSER_OPENERS = {
+  darwin: ["open"],
+  linux: ["xdg-open"],
+  win32: ["cmd", "/c", "start", ""],
+};
+
+/** The environment with our Node first, for anything the Gateway's agents run. */
+function withBundledNode(env) {
+  if (!PACKAGED) return env;
+  // Windows spells it `Path`, and a second `PATH` beside it would be ambiguous.
+  const key =
+    Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  const nodeDir = path.dirname(process.execPath);
+  return { ...env, [key]: `${nodeDir}${path.delimiter}${env[key] ?? ""}` };
+}
 
 function fail(message) {
   console.error(message);
@@ -67,13 +89,7 @@ function isListening(port) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 requireSupportedNode();
-if (!existsSync(bin("next"))) {
-  console.log("Installing dependencies. This only happens once.");
-  execFileSync("npm", ["ci", "--no-audit", "--no-fund"], {
-    cwd: ROOT,
-    stdio: "inherit",
-  });
-}
+// Before installing: `npm ci` would pull modules out from under a running copy.
 for (const [port, name] of [
   [GATEWAY_PORT, "the Gateway"],
   [WEB_PORT, "the frontend"],
@@ -83,19 +99,29 @@ for (const [port, name] of [
       `Port ${port} is already in use, so ${name} can't start. Stop whatever is using it and try again.`,
     );
 }
+if (!existsSync(NEXT) || !existsSync(PARALLEL)) {
+  console.log("Installing dependencies.");
+  execFileSync("npm", ["ci", "--no-audit", "--no-fund"], {
+    cwd: ROOT,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+}
 
 const firstRun = !existsSync(CONFIG);
 const token = gatewayToken();
 const children = new Map();
 let stopping = false;
 
-function stop(exitCode) {
+function stop(exitCode, { fromConsole = false } = {}) {
   if (stopping) return;
   stopping = true;
   process.exitCode = exitCode;
   console.log(
     "\nStopping. The Gateway lets running turns finish first, which can take a few minutes.",
   );
+  // Windows has no SIGTERM: kill() ends a child outright, so leave Ctrl+C to do it.
+  if (fromConsole && process.platform === "win32") return;
   // A terminal's Ctrl+C reaches the children too; this covers everything else.
   // Never SIGKILL the Gateway: it can leave agent databases degraded.
   for (const child of children.values()) child.kill("SIGTERM");
@@ -130,13 +156,20 @@ function start(name, command, args, options) {
   });
 }
 
-process.on("SIGINT", () => stop(0));
+process.on("SIGINT", () => stop(0, { fromConsole: true }));
 process.on("SIGTERM", () => stop(0));
 
 start(
   "web",
-  bin("next"),
-  ["dev", "--hostname", "127.0.0.1", "--port", String(WEB_PORT)],
+  process.execPath,
+  [
+    NEXT,
+    PACKAGED ? "start" : "dev",
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    String(WEB_PORT),
+  ],
   {
     cwd: path.join(ROOT, "apps/web"),
     env: {
@@ -151,17 +184,19 @@ while (!stopping && !(await isListening(WEB_PORT))) await sleep(POLL_MS);
 if (!stopping) {
   const url = `http://localhost:${WEB_PORT}`;
   console.log(`\nKazusa is running. Open ${url}\n`);
-  if (firstRun && process.platform === "darwin") spawn("open", [url]);
-  if (firstRun && process.platform === "linux") spawn("xdg-open", [url]);
+  // Someone who double-clicked an icon has no terminal habit to fall back on.
+  const opener = BROWSER_OPENERS[process.platform];
+  if (opener && (firstRun || PACKAGED))
+    spawn(opener[0], [...opener.slice(1), url], { stdio: "ignore" });
 }
 
 // The setup guide writes the config last, once the world is complete.
 while (!stopping && !existsSync(CONFIG)) await sleep(POLL_MS);
 if (!stopping) {
-  start("gateway", bin("openclaw"), ["gateway"], {
+  start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,
     env: {
-      ...process.env,
+      ...withBundledNode(process.env),
       OPENCLAW_CONFIG_PATH: "./openclaw.json",
       OPENCLAW_STATE_DIR: "./.state",
     },

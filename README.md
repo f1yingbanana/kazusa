@@ -121,6 +121,10 @@ World timeline showing character actions, and location details:
 > consider [waitlisting here](https://openrp.ai/kazusa). We'll send an email
 > once we get this running as a one-click deploy service in the cloud.
 
+**Download the Windows or Mac installer from
+[Releases](https://github.com/f1yingbanana/kazusa/releases/latest)**, or install
+with npm below.
+
 You'll need **Node.js 24.16+ (24.x) or 26.1+**, **Git**. Simply open a terminal
 and run (or ask your AI to do this for you):
 

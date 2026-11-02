@@ -194,6 +194,14 @@ export async function resolveCharacterStatus(
     queued: brainState.queued,
     onstage,
     ...(!onstage && stageRecord ? { offstageSince: stageRecord.since } : {}),
+    ...(brainState.failure
+      ? {
+          failure: {
+            error: brainState.failure.error,
+            at: brainState.failure.at,
+          },
+        }
+      : {}),
   };
 }
 

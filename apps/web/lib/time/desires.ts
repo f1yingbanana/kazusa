@@ -1,6 +1,5 @@
 import type {
   DesireDefinition,
-  DesireEffect,
   DesireRecord,
   DesiresConfig,
 } from "@kazusa/client";
@@ -166,34 +165,6 @@ export function nextDrop(
     };
   }
   return soonest;
-}
-
-/**
- * Re-anchors at `at` and moves each named desire toward its target state by
- * `until`, like the plugin's `startEffects`. A target equal to the current
- * state means no change. Used by the mock world only.
- */
-export function startEffects(
-  config: DesiresConfig,
-  record: DesireRecord | undefined,
-  task: { readonly id: string; readonly at: number; readonly until: number },
-  targets: Readonly<Record<string, string>>,
-): DesireRecord {
-  const anchorAt = Math.max(task.at, record?.anchorAt ?? task.at);
-  const levels = levelsAt(config, record, anchorAt);
-  const hours = Math.max(task.until - anchorAt, 1) / HOUR;
-  const byDesire: Record<string, DesireEffect> = {};
-  for (const [name, state] of Object.entries(targets)) {
-    const target = levelOfState(config, state);
-    const start = levels[name];
-    if (target === undefined || start === undefined) continue;
-    if (stateOf(config, start) === state) continue;
-    byDesire[name] = { target, rate: Math.abs(target - start) / hours };
-  }
-  const base = { anchorAt, levels, drain: record?.drain ?? {} };
-  return Object.keys(byDesire).length
-    ? { ...base, effects: { taskId: task.id, until: task.until, byDesire } }
-    : base;
 }
 
 /** `stimulation` → `Stimulation`, `inner_peace` → `Inner peace`. */

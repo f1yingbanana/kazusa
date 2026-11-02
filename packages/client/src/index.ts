@@ -27,6 +27,11 @@ export const ChatMessageSchema = z.object({
   /** Absent: speech. An action is done where the sender is, in third person. */
   type: z.enum(["speech", "action"]).optional(),
   timestamp: z.number(),
+  /**
+   * The stored record's real time, for lining it up with a brain trace. Only
+   * history has it.
+   */
+  createdAt: z.number().optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
@@ -212,7 +217,7 @@ export type ChatStreamEvent = z.infer<typeof ChatStreamEventSchema>;
 /* Read model: world + clock (PROPOSED — GET /kazusa/world, POST /kazusa/clock) */
 /* ========================================================================== */
 
-/** A slice of the read model that resolves to live/mock/unavailable on its own. */
+/** A slice of the read model that resolves to live/unavailable on its own. */
 export const DomainSchema = z.enum([
   "clock",
   "characters",
@@ -503,6 +508,8 @@ export const BrainTurnSchema = z.object({
   prompts: z.array(z.string()),
   calls: z.array(BrainCallSchema),
   usage: BrainUsageSchema.optional(),
+  /** Why the run failed, when no LLM call recorded it. */
+  error: z.string().optional(),
 });
 export type BrainTurn = z.infer<typeof BrainTurnSchema>;
 
@@ -573,6 +580,8 @@ export const CharacterStatusSchema = z.object({
    * then: clients compute levels at this moment, not now.
    */
   offstageSince: z.number().optional(),
+  /** Why the latest run failed, until one gets through. `at` is real time. */
+  failure: z.object({ error: z.string(), at: z.number() }).optional(),
 });
 export type CharacterStatus = z.infer<typeof CharacterStatusSchema>;
 

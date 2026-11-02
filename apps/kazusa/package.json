@@ -12,6 +12,7 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@openclaw/parallel-plugin": "2026.10.5",
     "openclaw": "^2026.10.5"
   }
 }

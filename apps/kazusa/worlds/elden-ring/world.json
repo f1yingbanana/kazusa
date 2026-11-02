@@ -4,6 +4,12 @@
   "systemAgent": "scribe",
   "defaultGroup": "roundtable",
   "kazusa": {
+    "welcome": [
+      "Tarnished. Welcome to the Lands Between. I am the Scribe, and I keep this world's records.",
+      "Those you called are onstage, yet time stands still, so nothing is spent until you choose a speed at the top of the screen.",
+      "Send word to anyone from Chats, see where they wander in World, and read what has come to pass in Timeline.",
+      "Should you wish anything changed, tell me: a new character, a rewritten history, a place not yet on any map. Where shall we begin?"
+    ],
     "user": {
       "id": "user:tarnished",
       "name": "Tarnished"

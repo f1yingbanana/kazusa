@@ -1,77 +1,75 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { useRealtime } from '@/lib/live/realtime-provider'
-import type { MockMode } from '@/lib/source/capabilities'
-import { useSources } from '@/lib/source/provider'
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { useRealtime } from "@/lib/live/realtime-provider";
+import { useSources } from "@/lib/source/provider";
 import {
   DEFAULT_CONFIG,
   saveConfig,
   useKazusaConfig,
   type KazusaConfig,
-} from '@/lib/state/config-store'
-import { cn } from '@/lib/utils'
-import { SettingsSection } from './settings-section'
-
-const MOCK_OPTIONS = [
-  { value: 'auto', label: 'Auto', description: 'Live where the backend serves a domain; placeholder data elsewhere.' },
-  { value: 'all', label: 'All', description: 'Placeholder data for every mockable domain, even when live.' },
-  { value: 'off', label: 'Off', description: 'Never mock. Missing domains show as unavailable.' },
-] as const satisfies readonly { value: MockMode; label: string; description: string }[]
+} from "@/lib/state/config-store";
+import { cn } from "@/lib/utils";
+import { SettingsSection } from "./settings-section";
 
 const STREAM_LABELS = {
-  open: 'Connected',
-  connecting: 'Reconnecting…',
-  error: 'Offline',
-} as const
+  open: "Connected",
+  connecting: "Reconnecting…",
+  error: "Offline",
+} as const;
 
 function isValidUrl(value: string) {
-  if (!value) return true
+  if (!value) return true;
   try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
-    return false
+    return false;
   }
 }
 
 function normalize(draft: KazusaConfig, config: KazusaConfig): KazusaConfig {
   return {
-    baseUrl: draft.baseUrl.trim().replace(/\/+$/, ''),
+    baseUrl: draft.baseUrl.trim().replace(/\/+$/, ""),
     token: draft.token?.trim() || undefined,
     userId: config.userId,
     userName: config.userName,
-    mocks: draft.mocks,
-  }
+  };
 }
 
 function sameConnection(a: KazusaConfig, b: KazusaConfig) {
-  return a.baseUrl === b.baseUrl && (a.token || undefined) === (b.token || undefined) && a.mocks === b.mocks
+  return (
+    a.baseUrl === b.baseUrl && (a.token || undefined) === (b.token || undefined)
+  );
 }
 
 function GatewayStatus() {
-  const { status } = useRealtime()
-  const { reachable, backendError, retryBackend } = useSources()
-  const { baseUrl } = useKazusaConfig()
-  const down = !reachable || status === 'error'
+  const { status } = useRealtime();
+  const { reachable, backendError, retryBackend } = useSources();
+  const { baseUrl } = useKazusaConfig();
+  const down = !reachable || status === "error";
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5">
       <span
         aria-hidden
         className={cn(
-          'size-2 shrink-0 rounded-full',
-          down ? 'bg-destructive' : status === 'open' ? 'bg-online' : 'animate-pulse bg-muted-foreground motion-reduce:animate-none',
+          "size-2 shrink-0 rounded-full",
+          down
+            ? "bg-destructive"
+            : status === "open"
+              ? "bg-online"
+              : "animate-pulse bg-muted-foreground motion-reduce:animate-none",
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -79,7 +77,9 @@ function GatewayStatus() {
           {!reachable ? "Can't reach the server" : STREAM_LABELS[status]}
         </span>
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {!reachable && backendError ? backendError.message : baseUrl || 'Same origin'}
+          {!reachable && backendError
+            ? backendError.message
+            : baseUrl || "Same origin"}
         </span>
       </div>
       {down ? (
@@ -88,38 +88,48 @@ function GatewayStatus() {
         </Button>
       ) : null}
     </div>
-  )
+  );
 }
 
-/** Where the client finds the Gateway, and how much of the world is placeholder. */
+/** Where the client finds the Gateway. */
 export function ConnectionSettings() {
-  const config = useKazusaConfig()
-  const [draft, setDraft] = useState<KazusaConfig>(config)
-  const [submitted, setSubmitted] = useState(false)
+  const config = useKazusaConfig();
+  const [draft, setDraft] = useState<KazusaConfig>(config);
+  const [submitted, setSubmitted] = useState(false);
 
-  const urlInvalid = submitted && !isValidUrl(draft.baseUrl.trim())
-  const dirty = !sameConnection(normalize(draft, config), config)
+  const urlInvalid = submitted && !isValidUrl(draft.baseUrl.trim());
+  const dirty = !sameConnection(normalize(draft, config), config);
 
-  function update<K extends keyof KazusaConfig>(key: K, value: KazusaConfig[K]) {
-    setDraft((current) => ({ ...current, [key]: value }))
+  function update<K extends keyof KazusaConfig>(
+    key: K,
+    value: KazusaConfig[K],
+  ) {
+    setDraft((current) => ({ ...current, [key]: value }));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSubmitted(true)
-    if (!isValidUrl(draft.baseUrl.trim())) return
-    const next = normalize(draft, config)
-    saveConfig(next)
-    setDraft(next)
-    setSubmitted(false)
-    toast.success('Connection saved')
+    event.preventDefault();
+    setSubmitted(true);
+    if (!isValidUrl(draft.baseUrl.trim())) return;
+    const next = normalize(draft, config);
+    saveConfig(next);
+    setDraft(next);
+    setSubmitted(false);
+    toast.success("Connection saved");
   }
 
   return (
     <div className="flex flex-col">
-      <SettingsSection title="Gateway" description="The client talks to your Kazusa server through this app's proxy.">
+      <SettingsSection
+        title="Gateway"
+        description="The client talks to your Kazusa server through this app's proxy."
+      >
         <GatewayStatus />
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-6"
+          noValidate
+        >
           <FieldGroup>
             <Field data-invalid={urlInvalid || undefined}>
               <FieldLabel htmlFor="base-url">Server URL</FieldLabel>
@@ -129,14 +139,18 @@ export function ConnectionSettings() {
                 inputMode="url"
                 className="font-mono"
                 value={draft.baseUrl}
-                onChange={(event) => update('baseUrl', event.target.value)}
+                onChange={(event) => update("baseUrl", event.target.value)}
                 placeholder="Same origin (default)"
                 aria-invalid={urlInvalid || undefined}
               />
               {urlInvalid ? (
-                <FieldError>Enter a full http(s) URL or leave blank.</FieldError>
+                <FieldError>
+                  Enter a full http(s) URL or leave blank.
+                </FieldError>
               ) : (
-                <FieldDescription>Leave blank to use this app’s Gateway connection.</FieldDescription>
+                <FieldDescription>
+                  Leave blank to use this app’s Gateway connection.
+                </FieldDescription>
               )}
             </Field>
             <Field>
@@ -145,32 +159,15 @@ export function ConnectionSettings() {
                 id="gateway-token"
                 type="password"
                 className="font-mono"
-                value={draft.token ?? ''}
-                onChange={(event) => update('token', event.target.value)}
+                value={draft.token ?? ""}
+                onChange={(event) => update("token", event.target.value)}
                 placeholder="Bearer token (optional for localhost)"
                 autoComplete="off"
               />
-              <FieldDescription>Required when connecting to a remote or tunneled OpenClaw Gateway.</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel id="mock-mode-label">Mock data</FieldLabel>
-              <div role="radiogroup" aria-labelledby="mock-mode-label" className="flex max-w-sm gap-1 rounded-lg border p-0.5">
-                {MOCK_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={draft.mocks === option.value}
-                    variant={draft.mocks === option.value ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => update('mocks', option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-              <FieldDescription>{MOCK_OPTIONS.find((option) => option.value === draft.mocks)?.description}</FieldDescription>
+              <FieldDescription>
+                Required when connecting to a remote or tunneled OpenClaw
+                Gateway.
+              </FieldDescription>
             </Field>
           </FieldGroup>
           <div className="flex items-center gap-2">
@@ -180,8 +177,17 @@ export function ConnectionSettings() {
             <Button
               type="button"
               variant="ghost"
-              disabled={sameConnection(normalize(draft, config), normalize(DEFAULT_CONFIG, config))}
-              onClick={() => setDraft({ ...DEFAULT_CONFIG, userId: config.userId, userName: config.userName })}
+              disabled={sameConnection(
+                normalize(draft, config),
+                normalize(DEFAULT_CONFIG, config),
+              )}
+              onClick={() =>
+                setDraft({
+                  ...DEFAULT_CONFIG,
+                  userId: config.userId,
+                  userName: config.userName,
+                })
+              }
             >
               Reset to defaults
             </Button>
@@ -189,5 +195,5 @@ export function ConnectionSettings() {
         </form>
       </SettingsSection>
     </div>
-  )
+  );
 }

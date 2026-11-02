@@ -171,7 +171,11 @@ export type MessagingEvent =
   | { readonly type: "chats"; readonly audience: readonly string[] };
 
 /** One projection shared by history, send responses and live message events. */
-export function clientMessage(delivery: MessageDelivery): ChatMessage {
+export function clientMessage(
+  delivery: MessageDelivery,
+  /** The stored record's real time. A receipt stays the same on a retry. */
+  createdAt?: number,
+): ChatMessage {
   return {
     id: delivery.id,
     requestId: delivery.params.requestId,
@@ -181,6 +185,7 @@ export function clientMessage(delivery: MessageDelivery): ChatMessage {
     text: delivery.params.text,
     ...(delivery.params.type === "action" ? { type: "action" } : {}),
     timestamp: delivery.timestamp,
+    ...(createdAt === undefined ? {} : { createdAt }),
   };
 }
 
@@ -700,22 +705,23 @@ export class Messaging {
     // older eligible page across a leave/rejoin interval.
     const entries = await this.deps.store.entries();
     const eligible = entries
-      .map(({ value }) => value)
       .filter(
-        (message) =>
+        ({ value: message }) =>
           message.chatId === chatId &&
           visible(message) &&
           (before === undefined || message.sequence < before),
       )
-      .sort((a, b) => b.sequence - a.sequence);
+      .sort((a, b) => b.value.sequence - a.value.sequence);
     const hasMore = eligible.length > limit;
     const page = eligible.slice(0, limit);
-    page.sort((a, b) => a.sequence - b.sequence);
+    page.sort((a, b) => a.value.sequence - b.value.sequence);
 
-    const messages = page.map(clientMessage);
+    const messages = page.map(({ value, createdAt }) =>
+      clientMessage(value, createdAt),
+    );
 
     const nextCursor =
-      hasMore && page.length > 0 ? page[0].sequence : undefined;
+      hasMore && page.length > 0 ? page[0].value.sequence : undefined;
     return {
       messages,
       nextCursor,

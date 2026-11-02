@@ -103,13 +103,12 @@ export function useMessages(chatId: string | null) {
 export function usePagedMessages<T extends MessagesResponse>(
   getKey: ReturnType<typeof messagesKeyGetter>,
   fetchPage: (chatId: string, before: number | null) => Promise<T>,
-  options?: { readonly refreshInterval?: number },
 ) {
   const { data, error, isLoading, size, setSize, isValidating, mutate } =
     useSWRInfinite<T, Error, ReturnType<typeof messagesKeyGetter>>(
       getKey,
       ([, , , id, before]) => fetchPage(id, before),
-      { revalidateFirstPage: true, revalidateOnFocus: false, ...options },
+      { revalidateFirstPage: true, revalidateOnFocus: false },
     );
 
   const messages = useMemo(() => {
@@ -146,7 +145,9 @@ export function appendMessageToPages(
     return pages;
   }
   const [first, ...rest] = pages;
-  return [{ ...first, messages: [...first.messages, message] }, ...rest];
+  // History gets this from the stored record; a live message arrives as it's sent.
+  const timed = { ...message, createdAt: message.createdAt ?? Date.now() };
+  return [{ ...first, messages: [...first.messages, timed] }, ...rest];
 }
 
 export function updateChatPreview<

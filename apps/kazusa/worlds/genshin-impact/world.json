@@ -4,6 +4,12 @@
   "systemAgent": "katheryne",
   "defaultGroup": "knights_of_favonius",
   "kazusa": {
+    "welcome": [
+      "Ad astra abyssosque, Traveler! Welcome to Teyvat. I'm Katheryne of the Adventurers' Guild, and I look after this world's records.",
+      "The people you chose are onstage, but time is paused, so nothing is spent until you choose a speed at the top of the screen.",
+      "You can text anyone from Chats, see where everyone is in World, and follow what happens in Timeline.",
+      "If you'd like anything changed, just ask me: a new character, a different history or a new place. Where would you like to begin?"
+    ],
     "user": {
       "id": "user:traveler",
       "name": "Traveler"

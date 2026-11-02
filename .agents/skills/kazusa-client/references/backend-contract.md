@@ -103,10 +103,10 @@ gets the same `Clock` module through HTTP (§3).
   `model` and `provider` the host recorded. Only the current session; text is
   clipped at 8000 characters. A tool call with no result may still have run.
 - `GET /kazusa/usage?days=<1-3650>` → `UsageResponse`, projected from
-  `sessions.usage` with `agentScope: "all"`, called through
-  `callGatewayFromCli` (`openclaw/plugin-sdk/gateway-runtime`). `partial` means
-  OpenClaw's cost cache isn't `fresh`. During Gateway warm-up the call can return
-  400 "Session stores changed"; SWR's retry covers it.
+  `sessions.usage` with `agentScope: "all"`, called through `callGatewayFromCli`
+  (`openclaw/plugin-sdk/gateway-runtime`). `partial` means OpenClaw's cost cache
+  isn't `fresh`. During Gateway warm-up the call can return 400 "Session stores
+  changed"; SWR's retry covers it.
 - Coverage: both read session transcripts. Decision-provider calls
   (`perception.*`) and `subagent.complete` (memory sleep) have no transcript of
   their own, so neither surface shows them unless the host records them.
@@ -176,8 +176,7 @@ their models themselves), so the world config only pins a shortlist in
 name). OpenClaw only prepares the catalogs of providers that a config model ref
 names, so each provider needs at least one pinned model before its other models
 appear (`venice/zai-org-glm-4.7` pins Venice). `decisionModel` is not part of
-this route. The domain is live-only: there is no mock catalog, and the picker
-hides without a Gateway.
+this route. The picker hides without a Gateway.
 
 #### OpenClaw limitation: the pick does not live in `openclaw.json`
 
@@ -387,8 +386,7 @@ are skipped.
 | `models`                     | Built: `GET /kazusa/models`, `POST /kazusa/model`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                |
 | `relationships`, `attention` | Schema only / drafted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | See the roadmap                                                                                                  |
 
-Until a domain is live, the client serves it from the mock source when mocks are
-enabled, with visible `Mock` tags (D10).
+Until a domain is live, its panels show an honest unavailable state (D10).
 
 ## 8. Backend work, in priority order
 

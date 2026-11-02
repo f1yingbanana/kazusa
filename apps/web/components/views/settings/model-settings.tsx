@@ -1,28 +1,35 @@
-'use client'
+"use client";
 
-import { RefreshCwIcon } from 'lucide-react'
-import type { ModelProviderStatus } from '@kazusa/client'
-import { Unavailable } from '@/components/entities/source-state'
+import { FolderOpenIcon, RefreshCwIcon } from "lucide-react";
+import { toast } from "sonner";
+import type { ModelProviderStatus } from "@kazusa/client";
+import { Unavailable } from "@/components/entities/source-state";
 import {
   PROVIDER_STATUS_LABELS,
   providerLabel,
   refName,
-} from '@/components/models/model-labels'
-import { ModelPicker } from '@/components/models/model-picker'
-import { ThinkingPicker } from '@/components/models/thinking-picker'
-import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Spinner } from '@/components/ui/spinner'
-import { useModels } from '@/hooks/use-models'
-import { cn } from '@/lib/utils'
-import { SettingsSection } from './settings-section'
+} from "@/components/models/model-labels";
+import { ModelPicker } from "@/components/models/model-picker";
+import { ThinkingPicker } from "@/components/models/thinking-picker";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { useModels } from "@/hooks/use-models";
+import { useKazusaConfig } from "@/lib/state/config-store";
+import { cn } from "@/lib/utils";
+import { SettingsSection } from "./settings-section";
 
 const INHERITANCE = [
-  'Every character runs on this model and reasoning level until you choose otherwise for them, from Model in their inspector.',
-  'Characters that follow the default switch the moment it changes. A character with its own choice keeps it until you set them back to the world default.',
-  'Model and reasoning are inherited separately, so a character can keep its own model and still follow the default reasoning level.',
-  'A turn already running finishes on the model it started with.',
-] as const
+  "Every character runs on this model and reasoning level until you choose otherwise for them, from Model in their inspector.",
+  "Characters that follow the default switch the moment it changes. A character with its own choice keeps it until you set them back to the world default.",
+  "Model and reasoning are inherited separately, so a character can keep its own model and still follow the default reasoning level.",
+  "A turn already running finishes on the model it started with.",
+] as const;
 
 function ProviderRow({
   provider,
@@ -30,46 +37,123 @@ function ProviderRow({
   total,
   available,
 }: {
-  provider: string
-  status: ModelProviderStatus['status'] | undefined
-  total: number
-  available: number
+  provider: string;
+  status: ModelProviderStatus["status"] | undefined;
+  total: number;
+  available: number;
 }) {
-  const ready = status === undefined || status === 'ready'
+  const ready = status === undefined || status === "ready";
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
-      <span aria-hidden className={cn('size-2 shrink-0 rounded-full', ready ? 'bg-online' : 'bg-destructive')} />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{providerLabel(provider)}</span>
+      <span
+        aria-hidden
+        className={cn(
+          "size-2 shrink-0 rounded-full",
+          ready ? "bg-online" : "bg-destructive",
+        )}
+      />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+        {providerLabel(provider)}
+      </span>
       <span className="font-mono text-xs text-muted-foreground tabular-nums">{`${available}/${total} usable`}</span>
-      <span className="w-24 text-right text-xs text-muted-foreground">{PROVIDER_STATUS_LABELS[status ?? 'ready']}</span>
+      <span className="w-24 text-right text-xs text-muted-foreground">
+        {PROVIDER_STATUS_LABELS[status ?? "ready"]}
+      </span>
     </li>
-  )
+  );
+}
+
+/**
+ * Shows a world file in Finder or Explorer. Only for a Gateway on this
+ * computer.
+ */
+function ConfigFiles() {
+  const { baseUrl } = useKazusaConfig();
+  if (baseUrl) return null;
+
+  const reveal = async (file: "config" | "env") => {
+    const response = await fetch("/reveal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file }),
+    }).catch(() => null);
+    const result = (await response?.json().catch(() => null)) as {
+      path?: string;
+      error?: string;
+    } | null;
+    if (!result?.path) {
+      toast.error("Couldn't open that file", { description: result?.error });
+      return;
+    }
+    // Finder doesn't show dotfiles until asked, so it can open on an empty folder.
+    const hidden = file === "env" && navigator.userAgent.includes("Mac");
+    toast.success("Opened the folder", {
+      description: hidden
+        ? `${result.path}. It's a hidden file: press ⌘⇧. in Finder to see it.`
+        : result.path,
+    });
+  };
+
+  return (
+    <SettingsSection
+      title="Configuration files"
+      description="Add providers and fine-tune models by hand. OpenClaw settings apply by themselves; after changing keys, restart Kazusa."
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void reveal("config")}
+        >
+          <FolderOpenIcon />
+          Show OpenClaw settings
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void reveal("env")}>
+          <FolderOpenIcon />
+          Show keys file (.env)
+        </Button>
+      </div>
+    </SettingsSection>
+  );
 }
 
 /**
  * World defaults for the models characters think with. Only the chat model
- * exists so far; embedding and decision models get their own sections here
- * once the backend has them.
+ * exists so far; embedding and decision models get their own sections here once
+ * the backend has them.
  */
 export function ModelSettings() {
-  const { enabled, data, error, refreshing, refresh } = useModels()
+  const { enabled, data, error, refreshing, refresh } = useModels();
 
   if (!enabled) {
-    return <Unavailable requires={['models']} title="Model settings need a live Gateway" />
+    // A broken config is often why the Gateway is down, so the files stay in reach.
+    return (
+      <div className="flex flex-col">
+        <Unavailable
+          requires={["models"]}
+          title="Model settings need a live Gateway"
+        />
+        <ConfigFiles />
+      </div>
+    );
   }
 
-  const models = data?.models ?? []
-  const current = models.find((model) => model.ref === data?.current)
-  const overridesConfigured = Boolean(data?.configured && data.configured !== data.current)
+  const models = data?.models ?? [];
+  const current = models.find((model) => model.ref === data?.current);
+  const overridesConfigured = Boolean(
+    data?.configured && data.configured !== data.current,
+  );
 
-  const providers = new Map<string, { total: number; available: number }>()
+  const providers = new Map<string, { total: number; available: number }>();
   for (const model of models) {
-    const entry = providers.get(model.provider) ?? { total: 0, available: 0 }
-    entry.total += 1
-    if (model.available) entry.available += 1
-    providers.set(model.provider, entry)
+    const entry = providers.get(model.provider) ?? { total: 0, available: 0 };
+    entry.total += 1;
+    if (model.available) entry.available += 1;
+    providers.set(model.provider, entry);
   }
-  const statusOf = new Map(data?.providers.map((entry) => [entry.provider, entry.status]))
+  const statusOf = new Map(
+    data?.providers.map((entry) => [entry.provider, entry.status]),
+  );
 
   return (
     <div className="flex flex-col">
@@ -95,13 +179,17 @@ export function ModelSettings() {
               <FieldLabel htmlFor="world-thinking">Reasoning level</FieldLabel>
               <ThinkingPicker id="world-thinking" className="max-w-md" />
               <FieldDescription>
-                How hard characters think before they answer. A level a model lacks is mapped to its nearest one.
+                How hard characters think before they answer. A level a model
+                lacks is mapped to its nearest one.
               </FieldDescription>
             </Field>
           ) : null}
         </FieldGroup>
 
-        <aside aria-labelledby="inheritance-title" className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
+        <aside
+          aria-labelledby="inheritance-title"
+          className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3"
+        >
           <h4 id="inheritance-title" className="text-sm font-medium">
             How characters use this default
           </h4>
@@ -117,9 +205,14 @@ export function ModelSettings() {
         title="Providers"
         description="Catalogs come from the Gateway's provider plugins. Models whose provider has no working key can't be picked."
         action={
-          <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshing}
+            onClick={() => void refresh()}
+          >
             {refreshing ? <Spinner /> : <RefreshCwIcon />}
-            {refreshing ? 'Asking providers…' : 'Refresh catalog'}
+            {refreshing ? "Asking providers…" : "Refresh catalog"}
           </Button>
         }
       >
@@ -136,9 +229,13 @@ export function ModelSettings() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">{data ? 'No providers reported any models.' : 'Loading providers…'}</p>
+          <p className="text-sm text-muted-foreground">
+            {data ? "No providers reported any models." : "Loading providers…"}
+          </p>
         )}
       </SettingsSection>
+
+      <ConfigFiles />
     </div>
-  )
+  );
 }

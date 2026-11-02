@@ -1,3 +1,5 @@
+import { isSameOrigin } from "../../../lib/same-origin";
+
 /** Local single-player bridge; the Gateway credential never enters browser code. */
 const ROUTES = new Map([
   ["world", "GET"],
@@ -45,12 +47,7 @@ async function forward(request: Request, context: Context): Promise<Response> {
     return Response.json({ error: "Unknown Kazusa route." }, { status: 404 });
   if (request.method !== method)
     return new Response(null, { status: 405, headers: { Allow: method } });
-  const origin = request.headers.get("origin");
-  if (
-    request.method === "POST" &&
-    origin &&
-    origin !== new URL(request.url).origin
-  ) {
+  if (request.method === "POST" && !isSameOrigin(request)) {
     return Response.json(
       { error: "Use the same origin for chat requests." },
       { status: 403 },

@@ -89,7 +89,8 @@ const gatewayDeps: Omit<ModelsDeps, "selection"> = {
   list: async ({ agentId, refresh }) => {
     const response = await dispatchGatewayMethod(
       "models.list",
-      { agentId, view: "default", ...(refresh ? { refresh: true } : {}) },
+      // "default" narrows to the shortlist, and the picker offers every model.
+      { agentId, view: "all", ...(refresh ? { refresh: true } : {}) },
       { timeoutMs: 60_000 },
     );
     if (!response.ok)

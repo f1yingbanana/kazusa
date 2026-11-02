@@ -15,7 +15,7 @@ export interface ClockAnchor {
   readonly offset: number;
 }
 
-/** Per-character live status, seeded from the characters snapshot (or mock). */
+/** Per-character live status, seeded from the characters snapshot. */
 export const statusStore = createKeyedStore<CharacterStatus>();
 
 export const clockStore = createValueStore<ClockAnchor | null>(null);

@@ -32,7 +32,7 @@ import {
   type ObservedConversation,
 } from "./messaging.ts";
 
-const USER = z.object({
+export const USER = z.object({
   id: z
     .string()
     .regex(/^user:[a-z0-9][a-z0-9_-]*$/)

@@ -1,28 +1,31 @@
-'use client'
+"use client";
 
-import { MousePointerClickIcon, XIcon } from 'lucide-react'
-import { MockTag } from '@/components/entities/source-state'
-import { Button } from '@/components/ui/button'
+import { MousePointerClickIcon, XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '@/components/ui/empty'
-import { useSelection } from '@/hooks/use-url-state'
-import { INSPECTOR_SECTIONS } from '@/lib/registry/inspector'
-import type { InspectorSection as InspectorSectionEntry } from '@/lib/registry/types'
-import { satisfies } from '@/lib/source/capabilities'
-import { useSources } from '@/lib/source/provider'
-import type { EntityRef } from '@/lib/state/entity-ref'
+} from "@/components/ui/empty";
+import { useSelection } from "@/hooks/use-url-state";
+import { INSPECTOR_SECTIONS } from "@/lib/registry/inspector";
+import type { InspectorSection as InspectorSectionEntry } from "@/lib/registry/types";
+import { satisfies } from "@/lib/source/capabilities";
+import { useSources } from "@/lib/source/provider";
+import type { EntityRef } from "@/lib/state/entity-ref";
 
-const KIND_LABEL = { character: 'Character', chat: 'Chat', place: 'Place' } as const
+const KIND_LABEL = {
+  character: "Character",
+  chat: "Chat",
+  place: "Place",
+} as const;
 
 /** Entity-polymorphic and slim: depth belongs in stage views. */
 export function Inspector() {
-  const [selection, select] = useSelection()
-  const { resolved } = useSources()
+  const [selection, select] = useSelection();
+  const { resolved } = useSources();
 
   if (!selection) {
     return (
@@ -32,15 +35,19 @@ export function Inspector() {
             <MousePointerClickIcon />
           </EmptyMedia>
           <EmptyTitle>Nothing selected</EmptyTitle>
-          <EmptyDescription>Pick a character in the roster, or any name in a view.</EmptyDescription>
+          <EmptyDescription>
+            Pick a character in the roster, or any name in a view.
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
-    )
+    );
   }
 
   const sections = INSPECTOR_SECTIONS.filter(
-    (section) => section.entity === selection.kind && satisfies(resolved, section.requires),
-  )
+    (section) =>
+      section.entity === selection.kind &&
+      satisfies(resolved, section.requires),
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -58,19 +65,29 @@ export function Inspector() {
           <p className="p-4 text-sm text-muted-foreground">{`Nothing to show for this ${selection.kind} yet.`}</p>
         ) : (
           sections.map((section) => (
-            <SectionFrame key={section.id} section={section} entity={selection} />
+            <SectionFrame
+              key={section.id}
+              section={section}
+              entity={selection}
+            />
           ))
         )}
       </div>
     </div>
-  )
+  );
 }
 
-const appliesToAll = () => true
+const appliesToAll = () => true;
 
-function SectionFrame({ section, entity }: { section: InspectorSectionEntry; entity: EntityRef }) {
-  const useApplies = section.useApplies ?? appliesToAll
-  if (!useApplies(entity)) return null
+function SectionFrame({
+  section,
+  entity,
+}: {
+  section: InspectorSectionEntry;
+  entity: EntityRef;
+}) {
+  const useApplies = section.useApplies ?? appliesToAll;
+  if (!useApplies(entity)) return null;
   return (
     <section
       aria-label={section.title || KIND_LABEL[entity.kind]}
@@ -79,10 +96,9 @@ function SectionFrame({ section, entity }: { section: InspectorSectionEntry; ent
       {section.title ? (
         <h3 className="flex items-center justify-between gap-2 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
           {section.title}
-          <MockTag requires={section.requires} />
         </h3>
       ) : null}
       <section.component entity={entity} />
     </section>
-  )
+  );
 }

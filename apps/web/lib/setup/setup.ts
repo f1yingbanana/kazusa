@@ -1,8 +1,16 @@
-import { cp, mkdir, readdir, readFile, rename, symlink, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
-import { parseEnv } from 'node:util'
-import { z } from 'zod'
+import {
+  cp,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { parseEnv } from "node:util";
+import { z } from "zod";
 
 /**
  * First-run setup. `worlds/<id>` are read-only templates; the player's world is
@@ -10,7 +18,7 @@ import { z } from 'zod'
  * again, and `openclaw.json` is written last: its existence means setup is done
  * and is what starts the Gateway (`scripts/dev.mjs`).
  */
-export const OPENROUTER_KEY = 'OPENROUTER_API_KEY'
+export const OPENROUTER_KEY = "OPENROUTER_API_KEY";
 
 const WorldSchema = z.object({
   /** Only on the live copy: which template it came from. */
@@ -22,208 +30,323 @@ const WorldSchema = z.object({
   defaultGroup: z.string().optional(),
   /** Merged into the plugin's config. */
   kazusa: z.record(z.string(), z.unknown()),
-})
+});
 
 const BaseSchema = z.object({
   systemAgent: z.record(z.string(), z.unknown()),
   config: z.looseObject({
     agents: z.looseObject({ defaults: z.record(z.string(), z.unknown()) }),
     plugins: z.looseObject({
-      entries: z.looseObject({ kazusa: z.looseObject({ config: z.record(z.string(), z.unknown()) }) }),
+      entries: z.looseObject({
+        kazusa: z.looseObject({ config: z.record(z.string(), z.unknown()) }),
+      }),
     }),
   }),
-})
+});
 
 export const SetupRequestSchema = z.object({
   world: z.string(),
   cast: z.array(z.string()).default([]),
-  /** Wall clock (`YYYY-MM-DDTHH:mm`) as picked. Sim time is shown in UTC, so it is kept as UTC. */
-  startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).optional(),
+  /**
+   * Wall clock (`YYYY-MM-DDTHH:mm`) as picked. Sim time is shown in UTC, so it
+   * is kept as UTC.
+   */
+  startAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    .optional(),
   openrouterKey: z.string().trim().min(1).optional(),
-})
-export type SetupRequest = z.infer<typeof SetupRequestSchema>
+});
+export type SetupRequest = z.infer<typeof SetupRequestSchema>;
 
 export interface CharacterGroup {
-  readonly name: string
-  readonly ids: readonly string[]
+  readonly name: string;
+  readonly ids: readonly string[];
 }
 
 export interface WorldOption {
-  readonly id: string
-  readonly title: string
-  readonly description: string
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly systemAgent: string;
   /** Everyone but the system agent; none means there's no cast to choose. */
-  readonly characters: readonly { readonly id: string; readonly name: string }[]
+  readonly characters: readonly {
+    readonly id: string;
+    readonly name: string;
+  }[];
   /** One list per anchor (Schools, Clubs), broadest first. */
-  readonly groups: readonly { readonly field: string; readonly groups: readonly CharacterGroup[] }[]
-  readonly defaultCast: readonly string[]
+  readonly groups: readonly {
+    readonly field: string;
+    readonly groups: readonly CharacterGroup[];
+  }[];
+  readonly defaultCast: readonly string[];
 }
 
 export interface SetupStatus {
-  readonly configured: boolean
-  readonly worlds: readonly WorldOption[]
+  readonly configured: boolean;
+  readonly worlds: readonly WorldOption[];
   /** The world already copied by an earlier, unfinished run. */
-  readonly imported: string | null
-  readonly hasKey: boolean
+  readonly imported: string | null;
+  readonly hasKey: boolean;
 }
 
 /** What `memory.anchors` defaults to in the plugin. */
-const DEFAULT_ANCHORS = { school: 'familiar', club: 'intimate' }
-const AnchorsSchema = z.object({ memory: z.object({ anchors: z.record(z.string(), z.string()) }) })
+const DEFAULT_ANCHORS = { school: "familiar", club: "intimate" };
+const AnchorsSchema = z.object({
+  memory: z.object({ anchors: z.record(z.string(), z.string()) }),
+});
 
-const ignoreDsStore = (source: string) => path.basename(source) !== '.DS_Store'
+const ignoreDsStore = (source: string) => path.basename(source) !== ".DS_Store";
 
 async function directories(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true })
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+  const entries = await readdir(dir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 }
 
 /** A character's display name, from the frontmatter of their `IDENTITY.md`. */
 async function characterName(workspaces: string, id: string): Promise<string> {
-  const identity = await readFile(path.join(workspaces, id, 'IDENTITY.md'), 'utf8')
-  const name = /^name:\s*["']?(.+?)["']?\s*$/m.exec(identity)?.[1]
-  return name ?? id
+  const identity = await readFile(
+    path.join(workspaces, id, "IDENTITY.md"),
+    "utf8",
+  );
+  const name = /^name:\s*["']?(.+?)["']?\s*$/m.exec(identity)?.[1];
+  return name ?? id;
 }
 
 const frontmatterField = (text: string, field: string): string | undefined =>
-  new RegExp(`^${field}:\\s*["']?(.+?)["']?\\s*$`, 'm').exec(text)?.[1]
+  new RegExp(`^${field}:\\s*["']?(.+?)["']?\\s*$`, "m").exec(text)?.[1];
 
 const readIfPresent = async (file: string): Promise<string | undefined> =>
-  existsSync(file) ? readFile(file, 'utf8') : undefined
+  existsSync(file) ? readFile(file, "utf8") : undefined;
 
 /**
- * The groups a world already defines: its anchors, read off the wiki's character
- * cards. An anchor's value may name a concept page, whose title reads better.
+ * The groups a world already defines: its anchors, read off the wiki's
+ * character cards. An anchor's value may name a concept page, whose title reads
+ * better.
  */
-async function characterGroups(wiki: string, ids: readonly string[], anchors: Readonly<Record<string, string>>) {
+async function characterGroups(
+  wiki: string,
+  ids: readonly string[],
+  anchors: Readonly<Record<string, string>>,
+) {
   const cards = await Promise.all(
-    ids.map(async (id) => [id, (await readIfPresent(path.join(wiki, 'entities/characters', `${id}.md`))) ?? ''] as const),
-  )
+    ids.map(
+      async (id) =>
+        [
+          id,
+          (await readIfPresent(
+            path.join(wiki, "entities/characters", `${id}.md`),
+          )) ?? "",
+        ] as const,
+    ),
+  );
   const fields = Object.keys(anchors).sort(
-    (a, b) => Number(anchors[a] === 'intimate') - Number(anchors[b] === 'intimate'),
-  )
+    (a, b) =>
+      Number(anchors[a] === "intimate") - Number(anchors[b] === "intimate"),
+  );
   return Promise.all(
     fields.map(async (field) => {
-      const members = new Map<string, string[]>()
+      const members = new Map<string, string[]>();
       for (const [id, card] of cards) {
-        const value = frontmatterField(card, field)
-        if (value) members.set(value, [...(members.get(value) ?? []), id])
+        const value = frontmatterField(card, field);
+        if (value) members.set(value, [...(members.get(value) ?? []), id]);
       }
       const groups = await Promise.all(
-        [...members].filter(([, group]) => group.length > 1).map(async ([value, group]) => {
-          const concept = await readIfPresent(path.join(wiki, 'concepts', `${value}.md`))
-          return { value, name: (concept && frontmatterField(concept, 'title')) ?? value, ids: group }
-        }),
-      )
-      return { field, groups: groups.toSorted((a, b) => a.name.localeCompare(b.name)) }
+        [...members]
+          .filter(([, group]) => group.length > 1)
+          .map(async ([value, group]) => {
+            const concept = await readIfPresent(
+              path.join(wiki, "concepts", `${value}.md`),
+            );
+            return {
+              value,
+              name: (concept && frontmatterField(concept, "title")) ?? value,
+              ids: group,
+            };
+          }),
+      );
+      return {
+        field,
+        groups: groups.toSorted((a, b) => a.name.localeCompare(b.name)),
+      };
     }),
-  )
+  );
 }
 
 export function createSetup(appDir: string) {
-  const worldsDir = path.join(appDir, 'worlds')
-  const liveDir = path.join(appDir, 'world')
-  const configFile = path.join(liveDir, 'openclaw.json')
-  const envFile = path.join(liveDir, '.state/.env')
-  const markerFile = path.join(liveDir, 'world.json')
+  const worldsDir = path.join(appDir, "worlds");
+  const liveDir = path.join(appDir, "world");
+  const configFile = path.join(liveDir, "openclaw.json");
+  const envFile = path.join(liveDir, ".state/.env");
+  const markerFile = path.join(liveDir, "world.json");
 
   const readWorld = async (dir: string) =>
-    WorldSchema.parse(JSON.parse(await readFile(path.join(dir, 'world.json'), 'utf8')))
+    WorldSchema.parse(
+      JSON.parse(await readFile(path.join(dir, "world.json"), "utf8")),
+    );
 
-  const savedEnv = async (): Promise<string> => (existsSync(envFile) ? readFile(envFile, 'utf8') : '')
+  const savedEnv = async (): Promise<string> =>
+    existsSync(envFile) ? readFile(envFile, "utf8") : "";
 
   async function worldOption(id: string): Promise<WorldOption> {
-    const dir = path.join(worldsDir, id)
-    const world = await readWorld(dir)
-    const workspaces = path.join(dir, 'workspaces')
-    const ids = (await directories(workspaces)).filter((agent) => agent !== world.systemAgent)
-    const named = await Promise.all(ids.map(async (agent) => ({ id: agent, name: await characterName(workspaces, agent) })))
-    const characters = named.toSorted((a, b) => a.name.localeCompare(b.name))
-    const anchors = AnchorsSchema.safeParse(world.kazusa).data?.memory.anchors ?? DEFAULT_ANCHORS
-    const fields = ids.length ? await characterGroups(path.join(dir, 'shared/wiki'), ids, anchors) : []
-    const defaultCast = fields.flatMap(({ groups }) => groups).find(({ value }) => value === world.defaultGroup)?.ids ?? []
+    const dir = path.join(worldsDir, id);
+    const world = await readWorld(dir);
+    const workspaces = path.join(dir, "workspaces");
+    const ids = (await directories(workspaces)).filter(
+      (agent) => agent !== world.systemAgent,
+    );
+    const named = await Promise.all(
+      ids.map(async (agent) => ({
+        id: agent,
+        name: await characterName(workspaces, agent),
+      })),
+    );
+    const characters = named.toSorted((a, b) => a.name.localeCompare(b.name));
+    const anchors =
+      AnchorsSchema.safeParse(world.kazusa).data?.memory.anchors ??
+      DEFAULT_ANCHORS;
+    const fields = ids.length
+      ? await characterGroups(path.join(dir, "shared/wiki"), ids, anchors)
+      : [];
+    const defaultCast =
+      fields
+        .flatMap(({ groups }) => groups)
+        .find(({ value }) => value === world.defaultGroup)?.ids ?? [];
     return {
       id,
       title: world.title,
       description: world.description,
+      systemAgent: world.systemAgent,
       characters,
-      groups: fields.map(({ field, groups }) => ({ field, groups: groups.map(({ name, ids: members }) => ({ name, ids: members })) })),
+      groups: fields.map(({ field, groups }) => ({
+        field,
+        groups: groups.map(({ name, ids: members }) => ({
+          name,
+          ids: members,
+        })),
+      })),
       defaultCast,
-    }
+    };
   }
 
   async function status(): Promise<SetupStatus> {
-    const ids = (await directories(worldsDir)).filter((id) => existsSync(path.join(worldsDir, id, 'world.json')))
-    const worlds = await Promise.all(ids.map(worldOption))
+    const ids = (await directories(worldsDir)).filter((id) =>
+      existsSync(path.join(worldsDir, id, "world.json")),
+    );
+    const worlds = await Promise.all(ids.map(worldOption));
     const imported = existsSync(markerFile)
-      ? (WorldSchema.parse(JSON.parse(await readFile(markerFile, 'utf8'))).id ?? null)
-      : null
+      ? (WorldSchema.parse(JSON.parse(await readFile(markerFile, "utf8"))).id ??
+        null)
+      : null;
     return {
       configured: existsSync(configFile),
       // Starting from scratch reads best as the last choice.
-      worlds: worlds.toSorted((a, b) => Number(a.id === 'starter') - Number(b.id === 'starter')),
+      worlds: worlds.toSorted(
+        (a, b) => Number(a.id === "starter") - Number(b.id === "starter"),
+      ),
       imported,
-      hasKey: Boolean(process.env[OPENROUTER_KEY]?.trim() || parseEnv(await savedEnv())[OPENROUTER_KEY]),
-    }
+      hasKey: Boolean(
+        process.env[OPENROUTER_KEY]?.trim() ||
+        parseEnv(await savedEnv())[OPENROUTER_KEY],
+      ),
+    };
   }
 
-  /** Copies only what's missing. The marker goes last, so a crash just copies again. */
+  /**
+   * Copies only what's missing. The marker goes last, so a crash just copies
+   * again.
+   */
   async function importWorld(id: string): Promise<void> {
-    if (existsSync(markerFile)) return
-    const dir = path.join(worldsDir, id)
-    const world = await readWorld(dir)
-    await mkdir(liveDir, { recursive: true })
-    for (const part of ['shared', 'workspaces'])
+    if (existsSync(markerFile)) return;
+    const dir = path.join(worldsDir, id);
+    const world = await readWorld(dir);
+    await mkdir(liveDir, { recursive: true });
+    for (const part of ["shared", "workspaces"])
       await cp(path.join(dir, part), path.join(liveDir, part), {
         recursive: true,
         force: false,
         filter: ignoreDsStore,
-      })
-    // The system agent reads Kazusa's own guides through this link.
-    const link = path.join(liveDir, 'workspaces', world.systemAgent, '.agents')
+      });
+    // The system agent reads Kazusa's own guides through this link. Only Windows
+    // reads the type: a junction needs no admin rights or Developer Mode.
+    const link = path.join(liveDir, "workspaces", world.systemAgent, ".agents");
     if (!existsSync(link))
-      await symlink(path.relative(path.dirname(link), path.join(appDir, '../../.agents')), link)
-    await writeFile(markerFile, `${JSON.stringify({ ...world, id }, null, 2)}\n`)
+      await symlink(
+        path.relative(path.dirname(link), path.join(appDir, "../../.agents")),
+        link,
+        "junction",
+      );
+    await writeFile(
+      markerFile,
+      `${JSON.stringify({ ...world, id }, null, 2)}\n`,
+    );
   }
 
   async function saveKey(key: string): Promise<void> {
-    const env = await savedEnv()
-    if (parseEnv(env)[OPENROUTER_KEY]) return
-    await mkdir(path.dirname(envFile), { recursive: true })
-    const separator = env && !env.endsWith('\n') ? '\n' : ''
-    const temporary = `${envFile}.tmp`
-    await writeFile(temporary, `${env}${separator}${OPENROUTER_KEY}=${key}\n`, { mode: 0o600 })
-    await rename(temporary, envFile)
+    const env = await savedEnv();
+    if (parseEnv(env)[OPENROUTER_KEY]) return;
+    await mkdir(path.dirname(envFile), { recursive: true });
+    const separator = env && !env.endsWith("\n") ? "\n" : "";
+    const temporary = `${envFile}.tmp`;
+    await writeFile(temporary, `${env}${separator}${OPENROUTER_KEY}=${key}\n`, {
+      mode: 0o600,
+    });
+    await rename(temporary, envFile);
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
-    const world = WorldSchema.parse(JSON.parse(await readFile(markerFile, 'utf8')))
-    const base = BaseSchema.parse(JSON.parse(await readFile(path.join(worldsDir, 'base.json'), 'utf8')))
-    const agents = await directories(path.join(liveDir, 'workspaces'))
-    const name = await characterName(path.join(liveDir, 'workspaces'), world.systemAgent)
+    const world = WorldSchema.parse(
+      JSON.parse(await readFile(markerFile, "utf8")),
+    );
+    const base = BaseSchema.parse(
+      JSON.parse(await readFile(path.join(worldsDir, "base.json"), "utf8")),
+    );
+    const agents = await directories(path.join(liveDir, "workspaces"));
+    const name = await characterName(
+      path.join(liveDir, "workspaces"),
+      world.systemAgent,
+    );
     const entries: Record<string, unknown> = Object.fromEntries(
       agents.map((id) => [id, { workspace: `./workspaces/${id}` }]),
-    )
+    );
     entries[world.systemAgent] = {
       workspace: `./workspaces/${world.systemAgent}`,
       identity: { name },
       cwd: liveDir,
       ...base.systemAgent,
-    }
-    const kazusa = base.config.plugins.entries.kazusa.config
-    const memory = { ...(kazusa.memory as object), ...(world.kazusa.memory as object | undefined) }
+    };
+    const kazusa = base.config.plugins.entries.kazusa.config;
+    const memory = {
+      ...(kazusa.memory as object),
+      ...(world.kazusa.memory as object | undefined),
+    };
     // A chosen cast starts paused, so nobody spends anything before the player is ready.
-    const chosen = agents.length > 1
-      ? {
-          stage: { defaultOnstage: false, cast: [world.systemAgent, ...request.cast] },
-          clock: { speed: 0, ...(request.startAt ? { startAt: `${request.startAt}:00.000Z` } : {}) },
-        }
-      : {}
+    const chosen =
+      agents.length > 1
+        ? {
+            stage: {
+              defaultOnstage: false,
+              cast: [world.systemAgent, ...request.cast],
+            },
+            clock: {
+              speed: 0,
+              ...(request.startAt
+                ? { startAt: `${request.startAt}:00.000Z` }
+                : {}),
+            },
+          }
+        : {};
     const config = {
       ...base.config,
       agents: {
         ...base.config.agents,
-        defaults: { ...base.config.agents.defaults, systemAgent: { agentId: world.systemAgent } },
+        defaults: {
+          ...base.config.agents.defaults,
+          systemAgent: { agentId: world.systemAgent },
+        },
         entries,
       },
       plugins: {
@@ -236,22 +359,24 @@ export function createSetup(appDir: string) {
           },
         },
       },
-    }
-    const temporary = `${configFile}.tmp`
-    await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })
-    await rename(temporary, configFile)
+    };
+    const temporary = `${configFile}.tmp`;
+    await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    await rename(temporary, configFile);
   }
 
   async function apply(request: SetupRequest): Promise<void> {
-    if (existsSync(configFile)) return
+    if (existsSync(configFile)) return;
     if (!(await status()).worlds.some(({ id }) => id === request.world))
-      throw new Error(`Unknown world: ${request.world}`)
-    await importWorld(request.world)
-    if (request.openrouterKey) await saveKey(request.openrouterKey)
-    await writeConfig(request)
+      throw new Error(`Unknown world: ${request.world}`);
+    await importWorld(request.world);
+    if (request.openrouterKey) await saveKey(request.openrouterKey);
+    await writeConfig(request);
   }
 
-  return { status, apply }
+  return { status, apply, files: { config: configFile, env: envFile } };
 }
 
-export const setup = createSetup(path.resolve(process.cwd(), '../kazusa'))
+export const setup = createSetup(path.resolve(process.cwd(), "../kazusa"));

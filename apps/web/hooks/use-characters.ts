@@ -30,15 +30,12 @@ export function useCharacter(id: string | undefined) {
   return id ? charactersById.get(id) : undefined;
 }
 
-/**
- * Full profile. Reads live GET /kazusa/character when live, or fallback mock
- * world.
- */
+/** Full profile, from GET /kazusa/character. */
 export function useCharacterDetail(id: string): {
   detail: CharacterDetail | undefined;
   available: boolean;
 } {
-  const { resolved, world } = useSources();
+  const { resolved } = useSources();
   const config = useKazusaConfig();
   const isLive = resolved.characters === "live";
 
@@ -51,12 +48,9 @@ export function useCharacterDetail(id: string): {
     { revalidateOnFocus: true, refreshInterval: 30_000 },
   );
 
-  if (isLive) {
-    return { detail: liveDetail, available: Boolean(liveDetail) };
-  }
-  if (resolved.characters === "mock")
-    return { detail: world?.details.get(id), available: true };
-  return { detail: undefined, available: false };
+  return isLive
+    ? { detail: liveDetail, available: Boolean(liveDetail) }
+    : { detail: undefined, available: false };
 }
 
 /** Per-id live subscription: a delta for one character re-renders one row. */

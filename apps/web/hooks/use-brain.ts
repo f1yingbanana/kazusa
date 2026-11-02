@@ -16,14 +16,19 @@ const PARTIAL_USAGE_POLLS_MS = [5000, 10_000, 20_000] as const;
  * A character's brain turns. Only polled while something is showing them, so
  * they stay out of the stream that every client carries.
  */
-export function useBrainTrace(id: string, limit: number, thinking: boolean) {
+export function useBrainTrace(
+  id: string | undefined,
+  limit: number,
+  thinking: boolean,
+) {
   const { resolved } = useSources();
   const { baseUrl, token } = useKazusaConfig();
   return useSWR<BrainTraceResponse, Error>(
-    resolved.brain === "live"
+    resolved.brain === "live" && id
       ? (["kazusa/brain/trace", baseUrl, id, limit] as const)
       : null,
-    () => fetchBrainTrace(baseUrl, token, id, limit),
+    ([, , agent]: readonly [string, string, string, number]) =>
+      fetchBrainTrace(baseUrl, token, agent, limit),
     {
       refreshInterval: thinking ? THINKING_POLL_MS : IDLE_POLL_MS,
       keepPreviousData: true,
