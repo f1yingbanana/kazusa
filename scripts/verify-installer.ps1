@@ -56,7 +56,10 @@ try {
   } 'the welcome message arrives'
 } finally {
   # A runner has no console to send Ctrl+C to, and this world is thrown away.
-  & taskkill /T /F /PID $app.Id | Out-Null
+  # A child can exit while the tree is being stopped, which taskkill calls an
+  # error. The check below is what says whether everything stopped.
+  & taskkill /T /F /PID $app.Id 2>&1 | Out-Null
+  $global:LASTEXITCODE = 0
 }
 
 Wait-Until {
