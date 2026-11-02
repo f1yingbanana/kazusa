@@ -14,7 +14,6 @@ import { PERCEPTION_CONFIG, type PerceptionDecisionRecord } from "./types.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 import { registerBrainRunLimits } from "./run-limits.ts";
-import { currentConfig } from "../current-config.ts";
 import { requestContinuation, takeContinuation } from "./continue.ts";
 import { BrainSlots } from "./brain-slots.ts";
 
@@ -58,8 +57,6 @@ export function registerPerception(
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
     readonly realtime?: PerceptionDeps["realtime"];
-    /** The system agent's run failed, so it can't say so itself. */
-    readonly onRunFailed?: (agentId: string, error: string) => Promise<void>;
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
     /** Something woke them, or broke into what they were doing. */
@@ -287,8 +284,6 @@ export function registerPerception(
   // =========================================================================
   // `finishing` can carry a run's error ahead of its final event.
   const runErrors = new Map<string, string>();
-  // The last failure told to the user, until a run gets through.
-  const reported = new Map<string, string>();
   api.agent.events.registerAgentEventSubscription({
     id: "perception",
     streams: ["lifecycle"],
@@ -325,50 +320,29 @@ export function registerPerception(
         runErrors.delete(event.runId);
         const stoppedOnPurpose =
           data.data.aborted === true || data.data.stopReason === "aborted";
+        const failed = error && !stoppedOnPurpose;
         try {
           await perception.noteRunOutcome(
             owner.agentId,
-            error && !stoppedOnPurpose
-              ? { error, at: Date.now(), runId: event.runId }
-              : undefined,
+            failed ? { error, at: Date.now(), runId: event.runId } : undefined,
           );
         } catch (err: unknown) {
           api.logger.warn(`Perception: run outcome not kept: ${String(err)}`);
         }
-        if (error && !stoppedOnPurpose) {
-          // A fresh run would most likely fail the same way, so a person decides.
-          const systemAgent =
-            currentConfig(api).agents?.defaults?.systemAgent?.agentId;
-          if (
-            owner.agentId === systemAgent &&
-            reported.get(owner.agentId) !== error
-          )
-            try {
-              reported.set(owner.agentId, error);
-              await deps.onRunFailed?.(owner.agentId, error);
-            } catch (err: unknown) {
-              api.logger.warn(
-                `Perception: failed run not reported: ${String(err)}`,
-              );
-            }
-        } else {
-          if (!error) reported.delete(owner.agentId);
-          if (note) {
-            try {
-              await perception.receive(owner.agentId, {
-                id: `continue:${owner.agentId}:${randomUUID()}`,
-                sessionKey: `agent:${owner.agentId}:tasks`,
-                sender: "kazusa:taskman",
-                text: `Carry on with your work: ${note}`,
-                idle: true,
-                resume: true,
-                timestamp: deps.clock.time(),
-              });
-            } catch (err: unknown) {
-              api.logger.warn(
-                `Perception: continue_work failed: ${String(err)}`,
-              );
-            }
+        // A fresh run would most likely fail the same way, so a person decides.
+        if (note && !failed) {
+          try {
+            await perception.receive(owner.agentId, {
+              id: `continue:${owner.agentId}:${randomUUID()}`,
+              sessionKey: `agent:${owner.agentId}:tasks`,
+              sender: "kazusa:taskman",
+              text: `Carry on with your work: ${note}`,
+              idle: true,
+              resume: true,
+              timestamp: deps.clock.time(),
+            });
+          } catch (err: unknown) {
+            api.logger.warn(`Perception: continue_work failed: ${String(err)}`);
           }
         }
       }

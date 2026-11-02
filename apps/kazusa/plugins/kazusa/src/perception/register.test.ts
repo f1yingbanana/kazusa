@@ -5,10 +5,7 @@ import { registerPerception } from "./register.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
-function setup(
-  onDeadline?: (agentId: string) => Promise<string | undefined>,
-  onRunFailed?: (agentId: string, error: string) => Promise<void>,
-) {
+function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
   const stores = new Map<string, Map<string, unknown>>();
   const on = vi.fn();
   const subscription = vi.fn();
@@ -85,7 +82,6 @@ function setup(
   const perception = registerPerception(api, {
     clock,
     onDeadline,
-    onRunFailed,
   });
 
   const hook = (name: string) =>
@@ -214,13 +210,9 @@ describe("Perception host integration", () => {
     expect(result).toBeUndefined();
   });
 
-  describe("a system agent's failed run", () => {
+  describe("a failed run", () => {
     const failing = () => {
-      const onRunFailed = vi.fn(async () => {});
-      const h = setup(undefined, onRunFailed);
-      Object.assign(h.api.config, {
-        agents: { defaults: { systemAgent: { agentId: "alice" } } },
-      });
+      const h = setup();
       const { handle } = h.subscription.mock.calls[0][0];
       const event = (data: Record<string, unknown>, agent = "alice") =>
         handle({
@@ -228,42 +220,47 @@ describe("Perception host integration", () => {
           runId: "run-1",
           data,
         });
-      return { h, onRunFailed, event };
+      const failure = async (agent = "alice") =>
+        (
+          (await h.stores.get("perception")?.get(agent)) as
+            { failure?: { error: string; runId: string } } | undefined
+        )?.failure;
+      return { h, event, failure };
     };
 
-    it("tells the user and stops, not handing off into the same failure", async () => {
-      const { h, onRunFailed, event } = failing();
+    it("is kept and stops there, not handing off into the same failure", async () => {
+      const { h, event, failure } = failing();
       requestContinuation("alice", "the places", 5);
       await event({ phase: "error", error: "billing error" });
-      expect(onRunFailed).toHaveBeenCalledWith("alice", "billing error");
+      expect(await failure()).toMatchObject({
+        error: "billing error",
+        runId: "run-1",
+      });
       expect(takeContinuation("alice")).toBeUndefined();
       expect(h.dispatchBrain).not.toHaveBeenCalled();
     });
 
-    it("reports the same failure once, until a run gets through", async () => {
-      const { onRunFailed, event } = failing();
+    it("clears when a run gets through", async () => {
+      const { event, failure } = failing();
       await event({ phase: "error", error: "billing error" });
-      await event({ phase: "error", error: "billing error" });
-      expect(onRunFailed).toHaveBeenCalledTimes(1);
       await event({ phase: "end" });
-      await event({ phase: "error", error: "billing error" });
-      expect(onRunFailed).toHaveBeenCalledTimes(2);
+      expect(await failure()).toBeUndefined();
     });
 
     it("remembers an error reported while finishing", async () => {
-      const { onRunFailed, event } = failing();
+      const { event, failure } = failing();
       await event({ phase: "finishing", error: "billing error" });
-      expect(onRunFailed).not.toHaveBeenCalled();
+      expect(await failure()).toBeUndefined();
       await event({ phase: "end" });
-      expect(onRunFailed).toHaveBeenCalledWith("alice", "billing error");
+      expect((await failure())?.error).toBe("billing error");
     });
 
-    it("stays quiet when someone stopped the run, or for a character", async () => {
-      const { onRunFailed, event } = failing();
-      await event({ phase: "error", error: "stopped", aborted: true });
+    it("covers every character, but not a run someone stopped", async () => {
+      const { event, failure } = failing();
       await event({ phase: "error", error: "billing error" }, "bob");
-      await event({ phase: "end" });
-      expect(onRunFailed).not.toHaveBeenCalled();
+      expect((await failure("bob"))?.error).toBe("billing error");
+      await event({ phase: "error", error: "stopped", aborted: true });
+      expect(await failure()).toBeUndefined();
     });
   });
 
