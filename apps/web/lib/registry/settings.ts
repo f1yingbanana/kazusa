@@ -26,7 +26,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "models",
     label: "Models",
-    description: "Default chat model and reasoning",
+    description: "Chat, decision and memory search models",
     icon: BoxesIcon,
     order: 10,
     component: ModelSettings,

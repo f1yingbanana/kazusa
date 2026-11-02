@@ -105,14 +105,15 @@ const gatewayDeps: Omit<ModelsDeps, "selection"> = {
 /**
  * World defaults plus per-agent choices, kept in Kazusa's selection
  * (`selection.ts`) and falling back to `openclaw.json`. The catalog comes from
- * the Gateway, which discovers provider models itself, so the world config only
- * lists the shortlist (`agents.defaults.models`) by hand.
+ * the Gateway, which discovers provider models itself, and lists only what the
+ * world has a key for: the providers connected in Settings.
  */
 export function registerModelsHttp(
   api: OpenClawPluginApi,
   overrides: Pick<ModelsDeps, "selection"> & Partial<ModelsDeps>,
 ): void {
   const deps: ModelsDeps = { ...gatewayDeps, ...overrides };
+
   // `models.list` is dispatched as the caller, so the Gateway must authenticate.
   const route = createRouteRegistrar(api, { auth: "gateway" });
 
@@ -141,6 +142,7 @@ export function registerModelsHttp(
     const result = ModelsListResultSchema.parse(
       await deps.list({ agentId, refresh }),
     );
+    // Only for aliases: the shortlist isn't shown as its own group.
     const shortlist = {
       ...config.agents?.defaults?.models,
       ...(targetId === undefined
@@ -152,8 +154,11 @@ export function registerModelsHttp(
     // brain. Absent means supported, as in OpenClaw's own check. `models.list`
     // reports no output modality, so text output can't be checked here; OpenClaw's
     // OpenRouter discovery and models.dev import skip non-text models themselves.
+    // A provider with no key (a bundled plugin nobody connected, such as the
+    // Claude CLI) isn't a choice; a rejected or cooling key still shows, with why.
     const models = result.models
       .filter((model) => model.supportsTools !== false)
+      .filter((model) => model.unavailableReason !== "missing-auth")
       .map((model): ModelOption => {
         const ref = `${model.provider}/${model.id}`;
         return {
@@ -162,7 +167,6 @@ export function registerModelsHttp(
           id: model.id,
           name: model.name,
           alias: model.alias ?? shortlist[ref]?.alias,
-          pinned: ref in shortlist,
           available: model.available !== false,
           unavailableReason: model.unavailableReason,
           contextWindow: model.contextWindow,

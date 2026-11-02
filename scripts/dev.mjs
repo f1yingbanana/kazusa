@@ -30,8 +30,14 @@ const PACKAGED = process.argv.includes("--packaged");
 // Run through Node, because `.bin` holds `.cmd` shims that Windows can't spawn.
 const NEXT = path.join(ROOT, "node_modules/next/dist/bin/next");
 const OPENCLAW = path.join(ROOT, "node_modules/openclaw/openclaw.mjs");
-// New worlds load this by path, so an older install has to pick it up.
-const PARALLEL = path.join(ROOT, "node_modules/@openclaw/parallel-plugin");
+// New worlds load these plugins by path, so an older install has to pick up
+// any added since.
+const PLUGINS = Object.keys(
+  JSON.parse(readFileSync(path.join(ROOT, "apps/kazusa/package.json"), "utf8"))
+    .dependencies,
+)
+  .filter((name) => name.startsWith("@openclaw/"))
+  .map((name) => path.join(ROOT, "node_modules", name));
 const BROWSER_OPENERS = {
   darwin: ["open"],
   linux: ["xdg-open"],
@@ -99,7 +105,7 @@ for (const [port, name] of [
       `Port ${port} is already in use, so ${name} can't start. Stop whatever is using it and try again.`,
     );
 }
-if (!existsSync(NEXT) || !existsSync(PARALLEL)) {
+if (!existsSync(NEXT) || !PLUGINS.every((dir) => existsSync(dir))) {
   console.log("Installing dependencies.");
   execFileSync("npm", ["ci", "--no-audit", "--no-fund"], {
     cwd: ROOT,

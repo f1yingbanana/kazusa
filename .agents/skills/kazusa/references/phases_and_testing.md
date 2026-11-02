@@ -232,8 +232,8 @@ apps/kazusa/ (or repository root)
     persists them to the owner's subjective ledger (`agent:<id>:chat:*`) with
     `[speaker:<id>]` prefix, and registers the stimulus.
   - **Jev Decision Model Evaluation**: Calls `api.runtime.decisions.evaluate`
-    using Jev (`jev/jev-latest`) to evaluate incoming stimuli in a single
-    sub-100ms forward pass without output tokens.
+    using Jev (`kazusa/jev`) to evaluate incoming stimuli in a single sub-100ms
+    forward pass without output tokens.
   - **Universal Gate (Both Idle & Busy)**:
     - _Idle_: Evaluates `["WAKE", "IGNORE"]` against the character's active task
       (e.g., sleeping, reading). Casual chatter while sleeping is ignored,

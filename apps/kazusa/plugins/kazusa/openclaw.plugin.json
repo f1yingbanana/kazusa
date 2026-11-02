@@ -160,8 +160,9 @@
               "baseUrl": {
                 "type": "string"
               },
-              "apiKeyEnv": {
-                "type": "string"
+              "provider": {
+                "type": "string",
+                "description": "The model provider whose key embeddings use, wherever OpenClaw keeps it."
               },
               "model": {
                 "type": "string"
@@ -458,13 +459,40 @@
             "description": "Characters onstage from the start even when defaultOnstage is false."
           }
         }
+      },
+      "decisions": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Jev decisions, routed to the provider picked in Settings → Models.",
+        "properties": {
+          "typesafeApiKey": {
+            "type": "object",
+            "required": ["source", "provider", "id"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["env", "store", "file", "exec"]
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "A secret reference to TypeSafe's key, for Jev through TypeSafe."
+          }
+        }
       }
     }
   },
   "decisionModels": [
     {
-      "provider": "jev",
-      "id": "jev-latest",
+      "provider": "kazusa",
+      "id": "jev",
       "name": "Jev",
       "capabilities": {
         "questionTypes": ["boolean", "choice", "score"],
@@ -476,7 +504,7 @@
     }
   ],
   "contracts": {
-    "decisionProviders": ["jev"],
+    "decisionProviders": ["kazusa"],
     "tools": [
       "clock_now",
       "clock_set_speed",
@@ -500,5 +528,16 @@
       "refresh_skills"
     ],
     "gatewayMethodDispatch": ["authenticated-request"]
+  },
+  "configContracts": {
+    "secretInputs": {
+      "paths": [
+        {
+          "path": "decisions.typesafeApiKey",
+          "expected": "string",
+          "ownerKind": "capability"
+        }
+      ]
+    }
   }
 }

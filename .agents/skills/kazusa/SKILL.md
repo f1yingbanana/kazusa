@@ -183,7 +183,7 @@ apps/kazusa/
 │       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs, GET /kazusa/desires
 │       ├── location/                   # World map, "location" store, task `where`, location.* RPCs, GET /kazusa/places|locations
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
-│       ├── decisions/                  # `jev/jev-latest`: hosted Jev through an OpenRouter or TypeSafe key
+│       ├── decisions/                  # `kazusa/jev`: Jev through OpenRouter or TypeSafe, as picked
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
@@ -215,19 +215,52 @@ apps/kazusa/
 - **`npm run dev`** (`scripts/dev.mjs`) installs what's missing and runs the
   frontend. The guide only asks what's missing and writes `world/openclaw.json`
   last, so its existence means setup is done; that is what starts the Gateway.
-- **Keys** live in `world/.state/.env`, the only `.env` OpenClaw takes provider
-  keys from (it ignores them in the cwd's `.env`, without warning). It is read
-  once at Gateway start. `openclaw.json` edits apply by themselves.
+- **Provider keys** live in OpenClaw's secret store
+  (`.state/state/openclaw.sqlite`). Writing a key reference into `openclaw.json`
+  reloads every plugin, so `worlds/base.json` writes one for every provider in
+  `src/providers/catalog.ts` up front
+  (`models.providers.<id>.apiKey: { source: "store", provider: "default", id: "<VAR>" }`;
+  TypeSafe's at `plugins.entries.kazusa.config.decisions.typesafeApiKey`, a
+  manifest `secretInputs` path read with `getPreparedPluginSecretInput`).
+  `catalog.test.ts` keeps them in step. Settings → Models only calls
+  `secrets.store.set`/`delete` (admin scope, so `callGatewayFromCli` with the
+  token, like Usage), which OpenClaw re-resolves live; it never writes config.
+  Costs: each provider without a key logs a cold-secret warning pair at start
+  and on every store change; Kazusa's brain channel declares
+  `plugins.entries.kazusa.config.decisions` a no-op reload prefix, or a TypeSafe
+  key change would restart it (OpenClaw ties a channel to all of its plugin's
+  config); a reference disables the environment fallback, so `.env` keys only
+  count for a provider whose reference was removed by hand. Read references from
+  `getRuntimeConfigSourceSnapshot()` (the runtime snapshot holds resolved keys).
+  Baseten and Cohere aren't offered: their plugins reject a key-only entry. The
+  setup guide stores OpenRouter's key with the CLI before the Gateway exists.
 - **Gateway token**: required even on loopback, because without it any website
   can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
   `.env`, and hands it to the frontend's proxy. Plugin routes read it from
   config or `OPENCLAW_GATEWAY_TOKEN` (`resolveAuthToken`); nobody sees it.
-- **One OpenRouter key covers everything**: chat (`openrouter/...`), embeddings
-  (`memory.embedding`: `baseUrl`, `apiKeyEnv`, `model`), and Jev. OpenClaw's
-  `typesafe` plugin can't reach OpenRouter (fixed endpoint, loopback-only
-  `baseUrl`, strict response check), so `src/decisions/jev.ts` provides
-  `jev/jev-latest`: a `TYPESAFE_API_KEY` wins, otherwise `OPENROUTER_API_KEY`.
-  OpenRouter requires non-empty `instructions` on every question.
+- **Three model slots**, all in Kazusa's `"models"` store (`ModelSelection`:
+  `model`/`thinking` per agent, `decision`/`embedding` for the world), never
+  `openclaw.json`, because OpenClaw reloads every plugin on a model change,
+  `decisionModel` included (verified: Kazusa force-retired mid-call). The same
+  model through two providers is two choices (whose key pays):
+  - **Chat**: over the configured primary.
+  - **Decisions**: `agents.defaults.decisionModel` is fixed at `kazusa/jev`, our
+    one decision provider (`src/decisions/jev.ts`), which reads the pick per
+    call and posts to OpenRouter's or TypeSafe's System One endpoint
+    (`JEV_ROUTES`). OpenRouter requires non-empty `instructions`. The official
+    `typesafe` plugin isn't used: it can't reach OpenRouter, and switching to it
+    would mean a config change.
+  - **Memory search**: over `memory.embedding` (`baseUrl`, `provider`, `model`);
+    choices in `src/memory/embedding-models.ts`, each naming the `vectors` it
+    makes. The index's `useVectors` switches sets (all kept), so the same model
+    through another provider costs nothing and a new model re-embeds in the
+    background. OpenClaw's embedding adapters are private to its memory plugin
+    since July 2026, hence our own client.
+
+  One OpenRouter key covers all three. Embeddings and Jev ask
+  `api.runtime.modelAuth` for the key per call (plaintext for plugins; no
+  sentinel), so a key saved while running works at once.
+
 - **A world's first moments** come from config the guide writes: `stage.cast`
   and `stage.defaultOnstage: false` for who is simulated, `clock.startAt` and
   `clock.speed: 0` so a chosen cast starts paused. The cast picker's tags are
@@ -573,9 +606,10 @@ connect these modules in process.
   admission interleavings, state compilation, and test specifications.
 - **Decision Model Paradigm**: Uses OpenClaw's native
   `api.runtime.decisions.evaluate({ state, questions }, { agentId, purpose: "perception" })`
-  powered by Jev (`jev/jev-latest`, Kazusa's own provider in `src/decisions/`).
-  Evaluates categorical choices in a single forward pass (~70–200ms latency,
-  zero generated output tokens, $0.042/1M input tokens).
+  powered by Jev through `kazusa/jev` (`src/decisions/jev.ts`), run by
+  OpenRouter or TypeSafe as picked in Settings → Models. Evaluates categorical
+  choices in a single forward pass (~70–200ms latency, zero generated output
+  tokens, $0.042/1M input tokens).
 - **Universal Gate (Both Idle & Busy Brains)**: All incoming stimuli are
   evaluated against the character's active task and cognitive state:
   - **Idle Brain**: Characters are never truly inactive (sleep, reading, and

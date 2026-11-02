@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DecisionBatch } from "openclaw/plugin-sdk/decisions";
-import { createJevProvider, type JevDeps } from "./jev.ts";
+import {
+  createJevProvider,
+  JEV_ROUTES,
+  type JevDeps,
+  type JevRoute,
+} from "./jev.ts";
 
 const batch: DecisionBatch = {
   state: "Airi sent a message.",
@@ -37,16 +42,36 @@ function context(overrides = {}) {
   };
 }
 
+/** The Gateway resolves each provider's key; here they are variables. */
+function keys(
+  env: Record<string, string>,
+  picked: JevRoute = JEV_ROUTES[0],
+): Omit<JevDeps, "post"> {
+  const keyOf: Record<string, string | undefined> = {
+    openrouter: env.OPENROUTER_API_KEY,
+    typesafe: env.TYPESAFE_API_KEY,
+  };
+  return {
+    route: async () => picked,
+    keyConfigured: (provider) => Boolean(keyOf[provider]?.trim()),
+    resolveKey: async (provider) => keyOf[provider],
+  };
+}
+
 function provider(
   env: Record<string, string>,
   response: { status?: number; retryAfter?: string; body?: unknown } = {},
+  picked?: JevRoute,
 ) {
   const post = vi.fn<JevDeps["post"]>(async () => ({
     status: response.status ?? 200,
     retryAfter: response.retryAfter ?? null,
     body: JSON.stringify(response.body ?? { model: "jev-1.14", answers }),
   }));
-  return { post, jev: createJevProvider({ env: () => env, post }) };
+  return {
+    post,
+    jev: createJevProvider({ ...keys(env, picked), post }),
+  };
 }
 
 describe("Jev decision provider", () => {
@@ -60,16 +85,16 @@ describe("Jev decision provider", () => {
     expect(JSON.parse(request?.body ?? "").model).toBe("jev-latest");
   });
 
-  it("prefers a direct TypeSafe key", async () => {
-    const { jev, post } = provider({
-      OPENROUTER_API_KEY: "or-key",
-      TYPESAFE_API_KEY: "ts-key",
-    });
-    await jev.evaluate(batch, context());
-    expect(post.mock.calls[0]?.[0].url).toBe(
-      "https://api.typesafe.ai/v1/systemone",
+  it("reaches Jev through TypeSafe when that's the pick", async () => {
+    const { jev, post } = provider(
+      { OPENROUTER_API_KEY: "or-key", TYPESAFE_API_KEY: "ts-key" },
+      {},
+      JEV_ROUTES.find((route) => route.provider === "typesafe"),
     );
-    expect(post.mock.calls[0]?.[0].apiKey).toBe("ts-key");
+    await jev.evaluate(batch, context());
+    const request = post.mock.calls[0]?.[0];
+    expect(request?.url).toBe("https://api.typesafe.ai/v1/systemone");
+    expect(request?.apiKey).toBe("ts-key");
   });
 
   it("isn't ready and sends nothing without a key", async () => {
@@ -165,7 +190,7 @@ describe("Jev decision provider", () => {
       throw new Error("aborted");
     };
     const jev = createJevProvider({
-      env: () => ({ OPENROUTER_API_KEY: "or-key" }),
+      ...keys({ OPENROUTER_API_KEY: "or-key" }),
       post,
     });
     await expect(

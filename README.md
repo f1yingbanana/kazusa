@@ -125,8 +125,8 @@ World timeline showing character actions, and location details:
 [Releases](https://github.com/f1yingbanana/kazusa/releases/latest)**, or install
 with npm below.
 
-You'll need **Node.js 24.16+ (24.x) or 26.1+**, **Git**. Simply open a terminal
-and run (or ask your AI to do this for you):
+You'll need **Node.js 24+** and **Git**. Simply open a terminal and run (or ask
+your AI to do this for you):
 
 ```bash
 git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
@@ -139,9 +139,10 @@ for:
    with.
 2. **Who is on-stage and when the story begins**, for the sample worlds, pick
    which characters are actively simulated when the world starts.
-3. **An [OpenRouter API key](https://openrouter.ai/keys)**, which powers
-   conversation, decisions and memory search. The guide also explains how to set
-   up separate providers instead.
+3. **A model provider key**. One
+   [OpenRouter API key](https://openrouter.ai/keys) powers conversation,
+   decisions and memory search. You can also skip to set up separate providers
+   in settings later.
 
 Your world lives in `apps/kazusa/world/`. To start afresh, stop Kazusa with
 Ctrl + C and delete that folder. Run `npm run dev` again to reinitialize.

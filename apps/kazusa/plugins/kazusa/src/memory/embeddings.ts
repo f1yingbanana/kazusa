@@ -12,22 +12,27 @@ export interface Embedder {
 const BATCH = 96;
 const QUERY_TIMEOUT_MS = 3_000;
 
-/** The OpenAI-compatible `/embeddings` call. */
+/**
+ * The OpenAI-compatible `/embeddings` call. The key is asked for on every call,
+ * so one saved while the Gateway runs is used at once.
+ */
 export function openAiEmbedder(options: {
   readonly baseUrl: string;
-  readonly apiKey: string;
+  readonly apiKey: () => Promise<string | undefined>;
   readonly model: string;
 }): Embedder {
   const url = `${options.baseUrl.replace(/\/+$/, "")}/embeddings`;
   return {
     model: options.model,
     embed: async (texts, signal) => {
+      const apiKey = await options.apiKey();
+      if (!apiKey) throw new Error("Embeddings have no key.");
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${options.apiKey}`,
-          "api-key": options.apiKey,
+          Authorization: `Bearer ${apiKey}`,
+          "api-key": apiKey,
         },
         body: JSON.stringify({ model: options.model, input: texts }),
         ...(signal ? { signal } : {}),

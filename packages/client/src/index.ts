@@ -329,8 +329,6 @@ export const ModelOptionSchema = z.object({
   name: z.string(),
   /** Display name from `agents.defaults.models`. */
   alias: z.string().optional(),
-  /** Listed in `agents.defaults.models`, the world's shortlist. */
-  pinned: z.boolean(),
   /** False when the provider has no working credentials right now. */
   available: z.boolean(),
   unavailableReason: z
@@ -381,6 +379,121 @@ export const ModelsResponseSchema = z.object({
   providers: z.array(ModelProviderStatusSchema),
 });
 export type ModelsResponse = z.infer<typeof ModelsResponseSchema>;
+
+/**
+ * Where a provider's key comes from. `store`: OpenClaw's secret store, through
+ * a reference Kazusa wrote. `env`: an environment variable (the world's
+ * `.state/.env`, read at Gateway start). `config`: anything else written into
+ * `openclaw.json` by hand. `none`: no key.
+ */
+export const ProviderKeySourceSchema = z.enum([
+  "store",
+  "env",
+  "config",
+  "none",
+]);
+export type ProviderKeySource = z.infer<typeof ProviderKeySourceSchema>;
+
+export const ProviderSummarySchema = z.object({
+  /** OpenClaw's provider id, as in model refs (`openrouter/...`). */
+  id: z.string(),
+  label: z.string(),
+  /** One line on what it offers. */
+  hint: z.string().optional(),
+  /** Where to create a key. */
+  keysUrl: z.string().url().optional(),
+  /** The secret store entry and environment variable it uses. */
+  keyName: z.string(),
+  key: ProviderKeySourceSchema,
+});
+export type ProviderSummary = z.infer<typeof ProviderSummarySchema>;
+
+/** GET /kazusa/providers: every provider this Gateway can use, alphabetical. */
+export const ProvidersResponseSchema = z.object({
+  providers: z.array(ProviderSummarySchema),
+});
+export type ProvidersResponse = z.infer<typeof ProvidersResponseSchema>;
+
+/**
+ * POST /kazusa/providers/key. Saves `key` in the secret store entry the
+ * provider already points at, so nothing in `openclaw.json` changes. Answers
+ * with the provider; its models need a catalog refresh.
+ */
+export const ProviderKeyPayloadSchema = z.object({
+  provider: z.string().min(1),
+  key: z.string().trim().min(1),
+});
+export type ProviderKeyPayload = z.infer<typeof ProviderKeyPayloadSchema>;
+
+/** POST /kazusa/providers/remove. Forgets a key Kazusa stored. */
+export const ProviderRemovePayloadSchema = z.object({
+  provider: z.string().min(1),
+});
+export type ProviderRemovePayload = z.infer<typeof ProviderRemovePayloadSchema>;
+
+/**
+ * One choice for a model role other than chat: the same model through two
+ * providers is two choices, picked by whose key pays for it.
+ */
+export const RoleModelOptionSchema = z.object({
+  /** `provider/model`. */
+  ref: z.string(),
+  provider: z.string(),
+  name: z.string(),
+  available: z.boolean(),
+  unavailableReason: z.enum(["missing-auth"]).optional(),
+});
+export type RoleModelOption = z.infer<typeof RoleModelOptionSchema>;
+
+/**
+ * GET /kazusa/models/decision: who runs Jev, which judges what reaches a
+ * character. Kept in Kazusa's selection, not `openclaw.json`.
+ */
+export const DecisionModelsResponseSchema = z.object({
+  current: z.string(),
+  options: z.array(RoleModelOptionSchema),
+});
+export type DecisionModelsResponse = z.infer<
+  typeof DecisionModelsResponseSchema
+>;
+
+/** POST /kazusa/models/decision/select. */
+export const DecisionModelSelectPayloadSchema = z.object({
+  ref: z.string().min(1),
+});
+export type DecisionModelSelectPayload = z.infer<
+  typeof DecisionModelSelectPayloadSchema
+>;
+
+export const EmbeddingModelOptionSchema = RoleModelOptionSchema.extend({
+  /** Choices with the same value make the same vectors, so they share them. */
+  vectors: z.string(),
+});
+export type EmbeddingModelOption = z.infer<typeof EmbeddingModelOptionSchema>;
+
+/** GET /kazusa/models/embedding: the memory search model and its progress. */
+export const EmbeddingModelsResponseSchema = z.object({
+  current: z.string(),
+  /** `memory.embedding` in `openclaw.json`, used until one is picked. */
+  configured: z.string(),
+  options: z.array(EmbeddingModelOptionSchema),
+  /** Passages of the loaded wikis with a vector from the current model. */
+  progress: z.object({
+    embedded: z.number().int(),
+    total: z.number().int(),
+  }),
+});
+export type EmbeddingModelsResponse = z.infer<
+  typeof EmbeddingModelsResponseSchema
+>;
+
+/** POST /kazusa/models/embedding/select. `null` goes back to `configured`. */
+export const EmbeddingModelSelectPayloadSchema = z.object({
+  ref: z.string().min(1).nullable(),
+});
+export type EmbeddingModelSelectPayload = z.infer<
+  typeof EmbeddingModelSelectPayloadSchema
+>;
 
 /** GET /kazusa/profile: who the player is. Only `about` can be edited. */
 export const ProfileResponseSchema = z.object({

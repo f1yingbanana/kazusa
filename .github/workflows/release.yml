@@ -61,9 +61,16 @@ jobs:
         with:
           name: installers
           path: installers
+      # A release made on GitHub's page creates the tag that starts this run, so
+      # it can already exist: then the installers go onto it, its notes kept.
       - run: |
-          gh release create "$TAG" installers/Kazusa-*.dmg installers/Kazusa-Setup-*.exe \
-            --verify-tag --generate-notes --notes "These builds are unsigned.
+          installers=(installers/Kazusa-*.dmg installers/Kazusa-Setup-*.exe)
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${installers[@]}" --clobber
+          else
+            gh release create "$TAG" "${installers[@]}" \
+              --verify-tag --generate-notes --notes "These builds are unsigned.
           **Windows:** choose More info, then Run anyway. To update, run the new installer and keep the same folder.
           **Mac (Apple silicon):** drag Kazusa to Applications and open it. If macOS blocks it, go to System Settings > Privacy & Security and choose Open Anyway. To update, replace the app.
           To quit, press Ctrl+C in Kazusa's terminal window and wait for it to finish."
+          fi

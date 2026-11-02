@@ -12,7 +12,9 @@ import { registerClock } from "./clock/register.ts";
 import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
-import { createJevProvider } from "./decisions/jev.ts";
+import { createJevProvider, gatewayJevDeps } from "./decisions/jev.ts";
+import { registerDecisionModelsHttp } from "./decisions/http.ts";
+import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
 import {
   registerBrainHttp,
@@ -25,6 +27,7 @@ import { registerLocationHttp } from "./location/http.ts";
 import { registerMemory } from "./memory/register.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
+import { registerProvidersHttp } from "./providers/http.ts";
 import { registerSkills } from "./skills/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
@@ -48,7 +51,12 @@ export default definePluginEntry({
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
     rememberRegistration(api);
-    api.registerDecisionProvider(createJevProvider());
+    const jev = gatewayJevDeps(api);
+    api.registerDecisionProvider(createJevProvider(jev));
+    registerDecisionModelsHttp(api, {
+      selection: modelSelection(api),
+      keyConfigured: jev.keyConfigured,
+    });
     registerHostPromptEdits(
       api,
       currentConfig(api).agents?.defaults?.systemAgent?.agentId,
@@ -83,6 +91,7 @@ export default definePluginEntry({
 
     const stage = registerStage(api);
     const models = registerModels(api);
+    registerProvidersHttp(api);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
     const contextRef: { current?: ReturnType<typeof registerContextEngine> } =

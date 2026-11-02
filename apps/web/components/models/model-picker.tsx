@@ -19,13 +19,13 @@ import {
 } from "@/components/ui/model-selector";
 import { Spinner } from "@/components/ui/spinner";
 import { useModels } from "@/hooks/use-models";
+import { useProviderLabel } from "@/hooks/use-providers";
 import { cn } from "@/lib/utils";
 import {
   PROVIDER_STATUS_LABELS,
   UNAVAILABLE_LABELS,
   formatContext,
   modelName,
-  providerLabel,
   refName,
 } from "./model-labels";
 
@@ -35,16 +35,14 @@ function ModelRow({
   model,
   value,
   checked,
-  showProvider = false,
   onSelect,
 }: {
   model: ModelOption;
   value: string;
   checked: boolean;
-  /** Outside a provider group, say whose model it is. */
-  showProvider?: boolean;
   onSelect: (model: ModelOption) => void;
 }) {
+  const providerLabel = useProviderLabel();
   return (
     <ModelSelectorItem
       value={value}
@@ -62,14 +60,7 @@ function ModelRow({
         provider={model.provider}
         className="text-muted-foreground"
       />
-      <ModelSelectorName>
-        {modelName(model)}
-        {showProvider ? (
-          <span className="ml-1.5 text-muted-foreground">
-            {providerLabel(model.provider)}
-          </span>
-        ) : null}
-      </ModelSelectorName>
+      <ModelSelectorName>{modelName(model)}</ModelSelectorName>
       {!model.available && model.unavailableReason ? (
         <span className="text-xs text-muted-foreground">
           {UNAVAILABLE_LABELS[model.unavailableReason]}
@@ -85,10 +76,10 @@ function ModelRow({
 
 /**
  * The chat model for one scope: the world default (no `agentId`) or one
- * character. The catalog is whatever the Gateway's providers report; the world
- * config only pins a shortlist. The first entry undoes the scope's choice: a
- * character goes back to following the world, the world to OpenClaw's
- * configured primary.
+ * character. The catalog is every model of a provider the world has a key for,
+ * grouped by provider. The first entry undoes the scope's choice: a character
+ * goes back to following the world, the world to OpenClaw's configured
+ * primary.
  *
  * OpenClaw limitation: switching `agents.defaults.model.primary` makes OpenClaw
  * reload every plugin (about ten seconds, Kazusa included), so the choice is
@@ -108,6 +99,7 @@ export function ModelPicker({
   const { data, error, isLoading, refreshing, select, refresh } =
     useModels(agentId);
   const world = useModels();
+  const providerLabel = useProviderLabel();
   const [open, setOpen] = useState(false);
 
   const byProvider = useMemo(() => {
@@ -122,7 +114,6 @@ export function ModelPicker({
 
   const models = data?.models ?? [];
   const current = models.find((model) => model.ref === data?.current);
-  const pinned = models.filter((model) => model.pinned);
   const statusOf = new Map(
     data?.providers.map((entry) => [entry.provider, entry.status]),
   );
@@ -205,23 +196,6 @@ export function ModelPicker({
                     </span>
                   </ModelSelectorName>
                 </ModelSelectorItem>
-              </ModelSelectorGroup>
-              <ModelSelectorSeparator />
-            </>
-          ) : null}
-          {pinned.length > 0 ? (
-            <>
-              <ModelSelectorGroup heading="Pinned">
-                {pinned.map((model) => (
-                  <ModelRow
-                    key={model.ref}
-                    model={model}
-                    value={`pinned:${model.ref}`}
-                    checked={own && model.ref === data?.current}
-                    showProvider
-                    onSelect={(picked) => choose(picked.ref)}
-                  />
-                ))}
               </ModelSelectorGroup>
               <ModelSelectorSeparator />
             </>

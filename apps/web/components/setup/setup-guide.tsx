@@ -1,8 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -205,75 +206,46 @@ function StartTimePicker({
   );
 }
 
-function Path({ children }: { children: string }) {
-  return (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs wrap-anywhere">
-      {children}
-    </code>
-  );
-}
-
 /**
- * For anyone not using one OpenRouter key: the three things that need a
- * provider.
+ * Starting with no key is allowed: the world is there to look at, and any
+ * provider can be connected from Settings later. What doesn't work until then
+ * is said plainly.
  */
-function OwnProviders() {
+function NoKeyWarning() {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3 text-sm">
-      <p>
-        <strong>Now, before pressing Start,</strong> add these to{" "}
-        <Path>apps/kazusa/world/.state/.env</Path>:
-      </p>
-      <ul className="flex list-disc flex-col gap-1 ps-5">
-        <li>
-          Your chat provider&apos;s key, using the variable from the{" "}
-          <a
-            className="underline"
-            href="https://docs.openclaw.ai/concepts/model-providers"
-            target="_blank"
-            rel="noreferrer"
-          >
-            OpenClaw provider guide
-          </a>
-          .
-        </li>
-        <li>
-          <Path>TYPESAFE_API_KEY</Path> for decisions. Without it, characters
-          react to everything, which is slower and costs more.
-        </li>
-      </ul>
-      <p>
-        <strong>After starting,</strong> edit{" "}
-        <Path>apps/kazusa/world/openclaw.json</Path>. Changes apply by
-        themselves:
-      </p>
-      <ul className="flex list-disc flex-col gap-1 ps-5">
-        <li>
-          Add your provider to <Path>plugins.allow</Path>, then pick its model
-          in Settings.
-        </li>
-        <li>
-          For memory search, set <Path>baseUrl</Path>, <Path>apiKeyEnv</Path>{" "}
-          and <Path>model</Path> under <Path>memory.embedding</Path> in the
-          Kazusa plugin&apos;s config, for any OpenAI-compatible embeddings API.
-          Without it, memory falls back to keywords.
-        </li>
-      </ul>
-    </div>
+    <Alert>
+      <TriangleAlertIcon />
+      <AlertTitle>Characters can&apos;t think yet</AlertTitle>
+      <AlertDescription>
+        <p>
+          Until a provider has a key, nobody can reply or act, the admin
+          included. You&apos;ll land in Settings, under Models: paste a key for
+          OpenRouter or any other provider there, and its models are ready at
+          once.
+        </p>
+        <p>
+          An OpenRouter key also covers decisions and memory search. With
+          another provider, characters react to everything (slower, and it costs
+          more) and remember by keywords only.
+        </p>
+      </AlertDescription>
+    </Alert>
   );
 }
 
 /**
  * Lands in the system agent's chat. The welcome opens that chat as the Gateway
  * starts, so wait for it: a chat opened first would be an empty draft beside
- * it.
+ * it. Without a key nobody could answer there, so it lands where keys go.
  */
 function Starting({
   paused,
   systemAgent,
+  keyless,
 }: {
   paused: boolean;
   systemAgent: string;
+  keyless: boolean;
 }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -283,6 +255,10 @@ function Starting({
       if (Date.now() - started > SLOW_START_MS) setSlow(true);
       const response = await fetch("/kazusa/chats").catch(() => null);
       if (!response?.ok) return;
+      if (keyless) {
+        window.location.assign("/?view=settings&settings.tab=models");
+        return;
+      }
       answeredAt ??= Date.now();
       const { chats } = (await response.json()) as {
         chats: readonly {
@@ -305,7 +281,7 @@ function Starting({
         );
     }, START_POLL_MS);
     return () => clearInterval(timer);
-  }, [systemAgent]);
+  }, [keyless, systemAgent]);
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <Spinner className="size-6" />
@@ -332,7 +308,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [date, setDate] = useState(now);
   const [time, setTime] = useState(() => format(now, "HH:mm"));
   const [key, setKey] = useState("");
-  const [ownProviders, setOwnProviders] = useState(false);
+  const [skipKey, setSkipKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -374,8 +350,8 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
 
   const submit = async () => {
     if (!world || submitting) return;
-    if (!status.hasKey && !ownProviders && !key.trim()) {
-      setError("Paste a key, or choose to set up your own providers.");
+    if (!status.hasKey && !skipKey && !key.trim()) {
+      setError("Paste a key, or skip this for now.");
       return;
     }
     setError(null);
@@ -389,7 +365,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
         ...(pickingCast
           ? { startAt: `${format(date, "yyyy-MM-dd")}T${time}` }
           : {}),
-        ...(key.trim() ? { openrouterKey: key.trim() } : {}),
+        ...(key.trim() && !skipKey ? { openrouterKey: key.trim() } : {}),
       }),
     }).catch(() => null);
     setSubmitting(false);
@@ -408,7 +384,11 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
     <main className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-xl flex-col gap-6">
         {starting && world ? (
-          <Starting paused={pickingCast} systemAgent={world.systemAgent} />
+          <Starting
+            paused={pickingCast}
+            systemAgent={world.systemAgent}
+            keyless={!status.hasKey && skipKey}
+          />
         ) : (
           <>
             <h1 className="text-xl font-semibold">Welcome to Kazusa</h1>
@@ -486,11 +466,11 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                 <QuestionnaireDescription>
                   {status.hasKey
                     ? "You are ready to start."
-                    : "One OpenRouter key covers chat, decisions and memory search. It stays on this computer."}
+                    : "Characters need a model to think. One OpenRouter key covers chat, decisions and memory search, and it's kept in OpenClaw's secret store on this computer."}
                 </QuestionnaireDescription>
                 {status.hasKey ? null : (
                   <div className="flex flex-col gap-3">
-                    {ownProviders ? null : (
+                    {skipKey ? null : (
                       <Field data-invalid={Boolean(error)}>
                         <FieldLabel htmlFor="setup-openrouter-key">
                           OpenRouter API key
@@ -525,15 +505,15 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                       variant="link"
                       className="w-fit px-0"
                       onClick={() => {
-                        setOwnProviders(!ownProviders);
+                        setSkipKey(!skipKey);
                         setError(null);
                       }}
                     >
-                      {ownProviders
-                        ? "Use an OpenRouter key instead"
-                        : "I'll set up my own providers"}
+                      {skipKey
+                        ? "Add an OpenRouter key instead"
+                        : "Skip for now, or use another provider"}
                     </Button>
-                    {ownProviders ? <OwnProviders /> : null}
+                    {skipKey ? <NoKeyWarning /> : null}
                   </div>
                 )}
                 {error ? <FieldError>{error}</FieldError> : null}

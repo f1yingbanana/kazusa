@@ -7,8 +7,10 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import { parseEnv } from "node:util";
 import { z } from "zod";
 
@@ -19,6 +21,71 @@ import { z } from "zod";
  * and is what starts the Gateway (`scripts/dev.mjs`).
  */
 export const OPENROUTER_KEY = "OPENROUTER_API_KEY";
+
+/** OpenClaw's secret store for the live world, where provider keys live. */
+export interface SecretStore {
+  readonly has: (name: string) => Promise<boolean>;
+  readonly set: (name: string, value: string) => Promise<void>;
+}
+
+const StoreListSchema = z.array(z.object({ name: z.string() }));
+
+/**
+ * Through OpenClaw's CLI, which writes the store directly: setup runs before
+ * the Gateway exists. About a second a call.
+ */
+export function cliSecretStore(appDir: string): SecretStore {
+  const liveDir = path.join(appDir, "world");
+  const cli = path.join(appDir, "../../node_modules/openclaw/openclaw.mjs");
+  const options = {
+    cwd: liveDir,
+    env: {
+      ...process.env,
+      OPENCLAW_CONFIG_PATH: path.join(liveDir, "openclaw.json"),
+      OPENCLAW_STATE_DIR: path.join(liveDir, ".state"),
+    },
+  };
+  const run = promisify(execFile);
+  return {
+    has: async (name) => {
+      if (!existsSync(path.join(liveDir, ".state"))) return false;
+      const { stdout } = await run(
+        process.execPath,
+        [cli, "secrets", "store", "list", "--json"],
+        options,
+      );
+      return StoreListSchema.parse(JSON.parse(stdout)).some(
+        (entry) => entry.name === name,
+      );
+    },
+    set: async (name, value) => {
+      await mkdir(options.env.OPENCLAW_STATE_DIR, { recursive: true });
+      await new Promise<void>((resolve, reject) => {
+        const child = execFile(
+          process.execPath,
+          [
+            cli,
+            "secrets",
+            "store",
+            "set",
+            name,
+            "--kind",
+            "secret",
+            "--value-file",
+            "-",
+          ],
+          options,
+          (error) => {
+            if (!error) resolve();
+            // The CLI's message never holds the key: it arrives on stdin.
+            else reject(new Error(`Couldn't store ${name}: ${error.message}`));
+          },
+        );
+        child.stdin?.end(value);
+      });
+    },
+  };
+}
 
 const WorldSchema = z.object({
   /** Only on the live copy: which template it came from. */
@@ -176,7 +243,10 @@ async function characterGroups(
   );
 }
 
-export function createSetup(appDir: string) {
+export function createSetup(
+  appDir: string,
+  store: SecretStore = cliSecretStore(appDir),
+) {
   const worldsDir = path.join(appDir, "worlds");
   const liveDir = path.join(appDir, "world");
   const configFile = path.join(liveDir, "openclaw.json");
@@ -249,8 +319,7 @@ export function createSetup(appDir: string) {
       ),
       imported,
       hasKey: Boolean(
-        process.env[OPENROUTER_KEY]?.trim() ||
-        parseEnv(await savedEnv())[OPENROUTER_KEY],
+        (await keyOutsideStore()) || (await store.has(OPENROUTER_KEY)),
       ),
     };
   }
@@ -285,16 +354,23 @@ export function createSetup(appDir: string) {
     );
   }
 
-  async function saveKey(key: string): Promise<void> {
-    const env = await savedEnv();
-    if (parseEnv(env)[OPENROUTER_KEY]) return;
-    await mkdir(path.dirname(envFile), { recursive: true });
-    const separator = env && !env.endsWith("\n") ? "\n" : "";
-    const temporary = `${envFile}.tmp`;
-    await writeFile(temporary, `${env}${separator}${OPENROUTER_KEY}=${key}\n`, {
-      mode: 0o600,
-    });
-    await rename(temporary, envFile);
+  /** A key from before keys moved to the store: the environment or `.env`. */
+  async function keyOutsideStore(): Promise<string | undefined> {
+    return (
+      process.env[OPENROUTER_KEY]?.trim() ||
+      parseEnv(await savedEnv())[OPENROUTER_KEY]?.trim() ||
+      undefined
+    );
+  }
+
+  /**
+   * Into the secret store. A key already there wins, as a key already in `.env`
+   * did, so finishing an interrupted run never swaps it.
+   */
+  async function storeKey(typed: string | undefined): Promise<void> {
+    if (await store.has(OPENROUTER_KEY)) return;
+    const key = typed ?? (await keyOutsideStore());
+    if (key) await store.set(OPENROUTER_KEY, key);
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
@@ -372,7 +448,7 @@ export function createSetup(appDir: string) {
     if (!(await status()).worlds.some(({ id }) => id === request.world))
       throw new Error(`Unknown world: ${request.world}`);
     await importWorld(request.world);
-    if (request.openrouterKey) await saveKey(request.openrouterKey);
+    await storeKey(request.openrouterKey);
     await writeConfig(request);
   }
 

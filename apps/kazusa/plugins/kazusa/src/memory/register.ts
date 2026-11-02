@@ -30,6 +30,11 @@ import {
   openAiEmbedder,
   type Embedder,
 } from "./embeddings.ts";
+import { modelSelection } from "../models/selection.ts";
+import {
+  configuredChoice,
+  registerEmbeddingModels,
+} from "./embedding-models.ts";
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
 import { lintMap } from "../location/world.ts";
@@ -77,11 +82,14 @@ export const MEMORY_CONFIG = z.strictObject({
       minMinutes: 180,
       notesPerPage: 30,
     }),
-  /** Secrets stay in the environment; absent means keywords only. */
+  /**
+   * The key is that model provider's, wherever OpenClaw keeps it (secret store,
+   * environment or config). No key means keywords only.
+   */
   embedding: z
     .strictObject({
       baseUrl: z.string().default("https://openrouter.ai/api/v1"),
-      apiKeyEnv: z.string().default("OPENROUTER_API_KEY"),
+      provider: z.string().default("openrouter"),
       model: z.string().default("openai/text-embedding-3-small"),
     })
     .prefault({}),
@@ -201,7 +209,7 @@ export function registerMemory(
   const index = sharedIndex(
     api,
     config.wikiDir ?? sharedDir("wiki"),
-    config.embedding.model,
+    configuredChoice(config.embedding).vectors,
     config.anchors,
   );
   const nameOf = (id: string): string | undefined =>
@@ -210,30 +218,53 @@ export function registerMemory(
     api.logger.warn(message);
   };
 
-  const apiKey = process.env[config.embedding.apiKeyEnv];
-  const embedder: Embedder | undefined = apiKey
-    ? openAiEmbedder({
-        baseUrl: config.embedding.baseUrl,
-        apiKey,
-        model: config.embedding.model,
-      })
-    : undefined;
+  const models = registerEmbeddingModels(api, {
+    selection: modelSelection(api),
+    configured: configuredChoice(config.embedding),
+    useVectors: (vectors) => index.useVectors(vectors),
+    progress: () => {
+      index.world(); // loads the world wiki if no turn has yet
+      return index.embeddingProgress();
+    },
+    fillIn: () => embedInBackground(),
+  });
+  /** The chosen model, asked for per use: a key or a switch applies at once. */
+  const currentEmbedder = async (): Promise<Embedder | undefined> => {
+    const choice = await models.current().catch((error: unknown) => {
+      warn(`Memory: keywords only, no embedding choice: ${String(error)}`);
+      return undefined;
+    });
+    if (!choice || !models.usable(choice)) return undefined;
+    index.useVectors(choice.vectors);
+    return openAiEmbedder({
+      baseUrl: choice.baseUrl,
+      model: choice.model,
+      apiKey: async () =>
+        (
+          await api.runtime.modelAuth.resolveApiKeyForProvider({
+            provider: choice.provider,
+          })
+        ).apiKey,
+    });
+  };
   /** One background embed at a time; a turn never waits for it. */
   let embedding = false;
-  const embedInBackground = (agentId: string): void => {
-    if (!embedder || embedding) return;
+  function embedInBackground(agentId?: string): void {
+    if (embedding) return;
     embedding = true;
-    void embedPending(index, embedder, agentId)
+    void currentEmbedder()
+      .then((embedder) => embedder && embedPending(index, embedder, agentId))
       .catch((error: unknown) => {
         warn(`Memory: embedding failed: ${String(error)}`);
       })
       .finally(() => {
         embedding = false;
       });
-  };
+  }
   const withVector = async (
     request: RetrievalRequest,
   ): Promise<RetrievalRequest> => {
+    const embedder = await currentEmbedder();
     const queryVector =
       embedder &&
       (await embedQuery(embedder, spokenText(request.stimulus), warn));

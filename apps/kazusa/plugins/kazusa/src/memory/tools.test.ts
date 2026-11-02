@@ -45,7 +45,7 @@ beforeEach(() => {
         wikiDir: path.join(root, "world"),
         anchors: WORLDS.saltmere.anchors,
         embedding: {
-          apiKeyEnv: "KAZUSA_NO_KEY",
+          provider: "kazusa-no-key",
           model: "m",
         },
       },
@@ -65,6 +65,14 @@ beforeEach(() => {
         openKeyedStore: () => ({
           lookup: async () => undefined,
           register: async () => {},
+        }),
+      },
+      config: { current: () => ({}) },
+      modelAuth: {
+        isProviderApiKeyConfigured: () => false,
+        resolveApiKeyForProvider: async () => ({
+          source: "none",
+          mode: "api-key",
         }),
       },
     },

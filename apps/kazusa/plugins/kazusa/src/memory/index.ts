@@ -167,9 +167,11 @@ export class MemoryIndex {
   private worldModel?: WorldModel;
   private worldCheckedAt = 0;
   private readonly vectors: DatabaseSync;
-  /** Vectors by chunk text hash, loaded once. */
+  /** The current model's vectors by chunk text hash. */
   private readonly vectorByHash = new Map<string, Float32Array>();
   private readonly options: MemoryIndexOptions;
+  /** Which model's vectors are loaded and written. */
+  private model = "";
 
   constructor(options: MemoryIndexOptions) {
     this.options = options;
@@ -179,15 +181,7 @@ export class MemoryIndex {
     this.vectors.exec(
       "CREATE TABLE IF NOT EXISTS vectors (hash TEXT, model TEXT, vector BLOB, PRIMARY KEY (hash, model))",
     );
-    const rows = this.vectors
-      .prepare("SELECT hash, vector FROM vectors WHERE model = ?")
-      .all(options.model ?? "") as Array<{ hash: string; vector: Uint8Array }>;
-    for (const row of rows) {
-      this.vectorByHash.set(
-        row.hash,
-        new Float32Array(row.vector.slice().buffer),
-      );
-    }
+    this.useVectors(options.model ?? "");
     this.db.exec(
       "CREATE VIRTUAL TABLE chunks USING fts5(scope UNINDEXED, page UNINDEXED, layer UNINDEXED, known_by UNINDEXED, date UNINDEXED, news UNINDEXED, text, tokenize = 'porter unicode61 remove_diacritics 2')",
     );
@@ -332,6 +326,40 @@ export class MemoryIndex {
     }));
   }
 
+  /**
+   * Switches to another model's vectors. Each model's stay stored, so going
+   * back to one costs nothing; a new one starts empty and fills in as pages are
+   * embedded.
+   */
+  useVectors(model: string): void {
+    if (model === this.model && this.vectorByHash.size > 0) return;
+    this.model = model;
+    this.vectorByHash.clear();
+    const rows = this.vectors
+      .prepare("SELECT hash, vector FROM vectors WHERE model = ?")
+      .all(model) as Array<{ hash: string; vector: Uint8Array }>;
+    for (const row of rows) {
+      this.vectorByHash.set(
+        row.hash,
+        new Float32Array(row.vector.slice().buffer),
+      );
+    }
+  }
+
+  /**
+   * Passages of every loaded wiki, and how many have the current model's
+   * vector.
+   */
+  embeddingProgress(): { embedded: number; total: number } {
+    const hashes = new Set<string>();
+    for (const files of this.files.values())
+      for (const { page } of files.values())
+        for (const chunk of chunksOf(page)) hashes.add(textHash(chunk.text));
+    let embedded = 0;
+    for (const hash of hashes) if (this.vectorByHash.has(hash)) embedded += 1;
+    return { embedded, total: hashes.size };
+  }
+
   /** Chunk texts of these scopes that have no vector yet. */
   unembedded(scopes: readonly string[], limit: number): string[] {
     const pending = new Set<string>();
@@ -357,11 +385,7 @@ export class MemoryIndex {
       const vector = Float32Array.from(values);
       const hash = textHash(text);
       this.vectorByHash.set(hash, vector);
-      statement.run(
-        hash,
-        this.options.model ?? "",
-        new Uint8Array(vector.buffer),
-      );
+      statement.run(hash, this.model, new Uint8Array(vector.buffer));
     }
   }
 

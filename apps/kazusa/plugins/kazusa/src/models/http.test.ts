@@ -42,6 +42,13 @@ const LIST = {
       name: "Claude Opus",
       provider: "openrouter",
       available: false,
+      unavailableReason: "auth-failed",
+    },
+    {
+      id: "claude-opus",
+      name: "Claude Opus (Claude CLI)",
+      provider: "claude-cli",
+      available: false,
       unavailableReason: "missing-auth",
     },
     {
@@ -124,7 +131,7 @@ const CONFIG = {
 };
 
 describe("registerModelsHttp", () => {
-  it("serves the Gateway catalog with the shortlist and current model", async () => {
+  it("serves the models the world has keys for, with the current one", async () => {
     const { routes, deps } = setup(CONFIG);
     const { status, body } = await call(
       routes["/kazusa/models"],
@@ -143,7 +150,6 @@ describe("registerModelsHttp", () => {
       expect.objectContaining({
         ref: "zai/glm-5.3-flash",
         alias: "GLM",
-        pinned: true,
         available: true,
         thinkingLevels: [
           { id: "off", label: "off" },
@@ -151,11 +157,12 @@ describe("registerModelsHttp", () => {
         ],
         thinkingDefault: "off",
       }),
-      expect.objectContaining({ ref: "zai/glm-5.3", pinned: false }),
+      expect.objectContaining({ ref: "zai/glm-5.3" }),
+      // A key that was added but rejected still shows; no key at all doesn't.
       expect.objectContaining({
         ref: "openrouter/anthropic/claude-opus",
         available: false,
-        unavailableReason: "missing-auth",
+        unavailableReason: "auth-failed",
       }),
     ]);
   });
@@ -186,7 +193,11 @@ describe("registerModelsHttp", () => {
       ref: "openrouter/anthropic/claude-opus",
     });
     expect(locked.status).toBe(409);
-    expect(locked.body.error).toContain("missing-auth");
+    expect(locked.body.error).toContain("auth-failed");
+    const keyless = await call(routes["/kazusa/model"], "POST", "/", {
+      ref: "claude-cli/claude-opus",
+    });
+    expect(keyless.status).toBe(404);
     expect(await selection.read()).toEqual({});
   });
 

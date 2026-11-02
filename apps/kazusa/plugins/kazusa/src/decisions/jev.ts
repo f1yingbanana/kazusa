@@ -1,24 +1,54 @@
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type {
   DecisionAnswer,
   DecisionProviderV1,
   ProviderDecisionOutcome,
 } from "openclaw/plugin-sdk/decisions";
+import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-runtime";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf-runtime";
 import { z } from "zod";
-
-export const JEV_PROVIDER_ID = "jev";
+import { modelSelection } from "../models/selection.ts";
 
 /**
- * Hosted Jev, reached with whichever key the world has. OpenRouter serves the
- * same System One API as TypeSafe. OpenClaw's `typesafe` plugin can't be
- * pointed at it: its endpoint is fixed, `baseUrl` only accepts loopback, and
- * its response check rejects OpenRouter's extra fields. A direct key wins
- * because it was set on purpose; most worlds only have the OpenRouter one.
+ * Jev, as the one decision model OpenClaw is configured with: `kazusa/jev`.
+ * Which provider runs it is a Kazusa choice (`ModelSelection.decision`), read
+ * per call, because changing OpenClaw's `decisionModel` reloads every plugin.
+ * Both serve TypeSafe's System One API; OpenRouter's also needs non-empty
+ * `instructions` and adds fields the check below ignores.
  */
-const ROUTES = [
-  { env: "TYPESAFE_API_KEY", url: "https://api.typesafe.ai/v1/systemone" },
-  { env: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/systemone" },
-] as const;
+export const DECISION_PROVIDER_ID = "kazusa";
+
+export interface JevRoute {
+  /** Whose key pays: a provider in the Providers catalog. */
+  readonly provider: string;
+  readonly model: string;
+  readonly name: string;
+  readonly url: string;
+}
+
+export const JEV_ROUTES: readonly JevRoute[] = [
+  {
+    provider: "openrouter",
+    model: "jev-latest",
+    name: "Jev",
+    url: "https://openrouter.ai/api/v1/systemone",
+  },
+  {
+    provider: "typesafe",
+    model: "jev-latest",
+    name: "Jev",
+    url: "https://api.typesafe.ai/v1/systemone",
+  },
+];
+
+export const routeRef = (route: JevRoute): string =>
+  `${route.provider}/${route.model}`;
+
+/**
+ * TypeSafe's key: a secret reference in Kazusa's own config, declared in the
+ * manifest's `secretInputs`, since TypeSafe is no model provider.
+ */
+export const TYPESAFE_KEY_PATH = "decisions.typesafeApiKey";
 
 const DEFAULT_INSTRUCTIONS = "Judge this from the state.";
 
@@ -60,7 +90,11 @@ interface JevResponse {
 }
 
 export interface JevDeps {
-  readonly env: () => Readonly<Record<string, string | undefined>>;
+  /** The picked route, else the first. */
+  readonly route: () => Promise<JevRoute>;
+  /** Whether a provider has a key now; synchronous and offline. */
+  readonly keyConfigured: (provider: string) => boolean;
+  readonly resolveKey: (provider: string) => Promise<string | undefined>;
   readonly post: (request: {
     readonly url: string;
     readonly apiKey: string;
@@ -70,45 +104,77 @@ export interface JevDeps {
   }) => Promise<JevResponse>;
 }
 
-const defaultDeps: JevDeps = {
-  env: () => process.env,
-  post: async ({ url, apiKey, body, signal, beforeRequest }) => {
-    const { response, release } = await fetchWithSsrFGuard({
-      url,
-      requireHttps: true,
-      maxRedirects: 0,
-      signal,
-      beforeRequest,
-      init: {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body,
+const post: JevDeps["post"] = async ({
+  url,
+  apiKey,
+  body,
+  signal,
+  beforeRequest,
+}) => {
+  const { response, release } = await fetchWithSsrFGuard({
+    url,
+    requireHttps: true,
+    maxRedirects: 0,
+    signal,
+    beforeRequest,
+    init: {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
       },
-    });
-    try {
-      return {
-        status: response.status,
-        retryAfter: response.headers.get("retry-after"),
-        body: await response.text(),
-      };
-    } finally {
-      await release();
-    }
-  },
+      body,
+    },
+  });
+  try {
+    return {
+      status: response.status,
+      retryAfter: response.headers.get("retry-after"),
+      body: await response.text(),
+    };
+  } finally {
+    await release();
+  }
 };
 
-function routeFor(
-  env: Readonly<Record<string, string | undefined>>,
-): { readonly url: string; readonly apiKey: string } | undefined {
-  for (const { env: name, url } of ROUTES) {
-    const apiKey = env[name]?.trim();
-    if (apiKey) return { url, apiKey };
-  }
-  return undefined;
+/** Keys wherever OpenClaw keeps them; the route from Kazusa's selection. */
+export function gatewayJevDeps(api: OpenClawPluginApi): JevDeps {
+  const selection = modelSelection(api);
+  const typesafeKey = (): string | undefined =>
+    getPreparedPluginSecretInput(DECISION_PROVIDER_ID, TYPESAFE_KEY_PATH).value;
+  return {
+    route: async () => {
+      const { decision } = await selection.read();
+      return (
+        JEV_ROUTES.find((route) => routeRef(route) === decision) ??
+        JEV_ROUTES[0]
+      );
+    },
+    keyConfigured: (provider) =>
+      provider === "typesafe"
+        ? Boolean(typesafeKey())
+        : api.runtime.modelAuth.isProviderApiKeyConfigured({
+            provider,
+            cfg: api.runtime.config.current() as Parameters<
+              typeof api.runtime.modelAuth.isProviderApiKeyConfigured
+            >[0]["cfg"],
+          }),
+    resolveKey: async (provider) =>
+      provider === "typesafe"
+        ? typesafeKey()
+        : (await api.runtime.modelAuth.resolveApiKeyForProvider({ provider }))
+            .apiKey,
+    post,
+  };
+}
+
+async function apiKeyFor(
+  deps: JevDeps,
+  route: JevRoute,
+): Promise<string | undefined> {
+  if (!deps.keyConfigured(route.provider)) return undefined;
+  return (await deps.resolveKey(route.provider))?.trim() || undefined;
 }
 
 /** Bodies can echo the request, so a failure carries only its status. */
@@ -139,23 +205,24 @@ function parseAnswers(
   }
 }
 
-export function createJevProvider(
-  deps: JevDeps = defaultDeps,
-): DecisionProviderV1 {
+export function createJevProvider(deps: JevDeps): DecisionProviderV1 {
   return {
-    id: JEV_PROVIDER_ID,
+    id: DECISION_PROVIDER_ID,
     contractVersion: 1,
-    isReady: () => routeFor(deps.env()) !== undefined,
+    // The pick needs a store read, so ready means any route could run.
+    isReady: () =>
+      JEV_ROUTES.some((route) => deps.keyConfigured(route.provider)),
     async evaluate(batch, context) {
-      const route = routeFor(deps.env());
-      if (!route)
+      const route = await deps.route();
+      const apiKey = await apiKeyFor(deps, route);
+      if (!apiKey)
         return { status: "unavailable", reason: "credentials-unavailable" };
       const remaining = context.deadlineMonotonicMs - performance.now();
       if (remaining <= 0) return { status: "unavailable", reason: "transport" };
       const questions = Object.fromEntries(
         Object.entries(batch.questions).map(([id, question]) => [
           id,
-          // OpenRouter requires non-empty `instructions`; TypeSafe lets them be absent.
+          // OpenRouter requires non-empty `instructions`.
           {
             ...question,
             instructions: question.instructions ?? DEFAULT_INSTRUCTIONS,
@@ -166,9 +233,10 @@ export function createJevProvider(
       let response: JevResponse;
       try {
         response = await deps.post({
-          ...route,
+          url: route.url,
+          apiKey,
           body: JSON.stringify({
-            model: context.model,
+            model: route.model,
             state: batch.state,
             questions,
           }),

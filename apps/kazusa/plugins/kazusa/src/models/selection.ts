@@ -1,20 +1,28 @@
 import type { ThinkingLevel } from "@kazusa/client";
-import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
+import {
+  KeyedAsyncQueue,
+  type OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
 import type { StateStore } from "../state.ts";
 
 /**
- * Sparse model and reasoning choices for the world or one agent. Agent fields
- * inherit the world's choices, then OpenClaw's native defaults.
+ * Every model choice, sparse, for the world or one agent: chat model and
+ * reasoning (agents inherit the world's, then OpenClaw's defaults), and the
+ * world's decision and memory search models.
  *
  * This lives in plugin state rather than `openclaw.json` because OpenClaw
- * treats any change to a configured model ref as a provider change and reloads
- * every plugin (Kazusa included) for about ten seconds. See
- * `backend-contract.md`, "Built: models".
+ * reloads every plugin (Kazusa included) on a change to a configured model, the
+ * decision model and a provider's key reference among them: live, a switch
+ * force-retired Kazusa mid-call. See `backend-contract.md`, "Built: models".
  */
 export interface ModelSelection {
-  /** `provider/model`. */
+  /** Chat, `provider/model`. */
   readonly model?: string;
   readonly thinking?: ThinkingLevel;
+  /** World only: `provider/model` from `decisions/catalog.ts`. */
+  readonly decision?: string;
+  /** World only: `provider/model` from `memory/embedding-models.ts`. */
+  readonly embedding?: string;
 }
 
 const WORLD_KEY = "world";
@@ -60,11 +68,23 @@ export function createModelSelection(
         const next: ModelSelection = {
           ...(merged.model ? { model: merged.model } : {}),
           ...(merged.thinking ? { thinking: merged.thinking } : {}),
+          ...(merged.decision ? { decision: merged.decision } : {}),
+          ...(merged.embedding ? { embedding: merged.embedding } : {}),
         };
         await store.register(scopeKey(agentId), next);
         return next;
       }),
   };
+}
+
+/** The one retained store, from any module. Never read it during registration. */
+export function modelSelection(api: OpenClawPluginApi): ModelSelectionStore {
+  return createModelSelection(
+    api.runtime.state.openKeyedStore<ModelSelection>({
+      namespace: "models",
+      retention: "retained",
+    }),
+  );
 }
 
 /** `venice/qwen3-235b` → `{ provider: "venice", model: "qwen3-235b" }`. */

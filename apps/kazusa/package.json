@@ -12,8 +12,22 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@openclaw/byteplus-provider": "2026.10.5",
+    "@openclaw/cerebras-provider": "2026.10.5",
+    "@openclaw/chutes-provider": "2026.10.5",
+    "@openclaw/deepinfra-provider": "2026.10.5",
+    "@openclaw/deepseek-provider": "2026.10.5",
+    "@openclaw/fireworks-provider": "2026.10.5",
+    "@openclaw/groq-provider": "2026.10.5",
+    "@openclaw/mistral-provider": "2026.10.5",
+    "@openclaw/moonshot-provider": "2026.10.5",
+    "@openclaw/novita-provider": "2026.10.5",
     "@openclaw/parallel-plugin": "2026.10.5",
+    "@openclaw/qwen-provider": "2026.10.5",
+    "@openclaw/synthetic-provider": "2026.10.5",
     "@openclaw/venice-provider": "2026.10.5",
+    "@openclaw/volcengine-provider": "2026.10.5",
+    "@openclaw/zai-provider": "2026.10.5",
     "openclaw": "^2026.10.5"
   }
 }

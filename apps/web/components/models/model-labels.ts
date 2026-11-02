@@ -4,12 +4,6 @@ import type {
   ThinkingLevel,
 } from "@kazusa/client";
 
-const PROVIDER_LABELS: Record<string, string> = {
-  zai: "Z.AI",
-  openrouter: "OpenRouter",
-  venice: "Venice",
-};
-
 export const UNAVAILABLE_LABELS: Record<
   NonNullable<ModelOption["unavailableReason"]>,
   string
@@ -27,10 +21,6 @@ export const PROVIDER_STATUS_LABELS: Record<
   "auth-rejected": "Key rejected",
   unavailable: "Unavailable",
 };
-
-export function providerLabel(provider: string) {
-  return PROVIDER_LABELS[provider] ?? provider;
-}
 
 export function modelName(model: ModelOption) {
   return model.alias ?? model.name;

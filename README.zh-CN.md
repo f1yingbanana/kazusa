@@ -113,8 +113,8 @@ git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 
 1. **选择一个世界**：从示例世界中挑选一个，或者选择空白世界让你自由发挥。
 2. **登场角色与故事起始时间**：对于示例世界，挑选哪些角色在世界启动时主动登场推演。
-3. **一个
-   [OpenRouter API 密钥](https://openrouter.ai/keys)**：用于生成对话、决策和记忆搜索。你也可以分别设定自己的 AI 供应商。
+3. **一个模型供应商的密钥**：一个
+   [OpenRouter API 密钥](https://openrouter.ai/keys)就能搞定对话、决策和记忆搜索。你也可以先跳过这步之后自行在设置里选择自己的供应商。
 
 你的世界数据存放在 `apps/kazusa/world/`。需要重新设置的话，只要按 Ctrl +
 C 停止 Kazusa，把那个文件夹删掉即可。重新跑 `npm run dev` 就会初始化。
