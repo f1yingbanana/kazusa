@@ -69,3 +69,60 @@ describe("POST /kazusa/move", () => {
     });
   });
 });
+
+describe("POST /kazusa/places/positions", () => {
+  function route(saved: unknown[]) {
+    let handler: Handler | undefined;
+    const api = {
+      config: {},
+      pluginConfig: { user: { id: "user:player", name: "Player" } },
+      registerHttpRoute: vi.fn((opts: { path: string; handler: Handler }) => {
+        if (opts.path === "/kazusa/places/positions") handler = opts.handler;
+      }),
+    } as unknown as OpenClawPluginApi;
+    registerLocationHttp(api, {
+      location: {
+        savePositions: async (positions: unknown) => {
+          saved.push(positions);
+          return 1;
+        },
+      } as unknown as LocationService,
+    });
+    return async (body: unknown) => {
+      const req = Object.assign(
+        Readable.from([Buffer.from(JSON.stringify(body))]),
+        {
+          method: "POST",
+          url: "/kazusa/places/positions",
+          headers: {},
+          socket: new Socket(),
+        },
+      );
+      let status = 0;
+      let json = "";
+      await handler?.(req, {
+        writeHead: (s: number) => {
+          status = s;
+        },
+        setHeader: vi.fn(),
+        end: (data?: string) => {
+          json = data ?? "";
+        },
+      });
+      return { status, body: JSON.parse(json || "{}") as unknown };
+    };
+  }
+
+  it("saves valid positions and refuses anything else", async () => {
+    const saved: unknown[] = [];
+    const post = route(saved);
+    const positions = { dock: { x: 0.5, y: 0.6 } };
+    const ok = await post({ positions });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toEqual({ written: 1 });
+    expect(saved).toEqual([positions]);
+    const bad = await post({ positions: { dock: { x: "far" } } });
+    expect(bad.status).toBeGreaterThanOrEqual(400);
+    expect(saved).toHaveLength(1);
+  });
+});

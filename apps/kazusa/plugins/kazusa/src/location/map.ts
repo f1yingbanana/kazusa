@@ -19,6 +19,15 @@ export const PLACE_FRONTMATTER = z.object({
   parent: PLACE_ID.optional(),
   summary: z.string().trim().min(1),
   entry_minutes: z.number().min(0).default(1),
+  /** Only a picture, so a bad value is dropped rather than failing the world. */
+  map: z
+    .object({
+      plane: z.string().trim().min(1).optional(),
+      x: z.number(),
+      y: z.number(),
+    })
+    .optional()
+    .catch(undefined),
   connections: z
     .array(
       z.strictObject({
@@ -52,6 +61,12 @@ export interface Place {
   /** Walking minutes to the parent's open space. */
   readonly entryMinutes: number;
   readonly connections: readonly Connection[];
+  /** Where it's drawn on the map. Routes and travel times never read this. */
+  readonly map?: {
+    readonly plane?: string;
+    readonly x: number;
+    readonly y: number;
+  };
   readonly bodyMarkdown: string;
 }
 
@@ -65,6 +80,7 @@ export function parsePlace(text: string): Place {
     summary: data.summary,
     entryMinutes: data.entry_minutes,
     connections: data.connections,
+    ...(data.map === undefined ? {} : { map: data.map }),
     bodyMarkdown: body,
   };
 }

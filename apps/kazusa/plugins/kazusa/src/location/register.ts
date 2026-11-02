@@ -12,6 +12,7 @@ import { personLabel } from "../person-label.ts";
 import { createSkillLoader } from "../context-engine/skill-loader.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
+import type { PlacePositions } from "@kazusa/client";
 import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
@@ -46,6 +47,7 @@ import {
   type Place,
   type WorldMap,
 } from "./map.ts";
+import { writePositions } from "./map-position.ts";
 import { sharedWorld, type World } from "./world.ts";
 
 /** The `where` parameter: short and stable, whatever the size of the world. */
@@ -63,6 +65,13 @@ const excerpt = (text: string | null, chars = 800): string | null =>
 
 export interface LocationService {
   readonly world?: World;
+  /**
+   * Writes where places are drawn to their pages; the wiki watcher reloads the
+   * map and tells observers. Returns how many pages changed.
+   */
+  readonly savePositions: (
+    positions: PlacePositions["positions"],
+  ) => Promise<number>;
   /** Absent for a world without places. */
   readonly taskExtension?: TaskExtension;
   /** The stored record, or the participant's home. */
@@ -872,6 +881,7 @@ export function registerLocation(
     get world() {
       return currentWorld();
     },
+    savePositions: (positions) => writePositions(config.wikiDir, positions),
     ...(taskExtension ? { taskExtension } : {}),
     record,
     participants,

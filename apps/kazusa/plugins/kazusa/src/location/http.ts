@@ -1,9 +1,11 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
   MovePayloadSchema,
+  PlacePositionsSchema,
   type LocationRecord as ClientLocationRecord,
   type LocationsResponse,
   type MoveResponse,
+  type PlacePositionsResponse,
   type PlacesResponse,
 } from "@kazusa/client";
 import {
@@ -53,6 +55,13 @@ export function registerLocationHttp(
         };
       }),
     } satisfies PlacesResponse);
+  });
+
+  route("places/positions", "POST", async (req, res) => {
+    const { positions } = PlacePositionsSchema.parse(await readJsonBody(req));
+    sendJson(res, 200, {
+      written: await location.savePositions(positions),
+    } satisfies PlacePositionsResponse);
   });
 
   route("locations", "GET", async (_req, res) => {

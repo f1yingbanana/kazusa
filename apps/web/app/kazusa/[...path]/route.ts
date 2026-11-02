@@ -18,6 +18,7 @@ const ROUTES = new Map([
   ["timeline", "GET"],
   ["desires", "GET"],
   ["places", "GET"],
+  ["places/positions", "POST"],
   ["locations", "GET"],
   ["move", "POST"],
   ["character/stage", "POST"],

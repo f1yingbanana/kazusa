@@ -9,6 +9,8 @@ import {
   isWithin,
   occupancy,
   peopleWithin,
+  placesOnPlane,
+  planesOf,
   positionAt,
 } from "./places";
 
@@ -144,5 +146,38 @@ describe("occupancy", () => {
       { id: "cleo", arriveAt: 500 },
     ]);
     expect(headingTo(ids, (id) => records.get(id), "town", 600)).toEqual([]);
+  });
+});
+
+describe("planes", () => {
+  const onMap = (id: string, plane?: string, parent?: string): Place => ({
+    id,
+    name: id,
+    aliases: [],
+    ...(parent ? { parent } : {}),
+    summary: "",
+    entryMinutes: 1,
+    connections: [],
+    ...(plane ? { map: { plane, x: 0, y: 0 } } : {}),
+    bodyMarkdown: "",
+  });
+  const index = buildPlaceIndex([
+    onMap("land", "over"),
+    onMap("cave", undefined, "land"),
+    onMap("deep", "under", "land"),
+    onMap("loose"),
+  ]);
+
+  it("inherits an area's plane and falls back to a shared default", () => {
+    const planes = planesOf(index);
+    expect(planes.get("cave")).toBe("over");
+    expect(planes.get("deep")).toBe("under");
+    expect(planes.get("loose")).toBe("");
+  });
+
+  it("treats a place whose area is on another plane as top level", () => {
+    const under = placesOnPlane(index, planesOf(index), "under");
+    expect(under.order).toEqual(["deep"]);
+    expect(under.depth.get("deep")).toBe(0);
   });
 });

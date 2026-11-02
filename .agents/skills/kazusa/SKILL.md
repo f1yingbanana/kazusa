@@ -744,14 +744,15 @@ connect these modules in process.
 - **Map (`map.ts`, pure)**: World Wiki places
   (`shared/wiki/entities/places/<id>.md`): `place_id`, `name`, `aliases`,
   `summary`, `parent`, `entry_minutes`, `connections` (two-way, declared once;
-  `ways`, the first is usual), optional client `map`; the body is the full
-  description. A tree through `parent`; every place is somewhere to stand.
-  `sharedWorld` (`world.ts`): one watcher per process keeps the map current, so
-  a new place or `home` needs no reload and SSE `places` tells clients to
-  refetch. A broken edit keeps the last good map and warns, and `wiki_lint`
-  names the problem; only a map broken from the start throws. A world without
-  places disables Location. `visibleFrom` = parent, children, siblings,
-  connection ends.
+  `ways`, the first is usual), optional `map` (`{ plane?, x, y }`, drawn by the
+  client, written by `POST /kazusa/places/positions`, never read by routing);
+  the body is the full description. A tree through `parent`; every place is
+  somewhere to stand. `sharedWorld` (`world.ts`): one watcher per process keeps
+  the map current, so a new place or `home` needs no reload and SSE `places`
+  tells clients to refetch. A broken edit keeps the last good map and warns, and
+  `wiki_lint` names the problem; only a map broken from the start throws. A
+  world without places disables Location. `visibleFrom` = parent, children,
+  siblings, connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's
   cards, `workspaces/<id>/wiki/entities/places/<place_id>.md`. **Visit loop**:
   with no card, **Where you are** shows the whole description; starting the next
@@ -902,10 +903,10 @@ connect these modules in process.
   `world-building` skill, and whole worlds are `world-project`. Both live in
   `.agents/skills/`, so coding agents working in this repo get them as well as
   every world's system agent, who selects them by her per-agent `skills` in
-  `worlds/base.json`. Long jobs survive the run limits
-  through a project file and `continue_work`, which starts a fresh run once this
-  one ends (`perception/continue.ts`), up to
-  `perception.systemAgent.maxContinuations` runs without the user speaking. Retained consumers use the host-injected
+  `worlds/base.json`. Long jobs survive the run limits through a project file
+  and `continue_work`, which starts a fresh run once this one ends
+  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
+  runs without the user speaking. Retained consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
   agent/identity/workspace lookups. Character and agent roster responses expose
   `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World

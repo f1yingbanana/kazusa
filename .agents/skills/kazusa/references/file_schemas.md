@@ -242,6 +242,10 @@ After-School Sweets Club.
   entry is judged by the decision model with that description as evidence
   (`location-judgment` skill).
 - `connections` (default `[]`): `{ to, ways: [{ by, minutes }], note? }`.
+- `map` (optional): `{ plane?, x, y }`, where the place is drawn in the client.
+  Coordinates are a fraction of the map; each `plane` is its own map, and a
+  place without one takes its parent's. A bad value is ignored. Arranging the
+  map in the client rewrites this line. Routes and travel times never read it.
 - `status` and opening hours are not yet part of the schema.
 
 ### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)

@@ -251,6 +251,7 @@ parent: <place_id of the area it is inside>
 summary: "One sentence, with anything needed at the door. Open 08:00–19:00."
 entry_minutes: 2
 renown: local
+map: { x: 0.42, y: 0.61 }
 connections:
   - to: <another place_id>
     ways:
@@ -271,6 +272,12 @@ it is, how it is kept and how busy it gets.
   an area means its open space.
 - `entry_minutes` is the walk to the parent. `connections` are extra routes,
   two-way and declared on one page only, with the usual way first.
+- `map` is optional: where the place is drawn, as `{ x, y }`, a fraction of the
+  map from 0 to 1 with y growing south, plus `plane` when a world has several
+  separate maps (a surface and an underworld). Add it when you know the
+  geography. Without it the map works out a spot from travel times. It is only a
+  picture: routes and travel times never read it, so set those with
+  `connections`.
 - Hours and locks go in `summary`, because it is all a returning visitor sees.
 - There are no flags for ownership, visibility or crowds. Write those in the
   description. Use `renown: private` for private homes and hideouts.

@@ -738,6 +738,18 @@ export const PlaceSchema = z.object({
       note: z.string().optional(),
     }),
   ),
+  /**
+   * Where it's drawn on the map; absent means automatic. Coordinates are a
+   * fraction of the map, and each plane is its own map. Only a picture: travel
+   * times come from `connections`, never from here.
+   */
+  map: z
+    .object({
+      plane: z.string().optional(),
+      x: z.number(),
+      y: z.number(),
+    })
+    .optional(),
   bodyMarkdown: z.string(),
 });
 export type Place = z.infer<typeof PlaceSchema>;
@@ -745,6 +757,22 @@ export type Place = z.infer<typeof PlaceSchema>;
 /** Places in tree order: each area, then its places by name. */
 export const PlacesResponseSchema = z.object({ places: z.array(PlaceSchema) });
 export type PlacesResponse = z.infer<typeof PlacesResponseSchema>;
+
+/**
+ * POST /kazusa/places/positions: where places are drawn, written to their
+ * pages.
+ */
+export const PlacePositionsSchema = z.object({
+  positions: z.record(
+    z.string(),
+    z.object({ x: z.number().finite(), y: z.number().finite() }),
+  ),
+});
+export type PlacePositions = z.infer<typeof PlacePositionsSchema>;
+export const PlacePositionsResponseSchema = z.object({ written: z.number() });
+export type PlacePositionsResponse = z.infer<
+  typeof PlacePositionsResponseSchema
+>;
 
 /**
  * A participant's position. Clients compute it at any sim time: at `placeId`

@@ -6,6 +6,8 @@ import type { CharacterSummary } from "@kazusa/client";
 import {
   ChevronLeftIcon,
   InfoIcon,
+  ListIcon,
+  MapIcon,
   MapPinIcon,
   StarIcon,
   UsersIcon,
@@ -29,20 +31,23 @@ import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 import {
   KIND_LABELS,
+  OFFSTAGE_FOLDER,
   TRANSIT_FOLDER,
   UNPLACED_FOLDER,
   WATCH_FOLDER,
   busySummary,
   useWorldFolders,
+  usePlacesAvailable,
   useWorldParams,
   type Folder,
 } from "./world-state";
+import { PlaceMap } from "./map/place-map";
 import { WorldSidebar } from "./world-sidebar";
 
 /**
- * The open folder from the World sidebar. Narrow screens have no visible
- * sidebar, so until a folder is opened the folder list is this screen. A map
- * renderer can register as an alternative here later.
+ * The open folder from the World sidebar, as a map or a list. Narrow screens
+ * have no visible sidebar, so until a folder is opened the folder list is this
+ * screen.
  */
 export function WorldView() {
   const { folderParam } = useWorldParams();
@@ -116,9 +121,21 @@ function FolderStage() {
   const navigate = useNavigate();
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
-  const { by, kind, folder } = useWorldParams();
-  const { resolve, places } = useWorldFolders(by, kind);
+  const { by, kind, as, folder } = useWorldParams();
+  const { resolve, places, groups, everyone } = useWorldFolders(by, kind);
+  const placesAvailable = usePlacesAvailable();
   const open = resolve(folder) ?? resolve("all")!;
+  // Offstage and unplaced people have no spot on a map.
+  const mappable =
+    placesAvailable &&
+    places !== null &&
+    places.places.length > 0 &&
+    open.key !== UNPLACED_FOLDER &&
+    open.key !== OFFSTAGE_FOLDER;
+  const showMap = mappable && as === "map";
+  // By place, a folder is just where to look; everyone stays on the map.
+  const placeFolder = by === "place" && open.placeId !== undefined;
+  const onMap = placeFolder || open.key === "all" ? everyone : open.members;
   const members = open.members;
   const items = useMemo(() => itemsOf(open), [open]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,6 +199,34 @@ function FolderStage() {
               .join(" · ")}
           </p>
         </div>
+        {mappable ? (
+          <div
+            role="group"
+            aria-label="Show as"
+            className="flex shrink-0 rounded-md border"
+          >
+            <Button
+              variant={showMap ? "secondary" : "ghost"}
+              size="icon-sm"
+              aria-pressed={showMap}
+              className="rounded-r-none"
+              onClick={() => navigate({ "world.as": "map" }, "replace")}
+            >
+              <MapIcon />
+              <span className="sr-only">Map</span>
+            </Button>
+            <Button
+              variant={showMap ? "ghost" : "secondary"}
+              size="icon-sm"
+              aria-pressed={!showMap}
+              className="rounded-l-none"
+              onClick={() => navigate({ "world.as": "list" }, "replace")}
+            >
+              <ListIcon />
+              <span className="sr-only">List</span>
+            </Button>
+          </div>
+        ) : null}
         {open.placeId ? (
           <Button
             variant="ghost"
@@ -199,7 +244,14 @@ function FolderStage() {
         ) : null}
       </header>
 
-      {members.length === 0 ? (
+      {showMap ? (
+        <PlaceMap
+          places={places}
+          members={onMap}
+          focusPlaceId={open.placeId}
+          overlay={<OffMap by={by} groups={groups} />}
+        />
+      ) : members.length === 0 ? (
         <EmptyFolder folder={open} />
       ) : (
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -239,6 +291,33 @@ function FolderStage() {
         </div>
       )}
     </>
+  );
+}
+
+/** Who isn't anywhere on the map, and the way to them. */
+function OffMap({ by, groups }: { by: string; groups: readonly Folder[] }) {
+  const navigate = useNavigate();
+  if (by !== "place") return null;
+  const off = groups.filter(
+    (group) =>
+      (group.key === UNPLACED_FOLDER || group.key === OFFSTAGE_FOLDER) &&
+      group.members.length > 0,
+  );
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {off.map((group) => (
+        <Button
+          key={group.key}
+          variant="outline"
+          size="xs"
+          className="bg-background"
+          onClick={() => navigate({ "world.in": group.key })}
+        >
+          {group.label}
+          <span className="font-mono tabular-nums">{group.members.length}</span>
+        </Button>
+      ))}
+    </div>
   );
 }
 

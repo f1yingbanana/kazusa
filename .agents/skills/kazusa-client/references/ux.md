@@ -141,12 +141,23 @@ Clear resets everything.
 
 ## 5. Stage: World
 
-The folder opened in the World sidebar. Later, a map renderer registers as an
-alternative inside the same view (a renderer toggle), not as a separate view.
+The folder opened in the World sidebar, as a map or a list (a toggle in the
+header, not separate views).
 
 - **URL params:** `world.by` (dimension), `world.in` (open folder: `all`,
   `watch`, or a group key; absent means "nothing opened", which is `all` on
-  desktop and the folder list on narrow screens), `world.kind`.
+  desktop and the folder list on narrow screens), `world.kind`, `world.as`
+  (`map` or `list`; absent means map when grouping by place), `world.plane`.
+- **Map:** regions stack a translucent fill, so depth reads as contour lines.
+  Roads on foot are solid; anything ridden is dashed. An area's inside opens
+  with zoom, and hidden places pass their roads and people to the area around
+  them. What's written is decided per zoom on screen pixels (`planLabels`):
+  people, then area names, then other places, then travel times, each only if it
+  fits. By place, a folder only says where to look: everyone stays on the map.
+  By other dimensions, only the folder's members show. Coordinates come from
+  each page's `map`, and each plane is its own map; roads to another plane
+  aren't drawn. Arrange is explicit, so a stray drag while panning can't move
+  anything, and it only changes the picture.
 - **Header:** folder name, then a mono summary ("15 simulated · 2 thinking").
   The place/map NeedsLine sits on the right until `places` exists.
 - **Rows:** the shared ≈44px character row (presence avatar, name, one-line

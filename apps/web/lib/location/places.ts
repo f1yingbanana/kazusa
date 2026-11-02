@@ -49,6 +49,41 @@ export function buildPlaceIndex(places: readonly Place[]): PlaceIndex {
   };
 }
 
+/** Pages with no plane of their own take their area's, or else this one. */
+const DEFAULT_PLANE = "";
+
+/** Which plane each place is drawn on. Each plane is its own map. */
+export function planesOf(index: PlaceIndex): ReadonlyMap<string, string> {
+  const planes = new Map<string, string>();
+  const resolve = (id: string, seen: Set<string>): string => {
+    const known = planes.get(id);
+    if (known !== undefined) return known;
+    const place = index.byId.get(id);
+    const own = place?.map?.plane;
+    const parent = place?.parent;
+    const plane =
+      own ??
+      (parent !== undefined && index.byId.has(parent) && !seen.has(parent)
+        ? resolve(parent, seen.add(parent))
+        : DEFAULT_PLANE);
+    planes.set(id, plane);
+    return plane;
+  };
+  for (const place of index.places) resolve(place.id, new Set([place.id]));
+  return planes;
+}
+
+/** The places on one plane; a place whose area is elsewhere is top level here. */
+export function placesOnPlane(
+  index: PlaceIndex,
+  planes: ReadonlyMap<string, string>,
+  plane: string,
+): PlaceIndex {
+  return buildPlaceIndex(
+    index.places.filter((place) => planes.get(place.id) === plane),
+  );
+}
+
 /** The areas containing a place, innermost first. */
 export function ancestors(index: PlaceIndex, id: string): string[] {
   const chain: string[] = [];

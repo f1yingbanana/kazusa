@@ -1,8 +1,10 @@
 import {
   LocationsResponseSchema,
   MoveResponseSchema,
+  PlacePositionsResponseSchema,
   PlacesResponseSchema,
   type LocationsResponse,
+  type PlacePositions,
   type MoveResponse,
   type PlacesResponse,
 } from "@kazusa/client";
@@ -10,7 +12,6 @@ import { buildUrl, postJson, request } from "../http";
 
 export const PLACES_KEY = "kazusa/places";
 export const LOCATIONS_KEY = "kazusa/locations";
-
 export function isPlacesKey(key: unknown) {
   return Array.isArray(key) && key[0] === PLACES_KEY;
 }
@@ -30,6 +31,20 @@ export async function fetchPlaces(
     token,
   );
   return PlacesResponseSchema.parse(data);
+}
+
+/** Writes where places are drawn to their pages. */
+export async function savePlacePositions(
+  baseUrl: string,
+  positions: PlacePositions["positions"],
+  token?: string,
+): Promise<void> {
+  const data = await postJson<unknown>(
+    buildUrl(baseUrl, "/kazusa/places/positions"),
+    { positions } satisfies PlacePositions,
+    token,
+  );
+  PlacePositionsResponseSchema.parse(data);
 }
 
 export async function fetchLocations(

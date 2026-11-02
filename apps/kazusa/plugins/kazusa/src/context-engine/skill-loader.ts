@@ -197,6 +197,28 @@ export function parseSkillMarkdown(content: string): ParsedSkillDocument {
   }
 }
 
+const LOADER_CACHES = Symbol.for("kazusa.skillLoaderCaches");
+
+/**
+ * Every loader in the process. Each registration builds its own, and a skill
+ * edited on disk has to reach all of them, so `refresh_skills` clears them
+ * together. Weak, so a loader from a replaced registration can still go.
+ */
+function loaderCaches(): Set<WeakRef<() => void>> {
+  const cell = globalThis as { [LOADER_CACHES]?: Set<WeakRef<() => void>> };
+  return (cell[LOADER_CACHES] ??= new Set());
+}
+
+/** Forget every loader's resolved paths and bodies, so the next load reads disk. */
+export function clearSkillCaches(): void {
+  const caches = loaderCaches();
+  for (const ref of caches) {
+    const clear = ref.deref();
+    if (clear) clear();
+    else caches.delete(ref);
+  }
+}
+
 /** Strip YAML frontmatter delimiters and headers from SKILL.md content. */
 export function stripFrontmatter(content: string): string {
   return parseSkillMarkdown(content).body;
@@ -517,6 +539,7 @@ export function createSkillLoader(
     contentCache.clear();
     pathCache.clear();
   }
+  loaderCaches().add(new WeakRef(clearCache));
 
   return {
     loadSkill,
