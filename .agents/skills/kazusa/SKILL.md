@@ -864,24 +864,34 @@ connect these modules in process.
 - **Character Tool Surface (`tools.profile` + `tools.alsoAllow`)**: characters
   inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
   `send_message`, `list_chats`, `manage_chat`, `recall`, `look_up`, `remember`,
-  `view_image`. Memory goes through tools, not files; ARONA keeps file access.
-  `tools.deny` keeps `group:sessions`, `message`, and `gateway` (the updater
-  included in `minimal`). `tools.exec.applyPatch.enabled: false` prevents
-  implicit patch access from `write`; ARONA explicitly enables it in her native
-  exec override. `tools.toolSearch: false`: with a dozen tools, Tool Search's
-  three control tools cost more than they save, and models route calls through
-  its generic `tool_call`. `tools.codeMode.enabled: false` for the same reason:
-  models whose catalog prefers code mode (GLM-5.3-flash) otherwise get every
-  tool behind one `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for
-  five minutes, holding a Gateway stop open. `clock_*` stay registered for
-  operators but are not allowed for characters. Everything a roleplaying
-  character must not reach is excluded by omission: shell, web, browser, UI,
-  nodes/computer, Gateway/plugin management, media generation, goals,
-  `ask_user`, and `session_status` (whose presence also adds a "use
-  `session_status` for the exact time" line to the system prompt). A deployment
-  widens the surface in its own `openclaw.json` (global profile plus
-  `alsoAllow`, or a per-agent profile/allowlist); a tool from a new plugin is
-  unavailable until allowed there.
+  `view_image`, `skills_read`. Memory goes through tools, not files; ARONA keeps
+  file access. **Character skills**: `agents.defaults.skills` is every skill in
+  `skills.load.extraDirs` (the world's `shared/skills`, then the defaults) but
+  the engine's own seven, which the context engine injects itself; bundled and
+  repo skills (`kazusa`, `typescript`, …) stay hidden. `src/skills/` keeps that
+  list: on `gateway_start`, and when ARONA runs `refresh_skills` after writing a
+  skill. With `skills.load.watch: false` nothing else reloads skills: OpenClaw
+  rebuilds a session's skill snapshot from disk only when its allowlist changes
+  (bodies are read on use; descriptions wait for a rebuild), and our loaders
+  cache until `clearSkillCaches()`. The repo's `.agents/skills` reach ARONA
+  through her workspace symlink, not `extraDirs`. `tools.deny` keeps
+  `group:sessions`, `message`, and `gateway` (the updater included in
+  `minimal`). `tools.exec.applyPatch.enabled: false` prevents implicit patch
+  access from `write`; ARONA explicitly enables it in her native exec override.
+  `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
+  tools cost more than they save, and models route calls through its generic
+  `tool_call`. `tools.codeMode.enabled: false` for the same reason: models whose
+  catalog prefers code mode (GLM-5.3-flash) otherwise get every tool behind one
+  `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for five minutes,
+  holding a Gateway stop open. `clock_*` stay registered for operators but are
+  not allowed for characters. Everything a roleplaying character must not reach
+  is excluded by omission: shell, web, browser, UI, nodes/computer,
+  Gateway/plugin management, media generation, goals, `ask_user`, and
+  `session_status` (whose presence also adds a "use `session_status` for the
+  exact time" line to the system prompt). A deployment widens the surface in its
+  own `openclaw.json` (global profile plus `alsoAllow`, or a per-agent
+  profile/allowlist); a tool from a new plugin is unavailable until allowed
+  there.
 - **System console**: this deployment selects ARONA with native
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.

@@ -25,6 +25,7 @@ import { registerLocationHttp } from "./location/http.ts";
 import { registerMemory } from "./memory/register.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
+import { registerSkills } from "./skills/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import { registerWelcome } from "./messaging/welcome.ts";
@@ -150,6 +151,7 @@ export default definePluginEntry({
     });
     contextRef.current = context;
     registerContextHttp(api, { context });
+    registerSkills(api);
     registerUsageHttp(api);
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {

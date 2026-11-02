@@ -168,11 +168,11 @@ Decisions:
   `world` (title, summary), `taskman.categories` (keep `sleeping` and
   `traveling`).
 - **Wording that doesn't fit.** The shared skills assume phones and daily
-  routines. If that's wrong for the setting, read the original with
-  `skills_read`, then write an adjusted full copy to
-  `shared/skills/<name>/SKILL.md`. Yours replaces it for this world. If there's
-  no way to send a message at a distance, invent the smallest one, write it up
-  as a concept, and tell the user it's invented.
+  routines. If that's wrong for the setting, read the original in
+  `../shared/skills/<name>/SKILL.md`, then write an adjusted full copy to
+  `shared/skills/<name>/SKILL.md` and run `refresh_skills`. Yours replaces it
+  for this world. If there's no way to send a message at a distance, invent the
+  smallest one, write it up as a concept, and tell the user it's invented.
 
 ### Traps
 

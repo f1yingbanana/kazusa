@@ -29,6 +29,7 @@
         "clock_now",
         "clock_set_speed",
         "clock_advance",
+        "refresh_skills",
         "apply_patch"
       ],
       "deny": ["exec", "process", "code_execution", "openclaw"],
@@ -74,13 +75,15 @@
         "heartbeat": {
           "every": "0m"
         },
-        "skipBootstrap": true
+        "skipBootstrap": true,
+        "skills": [],
+        "modelPolicy": {}
       },
       "ownership": "explicit",
       "entries": {}
     },
     "plugins": {
-      "allow": ["kazusa", "openrouter", "parallel"],
+      "allow": ["kazusa", "openrouter", "venice", "parallel"],
       "slots": {
         "contextEngine": "kazusa",
         "memory": "none"
@@ -88,7 +91,8 @@
       "load": {
         "paths": [
           "../plugins/kazusa",
-          "../../../node_modules/@openclaw/parallel-plugin"
+          "../../../node_modules/@openclaw/parallel-plugin",
+          "../../../node_modules/@openclaw/venice-provider"
         ]
       },
       "entries": {
@@ -150,6 +154,9 @@
         "parallel": { "enabled": true },
         "openrouter": {
           "enabled": true
+        },
+        "venice": {
+          "enabled": true
         }
       }
     },
@@ -185,7 +192,8 @@
         "recall",
         "look_up",
         "remember",
-        "view_image"
+        "view_image",
+        "skills_read"
       ],
       "fs": {
         "workspaceOnly": true
@@ -203,11 +211,7 @@
     },
     "skills": {
       "load": {
-        "extraDirs": [
-          "./shared/skills",
-          "../shared/skills",
-          "../../../.agents/skills"
-        ],
+        "extraDirs": ["./shared/skills", "../shared/skills"],
         "watch": false
       },
       "install": {

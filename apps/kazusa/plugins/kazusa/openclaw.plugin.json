@@ -496,7 +496,8 @@
       "continue_work",
       "knowledge_explain",
       "memory_consolidate",
-      "memory_restore"
+      "memory_restore",
+      "refresh_skills"
     ],
     "gatewayMethodDispatch": ["authenticated-request"]
   }

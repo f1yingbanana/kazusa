@@ -2,9 +2,10 @@
 name: world-building
 description:
   "Create or edit characters, seed the World Wiki or a character's personal
-  wiki, and create or change places. Use when the user asks to add someone to
-  the world, change who a character is or what they remember, write lore, or add
-  to the map."
+  wiki, create or change places, and write skills every character can use. Use
+  when the user asks to add someone to the world, change who a character is or
+  what they remember, write lore, add to the map, or teach characters how to do
+  something."
 ---
 
 # Building the World
@@ -52,6 +53,7 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Adding to `agents.entries` in `openclaw.json` | By itself, but it can interrupt your turn   |
 | Any place, or a `home` on a character card    | Within a second, once the map loads         |
 | Concept pages                                 | Coming turns                                |
+| Anything under `shared/skills/`               | Coming turns, once you run `refresh_skills` |
 
 **A broken map changes nothing.** An unknown `home`, `parent` or connection
 target keeps the whole map as it was until it's fixed. After changing a place or
@@ -286,6 +288,34 @@ Before finishing, check that the `parent` and every `to` exist, that nothing
 connects to itself or twice to the same place, that no `parent` chain loops, and
 that the new place can be reached from the rest of the map. Then run
 `wiki_lint`.
+
+## Writing a skill for every character
+
+A skill is know-how anyone in the world could look up when they need it: how a
+craft is done, how a ritual goes, the rules of a game. It is not lore (that is a
+concept page) and not who someone is.
+
+```markdown
+---
+name: <skill-name>
+description: "What it covers and when to use it, in one or two sentences."
+---
+
+# <Title>
+
+The steps or rules, written for someone in this world.
+```
+
+- Save it as `shared/skills/<skill-name>/SKILL.md`. The name is lowercase words
+  joined by `-`, and the folder has the same name.
+- Characters see only the `description` until they open the skill, so make it
+  say when it applies.
+- `context-conventions`, `task-lifecycle`, `task-interrupt`, `in-person`,
+  `perception`, `location-judgment` and `sleep-consolidation` are how the world
+  runs, and the engine gives them to characters itself. Read the original in
+  `../shared/skills/<name>/SKILL.md` before replacing one with a copy here.
+- Then run `refresh_skills`. Nothing reloads on its own. It reports which skills
+  characters can read.
 
 ## Finishing
 
