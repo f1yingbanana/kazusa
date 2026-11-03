@@ -16,6 +16,12 @@ import { z } from "zod";
 import { writeTemplateSnapshot } from "./template-snapshot";
 
 /**
+ * Where a world's config includes its system agent's tools and skills from;
+ * `scripts/system-agent.mjs` rewrites that file before every Gateway start.
+ */
+export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
+
+/**
  * First-run setup. `worlds/<id>` are read-only templates; the player's world is
  * a copy in `world/`, so playing never touches the repo. Every step can run
  * again, and `openclaw.json` is written last: its existence means setup is done
@@ -391,11 +397,15 @@ export function createSetup(
     const entries: Record<string, unknown> = Object.fromEntries(
       agents.map((id) => [id, { workspace: `./workspaces/${id}` }]),
     );
+    // Its tools and skills come with Kazusa, so they update with it.
+    const included = path.join(liveDir, SYSTEM_AGENT_INCLUDE);
+    await mkdir(path.dirname(included), { recursive: true });
+    await writeFile(included, `${JSON.stringify(base.systemAgent, null, 2)}\n`);
     entries[world.systemAgent] = {
+      $include: SYSTEM_AGENT_INCLUDE,
       workspace: `./workspaces/${world.systemAgent}`,
       identity: { name },
       cwd: liveDir,
-      ...base.systemAgent,
     };
     const kazusa = base.config.plugins.entries.kazusa.config;
     const memory = {

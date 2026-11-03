@@ -1078,33 +1078,41 @@ connect these modules in process.
 - **System console**: this deployment selects ARONA with native
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
-  Only the system console selects `full` with its explicit admin allowlist:
-  character tools, `ls`, web search/fetch, workspace-only patches, and clock
-  controls. Her runs have their own limits (`perception.systemAgent`). For every
-  character, near the limits only `send_message` still runs, so a run can report
-  before it ends. Shell execution, code execution and `openclaw` delegation are
-  denied; native `cwd` selects `apps/kazusa` for coding while identity/memory
-  remain in her character workspace. File tools enforce that coding directory.
-  Its `.agents` workspace symlink exposes these architecture guides without
-  adding a workspace-root `AGENTS.md`. Use native `skills_read` for complete
-  installed guides; ordinary file reads through an escaping symlink remain
-  blocked. Perception admits its input immediately, even paused; Messaging uses
-  wall-time pacing, and its message, chat-management and task tools skip the
-  pause wait. Simulation time, task deadlines and ordinary characters remain
-  frozen. Offstage and custody gates still apply. How she works is in her
-  `SOUL.md`; the common jobs (characters, wikis, places) are the
-  `world-building` skill, and whole worlds are `world-project`. Both live in
-  `.agents/skills/`, so coding agents working in this repo get them as well as
-  every world's system agent, who selects them by her per-agent `skills` in
-  `worlds/base.json`. Long jobs survive the run limits through a project file
-  and `continue_work`, which starts a fresh run once this one ends
-  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
-  runs without the user speaking. Retained consumers use the host-injected
-  `api.runtime.config.current()` rather than retaining `api.config` for live
-  agent/identity/workspace lookups. Character and agent roster responses expose
-  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
-  rows and direct-chat rows. Never infer administrator status from a name or
-  biography.
+  Only the system console selects `full`. Her tools and skills belong to the
+  app, not the world: `systemAgent` in `worlds/base.json`, which a world's
+  config `$include`s from `world/.state/kazusa/system-agent.json`, rewritten by
+  `scripts/system-agent.mjs` before every Gateway start (`npm run dev` and
+  `npm run gateway`). Her entry in `openclaw.json` keeps only workspace, name
+  and `cwd`; keys beside the include override it. The same script moves a world
+  set up before this onto the include, dropping the copy setup made. Her
+  allowlist names the `kazusa` plugin, so every Kazusa tool, including any added
+  later, is hers with no config change, plus the file and web built-ins.
+  Characters stay on `minimal` with an explicit `alsoAllow`, so a new tool
+  reaches none of them unless it is listed there. Her runs have their own limits
+  (`perception.systemAgent`). For every character, near the limits only
+  `send_message` still runs, so a run can report before it ends. Shell
+  execution, code execution and `openclaw` delegation are denied; native `cwd`
+  selects `apps/kazusa` for coding while identity/memory remain in her character
+  workspace. File tools enforce that coding directory. Its `.agents` workspace
+  symlink exposes these architecture guides without adding a workspace-root
+  `AGENTS.md`. Use native `skills_read` for complete installed guides; ordinary
+  file reads through an escaping symlink remain blocked. Perception admits its
+  input immediately, even paused; Messaging uses wall-time pacing, and its
+  message, chat-management and task tools skip the pause wait. Simulation time,
+  task deadlines and ordinary characters remain frozen. Offstage and custody
+  gates still apply. How she works is in her `SOUL.md`; the common jobs
+  (characters, wikis, places) are the `world-building` skill, and whole worlds
+  are `world-project`. Both live in `.agents/skills/`, so coding agents working
+  in this repo get them as well as every world's system agent, who selects them
+  by her per-agent `skills` in `worlds/base.json`. Long jobs survive the run
+  limits through a project file and `continue_work`, which starts a fresh run
+  once this one ends (`perception/continue.ts`), up to
+  `perception.systemAgent.maxContinuations` runs without the user speaking.
+  Retained consumers use the host-injected `api.runtime.config.current()` rather
+  than retaining `api.config` for live agent/identity/workspace lookups.
+  Character and agent roster responses expose `isSystemAgent` from that
+  snapshot; the client renders it as `ADMIN` in World rows and direct-chat rows.
+  Never infer administrator status from a name or biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from

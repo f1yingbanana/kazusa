@@ -9,7 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createSetup, type SecretStore } from "./setup";
+import { SYSTEM_AGENT_INCLUDE as SCRIPT_INCLUDE } from "../../../../scripts/system-agent.mjs";
+import { createSetup, SYSTEM_AGENT_INCLUDE, type SecretStore } from "./setup";
 
 function write(file: string, text: string) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -147,11 +148,18 @@ describe("setup", () => {
       "cy",
     ]);
     expect(made.agents.defaults.systemAgent.agentId).toBe("admin");
-    expect(made.agents.entries.admin).toMatchObject({
+    expect(made.agents.entries.admin).toEqual({
+      $include: SYSTEM_AGENT_INCLUDE,
+      workspace: "./workspaces/admin",
       cwd: path.join(app, "world"),
-      skills: ["kazusa"],
       identity: { name: "ADMIN" },
     });
+    expect(
+      JSON.parse(
+        readFileSync(path.join(app, "world", SYSTEM_AGENT_INCLUDE), "utf8"),
+      ),
+    ).toEqual({ skills: ["kazusa"] });
+    expect(SYSTEM_AGENT_INCLUDE).toBe(SCRIPT_INCLUDE);
     const kazusa = made.plugins.entries.kazusa.config;
     expect(kazusa.stage).toEqual({
       defaultOnstage: false,

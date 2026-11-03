@@ -15,6 +15,7 @@ import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
+import { syncSystemAgent } from "./system-agent.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORLD = path.join(ROOT, "apps/kazusa/world");
@@ -199,6 +200,11 @@ if (!stopping) {
 // The setup guide writes the config last, once the world is complete.
 while (!stopping && !existsSync(CONFIG)) await sleep(POLL_MS);
 if (!stopping) {
+  try {
+    for (const line of syncSystemAgent(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't update the system agent's tools: ${error.message}`);
+  }
   start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,
     env: {

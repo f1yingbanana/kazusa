@@ -2,10 +2,11 @@
 name: world-building
 description:
   "Create or edit characters and their stickers, seed the World Wiki or a
-  character's personal wiki, create or change places, and write skills every
-  character can use. Use when the user asks to add someone to the world, change
-  who a character is or what they remember, label or fix stickers, write lore,
-  add to the map, or teach characters how to do something."
+  character's personal wiki, create or change places, write skills every
+  character can use, and give yourself new skills or tools. Use when the user
+  asks to add someone to the world, change who a character is or what they
+  remember, label or fix stickers, write lore, add to the map, teach characters
+  how to do something, or have you learn something or use a tool you lack."
 ---
 
 # Building the World
@@ -377,6 +378,52 @@ The steps or rules, written for someone in this world.
   `../shared/skills/<name>/SKILL.md` before replacing one with a copy here.
 - Then run `refresh_skills`. Nothing reloads on its own. It reports which skills
   characters can read.
+
+## Your own skills and tools
+
+Your skills and tools come with Kazusa and update with it. Your built-in skills
+are in `workspaces/<your id>/.agents/skills/`, a link to Kazusa's own files:
+read them, but never edit them, because the next update replaces them. Your
+entry in `openclaw.json` holds your workspace, name and `cwd`, plus an
+`$include` of `.state/kazusa/system-agent.json`, which Kazusa rewrites every
+time it starts. Never edit that file either.
+
+When the user asks you to learn something, or to change or drop a skill or tool,
+put it in the world, where it outlives updates:
+
+- **A new skill for yourself:** write
+  `workspaces/<your id>/skills/<skill-name>/SKILL.md`, in the same format as a
+  skill for characters, then add its name beside the `$include` in your entry:
+  `"skills": ["<skill-name>"]`. A list there is added to Kazusa's, not swapped
+  for it, so name only your own.
+- **Changing one of your skills:** copy its folder from `.agents/skills/` to
+  `workspaces/<your id>/skills/` and edit the copy; a skill there wins over the
+  built-in one of the same name. Tell the user their copy no longer gets
+  Kazusa's improvements to it.
+- **A tool you don't have:** add `"tools": { "allow": ["<tool>"] }` beside the
+  `$include`, naming an OpenClaw tool (the `openclaw` skill lists them) or an
+  installed plugin's id, which brings all its tools.
+- **A tool to stop using:** `"tools": { "deny": ["<tool>"] }`. A denied tool is
+  gone even when Kazusa grants it, which is also why shell and code execution
+  stay off whatever you allow.
+- **What can't be done:** you can't drop one of Kazusa's skills, only replace it
+  with a copy, and you can't make a new tool: that takes code, a plugin a
+  developer writes and the user installs. Say so.
+
+Message the user before you edit `openclaw.json`, because the change can
+interrupt your turn.
+
+**When it applies.** Skill lists are only reloaded at certain moments, so tell
+the user which kind their change is:
+
+- **The next time it is read:** editing the text of a skill already in use,
+  yours or a character's.
+- **Your next turn:** a new skill once you list it, or a tool you allow or deny.
+  Write the skill's file before you list it, because listing it is what makes
+  Kazusa look for it.
+- **Only after Kazusa restarts:** a copy that replaces one of your built-in
+  skills, and a changed `description`, yours or a character's. Nothing you can
+  run brings these in sooner, so say plainly that it needs a restart.
 
 ## Finishing
 
