@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: shanhaijing_rikkagaku
-name: "Rikkagaku"
-learned: familiar place
+name: "Genryumon Old Palace"
+learned: always known
 ---
 
-A place I know through my club.
+Red pillars, gold roofs, a lot of people who want something. The old palace is a
+city inside a city. I know every shadow in it.

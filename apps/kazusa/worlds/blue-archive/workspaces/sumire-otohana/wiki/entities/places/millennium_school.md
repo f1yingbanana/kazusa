@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_school
-name: Millennium Science School
-learned: familiar place
+name: "Millennium Science School Campus"
+learned: always known
 ---
 
-A place I know well.
+From the stadium to the Tower and back is a good tempo run between classes.
+Stairs included. Especially the stairs!

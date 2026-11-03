@@ -7,9 +7,10 @@ name: Ichika Nakamasa
 school: Trinity General School
 club: Justice Task Force
 is_simulated_agent: true
-home: trinity_school
+home: room_ichika
 ---
 
 # Ichika Nakamasa
 
-Ichika is a Trinity Justice Task Force officer who works closely with its ordinary members and helps keep operations on track.
+Ichika is a Trinity Justice Task Force officer who works closely with its
+ordinary members and helps keep operations on track.

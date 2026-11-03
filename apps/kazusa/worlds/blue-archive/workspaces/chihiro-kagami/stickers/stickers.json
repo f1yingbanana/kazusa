@@ -1,0 +1,101 @@
+{
+  "outfits": {
+    "camp": "a navy-and-teal bucket hat, a cream hiking jacket and a large backpack",
+    "pajamas": "a loose white long-sleeve tee, navy shorts and a black headband"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes half-lidded, teeth showing through parted lips"
+    },
+    "calm": {
+      "look": "calm, eyes closed, lips relaxed"
+    },
+    "camp-angry": {
+      "look": "angry, brows furrowed, mouth open scolding"
+    },
+    "camp-calm": {
+      "look": "calm, eyes closed, lips relaxed"
+    },
+    "camp-confused": {
+      "look": "confused, brows knit, mouth slightly open"
+    },
+    "camp-gloomy": {
+      "look": "gloomy, a shadow over the brow, a cold sweat"
+    },
+    "camp-happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "camp-laughing": {
+      "look": "laughing with eyes shut, mouth open in a smile"
+    },
+    "camp-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "camp-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth slightly open"
+    },
+    "camp-skeptical": {
+      "look": "skeptical, eyes shut, brows lowered, mouth flat"
+    },
+    "camp-stern": {
+      "look": "stern, glasses glinting white, eyes hidden"
+    },
+    "camp-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "camp-worried": {
+      "look": "worried, eyes squeezed shut, teeth clenched, sweating"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "pajamas-angry": {
+      "look": "angry, brows furrowed, mouth open scolding"
+    },
+    "pajamas-calm": {
+      "look": "calm, eyes closed, lips relaxed"
+    },
+    "pajamas-confused": {
+      "look": "confused, one brow raised, mouth slightly open"
+    },
+    "pajamas-gloomy": {
+      "look": "gloomy, a shadow over the brow, a cold sweat"
+    },
+    "pajamas-happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "pajamas-laughing": {
+      "look": "laughing with eyes shut, mouth open in a smile"
+    },
+    "pajamas-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "pajamas-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth slightly open"
+    },
+    "pajamas-skeptical": {
+      "look": "skeptical, eyes shut, brows lowered, mouth flat"
+    },
+    "pajamas-stern": {
+      "look": "stern, glasses glinting white, eyes hidden"
+    },
+    "pajamas-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "pajamas-worried": {
+      "look": "worried, eyes squeezed shut, teeth clenched, sweating"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth slightly open"
+    },
+    "skeptical": {
+      "look": "skeptical, eyes narrowed, lips pressed"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    }
+  }
+}

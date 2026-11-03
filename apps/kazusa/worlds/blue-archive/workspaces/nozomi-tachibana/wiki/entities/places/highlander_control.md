@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: highlander_control
-name: "Highlander Central Control Center"
-learned: familiar place
+name: "Central Control Center Operations Floor"
+learned: always known
 ---
 
-A place I know through my club.
+Nozo's battle station! Big map, every train a dot, and I know where all of them
+are. The reports are the annoying part. I do them. Eventually.

@@ -1,0 +1,192 @@
+{
+  "outfits": {
+    "winter": "a long white puffer coat, a thick white scarf, mint mittens and gray tights",
+    "spacesuit": "a white cat-eared helmet with a clear visor, a lime-green scarf and a padded white suit",
+    "maid": "a navy maid dress with a white apron, a frilled headband and a light-blue ribbon"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, lips pressed"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, a tear at the corner, mouth open"
+    },
+    "happy": {
+      "look": "happy, blushing, eyes softened, a small open smile"
+    },
+    "maid-annoyed": {
+      "look": "annoyed, brows knit, mouth open in complaint"
+    },
+    "maid-determined": {
+      "look": "determined, brows set, lips closed"
+    },
+    "maid-flustered": {
+      "look": "flustered, eyes squeezed shut, a tear at the corner, mouth open"
+    },
+    "maid-happy": {
+      "look": "happy, eyes softened, mouth open in a smile"
+    },
+    "maid-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "maid-neutral": {
+      "look": "neutral, blushing, a calm look"
+    },
+    "maid-pouting": {
+      "look": "pouting, brows tilted, lips pursed"
+    },
+    "maid-sad": {
+      "look": "sad, eyes lowered, a tear under one eye, lips pressed"
+    },
+    "maid-shocked": {
+      "look": "shocked, blank white eyes, mouth agape, sweating"
+    },
+    "maid-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "maid-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "maid-teary": {
+      "look": "teary, eyes shut, a tear at the corner"
+    },
+    "maid-uneasy": {
+      "look": "uneasy, brows tilted, lips pressed"
+    },
+    "maid-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "sad": {
+      "look": "sad, a tear under one eye, lips pressed"
+    },
+    "shocked": {
+      "look": "shocked, blank white eyes, mouth agape, sweating"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, blushing"
+    },
+    "spacesuit-annoyed": {
+      "look": "annoyed, brows knit, mouth open in complaint"
+    },
+    "spacesuit-confused": {
+      "look": "confused, brows raised, lips pursed"
+    },
+    "spacesuit-determined": {
+      "look": "determined, brows set, lips closed"
+    },
+    "spacesuit-flustered": {
+      "look": "flustered, eyes squeezed shut, sweating, mouth wobbling"
+    },
+    "spacesuit-happy": {
+      "look": "happy, eyes shut, a bright open smile"
+    },
+    "spacesuit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "spacesuit-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "spacesuit-pleased": {
+      "look": "pleased, eyes softened, a small open smile"
+    },
+    "spacesuit-pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "spacesuit-shocked": {
+      "look": "shocked, blank white eyes, a tear, mouth open"
+    },
+    "spacesuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "spacesuit-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "spacesuit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "spacesuit-teary": {
+      "look": "teary, eyes shut, brows tilted, a tear at the corner"
+    },
+    "spacesuit-uneasy": {
+      "look": "uneasy, brows tilted, lips pressed"
+    },
+    "spacesuit-unimpressed": {
+      "look": "unimpressed, eyes half-lidded, lips pressed"
+    },
+    "spacesuit-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "teary": {
+      "look": "teary, eyes shut, brows tilted, a tear at the corner"
+    },
+    "uneasy": {
+      "look": "uneasy, brows tilted, lips pressed"
+    },
+    "winter-annoyed": {
+      "look": "annoyed, brows knit, mouth open in complaint"
+    },
+    "winter-confused": {
+      "look": "confused, brows tilted, mouth slightly open"
+    },
+    "winter-determined": {
+      "look": "determined, brows set, lips closed"
+    },
+    "winter-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open"
+    },
+    "winter-happy": {
+      "look": "happy, blushing, mouth open in a smile"
+    },
+    "winter-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "winter-neutral": {
+      "look": "neutral, blushing, chin tucked into the scarf"
+    },
+    "winter-pleased": {
+      "look": "pleased, a small closed-mouth smile, blushing"
+    },
+    "winter-pouting": {
+      "look": "pouting, blushing, brows knit, lips pursed"
+    },
+    "winter-sad": {
+      "look": "sad, eyes lowered, lips wobbling"
+    },
+    "winter-shocked": {
+      "look": "shocked, blank white eyes, a tear, mouth open"
+    },
+    "winter-shy": {
+      "look": "shy, blushing, lips pursed into the scarf"
+    },
+    "winter-sighing": {
+      "look": "sighing, eyes shut, a sweat drop, mouth open"
+    },
+    "winter-sleepy": {
+      "look": "sleepy, eyes closed, blushing"
+    },
+    "winter-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "winter-teary": {
+      "look": "teary, eyes shut, brows tilted, a tear at the corner"
+    },
+    "winter-uneasy": {
+      "look": "uneasy, brows tilted, mouth wavering"
+    },
+    "winter-unimpressed": {
+      "look": "unimpressed, eyes half-lidded, lips closed"
+    },
+    "winter-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

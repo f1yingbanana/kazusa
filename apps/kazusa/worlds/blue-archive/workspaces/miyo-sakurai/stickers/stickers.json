@@ -1,0 +1,97 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, half-lidded eyes, mouth open in complaint"
+    },
+    "awkward": {
+      "look": "awkward, a sweat drop, lips pressed in a wavy line"
+    },
+    "confused": {
+      "look": "confused, lips parted, brows slightly raised"
+    },
+    "content": {
+      "look": "content, a soft closed-mouth smile"
+    },
+    "crying": {
+      "look": "crying, flat narrowed eyes, tears dripping, wobbly mouth"
+    },
+    "curious": {
+      "look": "curious, glancing aside, lips in a small o"
+    },
+    "deadpan": {
+      "look": "deadpan, half-lidded eyes, mouth small"
+    },
+    "doubtful": {
+      "look": "doubtful, a sidelong look, lips pressed"
+    },
+    "eerie": {
+      "look": "eerie, face shadowed, a fixed flat stare"
+    },
+    "excited": {
+      "look": "excited, eyes squinted, blushing, mouth wide open"
+    },
+    "flustered": {
+      "look": "flustered, face flushed with lines, sweat drops"
+    },
+    "grimacing": {
+      "look": "grimacing, brows knit, teeth clenched"
+    },
+    "happy": {
+      "look": "happy, eyes bright, mouth open in a smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "nervous": {
+      "look": "nervous, brows tilted, a sweat drop, teeth showing"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, faint blush"
+    },
+    "pleased": {
+      "look": "pleased, eyes shut in flat lines, a small smile"
+    },
+    "pouting": {
+      "look": "pouting, blushing, glancing aside"
+    },
+    "relieved": {
+      "look": "relieved, eyes shut, a gentle smile, blushing"
+    },
+    "sad": {
+      "look": "sad, brows drooping, gloom lines on the cheek"
+    },
+    "sheepish": {
+      "look": "sheepish, blushing, a sweat drop, a wobbly smile"
+    },
+    "shocked": {
+      "look": "shocked, eyes gone blank white, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, lips small"
+    },
+    "sighing": {
+      "look": "sighing, eyes shut, mouth open"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, lips relaxed"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, a sweat drop, mouth open"
+    },
+    "thinking": {
+      "look": "thinking, glancing up and aside, lips small"
+    },
+    "touched": {
+      "look": "touched, eyes shut, tears streaming, a smile"
+    },
+    "unimpressed": {
+      "look": "unimpressed, a sidelong half-lidded glance, mouth flat"
+    },
+    "worried": {
+      "look": "worried, brows tilted, a sweat drop, mouth open"
+    }
+  }
+}

@@ -1,9 +1,10 @@
 ---
-pageType: entity
-entityType: place
 place_id: problem_solver_office
-name: Problem Solver 68 Office
-learned: works here
+name: "Problem Solver 68 Office"
+aliases: ["our agency"]
+learned: always known
 ---
 
-Our rented office, where we meet and plan jobs.
+The office! Aru-chan's big desk, her outlaw poses, and a sofa she definitely
+doesn't sleep on. I hide little surprises in her drawers. Clients come in, we
+solve problems. Usually loudly.

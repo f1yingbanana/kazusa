@@ -30,6 +30,8 @@
         "clock_set_speed",
         "clock_advance",
         "refresh_skills",
+        "world_update",
+        "grep",
         "apply_patch"
       ],
       "deny": ["exec", "process", "code_execution", "openclaw"],
@@ -50,6 +52,7 @@
     "skills": [
       "world-building",
       "world-project",
+      "world-update",
       "kazusa",
       "openclaw",
       "typescript"

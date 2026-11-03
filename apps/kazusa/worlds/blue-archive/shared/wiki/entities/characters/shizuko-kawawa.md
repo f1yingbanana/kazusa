@@ -7,9 +7,10 @@ name: Shizuko Kawawa
 school: Hyakkiyako Alliance Academy
 club: Festival Operations Department
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_shizuko
 ---
 
 # Shizuko Kawawa
 
-Shizuko leads Hyakkiyako’s Festival Operations Department and runs the Momoyodou teahouse.
+Shizuko leads Hyakkiyako’s Festival Operations Department and runs the Momoyodou
+teahouse.

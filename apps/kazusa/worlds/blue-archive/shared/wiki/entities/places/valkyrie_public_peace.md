@@ -4,11 +4,20 @@ entityType: place
 id: entity.place.valkyrie_public_peace
 place_id: valkyrie_public_peace
 name: "Valkyrie Public Peace Bureau"
-parent: valkyrie_school
-entry_minutes: 6
-summary: "The office of Valkyrie’s Public Peace Bureau."
+aliases: ["Valkyrie Public Security Bureau"]
+parent: valkyrie_hq_building
+entry_minutes: 1
+summary:
+  "The top-floor office of Valkyrie's investigators: case boards, a coffee
+  machine, a cot; lit past midnight during cases, closed to visitors without
+  escort."
+renown: known
+community: valkyrie_police_academy
 ---
 
 # Valkyrie Public Peace Bureau
 
-Kanna and her colleagues handle investigations and public peace work here. Its offices are working areas rather than a public waiting room.
+A long top-floor office with case boards strung in red thread, a coffee machine
+that is never off, and a folding cot in the corner for nights that run late. The
+director's desk faces the door. Its officers are feared across D.U. and have the
+most complaints filed against them, sometimes by the Security Bureau downstairs.

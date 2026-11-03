@@ -1,9 +1,7 @@
 ---
-pageType: entity
-entityType: place
 place_id: trinity_school
-name: Trinity General School
-learned: familiar place
+name: "Trinity General School Campus"
+learned: always known
 ---
 
-A place I know well.
+Too big and too sunny. I keep to the forgotten corner and the hedges keep me.

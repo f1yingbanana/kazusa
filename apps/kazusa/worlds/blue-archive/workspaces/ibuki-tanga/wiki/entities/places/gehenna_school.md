@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: gehenna_school
-name: Gehenna Academy
-learned: familiar place
+name: "Gehenna Academy Campus"
+learned: always known
 ---
 
-A place I know well.
+Ibuki's school! It's really, really big, and sometimes there are explosions, but
+everybody is nice to Ibuki.

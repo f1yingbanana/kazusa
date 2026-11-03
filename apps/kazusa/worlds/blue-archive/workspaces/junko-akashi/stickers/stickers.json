@@ -1,0 +1,158 @@
+{
+  "outfits": {
+    "gym": "a white short-sleeved gym shirt with red trim and red bloomers",
+    "newyear": "a yellow floral kimono with a navy pleated hakama and a red sash"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, brows lowered, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows lowered, teeth gritted"
+    },
+    "confused": {
+      "look": "confused, a blank stare, lips parted"
+    },
+    "crying": {
+      "look": "crying, tears, heavy blush, teeth gritted"
+    },
+    "delighted": {
+      "look": "delighted, eyes closed, smiling with mouth open"
+    },
+    "excited": {
+      "look": "excited, sparkling eyes, blushing, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, blushing, a sweat drop, mouth open"
+    },
+    "gym-angry": {
+      "look": "angry, brows lowered, shouting"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, brows lowered, teeth gritted"
+    },
+    "gym-confused": {
+      "look": "confused, a blank stare, lips parted"
+    },
+    "gym-crying": {
+      "look": "crying, tears, heavy blush, teeth gritted"
+    },
+    "gym-delighted": {
+      "look": "delighted, eyes closed, smiling with mouth open"
+    },
+    "gym-excited": {
+      "look": "excited, sparkling eyes, blushing, mouth open"
+    },
+    "gym-flustered": {
+      "look": "flustered, blushing, a sweat drop, mouth open"
+    },
+    "gym-happy": {
+      "look": "happy, smiling with mouth open"
+    },
+    "gym-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "gym-neutral": {
+      "look": "neutral, a small frown, lips closed"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, a sweat drop, teeth clenched"
+    },
+    "gym-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "gym-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "gym-suspicious": {
+      "look": "suspicious, eyes narrowed, a sweat drop"
+    },
+    "gym-teary": {
+      "look": "teary, blushing, tears welling, shouting"
+    },
+    "gym-worried": {
+      "look": "worried, a sweat drop, mouth open showing a fang"
+    },
+    "happy": {
+      "look": "happy, smiling with mouth open"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a small frown, lips closed"
+    },
+    "newyear-angry": {
+      "look": "angry, brows lowered, shouting"
+    },
+    "newyear-annoyed": {
+      "look": "annoyed, brows lowered, teeth gritted"
+    },
+    "newyear-confused": {
+      "look": "confused, a blank stare, lips parted"
+    },
+    "newyear-excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "newyear-flustered": {
+      "look": "flustered, blushing, a sweat drop, mouth open"
+    },
+    "newyear-frustrated": {
+      "look": "frustrated, tears welling, blushing, teeth gritted"
+    },
+    "newyear-happy": {
+      "look": "happy, eyes closed, smiling with mouth open"
+    },
+    "newyear-indignant": {
+      "look": "indignant, brows furrowed, a sweat drop, mouth open"
+    },
+    "newyear-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "newyear-neutral": {
+      "look": "neutral, a steady look, lips closed"
+    },
+    "newyear-sheepish": {
+      "look": "sheepish, brows tilted, a sweat drop, lips pressed"
+    },
+    "newyear-shocked": {
+      "look": "shocked, eyes blank white, teary, mouth wide open"
+    },
+    "newyear-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "newyear-smug": {
+      "look": "smug, brows lowered, a sly wavy smile"
+    },
+    "newyear-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "newyear-suspicious": {
+      "look": "suspicious, eyes narrowed, a sweat drop"
+    },
+    "newyear-teary": {
+      "look": "teary, blushing, tears welling, shouting"
+    },
+    "newyear-worried": {
+      "look": "worried, a sweat drop, mouth open"
+    },
+    "sheepish": {
+      "look": "sheepish, a sweat drop, teeth clenched"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "suspicious": {
+      "look": "suspicious, eyes narrowed, a sweat drop"
+    },
+    "teary": {
+      "look": "teary, blushing, tears welling, shouting"
+    },
+    "worried": {
+      "look": "worried, a sweat drop, mouth open showing a fang"
+    }
+  }
+}

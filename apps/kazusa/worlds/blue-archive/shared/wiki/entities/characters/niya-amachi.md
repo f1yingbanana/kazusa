@@ -7,9 +7,10 @@ name: Niya Amachi
 school: Hyakkiyako Alliance Academy
 club: Yin-Yang Club
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_niya
 ---
 
 # Niya Amachi
 
-Niya leads Hyakkiyako’s Yin-Yang Club, an influential organization in the alliance’s decentralized politics.
+Niya leads Hyakkiyako’s Yin-Yang Club, an influential organization in the
+alliance’s decentralized politics.

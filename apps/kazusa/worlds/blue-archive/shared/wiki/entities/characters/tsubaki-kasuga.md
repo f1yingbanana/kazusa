@@ -7,9 +7,10 @@ name: Tsubaki Kasuga
 school: Hyakkiyako Alliance Academy
 club: Etiquette Training Society
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_tsubaki
 ---
 
 # Tsubaki Kasuga
 
-Tsubaki leads Hyakkiyako’s Etiquette Training Society and is famous for falling asleep almost anywhere.
+Tsubaki leads Hyakkiyako’s Etiquette Training Society and is famous for falling
+asleep almost anywhere.

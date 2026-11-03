@@ -1,0 +1,115 @@
+{
+  "outfits": {
+    "swimsuit": "a navy floral bikini with a sheer white sarong and an open white shirt"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, lips pressed"
+    },
+    "cheerful": {
+      "look": "cheerful, eyes shut, smiling with mouth open"
+    },
+    "dazed": {
+      "look": "dazed, wide-eyed, blushing, lips parted"
+    },
+    "exasperated": {
+      "look": "exasperated, eyes shut, mouth open in a sigh"
+    },
+    "flustered": {
+      "look": "flustered, blushing, sweating, mouth open and wavy"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile, lightly blushing"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pleased": {
+      "look": "pleased, eyes shut, a small fanged smile"
+    },
+    "sad": {
+      "look": "sad, eyes downcast, a wobbly frown"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, blushing, a toothy grin"
+    },
+    "shy": {
+      "look": "shy, blushing, lips slightly parted"
+    },
+    "smug": {
+      "look": "smug, eyes half-lidded, a knowing smile"
+    },
+    "startled": {
+      "look": "startled, a sweat drop, mouth wide open"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, lips parted"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, a flat stare, a small frown"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a peaceful smile"
+    },
+    "swimsuit-dazed": {
+      "look": "dazed, wide-eyed, blushing deeply, mouth open"
+    },
+    "swimsuit-eerie": {
+      "look": "eerie, eyes shadowed, a thin smile"
+    },
+    "swimsuit-embarrassed": {
+      "look": "embarrassed, wide-eyed, blushing hard, a sweat drop, lips pressed"
+    },
+    "swimsuit-exasperated": {
+      "look": "exasperated, eyes shut, a sweat drop, mouth open in a sigh"
+    },
+    "swimsuit-excited": {
+      "look": "excited, blushing, mouth open"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing, sweating, mouth open and wavy"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open in a wide smile"
+    },
+    "swimsuit-nervous": {
+      "look": "nervous, blushing, teeth showing through parted lips"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, lips slightly parted"
+    },
+    "swimsuit-playful": {
+      "look": "playful, eyes squinted shut, a wide open grin"
+    },
+    "swimsuit-pleased": {
+      "look": "pleased, eyes squinted shut, a cat-like smile"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, blushing, a sweat drop, a wavy frown"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, blushing, a nervous sweat, teeth clenched in a smile"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, a gentle closed smile"
+    },
+    "swimsuit-startled": {
+      "look": "startled, blushing, eyes wide, mouth open"
+    },
+    "swimsuit-sulking": {
+      "look": "sulking, eyes shut, a small frown"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a faint blush, a wobbly frown"
+    },
+    "worried": {
+      "look": "worried, blushing, a nervous sweat, mouth wavering"
+    }
+  }
+}

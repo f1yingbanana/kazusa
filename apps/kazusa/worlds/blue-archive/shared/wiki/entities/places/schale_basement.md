@@ -6,9 +6,13 @@ place_id: schale_basement
 name: "SCHALE Basement"
 parent: schale_office
 entry_minutes: 3
-summary: "A private work and rest space beneath SCHALE."
+summary:
+  "SCHALE's basement level: the Shittim Chest's room and FOX Squad's
+  headquarters; keycard only."
 ---
 
 # SCHALE Basement
 
-A desk, records, planning materials and a couch make the basement a quieter alternative to the main office. It is a working area rather than a public lounge.
+A quiet concrete level beneath the building, reached by a keycard lift. One door
+leads to the room where the Shittim Chest is kept; another, to FOX Squad's
+headquarters.

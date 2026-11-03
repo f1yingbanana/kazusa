@@ -3,19 +3,23 @@ pageType: entity
 entityType: place
 id: entity.place.wildhunt_school
 place_id: wildhunt_school
-name: "Wild Hunt Academy of Arts"
+name: "Wild Hunt Academy Fortress"
+aliases: ["Wild Hunt campus"]
+parent: wildhunt_district
+entry_minutes: 6
 summary:
-  "An arts academy of studios and dormitories, dedicated to the pursuit of
-  artistic expression."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 40 }
-    note: "Approximate interdistrict travel time for the simulation."
+  "Star-fort campus inside canal moats: studios, dorms, a statue piazza, bastion
+  walls. One gate, inspected 06:00–22:00; outing pass needed to leave; dorm
+  curfew 22:00."
+renown: known
 community: wild_hunt_academy
 ---
 
-# Wild Hunt Academy of Arts
+# Wild Hunt Academy Fortress
 
-Wild Hunt is an arts academy with a strong tradition of artistic training. Its
-Arts Council oversees school affairs and dormitory assignments.
+The academy fills the whole star fortress: studio buildings with tall north
+windows, the Arts Information Center, a piazza around a purple statue, a walled
+dormitory quarter and an abandoned schoolhouse in the east bastion that nobody
+is supposed to enter. The outer rampart runs around everything. Clubs are not
+officially allowed, so they meet as informal gatherings in dorm rooms and quiet
+corners.

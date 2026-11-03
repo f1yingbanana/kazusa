@@ -7,9 +7,10 @@ name: Yukari Kadenokouji
 school: Hyakkiyako Alliance Academy
 club: Hyakkaryouran Resolution Council
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_yukari
 ---
 
 # Yukari Kadenokouji
 
-Yukari is a Hyakkiyako student from a traditional family and a member of the Hyakkaryouran Resolution Council.
+Yukari is a Hyakkiyako student from a traditional family and a member of the
+Hyakkaryouran Resolution Council.

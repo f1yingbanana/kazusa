@@ -1,0 +1,149 @@
+{
+  "outfits": {
+    "swimsuit": "a white bikini under a loose cropped knit cardigan, hair up with an orange scrunchie",
+    "bandana": "a blue striped bandana, white bikini, cropped knit cardigan and belted denim shorts"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, a small frown"
+    },
+    "bandana-annoyed": {
+      "look": "annoyed, brows furrowed, a small frown"
+    },
+    "bandana-confused": {
+      "look": "confused, brows knit, mouth slightly open"
+    },
+    "bandana-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "bandana-deadpan": {
+      "look": "deadpan, half-lidded eyes, flat mouth"
+    },
+    "bandana-delighted": {
+      "look": "delighted, eyes shut, blushing, mouth open"
+    },
+    "bandana-flustered": {
+      "look": "flustered, eyes squeezed shut, sweating, wailing"
+    },
+    "bandana-happy": {
+      "look": "happy, eyes shut, beaming with mouth open"
+    },
+    "bandana-laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "bandana-neutral": {
+      "look": "neutral, a calm look, a faint smile"
+    },
+    "bandana-pouting": {
+      "look": "pouting, lips pushed out, brows knit"
+    },
+    "bandana-sad": {
+      "look": "sad, brows drooping, mouth wavering open"
+    },
+    "bandana-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "bandana-smug": {
+      "look": "smug, a sly closed-mouth smile"
+    },
+    "bandana-stunned": {
+      "look": "stunned, eyes wide, mouth a small o"
+    },
+    "bandana-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "bandana-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "delighted": {
+      "look": "delighted, eyes shut, blushing, mouth open"
+    },
+    "determined": {
+      "look": "determined, starry eyes, brows set, mouth open"
+    },
+    "excited": {
+      "look": "excited, stars in the eyes, mouth a small o"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, sweating, wailing"
+    },
+    "happy": {
+      "look": "happy, eyes shut, beaming with mouth open"
+    },
+    "laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a faint smile, holding up an orange camera"
+    },
+    "pouting": {
+      "look": "pouting, lips pushed out, brows knit"
+    },
+    "sad": {
+      "look": "sad, brows drooping, mouth wavering open"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "smug": {
+      "look": "smug, a sly closed-mouth smile"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows furrowed, a small frown"
+    },
+    "swimsuit-confused": {
+      "look": "confused, brows knit, mouth slightly open"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "swimsuit-deadpan": {
+      "look": "deadpan, half-lidded eyes, flat mouth"
+    },
+    "swimsuit-delighted": {
+      "look": "delighted, eyes shut, blushing, mouth open"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, eyes squeezed shut, sweating, wailing"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, beaming with mouth open"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a calm look, a faint smile"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, lips pushed out, brows knit"
+    },
+    "swimsuit-sad": {
+      "look": "sad, brows drooping, mouth wavering open"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "swimsuit-smug": {
+      "look": "smug, a sly closed-mouth smile"
+    },
+    "swimsuit-stunned": {
+      "look": "stunned, eyes wide, mouth a small o"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

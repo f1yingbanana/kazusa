@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: highlander_rail_yard
-name: "Highlander Freight Rail Yard"
-learned: familiar place
+name: "Highlander Freight Yard"
+learned: always known
 ---
 
-A place I know through my club.
+Floodlights, diesel, shunters clanking at three in the morning. Freight
+Logistics keeps it all running while everybody else takes the credit.

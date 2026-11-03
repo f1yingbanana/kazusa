@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: seminar_office
 name: "Seminar Office"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+Where they sit me down and hand me codes, sheet after sheet, like I'm a vending
+machine. I crack one, they bring three more. Yuuka-senpai counts every coin in
+here; Noa-senpai just smiles. The smile is worse.

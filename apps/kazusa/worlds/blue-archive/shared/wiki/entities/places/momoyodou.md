@@ -4,12 +4,19 @@ entityType: place
 id: entity.place.momoyodou
 place_id: momoyodou
 name: "Momoyodou"
-aliases: ["Momoyodou tea house"]
+aliases: ["Momoyodou Tea House"]
 parent: hyakkiyako_shopping_district
-entry_minutes: 3
-summary: "Shizuko’s welcoming tea house in Hyakkiyako."
+entry_minutes: 1
+summary:
+  "Classic tea house run by the Festival Operations Department: matcha, dango,
+  seasonal sweets; open 10:00–19:00, closed Wednesdays, queues at weekends."
+renown: famous
+community: festival_operations_department
 ---
 
 # Momoyodou
 
-The tea house is associated with Shizuko and the Festival Operations Department. It offers a place to pause for refreshments amid the shopping district.
+A two-storey wooden tea house with a pink noren and red-felt benches out front.
+The Festival Operations Department runs it between festivals: the staff wear
+kimono aprons, the dango are made each morning, and the owner lives in a small
+room upstairs.

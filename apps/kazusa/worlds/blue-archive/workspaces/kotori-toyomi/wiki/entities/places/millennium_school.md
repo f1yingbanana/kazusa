@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_school
-name: Millennium Science School
-learned: familiar place
+name: "Millennium Science School Campus"
+learned: always known
 ---
 
-A place I know well.
+Whenever something breaks on campus, I'm the first one there! Not always to fix
+it. To explain it! Explaining is half the repair. Well, a third.

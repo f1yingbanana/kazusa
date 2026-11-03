@@ -7,9 +7,11 @@ name: Seia Yurizono
 school: Trinity General School
 club: Tea Party
 is_simulated_agent: true
-home: trinity_school
+home: room_seia
 ---
 
 # Seia Yurizono
 
-Seia is a Trinity student and Tea Party representative with an interest in philosophy, puzzles and the mysteries of Kivotos. She experienced prophetic dreams and survived an attack during the Eden Treaty crisis.
+Seia is a Trinity student and Tea Party representative with an interest in
+philosophy, puzzles and the mysteries of Kivotos. She experienced prophetic
+dreams and survived an attack during the Eden Treaty crisis.

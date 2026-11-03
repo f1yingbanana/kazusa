@@ -8,8 +8,10 @@ import {
   ledgerWindowEnd,
   type ContextEngine,
 } from "./context-engine.ts";
+import type { BrainTurn } from "@kazusa/client";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { SkillLoader } from "./skill-loader.ts";
+import { sharedDir } from "../shared-dir.ts";
 
 vi.mock("openclaw/plugin-sdk/core", () => ({
   buildMemorySystemPromptAddition: vi.fn(() => ""),
@@ -58,7 +60,8 @@ const testSkillLoader: SkillLoader = {
     body: "Stay in character.",
   })),
   resolveSkillPath: vi.fn(async () => "/fake/SKILL.md"),
-  getCandidateRoots: vi.fn(() => []),
+  // The shared skills hold what code reads by section (`kazusa-deliveries`).
+  getCandidateRoots: vi.fn(() => [sharedDir("skills")]),
   clearCache: vi.fn(),
 };
 
@@ -452,6 +455,42 @@ describe("Context assembly", () => {
       });
       expect(JSON.stringify(messages)).not.toContain("an earlier delivery");
       expect(messages).not.toContainEqual(call);
+    });
+
+    const pastTurn = (id: string): BrainTurn => ({
+      id: "r1",
+      prompts: [],
+      calls: [
+        {
+          id: "c1",
+          steps: [
+            {
+              type: "tool",
+              id,
+              name: "send_message",
+              input: "{}",
+              result: "delivered",
+            },
+          ],
+        },
+      ],
+    });
+
+    it("brings back past tool calls from the transcript, as a digest", async () => {
+      const { messages } = await assemble({
+        prompt: "the delivery now",
+        brainTurns: [pastTurn("t0")],
+      });
+      expect(JSON.stringify(messages)).toContain("send_message {} → ok");
+    });
+
+    it("leaves the run under way out of the digest", async () => {
+      const { messages } = await assemble({
+        prompt: "the delivery now",
+        brainTurns: [pastTurn("t1")],
+        runId: "r1",
+      });
+      expect(JSON.stringify(messages)).not.toContain("send_message {} → ok");
     });
 
     it("keeps only the turn under way when the messages hold it", async () => {

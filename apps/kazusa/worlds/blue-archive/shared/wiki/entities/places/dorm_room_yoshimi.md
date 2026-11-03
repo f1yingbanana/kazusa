@@ -5,10 +5,11 @@ id: entity.place.dorm_room_yoshimi
 place_id: dorm_room_yoshimi
 name: "Yoshimi's Room"
 aliases: ["Yoshimi's dorm room"]
-parent: trinity_dorm
+parent: trinity_dorm_upstairs
+entry_minutes: 1
 summary:
-  "Yoshimi's private room: a handheld console charging, dessert rankings pinned
-  to the wall. She often forgets to lock it."
+  "Top-floor room: a handheld console charging, dessert rankings pinned to the
+  wall; she often forgets to lock it."
 renown: private
 ---
 

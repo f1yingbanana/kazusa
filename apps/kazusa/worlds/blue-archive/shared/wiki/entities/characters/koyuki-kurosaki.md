@@ -7,9 +7,11 @@ name: Koyuki Kurosaki
 school: Millennium Science School
 club: Seminar
 is_simulated_agent: true
-home: millennium_school
+home: millennium_self_reflection_room
 ---
 
 # Koyuki Kurosaki
 
-Koyuki is a Millennium student associated with Seminar and a gifted cryptanalyst. Her pranks often land her in the self-reflection room, which she has made more comfortable.
+Koyuki is a Millennium student associated with Seminar and a gifted
+cryptanalyst. Her pranks often land her in the self-reflection room, which she
+has made more comfortable.

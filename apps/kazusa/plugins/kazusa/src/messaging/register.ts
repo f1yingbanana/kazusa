@@ -22,6 +22,7 @@ import { z } from "zod";
 import { untilRunning, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
+import { readStickers, stickerText } from "../stickers/stickers.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
@@ -122,7 +123,6 @@ export function registerMessaging(
   const messagingConfig = MESSAGING_CONFIG.parse(
     api.pluginConfig?.messaging ?? {},
   );
-  const sendMessage = sendMessageSchema(messagingConfig.maxBubbles);
   const text = pluginSkillText(api);
   const messaging = new Messaging({
     api,
@@ -342,19 +342,45 @@ export function registerMessaging(
     },
   });
 
+  /** A character's own stickers, read again for each turn's tools. */
+  const stickersOf = (agentId: string | undefined) =>
+    agentId
+      ? readStickers(
+          api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
+        )
+      : undefined;
+
   api.registerTool(
     {
       contextVersion: 2,
       create: (context) => {
+        const skillContext = context.agentId
+          ? { agentId: context.agentId }
+          : {};
         // Their wording is the `kazusa-tools` skill's.
         const worded = <P>(
           name: string,
           parameters: P,
           values: Readonly<Record<string, number>> = {},
-        ) =>
-          describeTool(text, { name, parameters }, values, {
-            ...(context.agentId ? { agentId: context.agentId } : {}),
-          });
+        ) => describeTool(text, { name, parameters }, values, skillContext);
+        const stickers = stickersOf(context.agentId);
+        const outfits = [...(stickers?.outfits ?? [])];
+        // Its names are the schema; the outfits are its wording's `{data}`.
+        const sendMessage = sendMessageSchema(
+          messagingConfig.maxBubbles,
+          [...(stickers?.stickers.keys() ?? [])],
+          outfits.length
+            ? text(
+                "kazusa-tools#send_message.sticker-outfits",
+                {
+                  outfits: outfits
+                    .map(([word, worn]) => `${word}: ${worn}`)
+                    .join("; "),
+                },
+                skillContext,
+              )
+            : "",
+        );
         return [
           {
             ...worded("send_message", z.toJSONSchema(sendMessage), {
@@ -372,14 +398,30 @@ export function registerMessaging(
                   signal ? AbortSignal.any([release, signal]) : release,
                 );
               const params = sendMessage.parse(input);
+              const senderName = await characterName(api, config, agentId);
+              // A sticker is sent as what everyone reads, frozen now.
+              const messages = params.messages.map((bubble) => {
+                if (typeof bubble === "string" || !("sticker" in bubble))
+                  return bubble;
+                const sticker = stickersOf(agentId)?.stickers.get(
+                  bubble.sticker,
+                );
+                if (!sticker)
+                  throw new Error(`You have no sticker "${bubble.sticker}".`);
+                return {
+                  text: stickerText(senderName, sticker),
+                  type: "sticker" as const,
+                  sticker: { name: sticker.name, v: sticker.version },
+                };
+              });
               // Provider call IDs can repeat within one brain session. Each
               // execution accepts a new send; retained delivery/outbox records
               // own retries without another model call.
               const requestId = generateSecureUuid();
               const details = await messaging.speak(
                 agentId,
-                await characterName(api, config, agentId),
-                { ...params, requestId },
+                senderName,
+                { ...params, messages, requestId },
                 context.assertInvocationCurrent,
                 agents,
                 config.agents?.defaults?.systemAgent?.agentId,

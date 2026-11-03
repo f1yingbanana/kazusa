@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: shanhaijing_school
-name: Shanhaijing Senior Secondary School
-learned: familiar place
+name: "Shanhaijing Central Special Zone"
+learned: always known
 ---
 
-A place I know well.
+The inner campus. The guards at the gate are polite to me, perhaps too polite.
+Do I really look so senior?

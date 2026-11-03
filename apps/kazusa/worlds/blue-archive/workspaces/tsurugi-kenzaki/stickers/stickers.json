@@ -1,0 +1,156 @@
+{
+  "outfits": {
+    "gym": "a white gym shirt with navy trim, navy shorts and sneakers",
+    "dress": "a white off-shoulder ball gown with big bows, a pale blue choker and a white hair bow",
+    "swimsuit": "a black halter bikini with criss-cross straps, a high ponytail and a yellow flower hair clip"
+  },
+  "stickers": {
+    "confused": {
+      "look": "confused, eyes half-lidded, lips slightly parted"
+    },
+    "dazed": {
+      "look": "dazed, pale blank eyes, mouth hanging open"
+    },
+    "dress-angry": {
+      "look": "angry, face shadowed, fangs bared"
+    },
+    "dress-annoyed": {
+      "look": "annoyed, a vein mark, teeth gritted"
+    },
+    "dress-content": {
+      "look": "content, eyes closed, softly blushing"
+    },
+    "dress-determined": {
+      "look": "determined, eyes narrowed, brow creased, a fanged grin"
+    },
+    "dress-flustered": {
+      "look": "flustered, blushing, a wobbly open mouth"
+    },
+    "dress-happy": {
+      "look": "happy, blushing, a soft open smile"
+    },
+    "dress-menacing": {
+      "look": "menacing, eyes shadowed, a fanged smile"
+    },
+    "dress-neutral": {
+      "look": "neutral, eyes glancing aside, lips slightly parted"
+    },
+    "dress-scheming": {
+      "look": "scheming, one eye twitching, a fanged grin"
+    },
+    "dress-sheepish": {
+      "look": "sheepish, blushing, a wavy smile, eyes glancing aside"
+    },
+    "dress-shy": {
+      "look": "shy, blushing, lips pressed in a wavy line"
+    },
+    "dress-smug": {
+      "look": "smug, eyes glancing aside, a fanged grin"
+    },
+    "dress-surprised": {
+      "look": "surprised, blushing, mouth a small o"
+    },
+    "excited": {
+      "look": "excited, eyes wide, a sharp-toothed open grin"
+    },
+    "flustered": {
+      "look": "flustered, deep blush, a wobbly mouth"
+    },
+    "gleeful": {
+      "look": "gleeful, eyes shut, a toothy grin"
+    },
+    "gym-confused": {
+      "look": "confused, eyes half-lidded, lips slightly parted"
+    },
+    "gym-dazed": {
+      "look": "dazed, pale blank eyes, mouth hanging open"
+    },
+    "gym-excited": {
+      "look": "excited, eyes wide, a sharp-toothed open grin"
+    },
+    "gym-flustered": {
+      "look": "flustered, deep blush, a wobbly mouth"
+    },
+    "gym-gleeful": {
+      "look": "gleeful, eyes shut, a toothy grin"
+    },
+    "gym-happy": {
+      "look": "happy, eyes wide, a fanged open smile"
+    },
+    "gym-manic": {
+      "look": "manic, tongue lolling out, eyes wide"
+    },
+    "gym-menacing": {
+      "look": "menacing, face shadowed, eyes glowing, a wide grin"
+    },
+    "gym-neutral": {
+      "look": "neutral, a wide-eyed stare, lips slightly parted"
+    },
+    "gym-shocked": {
+      "look": "shocked, eyes bulging, fanged mouth agape"
+    },
+    "gym-shy": {
+      "look": "shy, deep blush, lips slightly parted"
+    },
+    "gym-smug": {
+      "look": "smug, a wide toothy grin, eyes narrowed"
+    },
+    "gym-worried": {
+      "look": "worried, eyes wide, sweating, a wobbly open mouth"
+    },
+    "happy": {
+      "look": "happy, eyes wide, a fanged open smile"
+    },
+    "manic": {
+      "look": "manic, tongue lolling out, eyes wide"
+    },
+    "menacing": {
+      "look": "menacing, face shadowed, eyes glowing, a wide grin"
+    },
+    "neutral": {
+      "look": "neutral, a wide-eyed stare, lips slightly parted"
+    },
+    "shocked": {
+      "look": "shocked, eyes bulging, fanged mouth agape"
+    },
+    "shy": {
+      "look": "shy, deep blush, lips slightly parted"
+    },
+    "smug": {
+      "look": "smug, a wide toothy grin, eyes narrowed"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes shut, sweating, a faint wavy smile"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing, sweating, a wobbly open mouth"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a fanged open smile"
+    },
+    "swimsuit-menacing": {
+      "look": "menacing, face shadowed, eyes narrowed, a fanged grin"
+    },
+    "swimsuit-panicked": {
+      "look": "panicked, eyes bulging, fangs bared, sweating"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, sweating, a wavy smile"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, a small closed smile"
+    },
+    "swimsuit-smug": {
+      "look": "smug, blushing, eyes narrowed, a fanged grin"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, blushing, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, eyes glancing aside, mouth open"
+    },
+    "worried": {
+      "look": "worried, eyes wide, sweating, a wobbly open mouth"
+    }
+  }
+}

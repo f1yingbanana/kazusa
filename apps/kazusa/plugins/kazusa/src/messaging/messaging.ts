@@ -8,11 +8,12 @@ import type {
 import { KeyedAsyncQueue, OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { sleepSim, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
+import { stickerUrl } from "../stickers/stickers.ts";
 import type { CurrentSpeech } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
 import type { Stimulus } from "../stimulus.ts";
 import {
-  DELIVERY_REQUEST,
+  DELIVERY,
   LIST_CHATS,
   SPEECH_REQUEST,
   bubbleOf,
@@ -185,6 +186,15 @@ export function clientMessage(
     senderName: delivery.senderName,
     text: delivery.params.text,
     ...(delivery.params.type === "action" ? { type: "action" } : {}),
+    ...(delivery.params.type === "sticker" && delivery.params.sticker
+      ? {
+          type: "sticker",
+          sticker: {
+            name: delivery.params.sticker.name,
+            url: stickerUrl(delivery.sender, delivery.params.sticker),
+          },
+        }
+      : {}),
     timestamp: delivery.timestamp,
     ...(createdAt === undefined ? {} : { createdAt }),
   };
@@ -1181,7 +1191,7 @@ export class Messaging {
     configuredAgents?: ReadonlySet<string>,
   ): Promise<SendMessageResult> {
     PARTICIPANT_ID.parse(sender);
-    const params = DELIVERY_REQUEST.parse(input);
+    const params = DELIVERY.parse(input);
     params.members?.sort();
     params.title ??= null;
     if (params.sessionKey) {
@@ -1293,14 +1303,16 @@ export class Messaging {
     const { sender, senderName, params } = plan;
     const { messages, requestId, ...target } = params;
     // Actions are seen only where the speaker is; in a text chat they are
-    // dropped, so a model that adds one by habit changes nothing there. The
-    // original index keeps each bubble's identity stable across replays.
+    // dropped, so a model that adds one by habit changes nothing there.
+    // Stickers are the other way round: a phone thing, dropped face to face.
+    // The original index keeps each bubble's identity stable across replays.
     const inPlace =
       target.aloud === true ||
       Boolean(target.sessionKey?.match(/(?:^|:)chat:huddle:/));
     const bubbles = messages.flatMap((bubble, at) => {
       const typed = bubbleOf(bubble);
-      const pieces = !inPlace && typed.type === "action" ? [] : [typed];
+      const pieces =
+        typed.type === (inPlace ? "sticker" : "action") ? [] : [typed];
       // Message type is authoritative; Markdown never changes speech into actions.
       return pieces.map((piece, part) => ({
         index: part === 0 ? String(at) : `${at}.${part}`,
@@ -1353,12 +1365,13 @@ export class Messaging {
             assertInvocationCurrent?.();
           },
         });
-      for (const { index, text, type } of bubbles) {
+      for (const { index, text, type, sticker } of bubbles) {
         const first = sent[0];
         const bubble: SendMessageParams = {
           ...(first ? { sessionKey: first.sessionKey } : target),
           text,
-          ...(type === "action" ? { type } : {}),
+          ...(type === "speech" ? {} : { type }),
+          ...(sticker ? { sticker } : {}),
           requestId: messagingId([requestId, index]),
         };
         if (
@@ -1382,9 +1395,13 @@ export class Messaging {
                   now: () => ({ simTime: Date.now(), speed: 1, formatted: "" }),
                 }
               : this.deps.clock;
-          paced = await sleepSim(speechClock, typingMs(text), signal, {
-            release: this.deps.release ?? shutdownSignal(),
-          });
+          // A sticker is picked, not typed: only the base pause.
+          paced = await sleepSim(
+            speechClock,
+            typingMs(sticker ? "" : text),
+            signal,
+            { release: this.deps.release ?? shutdownSignal() },
+          );
         }
         signal.throwIfAborted();
         sent.push(

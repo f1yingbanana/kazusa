@@ -1,0 +1,158 @@
+{
+  "outfits": {
+    "swimsuit": "a red halter bikini, a white flower in the hair and dangling gold earrings",
+    "pirate": "a red halter bikini, a navy head wrap with a white flower, a black eyepatch"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, teeth gritted, face shadowed"
+    },
+    "annoyed": {
+      "look": "annoyed, mouth open showing a fang, a sweat drop"
+    },
+    "flustered": {
+      "look": "flustered, blushing, mouth open, brows raised"
+    },
+    "frustrated": {
+      "look": "frustrated, teeth clenched, brows knit, a sweat drop"
+    },
+    "grinning": {
+      "look": "grinning wide, teeth bared, eyes narrowed"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a gentle smile"
+    },
+    "laughing": {
+      "look": "laughing, mouth wide open in a fanged grin"
+    },
+    "pirate-angry": {
+      "look": "angry, teeth gritted, face shadowed"
+    },
+    "pirate-annoyed": {
+      "look": "annoyed, mouth open showing a fang, a sweat drop"
+    },
+    "pirate-blissful": {
+      "look": "blissful, eye shut, blushing, smiling"
+    },
+    "pirate-calm": {
+      "look": "calm, eye closed, a faint smile"
+    },
+    "pirate-dazed": {
+      "look": "dazed, blushing, half-lidded, lips parted"
+    },
+    "pirate-embarrassed": {
+      "look": "embarrassed, blushing, a wavering smile, a sweat drop"
+    },
+    "pirate-flustered": {
+      "look": "flustered, blushing, mouth open, brows raised"
+    },
+    "pirate-frustrated": {
+      "look": "frustrated, teeth clenched, a sweat drop"
+    },
+    "pirate-grinning": {
+      "look": "grinning wide, teeth bared, eye narrowed"
+    },
+    "pirate-happy": {
+      "look": "happy, faintly blushing, a soft closed-mouth smile"
+    },
+    "pirate-laughing": {
+      "look": "laughing, mouth wide open in a fanged grin"
+    },
+    "pirate-neutral": {
+      "look": "neutral, a plain look, lips slightly parted"
+    },
+    "pirate-pouting": {
+      "look": "pouting, blushing, eye narrowed, lips pressed"
+    },
+    "pirate-sheepish": {
+      "look": "sheepish, eye shut, smiling, a sweat drop"
+    },
+    "pirate-shocked": {
+      "look": "shocked, eye wide with a tiny pupil, mouth open"
+    },
+    "pirate-shy": {
+      "look": "shy, blushing, half-lidded, a soft smile"
+    },
+    "pirate-smug": {
+      "look": "smug, eye narrowed, a small sly smile"
+    },
+    "pirate-surprised": {
+      "look": "surprised, eye wide, mouth a small o"
+    },
+    "pirate-worried": {
+      "look": "worried, blushing, brows knit, mouth open, sweating"
+    },
+    "shocked": {
+      "look": "shocked, eyes wide, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing deeply, a sweat drop, lips parted"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a small sly smile"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-angry": {
+      "look": "angry, teeth gritted, face shadowed"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, mouth open showing a fang, a sweat drop"
+    },
+    "swimsuit-blissful": {
+      "look": "blissful, eyes shut, blushing, smiling"
+    },
+    "swimsuit-calm": {
+      "look": "calm, eyes closed, a faint smile"
+    },
+    "swimsuit-dazed": {
+      "look": "dazed, blushing, half-lidded, lips parted"
+    },
+    "swimsuit-embarrassed": {
+      "look": "embarrassed, blushing, a wavering smile, a sweat drop"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing, mouth open, brows raised"
+    },
+    "swimsuit-frustrated": {
+      "look": "frustrated, teeth clenched, a sweat drop"
+    },
+    "swimsuit-grinning": {
+      "look": "grinning wide, teeth bared, eyes narrowed"
+    },
+    "swimsuit-happy": {
+      "look": "happy, faintly blushing, a soft closed-mouth smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing, mouth wide open in a fanged grin"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a plain look, lips slightly parted"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, blushing, eyes narrowed, lips pressed"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, eyes shut, smiling, a sweat drop"
+    },
+    "swimsuit-shocked": {
+      "look": "shocked, eyes wide with tiny pupils, mouth open"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, half-lidded, a soft smile"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a small sly smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, blushing, brows knit, mouth open, sweating"
+    },
+    "unimpressed": {
+      "look": "unimpressed, half-lidded stare, lips parted, faint blush"
+    }
+  }
+}

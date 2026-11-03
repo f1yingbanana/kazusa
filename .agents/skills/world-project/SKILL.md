@@ -211,8 +211,12 @@ Each stage depends on the last, and the project file tracks them.
 4. **Workspaces**, one group at a time, so that people who know each other are
    written together: `IDENTITY.md`, `SOUL.md`, `MEMORY.md`.
 5. **Seeding** (section 7).
-6. **The final checks** (section 8). Fix what they find.
-7. **Registering** (section 6). This is the very last edit.
+6. **The index page.** Write `shared/wiki/INDEX.md` (see `world-building`): the
+   world and its moment, the player, where the lore starts, the map's top-level
+   areas, the cast in groups, and the conventions you chose. A front page, not a
+   listing.
+7. **The final checks** (section 8). Fix what they find.
+8. **Registering** (section 6). This is the very last edit.
 
 ### The map
 

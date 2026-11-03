@@ -1,11 +1,11 @@
 ---
 name: world-building
 description:
-  "Create or edit characters, seed the World Wiki or a character's personal
-  wiki, create or change places, and write skills every character can use. Use
-  when the user asks to add someone to the world, change who a character is or
-  what they remember, write lore, add to the map, or teach characters how to do
-  something."
+  "Create or edit characters and their stickers, seed the World Wiki or a
+  character's personal wiki, create or change places, and write skills every
+  character can use. Use when the user asks to add someone to the world, change
+  who a character is or what they remember, label or fix stickers, write lore,
+  add to the map, or teach characters how to do something."
 ---
 
 # Building the World
@@ -16,6 +16,15 @@ Everything here is a Markdown edit with your file tools, except one line of
 For one character, place or page, this skill is enough. For anything bigger (a
 whole world, a region, a faction, many characters, building from a wiki), read
 `world-project` first: it covers how to do that across many runs.
+
+**Read `shared/wiki/INDEX.md` first.** It is the world's front page, written for
+you and for the people who build the world: what the world is and at what
+moment, the player, where the lore starts, the shape of the map, the cast, and
+the conventions this world keeps. Characters never read it and the memory index
+skips it, so it is only a guide; the folders are the full listing. Keep it high
+level, and update it when you change something it describes (a new district, a
+new group, a convention, the counts). A world without one gets one when you
+first build it out.
 
 ## Two wikis
 
@@ -53,6 +62,7 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Adding to `agents.entries` in `openclaw.json` | By itself, but it can interrupt your turn   |
 | Any place, or a `home` on a character card    | Within a second, once the map loads         |
 | Concept pages                                 | Coming turns                                |
+| A character's `stickers/`                     | That character's next turn                  |
 | Anything under `shared/skills/`               | Coming turns, once you run `refresh_skills` |
 
 **A broken map changes nothing.** An unknown `home`, `parent` or connection
@@ -128,7 +138,58 @@ takes them offstage. They start at `home`.
   `home` only decides where someone starts if they have never moved. Tell the
   user what can't be done with files.
 - **Renaming an id** touches the card, the workspace, `openclaw.json` and every
-  page that mentions it. Tell the user what it would involve before starting.
+  page that mentions it (`grep` for the id finds them). Tell the user what it
+  would involve before starting. When you rename a place or concept in a
+  template that others have copied, also add it to `renames` in the template's
+  `world.json` (`{ "old_id": "new_id" }`), so their copies follow it when they
+  update (see `world-update`).
+
+## Stickers
+
+A character can send a sticker in a chat: a small picture of themselves, from
+their own set. Others read a line describing it, built from the labels below, so
+the labels are what matters.
+
+```text
+workspaces/<id>/stickers/
+  happy.webp            # their usual clothes, the ones in IDENTITY.md
+  laughing.webp
+  maid-laughing.webp    # another outfit: the outfit's word comes first
+  stickers.json
+```
+
+```json
+{
+  "outfits": { "maid": "a black-and-white maid dress and headband" },
+  "stickers": {
+    "laughing": { "look": "laughing with eyes squeezed shut" },
+    "maid-laughing": { "look": "laughing with eyes squeezed shut" }
+  }
+}
+```
+
+- **A name** is lowercase words joined by `-`: an optional outfit word, then the
+  mood. Use these moods where they fit: neutral, happy, laughing, excited, smug,
+  shy, flustered, sheepish, surprised, confused, worried, sad, crying, annoyed,
+  angry, determined, thinking, sleepy. Another plain word is fine when none
+  does. Each name is distinct, so never `happy-2`; give the second one a truer
+  mood instead.
+- **`outfits`** describes every outfit except their usual clothes, once, as
+  someone would see it. Only words declared here count as outfits in a name.
+- **`look`** starts with the mood and says what the face and hands do. It is
+  optional, but without it others read only the mood word.
+- **Files** are raster images (`.webp`, `.png`, `.gif`, `.jpg`), square, about
+  256 px, ideally with a transparent background. The filename without its
+  extension is the name.
+- Others read "<Name>, <look>, in <outfit>". Describe only what is visible: no
+  franchise names, and nothing the picture doesn't show.
+
+**Editing.** Relabel a sticker or describe an outfit by editing `stickers.json`.
+`view_image` on a file shows what it really looks like, so check before you
+label. You can't download, crop, rename or delete pictures yourself. When a name
+must change, or the user wants new stickers, ask them to put or rename the files
+in the folder, then label them. A character's sticker habit, such as rarely
+using them or favoring one, belongs in their `SOUL.md`.
 
 ## Seeding the World Wiki
 

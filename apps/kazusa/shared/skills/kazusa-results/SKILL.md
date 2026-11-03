@@ -42,3 +42,11 @@ You're on your way, so nobody is close enough to hear.
 ## aloud-not-there
 
 You aren't there, so nobody in it can hear you.
+
+## outside-repository
+
+{path} is outside the Kazusa repository, so this did not run.
+
+## secret-file
+
+{path} holds secrets, so this did not run.

@@ -32,7 +32,7 @@ interface Known {
   readonly page: Page;
 }
 
-/** Index files, not pages (`INDEX.md`, `KIVOTOS_INDEX.md`). */
+/** Index files, not pages: `INDEX.md`, and older `<WORLD>_INDEX.md` listings. */
 const isPage = (name: string): boolean =>
   name.endsWith(".md") && !/^(?:[A-Z_]+_)?INDEX\.md$/.test(name);
 

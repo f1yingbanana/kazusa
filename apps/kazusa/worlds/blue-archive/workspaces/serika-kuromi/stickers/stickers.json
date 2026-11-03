@@ -1,0 +1,264 @@
+{
+  "outfits": {
+    "robber": "a red knit ski mask with cat-ear bumps and a big '4', over a navy blazer",
+    "waitress": "a white headscarf, a black short-sleeved top with a cyan bow and a navy work apron",
+    "gym": "a black-and-cyan zip-up track jacket with white stripes and black gym shorts",
+    "idol": "a black peaked cap, a studded choker, a headset mic and a black halter top",
+    "newyear": "a white kimono top, red hakama and a high ponytail with flower ornaments",
+    "swimsuit": "a navy off-shoulder frilled bikini and cyan-strapped sandals"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, brows furrowed, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, an anger mark, eyes shut, teeth gritted"
+    },
+    "confused": {
+      "look": "confused, brows knit, mouth slightly open"
+    },
+    "doubtful": {
+      "look": "doubtful, brows tilted, lips pressed"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, a sweat drop, mouth open"
+    },
+    "gloomy": {
+      "look": "gloomy, a dark shadow over the eyes, teeth clenched"
+    },
+    "gym-angry": {
+      "look": "angry, brows furrowed, shouting"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, an anger mark, eyes shut, teeth gritted"
+    },
+    "gym-flustered": {
+      "look": "flustered, swirly eyes, blushing hard, mouth open"
+    },
+    "gym-gloomy": {
+      "look": "gloomy, a dark shadow over the eyes, teeth clenched"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "gym-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "gym-pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, a nervous sweat, teeth clenched"
+    },
+    "gym-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "gym-surprised": {
+      "look": "surprised, brows raised, mouth a small o"
+    },
+    "gym-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "idol-angry": {
+      "look": "angry, brows furrowed, shouting"
+    },
+    "idol-flustered": {
+      "look": "flustered, blushing, a sweat drop, mouth open"
+    },
+    "idol-gloomy": {
+      "look": "gloomy, a dark shadow over the eyes, teeth clenched"
+    },
+    "idol-grinning": {
+      "look": "grinning, eyes shut, a wide toothy grin"
+    },
+    "idol-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "idol-neutral": {
+      "look": "neutral, a cool, steady look"
+    },
+    "idol-pouting": {
+      "look": "pouting, lips wavy, eyes narrowed"
+    },
+    "idol-sheepish": {
+      "look": "sheepish, a nervous sweat, teeth clenched"
+    },
+    "idol-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "idol-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "idol-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "idol-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "newyear-angry": {
+      "look": "angry, brows furrowed, shouting with a fang"
+    },
+    "newyear-annoyed": {
+      "look": "annoyed, an anger mark, eyes shut, teeth gritted"
+    },
+    "newyear-flustered": {
+      "look": "flustered, swirly eyes, blushing hard, sweating"
+    },
+    "newyear-gloomy": {
+      "look": "gloomy, a dark shadow over the eyes, mouth wobbling"
+    },
+    "newyear-happy": {
+      "look": "happy, eyes shut, a fanged open smile"
+    },
+    "newyear-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "newyear-pouting": {
+      "look": "pouting, brows lowered, lips pressed"
+    },
+    "newyear-sheepish": {
+      "look": "sheepish, a nervous sweat, teeth clenched"
+    },
+    "newyear-shy": {
+      "look": "shy, a soft smile, lightly blushing"
+    },
+    "newyear-sleepy": {
+      "look": "sleepy, eyes squeezed shut"
+    },
+    "newyear-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "newyear-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "newyear-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "robber-angry": {
+      "look": "angry, brows furrowed, shouting"
+    },
+    "robber-annoyed": {
+      "look": "annoyed, eyes shut, teeth gritted in a grin"
+    },
+    "robber-flustered": {
+      "look": "flustered, swirly eyes, mouth open"
+    },
+    "robber-gloomy": {
+      "look": "gloomy, a dark shadow over the eyes"
+    },
+    "robber-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "robber-neutral": {
+      "look": "neutral, a steady stare through the mask"
+    },
+    "robber-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "robber-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "robber-surprised": {
+      "look": "surprised, mouth a small o through the mask"
+    },
+    "robber-worried": {
+      "look": "worried, brows tilted, mouth open"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, teeth clenched"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, mouth a small o"
+    },
+    "swimsuit-angry": {
+      "look": "angry, an anger mark, eyes shut, teeth gritted"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, eyes narrowed, mouth slightly open"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing hard, mouth open"
+    },
+    "swimsuit-gloomy": {
+      "look": "gloomy, a shadow over the eyes, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing, eyes squeezed shut, mouth open"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, blushing, eyes averted"
+    },
+    "swimsuit-sad": {
+      "look": "sad, eyes lowered, mouth slightly open"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "swimsuit-smug": {
+      "look": "smug, a small smile, blushing"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, blushing, eyes a little wide, mouth slightly open"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "waitress-angry": {
+      "look": "angry, brows furrowed, shouting"
+    },
+    "waitress-annoyed": {
+      "look": "annoyed, eyes shut, teeth gritted in a grin"
+    },
+    "waitress-flustered": {
+      "look": "flustered, blushing hard, a sweat drop, mouth open"
+    },
+    "waitress-gloomy": {
+      "look": "gloomy, a dark shadow over the eyes, teeth clenched"
+    },
+    "waitress-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "waitress-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "waitress-pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "waitress-sheepish": {
+      "look": "sheepish, a nervous sweat, teeth clenched"
+    },
+    "waitress-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "waitress-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "waitress-surprised": {
+      "look": "surprised, brows raised, mouth a small o"
+    },
+    "waitress-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

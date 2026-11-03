@@ -129,4 +129,23 @@ describe("messagePreview", () => {
       ),
     ).toBe("Sensei waves.");
   });
+
+  it("says a sticker is one rather than describing it", () => {
+    const sticker = {
+      text: "Kazusa, smug, sipping tea",
+      senderId: "kazusa",
+      type: "sticker" as const,
+    };
+    expect(messagePreview(sticker, group, "user:me", nameOf)).toBe(
+      "Kazusa: Sticker",
+    );
+    expect(
+      messagePreview(
+        sticker,
+        chat({ type: "direct", members: ["kazusa", "user:me"] }),
+        "user:me",
+        nameOf,
+      ),
+    ).toBe("Sticker");
+  });
 });

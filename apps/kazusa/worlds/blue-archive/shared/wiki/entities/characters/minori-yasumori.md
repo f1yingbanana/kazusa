@@ -7,9 +7,10 @@ name: Minori Yasumori
 school: Red Winter Federal Academy
 club: Public Works Department
 is_simulated_agent: true
-home: red_winter_school
+home: room_minori
 ---
 
 # Minori Yasumori
 
-Minori leads Red Winter’s Public Works Department, whose students perform construction and repairs and advocate for fair treatment.
+Minori leads Red Winter’s Public Works Department, whose students perform
+construction and repairs and advocate for fair treatment.

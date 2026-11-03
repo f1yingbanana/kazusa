@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: shanhaijing_promenade
 name: "Black Tortoise Promenade"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+This street was nothing special when I took over. Now people ride trains for it.
+Every lantern on it is a promise I made to someone.

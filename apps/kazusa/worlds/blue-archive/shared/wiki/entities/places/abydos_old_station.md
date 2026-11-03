@@ -3,18 +3,22 @@ pageType: entity
 entityType: place
 id: entity.place.abydos_old_station
 place_id: abydos_old_station
-name: "Abydos Central Station Old Building"
-aliases: ["Abydos old station"]
+name: "Old Desert Line Station"
+aliases: ["Abydos old station", "Abydos Central Station Old Building"]
 parent: abydos_desert
-entry_minutes: 25
-summary: "An old railway building amid the Abydos sands."
-connections:
-  - to: highlander_rail_yard
-    ways:
-      - { by: train, minutes: 55 }
-    note: "A rail connection through the desert; service and travel time are simulation estimates."
+entry_minutes: 30
+summary:
+  "The first Abydos Central Station building, abandoned to the dunes when the
+  line was cut back to the suburbs; rails half buried, Highlander survey crews
+  now and then. No trains, no water."
+renown: local
 ---
 
-# Abydos Central Station Old Building
+# Old Desert Line Station
 
-The old station building was involved in the struggle over Abydos’s railway rights. It stands away from the surviving school in the desert district.
+The original Abydos Central Station, out in districts the desert has since
+swallowed. When the dunes covered the approach, the line was cut back to the
+present station by Suburban Town and this building was left to the desert. The
+platform clock stopped long ago and the ticket hall is full of sand. The
+railway's bonds and rights were fought over here, and Highlander survey crews
+still come out to check the rails.

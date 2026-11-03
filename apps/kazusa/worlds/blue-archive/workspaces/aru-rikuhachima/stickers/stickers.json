@@ -1,0 +1,137 @@
+{
+  "outfits": {
+    "dress": "a strapless red evening gown, long white gloves, a necklace, a dark coat over the shoulders",
+    "newyear": "a rose-patterned red kimono, a dark fur stole, a large rose and veil in the hair"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, a small frown"
+    },
+    "boastful": {
+      "look": "boastful, half-lidded eyes, mouth open mid-boast"
+    },
+    "content": {
+      "look": "content, eyes closed, a calm smile"
+    },
+    "dress-annoyed": {
+      "look": "annoyed, eyes narrowed, lips pressed"
+    },
+    "dress-boastful": {
+      "look": "boastful, half-lidded eyes, mouth open mid-boast"
+    },
+    "dress-content": {
+      "look": "content, eyes closed, a calm smile"
+    },
+    "dress-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "dress-flustered": {
+      "look": "flustered, wide eyes, blushing, a nervous sweat, mouth open"
+    },
+    "dress-happy": {
+      "look": "happy, grinning with eyes shut"
+    },
+    "dress-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "dress-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "dress-proud": {
+      "look": "proud, a confident half-lidded smile"
+    },
+    "dress-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, a wobbly smile"
+    },
+    "dress-shocked": {
+      "look": "shocked, blank white eyes, mouth wide open, sweating"
+    },
+    "dress-shy": {
+      "look": "shy, blushing, lips parted"
+    },
+    "dress-smug": {
+      "look": "smug, eyes shadowed, a sly toothy grin"
+    },
+    "dress-surprised": {
+      "look": "surprised, mouth an open o"
+    },
+    "dress-worried": {
+      "look": "worried, teary eyes, teeth clenched"
+    },
+    "flustered": {
+      "look": "flustered, wide eyes, a nervous sweat, mouth open"
+    },
+    "happy": {
+      "look": "happy, grinning with eyes shut, blushing"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "nervous": {
+      "look": "nervous, wide eyes, brows knit, a small frown, a sweat drop"
+    },
+    "neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "newyear-annoyed": {
+      "look": "annoyed, a small frown"
+    },
+    "newyear-boastful": {
+      "look": "boastful, half-lidded eyes, mouth open mid-boast"
+    },
+    "newyear-content": {
+      "look": "content, eyes closed, a serene face"
+    },
+    "newyear-flustered": {
+      "look": "flustered, wide eyes, a nervous sweat, mouth open"
+    },
+    "newyear-happy": {
+      "look": "happy, grinning with eyes shut"
+    },
+    "newyear-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "newyear-nervous": {
+      "look": "nervous, wide eyes, a sweat drop, lips pressed"
+    },
+    "newyear-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "newyear-panicked": {
+      "look": "panicked, wide eyes, blushing, mouth wobbling"
+    },
+    "newyear-scheming": {
+      "look": "scheming, eyes shadowed, a sly toothy grin"
+    },
+    "newyear-shocked": {
+      "look": "shocked, blank white eyes, mouth wide open, sweating"
+    },
+    "newyear-shy": {
+      "look": "shy, blushing, lips closed"
+    },
+    "newyear-smug": {
+      "look": "smug, half-lidded eyes, a small smirk"
+    },
+    "newyear-wincing": {
+      "look": "wincing, eyes squeezed shut, teeth clenched, sweating"
+    },
+    "proud": {
+      "look": "proud, a confident half-lidded smile"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, a tight smile"
+    },
+    "smug": {
+      "look": "smug, half-lidded eyes, a closed-mouth smirk"
+    },
+    "surprised": {
+      "look": "surprised, mouth wide open"
+    },
+    "wailing": {
+      "look": "wailing, eyes squeezed shut, mouth wide open, a sweat drop"
+    },
+    "worried": {
+      "look": "worried, teary eyes, teeth clenched, a nervous sweat"
+    }
+  }
+}

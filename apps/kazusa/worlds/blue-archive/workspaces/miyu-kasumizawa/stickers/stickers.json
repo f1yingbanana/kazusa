@@ -1,0 +1,125 @@
+{
+  "outfits": {
+    "gym": "a white gym shirt with blue trim and blue bloomers, hair in low twin tails",
+    "swimsuit": "a white lemon-print bikini, a frilled white neck bow and a straw hat, hair in a long braid"
+  },
+  "stickers": {
+    "distressed": {
+      "look": "distressed, eyes squeezed shut, mouth wide open, a sweat drop"
+    },
+    "flustered": {
+      "look": "flustered, swirling eyes, wavy mouth"
+    },
+    "gym-distressed": {
+      "look": "distressed, eyes squeezed shut, mouth wide open, a sweat drop"
+    },
+    "gym-flustered": {
+      "look": "flustered, swirling eyes, wavy mouth"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "gym-neutral": {
+      "look": "neutral, a quiet, blank look, faint blush"
+    },
+    "gym-pouting": {
+      "look": "pouting, eyes wide open, a small downturned mouth"
+    },
+    "gym-sad": {
+      "look": "sad, tear welling, a nervous sweat, lips wavering"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "gym-shy": {
+      "look": "shy, a small closed-mouth smile, faint blush"
+    },
+    "gym-sleepy": {
+      "look": "sleepy, eyes closed, lips pressed"
+    },
+    "gym-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "gym-teary": {
+      "look": "teary, eyes shut, a tear at the eye, mouth wobbling"
+    },
+    "gym-touched": {
+      "look": "touched, eyes shut, blushing, a tear at the eye, open smile"
+    },
+    "gym-worried": {
+      "look": "worried, tear welling, a nervous sweat, mouth open"
+    },
+    "happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "neutral": {
+      "look": "neutral, a quiet, blank look, faint blush"
+    },
+    "pouting": {
+      "look": "pouting, eyes wide open, a small downturned mouth"
+    },
+    "sad": {
+      "look": "sad, tear welling, a nervous sweat, lips wavering"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "shy": {
+      "look": "shy, a small closed-mouth smile, faint blush"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, lips pressed"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-distressed": {
+      "look": "distressed, eyes squeezed shut, mouth wide open, a sweat drop"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, swirling eyes, wavy mouth"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a quiet, blank look, faint blush"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, eyes wide open, a small downturned mouth"
+    },
+    "swimsuit-sad": {
+      "look": "sad, tear welling, a nervous sweat, lips wavering"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "swimsuit-shy": {
+      "look": "shy, a small closed-mouth smile, faint blush"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed, lips pressed"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-teary": {
+      "look": "teary, eyes shut, a tear at the eye, mouth wobbling"
+    },
+    "swimsuit-touched": {
+      "look": "touched, eyes shut, blushing, a tear at the eye, open smile"
+    },
+    "swimsuit-worried": {
+      "look": "worried, tear welling, a nervous sweat, mouth open"
+    },
+    "teary": {
+      "look": "teary, eyes shut, a tear at the eye, mouth wobbling"
+    },
+    "touched": {
+      "look": "touched, eyes shut, blushing, a tear at the eye, open smile"
+    },
+    "worried": {
+      "look": "worried, tear welling, a nervous sweat, mouth open"
+    }
+  }
+}

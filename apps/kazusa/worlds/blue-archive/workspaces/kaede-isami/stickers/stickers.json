@@ -1,0 +1,137 @@
+{
+  "outfits": {
+    "gym": "a white gym shirt with pink collar and cuffs, pink bloomers and white socks",
+    "guide": "a navy tour-guide suit and small cap, white gloves, a red neck bow, dark tights"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, blank glaring eyes, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in complaint"
+    },
+    "awkward": {
+      "look": "awkward, a flat stare, a bead of sweat"
+    },
+    "curious": {
+      "look": "curious, eyes wide, mouth a small o"
+    },
+    "doubtful": {
+      "look": "doubtful, half-lidded eyes, lips parted"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, eyes wide, mouth open"
+    },
+    "guide-angry": {
+      "look": "angry, blank glaring eyes, fanged mouth open"
+    },
+    "guide-annoyed": {
+      "look": "annoyed, brows lowered, lips pressed"
+    },
+    "guide-awkward": {
+      "look": "awkward, eyes lowered, a bead of sweat, lips pursed"
+    },
+    "guide-content": {
+      "look": "content, eyes closed, a small smile"
+    },
+    "guide-curious": {
+      "look": "curious, eyes wide, lips parted"
+    },
+    "guide-flustered": {
+      "look": "flustered, brows raised, a bead of sweat, mouth open"
+    },
+    "guide-happy": {
+      "look": "happy, mouth open in a bright smile"
+    },
+    "guide-laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "guide-sheepish": {
+      "look": "sheepish, a bead of sweat, grinning"
+    },
+    "guide-smug": {
+      "look": "smug, a small closed smile, brows raised, glancing aside"
+    },
+    "guide-surprised": {
+      "look": "surprised, blank round eyes, mouth open"
+    },
+    "guide-teary": {
+      "look": "teary, blank round eyes, a tear at one eye, mouth open"
+    },
+    "guide-whining": {
+      "look": "whining, eyes squeezed shut, mouth wavy"
+    },
+    "guide-wink": {
+      "look": "wink, one eye shut, mouth open in a grin"
+    },
+    "guide-worried": {
+      "look": "worried, a bead of sweat, mouth a small o"
+    },
+    "gym-angry": {
+      "look": "angry, blank glaring eyes, shouting"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in complaint"
+    },
+    "gym-awkward": {
+      "look": "awkward, a flat stare, a bead of sweat"
+    },
+    "gym-curious": {
+      "look": "curious, eyes wide, mouth a small o"
+    },
+    "gym-doubtful": {
+      "look": "doubtful, half-lidded eyes, lips parted"
+    },
+    "gym-flustered": {
+      "look": "flustered, blushing hard, eyes wide, mouth open"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut in a beaming smile"
+    },
+    "gym-laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "gym-neutral": {
+      "look": "neutral, a calm look, a faint blush"
+    },
+    "gym-sleepy": {
+      "look": "sleepy, eyes closed, a soft blush"
+    },
+    "gym-surprised": {
+      "look": "surprised, blank round eyes, mouth open"
+    },
+    "gym-teary": {
+      "look": "teary, blank round eyes, a tear at one eye, mouth open"
+    },
+    "gym-whining": {
+      "look": "whining, eyes squeezed shut, mouth wavy"
+    },
+    "gym-worried": {
+      "look": "worried, brows tilted, a bead of sweat, lips parted"
+    },
+    "happy": {
+      "look": "happy, eyes shut in a beaming smile"
+    },
+    "laughing": {
+      "look": "laughing, eyes squeezed shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, a faint blush"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, a soft blush"
+    },
+    "surprised": {
+      "look": "surprised, blank round eyes, mouth open"
+    },
+    "teary": {
+      "look": "teary, blank round eyes, a tear at one eye, mouth open"
+    },
+    "whining": {
+      "look": "whining, eyes squeezed shut, mouth wavy"
+    },
+    "worried": {
+      "look": "worried, brows tilted, a bead of sweat, lips parted"
+    }
+  }
+}

@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: usagi_park
-name: Usagi Park
-learned: familiar place
+name: "Kousagi Park"
+learned: always known
 ---
 
-A place I know well.
+Our home ground. Bun Bun and I patrol the white clover patches most mornings.
+She knows the route better than some members of my platoon.

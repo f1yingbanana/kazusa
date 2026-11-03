@@ -22,10 +22,18 @@ export const ChatMessageSchema = z.object({
   sequence: z.number(),
   senderId: z.string(),
   senderName: z.string(),
-  /** Plain text; for an action, what the sender does (render as done). */
+  /**
+   * Plain text; for an action, what the sender does (render as done); for a
+   * sticker, what it shows, as everyone in the chat reads it (its alt text).
+   */
   text: z.string(),
-  /** Absent: speech. An action is done where the sender is, in third person. */
-  type: z.enum(["speech", "action"]).optional(),
+  /**
+   * Absent: speech. An action is done where the sender is, in third person. A
+   * sticker is a picture from a character's own set, shown without a bubble.
+   */
+  type: z.enum(["speech", "action", "sticker"]).optional(),
+  /** Stickers only: its name in the sender's set and where to load it. */
+  sticker: z.object({ name: z.string(), url: z.string() }).optional(),
   timestamp: z.number(),
   /**
    * The stored record's real time, for lining it up with a brain trace. Only
@@ -960,6 +968,8 @@ export const AssembledContextSchema = z.object({
       situation: z.number(),
       history: z.number(),
       records: z.number(),
+      /** Past turns' tool calls and outcomes. */
+      tools: z.number().default(0),
     })
     .optional(),
 });

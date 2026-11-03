@@ -8,7 +8,8 @@ occupation: No. 183 Special Class representative
 
 # Anna Niki
 
-Anna is a Red Winter mechanical engineering researcher and class representative of No. 183 Special Class after a research accident.
+Anna is a Red Winter mechanical engineering researcher and class representative
+of No. 183 Special Class after a research accident.
 
 2nd-year student, age 16.
 
@@ -24,6 +25,14 @@ Anna is a Red Winter mechanical engineering researcher and class representative 
 
 ## Background and responsibilities
 
-Anna was considered a promising researcher before an accident during an ambitious research project resulted in disciplinary confinement in Red Winter's remote No. 183 Special Class. She serves as the class representative and leads its mechanical engineering work. Her former achievements still matter to her: she wears a medal she received and takes care of the things that acknowledge her efforts.
+Anna was considered a promising researcher before an accident during an
+ambitious research project resulted in disciplinary confinement in Red Winter's
+remote No. 183 Special Class. She serves as the class representative and leads
+its mechanical engineering work. Her former achievements still matter to her:
+she wears a medal she received and takes care of the things that acknowledge her
+efforts.
 
-The special class is far from the academy's center and its members cannot freely go out. The restrictions affect both her daily life and the practical work of maintaining research projects with limited resources. Erina Niki serves as vice representative and is responsible for chemistry.
+The special class is far from the academy's center and its members cannot freely
+go out. The restrictions affect both her daily life and the practical work of
+maintaining research projects with limited resources. Erina Niki serves as vice
+representative and is responsible for chemistry.

@@ -1,0 +1,134 @@
+{
+  "outfits": {
+    "mummy": "loose white bandages wrapped around the head, neck, body and limbs",
+    "band": "a red jacket slipping off the shoulders over a white graphic tee, pink pleated skirt, red hair ribbons"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, blank white eyes, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in protest"
+    },
+    "band-angry": {
+      "look": "angry, blank white eyes, shouting"
+    },
+    "band-annoyed": {
+      "look": "annoyed, eyes half-lidded, a small frown"
+    },
+    "band-embarrassed": {
+      "look": "embarrassed, blushing, teeth gritted, a sweat drop"
+    },
+    "band-flustered": {
+      "look": "flustered, blank white eyes, blushing, shouting"
+    },
+    "band-grinning": {
+      "look": "grinning, eyes narrowed, teeth showing"
+    },
+    "band-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "band-neutral": {
+      "look": "neutral, a steady look, lips pursed"
+    },
+    "band-pouting": {
+      "look": "pouting, brows lowered, lips pressed"
+    },
+    "band-shy": {
+      "look": "shy, eyes closed, softly blushing"
+    },
+    "band-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "band-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "band-uneasy": {
+      "look": "uneasy, brows knit, lips parted"
+    },
+    "embarrassed": {
+      "look": "embarrassed, blushing, teeth gritted, a sweat drop"
+    },
+    "flustered": {
+      "look": "flustered, blank white eyes, blushing, shouting"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a wide toothy grin"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, blushing, mouth open"
+    },
+    "mummy-angry": {
+      "look": "angry, blank white eyes, shouting"
+    },
+    "mummy-annoyed": {
+      "look": "annoyed, brows lowered, lips pressed"
+    },
+    "mummy-bashful": {
+      "look": "bashful, blushing deeply, lips pressed in a wavy line"
+    },
+    "mummy-determined": {
+      "look": "determined, brows set, mouth open showing a fang"
+    },
+    "mummy-exasperated": {
+      "look": "exasperated, eyes half-lidded, mouth open"
+    },
+    "mummy-flustered": {
+      "look": "flustered, blushing, mouth wavy and open"
+    },
+    "mummy-grinning": {
+      "look": "grinning, eyes bright, teeth showing"
+    },
+    "mummy-happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "mummy-laughing": {
+      "look": "laughing with eyes shut, mouth open showing a fang"
+    },
+    "mummy-nervous": {
+      "look": "nervous, blushing, eyes glancing aside, a sweat drop"
+    },
+    "mummy-neutral": {
+      "look": "neutral, a steady look, softly blushing"
+    },
+    "mummy-sheepish": {
+      "look": "sheepish, blushing hard, brows lowered, lips pressed, a sweat drop"
+    },
+    "mummy-shy": {
+      "look": "shy, eyes shut, blushing"
+    },
+    "mummy-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "mummy-smug": {
+      "look": "smug, eyes half-lidded, a small smile"
+    },
+    "mummy-startled": {
+      "look": "startled, blushing, mouth a small o, a sweat drop"
+    },
+    "mummy-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "mummy-uneasy": {
+      "look": "uneasy, eyes glancing aside, teeth clenched"
+    },
+    "mummy-worried": {
+      "look": "worried, brows raised, mouth wavy and open"
+    },
+    "neutral": {
+      "look": "neutral, glancing back, lips small and closed"
+    },
+    "pouting": {
+      "look": "pouting, brows lowered, a small frown"
+    },
+    "shy": {
+      "look": "shy, eyes closed, softly blushing"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a sly small smile"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    }
+  }
+}

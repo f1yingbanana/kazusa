@@ -64,8 +64,25 @@ ignores `session.mainKey`, so it cannot rename the default `main` session into
   Past turns are in the ledgers, which record settled actions. Replaying them
   was measured live on 2026-10-31: 66k tokens a call against 13k, and double
   sends in 18 of 24 runs against 3 of 24, since the model copies its recent tool
-  calls. The cost is that a failed tool call in an earlier turn is forgotten;
-  the character finds out again if it matters.
+  calls. So past turns come back only as a **tool-call digest**
+  (`tool-history.ts`): one line per call, arguments as a shape with no words
+  said, and the outcome or error. It is what was missing: on the live world on
+  2026-11-02, 414 of 1,626 `send_message` calls failed (169 named no chat, with
+  a correct call earlier in the same session), and 59 of 221 `start_task` calls
+  (invalid `afterwards`, a second activity). Budget: 600 tokens, 4,000 for the
+  system agent; 0 turns it off. Not yet measured live: watch the double-send
+  rate, since the digest still shows recent calls.
+
+  The calls are the brain trace's: `readBrainTurns`
+  (`perception/brain-trace.ts`) reads the brain transcript the host keeps, the
+  same read the client's brain view uses, and the digest prints one line per
+  tool call, each turn's under the sim time its prompt starts with (perception
+  stamps every delivery; the transcript's own timestamps are the host's wall
+  clock). The run under way is left out by its id (`currentBrainRun`, the
+  delivery id the brain channel dispatches with, known before the run starts).
+  Neither shortcut works: when the host passes `prompt`, `messages` is empty,
+  and the first model call is assembled before the host writes the prompt, so
+  the newest turn may be the last finished run (both seen live on 2026-11-03).
 
 ## Time convention
 

@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: gehenna_school
-name: Gehenna Academy
-learned: familiar place
+name: "Gehenna Academy Campus"
+learned: always known
 ---
 
-A place I know well.
+Campus is huuuge and kinda fancy, like a palace somebody keeps shooting at. Best
+people-watching is on the lawn between classes. I've made like three new friends
+there just this week!

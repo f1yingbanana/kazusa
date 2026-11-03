@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_engineering
-name: "Millennium Engineering Workshop"
-learned: familiar place
+name: "Millennium Engineering Hangar"
+learned: always known
 ---
 
-A place I know through my club.
+The hangar. My real room, honestly. Printers, the lathe, a bench with my name on
+masking tape. Utaha-senpai makes me demo things here in front of people. I'd
+rather demo them in front of nobody.

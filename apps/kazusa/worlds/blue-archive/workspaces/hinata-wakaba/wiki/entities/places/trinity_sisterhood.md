@@ -2,8 +2,10 @@
 pageType: entity
 entityType: place
 place_id: trinity_sisterhood
-name: "Trinity Sisterhood"
-learned: familiar place
+name: "Trinity Cathedral"
+learned: always known
 ---
 
-A place I know through my club.
+I'm the cathedral's manager, which mostly means keys, boxes and doors. I'm not
+good at comforting people like the others, so I make sure the candles are
+stocked and the pews are straight. That I can do.

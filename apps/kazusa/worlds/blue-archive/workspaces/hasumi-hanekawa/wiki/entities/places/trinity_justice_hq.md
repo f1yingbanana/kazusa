@@ -3,7 +3,9 @@ pageType: entity
 entityType: place
 place_id: trinity_justice_hq
 name: "Justice Task Force Headquarters"
-learned: familiar place
+aliases: ["Task Force headquarters"]
+learned: always known
 ---
 
-A place I know through my club.
+Rosters, reports, briefings: someone has to handle them, and Tsurugi prefers
+handling suspects. My office light is generally the last one out.

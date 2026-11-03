@@ -3,12 +3,20 @@ pageType: entity
 entityType: place
 id: entity.place.veritas_clubroom
 place_id: veritas_clubroom
-name: "Veritas Clubroom"
-parent: millennium_school
-entry_minutes: 7
-summary: "The computer-filled base of Millennium’s Veritas."
+name: "Hackers' Lounge"
+aliases: ["Veritas Clubroom"]
+parent: millennium_clubhouse
+entry_minutes: 1
+summary:
+  "Veritas' server-cooled den: racks, screens and an air conditioner set to
+  arctic; door code only, lights on at all hours."
+renown: known
+community: veritas
 ---
 
-# Veritas Clubroom
+# Hackers' Lounge
 
-Veritas members work with networks, information and cybersecurity here. The room is a club workspace, with equipment and screens used for their projects.
+Server racks along one wall, a bank of screens, a projector for movie nights,
+and an air conditioner turned so low that a luxury camping tent has been pitched
+in the back to keep warm in. Empty energy-drink cans form a slow sculpture by
+the bin. The door code changes weekly and is never written down.

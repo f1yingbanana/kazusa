@@ -3,19 +3,19 @@ pageType: entity
 entityType: place
 id: entity.place.problem_solver_office
 place_id: problem_solver_office
-name: Problem Solver 68 Office
+name: "Problem Solver 68 Office"
+aliases: ["PS68 office"]
+parent: gehenna_hotaru_building
+entry_minutes: 1
 summary:
-  "A modest rented office with a desk, sofa, paperwork and the agency's emblem."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 20 }
-    note: "Approximate travel time for the simulation."
+  "A modest rented office: a big desk, a sofa that doubles as a bed, a framed
+  emblem; open whenever someone's in, clients by appointment."
+renown: local
 community: problem_solver_68
 ---
 
 # Problem Solver 68 Office
 
-Aru's agency works from a rented office in a commercial building. The room has
-pale green walls, a desk with paperwork and a laptop, a sofa and a framed agency
-emblem. Its inhabitants receive clients and plan jobs here.
+Pale green walls, a desk with paperwork and a laptop, a sofa for clients that is
+also the boss's bed on late nights, and a framed emblem of the agency. A dusty
+old dress hangs in one corner; the floor is swept every dawn.

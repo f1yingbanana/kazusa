@@ -1,0 +1,144 @@
+{
+  "outfits": {
+    "maid": "a black-and-white maid dress with an apron and a frilled headband",
+    "winter": "a beige winter coat with white fur cuffs, a plaid scarf and white earmuffs",
+    "armor": "a white-and-blue mechanical armor suit with cyan head fins and a black collar"
+  },
+  "stickers": {
+    "armor-crying": {
+      "look": "crying, tears streaming down the cheek, mouth open"
+    },
+    "armor-determined": {
+      "look": "determined, eyes narrowed, brows set"
+    },
+    "armor-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "armor-flustered": {
+      "look": "flustered, eyes squeezed shut, sweating"
+    },
+    "armor-happy": {
+      "look": "happy, blushing, mouth open in a smile"
+    },
+    "armor-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "armor-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "armor-pouting": {
+      "look": "pouting, blushing, brows lowered"
+    },
+    "armor-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "armor-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "armor-smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "armor-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "armor-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    },
+    "crying": {
+      "look": "crying with eyes shut, tears at the eye corners, mouth open"
+    },
+    "determined": {
+      "look": "determined, brows set"
+    },
+    "eerie": {
+      "look": "eerie, a blank stare from glowing pink eyes"
+    },
+    "excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, sweating"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "maid-determined": {
+      "look": "determined, brows set"
+    },
+    "maid-excited": {
+      "look": "excited, beaming, mouth open"
+    },
+    "maid-flustered": {
+      "look": "flustered, eyes squeezed shut, wailing"
+    },
+    "maid-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "maid-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "maid-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly smile"
+    },
+    "maid-shy": {
+      "look": "shy, blushing, lips pursed"
+    },
+    "maid-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "maid-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "maid-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "sad": {
+      "look": "sad, eyes welling up"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, lips pressed"
+    },
+    "shy": {
+      "look": "shy, softly blushing, lips closed"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "winter-determined": {
+      "look": "determined, brows set"
+    },
+    "winter-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "winter-flustered": {
+      "look": "flustered, eyes squeezed shut, sweating"
+    },
+    "winter-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "winter-neutral": {
+      "look": "neutral, blushing, peeking over the scarf"
+    },
+    "winter-sad": {
+      "look": "sad, brows tilted, eyes welling up"
+    },
+    "winter-sheepish": {
+      "look": "sheepish, brows raised, a nervous sweat"
+    },
+    "winter-shy": {
+      "look": "shy, blushing, eyes lowered, lips pressed"
+    },
+    "winter-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "winter-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

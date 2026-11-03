@@ -2,10 +2,10 @@
 pageType: entity
 entityType: place
 place_id: class_1a
-name: "Class 1-A"
-learned: goes to school here
+name: "Trinity Class 1-A"
+learned: always known
 ---
 
-# Class 1-A
-
-Our homeroom, with the others from the club.
+Our homeroom: Airi, Yoshimi and me, plus some classmates with excellent posture.
+I write aphorisms in the margins of my textbooks. The teachers call it doodling.
+History will decide.

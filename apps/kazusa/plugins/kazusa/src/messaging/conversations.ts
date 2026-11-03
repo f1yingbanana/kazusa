@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { STICKER_NAME } from "../stickers/stickers.ts";
 
 export const AGENT_ID = z
   .string()
@@ -55,7 +56,19 @@ const TEXT = (max: number) =>
 
 /** What a message is: words, or something done where others can see it. */
 export const MESSAGE_TYPE = z.enum(["speech", "action"]);
-export type MessageType = z.infer<typeof MESSAGE_TYPE>;
+/** ...or, sent by a character, a sticker from its own set. */
+const DELIVERED_TYPE = z.enum(["speech", "action", "sticker"]);
+export type MessageType = z.infer<typeof DELIVERED_TYPE>;
+
+/** A sent sticker: its name in the sender's set and that file's version. */
+export const STICKER_REF = z.strictObject({
+  name: STICKER_NAME,
+  v: z
+    .string()
+    .regex(/^[a-z0-9]+$/)
+    .max(16),
+});
+export type StickerRef = z.infer<typeof STICKER_REF>;
 
 const BUBBLE = z.union([
   TEXT(4_000),
@@ -64,54 +77,94 @@ const BUBBLE = z.union([
     type: MESSAGE_TYPE.optional(),
   }),
 ]);
-/** One bubble as a plain string (speech) or with its type. */
-export type Bubble = z.infer<typeof BUBBLE>;
+/** A sticker as delivered: what everyone reads, frozen when it is sent. */
+const STICKER_BUBBLE = z.strictObject({
+  text: TEXT(4_000),
+  type: z.literal("sticker"),
+  sticker: STICKER_REF,
+});
+/**
+ * One bubble as a plain string (speech), with its type, or a sticker resolved
+ * from the sender's set.
+ */
+export type Bubble = z.infer<typeof BUBBLE> | z.infer<typeof STICKER_BUBBLE>;
 
 /** Absolute ceiling; the tool offers `messaging.maxBubbles`. */
 const MAX_BUBBLES = 32;
 
-const bubbles = (max: number) => z.array(BUBBLE).min(1).max(max);
-
-/** The `send_message` tool's arguments, with at most `maxBubbles` bubbles. */
-export const sendMessageSchema = (maxBubbles: number) =>
-  CHAT_TARGET.extend({ messages: bubbles(maxBubbles) }).refine(...HAS_TARGET);
+/**
+ * The `send_message` tool's arguments, with at most `maxBubbles` bubbles. A
+ * character with stickers may also pick one of `stickers` by name; `about` is
+ * that field's description.
+ */
+export const sendMessageSchema = (
+  maxBubbles: number,
+  stickers: readonly string[] = [],
+  about = "",
+) => {
+  const [first, ...rest] = stickers;
+  const bubble = first
+    ? z.union([
+        ...BUBBLE.options,
+        z.strictObject({ sticker: z.enum([first, ...rest]).describe(about) }),
+      ])
+    : BUBBLE;
+  return CHAT_TARGET.extend({
+    messages: z.array(bubble).min(1).max(maxBubbles),
+  }).refine(...HAS_TARGET);
+};
 /** A paced multi-bubble send; the host adapter supplies its identity. */
 export const SPEECH_REQUEST = CHAT_TARGET.extend({
-  messages: bubbles(MAX_BUBBLES),
+  messages: z
+    .array(z.union([...BUBBLE.options, STICKER_BUBBLE]))
+    .min(1)
+    .max(MAX_BUBBLES),
   requestId: z.string().trim().min(1).max(128),
 }).refine(...HAS_TARGET);
 
-/** A bubble's words and type. */
+/** A bubble's words and type, and its sticker if it is one. */
 export function bubbleOf(bubble: Bubble): {
   readonly text: string;
   readonly type: MessageType;
+  readonly sticker?: StickerRef;
 } {
-  return typeof bubble === "string"
-    ? { text: bubble, type: "speech" }
-    : { text: bubble.text, type: bubble.type ?? "speech" };
+  if (typeof bubble === "string") return { text: bubble, type: "speech" };
+  if (bubble.type === "sticker") return bubble;
+  return { text: bubble.text, type: bubble.type ?? "speech" };
 }
 
-/** Explicit action marker in recalled text; speech is the default. */
+/** Explicit action or sticker marker in recalled text; speech is the default. */
 export function readAs(params: {
   readonly text: string;
   readonly type?: MessageType;
 }): string {
-  return params.type === "action"
-    ? `[type=action] ${params.text}`
+  return params.type === "action" || params.type === "sticker"
+    ? `[type=${params.type}] ${params.text}`
     : params.text;
 }
 export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
-/**
- * One canonical message. Delivery identity is supplied by the host adapter,
- * never the model.
- */
-export const DELIVERY_REQUEST = CHAT_TARGET.extend({
+
+const MESSAGE = CHAT_TARGET.extend({
   text: TEXT(32_000),
   /** Absent: speech. */
   type: MESSAGE_TYPE.optional(),
   requestId: z.string().trim().min(1).max(128),
-}).refine(...HAS_TARGET);
-export type SendMessageParams = z.infer<typeof DELIVERY_REQUEST>;
+});
+/**
+ * One message as a person sends it. Delivery identity is supplied by the host
+ * adapter, never the model.
+ */
+export const DELIVERY_REQUEST = MESSAGE.refine(...HAS_TARGET);
+/** One canonical message, which may also be a character's sticker. */
+export const DELIVERY = MESSAGE.extend({
+  type: DELIVERED_TYPE.optional(),
+  sticker: STICKER_REF.optional(),
+})
+  .refine(...HAS_TARGET)
+  .refine((params) => (params.type === "sticker") === Boolean(params.sticker), {
+    message: "A sticker message carries its sticker, and only it does.",
+  });
+export type SendMessageParams = z.infer<typeof DELIVERY>;
 
 export const LIST_CHATS = z.strictObject({
   query: z.string().trim().min(1).max(256).optional(),

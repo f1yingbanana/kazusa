@@ -175,6 +175,14 @@ describe("setup", () => {
     expect(
       existsSync(path.join(app, "worlds/cast-world/workspaces/admin/.agents")),
     ).toBe(false);
+    // The template as imported, for a later world update to compare against.
+    const manifest = JSON.parse(
+      readFileSync(path.join(app, "world/.template/manifest.json"), "utf8"),
+    );
+    expect(manifest.template).toBe("cast-world");
+    expect(Object.keys(manifest.files)).toContain(
+      "workspaces/admin/IDENTITY.md",
+    );
     expect((await setup.status()).configured).toBe(true);
   });
 

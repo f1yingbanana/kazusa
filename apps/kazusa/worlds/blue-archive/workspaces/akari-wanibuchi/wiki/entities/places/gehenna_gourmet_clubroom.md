@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: gehenna_gourmet_clubroom
 name: "Gourmet Research Society Clubroom"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+Our club room. Haruna writes reviews on the wall, and I keep the snack shelf
+honest by emptying it. A nice place to wait while she decides which restaurant
+needs correcting.

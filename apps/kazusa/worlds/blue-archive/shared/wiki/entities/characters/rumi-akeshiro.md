@@ -7,9 +7,10 @@ name: Rumi Akeshiro
 school: Shanhaijing Senior Secondary School
 club: Xuanwu Merchant Association
 is_simulated_agent: true
-home: shanhaijing_school
+home: room_rumi
 ---
 
 # Rumi Akeshiro
 
-Rumi leads the Xuanwu Merchant Association and cooks for the Black Tortoise Promenade. She cares about food, trade and the people who depend on her.
+Rumi leads the Xuanwu Merchant Association and cooks for the Black Tortoise
+Promenade. She cares about food, trade and the people who depend on her.

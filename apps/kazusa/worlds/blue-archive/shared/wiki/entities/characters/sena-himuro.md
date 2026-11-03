@@ -7,9 +7,10 @@ name: Sena Himuro
 school: Gehenna Academy
 club: Emergency Medicine Club
 is_simulated_agent: true
-home: gehenna_school
+home: room_sena
 ---
 
 # Sena Himuro
 
-Sena leads Gehenna’s Emergency Medicine Club and provides urgent care and transport to injured people.
+Sena leads Gehenna’s Emergency Medicine Club and provides urgent care and
+transport to injured people.

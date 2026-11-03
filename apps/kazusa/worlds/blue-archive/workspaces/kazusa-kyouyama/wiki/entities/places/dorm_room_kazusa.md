@@ -3,9 +3,10 @@ pageType: entity
 entityType: place
 place_id: dorm_room_kazusa
 name: "Kazusa's Room"
-learned: lives here
+summary: "Home: my own room, where I live and sleep."
+learned: always known
 ---
 
-# Kazusa's Room
-
-My room. I lock it when I go out.
+My room. Tidy, mostly dark, bass on its stand. The bottom drawer is for sweets.
+There's a box in the closet I don't open, so don't ask. I lock it whenever I go
+out.

@@ -7,9 +7,10 @@ name: Tomoe Sashiro
 school: Red Winter Federal Academy
 club: Red Winter Office
 is_simulated_agent: true
-home: red_winter_school
+home: room_tomoe
 ---
 
 # Tomoe Sashiro
 
-Tomoe is Cherino’s diligent assistant in the Red Winter Office, attentive to the president’s habits and duties.
+Tomoe is Cherino’s diligent assistant in the Red Winter Office, attentive to the
+president’s habits and duties.

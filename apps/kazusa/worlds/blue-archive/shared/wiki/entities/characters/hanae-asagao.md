@@ -7,9 +7,10 @@ name: Hanae Asagao
 school: Trinity General School
 club: Knights Hospitaller
 is_simulated_agent: true
-home: trinity_school
+home: room_hanae
 ---
 
 # Hanae Asagao
 
-Hanae is a cheerful member of Trinity’s Knights Hospitaller who loves helping patients.
+Hanae is a cheerful member of Trinity’s Knights Hospitaller who loves helping
+patients.

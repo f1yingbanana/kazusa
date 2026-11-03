@@ -1,0 +1,40 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, half-lidded eyes, mouth flat, closed fan at chin"
+    },
+    "content": {
+      "look": "content, eyes closed, a soft smile, head tilted"
+    },
+    "curious": {
+      "look": "curious, eyes shut, lips parted in a small o"
+    },
+    "eerie": {
+      "look": "eerie, face shadowed, half-lidded eyes, closed fan at chin"
+    },
+    "happy": {
+      "look": "happy, eyes shut in a gentle smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, eyes closed, mouth relaxed"
+    },
+    "sheepish": {
+      "look": "sheepish, laughing with eyes shut, a sweat drop"
+    },
+    "shy": {
+      "look": "shy, eyes closed, blushing, a small smile, closed fan at chin"
+    },
+    "smug": {
+      "look": "smug, half-lidded eyes, a sly smile, closed fan at chin"
+    },
+    "surprised": {
+      "look": "surprised, eyes half-open, mouth slightly open"
+    },
+    "thinking": {
+      "look": "thinking, eyes closed, lips pressed, closed fan at chin"
+    }
+  }
+}

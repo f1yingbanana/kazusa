@@ -1,0 +1,88 @@
+{
+  "outfits": {
+    "hatless": "a black jacket, black turtleneck and red striped bow, white braided hair with no hat"
+  },
+  "stickers": {
+    "cheerful": {
+      "look": "cheerful, blushing, mouth open in a bright smile"
+    },
+    "distressed": {
+      "look": "distressed, eyes squeezed shut, mouth open and wavy"
+    },
+    "doubtful": {
+      "look": "doubtful, eyes level, lips pressed flat"
+    },
+    "excited": {
+      "look": "excited, sparkling eyes, blushing, mouth open, a sweat drop"
+    },
+    "happy": {
+      "look": "happy, eyes closed in a gentle smile"
+    },
+    "hatless-excited": {
+      "look": "excited, sparkling eyes, blushing, mouth open, a sweat drop"
+    },
+    "hatless-happy": {
+      "look": "happy, eyes closed in a gentle smile"
+    },
+    "hatless-neutral": {
+      "look": "neutral, a calm look with a faint smile"
+    },
+    "hatless-pleased": {
+      "look": "pleased, blushing, a tight-lipped wavy smile"
+    },
+    "hatless-pouting": {
+      "look": "pouting, eyes closed, lips in a wavy line"
+    },
+    "hatless-sheepish": {
+      "look": "sheepish, a sweat drop, a wobbly open mouth"
+    },
+    "hatless-shocked": {
+      "look": "shocked, eyes wide and staring, mouth open, sweating"
+    },
+    "hatless-shy": {
+      "look": "shy, blushing, lips pressed tight"
+    },
+    "hatless-sleepy": {
+      "look": "sleepy, eyes drowsily closed, a faint smile"
+    },
+    "hatless-smug": {
+      "look": "smug, a small closed-mouth smirk, eyes steady"
+    },
+    "hatless-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "hatless-teary": {
+      "look": "teary, a small tear at one eye, blushing, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look with a faint smile"
+    },
+    "pleased": {
+      "look": "pleased, blushing, a tight-lipped wavy smile"
+    },
+    "pouting": {
+      "look": "pouting, eyes closed, lips in a wavy line"
+    },
+    "sheepish": {
+      "look": "sheepish, a sweat drop, a wobbly open mouth"
+    },
+    "shocked": {
+      "look": "shocked, eyes wide and staring, mouth open, sweating"
+    },
+    "shy": {
+      "look": "shy, blushing, lips pressed tight"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes drowsily closed, a faint smile"
+    },
+    "smug": {
+      "look": "smug, a small closed-mouth smirk, eyes steady"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "teary": {
+      "look": "teary, a small tear at one eye, blushing, mouth open"
+    }
+  }
+}

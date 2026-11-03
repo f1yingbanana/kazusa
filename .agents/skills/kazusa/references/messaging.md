@@ -394,6 +394,75 @@ audiences, ledger copies and notifications are unchanged per bubble.
 - **One outbox per character.** A new `send_message` from the same character
   aborts an older one still pacing.
 
+## Stickers
+
+A sticker is a picture of the sender from their own sticker set, sent as a
+bubble of its own: `{ "sticker": "maid-laughing" }` beside speech and actions in
+`messages`. In this kind of roleplay it adds imagery to a chat rather than
+copying how often a real person sends one, so the wording asks for good taste: a
+sticker marks a change of mood and doesn't repeat the last one, unless a strong
+feeling deserves the emphasis. That is a hint only. Code never rejects a
+repeated mood or limits how many a send has, and a world overrides the wording
+in its own `kazusa-tools#send_message.messages.sticker`.
+
+**Files.** `workspaces/<id>/stickers/<name>.<webp|png|gif|jpg|avif>`, raster
+only, about 256 px square with a transparent background. A name is lowercase
+words joined by `-`: `[<outfit>-]<mood>`, such as `laughing` or `maid-laughing`.
+The mood comes first from a shared vocabulary (neutral, happy, laughing,
+excited, smug, shy, flustered, sheepish, surprised, confused, worried, sad,
+crying, annoyed, angry, determined, thinking, sleepy), or another plain word
+where none fits. Each name is distinct, so there is no `-2`. The optional
+`stickers/stickers.json` adds what the files can't say:
+
+```json
+{
+  "outfits": { "maid": "a black-and-white maid dress and headband" },
+  "stickers": {
+    "maid-laughing": { "look": "laughing with eyes squeezed shut" }
+  }
+}
+```
+
+- `outfits` describes each outfit other than the character's usual clothes
+  (those in `IDENTITY.md`) once. A name's first word is an outfit only when
+  `outfits` declares it, so `eyes-closed` stays a mood.
+- `look` starts with the mood and says what the face does. Without it the mood
+  word stands alone. A sticker missing from `stickers` still works.
+
+**Sending.** `src/stickers/` reads a character's set from disk each time its
+tools are built, so an edit applies from the next turn. The set becomes an
+`enum` of names on the sticker bubble, and the outfit list fills the wording's
+`{data}`. A character without stickers has no sticker bubble at all, so nothing
+tempts it. `send_message` resolves the name before pacing: the retained bubble
+is `{ type: "sticker", text, sticker: { name, v } }`, where `text` is what
+everyone reads, frozen at send, and `v` is the file's mtime in base 36.
+
+**What everyone reads.** `text` is `<Name>, <look or mood>[, in <outfit>]`, for
+example "Aris, laughing with eyes squeezed shut, in a black-and-white maid dress
+and headband". Ledgers, notifications and Jev read it as
+`[type=sticker] <text>`. Nobody makes a vision call. Like an action in a text
+chat, a sticker in a huddle or said `aloud` is dropped, because it is a phone
+thing.
+
+**Client.** `ChatMessage` carries `type: "sticker"`, `text` as alt text and
+`sticker: { name, url }`. The url is
+`/kazusa/sticker?id=<sender>&name=<name>&v=<v>` and is served from the workspace
+like an avatar, cached forever. Replacing a file changes `v` only for later
+messages; old ones load whatever the name holds now. The chat shows the image
+without a bubble at about 128 px, and the chat list previews it as "Sticker".
+The player can't send stickers yet.
+
+**Importing.** `scripts/stickers.mjs` stages a set from a MediaWiki gallery and
+places a labelled set into a workspace:
+
+- Blue Archive expression portraits are full-body pictures where only the face
+  changes. `stage` finds the face from where the expressions differ and crops
+  one square for the whole set.
+- Genshin Impact's "Paimon's Paintings" are stickers already; `stage` trims and
+  resizes them.
+- Labelling is by eye from the staged contact sheet. `place` writes the files
+  and `stickers.json`.
+
 See [context assembly](context_engine.md) for the shared simulated-time window
 and [Perception](perception.md) for attention admission. The always-loaded
 `context-conventions` agent skill teaches discovery, both send forms, group

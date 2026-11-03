@@ -1,0 +1,64 @@
+{
+  "outfits": {
+    "guide": "a navy skirt suit with a red neck bow, white gloves and a small navy cap"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, wailing"
+    },
+    "guide-annoyed": {
+      "look": "annoyed, brows furrowed, mouth open"
+    },
+    "guide-flustered": {
+      "look": "flustered, eyes squeezed shut, a sweat drop"
+    },
+    "guide-happy": {
+      "look": "happy, mouth open in a fanged smile"
+    },
+    "guide-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "guide-neutral": {
+      "look": "neutral, a calm look, a faint smile"
+    },
+    "guide-sad": {
+      "look": "sad, brows tilted, a small frown"
+    },
+    "guide-sleepy": {
+      "look": "sleepy, eyes closed, a faint smile"
+    },
+    "guide-smug": {
+      "look": "smug, a toothy grin"
+    },
+    "guide-wink": {
+      "look": "wink, one eye closed, a small smile"
+    },
+    "guide-worried": {
+      "look": "worried, brows tilted, mouth open"
+    },
+    "happy": {
+      "look": "happy, smiling with mouth open"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, a fanged grin"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, a faint smile"
+    },
+    "sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, a faint smile"
+    },
+    "smug": {
+      "look": "smug, blushing, a toothy grin"
+    },
+    "worried": {
+      "look": "worried, brows tilted, mouth open"
+    }
+  }
+}

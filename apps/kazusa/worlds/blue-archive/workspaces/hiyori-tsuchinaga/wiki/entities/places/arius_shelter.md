@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: arius_shelter
-name: Arius Temporary Shelter
-learned: familiar place
+name: "Arius Squad Shelter"
+learned: always known
 ---
 
-A place I know well.
+Where the four of us live now. A real roof, a steel door, and Valkyrie knocking
+once a week to check we haven't run off. Heehee... where would we even run?
+We've already done all the running.

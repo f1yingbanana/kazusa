@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: highlander_school
-name: Highlander Railroad Academy
-learned: familiar place
+name: "Highlander Station Campus"
+learned: always known
 ---
 
-A place I know well.
+Our campus is the east wing of a station. People think that sounds romantic.
+It's loud.

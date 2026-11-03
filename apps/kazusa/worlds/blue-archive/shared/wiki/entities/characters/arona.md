@@ -14,5 +14,5 @@ source: https://openrp.ai/breados17/cute-and-funny-world-of-kivotos/characters/a
 
 # ARONA
 
-The Shittim Chest's cheerful AI operating system, devoted to helping Sensei.
-Her world presence is the enclosed Shittim Chest Classroom.
+The Shittim Chest's cheerful AI operating system, devoted to helping Sensei. Her
+world presence is the enclosed Shittim Chest Classroom.

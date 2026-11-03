@@ -1,0 +1,64 @@
+{
+  "outfits": {
+    "swimsuit": "a wide straw sun hat, a white crop top and a pink bikini"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, brows down, shouting with a fang showing"
+    },
+    "annoyed": {
+      "look": "annoyed, blushing, brows lowered, lips pressed"
+    },
+    "content": {
+      "look": "content, eyes closed, a small curled smile"
+    },
+    "happy": {
+      "look": "happy with eyes shut, a wide toothy grin, blushing"
+    },
+    "neutral": {
+      "look": "neutral, a small curled mouth, a faint blush"
+    },
+    "shocked": {
+      "look": "shocked, blank white eyes, a stiff toothy grin, a sweat drop"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a fanged open grin"
+    },
+    "surprised": {
+      "look": "surprised, mouth open, a light blush"
+    },
+    "swimsuit-angry": {
+      "look": "angry, brows down, shouting with a fang showing"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows lowered, a small frown"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a small curled smile"
+    },
+    "swimsuit-happy": {
+      "look": "happy with eyes shut, a toothy grin"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a small curled mouth"
+    },
+    "swimsuit-shocked": {
+      "look": "shocked, blank white eyes, mouth open, a sweat drop"
+    },
+    "swimsuit-smug": {
+      "look": "smug, sharp eyes, an open fanged grin"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth open"
+    },
+    "swimsuit-suspicious": {
+      "look": "suspicious, a sidelong glance, lips pursed"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    }
+  }
+}

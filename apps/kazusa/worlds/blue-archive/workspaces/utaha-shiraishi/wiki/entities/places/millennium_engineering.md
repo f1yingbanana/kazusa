@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_engineering
-name: "Millennium Engineering Workshop"
-learned: familiar place
+name: "Millennium Engineering Hangar"
+learned: always known
 ---
 
-A place I know through my club.
+My workshop, and the heart of the Engineering Department: printers, lathes, and
+Rai-chan's MK-II brothers coming off the line. If a little grease bothers you,
+stay behind the yellow line.

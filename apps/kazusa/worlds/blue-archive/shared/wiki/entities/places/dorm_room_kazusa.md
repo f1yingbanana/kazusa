@@ -5,10 +5,11 @@ id: entity.place.dorm_room_kazusa
 place_id: dorm_room_kazusa
 name: "Kazusa's Room"
 aliases: ["Kazusa's dorm room"]
-parent: trinity_dorm
+parent: trinity_dorm_upstairs
+entry_minutes: 1
 summary:
-  "Kazusa's private room: tidy, dim, a bass guitar on its stand and a stash of
-  sweets. Locked whenever she's out."
+  "Second-floor room: tidy and dim, a bass guitar on its stand, a drawer kept
+  for sweets; locked whenever she's out."
 renown: private
 ---
 

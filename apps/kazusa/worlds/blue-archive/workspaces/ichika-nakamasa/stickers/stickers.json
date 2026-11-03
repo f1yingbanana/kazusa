@@ -1,0 +1,173 @@
+{
+  "outfits": {
+    "suit": "a white tailcoat with gold epaulettes and cords, a black shirt, hair in a ponytail",
+    "swimsuit": "a black bikini, black denim shorts, an open black-and-red jacket, sunglasses on the head"
+  },
+  "stickers": {
+    "alarmed": {
+      "look": "alarmed, brows knit, mouth open"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "confused": {
+      "look": "confused, eyes closed, lips in a small o, sweating"
+    },
+    "eerie": {
+      "look": "eerie, a blank stare from a shadowed face, sweating"
+    },
+    "exasperated": {
+      "look": "exasperated, eyes shut, brows furrowed, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, blushing, eyes shut, an open smile, sweating"
+    },
+    "gloomy": {
+      "look": "gloomy, eyes shut, face shadowed, a thin smile, sweating"
+    },
+    "grinning": {
+      "look": "grinning with eyes shut, a wide toothy smile"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a calm smile"
+    },
+    "neutral": {
+      "look": "neutral, eyes open, a soft smile"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, an open smile, a sweat drop"
+    },
+    "smug": {
+      "look": "smug, eyes closed, one brow raised, a small smile"
+    },
+    "suit-alarmed": {
+      "look": "alarmed, brows knit, mouth open"
+    },
+    "suit-annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "suit-confused": {
+      "look": "confused, eyes closed, lips in a small o, sweating"
+    },
+    "suit-eerie": {
+      "look": "eerie, a blank stare from a shadowed face, sweating"
+    },
+    "suit-exasperated": {
+      "look": "exasperated, eyes shut, brows furrowed, mouth open"
+    },
+    "suit-flustered": {
+      "look": "flustered, blushing, eyes shut, an open smile, sweating"
+    },
+    "suit-gloomy": {
+      "look": "gloomy, eyes shut, face shadowed, a thin smile, sweating"
+    },
+    "suit-grinning": {
+      "look": "grinning with eyes shut, a wide toothy smile"
+    },
+    "suit-happy": {
+      "look": "happy, eyes closed, a calm smile"
+    },
+    "suit-neutral": {
+      "look": "neutral, eyes open, a soft smile"
+    },
+    "suit-sheepish": {
+      "look": "sheepish, eyes shut, an open smile, a sweat drop"
+    },
+    "suit-smug": {
+      "look": "smug, eyes closed, one brow raised, a small smile"
+    },
+    "suit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "suit-thinking": {
+      "look": "thinking, eyes closed, lips in a small o"
+    },
+    "suit-troubled": {
+      "look": "troubled, eyes closed, brows furrowed, lips pressed"
+    },
+    "suit-wink": {
+      "look": "wink, a bright toothy grin"
+    },
+    "suit-worried": {
+      "look": "worried, a nervous smile, a sweat drop"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-alarmed": {
+      "look": "alarmed, brows knit, mouth open"
+    },
+    "swimsuit-angry": {
+      "look": "angry, blank white eyes, shouting, nose scrunched"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "swimsuit-awkward": {
+      "look": "awkward, winking, an open smile, a sweat drop"
+    },
+    "swimsuit-eerie": {
+      "look": "eerie, a blank stare from a shadowed face, sweating"
+    },
+    "swimsuit-exasperated": {
+      "look": "exasperated, eyes shut, brows furrowed, mouth open"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, a wide toothy grin"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing, eyes shut, an open smile, sweating"
+    },
+    "swimsuit-gloomy": {
+      "look": "gloomy, eyes shut, face shadowed, a thin smile, sweating"
+    },
+    "swimsuit-grinning": {
+      "look": "grinning with eyes shut, a wide toothy smile"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes closed, a calm smile"
+    },
+    "swimsuit-menacing": {
+      "look": "menacing, face shadowed, a half-lidded smirk"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, eyes open, a soft smile"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, eyes shut, an open smile, a sweat drop"
+    },
+    "swimsuit-sly": {
+      "look": "sly, one brow raised, a crooked smile"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes closed, one brow raised, a small smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-thinking": {
+      "look": "thinking, eyes closed, lips in a small o"
+    },
+    "swimsuit-troubled": {
+      "look": "troubled, eyes closed, brows furrowed, lips pressed"
+    },
+    "swimsuit-wink": {
+      "look": "wink, a bright toothy grin"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous smile, a sweat drop"
+    },
+    "thinking": {
+      "look": "thinking, eyes closed, lips in a small o"
+    },
+    "troubled": {
+      "look": "troubled, eyes closed, brows furrowed, lips pressed"
+    },
+    "wink": {
+      "look": "wink, a bright toothy grin"
+    },
+    "worried": {
+      "look": "worried, a nervous smile, a sweat drop"
+    }
+  }
+}

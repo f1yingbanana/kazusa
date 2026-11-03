@@ -1,0 +1,116 @@
+{
+  "outfits": {
+    "idol": "a frilly pink-and-brown idol dress, a pink bear-eared beret with donut ornaments",
+    "swimsuit": "a lavender bikini under an open white shirt and black vest, goggles on the head"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, shouting with mouth wide open"
+    },
+    "confused": {
+      "look": "confused, a bead of sweat, lips parted"
+    },
+    "dazed": {
+      "look": "dazed, blank dot eyes, a sweaty open smile"
+    },
+    "happy": {
+      "look": "happy, saluting with a gentle closed-mouth smile"
+    },
+    "idol-angry": {
+      "look": "angry, shouting with mouth wide open"
+    },
+    "idol-confused": {
+      "look": "confused, a bead of sweat, lips parted"
+    },
+    "idol-dazed": {
+      "look": "dazed, blank dot eyes, a sweaty open smile"
+    },
+    "idol-flustered": {
+      "look": "flustered, eyes squeezed shut, wailing"
+    },
+    "idol-happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "idol-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "idol-pouting": {
+      "look": "pouting, brows furrowed, lips pressed tight"
+    },
+    "idol-proud": {
+      "look": "proud, eyes closed, a satisfied smile"
+    },
+    "idol-sad": {
+      "look": "sad, eyes squeezed shut, a wobbly frown"
+    },
+    "idol-sheepish": {
+      "look": "sheepish, brows raised, a small awkward smile"
+    },
+    "idol-shy": {
+      "look": "shy, blushing deeply, a wobbly smile"
+    },
+    "idol-surprised": {
+      "look": "surprised, eyes round, mouth a tiny o"
+    },
+    "idol-worried": {
+      "look": "worried, brows raised, mouth open in alarm"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pouting": {
+      "look": "pouting, brows furrowed, lips pressed tight"
+    },
+    "proud": {
+      "look": "proud, eyes closed, a satisfied smile"
+    },
+    "sad": {
+      "look": "sad, eyes squeezed shut, a wobbly frown"
+    },
+    "surprised": {
+      "look": "surprised, eyes round, mouth a tiny o"
+    },
+    "swimsuit-angry": {
+      "look": "angry, shouting with mouth wide open"
+    },
+    "swimsuit-confused": {
+      "look": "confused, a bead of sweat, lips parted"
+    },
+    "swimsuit-dazed": {
+      "look": "dazed, blank dot eyes, a sweaty open smile"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, eyes squeezed shut, wailing"
+    },
+    "swimsuit-happy": {
+      "look": "happy, holding a red whistle, a gentle smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, brows furrowed, lips pressed tight"
+    },
+    "swimsuit-proud": {
+      "look": "proud, eyes closed, a satisfied smile"
+    },
+    "swimsuit-sad": {
+      "look": "sad, eyes squeezed shut, a wobbly frown"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, brows raised, a small awkward smile"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing deeply, a wobbly smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes round, mouth a tiny o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth open in alarm"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open in alarm"
+    }
+  }
+}

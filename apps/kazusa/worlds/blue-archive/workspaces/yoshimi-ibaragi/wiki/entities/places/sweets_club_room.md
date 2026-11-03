@@ -1,13 +1,9 @@
 ---
 place_id: sweets_club_room
-affinity: 9.8
-last_visited: "2026-10-21"
-relation: "workspace"
+name: Sweets Club Room
+learned: always known
 ---
 
-# Sweets Club Room (Yoshimi's Perspective)
-
-My office. The wooden table is where all major dessert operations are planned.
-Today I hosted a baking workshop and a budget meeting here.
-
-## Open threads
+Our room, our oven, our long table where every serious dessert decision gets
+made. The president's chair is still empty. Not that I've been eyeing it. Much.
+After class this is where I end up, every single day.

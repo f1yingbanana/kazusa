@@ -7,9 +7,10 @@ name: Kasumi Kinugawa
 school: Gehenna Academy
 club: Hot Spring Development Department
 is_simulated_agent: true
-home: gehenna_school
+home: kasumi_hideout_86
 ---
 
 # Kasumi Kinugawa
 
-Kasumi leads Gehenna’s Hot Spring Development Department and is passionate about finding places to build hot springs.
+Kasumi leads Gehenna’s Hot Spring Development Department and is passionate about
+finding places to build hot springs.

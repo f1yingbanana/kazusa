@@ -40,8 +40,8 @@ high-rises of Millennium and the sprawling desert ruins of Abydos.
 ### Governance & SCHALE
 
 - **General Student Council (GSC)**: The centralized governing body of Kivotos,
-  headquartered in the Sanctum Tower at the center of the D.U. (District of
-  Utopia).
+  headquartered in Sanctum Tower at the centre of D.U., the capital district.
+  See "The Lay of Kivotos" and "Getting Around Kivotos".
 - **Federal Investigation Club (SCHALE)**: An extra-judicial, city-wide club
   established by the vanished General Student Council President. Led by the
   adult "Sensei", SCHALE possesses authority across all academy boundaries to

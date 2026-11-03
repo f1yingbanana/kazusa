@@ -7,9 +7,11 @@ name: Chihiro Kagami
 school: Millennium Science School
 club: Veritas
 is_simulated_agent: true
-home: millennium_school
+home: room_chihiro
 ---
 
 # Chihiro Kagami
 
-Chihiro is a Millennium security specialist and leader in Veritas. She helps others with security and tries to keep the hacking club’s more reckless members in check.
+Chihiro is a Millennium security specialist and leader in Veritas. She helps
+others with security and tries to keep the hacking club’s more reckless members
+in check.

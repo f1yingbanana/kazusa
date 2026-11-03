@@ -5,10 +5,11 @@ id: entity.place.dorm_room_airi
 place_id: dorm_room_airi
 name: "Airi's Room"
 aliases: ["Airi's dorm room"]
-parent: trinity_dorm
+parent: trinity_dorm_upstairs
+entry_minutes: 1
 summary:
-  "Airi's private room: neat shelves of tea tins, a planner, mint-green
-  everything. Locked when she's out; she opens to a friend's knock."
+  "Second-floor room: neat shelves of tea tins, a planner, mint green
+  everywhere; locked when she's out, but she opens to a friend's knock."
 renown: private
 ---
 

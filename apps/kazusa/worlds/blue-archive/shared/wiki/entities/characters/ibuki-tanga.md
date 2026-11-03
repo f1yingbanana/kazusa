@@ -7,9 +7,10 @@ name: Ibuki Tanga
 school: Gehenna Academy
 club: Pandemonium Society
 is_simulated_agent: true
-home: gehenna_school
+home: room_ibuki
 ---
 
 # Ibuki Tanga
 
-Ibuki is a young Gehenna student and member of the Pandemonium Society. She enjoys stuffed animals, pudding and mathematics.
+Ibuki is a young Gehenna student and member of the Pandemonium Society. She
+enjoys stuffed animals, pudding and mathematics.

@@ -7,9 +7,10 @@ name: Mimori Mizuha
 school: Hyakkiyako Alliance Academy
 club: Etiquette Training Society
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_mimori
 ---
 
 # Mimori Mizuha
 
-Mimori helps manage Hyakkiyako’s Etiquette Training Society and practices cooking, sewing and traditional manners.
+Mimori helps manage Hyakkiyako’s Etiquette Training Society and practices
+cooking, sewing and traditional manners.

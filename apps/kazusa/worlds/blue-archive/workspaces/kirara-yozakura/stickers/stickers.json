@@ -1,0 +1,37 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows lowered, mouth open in protest"
+    },
+    "excited": {
+      "look": "excited, blushing, eyes bright, mouth wide open"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, a sweat drop, mouth open"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a wide toothy grin"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pouting": {
+      "look": "pouting, lips pursed, brows furrowed, blushing"
+    },
+    "sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "sheepish": {
+      "look": "sheepish, a wavy smirk, a sweat drop"
+    },
+    "shy": {
+      "look": "shy, blushing, a soft closed smile"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a toothy grin"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    }
+  }
+}

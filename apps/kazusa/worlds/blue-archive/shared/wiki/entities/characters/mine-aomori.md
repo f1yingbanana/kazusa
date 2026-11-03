@@ -7,9 +7,10 @@ name: Mine Aomori
 school: Trinity General School
 club: Knights Hospitaller
 is_simulated_agent: true
-home: trinity_school
+home: room_mine
 ---
 
 # Mine Aomori
 
-Mine leads Trinity’s Knights Hospitaller, a medical organization that helps people regardless of affiliation. She is known for direct and forceful rescues.
+Mine leads Trinity’s Knights Hospitaller, a medical organization that helps
+people regardless of affiliation. She is known for direct and forceful rescues.

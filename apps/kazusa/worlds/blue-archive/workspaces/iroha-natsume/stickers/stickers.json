@@ -1,0 +1,146 @@
+{
+  "outfits": {
+    "swimsuit": "a pink frilled one-piece swimsuit, a white neck ribbon and a straw sun hat with white roses",
+    "pirate": "a pink frilled one-piece swimsuit, a black bandana and a black-and-red captain's coat"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "confused": {
+      "look": "confused, brows raised, lips parted, blushing"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wobbling"
+    },
+    "neutral": {
+      "look": "neutral, half-lidded eyes, a book raised to the chin"
+    },
+    "pirate-angry": {
+      "look": "angry, brows furrowed, mouth open shouting"
+    },
+    "pirate-annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "pirate-confused": {
+      "look": "confused, brows raised, lips parted, blushing"
+    },
+    "pirate-excited": {
+      "look": "excited, eyes bright, mouth open wide"
+    },
+    "pirate-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wobbling, sweating"
+    },
+    "pirate-gloomy": {
+      "look": "gloomy, eyes hidden in a dark shadow"
+    },
+    "pirate-happy": {
+      "look": "happy, half-lidded eyes, a relaxed open smile"
+    },
+    "pirate-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pirate-neutral": {
+      "look": "neutral, a calm half-lidded look"
+    },
+    "pirate-sad": {
+      "look": "sad, brows tilted, a small frown"
+    },
+    "pirate-sheepish": {
+      "look": "sheepish, a toothy grimace, a nervous sweat"
+    },
+    "pirate-shy": {
+      "look": "shy, blushing, lips pressed together"
+    },
+    "pirate-skeptical": {
+      "look": "skeptical, half-lidded eyes, a small frown"
+    },
+    "pirate-sleepy": {
+      "look": "sleepy, eyes closed, mouth relaxed"
+    },
+    "pirate-smug": {
+      "look": "smug, eyes narrowed, a slight smile"
+    },
+    "pirate-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "pirate-teasing": {
+      "look": "teasing, half-lidded eyes, a lopsided grin"
+    },
+    "pirate-weary": {
+      "look": "weary, eyes closed, lips pursed small"
+    },
+    "pirate-worried": {
+      "look": "worried, blushing, mouth tense and wavering"
+    },
+    "sheepish": {
+      "look": "sheepish, a toothy grimace, a faint blush"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, mouth relaxed"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a sly little smile"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, lips in a small o"
+    },
+    "swimsuit-angry": {
+      "look": "angry, brows furrowed, mouth open shouting"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows furrowed, a flat frown"
+    },
+    "swimsuit-confused": {
+      "look": "confused, brows raised, lips parted, blushing"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, mouth open wide"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wobbling, sweating"
+    },
+    "swimsuit-gloomy": {
+      "look": "gloomy, eyes hidden in a dark shadow"
+    },
+    "swimsuit-happy": {
+      "look": "happy, half-lidded eyes, a relaxed open smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a calm half-lidded look"
+    },
+    "swimsuit-sad": {
+      "look": "sad, brows tilted, a small frown"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a toothy grimace, a nervous sweat"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, lips pressed together"
+    },
+    "swimsuit-skeptical": {
+      "look": "skeptical, half-lidded eyes, a small frown"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed, mouth relaxed"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a slight smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "swimsuit-teasing": {
+      "look": "teasing, half-lidded eyes, a lopsided grin"
+    },
+    "swimsuit-weary": {
+      "look": "weary, eyes closed, lips pursed small"
+    },
+    "swimsuit-worried": {
+      "look": "worried, blushing, mouth tense and wavering"
+    }
+  }
+}

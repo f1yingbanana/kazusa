@@ -7,9 +7,10 @@ name: Kurumi Takakura
 school: SRT Special Academy
 club: FOX Platoon
 is_simulated_agent: true
-home: srt_training_facility
+home: room_kurumi
 ---
 
 # Kurumi Takakura
 
-Kurumi is a former SRT FOX Platoon point member who carries a protective shield and takes her teammates’ safety seriously.
+Kurumi is a former SRT FOX Platoon point member who carries a protective shield
+and takes her teammates’ safety seriously.

@@ -1,0 +1,141 @@
+{
+  "outfits": {
+    "suit": "a dark navy suit jacket over a white collared shirt with a magenta tie",
+    "dress": "a low-cut wine-red party dress, a white fur stole, a black choker bow and a black bow hairband",
+    "newyear": "a white floral kimono with a dark fur collar and a pink blossom hair ornament"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "dress-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "dress-excited": {
+      "look": "excited, a fanged open grin, brows angled"
+    },
+    "dress-grinning": {
+      "look": "grinning, a toothy smile, eyes half-lidded"
+    },
+    "dress-happy": {
+      "look": "happy, a small smile, fingers raised to the cheek"
+    },
+    "dress-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "dress-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "dress-scheming": {
+      "look": "scheming, a toothy grin, brows angled sharply"
+    },
+    "dress-sheepish": {
+      "look": "sheepish, a nervous sweat, teeth showing"
+    },
+    "dress-shy": {
+      "look": "shy, blushing, wide eyes, lips pursed"
+    },
+    "dress-smug": {
+      "look": "smug, eyes narrowed, a blushing smile"
+    },
+    "dress-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "excited": {
+      "look": "excited, a fanged open grin, brows angled"
+    },
+    "grinning": {
+      "look": "grinning, a wide toothy smile, eyes narrowed"
+    },
+    "happy": {
+      "look": "happy, blushing, mouth open in a smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "newyear-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "newyear-happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "newyear-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "newyear-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "newyear-scheming": {
+      "look": "scheming, a toothy grin, brows angled sharply"
+    },
+    "newyear-sheepish": {
+      "look": "sheepish, a nervous sweat, an awkward open smile"
+    },
+    "newyear-smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "newyear-surprised": {
+      "look": "surprised, eyes open, mouth a tiny o"
+    },
+    "newyear-worried": {
+      "look": "worried, brows tilted, mouth a small o"
+    },
+    "scheming": {
+      "look": "scheming, a toothy grin, brows angled sharply"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes shut, brows drooping, mouth a small o"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a small closed-mouth smile"
+    },
+    "suit-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "suit-excited": {
+      "look": "excited, a fanged open grin, brows angled"
+    },
+    "suit-grinning": {
+      "look": "grinning, a wide toothy smile, eyes narrowed"
+    },
+    "suit-happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "suit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "suit-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "suit-scheming": {
+      "look": "scheming, a toothy grin, brows angled sharply"
+    },
+    "suit-sheepish": {
+      "look": "sheepish, a nervous sweat, an open smile"
+    },
+    "suit-sleepy": {
+      "look": "sleepy, eyes shut, blushing, mouth wide open in a yawn"
+    },
+    "suit-smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "suit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "surprised": {
+      "look": "surprised, round eyes, mouth a small o"
+    },
+    "teasing": {
+      "look": "teasing, blushing, eyes half-lidded, a sly smile"
+    },
+    "worried": {
+      "look": "worried, brows tilted, mouth slightly open"
+    }
+  }
+}

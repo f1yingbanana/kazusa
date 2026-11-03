@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_school
-name: Millennium Science School
-learned: familiar place
+name: "Millennium Science School Campus"
+learned: always known
 ---
 
-A place I know well.
+I can walk from the Tower to any club room on this campus in under six minutes,
+which matters when a club is about to spend money it doesn't have.

@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: wildhunt_school
-name: Wild Hunt Academy of Arts
-learned: familiar place
+name: "Wild Hunt Academy Fortress"
+learned: always known
 ---
 
-A place I know well.
+A fortress built to keep things out, run by people who want to keep us in. Walls
+are just a design problem. Fufu.

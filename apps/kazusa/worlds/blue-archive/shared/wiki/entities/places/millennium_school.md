@@ -3,20 +3,23 @@ pageType: entity
 entityType: place
 id: entity.place.millennium_school
 place_id: millennium_school
-name: "Millennium Science School"
+name: "Millennium Science School Campus"
+aliases: ["Millennium Science School grounds"]
+parent: millennium_district
+entry_minutes: 6
 summary:
-  "Modern research buildings and glass towers form a busy technology-focused
-  campus."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 30 }
-    note: "Approximate interdistrict travel time for the simulation."
+  "Millennium's campus of glass towers and labs around the Tower and the Square;
+  gates 06:00–23:00, ID card after hours; busiest 08:00–08:30 and 16:00–18:00."
+renown: famous
 community: millennium_science_school
 ---
 
-# Millennium Science School
+# Millennium Science School Campus
 
-Millennium is a science and technology academy governed by Seminar. Its campus
-contains classrooms, laboratories and the workplaces of clubs ranging from
-Veritas to the Game Development Department.
+A campus that looks more like a research park than a school. Millennium Tower
+rises in the middle over Millennium Square; around it stand the Lecture
+Building, the long Clubhouse, the Study Area with its monorail stop, the
+Engineering hangar and, at the far end, the 12th Millennium Stadium. Paths are
+lined with charging posts and security cameras, and delivery drones cross
+overhead all day. The north gate faces the dormitory footbridge; the south gate
+opens toward the railway crossing and Euler Heights.

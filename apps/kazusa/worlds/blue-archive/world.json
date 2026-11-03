@@ -18,5 +18,9 @@
       "title": "Kivotos",
       "summary": "Students, schools, and one very busy Sensei."
     }
+  },
+  "renames": {
+    "black_market": "black_market_district",
+    "red_winter_office": "red_winter_secretariat"
   }
 }

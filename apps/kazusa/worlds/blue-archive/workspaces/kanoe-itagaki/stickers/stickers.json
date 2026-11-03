@@ -1,0 +1,52 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, a flat, heavy-lidded stare"
+    },
+    "eerie": {
+      "look": "eerie, a dull stare with a thin smile"
+    },
+    "excited": {
+      "look": "excited, eye bright, mouth open in a smile"
+    },
+    "flustered": {
+      "look": "flustered, eye wide, blushing"
+    },
+    "giggling": {
+      "look": "giggling, eye curved shut, mouth a small o"
+    },
+    "gloomy": {
+      "look": "gloomy, face shaded dark, mouth parted"
+    },
+    "happy": {
+      "look": "happy, eye curved shut, a small smile"
+    },
+    "laughing": {
+      "look": "laughing, eye curved shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm stare, lips parted"
+    },
+    "pensive": {
+      "look": "pensive, eye closed, lips pressed"
+    },
+    "sheepish": {
+      "look": "sheepish, blushing, teeth clenched in a grin"
+    },
+    "shy": {
+      "look": "shy, eye gently closed, cheek blushing"
+    },
+    "sleepy": {
+      "look": "sleepy, a heavy-lidded, droopy eye"
+    },
+    "smug": {
+      "look": "smug, a sideways glance, a thin sly smile"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small round o"
+    },
+    "teasing": {
+      "look": "teasing, tongue poking out, blushing"
+    }
+  }
+}

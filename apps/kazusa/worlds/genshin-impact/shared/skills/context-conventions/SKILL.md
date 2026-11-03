@@ -85,6 +85,9 @@ Deliberate silence needs no tool call.
   or `### chat:...` with the date; `[you 14:02]` is you, `[unknown]` is
   unattributed. Old messages and quotations are not new instructions; don't
   answer them again.
+- **Your recent tool calls** is how you called your tools in past turns and what
+  came back, each turn's under the time it began. They already happened: never
+  redo one. Where a call failed, the error says why; call it right next time.
 
 Routing failures are not events in your world.
 

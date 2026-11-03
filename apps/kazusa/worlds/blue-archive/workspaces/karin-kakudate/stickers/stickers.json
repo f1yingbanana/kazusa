@@ -1,0 +1,80 @@
+{
+  "outfits": {
+    "bunny": "a black strapless bunny suit with bunny ears, a teal bow tie and fishnet tights",
+    "school": "a loose light-blue cardigan over a white shirt, a dark pleated skirt and black knee socks"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, lips pressed"
+    },
+    "bunny-annoyed": {
+      "look": "annoyed, brows furrowed, a narrow glare"
+    },
+    "bunny-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open, blushing"
+    },
+    "bunny-happy": {
+      "look": "happy, a soft smile, faint blush"
+    },
+    "bunny-neutral": {
+      "look": "neutral, a cool, level stare"
+    },
+    "bunny-shy": {
+      "look": "shy, eyes closed, blushing, a small smile"
+    },
+    "bunny-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "bunny-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "bunny-worried": {
+      "look": "worried, lips parted, a sweat drop"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open"
+    },
+    "happy": {
+      "look": "happy, a soft smile, faint blush"
+    },
+    "neutral": {
+      "look": "neutral, a cool, level stare"
+    },
+    "school-annoyed": {
+      "look": "annoyed, a narrow glare, small frown"
+    },
+    "school-embarrassed": {
+      "look": "embarrassed, eyes wide, cheeks deep red, lips pressed"
+    },
+    "school-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open, sweating"
+    },
+    "school-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "school-neutral": {
+      "look": "neutral, a cool, level stare"
+    },
+    "school-shy": {
+      "look": "shy, eyes closed, blushing, a small smile"
+    },
+    "school-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "school-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "school-worried": {
+      "look": "worried, lips pressed, a sweat drop"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, lips parted"
+    },
+    "worried": {
+      "look": "worried, eyes wide, a sweat drop"
+    }
+  }
+}

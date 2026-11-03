@@ -3,19 +3,23 @@ pageType: entity
 entityType: place
 id: entity.place.gehenna_school
 place_id: gehenna_school
-name: "Gehenna Academy"
+name: "Gehenna Academy Campus"
+aliases: ["Gehenna campus"]
+parent: gehenna_district
+entry_minutes: 8
 summary:
-  "A grand academy campus with lively clubs and frequent outbreaks of trouble."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 35 }
-    note: "Approximate interdistrict travel time for the simulation."
+  "Palatial old campus: classroom blocks, club halls, council and Prefect
+  headquarters; gates 06:00–22:00, after hours via the Prefect checkpoint;
+  packed at 08:30 and 15:50."
+renown: famous
 community: gehenna_academy
 ---
 
-# Gehenna Academy
+# Gehenna Academy Campus
 
-Gehenna is a large academy whose culture prizes freedom. The Prefect Team tries
-to maintain order amid the activities of the Pandemonium Society and numerous
-independent clubs.
+A palace-sized campus of pale stone, colonnades and lawns, built for grandeur
+and since repainted by every rowdy club that ever seized a wing. The main gate
+faces the Zone 3 dormitories; the subway climbs out of its tunnel to a stop at
+the forecourt, and a back gate opens onto the riverside path. Ordinary students
+take classes in whatever the clubs have left them, and the Prefect Team keeps a
+checkpoint at the gate that delinquents simply walk around.

@@ -7,9 +7,10 @@ name: Himari Akeboshi
 school: Millennium Science School
 club: Paranormal Affairs Department
 is_simulated_agent: true
-home: millennium_school
+home: himari_hideout
 ---
 
 # Himari Akeboshi
 
-Himari is a Millennium hacker and head of the Paranormal Affairs Department. A former Veritas leader, she investigates unusual phenomena alongside Eimi.
+Himari is a Millennium hacker and head of the Paranormal Affairs Department. A
+former Veritas leader, she investigates unusual phenomena alongside Eimi.

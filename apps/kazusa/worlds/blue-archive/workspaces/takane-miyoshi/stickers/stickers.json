@@ -1,0 +1,58 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, eyes wide, brows furrowed, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in a retort"
+    },
+    "confused": {
+      "look": "confused, brows knit, mouth slightly open"
+    },
+    "content": {
+      "look": "content, eyes shut, a gentle smile"
+    },
+    "determined": {
+      "look": "determined, brows lowered, a fierce open grin, a bead of sweat"
+    },
+    "excited": {
+      "look": "excited, eyes wide, beaming, a bead of sweat"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, mouth wobbling"
+    },
+    "happy": {
+      "look": "happy, blushing, a bright open smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a steady look, lips pressed"
+    },
+    "pleased": {
+      "look": "pleased, relaxed eyes, a small open-mouthed smile"
+    },
+    "pouting": {
+      "look": "pouting, brows lowered, lips pressed, faintly blushing"
+    },
+    "sheepish": {
+      "look": "sheepish, brows tilted, a nervous sweat, mouth open"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, lips pressed"
+    },
+    "smug": {
+      "look": "smug, eyes closed, a faint knowing smile"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, mouth a small o"
+    },
+    "unimpressed": {
+      "look": "unimpressed, half-lidded eyes, lips flat"
+    },
+    "worried": {
+      "look": "worried, brows tilted, mouth slightly open"
+    }
+  }
+}

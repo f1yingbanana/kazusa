@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: trinity_school
-name: Trinity General School
-learned: familiar place
+name: "Trinity General School Campus"
+learned: always known
 ---
 
-A place I know well.
+Ten or so buildings in a day, ward, classroom, dining hall, back to the ward.
+It's a lot of walking! Good for the heart, though.

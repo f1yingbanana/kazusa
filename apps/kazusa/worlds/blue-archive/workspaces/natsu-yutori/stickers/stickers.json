@@ -1,0 +1,114 @@
+{
+  "outfits": {
+    "gym": "a navy-and-white zip-up track jacket with a high collar, and navy shorts",
+    "halloween": "a ragged black coat over a ribbed black turtleneck, a stitched face patch, a head bolt",
+    "band": "an oversized cream jacket over a white graphic T-shirt, hair in a bun with a yellow scrunchie"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes half-lidded, a small frown"
+    },
+    "band-annoyed": {
+      "look": "annoyed, eyes half-lidded, lips parted in a flat grimace"
+    },
+    "band-content": {
+      "look": "content, blushing, a small closed smile"
+    },
+    "band-dismayed": {
+      "look": "dismayed, a dark shadow over the eyes, mouth open"
+    },
+    "band-excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "band-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "band-neutral": {
+      "look": "neutral, a calm, blank look"
+    },
+    "band-sheepish": {
+      "look": "sheepish, a nervous sweat drop, lips slightly parted"
+    },
+    "band-shocked": {
+      "look": "shocked, blank white eyes, a blue shadow over the face, mouth agape"
+    },
+    "band-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "band-surprised": {
+      "look": "surprised, blushing, mouth a small o"
+    },
+    "excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, eyes half-lidded, a small frown"
+    },
+    "gym-excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "gym-neutral": {
+      "look": "neutral, a calm, blank look"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, a nervous sweat drop, lips slightly parted"
+    },
+    "gym-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "gym-surprised": {
+      "look": "surprised, lips parted in a small o"
+    },
+    "halloween-annoyed": {
+      "look": "annoyed, lips parted in a flat grimace"
+    },
+    "halloween-content": {
+      "look": "content, eyes calm, a small closed smile"
+    },
+    "halloween-dismayed": {
+      "look": "dismayed, a dark shadow over the eyes, mouth open"
+    },
+    "halloween-excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "halloween-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "halloween-neutral": {
+      "look": "neutral, a calm, blank look"
+    },
+    "halloween-sheepish": {
+      "look": "sheepish, a nervous sweat drop, lips slightly parted"
+    },
+    "halloween-shocked": {
+      "look": "shocked, blank white eyes, a blue shadow over the face, mouth agape"
+    },
+    "halloween-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "halloween-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "halloween-upset": {
+      "look": "upset, mouth open wide in protest"
+    },
+    "happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "neutral": {
+      "look": "neutral, a calm, blank look"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat drop, lips slightly parted"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "surprised": {
+      "look": "surprised, lips parted in a small o"
+    }
+  }
+}

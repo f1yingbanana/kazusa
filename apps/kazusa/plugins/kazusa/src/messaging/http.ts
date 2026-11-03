@@ -98,8 +98,8 @@ function observedChat({
             sequence: latest.sequence,
             senderId: latest.sender,
             senderName: latest.senderName,
-            ...(latest.params.type === "action"
-              ? { type: "action" as const }
+            ...(latest.params.type && latest.params.type !== "speech"
+              ? { type: latest.params.type }
               : {}),
           },
         }

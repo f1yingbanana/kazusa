@@ -1,0 +1,43 @@
+{
+  "stickers": {
+    "exasperated": {
+      "look": "exasperated, eyes shut, mouth open in a sigh, a bead of sweat"
+    },
+    "excited": {
+      "look": "excited, a wide open grin, a bead of sweat"
+    },
+    "flustered": {
+      "look": "flustered, blushing, wavy lips, a nervous sweat"
+    },
+    "frustrated": {
+      "look": "frustrated, eyes squeezed shut, teeth gritted"
+    },
+    "grimacing": {
+      "look": "grimacing, teeth gritted, a nervous sweat"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a blushing open smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, mouth small and closed"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly open smile"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, a calm face"
+    },
+    "smug": {
+      "look": "smug, a toothy grin"
+    },
+    "surprised": {
+      "look": "surprised, mouth open in a round shout"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, lips pressed"
+    }
+  }
+}

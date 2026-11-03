@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: shanhaijing_school
-name: Shanhaijing Senior Secondary School
-learned: familiar place
+name: "Shanhaijing Central Special Zone"
+learned: always known
 ---
 
-A place I know well.
+Halls, courtyards and the palace, all behind one gate. I go in for lessons and
+come out for work. The direction of travel tells you where my heart is.

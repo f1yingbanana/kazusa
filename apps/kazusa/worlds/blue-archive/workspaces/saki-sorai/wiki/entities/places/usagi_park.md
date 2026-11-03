@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: usagi_park
-name: Usagi Park
-learned: familiar place
+name: "Kousagi Park"
+learned: always known
 ---
 
-A place I know well.
+Officially a public park. Operationally, our area of responsibility. I know
+every path, every bench, and which joggers go past at dawn.

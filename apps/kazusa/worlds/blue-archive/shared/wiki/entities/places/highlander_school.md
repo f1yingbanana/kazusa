@@ -3,19 +3,29 @@ pageType: entity
 entityType: place
 id: entity.place.highlander_school
 place_id: highlander_school
-name: "Highlander Railroad Academy"
+name: "Highlander Station Campus"
+aliases: ["Highlander campus"]
+parent: du_downtown
+entry_minutes: 4
 summary:
-  "A railway-focused academy whose students keep trains and freight moving
-  across their network."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 40 }
-    note: "Approximate interdistrict travel time for the simulation."
+  "Highlander Railroad Academy's offices, classrooms and crew quarters in the
+  east wing of D.U. Central Station; staff badges past the lobby."
 community: highlander_railroad_academy
+connections:
+  - to: du_central_station
+    ways:
+      - { by: walk, minutes: 2 }
+    note: "A staff corridor straight onto the concourse."
 ---
 
-# Highlander Railroad Academy
+# Highlander Station Campus
 
-Highlander is organized around its rail operations. Its supervisory office,
-control center and freight department each have a role in running the network.
+Highlander Railroad Academy governs rail lines rather than a district, so it
+lives inside its busiest station: the east wing of D.U. Central Station, five
+floors of offices, lecture rooms and crew quarters with timetables on every
+wall. The floors hum when expresses pass. Students in conductor caps hurry
+between shifts; the Central Control Center watches the whole network from its
+operations floor, the Supervisory Office watches the Control Center, and the
+Freight Logistics Department keeps everything running from the freight yard down
+the tracks. The academy is owned by a corporate group, and its factions compete
+for lines on a points system.

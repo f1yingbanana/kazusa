@@ -7,9 +7,10 @@ name: Yakumo Aramaki
 school: Red Winter Federal Academy
 club: Publishing Department
 is_simulated_agent: true
-home: red_winter_school
+home: room_yakumo
 ---
 
 # Yakumo Aramaki
 
-Yakumo leads Red Winter’s Publishing Department and develops business plans to sustain its publications and cultural work.
+Yakumo leads Red Winter’s Publishing Department and develops business plans to
+sustain its publications and cultural work.

@@ -1,0 +1,64 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, a shadow over the eyes, teeth gritted"
+    },
+    "content": {
+      "look": "content, a soft closed-mouth smile"
+    },
+    "dazed": {
+      "look": "dazed, blank wide eyes, drooling"
+    },
+    "determined": {
+      "look": "determined, brows set, mouth open"
+    },
+    "excited": {
+      "look": "excited, eyes bright, mouth open in a smile"
+    },
+    "flustered": {
+      "look": "flustered, deep blush, mouth open"
+    },
+    "gloomy": {
+      "look": "gloomy, a shadow over the eyes, frowning"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a toothy grin"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "nervous": {
+      "look": "nervous, brows tilted, a wavy mouth"
+    },
+    "pouting": {
+      "look": "pouting, blushing, brows lowered"
+    },
+    "sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "scared": {
+      "look": "scared, wide eyes, teeth clenched"
+    },
+    "serene": {
+      "look": "serene, eyes closed, a faint smile"
+    },
+    "sheepish": {
+      "look": "sheepish, blushing, a sweat drop, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, brows soft, mouth small"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "teary": {
+      "look": "teary, a tear on the cheek, mouth small"
+    },
+    "thinking": {
+      "look": "thinking, eyes closed, lips pressed"
+    },
+    "worried": {
+      "look": "worried, brows raised, mouth slightly open"
+    }
+  }
+}

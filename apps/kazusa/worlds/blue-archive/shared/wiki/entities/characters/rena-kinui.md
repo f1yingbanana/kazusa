@@ -7,9 +7,10 @@ name: Rena Kinui
 school: Wild Hunt Academy of Arts
 club: Occult Research Society
 is_simulated_agent: true
-home: wildhunt_school
+home: wildhunt_room404
 ---
 
 # Rena Kinui
 
-Rena is a Wild Hunt fashion student and the youngest member of the Occult Research Society. She enjoys sewing and making accessories.
+Rena is a Wild Hunt fashion student and the youngest member of the Occult
+Research Society. She enjoys sewing and making accessories.

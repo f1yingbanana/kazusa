@@ -1,0 +1,40 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes half-lidded, a flat stare"
+    },
+    "bored": {
+      "look": "bored, eyes half-lidded, mouth hanging slightly open"
+    },
+    "calm": {
+      "look": "calm, eyes softly closed, mouth small"
+    },
+    "happy": {
+      "look": "happy, a faint soft smile"
+    },
+    "neutral": {
+      "look": "neutral, a steady wide-eyed look, mouth small"
+    },
+    "pleased": {
+      "look": "pleased, eyes shut in flat lines, mouth a tiny dash"
+    },
+    "sheepish": {
+      "look": "sheepish, a small sweat drop, mouth slightly open"
+    },
+    "shy": {
+      "look": "shy, cheeks deeply blushing, a small sweat drop"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes shut, mouth open in a little yawn"
+    },
+    "sulking": {
+      "look": "sulking, eyes closed, a small frown"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "worried": {
+      "look": "worried, a wobbly little mouth"
+    }
+  }
+}

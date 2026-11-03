@@ -1,0 +1,43 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, brows lowered, mouth open in protest"
+    },
+    "annoyed": {
+      "look": "annoyed, brows lowered, a small frown"
+    },
+    "confused": {
+      "look": "confused, brows knit, lips slightly parted"
+    },
+    "content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, eyes teary, mouth wobbling"
+    },
+    "grinning": {
+      "look": "grinning with eyes shut, teeth showing, blushing"
+    },
+    "happy": {
+      "look": "happy, a soft closed-lipped smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, blushing, a nervous sweat"
+    },
+    "shy": {
+      "look": "shy, blushing, one eye shut, lips pursed"
+    },
+    "surprised": {
+      "look": "surprised, blank white eyes, mouth tiny"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

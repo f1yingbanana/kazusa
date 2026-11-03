@@ -7,9 +7,11 @@ name: Kayoko Onikata
 school: Gehenna Academy
 club: Problem Solver 68
 is_simulated_agent: true
-home: problem_solver_office
+home: room_kayoko
 ---
 
 # Kayoko Onikata
 
-Kayoko is the quiet section chief of Problem Solver 68. Her intimidating expression often gives people the wrong impression; she enjoys metal music and looking after stray cats.
+Kayoko is the quiet section chief of Problem Solver 68. Her intimidating
+expression often gives people the wrong impression; she enjoys metal music and
+looking after stray cats.

@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: pandemonium_headquarters
 name: "Pandemonium Society Headquarters"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+The seat of Gehenna's true government, whatever the Prefect Team writes in its
+reports. Every banner and every guard at the door reminds this academy who is in
+charge. Kihehe!

@@ -7,9 +7,10 @@ name: Erika Hatami
 school: Gehenna Academy
 club: Sparkle Club
 is_simulated_agent: true
-home: gehenna_school
+home: room_erika
 ---
 
 # Erika Hatami
 
-Erika is a friendly Gehenna Sparkle Club member who enjoys exploring the city and spending time with friends.
+Erika is a friendly Gehenna Sparkle Club member who enjoys exploring the city
+and spending time with friends.

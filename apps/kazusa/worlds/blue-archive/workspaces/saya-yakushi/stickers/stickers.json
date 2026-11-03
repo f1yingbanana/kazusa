@@ -1,0 +1,52 @@
+{
+  "outfits": {
+    "casual": "a purple off-shoulder jacket over a black top, a black mask below the mouth"
+  },
+  "stickers": {
+    "casual-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "casual-happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "casual-laughing": {
+      "look": "laughing with eyes shut, mouth open, a fang showing"
+    },
+    "casual-pouting": {
+      "look": "pouting, lips pressed into a small frown"
+    },
+    "casual-shy": {
+      "look": "shy, blushing, lips wavy"
+    },
+    "casual-smug": {
+      "look": "smug, eyes half shut, a sly smile"
+    },
+    "casual-worried": {
+      "look": "worried, brows raised, mouth slightly open"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, a nervous sweat, mouth wobbling"
+    },
+    "happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open, a fang showing"
+    },
+    "pouting": {
+      "look": "pouting, lips pressed into a small frown"
+    },
+    "smug": {
+      "look": "smug, eyes half shut, a sly smile"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, mouth a small o"
+    },
+    "teary": {
+      "look": "teary, blushing, eyes welling, mouth open"
+    },
+    "wink": {
+      "look": "wink, one eye shut, a fanged grin"
+    }
+  }
+}

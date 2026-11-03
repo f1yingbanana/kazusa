@@ -7,9 +7,10 @@ name: Fuyu Wakasa
 school: Wild Hunt Academy of Arts
 club: Free Trade Cartel
 is_simulated_agent: true
-home: wildhunt_school
+home: wildhunt_room402
 ---
 
 # Fuyu Wakasa
 
-Fuyu is a Wild Hunt media artist and the self-styled sales manager of the Free Trade Cartel. She creates art using discarded electronics.
+Fuyu is a Wild Hunt media artist and the self-styled sales manager of the Free
+Trade Cartel. She creates art using discarded electronics.

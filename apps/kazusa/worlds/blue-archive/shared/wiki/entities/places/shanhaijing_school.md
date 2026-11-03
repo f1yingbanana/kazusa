@@ -3,20 +3,19 @@ pageType: entity
 entityType: place
 id: entity.place.shanhaijing_school
 place_id: shanhaijing_school
-name: "Shanhaijing Senior Secondary School"
+name: "Shanhaijing Central Special Zone"
+aliases: ["Shanhaijing campus"]
+parent: shanhaijing_district
+entry_minutes: 8
 summary:
-  "Tiled roofs, pavilions and garden paths mark an academy district shaped by
-  trade and tradition."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 50 }
-    note: "Approximate interdistrict travel time for the simulation."
+  "The inner academy behind the Inner Gate: lecture hall, the old palace, labs,
+  gardens; pass holders only, gates 06:00–23:00, guards at every arch."
+renown: known
 community: shanhaijing_senior_secondary_school
 ---
 
-# Shanhaijing Senior Secondary School
+# Shanhaijing Central Special Zone
 
-Shanhaijing combines old traditions with active commerce. Visitors can approach
-public areas, but access farther into the school may be restricted by its
-closed-door policy.
+The heart of Shanhaijing, behind its walls: halls with curved roofs, stone
+courtyards, a palace complex and gardens. Only students and invited guests may
+come in, and Genryumon guards stand at the arches.

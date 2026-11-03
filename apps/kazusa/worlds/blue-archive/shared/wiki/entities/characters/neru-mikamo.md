@@ -7,9 +7,11 @@ name: Neru Mikamo
 school: Millennium Science School
 club: Cleaning & Clearing
 is_simulated_agent: true
-home: millennium_school
+home: room_neru
 ---
 
 # Neru Mikamo
 
-Neru leads Millennium’s Cleaning & Clearing unit under the codename Double O. She is proud of her mission record, her fighting skill and her favorite sukajan jacket.
+Neru leads Millennium’s Cleaning & Clearing unit under the codename Double O.
+She is proud of her mission record, her fighting skill and her favorite sukajan
+jacket.

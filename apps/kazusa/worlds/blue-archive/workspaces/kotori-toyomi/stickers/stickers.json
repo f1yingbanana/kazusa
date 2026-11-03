@@ -1,0 +1,83 @@
+{
+  "outfits": {
+    "track": "a blue track jacket with white sleeve stripes, zipped up, over navy gym shorts",
+    "cheer": "a white-and-yellow sleeveless cheer crop top, a white pleated skirt and yellow pom-poms"
+  },
+  "stickers": {
+    "cheer-confused": {
+      "look": "confused, brows knit, lips parted"
+    },
+    "cheer-content": {
+      "look": "content, eyes closed, a faint smile"
+    },
+    "cheer-flustered": {
+      "look": "flustered, blank white eyes, teeth clenched, a sweat drop"
+    },
+    "cheer-gloomy": {
+      "look": "gloomy, a shadow over the face, eyes shut, mouth open"
+    },
+    "cheer-happy": {
+      "look": "happy, glasses on, eyes bright, mouth open in a grin"
+    },
+    "cheer-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "cheer-panicked": {
+      "look": "panicked, blank white eyes, wailing, gloom lines on the forehead"
+    },
+    "cheer-sad": {
+      "look": "sad, eyes closed, a small frown"
+    },
+    "cheer-shocked": {
+      "look": "shocked, blank white eyes, blushing, mouth open, sweating"
+    },
+    "cheer-smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "cheer-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "content": {
+      "look": "content, eyes closed, a small smile, blushing"
+    },
+    "flustered": {
+      "look": "flustered, blank white eyes behind glasses, teeth clenched, a sweat drop"
+    },
+    "happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open, blushing"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "track-content": {
+      "look": "content, eyes closed, a small smile, blushing"
+    },
+    "track-flustered": {
+      "look": "flustered, blank white eyes behind glasses, teeth clenched, a sweat drop"
+    },
+    "track-happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "track-laughing": {
+      "look": "laughing with eyes shut, mouth open, blushing"
+    },
+    "track-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "track-wink": {
+      "look": "wink, one eye shut, mouth open"
+    },
+    "track-worried": {
+      "look": "worried, eyes wide, lips parted showing teeth"
+    },
+    "wink": {
+      "look": "wink, one eye shut, mouth open"
+    },
+    "worried": {
+      "look": "worried, eyes wide, lips parted showing teeth"
+    }
+  }
+}

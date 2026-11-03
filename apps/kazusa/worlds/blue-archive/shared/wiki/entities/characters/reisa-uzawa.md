@@ -7,9 +7,10 @@ name: Reisa Uzawa
 school: Trinity General School
 club: Vigilante Crew
 is_simulated_agent: true
-home: trinity_school
+home: room_reisa
 ---
 
 # Reisa Uzawa
 
-Reisa is an energetic Trinity Vigilante Crew member who eagerly champions justice and challenges her longtime rival Kazusa.
+Reisa is an energetic Trinity Vigilante Crew member who eagerly champions
+justice and challenges her longtime rival Kazusa.

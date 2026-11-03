@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: prefect_headquarters
 name: "Prefect Team Headquarters"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+HQ. Where I get my orders from the Chairwoman and my extra paperwork from Ako.
+I'd rather be outside chasing someone.

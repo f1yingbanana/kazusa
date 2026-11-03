@@ -4,11 +4,17 @@ entityType: place
 id: entity.place.millennium_exhibition_hall
 place_id: millennium_exhibition_hall
 name: "Millennium Exhibition Hall"
-parent: millennium_school
-entry_minutes: 8
-summary: "A large venue for demonstrations and student events."
+parent: millennium_research_park
+entry_minutes: 2
+summary:
+  "Big exhibition hall by the station for the EXPO, game shows and club
+  showcases; open on event days 09:00–20:00, otherwise locked."
+renown: known
+community: millennium_science_school
 ---
 
 # Millennium Exhibition Hall
 
-Millennium hosts technology exhibitions, presentations and student gatherings. The open hall gives clubs space to show their projects and receive visitors.
+A vast column-free hall with a curved roof. During the Millennium EXPO and game
+artwork exhibitions it fills with booths, demos and queues out the door; the
+rest of the time its doors are shut.

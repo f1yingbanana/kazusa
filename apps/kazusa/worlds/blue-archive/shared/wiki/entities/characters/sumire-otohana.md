@@ -7,9 +7,10 @@ name: Sumire Otohana
 school: Millennium Science School
 club: Gym Training Department
 is_simulated_agent: true
-home: millennium_school
+home: room_sumire
 ---
 
 # Sumire Otohana
 
-Sumire leads Millennium’s Gym Training Department and is devoted to physical training.
+Sumire leads Millennium’s Gym Training Department and is devoted to physical
+training.

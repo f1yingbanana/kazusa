@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: school_library
-name: "Library"
-learned: familiar place
+name: "Trinity Central Library"
+learned: always known
 ---
 
-A place I know through my club.
+My desk! I've read every book on these shelves, so ask me anything. Please keep
+your voice down, though. And if you dog-ear a page... we'll be having a little
+talk.

@@ -7,9 +7,10 @@ name: Momiji Akiizumi
 school: Red Winter Federal Academy
 club: Knowledge Liberation Front
 is_simulated_agent: true
-home: red_winter_school
+home: room_momiji
 ---
 
 # Momiji Akiizumi
 
-Momiji is a Red Winter librarian and Knowledge Liberation Front member who collects and preserves books and fanzines.
+Momiji is a Red Winter librarian and Knowledge Liberation Front member who
+collects and preserves books and fanzines.

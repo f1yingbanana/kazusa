@@ -1,0 +1,85 @@
+{
+  "outfits": {
+    "magical": "a navy cropped jacket over a black leotard, green sailor collar, black gloves, a slim wand"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "flustered": {
+      "look": "flustered, blushing, mouth open"
+    },
+    "happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "magical-annoyed": {
+      "look": "annoyed, brows knit, mouth open in protest"
+    },
+    "magical-cocky": {
+      "look": "cocky, brows lowered, a fanged open-mouth grin"
+    },
+    "magical-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "magical-excited": {
+      "look": "excited, eyes bright, a wide open-mouth smile"
+    },
+    "magical-giddy": {
+      "look": "giddy, eyes squeezed into ><, mouth open"
+    },
+    "magical-grimacing": {
+      "look": "grimacing, teeth clenched, a nervous sweat"
+    },
+    "magical-happy": {
+      "look": "happy, eyes bright, mouth open"
+    },
+    "magical-hopeful": {
+      "look": "hopeful, brows raised, an open-mouth smile"
+    },
+    "magical-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "magical-mocking": {
+      "look": "mocking, eyes flat and half-lidded, mouth open"
+    },
+    "magical-neutral": {
+      "look": "neutral, a calm look, faint smile"
+    },
+    "magical-sad": {
+      "look": "sad, brows tilted, small frown"
+    },
+    "magical-sly": {
+      "look": "sly, eyes narrowed, a lopsided smirk"
+    },
+    "magical-smitten": {
+      "look": "smitten, a heart in one eye, sweating, mouth open"
+    },
+    "magical-smug": {
+      "look": "smug, eyes half-lidded, a small blushing smile"
+    },
+    "magical-surprised": {
+      "look": "surprised, mouth slightly open"
+    },
+    "magical-teasing": {
+      "look": "teasing, eyes narrowed, a fanged open-mouth grin"
+    },
+    "magical-uneasy": {
+      "look": "uneasy, brows knit, a nervous sweat, small frown"
+    },
+    "magical-worried": {
+      "look": "worried, brows raised, a nervous sweat, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, lips closed"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth a small o"
+    }
+  }
+}

@@ -2,8 +2,10 @@
 pageType: entity
 entityType: place
 place_id: wildhunt_school
-name: Wild Hunt Academy of Arts
-learned: familiar place
+name: "Wild Hunt Academy Fortress"
+learned: always known
 ---
 
-A place I know well.
+The whole fortress is stone! Walls, bastions, steps, everything! People see a
+school; I see a whole quarry somebody already stacked up really nicely. Best
+campus in Kivotos.

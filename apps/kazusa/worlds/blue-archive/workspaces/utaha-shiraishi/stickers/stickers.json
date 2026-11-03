@@ -1,0 +1,113 @@
+{
+  "outfits": {
+    "kimono": "a white-and-plum kimono with gold chrysanthemums, a flower hair ornament, and a handheld microphone",
+    "cheer": "a long black coat with blue trim, white gloves, white trousers, lace-up boots and a blue headband"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed sideways, lips flat"
+    },
+    "calm": {
+      "look": "calm, eyes closed, lips closed"
+    },
+    "cheer-annoyed": {
+      "look": "annoyed, half-lidded sideways glance, lips flat"
+    },
+    "cheer-calm": {
+      "look": "calm, eyes closed, lips closed"
+    },
+    "cheer-dazed": {
+      "look": "dazed, blank flat eyes, a faint smile"
+    },
+    "cheer-happy": {
+      "look": "happy, a bright open smile"
+    },
+    "cheer-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "cheer-nervous": {
+      "look": "nervous, a strained grin showing teeth"
+    },
+    "cheer-neutral": {
+      "look": "neutral, a steady look, lips closed"
+    },
+    "cheer-sad": {
+      "look": "sad, brows tilted, lips barely parted"
+    },
+    "cheer-sheepish": {
+      "look": "sheepish, brows tilted, a wavy mouth"
+    },
+    "cheer-sleepy": {
+      "look": "sleepy, eyes shut, mouth open in a small yawn"
+    },
+    "cheer-smug": {
+      "look": "smug, brows raised, a sly smile"
+    },
+    "cheer-surprised": {
+      "look": "surprised, eyes wide, lips parted"
+    },
+    "cheer-worried": {
+      "look": "worried, brows raised high, mouth open"
+    },
+    "confused": {
+      "look": "confused, eyes wide, mouth a small o"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "kimono-awkward": {
+      "look": "awkward, a nervous sweat, a wavy mouth"
+    },
+    "kimono-confused": {
+      "look": "confused, eyes wide, mouth a tiny wavy o"
+    },
+    "kimono-dismayed": {
+      "look": "dismayed, eyes shut, teeth gritted, gloom lines on a cheek"
+    },
+    "kimono-excited": {
+      "look": "excited, beaming, mouth open"
+    },
+    "kimono-flustered": {
+      "look": "flustered, blushing deeply, brows tilted"
+    },
+    "kimono-happy": {
+      "look": "happy, a gentle closed smile, holding a microphone"
+    },
+    "kimono-nervous": {
+      "look": "nervous, an open smile with a bead of sweat"
+    },
+    "kimono-peaceful": {
+      "look": "peaceful, eyes closed, a soft smile"
+    },
+    "kimono-sheepish": {
+      "look": "sheepish, blushing, a toothy grin"
+    },
+    "kimono-shy": {
+      "look": "shy, blushing, lips pressed"
+    },
+    "kimono-singing": {
+      "look": "singing with eyes shut, mouth open into the microphone"
+    },
+    "kimono-smug": {
+      "look": "smug, one brow raised, a sly smile"
+    },
+    "kimono-surprised": {
+      "look": "surprised, brows raised, mouth open"
+    },
+    "kimono-worried": {
+      "look": "worried, brows tilted, lips pressed"
+    },
+    "neutral": {
+      "look": "neutral, a steady, calm look, lips closed"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, lips parted mid-speech"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, lips parted"
+    },
+    "tired": {
+      "look": "tired, half-lidded eyes, lips slightly parted"
+    }
+  }
+}

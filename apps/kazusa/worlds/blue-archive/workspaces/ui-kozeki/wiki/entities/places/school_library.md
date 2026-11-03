@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: school_library
-name: "Library"
-learned: familiar place
+name: "Trinity Central Library"
+learned: always known
 ---
 
-A place I know through my club.
+The big library everyone uses. It's fine. Bright, well-lit, full of new books.
+Shimiko runs the desk. If you want something old, though, you come to me.

@@ -1,0 +1,169 @@
+{
+  "outfits": {
+    "track": "a navy-and-white zip-up track jacket with matching shorts",
+    "pool": "a plain navy one-piece swimsuit with white side panels",
+    "swimsuit": "a white frilled bikini with navy ties, round sunglasses pushed up on the head",
+    "racing": "a black-and-red one-shoulder racing dress with long black gloves, a choker and a headband"
+  },
+  "stickers": {
+    "confused": {
+      "look": "confused, swirly eyes, a nervous sweat, mouth open"
+    },
+    "excited": {
+      "look": "excited, blushing, mouth wide open"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, sweating"
+    },
+    "happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "laughing": {
+      "look": "laughing nervously, eyes shut, a sweat drop, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "pool-excited": {
+      "look": "excited, blushing, mouth wide open"
+    },
+    "pool-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "pool-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "pool-pouting": {
+      "look": "pouting, brows lowered, a small frown"
+    },
+    "pool-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "pool-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "pool-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "pouting": {
+      "look": "pouting, brows lowered, a small frown"
+    },
+    "racing-annoyed": {
+      "look": "annoyed, eyes narrowed, a small frown"
+    },
+    "racing-confused": {
+      "look": "confused, swirly eyes, a nervous sweat"
+    },
+    "racing-content": {
+      "look": "content, eyes shut, a soft smile"
+    },
+    "racing-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "racing-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open, sweating"
+    },
+    "racing-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "racing-laughing": {
+      "look": "laughing, eyes shut, a nervous sweat, mouth open"
+    },
+    "racing-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "racing-pleased": {
+      "look": "pleased, a small closed-mouth smile"
+    },
+    "racing-pouting": {
+      "look": "pouting, blushing, lips pursed"
+    },
+    "racing-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "racing-shy": {
+      "look": "shy, blushing, brows tilted"
+    },
+    "racing-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "racing-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "racing-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling open"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, lips wobbling"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-confused": {
+      "look": "confused, swirly eyes, a nervous sweat, mouth open"
+    },
+    "swimsuit-excited": {
+      "look": "excited, blushing, mouth wide open"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, blushing, mouth open"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing, eyes shut, a nervous sweat"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, lifting sunglasses off the head"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a nervous sweat, an open smile"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, brows tilted, lips pressed"
+    },
+    "teary": {
+      "look": "teary, eyes squeezed shut, a tear at the eye, mouth wide open"
+    },
+    "track-excited": {
+      "look": "excited, blushing, mouth wide open"
+    },
+    "track-happy": {
+      "look": "happy, eyes shut, mouth open in a smile"
+    },
+    "track-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "track-pouting": {
+      "look": "pouting, brows lowered, a small frown"
+    },
+    "track-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "track-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "track-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    }
+  }
+}

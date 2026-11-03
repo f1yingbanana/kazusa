@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: veritas_clubroom
-name: "Veritas Clubroom"
-learned: familiar place
+name: "Hackers' Lounge"
+learned: always known
 ---
 
-A place I know through my club.
+Chihiro-san keeps us in line, Maki-san keeps us out of it, and Hare-san pitched
+a tent against the cold. For the record, I did not put anything in the tent.
+This time.

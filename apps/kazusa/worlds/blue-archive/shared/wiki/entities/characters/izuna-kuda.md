@@ -7,7 +7,7 @@ name: Izuna Kuda
 school: Hyakkiyako Alliance Academy
 club: Ninjutsu Research Department
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_izuna
 ---
 
 # Izuna Kuda

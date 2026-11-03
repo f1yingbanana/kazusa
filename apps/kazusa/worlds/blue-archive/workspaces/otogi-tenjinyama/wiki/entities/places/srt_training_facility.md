@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: srt_training_facility
-name: Former SRT Training Facility
-learned: trained here
+name: "SRT Special Academy Campus"
+learned: always known
 ---
 
-A familiar training site from SRT.
+Where an instructor told me I had too much presence to be a sniper. Then I asked
+him how many targets I'd missed. The gates are sealed now. I still know three
+ways in.

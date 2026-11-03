@@ -12,4 +12,6 @@ home: game_development_room
 
 # Aris Tendou
 
-Aris is a first-year Millennium student and member of the Game Development Department. Found dormant in the ruins, she discovered games and friendship with the club.
+Aris is a first-year Millennium student and member of the Game Development
+Department. Found dormant in the ruins, she discovered games and friendship with
+the club.

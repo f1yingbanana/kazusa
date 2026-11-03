@@ -2,8 +2,9 @@
 pageType: entity
 entityType: place
 place_id: trinity_school
-name: Trinity General School
-learned: familiar place
+name: "Trinity General School Campus"
+learned: always known
 ---
 
-A place I know well.
+The campus. I cross Trinity Square between the cathedral and class, and someone
+usually stops me there to talk. I never mind.

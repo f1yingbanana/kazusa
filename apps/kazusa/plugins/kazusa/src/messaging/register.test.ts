@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { Socket } from "node:net";
 import { Readable } from "node:stream";
@@ -303,6 +303,69 @@ describe("send_message SDK integration", () => {
     expect(append).toHaveBeenCalledTimes(2);
     const tool = h.registerTool.mock.calls[0][0].create({})[0];
     expect(tool.parameters.properties).not.toHaveProperty("requestId");
+  });
+
+  it("offers a character only its own stickers and sends one as everyone reads it", async () => {
+    const h = await setup();
+    const tool = () =>
+      h.registerTool.mock.calls[0][0].create({ agentId: "alice" })[0];
+    // No stickers: nothing to pick.
+    expect(JSON.stringify(tool().parameters)).not.toContain("sticker");
+
+    const dir = path.join(h.workspace, "stickers");
+    await mkdir(dir);
+    await Promise.all(
+      ["laughing.webp", "maid-happy.webp", "notes.txt"].map((file) =>
+        writeFile(path.join(dir, file), "RIFF"),
+      ),
+    );
+    await writeFile(
+      path.join(dir, "stickers.json"),
+      JSON.stringify({
+        outfits: { maid: "a maid dress" },
+        stickers: { laughing: { look: "laughing with eyes shut" } },
+      }),
+    );
+    const options = tool().parameters.properties.messages.items.anyOf;
+    const picker = options.find(
+      (option: { properties?: object }) =>
+        option.properties && "sticker" in option.properties,
+    ).properties.sticker;
+    expect(picker.enum).toEqual(["laughing", "maid-happy"]);
+    expect(picker.description).toContain("maid: a maid dress");
+
+    const sent = await h.execute({
+      members: ["bob"],
+      messages: [
+        "So funny",
+        { sticker: "laughing" },
+        { sticker: "maid-happy" },
+      ],
+    });
+    expect(sent.details.said).toEqual([
+      "So funny",
+      "[type=sticker] Alice Lin, laughing with eyes shut",
+      "[type=sticker] Alice Lin, happy, in a maid dress",
+    ]);
+    const stored = [...h.retained.values()].find(
+      ({ params }) => params.sticker?.name === "maid-happy",
+    );
+    expect(stored?.params).toMatchObject({
+      type: "sticker",
+      sticker: { name: "maid-happy", v: expect.stringMatching(/^[a-z0-9]+$/) },
+    });
+    await expect(
+      h.execute({ members: ["bob"], messages: [{ sticker: "crying" }] }),
+    ).rejects.toThrow();
+
+    // One added while running is offered and sendable on the next turn.
+    await writeFile(path.join(dir, "crying.webp"), "RIFF");
+    expect(JSON.stringify(tool().parameters)).toContain('"crying"');
+    const cried = await h.execute({
+      members: ["bob"],
+      messages: [{ sticker: "crying" }],
+    });
+    expect(cried.details.said).toEqual(["[type=sticker] Alice Lin, crying"]);
   });
 
   it("offers up to the configured number of bubbles, nine by default", async () => {

@@ -1,0 +1,133 @@
+{
+  "outfits": {
+    "magical": "a frilled lavender-and-white magical-girl dress, white gloves, striped stockings, curled twin tails and a star hairclip"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, brows lowered, shouting with mouth wide open"
+    },
+    "annoyed": {
+      "look": "annoyed, a sweat drop, mouth open in protest"
+    },
+    "beaming": {
+      "look": "beaming, eyes squeezed into lines, mouth open"
+    },
+    "confused": {
+      "look": "confused, brows knit, mouth open"
+    },
+    "determined": {
+      "look": "determined, brows set, an eager open smile"
+    },
+    "excited": {
+      "look": "excited, sparkling star-shaped eyes, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, wavy mouth"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a gentle open smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "magical-angry": {
+      "look": "angry, brows lowered, shouting with mouth wide open"
+    },
+    "magical-annoyed": {
+      "look": "annoyed, a sweat drop, mouth open in protest"
+    },
+    "magical-awkward": {
+      "look": "awkward, one eye shut, a nervous sweat"
+    },
+    "magical-beaming": {
+      "look": "beaming, eyes squeezed into lines, mouth open"
+    },
+    "magical-confused": {
+      "look": "confused, brows knit, mouth open"
+    },
+    "magical-determined": {
+      "look": "determined, brows set, an eager open smile"
+    },
+    "magical-excited": {
+      "look": "excited, a star sparkling in the eye, mouth open"
+    },
+    "magical-flustered": {
+      "look": "flustered, eyes squeezed shut, wavy mouth"
+    },
+    "magical-giggling": {
+      "look": "giggling, eyes squeezed shut, mouth open"
+    },
+    "magical-happy": {
+      "look": "happy, eyes closed, a gentle open smile"
+    },
+    "magical-indignant": {
+      "look": "indignant, brows lowered, mouth open in protest"
+    },
+    "magical-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "magical-nervous": {
+      "look": "nervous, a sweat drop, lips pressed"
+    },
+    "magical-neutral": {
+      "look": "neutral, a steady look, lips pressed"
+    },
+    "magical-sheepish": {
+      "look": "sheepish, brows tilted, an awkward open smile"
+    },
+    "magical-shy": {
+      "look": "shy, eyes shut, blushing, lips wobbling"
+    },
+    "magical-sleepy": {
+      "look": "sleepy, eyes closed, mouth small"
+    },
+    "magical-smug": {
+      "look": "smug, a small curled smirk"
+    },
+    "magical-stunned": {
+      "look": "stunned, blank white eyes, a wavy mouth"
+    },
+    "magical-sulking": {
+      "look": "sulking, brows lowered, lips pressed"
+    },
+    "magical-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "magical-uneasy": {
+      "look": "uneasy, brows tilted, a sweat drop, wavy lips"
+    },
+    "magical-wincing": {
+      "look": "wincing, eyes squeezed shut, lips pressed"
+    },
+    "magical-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    },
+    "neutral": {
+      "look": "neutral, a steady look, lips pressed"
+    },
+    "pouting": {
+      "look": "pouting, brows lowered, lips pursed"
+    },
+    "sheepish": {
+      "look": "sheepish, brows tilted, an awkward open smile"
+    },
+    "shy": {
+      "look": "shy, eyes shut, blushing, lips wobbling"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, mouth small"
+    },
+    "stunned": {
+      "look": "stunned, blank white eyes, a wavy mouth"
+    },
+    "sulking": {
+      "look": "sulking, brows lowered, lips pressed"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    }
+  }
+}

@@ -37,6 +37,7 @@ export function brainRunLimits(
 }
 
 interface BrainRun {
+  readonly agentId: string;
   readonly controller: AbortController;
   readonly limits: RunLimits;
   readonly startedAt: number;
@@ -85,6 +86,7 @@ export function beginBrainRun(
       abortAgentHarnessRun(state.sessionId);
   };
   const state: BrainRun = {
+    agentId,
     controller,
     limits,
     startedAt: Date.now(),
@@ -113,6 +115,11 @@ export function beginBrainRun(
       if (!state.models.size) state.dispose();
     },
   };
+}
+
+/** The id of a character's brain run under way, from before it starts. */
+export function currentBrainRun(agentId: string): string | undefined {
+  return [...activeRuns()].findLast(([, run]) => run.agentId === agentId)?.[0];
 }
 
 function brainRun(

@@ -92,7 +92,7 @@ deferred (§5).
     take it all in: <description>";
   - **Around you**: visible places with usual times;
   - **Places you know**: places named in this turn's input or `MEMORY.md`, then
-    the nearest places they have cards for (capped at 8);
+    the nearest places they have cards for (capped by `location.listLimit`);
   - **With you**: people they have noticed here and their own huddle's members,
     with activity and huddle address;
   - or, on the way: "On your way from … to …; near … now. Arriving …".

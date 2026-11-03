@@ -7,9 +7,10 @@ name: Kikyou Kiryuu
 school: Hyakkiyako Alliance Academy
 club: Hyakkaryouran Resolution Council
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_kikyou
 ---
 
 # Kikyou Kiryuu
 
-Kikyou coordinates planning and intelligence for Hyakkiyako’s Hyakkaryouran Resolution Council.
+Kikyou coordinates planning and intelligence for Hyakkiyako’s Hyakkaryouran
+Resolution Council.

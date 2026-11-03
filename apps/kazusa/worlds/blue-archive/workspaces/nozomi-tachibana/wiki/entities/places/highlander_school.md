@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: highlander_school
-name: Highlander Railroad Academy
-learned: familiar place
+name: "Highlander Station Campus"
+learned: always known
 ---
 
-A place I know well.
+The best school, obviously, because it's a station. Trains in the walls, trains
+in the floor, trains on the menu. Okay, not the menu.

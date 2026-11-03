@@ -1,0 +1,88 @@
+{
+  "outfits": {
+    "swimsuit": "a black bikini, an open white cropped jacket, a gray combat helmet and black gloves"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, glaring, shouting with sharp teeth bared"
+    },
+    "content": {
+      "look": "content, eyes closed, a faint smile"
+    },
+    "grinning": {
+      "look": "grinning, eyes shut, sharp teeth showing"
+    },
+    "happy": {
+      "look": "happy, open fanged smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, fanged mouth open"
+    },
+    "nervous": {
+      "look": "nervous, a bead of sweat on the cheek, teeth gritted"
+    },
+    "neutral": {
+      "look": "neutral, a steady, level gaze"
+    },
+    "pouting": {
+      "look": "pouting, frowning, lips pressed together"
+    },
+    "shocked": {
+      "look": "shocked, eyes wide, sweating, fanged mouth open"
+    },
+    "smug": {
+      "look": "smug, a wide fanged grin"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth slightly open"
+    },
+    "swimsuit-angry": {
+      "look": "angry, glaring, shouting with sharp teeth bared"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows lowered, mouth open showing teeth"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a faint smile"
+    },
+    "swimsuit-distressed": {
+      "look": "distressed, eyes squeezed shut, wailing with sharp teeth bared"
+    },
+    "swimsuit-grinning": {
+      "look": "grinning, eyes shut, wide toothy grin"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes bright, open fanged smile"
+    },
+    "swimsuit-hiding": {
+      "look": "hiding, helmet pulled down over the eyes"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, fanged mouth open"
+    },
+    "swimsuit-nervous": {
+      "look": "nervous, a bead of sweat on the cheek, teeth gritted"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, flat mouth, a steady gaze"
+    },
+    "swimsuit-proud": {
+      "look": "proud, eyes narrowed, wide fanged grin"
+    },
+    "swimsuit-shocked": {
+      "look": "shocked, eyes wide, sweating, mouth agape"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a small closed smile"
+    },
+    "swimsuit-uneasy": {
+      "look": "uneasy, flat mouth, a bead of sweat on the cheek"
+    },
+    "swimsuit-worried": {
+      "look": "worried, brows tilted, grimacing"
+    },
+    "worried": {
+      "look": "worried, brows tilted, mouth slightly open"
+    }
+  }
+}

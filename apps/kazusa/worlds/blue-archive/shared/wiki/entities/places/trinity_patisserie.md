@@ -3,13 +3,24 @@ pageType: entity
 entityType: place
 id: entity.place.trinity_patisserie
 place_id: trinity_patisserie
-name: "Pâtisserie de Trinity"
-aliases: ["Patisserie de Trinity", "patisserie"]
+name: "Cafe Mille-Feuille"
+aliases: ["Pâtisserie de Trinity", "Patisserie de Trinity"]
 parent: church_street
-summary: "Elegant patisserie and tea salon; glass cases of macarons and tarts, a terrace under awnings. Open 10:00–19:00."
 entry_minutes: 2
+summary:
+  "Trinity Street's favourite dessert café: mille-feuille, seasonal menus, a
+  terrace; open 10:00–20:00; queues on new-menu days, students crowd it after
+  15:30."
+renown: known
 ---
 
-# Pâtisserie de Trinity
+# Cafe Mille-Feuille
 
-An elegant European-style patisserie and salon de thé. Brass-trimmed glass cases hold macarons, mille-feuille, fruit tarts and chocolate mousse domes. Small marble tables and wicker chairs fill the room and spill onto a cobblestone terrace under striped awnings. Classical violin plays softly over the chatter of students sipping floral teas. It opens at 10:00 and closes at 19:00; after closing the doors are locked and the cases emptied.
+An elegant café and pâtisserie with brass-trimmed glass cases of macarons, fruit
+tarts and its namesake mille-feuille. Marble tables and wicker chairs fill the
+room and spill onto a terrace under striped awnings. A new seasonal menu
+launches every few weeks, and the line on launch day reaches down the street.
+
+Staff are mostly part-timers, students from Trinity and from outside it; one
+Arius student works the afternoon and evening shifts several days a week. The
+doors lock at 20:00 and the cases are emptied.

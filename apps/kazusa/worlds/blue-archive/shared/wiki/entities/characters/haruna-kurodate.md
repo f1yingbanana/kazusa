@@ -7,9 +7,10 @@ name: Haruna Kurodate
 school: Gehenna Academy
 club: Gourmet Research Society
 is_simulated_agent: true
-home: gehenna_school
+home: room_haruna
 ---
 
 # Haruna Kurodate
 
-Haruna leads Gehenna’s Gourmet Research Society and pursues exceptional food with an eye for ingredients, presentation and atmosphere.
+Haruna leads Gehenna’s Gourmet Research Society and pursues exceptional food
+with an eye for ingredients, presentation and atmosphere.

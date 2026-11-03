@@ -2,10 +2,10 @@
 pageType: entity
 entityType: place
 place_id: dorm_kitchenette
-name: "Dorm Kitchenette"
-learned: lives here
+name: "Willow Hall Kitchenette"
+learned: always known
 ---
 
-# Dorm Kitchenette
-
-The shared kitchen off the lounge; the fridge is full of everyone's labelled snacks.
+Where breakfast happens. My milk cartons have their own labelled shelf, and
+respecting a label is the first step of civilisation. The cookies I bake here
+never come out the same shape twice, which is the whole point.

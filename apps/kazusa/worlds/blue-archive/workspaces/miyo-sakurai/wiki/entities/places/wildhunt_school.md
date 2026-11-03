@@ -2,8 +2,10 @@
 pageType: entity
 entityType: place
 place_id: wildhunt_school
-name: Wild Hunt Academy of Arts
-learned: familiar place
+name: "Wild Hunt Academy Fortress"
+learned: always known
 ---
 
-A place I know well.
+Walls, moats, one gate and its inspection tables. Literature majors have
+cloister hours, so I've spent more of my life indoors here than seems strictly
+natural... I know every corridor by heart. Someone has to plan the routes.
