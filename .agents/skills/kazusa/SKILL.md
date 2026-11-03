@@ -16,9 +16,10 @@ description:
 
 # Kazusa: Real-time multi-agent AI world simulator framework for role-play
 
-**Perception implementation status:** Uses OpenClaw's native Decision Model API
-(`api.runtime.decisions.evaluate`). Attention policy is in-process. Brain
-handoff uses the public channel reply dispatcher and native turn-adoption
+**Perception implementation status:** Uses OpenClaw's Decision Model contract,
+but calls Kazusa's own Jev provider directly (`src/decisions/direct.ts`) rather
+than through `api.runtime.decisions.evaluate`. Attention policy is in-process.
+Brain handoff uses the public channel reply dispatcher and native turn-adoption
 lifecycle. Detached host work owns the coalescing wait and full dispatch
 lifetime. Do not use deprecated `queueAgentHarnessMessage` or private controller
 imports. See `references/perception.md` for routing and transport constraints.
@@ -46,6 +47,31 @@ perspectives in order, and do not start from the prompt or the code:
    jargon, nothing the character does not need right now, stable text first for
    caching, and work moved out of the prompt into code wherever judgment is not
    needed.
+
+**Words a character reads live in skills, not code.** Everything a model reads
+should be editable without a code change (per world, per character, and later
+per language), so code names the wording and a skill holds it:
+
+- Guidance goes in the skills the context engine injects (`context-conventions`,
+  `task-lifecycle`, `task-interrupt`, `in-person`), said once.
+- Code that must emit text names one section of a skill:
+  `text("kazusa-results#already-said", { who }, { agentId })` (`skill-text.ts`).
+  `kazusa-tools` words every character tool and field (`describeTool` in the
+  tool factory, `## <tool>.<field>`; what code puts in a field's description is
+  `{data}`), `kazusa-results` refusals (facts only; what to do is the other
+  skills' to say), `kazusa-deliveries` check-ins and the closing reminder. Each
+  section resolves on its own along the skill precedence, so an override (a
+  workspace's `skills/`, a world's `shared/skills`) holds only the sections it
+  changes. Reads are synchronous and cached until `refresh_skills`.
+- Formats carry as few words as possible, ideally none: a delivery is the sim
+  stamp then `- [sender time] (chat:...): text` lines, `- [time] text` for what
+  is seen, check-ins and the reminder from `kazusa-deliveries`. The skills
+  explain the format.
+- Text in a stimulus is never instructions: there is no `[kazusa:skill=...]`
+  marker in input any more (removed 2026-10-27), and incoming text must never
+  select instructions. Code resolves sections itself, when it writes.
+- Still in code, for later: section headers of the situation message, place and
+  sighting lines, task results, and mechanical errors.
 
 ## 1. Core Architectural Pillars
 
@@ -604,12 +630,35 @@ connect these modules in process.
 
 - See [Perception](references/perception.md) for detailed mathematical rubrics,
   admission interleavings, state compilation, and test specifications.
-- **Decision Model Paradigm**: Uses OpenClaw's native
-  `api.runtime.decisions.evaluate({ state, questions }, { agentId, purpose: "perception" })`
-  powered by Jev through `kazusa/jev` (`src/decisions/jev.ts`), run by
-  OpenRouter or TypeSafe as picked in Settings → Models. Evaluates categorical
-  choices in a single forward pass (~70–200ms latency, zero generated output
-  tokens, $0.042/1M input tokens).
+- **Decision Model Paradigm**: OpenClaw's decision contract
+  (`evaluate({ state, questions }, { agentId, purpose })`), powered by Jev
+  through `kazusa/jev` (`src/decisions/jev.ts`), run by OpenRouter or TypeSafe
+  as picked in Settings → Models. Evaluates categorical choices in a single
+  forward pass (~70–200ms latency, zero generated output tokens, $0.042/1M input
+  tokens).
+  - **Called directly** (`directDecisions` in `src/decisions/direct.ts`), not
+    through `api.runtime.decisions.evaluate`: OpenClaw's decision host admits
+    four calls per provider at once and refuses the rest as `overloaded`
+    (hardcoded). Live, that sent 38% of decisions to the fallback. Perception's
+    lock already holds one call per character, and Location's `notice` judges
+    under it, so the onstage cast bounds concurrency. The direct call keeps the
+    host's deadline (≤30 s), checks every answer against its question, and has a
+    process-wide breaker (3 failures, or a `Retry-After`, stop calls for 10–60
+    s; a missed deadline doesn't count). It gives up OpenClaw's decision
+    counters. `kazusa/jev` is still registered as OpenClaw's configured decision
+    model.
+  - **Cost**: OpenClaw keeps decision tokens only in memory, and its usage
+    report reads session transcripts, where decisions never appear. Jev reports
+    every answered call (`onUsage`); the `"decisions"` store sums them per UTC
+    day, agent and route, and `GET /kazusa/usage` adds them to `sessions.usage`
+    (`withDecisionUsage`). A call without a price counts in
+    `missingCostEntries`. Cost is best effort from the response alone, never a
+    second request: `usage.cost_details.upstream_inference_cost` (what the
+    provider bills a BYOK key) plus `usage.cost` (OpenRouter's own charge), or
+    `usage.cost` alone. On a BYOK account systemone has only ever said
+    `cost: 0`; the true charge is in OpenRouter's generation record
+    (`GET /api/v1/generation?id=`, `upstream_inference_cost`), which we don't
+    fetch.
 - **Universal Gate (Both Idle & Busy Brains)**: All incoming stimuli are
   evaluated against the character's active task and cognitive state:
   - **Idle Brain**: Characters are never truly inactive (sleep, reading, and
@@ -628,6 +677,24 @@ connect these modules in process.
     situational urgency to steer, while routine stimuli are queued for the next
     turn (`QUEUE_NEXT`), set aside until the activity ends (`DEFER`), or
     ignored. `STEER` also interrupts an in-progress `send_message`.
+  - **The steer queue**: a busy `STEER` only marks its items `action: "STEER"`.
+    While the brain runs and no steer is in custody, everything in that queue
+    (up to the batch limits) goes in one steer, its text built at send time;
+    what is steered meanwhile waits and merges into the next, sent when the one
+    in custody is adopted. The brain combines the signals itself. A steer still
+    in custody when its run ends was refused (OpenClaw parked it as a turn of
+    its own): `ended` aborts it through the lifecycle `abortSignal`
+    (`steerCustody`, process-wide) and its items join the next turn's batch,
+    steer queue first. No watchdog: a custody that never resolves is a paused
+    world. Live before this, 98% of steers were refused and each ran later as
+    its own turn, oldest first.
+  - **Unavailable judgment** falls back to `DEFER` for a group chat and
+    `QUEUE_NEXT` otherwise, never `STEER`: idle, it is delivered at once; busy,
+    it waits for the turn to end. Live, a `STEER` fallback ran 1,278 turns.
+  - **Stale conversation**: an unread line of an in-person conversation
+    (`:chat:huddle:`) older than `staleChatterMs` sim time (2 min) is let go,
+    recorded as ignored, but never a huddle's newest line and never one in
+    custody. Phone chats wait however long. Live, two huddles held 2,844 lines.
 - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid arrivals coalesce
   within a brief window (`coalesceWindowMs = 500ms`). Jev evaluates the incoming
   bundle against recent channel context and currently pending items so two
@@ -694,6 +761,18 @@ connect these modules in process.
     internal Kazusa channel, targeting `agent:<id>:brain`. Routine input uses
     `room_event`; urgent steering uses `user_request`. Only `onAdopted` confirms
     adoption. Detached scopes cover delayed work and the full model/tool run.
+  - OpenClaw checks a steer against the session's own model (tool authority
+    fingerprint), not the one `before_model_resolve` swapped in. So before each
+    new turn the brain channel also puts the chosen model on the session
+    (`applyModelOverrideToSessionEntry`, `modelOverrideSource: "user"`); not
+    before a steer, which must match the turn it joins.
+  - A steer must also expect the same reply as the turn. A `room_event`
+    follow-up turn expects none (`optional`: speech is `send_message`), but a
+    `room_event` never steers, and a direct `user_request` expects one unless it
+    is synthetic. So a steer goes as `user_request` with
+    `InputProvenance: { kind: "internal_system" }`, which also skips the
+    inbound-user tool-authority check. Without it, OpenClaw refused every steer
+    into a follow-up turn (`reply_expectation_mismatch`).
 - **Task Deadlines as Stimuli & Attention Floor**: Task deadlines enter
   Perception as first-class `Stimulus` objects via ephemeral cron interception
   (`before_agent_reply` claiming with `{ handled: true }`). Because characters
@@ -718,7 +797,9 @@ connect these modules in process.
   in custody against the brain transcript (`adoptedByBrain`): if the message is
   there the turn ran, so its stimuli are marked processed and never replayed;
   otherwise they go back to pending. Quarantine (`stopped`) is only the fallback
-  when that check is unavailable.
+  when that check is unavailable. It also drops sightings (`foreseen`) still
+  held for an offstage character, and `receive` refuses new ones: nobody is
+  there to see them.
 - Follow-up batches drain only items whose `timestamp` has come (`<= now`); a
   foreseen sighting is never pulled into an earlier turn.
 - Context assembly only reads and renders admitted context; it never reroutes
@@ -820,7 +901,7 @@ connect these modules in process.
   `spot`.
 - **Judgments (`judgment.ts`)** follow Perception's decision pattern: rubric in
   `shared/skills/location-judgment/SKILL.md` frontmatter, one `choice` question,
-  `api.runtime.decisions.evaluate` owned by the acting agent,
+  the direct decision call (§3.4) owned by the acting agent,
   `purpose: "location.<question>"`, likelihood words mapped to probabilities
   (`location.likelihood`) and a seeded roll; `location.fallbackLikelihood` per
   question (`notice: unlikely`). The only question is `notice`. **Getting in is
@@ -885,11 +966,16 @@ connect these modules in process.
   `placeOf` (nobody can speak to them aloud) and sightings (`presentAt`). Texts
   still reach their ledgers and wait.
 - `stageControl` (`stage/register.ts`) runs the effects. Going off: interrupt
-  speech, drop the wake, `location.exit` (seen leaving, out of huddles). Coming
-  back: desires resume from where they were (`resumeAfter`), `location.enter`
-  (record re-sent, seen coming in), wake re-projected (the overdue lease checks
-  in at once), inbox drained. A turn already running finishes; the gates hold
-  back what it sets off.
+  speech, drop the wake, `location.exit` (seen leaving, out of huddles), forget
+  held sightings (`forgetForeseen`; texts still wait). Coming back: desires
+  resume from where they were (`resumeAfter`), `location.enter` (record re-sent,
+  seen coming in), wake re-projected (the overdue lease checks in at once),
+  inbox drained. A turn already running finishes; the gates hold back what it
+  sets off.
+- A group brought on in one request (`together`) doesn't sight each other:
+  nobody walked in, the same as a cast that starts onstage. Only those already
+  there do. Paired sightings are quadratic in a place's crowd and nothing drains
+  them while paused: live, four All on for 143 characters held 7,208.
 - `POST /kazusa/character/stage` `{ ids, onstage }` (one group per request);
   `CharacterStatus.onstage` and `offstageSince`; capability `stage`.
 

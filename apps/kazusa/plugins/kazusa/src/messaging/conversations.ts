@@ -36,23 +36,10 @@ const MEMBERS = z
 const TITLE = z.string().trim().min(1).max(160);
 
 const CHAT_TARGET = z.strictObject({
-  aloud: z
-    .boolean()
-    .optional()
-    .describe(
-      "Speak aloud to members who are where you are, face to face, instead of texting them. They join your conversation there, with anyone they were talking with; with none of your own, you join theirs or start one. To walk over to another conversation instead, speak into its chat:huddle:... address.",
-    ),
-  sessionKey: CHAT_SESSION.optional().describe(
-    "Your chat address, from context or list_chats (e.g. chat:direct:bob); omit members and title.",
-  ),
-  members: MEMBERS.optional().describe(
-    "Other configured agent IDs to start a chat with; you are included automatically. Omit if sessionKey is provided.",
-  ),
-  title: TITLE.nullable()
-    .optional()
-    .describe(
-      "Optional new group title. One other member without a title reuses the direct chat.",
-    ),
+  aloud: z.boolean().optional(),
+  sessionKey: CHAT_SESSION.optional(),
+  members: MEMBERS.optional(),
+  title: TITLE.nullable().optional(),
 });
 const HAS_TARGET = [
   (params: z.infer<typeof CHAT_TARGET>) =>
@@ -74,9 +61,7 @@ const BUBBLE = z.union([
   TEXT(4_000),
   z.strictObject({
     text: TEXT(4_000),
-    type: MESSAGE_TYPE.optional().describe(
-      '"action" for something you do, written in third person without your name ("sets the textbook on the desk"). Actions are only seen where you are (speaking aloud, or a chat:huddle:... address); anywhere else they are dropped. Default "speech".',
-    ),
+    type: MESSAGE_TYPE.optional(),
   }),
 ]);
 /** One bubble as a plain string (speech) or with its type. */
@@ -85,14 +70,7 @@ export type Bubble = z.infer<typeof BUBBLE>;
 /** Absolute ceiling; the tool offers `messaging.maxBubbles`. */
 const MAX_BUBBLES = 32;
 
-const bubbles = (max: number) =>
-  z
-    .array(BUBBLE)
-    .min(1)
-    .max(max)
-    .describe(
-      "Your character's bubbles, in order, without speaker labels: what you say, and where you are, what you do. They are typed and sent one at a time; you may be interrupted before later ones are sent.",
-    );
+const bubbles = (max: number) => z.array(BUBBLE).min(1).max(max);
 
 /** The `send_message` tool's arguments, with at most `maxBubbles` bubbles. */
 export const sendMessageSchema = (maxBubbles: number) =>
@@ -136,15 +114,7 @@ export const DELIVERY_REQUEST = CHAT_TARGET.extend({
 export type SendMessageParams = z.infer<typeof DELIVERY_REQUEST>;
 
 export const LIST_CHATS = z.strictObject({
-  query: z
-    .string()
-    .trim()
-    .min(1)
-    .max(256)
-    .optional()
-    .describe(
-      "Filter your chats by title, member ID or session key; omit to list all current memberships.",
-    ),
+  query: z.string().trim().min(1).max(256).optional(),
 });
 export const MANAGE_CHAT = z.discriminatedUnion("action", [
   z.strictObject({

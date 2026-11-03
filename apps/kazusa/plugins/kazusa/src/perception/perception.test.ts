@@ -219,12 +219,17 @@ function setup(options: SetupOptions = {}) {
   };
 }
 
+/** Jev wants every stimulus seen now: woken at once, or steered into a turn. */
 function setupWake(options: SetupOptions = {}) {
   const h = setup(options);
   h.evaluateDecision.mockResolvedValue({
     status: "ok",
     result: {
-      answers: { wake_decision: { type: "choice", choice: "WAKE" } },
+      answers: {
+        wake_decision: { type: "choice", choice: "WAKE" },
+        attention_allocation: { type: "choice", choice: "STEER" },
+        response_latency: { type: "score", score: 0 },
+      },
     },
   });
   return h;
@@ -303,6 +308,76 @@ describe("Decision fallback", () => {
     h.evaluateDecision.mockRejectedValue(new Error("overloaded"));
     await h.router.receive("alice", stimulus("a"));
     expect(h.deliveries[0].ids).toEqual(["a"]);
+  });
+});
+
+describe("Stale conversation", () => {
+  const huddle = "agent:alice:chat:huddle:cafe";
+  const line = (id: string, minutesAgo: number, sessionKey = huddle) => ({
+    ...stimulus(id),
+    sessionKey,
+    timestamp: NOW - minutesAgo * 60_000,
+  });
+
+  it("lets unread lines of a conversation in person go, all but its newest", async () => {
+    // Live: two huddles held 2,844 unread lines; most were minutes old.
+    const h = setup();
+    h.states.set("alice", {
+      brainRun: "busy",
+      pending: [
+        { ...line("old", 5), action: "QUEUE_NEXT" },
+        line("older", 3),
+        line("recent", 1),
+        line("last", 4, "agent:alice:chat:huddle:park"),
+        line("text", 30, "agent:alice:chat:direct:bob"),
+      ],
+    });
+    h.evaluateDecision.mockResolvedValue({
+      status: "ok",
+      result: {
+        answers: {
+          attention_allocation: { type: "choice", choice: "QUEUE_NEXT" },
+        },
+      },
+    });
+    await h.router.drain("alice");
+    expect(h.snapshot().pending.map(({ id }) => id)).toEqual([
+      "recent",
+      "last",
+      "text",
+    ]);
+    const noticed = await h.router.noticed("alice");
+    expect(noticed(line("old", 5))).toBe(false);
+    expect(h.snapshot().ignoredIds).toHaveLength(2);
+  });
+
+  it("keeps a line already handed to the brain", async () => {
+    const h = setup();
+    const held = line("held", 5);
+    h.states.set("alice", {
+      brainRun: "busy",
+      pending: [held, line("newer", 0)],
+      deliveries: [
+        {
+          id: "d",
+          agentId: "alice",
+          mode: "followup",
+          message: "",
+          ids: ["held"],
+          keys: [stimulusKey(held)],
+        },
+      ],
+    });
+    h.evaluateDecision.mockResolvedValue({
+      status: "ok",
+      result: {
+        answers: {
+          attention_allocation: { type: "choice", choice: "QUEUE_NEXT" },
+        },
+      },
+    });
+    await h.router.drain("alice");
+    expect(h.snapshot().pending.map(({ id }) => id)).toEqual(["held", "newer"]);
   });
 });
 
@@ -705,31 +780,57 @@ describe("Brain handoff custody", () => {
     expect(h.snapshot().brainRun).toBe("real-run");
   });
 
-  it("does not acknowledge a deferred steer until host adoption, even if the old turn ends", async () => {
+  it("sends one steer at a time and merges what is steered meanwhile", async () => {
+    const h = setupWake();
+    await h.router.started("alice", "run");
+    let adopt: () => void | Promise<void> = () => {};
+    h.deliver.mockImplementationOnce(async (delivery, lifecycle) => {
+      h.deliveries.push(structuredClone(delivery));
+      lifecycle.onDeferred?.();
+      adopt = lifecycle.onAdopted;
+    });
+    await h.router.receive("alice", stimulus("a"));
+    await h.router.receive("alice", stimulus("b"));
+    await h.router.receive("alice", stimulus("c"));
+    expect(h.deliveries.map(({ mode, ids }) => [mode, ids])).toEqual([
+      ["steer", ["a"]],
+    ]);
+    await adopt();
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(2));
+    expect(h.deliveries[1]).toMatchObject({ mode: "steer", ids: ["b", "c"] });
+    expect(h.snapshot().pending).toEqual([]);
+  });
+
+  it("takes back a steer its turn refused, for the next turn with the rest", async () => {
+    // Live: each refused steer ran later as a turn of its own, oldest first,
+    // still saying "noticed while thinking"; Noa spent 21 of 22 turns so.
     const h = setupWake();
     await h.router.started("alice", "old-run");
-    h.evaluateDecision.mockResolvedValue({
-      status: "ok",
-      result: {
-        answers: {
-          attention_allocation: { type: "choice", choice: "STEER" },
-        },
-      },
-    });
     h.deliver.mockImplementationOnce(async (_delivery, lifecycle) => {
       lifecycle.onDeferred?.();
     });
     await h.router.receive("alice", stimulus("a"));
-    const [, lifecycle] = h.deliver.mock.calls[0];
-    expect(h.snapshot().pending).toHaveLength(1);
-    expect(h.snapshot().deliveries?.[0]?.mode).toBe("steer");
-    await h.router.ended("alice", "old-run", false);
+    const [refused, lifecycle] = h.deliver.mock.calls[0];
+    expect(refused.mode).toBe("steer");
     await h.router.receive("alice", stimulus("b"));
-    expect(h.deliver).toHaveBeenCalledTimes(2);
-    expect(h.snapshot().pending.map(({ id }) => id)).toEqual(["a"]);
+    expect(h.deliver).toHaveBeenCalledTimes(1);
+    expect(h.snapshot().pending.map(({ id, action }) => [id, action])).toEqual([
+      ["a", "STEER"],
+      ["b", "STEER"],
+    ]);
+
+    await h.router.ended("alice", "old-run", false);
+    expect(lifecycle.abortSignal?.aborted).toBe(true);
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0]).toMatchObject({
+      mode: "followup",
+      ids: ["a", "b"],
+    });
+    // The host adopting it anyway, as it was taken back, changes nothing.
     await lifecycle.onAdopted();
+    lifecycle.onAbandoned?.();
     expect(h.snapshot().pending).toEqual([]);
-    expect(h.snapshot().deliveries?.[0]).toBeUndefined();
+    expect(h.snapshot().stopped).toBeFalsy();
   });
 
   it("keeps inputs on explicit abandonment and retries with the same source ID", async () => {
@@ -1339,10 +1440,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
           `task-deadline:task-1:${new Date(NOW - 60_000).toISOString()}`,
         ],
       });
-      expect(h.deliveries[0].message).toContain("Incoming chats");
-      // Leading sim-time envelope suppresses OpenClaw's wall-clock stamp.
+      // Leading sim-time envelope suppresses OpenClaw's wall-clock stamp;
+      // no words of its own follow it, only the lines.
       expect(h.deliveries[0].message).toMatch(
-        /^\[\w{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}\] Incoming chats:/,
+        /^\[\w{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}\]\n- \[/,
       );
       expect(h.deliveries[0].message).toContain(
         "Activity check-in: your eating activity was planned to end at",
@@ -1762,7 +1863,8 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.snapshot().pending).toHaveLength(0);
     });
 
-    it("fails open to steer when decision model returns unavailable for busy brain", async () => {
+    it("queues for the next turn, never steers, when the decision model is unavailable", async () => {
+      // Live: a fallback steer for every refused decision ran 1,278 turns.
       const h = setup();
       await h.router.started("alice", "run-busy");
       h.evaluateDecision.mockResolvedValueOnce({
@@ -1772,13 +1874,20 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
 
       await h.router.receive("alice", stimulus("busy-msg"));
 
-      expect(h.deliver).toHaveBeenCalledTimes(1);
+      expect(h.deliver).not.toHaveBeenCalled();
+      expect(h.snapshot().pending[0]).toMatchObject({
+        id: "busy-msg",
+        action: "QUEUE_NEXT",
+      });
+      h.evaluateDecision.mockResolvedValueOnce({
+        status: "unavailable",
+        reason: "service-error",
+      });
+      await h.router.ended("alice", "run-busy", false);
       expect(h.deliveries[0]).toMatchObject({
-        agentId: "alice",
-        mode: "steer",
+        mode: "followup",
         ids: ["busy-msg"],
       });
-      expect(h.snapshot().pending).toHaveLength(0);
     });
 
     it("flushes immediately without waiting for debounce timer when pending items reach maxBatchSize", async () => {
@@ -1846,10 +1955,11 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.deliveries[0].message).not.toContain(
         "[kazusa:skill=task-interrupt]",
       );
-      expect(h.deliveries[0].message).toContain("Incoming chats:");
       expect(h.deliveries[0].message).toContain(
         "- [`bob` Sat 2026-10-24 12:00] (chat:direct:bob): Can you help me?",
       );
+      // The closing reminder is the skill's, as written there.
+      expect(h.deliveries[0].message).toMatch(/\n\n\(If you answer: /);
       // No raw JSON stringification
       expect(h.deliveries[0].message).not.toContain("[kazusa\\u003a");
       expect(h.deliveries[0].message).not.toContain('{"id":');
@@ -1985,7 +2095,7 @@ describe("Human reply timing and task boundaries", () => {
       `task-deadline:study:${new Date(NOW + HOUR).toISOString()}`,
       "text",
     ]);
-    expect(h.deliveries[0].message).toContain("Incoming chats:");
+    expect(h.deliveries[0].message).toContain("(chat:direct:bob): ");
     expect(h.deliveries[0].message).toContain("Activity check-in");
   });
 
@@ -2043,7 +2153,7 @@ describe("Human reply timing and task boundaries", () => {
       taskId: "study",
     });
     expect(recorded[1].record).toMatchObject({
-      action: "STEER",
+      action: "QUEUE_NEXT",
       source: "fallback",
       note: "decision unavailable: timeout",
     });
@@ -2175,7 +2285,7 @@ describe("Foreseen stimuli", () => {
     await vi.waitFor(() => expect(h.deliveries[0]?.ids).toEqual(["seen"]));
     expect(confirm).toHaveBeenCalledTimes(2);
     expect(h.deliveries[0]?.message).toContain(
-      "Seen around you:\n- [Sat 2026-10-24 12:01] Bob waves from across the courtyard.",
+      "]\n- [Sat 2026-10-24 12:01] Bob waves from across the courtyard.",
     );
     expect(h.snapshot().pending).toEqual([]);
   });
@@ -2283,6 +2393,44 @@ describe("Foreseen stimuli", () => {
     h.setSpeed(0);
     await h.router.receive("alice", stimulus("offstage"));
     expect(h.deliveries).toEqual([]);
+  });
+
+  it("forgets held sightings going offstage, and keeps the texts", async () => {
+    const offstage = new Set<string>();
+    const h = setupWake({ onstage: async (id) => !offstage.has(id) });
+    await h.router.receive("alice", {
+      ...stimulus("sighting", "alice", "Bob is here."),
+      timestamp: NOW + 60_000,
+      foreseen: true,
+    });
+    offstage.add("alice");
+    await h.router.receive("alice", stimulus("text"));
+    await h.router.forgetForeseen("alice");
+    expect(h.snapshot().pending.map(({ id }) => id)).toEqual(["text"]);
+    expect(h.snapshot().processedIds ?? []).toEqual([]);
+  });
+
+  it("never holds a sighting for someone offstage", async () => {
+    const h = setupWake({ onstage: async () => false });
+    await h.router.receive("alice", {
+      ...stimulus("sighting", "alice", "Bob is here."),
+      foreseen: true,
+    });
+    expect(h.states.get("alice")).toBeUndefined();
+  });
+
+  it("forgets on restart the sightings held from before going offstage", async () => {
+    // Live: everyone sent offstage at once left 3,800 sightings held for good,
+    // since going offstage again did nothing for those already off.
+    const h = setupWake({ onstage: async () => false });
+    h.states.set("alice", {
+      pending: [
+        { ...stimulus("sighting", "alice", "Bob is here."), foreseen: true },
+        stimulus("text"),
+      ],
+    });
+    await h.router.recover();
+    expect(h.snapshot().pending.map(({ id }) => id)).toEqual(["text"]);
   });
 
   it("does not give the system agent a foreseen event before its sim timestamp", async () => {

@@ -1,4 +1,5 @@
 import { inBackground } from "../background.ts";
+import { bundledSkillText, type SkillText } from "../skill-text.ts";
 import type {
   ChatMessage,
   MessagesResponse,
@@ -216,6 +217,8 @@ function isDeliverySettled(delivery: MessageDelivery): boolean {
 
 export interface MessagingDeps {
   readonly api: OpenClawPluginApi;
+  /** Where its refusals' wording comes from. Absent: Kazusa's own skills. */
+  readonly text?: SkillText;
   readonly store: StateStore<MessageDelivery>;
   readonly conversations: StateStore<ChatConversation>;
   readonly outbox: RemovableStateStore<OutboxPlan>;
@@ -309,6 +312,19 @@ export class Messaging {
 
   constructor(private readonly deps: MessagingDeps) {
     this.shared = deps.state ?? createMessagingState();
+  }
+
+  /** A refusal as the speaker's skills word it (`kazusa-results`). */
+  private refusal(
+    result: string,
+    agentId: string,
+    values: Readonly<Record<string, string>> = {},
+  ): string {
+    return (this.deps.text ?? bundledSkillText())(
+      `kazusa-results#${result}`,
+      values,
+      { agentId },
+    );
   }
 
   private get serial(): KeyedAsyncQueue {
@@ -866,10 +882,7 @@ export class Messaging {
     who: string,
   ): Promise<{ readonly placeId: string; readonly title: string }> {
     const place = await this.deps.placeOf?.(who);
-    if (!place)
-      throw new Error(
-        "You're on your way, so nobody is close enough to hear. Text them instead.",
-      );
+    if (!place) throw new Error(this.refusal("aloud-on-the-way", who));
     return place;
   }
 
@@ -928,9 +941,7 @@ export class Messaging {
     const place = await this.standingPlace(sender);
     for (const other of others) {
       if ((await this.deps.placeOf?.(other))?.placeId !== place.placeId)
-        throw new Error(
-          `${other} isn't here, so they can't hear you. Text them instead.`,
-        );
+        throw new Error(this.refusal("aloud-not-here", sender, { who: other }));
     }
     const speakers = [sender, ...others];
     const groups = [...this.chats.values()].filter(
@@ -980,9 +991,7 @@ export class Messaging {
     if (!chat.members.includes(sender)) {
       const place = await this.deps.placeOf?.(sender);
       if (place?.placeId !== chat.placeId)
-        throw new Error(
-          "You aren't there, so nobody in it can hear you. Text them instead.",
-        );
+        throw new Error(this.refusal("aloud-not-there", sender));
     }
     if (chat.members.includes(sender)) return chat;
     await this.leaveOtherHuddles(sender, chat.id);

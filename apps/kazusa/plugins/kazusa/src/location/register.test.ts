@@ -409,7 +409,7 @@ describe("location registration", () => {
     );
     h.setNow(minutes(1));
     expect(await h.location.settle("kurimura-airi")).toBe(
-      "You've arrived at Kazusa's Room `room_kazusa` (Dorm). You came here for \"Dropping by Kazusa's room\", planning about 19 min. Carry on with it, or change your mind.",
+      "You've arrived at Kazusa's Room `room_kazusa` (Dorm). You came here for \"Dropping by Kazusa's room\", planning about 19 min.",
     );
     expect(await h.location.record("kurimura-airi")).toEqual({
       placeId: "room_kazusa",
@@ -669,6 +669,45 @@ describe("location registration", () => {
     expect(await location.participants()).toContain("kurimura-airi");
     expect(received.map(({ id }) => id)).toContain(
       `sighting|comes|kurimura-airi|club|${T0}`,
+    );
+  });
+
+  it("doesn't have a group brought on together sight each other", async () => {
+    // Live: bringing 143 on, paused, held 1802 sightings each time.
+    const stage = createStage(createInMemoryStore<StageRecord>(), {
+      defaultOnstage: true,
+      cast: [],
+    });
+    const { call, location } = setup({ stage });
+    const received: Stimulus[] = [];
+    location.attachPerception({
+      receive: async (_agentId, stimulus) => {
+        received.push(stimulus);
+      },
+    });
+    await call("location.place", { id: "kurimura-airi", placeId: "club" });
+    await call("location.place", { id: "yutori-natsu", placeId: "club" });
+    await call("location.place", { id: "kazusa", placeId: "club" });
+    const group = ["kurimura-airi", "yutori-natsu"];
+    for (const id of group) {
+      await stage.set(id, false, T0);
+      await location.exit(id, T0);
+    }
+    received.length = 0;
+
+    for (const id of group) {
+      await stage.set(id, true, T0);
+      await location.enter(id, T0, group);
+    }
+
+    // Kazusa was already there: only the sightings between her and each of them.
+    expect(received.map(({ id }) => id).sort()).toEqual(
+      [
+        `sighting|arrive|kazusa|club|${T0}`,
+        `sighting|arrive|kazusa|club|${T0}`,
+        `sighting|comes|kurimura-airi|club|${T0}`,
+        `sighting|comes|yutori-natsu|club|${T0}`,
+      ].sort(),
     );
   });
 

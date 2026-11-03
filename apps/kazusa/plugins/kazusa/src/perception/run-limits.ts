@@ -4,14 +4,12 @@ import {
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
+import { pluginSkillText } from "../skill-text.ts";
 import {
-  ALREADY_SAID,
   chooseActivity,
   LOOKUP_NAMES,
   MAX_LOOKUPS,
-  NO_MORE_LOOKUPS,
   repeatsItself,
-  SECOND_ACTIVITY,
   turnOf,
 } from "../turn.ts";
 import { PERCEPTION_CONFIG } from "./types.ts";
@@ -20,8 +18,6 @@ import { PERCEPTION_CONFIG } from "./types.ts";
 const WRAP_UP_MODEL_CALLS = 2;
 /** Share of a run's time after which it is told to wrap up. */
 const WRAP_UP_TIME_SHARE = 0.8;
-const WRAP_UP =
-  "You are out of time for this reaction, so this did not run. Use send_message to say where things stand, what is done and what is not, then end with NO_REPLY.";
 
 interface RunLimits {
   readonly maxModelCalls: number;
@@ -142,6 +138,16 @@ export function registerBrainRunLimits(
   api: OpenClawPluginApi,
   simTime: () => number,
 ): (runId: string) => void {
+  // What a refused call says is the `kazusa-results` skill's.
+  const text = pluginSkillText(api);
+  const refuse = (result: string, agentId?: string) => ({
+    block: true,
+    blockReason: text(
+      `kazusa-results#${result}`,
+      {},
+      agentId ? { agentId } : {},
+    ),
+  });
   api.on("model_call_started", (event, ctx) => {
     const state = brainRun(
       api,
@@ -161,27 +167,24 @@ export function registerBrainRunLimits(
         event.toolName === "send_message" &&
         repeatsItself(turn, event.params, ctx.toolCallId ?? event.toolCallId)
       )
-        return { block: true, blockReason: ALREADY_SAID };
+        return refuse("already-said", ctx.agentId);
       if (LOOKUP_NAMES.has(event.toolName)) {
         if (turn.lookups >= MAX_LOOKUPS)
-          return { block: true, blockReason: NO_MORE_LOOKUPS };
+          return refuse("lookup-limit", ctx.agentId);
         turn.lookups++;
       }
       if (event.toolName === "start_task" || event.toolName === "delay_task") {
         const now = { wall: Date.now(), sim: simTime() };
         const callId = ctx.toolCallId ?? event.toolCallId;
         if (!chooseActivity(ctx.agentId, now, callId))
-          return { block: true, blockReason: SECOND_ACTIVITY };
+          return refuse("second-activity", ctx.agentId);
       }
     }
     const runId = ctx.runId ?? event.runId;
     const state = runId ? activeRuns().get(runId) : undefined;
     if (!state) return;
     if (state.controller.signal.aborted)
-      return {
-        block: true,
-        blockReason: "This brain run reached its hard limit. End this turn.",
-      };
+      return refuse("hard-limit", ctx.agentId);
     const callId = ctx.toolCallId ?? event.toolCallId;
     const key = callId ? `${state.models.size}:${callId}` : undefined;
     // A host can invoke a hook through multiple registrations; count once.
@@ -197,7 +200,7 @@ export function registerBrainRunLimits(
         Date.now() - state.startedAt >=
           maxRunSeconds * 1000 * WRAP_UP_TIME_SHARE)
     )
-      return { block: true, blockReason: WRAP_UP };
+      return refuse("out-of-time", ctx.agentId);
     state.tools.add(key ?? `uncorrelated:${state.tools.size}`);
   });
   // The outer lifecycle owns cleanup, so provider fallback attempts cannot

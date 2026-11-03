@@ -141,6 +141,8 @@ export type StartTaskResult =
       readonly message: string;
       /** The journal payload written with the ledger row. */
       readonly payload: TaskStartedPayload;
+      /** The ledger row's sim time; the live event must carry the same one. */
+      readonly simTime: number;
     }
   | { readonly success: false; readonly message: string };
 
@@ -150,4 +152,6 @@ export interface DelayTaskResult {
   readonly message: string;
   /** The journal payload written with the ledger row. */
   readonly payload?: TaskDelayedPayload;
+  /** The ledger row's sim time; the live event must carry the same one. */
+  readonly simTime?: number;
 }

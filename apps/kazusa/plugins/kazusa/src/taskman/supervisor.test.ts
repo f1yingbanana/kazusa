@@ -313,42 +313,6 @@ describe("startIdleSupervisor", () => {
     }
   });
 
-  it("passes configured idleText to idleWake", async () => {
-    vi.useFakeTimers();
-    try {
-      const clock = createMockClock(1_000_000, 1);
-      const store = createMockTaskStore();
-      const idleWake = vi.fn().mockResolvedValue(undefined);
-      const perception = {
-        getBrainState: vi.fn().mockResolvedValue({ brain: "idle", queued: 0 }),
-        idleWake,
-      } as unknown as Perception;
-
-      const api = {
-        config: { agents: { list: [{ id: "alice" }] } },
-        logger: { warn: vi.fn() },
-      } as unknown as OpenClawPluginApi;
-      Object.assign(api, {
-        runtime: { ...api.runtime, config: { current: () => api.config } },
-      });
-
-      const dispose = startIdleSupervisor(api, {
-        clock,
-        store,
-        perception,
-        intervalMs: 10_000,
-        idleText: "Time to plan your day.",
-      });
-
-      await vi.advanceTimersByTimeAsync(2500);
-      expect(idleWake).toHaveBeenCalledWith("alice", "Time to plan your day.");
-
-      dispose();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("wakes once per interval however many registrations started one", async () => {
     // Live: each plugin registration ran its own supervisor, so an idle
     // character got one check-in per registration.

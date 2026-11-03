@@ -21,6 +21,7 @@ import { localAvatarUrl } from "../characters/avatar.ts";
 import { z } from "zod";
 import { untilRunning, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
+import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
@@ -122,8 +123,10 @@ export function registerMessaging(
     api.pluginConfig?.messaging ?? {},
   );
   const sendMessage = sendMessageSchema(messagingConfig.maxBubbles);
+  const text = pluginSkillText(api);
   const messaging = new Messaging({
     api,
+    text,
     state: sharedMessagingState(),
     store: api.runtime.state.openKeyedStore<MessageDelivery>({
       namespace: "messaging",
@@ -342,116 +345,112 @@ export function registerMessaging(
   api.registerTool(
     {
       contextVersion: 2,
-      create: (context) => [
-        {
-          name: "send_message",
-          label: "Send Message",
-          // Speech is how characters act on most turns; keep its schema
-          // visible instead of behind Tool Search.
-          catalogMode: "direct-only",
-          description: `Say something in an existing chat with sessionKey. To start a chat and send its first message in one call, supply members (other agent or human IDs) and an optional title instead. To speak aloud to people where you are, supply members with aloud: true, or use a chat:huddle:... address to join a conversation going on there. One other member without a title opens the direct chat; otherwise create a group. Split what you say into natural bubbles in messages, 1 to ${messagingConfig.maxBubbles}; they are typed and sent one at a time. Face to face, a bubble can also be an action, { "text": "sets the textbook on the desk", "type": "action" }: third person, without your name. Actions in a text chat are dropped. If something more important comes up meanwhile, you stop: the result lists what was said and what was left unsaid. Delivery retries automatically. Use list_chats when the address is unknown.`,
-          parameters: z.toJSONSchema(sendMessage),
-          async execute(_toolCallId, input: unknown, signal?: AbortSignal) {
-            const { agentId, config, agents } = caller(context);
-            if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
-              await untilRunning(
-                deps.clock,
-                signal ? AbortSignal.any([release, signal]) : release,
+      create: (context) => {
+        // Their wording is the `kazusa-tools` skill's.
+        const worded = <P>(
+          name: string,
+          parameters: P,
+          values: Readonly<Record<string, number>> = {},
+        ) =>
+          describeTool(text, { name, parameters }, values, {
+            ...(context.agentId ? { agentId: context.agentId } : {}),
+          });
+        return [
+          {
+            ...worded("send_message", z.toJSONSchema(sendMessage), {
+              maxBubbles: messagingConfig.maxBubbles,
+            }),
+            label: "Send Message",
+            // Speech is how characters act on most turns; keep its schema
+            // visible instead of behind Tool Search.
+            catalogMode: "direct-only",
+            async execute(_toolCallId, input: unknown, signal?: AbortSignal) {
+              const { agentId, config, agents } = caller(context);
+              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+                await untilRunning(
+                  deps.clock,
+                  signal ? AbortSignal.any([release, signal]) : release,
+                );
+              const params = sendMessage.parse(input);
+              // Provider call IDs can repeat within one brain session. Each
+              // execution accepts a new send; retained delivery/outbox records
+              // own retries without another model call.
+              const requestId = generateSecureUuid();
+              const details = await messaging.speak(
+                agentId,
+                await characterName(api, config, agentId),
+                { ...params, requestId },
+                context.assertInvocationCurrent,
+                agents,
+                config.agents?.defaults?.systemAgent?.agentId,
+                signal,
               );
-            const params = sendMessage.parse(input);
-            // Provider call IDs can repeat within one brain session. Each
-            // execution accepts a new send; retained delivery/outbox records
-            // own retries without another model call.
-            const requestId = generateSecureUuid();
-            const details = await messaging.speak(
-              agentId,
-              await characterName(api, config, agentId),
-              { ...params, requestId },
-              context.assertInvocationCurrent,
-              agents,
-              config.agents?.defaults?.systemAgent?.agentId,
-              signal,
-            );
-            // Message hashes are bookkeeping, not something the character reads.
-            const { messageIds: _messageIds, ...speech } = details;
-            const result =
-              speech.status === "interrupted"
-                ? {
-                    ...speech,
-                    note: "You stopped before the unsaid bubbles; nobody saw them.",
-                  }
-                : speech;
-            return {
-              content: [{ type: "text", text: JSON.stringify(result) }],
-              details,
-            };
-          },
-        },
-        {
-          name: "list_chats",
-          label: "List Chats",
-          description:
-            "Find your current direct and group chats by optional title, member ID or session key query. Returns your reply address, title and current members without reading anyone else's history. A chat address already present in context can be used directly.",
-          parameters: z.toJSONSchema(LIST_CHATS),
-          async execute(_id, input: unknown) {
-            const { agentId } = caller(context);
-            const result = await messaging.listChats(
-              agentId,
-              LIST_CHATS.parse(input),
-              context.assertInvocationCurrent,
-            );
-            return {
-              content: [{ type: "text", text: JSON.stringify(result) }],
-              details: { chats: result },
-            };
-          },
-        },
-        {
-          name: "manage_chat",
-          label: "Manage Group Chat",
-          description:
-            "Any current group member can rename the group, add or remove members, or leave. Use title for rename, members for add_members/remove_members, and neither for leave. Direct chats have fixed membership. Changes affect future messages; earlier accepted messages keep their original audience. Joining grants no prior history.",
-          parameters: {
-            type: "object",
-            properties: {
-              action: {
-                type: "string",
-                enum: ["rename", "add_members", "remove_members", "leave"],
-              },
-              sessionKey: {
-                type: "string",
-                description:
-                  "Your group chat session key, from context or list_chats.",
-              },
-              members: {
-                type: "array",
-                items: { type: "string" },
-                minItems: 1,
-                maxItems: 99,
-                uniqueItems: true,
-              },
-              title: { type: "string", minLength: 1, maxLength: 160 },
+              // Message hashes are bookkeeping, not something the character reads.
+              // `status`, `said` and `unsaid` tell an interrupted send; the
+              // skills explain them.
+              const { messageIds: _messageIds, ...speech } = details;
+              return {
+                content: [{ type: "text", text: JSON.stringify(speech) }],
+                details,
+              };
             },
-            required: ["action", "sessionKey"],
-            additionalProperties: false,
           },
-          async execute(_id, input: unknown) {
-            const { agentId, config, agents } = caller(context);
-            if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
-              await untilRunning(deps.clock, release);
-            const result = await messaging.manageChat(
-              agentId,
-              MANAGE_CHAT.parse(input),
-              context.assertInvocationCurrent,
-              agents,
-            );
-            return {
-              content: [{ type: "text", text: JSON.stringify(result) }],
-              details: result,
-            };
+          {
+            ...worded("list_chats", z.toJSONSchema(LIST_CHATS)),
+            label: "List Chats",
+            async execute(_id, input: unknown) {
+              const { agentId } = caller(context);
+              const result = await messaging.listChats(
+                agentId,
+                LIST_CHATS.parse(input),
+                context.assertInvocationCurrent,
+              );
+              return {
+                content: [{ type: "text", text: JSON.stringify(result) }],
+                details: { chats: result },
+              };
+            },
           },
-        },
-      ],
+          {
+            ...worded("manage_chat", {
+              type: "object",
+              properties: {
+                action: {
+                  type: "string",
+                  enum: ["rename", "add_members", "remove_members", "leave"],
+                },
+                sessionKey: { type: "string" },
+                members: {
+                  type: "array",
+                  items: { type: "string" },
+                  minItems: 1,
+                  maxItems: 99,
+                  uniqueItems: true,
+                },
+                title: { type: "string", minLength: 1, maxLength: 160 },
+              },
+              required: ["action", "sessionKey"],
+              additionalProperties: false,
+            }),
+            label: "Manage Group Chat",
+            async execute(_id, input: unknown) {
+              const { agentId, config, agents } = caller(context);
+              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+                await untilRunning(deps.clock, release);
+              const result = await messaging.manageChat(
+                agentId,
+                MANAGE_CHAT.parse(input),
+                context.assertInvocationCurrent,
+                agents,
+              );
+              return {
+                content: [{ type: "text", text: JSON.stringify(result) }],
+                details: result,
+              };
+            },
+          },
+        ];
+      },
     },
     { names: ["send_message", "list_chats", "manage_chat"] },
   );

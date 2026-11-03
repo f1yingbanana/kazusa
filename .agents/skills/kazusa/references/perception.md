@@ -260,18 +260,21 @@ Perception submits a choice evaluation query to Jev
   directly to Jev in `currentActivity`. Jev semantically weighs whether the
   stimuli warrant immediate mid-thought steering.
 - **Routing Rules**:
-  1. **STEER**: Injects immediately into the active brain execution lane via
-     OpenClaw's `mode: "steer"` session queue
-     (`InboundEventKind: "user_request"`).
+  1. **STEER**: Joins the steer queue. Whenever the brain is running and no
+     steer is in custody, the whole queue (up to the batch limits) goes into the
+     active brain execution lane as one steer via OpenClaw's `mode: "steer"`
+     session queue (`InboundEventKind: "user_request"`). A steer the turn
+     refused is taken back when the turn ends and joins the next turn's batch.
   2. **QUEUE_NEXT**: Retained in the pending attention queue to be delivered
      automatically when the current brain run finishes.
   3. **IGNORE**: Dropped from pending attention. The message remains permanently
      recorded in the subjective chat ledger.
   4. **Attention Floor for Deadlines**: Task deadlines can never be dropped into
      `IGNORE`; if evaluated as `IGNORE`, they clamp to `QUEUE_NEXT`.
-  5. **Fail-Open Policy**: If Jev is unavailable or throws, Perception fails
-     open to `STEER`, ensuring stimuli are never dropped or stalled when the
-     decision service is down.
+  5. **Fallback Policy**: If Jev is unavailable or throws, Perception queues the
+     bundle for the next turn (`QUEUE_NEXT`; a group chat `DEFER`s), so nothing
+     is dropped or stalled and nothing interrupts a turn while the decision
+     service is down.
 
 ---
 
@@ -770,7 +773,7 @@ discrete categorical attention decisions directly:
 | Urgent B arrives while routine A queued | Collective evaluation promotes both A and B to steer the active turn together.                    |
 | Task deadline arrives while busy        | Coalesced flag set; delivered together with queued chats on next brain turn.                      |
 | Task extended during active turn        | If `delay_task` was called, stale deadline check is dropped when turn finishes.                   |
-| Decision model unavailable / error      | Fails open to `WAKE` (if idle) or `STEER` (if busy); never silently drops or stalls stimuli.      |
+| Decision model unavailable / error      | `QUEUE_NEXT` (group chat `DEFER`): delivered now if idle, after the turn if busy; never dropped.  |
 | Process restart                         | Retained stimuli in `"perception"` store recovered; re-evaluates against live clock and task.     |
 | Restart mid-turn                        | Custody reconciled with the brain transcript; a tombstoned `:brain` is cleared and retried once.  |
 | Deferred chat when the task ends        | Delivered in the same turn as the deadline check-in (§12).                                        |

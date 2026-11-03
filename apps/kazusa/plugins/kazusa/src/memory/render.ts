@@ -77,7 +77,8 @@ export function renderEntity(
       ? " (you've only heard of it)"
       : "";
   const lines = [`${label(entity)}${relation}: ${view}${hedge}`];
-  if (own?.theyThinkOfMe) lines[0] += ` You think: ${own.theyThinkOfMe}`;
+  if (own?.theyThinkOfMe)
+    lines[0] += ` You guess they think: ${own.theyThinkOfMe}`;
   if (own?.openThreads.length)
     lines[0] += ` Unfinished: ${own.openThreads.join("; ")}`;
   if (own) {

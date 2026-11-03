@@ -1,4 +1,3 @@
-import { ONLY_WHAT_YOU_KNOW } from "../turn.ts";
 import {
   mkdirSync,
   mkdtempSync,
@@ -132,7 +131,7 @@ describe("retrieve", () => {
 
   it("searches what was said, not the delivery's envelope", () => {
     const delivered =
-      "Incoming chats:\n- [Kivotos `kivotos` Fri 2026-10-30 16:00] (chat:direct:kivotos): hello";
+      "[Fri 2026-10-30 16:00]\n- [Kivotos `kivotos` Fri 2026-10-30 16:00] (chat:direct:kivotos): hello";
     expect(spokenText(delivered).trim()).toBe("hello");
   });
 
@@ -237,7 +236,7 @@ describe("render", () => {
   it("shows view, guess, threads and the newest notes", () => {
     const { text } = renderOnYourMind(entities("", ["natsu"]), options);
     expect(text).toContain(
-      "Natsu Yutori `natsu` (close friend): Philosophical troublemaker. You think: Enjoys needling me. (think so) Unfinished: Stop her saying Cath Palug.",
+      "Natsu Yutori `natsu` (close friend): Philosophical troublemaker. You guess they think: Enjoys needling me. (think so) Unfinished: Stop her saying Cath Palug.",
     );
     expect(text).toContain(
       "· Oct 24, Natsu Yutori told you: Angel 24 might drop strawberry milk. (suspect)",
@@ -279,8 +278,14 @@ describe("spokenText and the closing reminder", () => {
   it("does not search for the words of the reminder", () => {
     expect(
       spokenText(
-        `Incoming chats:\n- [Natsu \`natsu\` Fri] (chat:direct:natsu): hi\n\n${ONLY_WHAT_YOU_KNOW}`,
+        "[Fri]\n- [Natsu `natsu` Fri] (chat:direct:natsu): hi\n\n(Before replying: whatever a world's skill says.)",
       ).trim(),
     ).toBe("hi");
+  });
+
+  it("searches a check-in alone by its words", () => {
+    expect(spokenText("[Fri]\nActivity check-in: studying.")).toContain(
+      "studying",
+    );
   });
 });

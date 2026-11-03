@@ -16,7 +16,7 @@ const estimate = (text: string): number => Math.ceil(text.length / 4);
 export function promptOf(test: RetrievalCase): string {
   if (test.prompt) return test.prompt;
   const [name, id] = test.from ?? ["Someone", "someone"];
-  return `Incoming chats:\n- [${name} \`${id}\` Tue 16:00] (chat:direct:${id}): ${test.text ?? ""}`;
+  return `[Tue 16:00]\n- [${name} \`${id}\` Tue 16:00] (chat:direct:${id}): ${test.text ?? ""}`;
 }
 
 /** Runs one case through the same request and render a brain turn uses. */

@@ -20,7 +20,7 @@ const lifecycle = { onAdopted: async () => {} } as unknown as Parameters<
 
 function setup(
   dispatch: ReturnType<typeof vi.fn>,
-  thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>,
+  selection: Parameters<typeof registerBrainChannel>[2] = {},
 ) {
   const patchSessionEntry = vi.fn(
     async (params: { update: (entry: Record<string, unknown>) => unknown }) => {
@@ -51,7 +51,7 @@ function setup(
     runtime: { ...api.runtime, config: { current: () => api.config } },
   });
   return {
-    deliver: registerBrainChannel(api, new AbortController().signal, thinking),
+    deliver: registerBrainChannel(api, new AbortController().signal, selection),
     patchSessionEntry,
     patches,
   };
@@ -101,7 +101,7 @@ describe("brain channel", () => {
       async (agentId: string): Promise<ThinkingLevel | undefined> =>
         agentId === "alice" ? "high" : undefined,
     );
-    const h = setup(vi.fn().mockResolvedValue(undefined), thinking);
+    const h = setup(vi.fn().mockResolvedValue(undefined), { thinking });
     await h.deliver(delivery, lifecycle);
     await h.deliver({ ...delivery, agentId: "bob" }, lifecycle);
     expect(thinking.mock.calls).toEqual([["alice"], ["bob"]]);
@@ -123,5 +123,91 @@ describe("brain channel", () => {
     expect(update?.({ thinkingLevel: "high" })).toEqual({
       thinkingLevel: undefined,
     });
+  });
+
+  it("puts the chosen model on the session before a new turn, not a steer", async () => {
+    // Live: with the model swapped only per turn, OpenClaw refused 98% of
+    // steers, since the session still named the configured primary.
+    const model = vi.fn(async () => "venice/mimo-flash");
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const h = setup(dispatch, { model });
+    await h.deliver({ ...delivery, mode: "steer" }, lifecycle);
+    expect(model).not.toHaveBeenCalled();
+    await h.deliver(delivery, lifecycle);
+    const update = h.patchSessionEntry.mock.calls[0]?.[0].update;
+    expect(
+      update?.({ sessionId: "s1", model: "glm-5.3-flash", contextTokens: 9 }),
+    ).toEqual({
+      providerOverride: "venice",
+      modelOverride: "mimo-flash",
+      modelOverrideSource: "user",
+      modelOverrideRouteResolution: "resolved",
+      model: undefined,
+      contextTokens: undefined,
+      updatedAt: expect.any(Number),
+    });
+    expect(
+      update?.({
+        sessionId: "s1",
+        providerOverride: "venice",
+        modelOverride: "mimo-flash",
+        modelOverrideSource: "user",
+        modelOverrideRouteResolution: "resolved",
+      }),
+    ).toBeNull();
+  });
+
+  it("clears a model it set once the choice goes back to the default", async () => {
+    const h = setup(vi.fn().mockResolvedValue(undefined), {
+      model: async () => undefined,
+    });
+    await h.deliver(delivery, lifecycle);
+    const update = h.patchSessionEntry.mock.calls[0]?.[0].update;
+    expect(update?.({ sessionId: "s1" })).toBeNull();
+    expect(
+      update?.({ providerOverride: "venice", modelOverride: "mimo-flash" }),
+    ).toEqual({
+      providerOverride: undefined,
+      modelOverride: undefined,
+      modelOverrideSource: undefined,
+      modelOverrideRouteResolution: undefined,
+    });
+  });
+
+  it("sends a steer as system input, so it expects no reply either", async () => {
+    // Live: a user_request steer expects a reply; a room_event turn doesn't,
+    // and OpenClaw refused every steer into one (reply_expectation_mismatch).
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const h = setup(dispatch);
+    await h.deliver({ ...delivery, mode: "steer" }, lifecycle);
+    await h.deliver(delivery, lifecycle);
+    const [steer, followup] = dispatch.mock.calls.map(
+      ([params]) => (params as { ctx: Record<string, unknown> }).ctx,
+    );
+    expect(steer).toMatchObject({
+      InboundEventKind: "user_request",
+      InputProvenance: { kind: "internal_system", sourceChannel: "kazusa" },
+    });
+    expect(followup.InboundEventKind).toBe("room_event");
+    expect(followup).not.toHaveProperty("InputProvenance");
+  });
+
+  it("aborts a steer Perception takes back", async () => {
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const h = setup(dispatch);
+    const custody = new AbortController();
+    await h.deliver(
+      { ...delivery, mode: "steer" },
+      { ...lifecycle, abortSignal: custody.signal },
+    );
+    const { replyOptions } = dispatch.mock.calls[0]?.[0] as {
+      replyOptions: {
+        abortSignal: AbortSignal;
+        turnAdoptionLifecycle: { abortSignal: AbortSignal };
+      };
+    };
+    custody.abort();
+    expect(replyOptions.abortSignal.aborted).toBe(true);
+    expect(replyOptions.turnAdoptionLifecycle.abortSignal.aborted).toBe(true);
   });
 });

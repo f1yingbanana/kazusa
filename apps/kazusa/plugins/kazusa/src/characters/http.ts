@@ -214,7 +214,11 @@ export function registerCharactersHttp(
     readonly broadcaster: KazusaRealtimeBroadcaster;
     readonly stage: Pick<Stage, "isOnstage" | "lookup">;
     /** Sends a character off or brings them back, with every effect. */
-    readonly setOnstage: (id: string, onstage: boolean) => Promise<void>;
+    readonly setOnstage: (
+      id: string,
+      onstage: boolean,
+      together: readonly string[],
+    ) => Promise<void>;
   },
 ): void {
   const getConfig = () => currentConfig(api);
@@ -297,9 +301,10 @@ export function registerCharactersHttp(
       return;
     }
     // One at a time: each change moves people and conversations others see.
+    const group = [...new Set(ids)];
     const statuses: Record<string, CharacterStatus> = {};
-    for (const id of new Set(ids)) {
-      await deps.setOnstage(id, onstage);
+    for (const id of group) {
+      await deps.setOnstage(id, onstage, group);
       const status = await resolveCharacterStatus(id, statusDeps);
       deps.broadcaster.broadcast({ type: "status", characterId: id, status });
       statuses[id] = status;

@@ -209,6 +209,11 @@ function loaderCaches(): Set<WeakRef<() => void>> {
   return (cell[LOADER_CACHES] ??= new Set());
 }
 
+/** Clears `clear` along with every loader's cache (`clearSkillCaches`). */
+export function trackSkillCache(clear: () => void): void {
+  loaderCaches().add(new WeakRef(clear));
+}
+
 /** Forget every loader's resolved paths and bodies, so the next load reads disk. */
 export function clearSkillCaches(): void {
   const caches = loaderCaches();

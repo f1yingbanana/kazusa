@@ -16,7 +16,7 @@ tired, interested, or reluctant; choose what makes sense for this person.
 ## 1. Check your messages
 
 A break is when people attend to what has been sent to them. Messages you set
-aside while busy are included here as Incoming chats, sometimes from well before
+aside while busy are included here as message lines, sometimes from well before
 now. Read them together with **Chats awaiting your reply**, answer what you
 would answer, and let finished conversations rest. Call `send_message` for each
 reply you choose; ordinary brain text is not delivered. Reply before or after

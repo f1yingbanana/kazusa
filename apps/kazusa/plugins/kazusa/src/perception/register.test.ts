@@ -5,7 +5,10 @@ import { registerPerception } from "./register.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
-function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
+function setup(
+  onDeadline?: (agentId: string) => Promise<string | undefined>,
+  extra: Partial<Parameters<typeof registerPerception>[1]> = {},
+) {
   const stores = new Map<string, Map<string, unknown>>();
   const on = vi.fn();
   const subscription = vi.fn();
@@ -82,6 +85,7 @@ function setup(onDeadline?: (agentId: string) => Promise<string | undefined>) {
   const perception = registerPerception(api, {
     clock,
     onDeadline,
+    ...extra,
   });
 
   const hook = (name: string) =>
@@ -405,7 +409,17 @@ describe("Perception host integration", () => {
   });
 
   it("uses the same dispatcher for urgent steering and lets the host own fallback", async () => {
-    const h = setup();
+    const h = setup(undefined, {
+      assembleDecisionContext: async () => ({
+        state: "Fire in the kitchen!",
+        questions: {
+          attention_allocation: {
+            type: "choice",
+            criteria: { STEER: "Now", QUEUE_NEXT: "Later" },
+          },
+        },
+      }),
+    });
     h.api.runtime.decisions = {
       evaluate: vi.fn(async () => ({
         status: "ok" as const,

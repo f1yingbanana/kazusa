@@ -299,10 +299,6 @@
               "maxAgentsPerTick": {
                 "type": "integer",
                 "default": 2
-              },
-              "idleText": {
-                "type": "string",
-                "default": "Activity check-in: no scheduled activity."
               }
             }
           }

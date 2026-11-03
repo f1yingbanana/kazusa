@@ -236,6 +236,7 @@ describe("Configurable task categories", () => {
         },
       },
       runtime: {
+        config: { current: () => ({}) },
         state: {
           openKeyedStore: () => createInMemoryTaskStore(),
         },
@@ -277,6 +278,7 @@ describe("Configurable task categories", () => {
     const mockApi = {
       pluginConfig: {},
       runtime: {
+        config: { current: () => ({}) },
         state: {
           openKeyedStore: () => createInMemoryTaskStore(),
         },

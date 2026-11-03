@@ -24,6 +24,12 @@ export const PERCEPTION_CONFIG = z.object({
   maxBatchSize: z.number().int().min(1).max(100).default(16),
   maxBatchChars: z.number().int().min(32_000).max(256_000).default(48_000),
   decisionTimeoutMs: z.number().int().min(1).max(30_000).default(10_000),
+  /**
+   * Sim time after which an unread line of an in-person conversation is moot:
+   * the talk has moved on, as it would for anyone who wasn't listening. The
+   * newest line of each conversation always stays. 0 keeps every line.
+   */
+  staleChatterMs: z.number().int().min(0).max(86_400_000).default(120_000),
   /** Longest real wait between readiness checks for delayed attention. */
   readinessPollMs: z.number().int().min(10).max(60_000).default(30_000),
 });
@@ -39,8 +45,8 @@ export interface AttentionDecision {
 /**
  * How an attention decision was reached, retained for debugging. `automatic`
  * skips the model (the system console, or idle task check-ins); `fallback` is
- * taken when the model was unavailable: it defers a group chat and admits
- * everything else.
+ * taken when the model was unavailable: it defers a group chat and queues
+ * everything else for the next turn, never interrupting one.
  */
 export interface DecisionTrace {
   readonly source: "model" | "automatic" | "fallback";

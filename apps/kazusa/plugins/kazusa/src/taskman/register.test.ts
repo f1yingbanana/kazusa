@@ -1,10 +1,94 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
+vi.mock("../ledger.ts", () => ({ appendLedgerEntry: vi.fn(async () => {}) }));
+import { appendLedgerEntry } from "../ledger.ts";
+import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { registerTaskman } from "./register.ts";
 import type { ActiveTask } from "./types.ts";
 
 const T0 = Date.parse("2026-10-27T16:00:00.000Z");
+
+describe("taskman journal events", () => {
+  it("broadcasts the ledger row's sim time, so a reread keeps the same seq", async () => {
+    const tasks = new Map<string, ActiveTask>();
+    const tools = new Map<
+      string,
+      { execute: (id: string, params: unknown) => Promise<unknown> }
+    >();
+    const api = {
+      config: { agents: { entries: { alice: {} } } },
+      pluginConfig: {},
+      logger: { warn: vi.fn(), info: vi.fn() },
+      lifecycle: {},
+      on: () => {},
+      registerTool: (
+        factory: (ctx: { agentId: string }) => {
+          name: string;
+          execute: (id: string, params: unknown) => Promise<unknown>;
+        },
+      ) => {
+        const tool = factory({ agentId: "alice" });
+        tools.set(tool.name, tool);
+      },
+      runtime: {
+        state: {
+          openKeyedStore: () => ({
+            lookup: async (key: string) => tasks.get(key),
+            register: async (key: string, value: ActiveTask) => {
+              tasks.set(key, value);
+            },
+          }),
+        },
+      },
+    } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
+    // A running clock: every read is later than the one before.
+    let now = T0;
+    const clock = {
+      init: async () => {},
+      time: () => (now += 250),
+      now: () => ({ simTime: now, speed: 1 }),
+      onClockChange: () => () => {},
+    } as unknown as Clock;
+    const broadcast = vi.fn();
+    registerTaskman(api, {
+      clock,
+      broadcaster: { broadcast } as unknown as KazusaRealtimeBroadcaster,
+    });
+
+    await tools.get("start_task")?.execute("call-1", {
+      type: "studying",
+      description: "Reading",
+      duration: 60,
+    });
+    await tools.get("delay_task")?.execute("call-2", {
+      additionalDuration: 5,
+    });
+
+    const reread = vi.mocked(appendLedgerEntry).mock.calls.map(([, entry]) => {
+      const { kind, payload } = entry.metadata as {
+        kind: string;
+        payload: Record<string, unknown>;
+      };
+      return withJournalSeq({
+        simTime: entry.timestamp,
+        kind,
+        actors: [entry.agentId],
+        payload,
+      });
+    });
+    expect(reread.map((row) => row.kind)).toEqual([
+      "task.started",
+      "task.delayed",
+    ]);
+    expect(broadcast.mock.calls.map(([{ event }]) => event.seq)).toEqual(
+      reread.map((row) => row.seq),
+    );
+  });
+});
 
 describe("taskman cron projection", () => {
   it("keeps no wake for an offstage character, and restores it on return", async () => {

@@ -196,7 +196,7 @@ export function sleepMessage(input: SleepInput): string {
       : []),
     ...(input.fading.length
       ? [
-          `# Fading: fold these into your view of each, or they are gone\n${input.fading
+          `# Fading\n${input.fading
             .map(({ id, notes }) => `## ${id}\n${notes.join("\n")}`)
             .join("\n\n")}`,
         ]

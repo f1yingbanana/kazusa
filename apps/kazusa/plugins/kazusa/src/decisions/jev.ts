@@ -54,7 +54,7 @@ const DEFAULT_INSTRUCTIONS = "Judge this from the state.";
 
 const Probabilities = z.record(z.string(), z.number());
 
-/** Unknown fields (OpenRouter's `id`, `provider`, `usage.cost`) are dropped. */
+/** Unknown fields (OpenRouter's `id`, `provider`) are dropped. */
 const ResponseSchema = z.object({
   model: z.string(),
   answers: z.record(
@@ -79,9 +79,39 @@ const ResponseSchema = z.object({
     .object({
       input_tokens: z.number().optional(),
       output_tokens: z.number().optional(),
+      /** What OpenRouter charged, in US dollars: only its fee when BYOK. */
+      cost: z.number().optional(),
+      /** BYOK: what the upstream provider charged on its own bill. */
+      cost_details: z
+        .object({ upstream_inference_cost: z.number().nullish() })
+        .nullish(),
     })
     .optional(),
 });
+
+/**
+ * Best effort, from the response alone: a lookup per call would double the
+ * requests. With a key of your own (BYOK) OpenRouter's `cost` is only its fee
+ * and the provider bills the rest, which it reports as upstream when it does;
+ * systemone has so far said only `cost: 0`.
+ */
+function billed(
+  usage: z.infer<typeof ResponseSchema>["usage"],
+): number | undefined {
+  const upstream = usage?.cost_details?.upstream_inference_cost;
+  if (typeof upstream === "number") return upstream + (usage?.cost ?? 0);
+  return usage?.cost;
+}
+
+/** One answered call, as billed. */
+export interface JevUsage {
+  readonly agentId?: string;
+  readonly route: JevRoute;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  /** US dollars; absent when the provider did not say. */
+  readonly cost?: number;
+}
 
 interface JevResponse {
   readonly status: number;
@@ -102,6 +132,12 @@ export interface JevDeps {
     readonly signal: AbortSignal;
     readonly beforeRequest: () => void;
   }) => Promise<JevResponse>;
+  /**
+   * Every call that came back answered, whatever is made of it later: OpenClaw
+   * keeps decision tokens in memory only, so nothing else counts what Jev
+   * costs. Must not throw.
+   */
+  readonly onUsage?: (usage: JevUsage) => void;
 }
 
 const post: JevDeps["post"] = async ({
@@ -258,6 +294,14 @@ export function createJevProvider(deps: JevDeps): DecisionProviderV1 {
         return failure(response);
       const parsed = parseAnswers(response.body);
       if (!parsed) return { status: "unavailable", reason: "invalid-response" };
+      const cost = billed(parsed.usage);
+      deps.onUsage?.({
+        ...(context.agentId ? { agentId: context.agentId } : {}),
+        route,
+        inputTokens: parsed.usage?.input_tokens ?? 0,
+        outputTokens: parsed.usage?.output_tokens ?? 0,
+        ...(cost === undefined ? {} : { cost }),
+      });
 
       const answers: Record<string, DecisionAnswer> = {};
       for (const [id, answer] of Object.entries(parsed.answers)) {

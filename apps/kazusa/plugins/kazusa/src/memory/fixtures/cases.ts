@@ -112,7 +112,7 @@ export const CASES: readonly RetrievalCase[] = [
   ),
   salt("recognition", "their guess about the sender shows", MARA, "hello", {
     from: ["Tobin Vell", "tobin-vell"],
-    shows: ["You think: Thinks I look down on him"],
+    shows: ["You guess they think: Thinks I look down on him"],
   }),
   salt("recognition", "open threads with the sender show", MARA, "hello", {
     from: ["Tobin Vell", "tobin-vell"],
@@ -142,7 +142,7 @@ export const CASES: readonly RetrievalCase[] = [
   ),
   salt("recognition", "two senders both come up", MARA, "", {
     prompt:
-      "Incoming chats:\n- [Tobin Vell `tobin-vell` Tue 2026-03-10 12:00] (chat:direct:tobin-vell): hey\n- [Ilse Dray `ilse-dray` Tue 2026-03-10 12:01] (chat:direct:ilse-dray): hello",
+      "[Tue 2026-03-10 12:01]\n- [Tobin Vell `tobin-vell` Tue 2026-03-10 12:00] (chat:direct:tobin-vell): hey\n- [Ilse Dray `ilse-dray` Tue 2026-03-10 12:01] (chat:direct:ilse-dray): hello",
     expect: ["tobin-vell", "ilse-dray"],
   }),
   north(
@@ -793,7 +793,7 @@ export const CASES: readonly RetrievalCase[] = [
   }),
   salt("context", "a sighting names who was seen", MARA, "", {
     prompt:
-      "Seen around you:\n- You see Oswin Hale `oswin-hale` crossing the pier.",
+      "[Tue 2026-03-10 12:00]\n- [Tue 2026-03-10 12:00] You see Oswin Hale `oswin-hale` crossing the pier.",
     expect: ["oswin-hale"],
   }),
   north("context", "the current place with a personal view", PRIYA, "morning", {

@@ -25,8 +25,14 @@ export interface StageEffects {
   readonly interrupt: (id: string) => void | Promise<void>;
   /** Takes them out of their place and its conversations. */
   readonly exit: (id: string, at: number) => Promise<void>;
-  /** Puts them back where they were, seen coming in. */
-  readonly enter: (id: string, at: number) => Promise<void>;
+  /** Forgets the sightings they were holding: they won't have seen those. */
+  readonly forgetSightings: (id: string) => Promise<void>;
+  /** Puts them back where they were, seen coming in by all but `together`. */
+  readonly enter: (
+    id: string,
+    at: number,
+    together: readonly string[],
+  ) => Promise<void>;
   /** Brings their wake in line with the stage: none while offstage. */
   readonly reschedule: (id: string) => Promise<void>;
   /** Their body waited too: desires pick up from where they were at `from`. */
@@ -46,9 +52,13 @@ export interface StageEffects {
  */
 export function stageControl(
   effects: StageEffects,
-): (id: string, onstage: boolean) => Promise<void> {
+): (
+  id: string,
+  onstage: boolean,
+  together?: readonly string[],
+) => Promise<void> {
   const { stage, clock } = effects;
-  return async (id, onstage) => {
+  return async (id, onstage, together = []) => {
     if ((await stage.isOnstage(id)) === onstage) return;
     await clock.init();
     const at = clock.time();
@@ -57,11 +67,12 @@ export function stageControl(
       await effects.interrupt(id);
       await effects.reschedule(id);
       await effects.exit(id, at);
+      await effects.forgetSightings(id);
       return;
     }
     if (previous && !previous.onstage)
       await effects.resumeDesires(id, previous.since, at);
-    await effects.enter(id, at);
+    await effects.enter(id, at, together);
     await effects.reschedule(id);
     await effects.drain(id);
   };

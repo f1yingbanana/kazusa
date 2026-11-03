@@ -97,7 +97,7 @@ export function arrive(
   const { trip } = record;
   if (!trip || at < trip.arriveAt) return undefined;
   const came = trip.purpose
-    ? ` You came here for "${trip.purpose.description}", planning about ${trip.purpose.minutes} min. Carry on with it, or change your mind.`
+    ? ` You came here for "${trip.purpose.description}", planning about ${trip.purpose.minutes} min.`
     : "";
   return {
     record: { placeId: trip.to, since: trip.arriveAt },
@@ -190,7 +190,7 @@ export async function planStart(params: {
     if (travel) {
       return {
         record: here,
-        note: `You don't know the way to "${spot}": it isn't anywhere you know how to get to. You're still at ${nameOf(map, here.placeId)}; ask someone, or head for a place you know.`,
+        note: `You don't know the way to "${spot}": it isn't anywhere you know how to get to. You're still at ${nameOf(map, here.placeId)}.`,
         payload: { where: here.placeId, unknown: spot },
       };
     }
@@ -207,7 +207,7 @@ export async function planStart(params: {
     const route = routeBetween(map, here.placeId, target.id);
     if (at + route.minutes * 60_000 >= endAt) {
       throw new Error(
-        `Getting from ${nameOf(map, here.placeId)} to ${target.name} usually takes ${describeTravel(route)}, which doesn't fit in this ${Math.round((endAt - at) / 60_000)}-minute activity. Plan it for longer, or make getting there its own trip first.`,
+        `Getting from ${nameOf(map, here.placeId)} to ${target.name} usually takes ${describeTravel(route)}, which doesn't fit in this ${Math.round((endAt - at) / 60_000)}-minute activity.`,
       );
     }
   }
@@ -357,7 +357,7 @@ export function renderWhereabouts(
   ownHuddle?: string,
 ): string {
   if (!record) {
-    return "You haven't settled anywhere yet; name the place with `where` when you choose your next activity.";
+    return "You haven't settled anywhere yet.";
   }
   const position = positionAt(record, at);
   if (position.kind === "traveling") {

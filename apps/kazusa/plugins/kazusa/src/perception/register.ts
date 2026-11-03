@@ -59,6 +59,10 @@ export function registerPerception(
     readonly realtime?: PerceptionDeps["realtime"];
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
+    /** The chat model each brain turn runs on, `provider/model` (Models). */
+    readonly model?: (agentId: string) => Promise<string | undefined>;
+    /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
+    readonly evaluateDecision?: PerceptionDeps["evaluateDecision"];
     /** Something woke them, or broke into what they were doing. */
     readonly onAwoken?: (agentId: string) => void;
   },
@@ -92,8 +96,14 @@ export function registerPerception(
     api,
     clock: deps.clock,
     assertCurrent: () => lifetime.signal.throwIfAborted(),
-    deliver: registerBrainChannel(api, lifetime.signal, deps.thinking),
+    deliver: registerBrainChannel(api, lifetime.signal, {
+      ...(deps.thinking ? { thinking: deps.thinking } : {}),
+      ...(deps.model ? { model: deps.model } : {}),
+    }),
     adopted: adoptedByBrain(api),
+    ...(deps.evaluateDecision
+      ? { evaluateDecision: deps.evaluateDecision }
+      : {}),
     assembleDecisionContext: deps.assembleDecisionContext,
     onDecision,
     serial: sharedPerceptionQueue(),

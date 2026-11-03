@@ -10,6 +10,7 @@ import type { Clock } from "../clock/clock.ts";
 import { untilRunning } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
 import { appendLedgerEntry } from "../ledger.ts";
+import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { withJournalSeq } from "../realtime.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -38,13 +39,11 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
       enabled: z.boolean().default(true),
       intervalMs: z.number().positive().default(60_000),
       maxAgentsPerTick: z.number().int().positive().default(2),
-      idleText: z.string().default("Activity check-in: no scheduled activity."),
     })
     .default({
       enabled: true,
       intervalMs: 60_000,
       maxAgentsPerTick: 2,
-      idleText: "Activity check-in: no scheduled activity.",
     }),
 });
 
@@ -90,6 +89,7 @@ export function registerTaskman(
 ): TaskmanService {
   const getConfig = () => currentConfig(api);
   const { clock } = deps;
+  const text = pluginSkillText(api);
   const extensions = deps.extensions ?? [];
   const startTaskParameters = extensions.reduce<Record<string, unknown>>(
     (all, extension) => ({ ...all, ...extension.startTaskParameters }),
@@ -313,55 +313,39 @@ export function registerTaskman(
     };
   };
 
+  // Their wording is the `kazusa-tools` skill's (`describeTool`).
   api.registerTool((toolContext) => ({
-    name: "start_task",
+    ...describeTool(
+      text,
+      {
+        name: "start_task",
+        parameters: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: config.categories },
+            description: { type: "string" },
+            duration: { type: "number" },
+            summary: { type: "string" },
+            monologue: { type: "string" },
+            metadata: { type: "object" },
+            ...startTaskParameters,
+          },
+          required: [
+            "type",
+            "description",
+            "duration",
+            ...requiredBy("startTaskParameters"),
+          ],
+          additionalProperties: false,
+        },
+      },
+      { minDuration: config.minDuration },
+      { agentId: toolContext?.agentId },
+    ),
     // Every check-in uses this tool; deferring it behind Tool Search hides
     // its parameter descriptions (including extensions' `effects`).
     catalogMode: "direct-only",
     label: "Start or Transition Task",
-    description:
-      "Start an initial task or conclude your current task and begin the next one. Characters are never idle; include a summary when replacing a task.",
-    parameters: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: config.categories,
-          description: "Major activity category of the task.",
-        },
-        description: {
-          type: "string",
-          description:
-            "Natural-language description of what your character is doing (e.g. 'Walking to the Academic Building', 'Eating a strawberry macaron at the cafe')",
-        },
-        duration: {
-          type: "number",
-          description: `Planned duration in minutes (minimum: ${config.minDuration} minutes)`,
-        },
-        summary: {
-          type: "string",
-          description:
-            "What happened in the task being replaced, when applicable",
-        },
-        monologue: {
-          type: "string",
-          description:
-            "Optional one or two sentences of inner monologue in your character's voice, as plain text, alongside the factual summary.",
-        },
-        metadata: {
-          type: "object",
-          description: "Optional task-specific metadata",
-        },
-        ...startTaskParameters,
-      },
-      required: [
-        "type",
-        "description",
-        "duration",
-        ...requiredBy("startTaskParameters"),
-      ],
-      additionalProperties: false,
-    },
     async execute(_id, params: TaskToolArguments<StartTaskParams>) {
       await clock.init();
       if (
@@ -381,7 +365,7 @@ export function registerTaskman(
         deps.broadcaster?.broadcast({
           type: "journal",
           event: withJournalSeq({
-            simTime: clock.time(),
+            simTime: result.simTime,
             kind: "task.started",
             actors: [agentId],
             payload: result.payload,
@@ -396,29 +380,27 @@ export function registerTaskman(
   }));
 
   api.registerTool((toolContext) => ({
-    name: "delay_task",
+    ...describeTool(
+      text,
+      {
+        name: "delay_task",
+        parameters: {
+          type: "object",
+          properties: {
+            additionalDuration: { type: "number" },
+            reason: { type: "string" },
+            monologue: { type: "string" },
+            ...delayTaskParameters,
+          },
+          required: requiredBy("delayTaskParameters"),
+          additionalProperties: false,
+        },
+      },
+      {},
+      { agentId: toolContext?.agentId },
+    ),
     catalogMode: "direct-only",
     label: "Delay Task",
-    description:
-      "Delay the completion time of your current active task by N minutes.",
-    parameters: {
-      type: "object",
-      properties: {
-        additionalDuration: {
-          type: "number",
-          description: "Additional minutes",
-        },
-        reason: { type: "string", description: "Optional reason" },
-        monologue: {
-          type: "string",
-          description:
-            "Optional one or two sentences of inner monologue in your character's voice, as plain text, alongside the reason for the delay.",
-        },
-        ...delayTaskParameters,
-      },
-      required: requiredBy("delayTaskParameters"),
-      additionalProperties: false,
-    },
     async execute(_id, params: TaskToolArguments<DelayTaskParams>) {
       await clock.init();
       if (
@@ -431,14 +413,19 @@ export function registerTaskman(
         params,
         resolveExecutionContext(toolContext),
       );
-      if (result.success && result.task && result.payload) {
+      if (
+        result.success &&
+        result.task &&
+        result.payload &&
+        result.simTime !== undefined
+      ) {
         const agentId = toolContext?.agentId ?? "main";
         await automation.synchronize?.(agentId);
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
           event: withJournalSeq({
-            simTime: clock.time(),
+            simTime: result.simTime,
             kind: "task.delayed",
             actors: [agentId],
             payload: result.payload,
@@ -468,7 +455,6 @@ export function registerTaskman(
         perception,
         intervalMs: config.supervisor.intervalMs,
         maxAgentsPerTick: config.supervisor.maxAgentsPerTick,
-        idleText: config.supervisor.idleText,
         cell: sharedSupervisorCell(),
         ...(deps.stage ? { stage: deps.stage } : {}),
       });

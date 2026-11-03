@@ -2,7 +2,6 @@ import { DEPTHS, type Depth, type Knowledge } from "./knowledge.ts";
 import { personalScope, type MemoryIndex, type SearchHit } from "./index.ts";
 import { NAME_LIKE_WORDS, STOPWORDS } from "./index.ts";
 import type { HistoryLine, Note, Page } from "./page.ts";
-import { ONLY_WHAT_YOU_KNOW } from "../turn.ts";
 
 export interface RetrievalRequest {
   readonly agentId: string;
@@ -159,16 +158,18 @@ export function mentionsIn(text: string, candidates: Iterable<Page>): string[] {
     .map(([id]) => id);
 }
 
-/** What was actually said: the words of each line, without its envelope. */
+const LINE = /^\s*-\s*\[[^\]]*\]\s*(?:\([^)]*\))?:?\s*/;
+
+/**
+ * What was actually said: the words of each `- [...]` line, without its
+ * envelope. Whatever else a delivery holds (a check-in, the closing reminder)
+ * is wording from skills; with no lines at all, that is the text.
+ */
 export function spokenText(stimulus: string): string {
-  return stimulus
-    .split(/\r?\n/)
-    .filter(
-      (line) =>
-        !/^[A-Z][^:]{0,40}:$/.test(line.trim()) && line !== ONLY_WHAT_YOU_KNOW,
-    )
-    .map((line) => line.replace(/^\s*-\s*\[[^\]]*\]\s*(?:\([^)]*\))?:?\s*/, ""))
-    .join("\n");
+  const lines = stimulus.split(/\r?\n/).filter((line) => LINE.test(line));
+  return lines.length
+    ? lines.map((line) => line.replace(LINE, "")).join("\n")
+    : stimulus;
 }
 
 /** Who sent the lines of a delivery, from `- [Name \`id` time] …`. */

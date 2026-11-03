@@ -22,7 +22,6 @@ import type { StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
-import { ONLY_WHAT_YOU_KNOW } from "../turn.ts";
 import { z } from "zod";
 import {
   PERCEPTION_CONFIG,
@@ -36,13 +35,20 @@ import {
   type Stimulus,
 } from "./types.ts";
 import { BrainSlots } from "./brain-slots.ts";
+import {
+  bundledSkillText,
+  pluginSkillText,
+  type SkillText,
+} from "../skill-text.ts";
 
 /**
- * `QUEUE_NEXT` marks attention already approved. `until` holds it back: it is
- * ready once `notBefore` passes or its bound task is over, whichever is first.
+ * `action` marks attention already approved. `QUEUE_NEXT` waits for the next
+ * turn; `until` holds it back further: it is ready once `notBefore` passes or
+ * its bound task is over, whichever is first. `STEER` is the steer queue: all
+ * of it goes into the running turn in one steer, else into the next turn.
  */
 export interface PendingItem extends Stimulus {
-  action?: "QUEUE_NEXT";
+  action?: "QUEUE_NEXT" | "STEER";
   /** Recheck chat coverage once the ongoing reply has finished. */
   reviewAfterRun?: boolean;
   until?: { taskId?: string; notBefore?: number };
@@ -61,6 +67,21 @@ const keysOf = (item: PendingItem): string[] => [
 ];
 
 const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
+
+/** One live conversation in person, as opposed to a chat on the phone. */
+const isHuddle = (item: Stimulus): boolean =>
+  item.sessionKey.includes(":chat:huddle:");
+
+/*
+ * A way to take back each steer in custody, by delivery id. A run's end may
+ * reach a different registration from the one that sent the steer, so the whole
+ * process shares them.
+ */
+const CUSTODY = Symbol.for("kazusa.perception.steer-custody");
+function steerCustody(): Map<string, AbortController> {
+  const scope = globalThis as { [CUSTODY]?: Map<string, AbortController> };
+  return (scope[CUSTODY] ??= new Map<string, AbortController>());
+}
 
 /** At is real time: this reports on the host, not the world. */
 export interface BrainFailure {
@@ -154,12 +175,19 @@ export interface PerceptionDeps {
     agentId: string,
     item: Stimulus,
   ) => Promise<Stimulus | undefined>;
+  /** Where its wording comes from. Absent: the Gateway's skills, else Kazusa's. */
+  readonly text?: SkillText;
 }
 
+/**
+ * What a delivery says, with no words of its own: chat lines carry their
+ * `chat:` address, things seen have none, check-ins are their own skill text,
+ * and the closing reminder is `kazusa-deliveries#before-replying`.
+ */
 function formatDeliveryMessage(
   bundle: PendingItem[],
-  mode: "steer" | "followup",
   simTime: number,
+  beforeReplying: string,
 ): string {
   const chatItems = bundle.filter(
     (item) =>
@@ -174,35 +202,33 @@ function formatDeliveryMessage(
   const idleItems = bundle.filter((item) => Boolean(item.idle));
 
   const parts: string[] = [];
-
-  if (chatItems.length) {
-    const header =
-      mode === "steer" ? "Messages noticed while thinking:" : "Incoming chats:";
-    const formattedChats = chatItems.map((item) => {
-      const channel = formatSessionHeader(item.sessionKey);
-      return `- [${personLabel(item.senderName, item.sender)} ${formatSimTime(item.timestamp)}] (${channel}): ${item.text}`;
-    });
-    parts.push(`${header}\n${formattedChats.join("\n")}`);
-  }
-  if (sightings.length) {
+  if (chatItems.length)
     parts.push(
-      `${mode === "steer" ? "Seen while thinking:" : "Seen around you:"}\n${sightings
-        .map((item) => `- [${formatSimTime(item.timestamp)}] ${item.text}`)
-        .join("\n")}`,
+      chatItems
+        .map(
+          (item) =>
+            `- [${personLabel(item.senderName, item.sender)} ${formatSimTime(item.timestamp)}] (${formatSessionHeader(item.sessionKey)}): ${item.text}`,
+        )
+        .join("\n"),
     );
-  }
+  if (sightings.length)
+    parts.push(
+      sightings
+        .map((item) => `- [${formatSimTime(item.timestamp)}] ${item.text}`)
+        .join("\n"),
+    );
 
   // Check-ins need no stamp of their own: the delivery stamp is the time they
   // reach the character, and a deadline's text names the planned time.
   for (const item of [...deadlineItems, ...idleItems]) parts.push(item.text);
 
-  if (chatItems.length || sightings.length) parts.push(ONLY_WHAT_YOU_KNOW);
+  if (chatItems.length || sightings.length) parts.push(beforeReplying);
 
   // OpenClaw stamps each user turn at the LLM boundary with its wall-clock
   // write time in the host timezone, unless the text already opens with a
   // `[... YYYY-MM-DD HH:mm` envelope. Lead with simulation time so the character
   // never sees the operator's clock.
-  return `[${formatSimTime(simTime)}] ${parts.join("\n\n")}`;
+  return `[${formatSimTime(simTime)}]\n${parts.join("\n\n")}`;
 }
 
 /**
@@ -216,6 +242,7 @@ export class Perception {
   private readonly api?: OpenClawPluginApi;
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
+  private readonly text: SkillText;
   private readonly store: StateStore<PerceptionState>;
   private readonly decisionStore: StateStore<PerceptionDecisionRecord>;
   private readonly taskStore: Pick<TaskStore, "lookup">;
@@ -236,6 +263,8 @@ export class Perception {
     this.api = deps.api;
     this.serial = deps.serial ?? new KeyedAsyncQueue();
     this.slots = deps.slots ?? new BrainSlots();
+    this.text =
+      deps.text ?? (this.api ? pluginSkillText(this.api) : bundledSkillText());
 
     this.config = PERCEPTION_CONFIG.parse(
       this.deps.config ?? this.api?.pluginConfig?.perception ?? {},
@@ -288,6 +317,13 @@ export class Perception {
         "Perception input must belong to the recipient's chat or task ledger.",
       );
     }
+    // Offstage, nobody is there to see it happen (`forgetForeseen`).
+    if (
+      stimulus.foreseen &&
+      this.deps.onstage &&
+      !(await this.deps.onstage(agentId))
+    )
+      return;
     let pendingCount = 0;
     let shouldDrain = false;
     await this.change(
@@ -407,14 +443,22 @@ export class Perception {
       id: `task-deadline:${task.id}:${task.endAt}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:clock",
-      text: `Activity check-in: your ${task.type} activity was planned to end at ${formatSimTime(Date.parse(task.endAt))}. ${note ? `${note} ` : ""}Reassess your progress.`,
+      text: this.text(
+        "kazusa-deliveries#check-in",
+        {
+          type: task.type,
+          time: formatSimTime(Date.parse(task.endAt)),
+          note: note ?? "",
+        },
+        { agentId },
+      ),
       deadline: { taskId: task.id, endAt: task.endAt },
       timestamp: Date.parse(task.endAt),
     };
     await this.receive(agentId, stimulus);
   }
 
-  async idleWake(agentId: string, text?: string): Promise<void> {
+  async idleWake(agentId: string): Promise<void> {
     const task = await this.taskStore.lookup(agentId);
     const simNow = this.deps.clock.time();
     if (
@@ -428,7 +472,7 @@ export class Perception {
       id: `task-idle:${agentId}:${simNow}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:taskman",
-      text: text ?? "Activity check-in: no scheduled activity.",
+      text: this.text("kazusa-deliveries#idle-check-in", {}, { agentId }),
       idle: true,
       timestamp: simNow,
     };
@@ -535,6 +579,20 @@ export class Perception {
       if (state.brainRun === runId || state.brainRun === "external") {
         delete state.brainRun;
         delete state.brainContext;
+        // A steer still in custody when its turn ends was refused, and OpenClaw
+        // would run it as a turn of its own. Take it back: its items, still in
+        // the steer queue, join the next turn with everything else.
+        const refused = state.deliveries?.filter(
+          (delivery) => delivery.mode === "steer",
+        );
+        if (refused?.length) {
+          for (const delivery of refused)
+            steerCustody().get(delivery.id)?.abort();
+          state.deliveries = state.deliveries?.filter(
+            (delivery) => delivery.mode !== "steer",
+          );
+          if (!state.deliveries?.length) delete state.deliveries;
+        }
         state.stopped = stopped;
         queued = state.pending.length;
         changed = true;
@@ -590,6 +648,10 @@ export class Perception {
         this.change(
           agentId,
           async (state) => {
+            // Sightings kept from before going offstage never happen
+            // (`forgetForeseen`).
+            if (this.deps.onstage && !(await this.deps.onstage(agentId)))
+              state.pending = state.pending.filter((item) => !item.foreseen);
             const adopted = this.deps.adopted;
             if (state.deliveries?.length && adopted) {
               for (const delivery of state.deliveries) {
@@ -667,6 +729,22 @@ export class Perception {
     await this.change(agentId, () => {});
   }
 
+  /**
+   * Going offstage: an offstage observer saw nothing, so what they were due to
+   * notice never happens for them. Paused or offstage nothing drains, so left
+   * here these only pile up until `confirm` refuses them all. Texts still
+   * wait.
+   */
+  async forgetForeseen(agentId: string): Promise<void> {
+    await this.change(
+      agentId,
+      (state) => {
+        state.pending = state.pending.filter((item) => !item.foreseen);
+      },
+      false,
+    );
+  }
+
   /** The clock runs again: take up whatever waited while it was paused. */
   async resume(): Promise<void> {
     const agents = (await this.store.entries())
@@ -688,6 +766,46 @@ export class Perception {
       chars += item.text.length;
     }
     return selected;
+  }
+
+  /** A batch with the steer queue taken first, in the order they came. */
+  private batchUrgentFirst(items: PendingItem[]): PendingItem[] {
+    const chosen = new Set(
+      this.batch([
+        ...items.filter((item) => item.action === "STEER"),
+        ...items.filter((item) => item.action !== "STEER"),
+      ]),
+    );
+    return items.filter((item) => chosen.has(item));
+  }
+
+  /**
+   * Unread lines of in-person conversation the talk has left behind: older than
+   * `staleChatterMs`, but never a conversation's newest line, so none goes
+   * silent. A phone message waits however long it takes.
+   */
+  private mootChatter(
+    pending: readonly PendingItem[],
+    reserved: ReadonlySet<string>,
+  ): PendingItem[] {
+    const limit = this.config.staleChatterMs;
+    if (!limit) return [];
+    const said = (item: PendingItem): number => item.burstAt ?? item.timestamp;
+    const newest = new Map<string, PendingItem>();
+    for (const item of pending) {
+      if (!isHuddle(item)) continue;
+      const latest = newest.get(item.sessionKey);
+      if (!latest || said(item) >= said(latest))
+        newest.set(item.sessionKey, item);
+    }
+    const now = this.deps.clock.time();
+    return pending.filter(
+      (item) =>
+        isHuddle(item) &&
+        newest.get(item.sessionKey) !== item &&
+        !reserved.has(stimulusKey(item)) &&
+        now - said(item) > limit,
+    );
   }
 
   private isCurrent(item: Stimulus, task?: ActiveTask): boolean {
@@ -777,6 +895,22 @@ export class Perception {
       state.pending = state.pending.filter(
         (item) => reserved.has(stimulusKey(item)) || this.isCurrent(item, task),
       );
+      const moot = new Set(
+        this.mootChatter(state.pending, reserved).flatMap(keysOf),
+      );
+      if (moot.size) {
+        state.pending = state.pending.filter(
+          (item) => !moot.has(stimulusKey(item)),
+        );
+        // Let go unread, as an ignored line is: never shown to the brain.
+        state.processedIds = [...(state.processedIds ?? []), ...moot].slice(
+          -1_000,
+        );
+        state.ignoredIds = [...(state.ignoredIds ?? []), ...moot].slice(-1_000);
+        this.api?.logger.info(
+          `Perception ${agentId}: let ${moot.size} unread lines of conversation go`,
+        );
+      }
       const available = state.pending.filter(
         (item) => !reserved.has(stimulusKey(item)),
       );
@@ -825,6 +959,14 @@ export class Perception {
       const queuedReview = review.length > 0;
       const fresh = queuedReview ? review : happened;
       if (!fresh.length) {
+        // The steer queue goes into the running turn whole, one steer at a
+        // time: what is approved while one is in custody joins the next.
+        const steer =
+          state.brainRun &&
+          !state.deliveries?.some((delivery) => delivery.mode === "steer")
+            ? this.batch(available.filter((item) => item.action === "STEER"))
+            : [];
+        if (steer.length) return this.reserve(agentId, state, steer, "steer");
         await this.save(agentId, state);
         if (busy || !available.length) {
           // A busy brain drains when it ends; only what has not happened yet
@@ -847,7 +989,7 @@ export class Perception {
         }
         // Picking up the phone shows everything that was waiting, but not
         // what has not happened yet.
-        const waiting = this.batch(
+        const waiting = this.batchUrgentFirst(
           available.filter((item) => item.timestamp <= now),
         );
         if (!systemAgent && !this.takeSlot(agentId, waiting)) {
@@ -908,31 +1050,30 @@ export class Perception {
         await this.save(agentId, state);
         continue;
       }
+      // Into the steer queue, sent from the top of the loop.
+      if (action === "STEER" && current.length && busy) {
+        for (const item of current) item.action = "STEER";
+        await this.save(agentId, state);
+        continue;
+      }
       if (action === "STEER" && current.length) {
-        const admitted = busy
-          ? current
-          : this.batch([
-              ...current,
-              ...available.filter(
-                (item) =>
-                  this.isCurrent(item, currentTask) &&
-                  item.action === "QUEUE_NEXT" &&
-                  !item.reviewAfterRun &&
-                  !current.some(
-                    (entry) => stimulusKey(entry) === stimulusKey(item),
-                  ),
-              ),
-            ]);
-        if (!busy && !systemAgent && !this.takeSlot(agentId, admitted)) {
+        const approved = available.filter(
+          (item) =>
+            this.isCurrent(item, currentTask) &&
+            item.action &&
+            !item.reviewAfterRun &&
+            !current.some((entry) => stimulusKey(entry) === stimulusKey(item)),
+        );
+        const admitted = this.batch([
+          ...current,
+          ...approved.filter((item) => item.action === "STEER"),
+          ...approved.filter((item) => item.action !== "STEER"),
+        ]);
+        if (!systemAgent && !this.takeSlot(agentId, admitted)) {
           await this.save(agentId, state);
           return;
         }
-        return this.reserve(
-          agentId,
-          state,
-          admitted,
-          busy ? "steer" : "followup",
-        );
+        return this.reserve(agentId, state, admitted, "followup");
       }
       const ignored = new Set<string>();
       for (const item of current) {
@@ -972,12 +1113,13 @@ export class Perception {
     busy: boolean,
     queuedReview = false,
   ): Promise<AttentionDecision & DecisionTrace> {
-    // With no judgment to go on, a group chat can wait; anything else may not.
+    // With no judgment to go on, a group chat can wait for the activity to end
+    // and anything else for the next turn; none is worth breaking into one.
     const fallback = bundle.every((item) =>
       item.sessionKey.includes(":chat:group:"),
     )
       ? "DEFER"
-      : "STEER";
+      : "QUEUE_NEXT";
     const admit = (note: string) =>
       ({ action: fallback, delayMs: 0, source: "fallback", note }) as const;
     const assemble = this.deps.assembleDecisionContext;
@@ -1026,7 +1168,7 @@ export class Perception {
                 !bundle.some(
                   (incoming) => stimulusKey(incoming) === stimulusKey(item),
                 ) &&
-                (item.action === "QUEUE_NEXT" ||
+                (item.action ||
                   state.deliveries?.some((delivery) =>
                     delivery.keys.includes(stimulusKey(item)),
                   )),
@@ -1141,7 +1283,7 @@ export class Perception {
         },
       );
     });
-    if (!held) for (const item of admitted) item.action = "QUEUE_NEXT";
+    if (!held) for (const item of admitted) item.action ??= "QUEUE_NEXT";
     return held;
   }
 
@@ -1174,9 +1316,14 @@ export class Perception {
       keys,
       ids: bundle.map((item) => item.id),
       sessionKeys,
-      message: formatDeliveryMessage(bundle, mode, this.deps.clock.time()),
+      message: formatDeliveryMessage(
+        bundle,
+        this.deps.clock.time(),
+        this.text("kazusa-deliveries#before-replying", {}, { agentId }),
+      ),
     };
     if (mode === "followup") this.slots.dispatch(agentId);
+    else steerCustody().set(delivery.id, new AbortController());
     state.deliveries = [...(state.deliveries ?? []), delivery];
     await this.save(agentId, state);
     return delivery;
@@ -1188,10 +1335,18 @@ export class Perception {
       let adopted = false;
       let deferred = false;
       let failed = false;
+      // Only a steer has one; aborted once its turn ended without it (`ended`).
+      const custody =
+        delivery.mode === "steer" ? steerCustody().get(delivery.id) : undefined;
+      const takenBack = (): boolean => custody?.signal.aborted === true;
       const fail = async (
         error: unknown,
         uncertain: boolean,
       ): Promise<void> => {
+        if (takenBack()) {
+          resolve();
+          return;
+        }
         this.warn(error);
         if (adopted || failed) return;
         failed = true;
@@ -1222,12 +1377,15 @@ export class Perception {
       const lifecycle: NonNullable<GetReplyOptions["turnAdoptionLifecycle"]> = {
         admission: "exclusive",
         ownerKey: delivery.id,
+        ...(custody ? { abortSignal: custody.signal } : {}),
         onAdopted: async () => {
+          let held = false;
           await this.change(
             delivery.agentId,
             (state) => {
               if (!state.deliveries?.some((item) => item.id === delivery.id))
                 return;
+              held = true;
               state.pending = state.pending.filter(
                 (item) => !delivery.keys.includes(stimulusKey(item)),
               );
@@ -1249,6 +1407,9 @@ export class Perception {
             },
             false,
           );
+          // Adopted just as it was taken back: its turn starts aborted, and
+          // its items wait for the next one.
+          if (!held && takenBack()) return;
           adopted = true;
           resolve();
           for (const listener of this.adoptedListeners) {
@@ -1283,6 +1444,7 @@ export class Perception {
             false,
           ),
         onSettled: () => {
+          steerCustody().delete(delivery.id);
           if (!adopted && !failed)
             reportFailure(
               new Error(`Brain handoff unconfirmed: ${delivery.id}`),
@@ -1298,6 +1460,12 @@ export class Perception {
             this.assertCurrent();
             if (!this.deps.deliver)
               throw new Error("Perception requires a brain delivery adapter");
+            // Its turn ended before it could even be sent.
+            if (takenBack()) {
+              steerCustody().delete(delivery.id);
+              resolve();
+              return;
+            }
             await this.deps.deliver(delivery, lifecycle);
           } finally {
             if (delivery.mode === "followup")

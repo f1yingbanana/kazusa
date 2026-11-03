@@ -144,6 +144,59 @@ describe("Jev decision provider", () => {
     });
   });
 
+  it("reports what each answered call cost, and whose it was", async () => {
+    const onUsage = vi.fn();
+    const post: JevDeps["post"] = async () => ({
+      status: 200,
+      retryAfter: null,
+      body: JSON.stringify({
+        model: "jev-1.14",
+        answers,
+        usage: { input_tokens: 275, output_tokens: 20, cost: 0.00003 },
+      }),
+    });
+    const jev = createJevProvider({
+      ...keys({ OPENROUTER_API_KEY: "or-key" }),
+      post,
+      onUsage,
+    });
+    await jev.evaluate(batch, context({ agentId: "airi" }));
+    expect(onUsage).toHaveBeenCalledWith({
+      agentId: "airi",
+      route: JEV_ROUTES[0],
+      inputTokens: 275,
+      outputTokens: 20,
+      cost: 0.00003,
+    });
+  });
+
+  it.each([
+    [
+      "the upstream bill too, when BYOK",
+      { cost: 0.25, cost_details: { upstream_inference_cost: 0.5 } },
+      0.75,
+    ],
+    ["OpenRouter's own charge", { cost: 0.25 }, 0.25],
+    ["no price when none is given", {}, undefined],
+  ])("counts %s", async (_name, priced, cost) => {
+    const onUsage = vi.fn();
+    const post: JevDeps["post"] = async () => ({
+      status: 200,
+      retryAfter: null,
+      body: JSON.stringify({
+        model: "jev-1.14",
+        answers,
+        usage: { input_tokens: 305, output_tokens: 31, ...priced },
+      }),
+    });
+    await createJevProvider({
+      ...keys({ OPENROUTER_API_KEY: "or-key" }),
+      post,
+      onUsage,
+    }).evaluate(batch, context());
+    expect(onUsage.mock.calls[0]?.[0].cost).toBe(cost);
+  });
+
   it.each([
     [401, "authentication"],
     [402, "authentication"],

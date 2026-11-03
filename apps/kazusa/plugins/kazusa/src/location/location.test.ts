@@ -142,7 +142,7 @@ describe("location", () => {
     ).record!;
     expect(arrive(map, record, record.trip!.arriveAt)).toEqual({
       record: { placeId: "dorm", since: minutes(13) },
-      note: 'You\'ve arrived at Dorm `dorm`. You came here for "Heading out", planning about 17 min. Carry on with it, or change your mind.',
+      note: 'You\'ve arrived at Dorm `dorm`. You came here for "Heading out", planning about 17 min.',
     });
   });
 
@@ -181,7 +181,7 @@ describe("location", () => {
       await start({ where: "Trinity Beach", task: task(30), travel: true }),
     ).toEqual({
       record: atClub,
-      note: "You don't know the way to \"Trinity Beach\": it isn't anywhere you know how to get to. You're still at Club; ask someone, or head for a place you know.",
+      note: "You don't know the way to \"Trinity Beach\": it isn't anywhere you know how to get to. You're still at Club.",
       payload: { where: "club", unknown: "Trinity Beach" },
     });
   });

@@ -231,7 +231,7 @@ describe("registerCharactersHttp", () => {
     };
 
     const sent = await post({ ids: ["kazusa", "kazusa"], onstage: false });
-    expect(setOnstage).toHaveBeenCalledWith("kazusa", false);
+    expect(setOnstage).toHaveBeenCalledWith("kazusa", false, ["kazusa"]);
     expect(sent).toMatchObject({
       status: 200,
       json: {

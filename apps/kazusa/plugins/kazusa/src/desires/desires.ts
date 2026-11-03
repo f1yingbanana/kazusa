@@ -218,9 +218,10 @@ export function afterwardsParameter(
   const desires = config.catalog
     .map(({ name, description }) => `${name}: ${description}`)
     .join("\n");
+  // Its wording is `kazusa-tools#start_task.afterwards`; this is its `{data}`.
   return {
     type: "object",
-    description: `Only the desires this activity changes, each as current${ARROW}afterwards state, e.g. a night's sleep: { "energy": "low${ARROW}full" }. Desires:\n${desires}`,
+    description: desires,
     propertyNames: { enum: config.catalog.map(({ name }) => name) },
     additionalProperties: { type: "string", enum: transitions(config) },
   };
@@ -232,8 +233,6 @@ export function delayAfterwardsParameter(
 ): Record<string, unknown> {
   return {
     type: "object",
-    description:
-      "As in start_task: only the desires the extended activity changes, as current→afterwards state.",
     additionalProperties: { type: "string", enum: transitions(config) },
   };
 }

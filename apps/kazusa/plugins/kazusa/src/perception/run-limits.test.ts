@@ -91,7 +91,7 @@ describe("brain run hard budgets", () => {
     h.tool("a");
     h.tool("b");
     expect(h.tool("c")).toMatchObject({
-      blockReason: expect.stringContaining("send_message"),
+      blockReason: expect.stringContaining("You can still speak."),
     });
     expect(h.tool("d", "send_message")).toBeUndefined();
     expect(native.abort).not.toHaveBeenCalled();

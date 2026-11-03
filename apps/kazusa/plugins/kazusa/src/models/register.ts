@@ -11,9 +11,10 @@ import {
 /**
  * Every character turn runs in its `:brain` session (Perception handles cron
  * wakes and everything else without a model call), so that is the one place the
- * selection has to reach. The model is swapped per turn here; reasoning has no
- * hook, so the brain channel writes it onto the session before each dispatch
- * (`thinking` in `registerBrainChannel`).
+ * selection has to reach. The model is swapped per turn here, and the brain
+ * channel also writes it onto the session before each new turn, since OpenClaw
+ * checks a steer against the session's model; reasoning has no hook, so it goes
+ * only on the session (`registerBrainChannel`).
  */
 export function registerModels(api: OpenClawPluginApi): ModelSelectionStore {
   const selection = createModelSelection(

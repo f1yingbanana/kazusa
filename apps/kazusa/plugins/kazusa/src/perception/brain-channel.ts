@@ -4,7 +4,9 @@ import { noteShutdown } from "../shutdown.ts";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readVisibleSessionTranscriptMessageEntries } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { applyModelOverrideToSessionEntry } from "openclaw/plugin-sdk/model-session-runtime";
 import type { ThinkingLevel } from "@kazusa/client";
+import { splitModelRef } from "../models/selection.ts";
 import type { PerceptionDelivery, PerceptionDeps } from "./perception.ts";
 
 const CHANNEL_ID = "kazusa";
@@ -130,11 +132,67 @@ async function applyThinking(
   });
 }
 
+/**
+ * Puts the character's chat model on the brain session, as `/model` would.
+ * `before_model_resolve` swaps the model for each turn, but OpenClaw checks a
+ * steer against the session's own model: while the two differed, it refused
+ * nearly every steer (`tool_authority_mismatch`, `runtime_rejected`). Only
+ * before a new turn, so a steer meets the model of the turn it joins.
+ */
+async function applyModel(
+  api: OpenClawPluginApi,
+  agentId: string,
+  ref: string | undefined,
+): Promise<void> {
+  const selection = ref ? splitModelRef(ref) : undefined;
+  await api.runtime.agent.session.patchSessionEntry({
+    agentId,
+    sessionKey: brainKey(agentId),
+    preserveActivity: true,
+    update: (entry) => {
+      // No choice: OpenClaw's configured primary, with nothing on the session.
+      if (!selection)
+        return entry.modelOverride || entry.providerOverride
+          ? {
+              providerOverride: undefined,
+              modelOverride: undefined,
+              modelOverrideSource: undefined,
+              modelOverrideRouteResolution: undefined,
+            }
+          : null;
+      const next = { ...entry };
+      if (
+        !applyModelOverrideToSessionEntry({
+          entry: next,
+          selection,
+          preserveAuthProfileOverride: true,
+        }).updated
+      )
+        return null;
+      // A patch merges, so a field the override removed goes as undefined.
+      const changed = new Set([...Object.keys(entry), ...Object.keys(next)]);
+      return Object.fromEntries(
+        [...changed]
+          .filter(
+            (key) =>
+              entry[key as keyof typeof entry] !==
+              next[key as keyof typeof next],
+          )
+          .map((key) => [key, next[key as keyof typeof next]]),
+      );
+    },
+  });
+}
+
 export function registerBrainChannel(
   api: OpenClawPluginApi,
   signal: AbortSignal,
-  /** The effective reasoning level for this character (Models). */
-  thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>,
+  /** This character's effective choices (Models). */
+  selection: {
+    readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
+    /** `provider/model`; absent or undefined: the configured primary. */
+    readonly model?: (agentId: string) => Promise<string | undefined>;
+  } = {},
 ): NonNullable<PerceptionDeps["deliver"]> {
   const getConfig = () => currentConfig(api);
   api.registerChannel({ plugin: BRAIN_CHANNEL });
@@ -144,13 +202,20 @@ export function registerBrainChannel(
   ): Promise<void> => {
     signal.throwIfAborted();
     const sessionKey = brainKey(delivery.agentId);
+    const { thinking, model } = selection;
     if (thinking)
       await applyThinking(
         api,
         delivery.agentId,
         await thinking(delivery.agentId),
       );
+    if (model && delivery.mode === "followup")
+      await applyModel(api, delivery.agentId, await model(delivery.agentId));
     const budget = beginBrainRun(api, delivery.agentId, delivery.id, signal);
+    // Perception takes back a steer the running turn refused (`ended`).
+    const abortSignal = lifecycle.abortSignal
+      ? AbortSignal.any([budget.signal, lifecycle.abortSignal])
+      : budget.signal;
     try {
       await api.runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
         cfg: getConfig(),
@@ -180,15 +245,27 @@ export function registerBrainChannel(
           // steer queue. Neither path aborts/restarts the current thought.
           InboundEventKind:
             delivery.mode === "steer" ? "user_request" : "room_event",
+          // A turn from `room_event` needs no reply (speech is send_message),
+          // and OpenClaw refuses a steer that expects otherwise
+          // (`reply_expectation_mismatch`): a `user_request` does, unless it is
+          // system input. Live, that refused every steer into such a turn.
+          ...(delivery.mode === "steer"
+            ? {
+                InputProvenance: {
+                  kind: "internal_system" as const,
+                  sourceChannel: CHANNEL_ID,
+                },
+              }
+            : {}),
         },
         replyOptions: {
           runId: delivery.id,
-          abortSignal: budget.signal,
+          abortSignal,
           // Run limits own how long a brain thinks; the host's default turn
           // timeout would otherwise end it first.
           timeoutOverrideSeconds: brainRunLimits(api, delivery.agentId)
             .maxRunSeconds,
-          turnAdoptionLifecycle: { ...lifecycle, abortSignal: budget.signal },
+          turnAdoptionLifecycle: { ...lifecycle, abortSignal },
           sourceReplyDeliveryMode: "message_tool_only",
           suppressTyping: true,
           disableBlockStreaming: true,

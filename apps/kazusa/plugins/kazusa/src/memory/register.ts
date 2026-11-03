@@ -21,6 +21,7 @@ import { inBackground } from "../background.ts";
 import { resolveStateDir } from "../context-engine/skill-loader.ts";
 import type { Clock } from "../clock/clock.ts";
 import { createSkillLoader } from "../context-engine/skill-loader.ts";
+import { createSkillText, describeTool } from "../skill-text.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { createSleep, type SleepPass, type SleepState } from "./sleep.ts";
@@ -290,6 +291,7 @@ export function registerMemory(
     config: currentConfig(api),
     pluginRootDir: api.rootDir,
   });
+  const text = createSkillText(skills);
   const holder = globalThis as unknown as Record<
     symbol,
     Map<string, SleepPass> | undefined
@@ -480,23 +482,23 @@ export function registerMemory(
     details: {},
   });
 
+  // Their wording is the `kazusa-tools` skill's.
+  const worded = <P>(name: string, parameters: P, agentId?: string) =>
+    describeTool(text, { name, parameters }, {}, agentId ? { agentId } : {});
+
   api.registerTool((context) => ({
-    name: "recall",
+    ...worded(
+      "recall",
+      {
+        type: "object",
+        properties: { query: { type: "string" } },
+        required: ["query"],
+        additionalProperties: false,
+      },
+      context.agentId,
+    ),
     catalogMode: "direct-only",
     label: "Recall",
-    description:
-      "Try to remember something on the tip of your tongue: searches what you remember and what you would know.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "What you are trying to remember, in your own words.",
-        },
-      },
-      required: ["query"],
-      additionalProperties: false,
-    },
     async execute(_id: string, input: unknown) {
       const agentId = toolAgent(context);
       const { query } = z.object({ query: z.string().min(1) }).parse(input);
@@ -524,19 +526,18 @@ export function registerMemory(
   }));
 
   api.registerTool((context) => ({
-    name: "look_up",
+    ...worded(
+      "look_up",
+      {
+        type: "object",
+        properties: { topic: { type: "string" } },
+        required: ["topic"],
+        additionalProperties: false,
+      },
+      context.agentId,
+    ),
     catalogMode: "direct-only",
     label: "Look Up",
-    description:
-      "Check a public source, such as a school portal, for something you don't know. Only finds what is publicly known.",
-    parameters: {
-      type: "object",
-      properties: {
-        topic: { type: "string", description: "What to look up." },
-      },
-      required: ["topic"],
-      additionalProperties: false,
-    },
     async execute(_id: string, input: unknown) {
       const agentId = toolAgent(context);
       const { topic } = z.object({ topic: z.string().min(1) }).parse(input);
@@ -579,39 +580,24 @@ export function registerMemory(
   }));
 
   api.registerTool((context) => ({
-    name: "remember",
+    ...worded(
+      "remember",
+      {
+        type: "object",
+        properties: {
+          about: { type: "string" },
+          note: { type: "string" },
+          source: { type: "string" },
+          certainty: { type: "string", enum: [...CERTAINTIES] },
+          on: { type: "string" },
+        },
+        required: ["about", "note"],
+        additionalProperties: false,
+      },
+      context.agentId,
+    ),
     catalogMode: "direct-only",
     label: "Remember",
-    description:
-      "Note a plan or promise someone made with you, someone new you met or heard of, or something that changes how you see someone. Call it before replying. Ordinary chat needs no note.",
-    parameters: {
-      type: "object",
-      properties: {
-        about: {
-          type: "string",
-          description:
-            "Who or what it is about, by name or id; `me` for your own plans and promises.",
-        },
-        note: { type: "string", description: "What to remember." },
-        source: {
-          type: "string",
-          description:
-            "How you know: `seen it`, `told by <id>`, `overheard <id>`, `read it` or `my guess`. Defaults to `seen it`.",
-        },
-        certainty: {
-          type: "string",
-          enum: [...CERTAINTIES],
-          description: "How sure you are. Defaults to `sure`.",
-        },
-        on: {
-          type: "string",
-          description:
-            "With `about: me`: the day a plan happens, YYYY-MM-DD. Defaults to today.",
-        },
-      },
-      required: ["about", "note"],
-      additionalProperties: false,
-    },
     async execute(_id: string, input: unknown) {
       const agentId = toolAgent(context);
       const args = z

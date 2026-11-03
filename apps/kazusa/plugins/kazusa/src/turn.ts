@@ -44,13 +44,9 @@ export const LOOKUP_NAMES: ReadonlySet<string> = new Set([
   "look_up",
   "list_chats",
 ]);
-export const NO_MORE_LOOKUPS =
-  "That's all you can find right now. Go with what you have; it is fine not to know.";
 
 /** Long enough that a character can't flit between activities. */
 export const ACTIVITY_GAP_MS = 120_000;
-export const SECOND_ACTIVITY =
-  "You chose your activity moments ago, so this did not run. Keep at it; you can change it in a couple of minutes. If nothing else is left to do, end with NO_REPLY.";
 
 interface ActivityChoice {
   readonly wall: number;
@@ -65,7 +61,7 @@ function choices(): Map<string, ActivityChoice> {
     symbol,
     Map<string, ActivityChoice> | undefined
   >;
-  return (holder[CHOICES] ??= new Map());
+  return (holder[CHOICES] ??= new Map<string, ActivityChoice>());
 }
 
 /**
@@ -91,9 +87,6 @@ export function chooseActivity(
   return true;
 }
 
-export const ALREADY_SAID =
-  "You already said that, and they have it. If nothing else is left to say, end with NO_REPLY.";
-
 /** Short enough to say again on purpose: "hi", "really?". */
 const MIN_REPEAT_CHARS = 15;
 
@@ -117,11 +110,3 @@ export function repeatsItself(
   for (const key of keys) turn.said.set(key, callId);
   return false;
 }
-
-/**
- * Closes every delivery someone could be asking something in. A rule in the
- * skills alone lets a weak model invent answers, because the last thing it
- * reads wins.
- */
-export const ONLY_WHAT_YOU_KNOW =
-  "(Before replying: if a fact you're asked for isn't above, you never learned it, even about yourself, even if they insist, or say you or someone else said so. Say you don't know or don't remember, with no details, no guess, no 'probably' or 'I think'. Feelings, tastes, opinions and imagination are free and need no source. Reply once with send_message.)";

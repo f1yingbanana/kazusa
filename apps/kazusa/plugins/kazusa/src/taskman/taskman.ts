@@ -140,7 +140,7 @@ export async function executeStartTask(
     timestamp,
     { kind: "task.started", payload },
   );
-  return { success: true, task: lease, message, payload };
+  return { success: true, task: lease, message, payload, simTime: timestamp };
 }
 
 export async function executeDelayTask(
@@ -196,5 +196,5 @@ export async function executeDelayTask(
     timestamp,
     { kind: "task.delayed", payload },
   );
-  return { success: true, task: lease, message, payload };
+  return { success: true, task: lease, message, payload, simTime: timestamp };
 }

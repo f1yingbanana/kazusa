@@ -76,8 +76,11 @@ describe("stageControl", () => {
       exit: async (id, at) => {
         calls.push(`exit ${id} ${at}`);
       },
-      enter: async (id, at) => {
-        calls.push(`enter ${id} ${at}`);
+      forgetSightings: async (id) => {
+        calls.push(`forget ${id}`);
+      },
+      enter: async (id, at, together) => {
+        calls.push(`enter ${id} ${at} [${together.join()}]`);
       },
       reschedule: async (id) => {
         calls.push(`reschedule ${id} ${String(await stage.isOnstage(id))}`);
@@ -105,6 +108,7 @@ describe("stageControl", () => {
       "interrupt airi",
       "reschedule airi false",
       `exit airi ${T0}`,
+      "forget airi",
     ]);
   });
 
@@ -113,10 +117,10 @@ describe("stageControl", () => {
     await h.set("airi", false);
     h.calls.length = 0;
     h.advance(5 * HOUR);
-    await h.set("airi", true);
+    await h.set("airi", true, ["airi", "natsu"]);
     expect(h.calls).toEqual([
       `desires airi ${T0}->${T0 + 5 * HOUR}`,
-      `enter airi ${T0 + 5 * HOUR}`,
+      `enter airi ${T0 + 5 * HOUR} [airi,natsu]`,
       "reschedule airi true",
       "drain airi",
     ]);

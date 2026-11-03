@@ -12,7 +12,6 @@ export interface IdleSupervisorDeps {
   readonly perception: Perception;
   readonly intervalMs?: number;
   readonly maxAgentsPerTick?: number;
-  readonly idleText?: string;
   /** Shared by every registration in the process; each test gets its own. */
   readonly cell?: SupervisorCell;
   /** Offstage characters are never checked in on. */
@@ -46,7 +45,6 @@ export function startIdleSupervisor(
   const getConfig = () => currentConfig(api);
   const intervalMs = deps.intervalMs ?? 60_000;
   const maxAgentsPerTick = deps.maxAgentsPerTick ?? 2;
-  const idleText = deps.idleText;
   const cell = deps.cell ?? { running: false, lastTickAt: 0 };
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -98,11 +96,7 @@ export function startIdleSupervisor(
 
       for (const agentId of selected) {
         try {
-          if (idleText !== undefined) {
-            await deps.perception.idleWake(agentId, idleText);
-          } else {
-            await deps.perception.idleWake(agentId);
-          }
+          await deps.perception.idleWake(agentId);
         } catch (err: unknown) {
           api.logger.warn(
             `Taskman supervisor failed to wake idle agent ${agentId}: ${String(err)}`,

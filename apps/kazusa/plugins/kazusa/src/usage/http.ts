@@ -2,6 +2,10 @@ import { UsageResponseSchema, type UsageResponse } from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
 import {
+  withDecisionUsage,
+  type DecisionUsageLedger,
+} from "../decisions/usage.ts";
+import {
   createRouteRegistrar,
   resolveAuthToken,
   sendJson,
@@ -48,9 +52,13 @@ export function toUsageResponse(result: SessionsUsageResult): UsageResponse {
  * Serves OpenClaw's own usage report. `api.runtime.gateway.request` is reserved
  * for bundled and official plugins, so this asks the Gateway the way its CLI
  * does, with the token this plugin already authenticates routes with. Nothing
- * here counts tokens: `sessions.usage` is the one source.
+ * here counts tokens: `sessions.usage` is the source for every session, and
+ * decision calls, which run in none, come from `decisions`.
  */
-export function registerUsageHttp(api: OpenClawPluginApi): void {
+export function registerUsageHttp(
+  api: OpenClawPluginApi,
+  decisions?: Pick<DecisionUsageLedger, "between">,
+): void {
   createRouteRegistrar(api)("usage", "GET", async (req, res) => {
     const days = Number(
       new URL(req.url ?? "/", "http://localhost").searchParams.get("days"),
@@ -73,6 +81,16 @@ export function registerUsageHttp(api: OpenClawPluginApi): void {
       },
       { progress: false },
     )) as unknown as SessionsUsageResult;
-    sendJson(res, 200, toUsageResponse(result));
+    const report = toUsageResponse(result);
+    sendJson(
+      res,
+      200,
+      decisions
+        ? withDecisionUsage(
+            report,
+            await decisions.between(report.startDate, report.endDate),
+          )
+        : report,
+    );
   });
 }

@@ -22,7 +22,7 @@ import type { Huddle } from "../messaging/messaging.ts";
 import { crossings } from "./encounters.ts";
 import { clientRecord } from "./http.ts";
 import { LOCATION_CONFIG, USER, type LocationConfig } from "./config.ts";
-import { judge } from "./judgment.ts";
+import { judge, type JudgeDeps } from "./judgment.ts";
 import {
   placesNamedIn,
   readPlaceCards,
@@ -50,12 +50,16 @@ import {
 import { writePositions } from "./map-position.ts";
 import { sharedWorld, type World } from "./world.ts";
 
-/** The `where` parameter: short and stable, whatever the size of the world. */
+/**
+ * The `where` parameter: short and stable, whatever the size of the world. Its
+ * wording is `kazusa-tools#start_task.where`; this is its `{data}`.
+ */
 function whereParameter(config: LocationConfig) {
-  const travel = config.travelCategories.map((type) => `\`${type}\``);
   return {
     type: "string",
-    description: `Where this activity happens: a place from Where you are (id or name), or your own words for a spot where you are. Somewhere else, you walk over first. With ${travel.join(" or ")}, the trip is the activity: \`where\` is your destination and its duration is how long you take, however you go.`,
+    description: config.travelCategories
+      .map((type) => `\`${type}\``)
+      .join(" or "),
   };
 }
 
@@ -99,9 +103,14 @@ export interface LocationService {
   readonly exit: (id: string, at: number) => Promise<void>;
   /**
    * Coming back onstage: they are where they were (or on their way), seen by
-   * whoever is there as if they had just come in.
+   * whoever is there as if they had just come in. Those in `together` come on
+   * with them: nobody walked in on anybody, so they don't sight each other.
    */
-  readonly enter: (id: string, at: number) => Promise<void>;
+  readonly enter: (
+    id: string,
+    at: number,
+    together?: readonly string[],
+  ) => Promise<void>;
   /**
    * Puts someone at a place now, without travel. Operators place characters;
    * the player, who has no tasks, moves only this way.
@@ -179,6 +188,8 @@ export function registerLocation(
     ) => readonly string[];
     /** Offstage characters are nowhere. Absent: everyone is onstage. */
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
+    /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
+    readonly evaluate?: JudgeDeps["evaluate"];
   },
 ): LocationService {
   const getConfig = () => currentConfig(api);
@@ -296,7 +307,9 @@ export function registerLocation(
     };
   };
   const judgeWith = (agentId: string, question: string) => ({
-    evaluate: api.runtime.decisions?.evaluate.bind(api.runtime.decisions),
+    evaluate:
+      deps.evaluate ??
+      api.runtime.decisions?.evaluate.bind(api.runtime.decisions),
     rubric: () =>
       skillLoader.loadSkillDocument("location-judgment", {
         agentId,
@@ -464,6 +477,7 @@ export function registerLocation(
     current: LocationRecord,
     before: string | undefined,
     at: number,
+    together: readonly string[] = [],
   ): Promise<void> => {
     const world = currentWorld();
     if (!world) return;
@@ -478,7 +492,9 @@ export function registerLocation(
       await leave(who, before, at, toward);
     }
     if (after !== undefined && after !== before) {
-      const others = (await occupants(after, at)).filter((id) => id !== who);
+      const others = (await occupants(after, at)).filter(
+        (id) => id !== who && !together.includes(id),
+      );
       const huddles = await huddlesAt(after);
       const inHuddle = new Set(huddles.flatMap(({ members }) => members));
       // The arriver may notice each group there; one sighting per group.
@@ -895,14 +911,14 @@ export function registerLocation(
       if (position.kind === "at") await leave(id, position.placeId, at);
       if (current.noticed?.length) await save(id, { ...current, noticed: [] });
     },
-    enter: async (id, at) => {
+    enter: async (id, at, together) => {
       const world = currentWorld();
       if (!world) return;
       const current = await record(id);
       if (!current) return;
       // Observers dropped them while they were away; this brings them back.
       await save(id, current);
-      await moved(id, current, undefined, at);
+      await moved(id, current, undefined, at, together);
     },
     whereabouts: async (agentId, at, evidence) => {
       const world = currentWorld();

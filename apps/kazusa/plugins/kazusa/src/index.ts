@@ -12,7 +12,12 @@ import { registerClock } from "./clock/register.ts";
 import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
+import { directDecisions } from "./decisions/direct.ts";
 import { createJevProvider, gatewayJevDeps } from "./decisions/jev.ts";
+import {
+  createDecisionUsage,
+  type DecisionUsageBucket,
+} from "./decisions/usage.ts";
 import { registerDecisionModelsHttp } from "./decisions/http.ts";
 import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
@@ -52,7 +57,20 @@ export default definePluginEntry({
   register(api: OpenClawPluginApi): void {
     rememberRegistration(api);
     const jev = gatewayJevDeps(api);
-    api.registerDecisionProvider(createJevProvider(jev));
+    const decisionUsage = createDecisionUsage(
+      api.runtime.state.openKeyedStore<DecisionUsageBucket>({
+        namespace: "decisions",
+        retention: "retained",
+      }),
+      (error) => api.logger.warn(`Decision usage: ${String(error)}`),
+    );
+    const jevProvider = createJevProvider({
+      ...jev,
+      onUsage: decisionUsage.record,
+    });
+    // Still OpenClaw's configured decision model, but Kazusa calls it itself.
+    api.registerDecisionProvider(jevProvider);
+    const decide = directDecisions(jevProvider);
     registerDecisionModelsHttp(api, {
       selection: modelSelection(api),
       keyConfigured: jev.keyConfigured,
@@ -110,6 +128,7 @@ export default definePluginEntry({
     });
     const location = registerLocation(api, {
       clock,
+      evaluate: decide,
       broadcaster,
       stage,
       rememberedPlaces: memory.places,
@@ -161,7 +180,7 @@ export default definePluginEntry({
     contextRef.current = context;
     registerContextHttp(api, { context });
     registerSkills(api);
-    registerUsageHttp(api);
+    registerUsageHttp(api, decisionUsage);
 
     const assembleDecisionContext = createDecisionContextAssembler(api, {
       clock,
@@ -171,6 +190,7 @@ export default definePluginEntry({
     });
     const perception = registerPerception(api, {
       clock,
+      evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
       // The wake turn should see the morning's memory, within reason.
@@ -190,6 +210,7 @@ export default definePluginEntry({
         );
       },
       thinking: async (agentId) => (await models.read(agentId)).thinking,
+      model: async (agentId) => (await models.read(agentId)).model,
     });
     registerBrainHttp(api);
     registerBrainTraceHttp(
@@ -257,6 +278,7 @@ export default definePluginEntry({
           messaging.interrupt(id);
         },
         exit: location.exit,
+        forgetSightings: (id) => perception.forgetForeseen(id),
         enter: location.enter,
         reschedule: (id) => taskman.reschedule(id),
         resumeDesires: desires.resume,
