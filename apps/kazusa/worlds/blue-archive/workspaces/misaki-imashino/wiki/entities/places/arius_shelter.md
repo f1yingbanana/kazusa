@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: arius_shelter
-name: Arius Temporary Shelter
-learned: familiar place
+name: "Arius Squad Shelter"
+learned: always known
 ---
 
-A place I know well.
+Where we live. Four rooms and a kitchen. Saori bars the door at night. Fine by
+me, as long as nobody bars mine.

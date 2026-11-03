@@ -7,6 +7,10 @@ export const CONTEXT_ENGINE_CONFIG = z.strictObject({
   shortTermHours: z.number().min(24).default(24),
   /** Past records in a turn; `recall` is for anything older. */
   ledgerMaxTokens: allowance(3_000),
+  /** Past turns' tool calls and their outcomes; 0 leaves them out. */
+  toolHistoryMaxTokens: allowance(600),
+  /** The same for the system agent, whose jobs span many calls. */
+  systemAgentToolHistoryMaxTokens: allowance(4_000),
   decisionMaxTokens: z.number().int().min(2_000).max(32_000).default(8_000),
   decisionShortTermHours: z.number().positive().default(4),
   decisionIdentityMaxTokens: allowance(600),

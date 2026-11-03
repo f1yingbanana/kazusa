@@ -7,9 +7,10 @@ name: Nozomi Tachibana
 school: Highlander Railroad Academy
 club: Central Control Center
 is_simulated_agent: true
-home: highlander_school
+home: room_nozomi
 ---
 
 # Nozomi Tachibana
 
-Nozomi is a Highlander Railroad Academy student and Hikari’s twin, working in the Central Control Center.
+Nozomi is a Highlander Railroad Academy student and Hikari’s twin, working in
+the Central Control Center.

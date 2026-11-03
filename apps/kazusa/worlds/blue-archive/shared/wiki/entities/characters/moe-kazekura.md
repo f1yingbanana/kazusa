@@ -7,9 +7,10 @@ name: Moe Kazekura
 school: SRT Special Academy
 club: RABBIT Platoon
 is_simulated_agent: true
-home: usagi_park
+home: room_moe
 ---
 
 # Moe Kazekura
 
-Moe is RABBIT Platoon’s technically skilled operator and a former SRT student. She enjoys powerful equipment, fireworks and sweet snacks.
+Moe is RABBIT Platoon’s technically skilled operator and a former SRT student.
+She enjoys powerful equipment, fireworks and sweet snacks.

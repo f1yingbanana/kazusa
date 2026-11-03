@@ -1,0 +1,58 @@
+{
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, blank white eyes, a sweat drop, mouth open in protest"
+    },
+    "calm": {
+      "look": "calm, eyes closed, lips relaxed"
+    },
+    "dismayed": {
+      "look": "dismayed, face shadowed, mouth a small o"
+    },
+    "eerie": {
+      "look": "eerie, face shadowed, eyes shut, a thin smile"
+    },
+    "excited": {
+      "look": "excited, blushing, a wide open smile"
+    },
+    "flattered": {
+      "look": "flattered, blushing, a sweat drop, mouth slightly open"
+    },
+    "flustered": {
+      "look": "flustered, blushing, mouth wavering"
+    },
+    "gloomy": {
+      "look": "gloomy, face shadowed, eyes half-lidded, lips flat"
+    },
+    "happy": {
+      "look": "happy, mouth open in a smile"
+    },
+    "horrified": {
+      "look": "horrified, blank white eyes, sweating, mouth wavering"
+    },
+    "laughing": {
+      "look": "laughing softly with eyes shut, blushing, a toothy grin"
+    },
+    "mortified": {
+      "look": "mortified, blushing, eyes squeezed shut, mouth wavering"
+    },
+    "nervous": {
+      "look": "nervous, blushing, a sweat drop, brows raised, mouth wavering"
+    },
+    "neutral": {
+      "look": "neutral, calm, a faint smile"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, lips softly parted"
+    },
+    "smug": {
+      "look": "smug, eyes half-lidded, faint blush, a small curled smile"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, lips parted"
+    }
+  }
+}

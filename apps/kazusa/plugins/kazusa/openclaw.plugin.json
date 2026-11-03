@@ -179,6 +179,16 @@
             "minimum": 0,
             "maximum": 32000
           },
+          "toolHistoryMaxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32000
+          },
+          "systemAgentToolHistoryMaxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32000
+          },
           "shortTermHours": {
             "default": 24,
             "type": "number",
@@ -521,7 +531,9 @@
       "knowledge_explain",
       "memory_consolidate",
       "memory_restore",
-      "refresh_skills"
+      "refresh_skills",
+      "world_update",
+      "grep"
     ],
     "gatewayMethodDispatch": ["authenticated-request"]
   },

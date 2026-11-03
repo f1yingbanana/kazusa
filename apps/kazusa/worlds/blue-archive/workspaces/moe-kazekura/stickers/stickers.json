@@ -1,0 +1,134 @@
+{
+  "outfits": {
+    "gym": "a white short-sleeved gym shirt with blue trim and blue athletic shorts",
+    "swimsuit": "a cropped blue hoodie with white stripes over a black bikini, glasses hung at the collar"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, mouth wavy"
+    },
+    "content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "excited": {
+      "look": "excited, wide-eyed, a drooling open grin"
+    },
+    "flustered": {
+      "look": "flustered, a nervous sweat, mouth open"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, eyes narrowed, mouth wavy"
+    },
+    "gym-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "gym-excited": {
+      "look": "excited, wide-eyed, a drooling open grin"
+    },
+    "gym-flustered": {
+      "look": "flustered, a nervous sweat, mouth open"
+    },
+    "gym-happy": {
+      "look": "happy, a gentle open smile"
+    },
+    "gym-laughing": {
+      "look": "laughing, eyes shut, a drooling grin"
+    },
+    "gym-mischievous": {
+      "look": "mischievous, eyes narrowed, a drooling grin"
+    },
+    "gym-neutral": {
+      "look": "neutral, a faint closed-mouth smile, blushing"
+    },
+    "gym-pouting": {
+      "look": "pouting, a small frown, lips pressed"
+    },
+    "gym-relieved": {
+      "look": "relieved, eyes closed, mouth slightly open"
+    },
+    "gym-scheming": {
+      "look": "scheming, eyes flat black bars, a drooling smirk"
+    },
+    "gym-sleepy": {
+      "look": "sleepy, eyes closed, mouth small"
+    },
+    "gym-smug": {
+      "look": "smug, eyes half-closed, a sly open smile"
+    },
+    "gym-surprised": {
+      "look": "surprised, brows raised, mouth open"
+    },
+    "gym-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    },
+    "happy": {
+      "look": "happy, a gentle open smile, holding a lollipop"
+    },
+    "laughing": {
+      "look": "laughing, eyes shut, a drooling grin"
+    },
+    "mischievous": {
+      "look": "mischievous, eyes narrowed, a drooling grin"
+    },
+    "neutral": {
+      "look": "neutral, a faint closed-mouth smile, blushing, holding a lollipop"
+    },
+    "pouting": {
+      "look": "pouting, a small frown, lips pressed"
+    },
+    "relieved": {
+      "look": "relieved, eyes closed, mouth slightly open"
+    },
+    "scheming": {
+      "look": "scheming, eyes flat black bars, a drooling smirk"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, mouth small"
+    },
+    "smug": {
+      "look": "smug, eyes half-closed, a sly open smile"
+    },
+    "surprised": {
+      "look": "surprised, brows raised, mouth open"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, eyes narrowed, teeth gritted"
+    },
+    "swimsuit-excited": {
+      "look": "excited, wide-eyed, a wide open grin"
+    },
+    "swimsuit-giddy": {
+      "look": "giddy, spiral eyes, blushing, a drooling grin"
+    },
+    "swimsuit-giggling": {
+      "look": "giggling, eyes shut, blushing, a toothy grin"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, a bright open smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing, eyes shut, blushing, mouth open"
+    },
+    "swimsuit-mischievous": {
+      "look": "mischievous, eyes half-lidded, blushing, a toothy grin"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, a small frown, lips pressed"
+    },
+    "swimsuit-relieved": {
+      "look": "relieved, eyes closed, mouth slightly open"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a closed-mouth smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, wide-eyed, mouth open"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, mouth wobbling"
+    }
+  }
+}

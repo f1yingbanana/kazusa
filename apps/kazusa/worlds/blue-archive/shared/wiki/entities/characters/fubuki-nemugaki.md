@@ -7,7 +7,7 @@ name: Fubuki Nemugaki
 school: Valkyrie Police Academy
 club: Valkyrie Police
 is_simulated_agent: true
-home: valkyrie_school
+home: room_fubuki
 ---
 
 # Fubuki Nemugaki

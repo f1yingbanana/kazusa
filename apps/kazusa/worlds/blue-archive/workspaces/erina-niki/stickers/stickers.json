@@ -1,0 +1,70 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, blank glaring eyes, shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows knit, teeth gritted"
+    },
+    "bored": {
+      "look": "bored, half-lidded eyes, mouth flat"
+    },
+    "content": {
+      "look": "content, eyes closed, a small curled smile"
+    },
+    "crying": {
+      "look": "crying with eyes shut, tears running down both cheeks"
+    },
+    "curious": {
+      "look": "curious, eyes wide and bright, mouth a small o"
+    },
+    "dismayed": {
+      "look": "dismayed, blank eyes, teeth gritted, a shadowed brow"
+    },
+    "flustered": {
+      "look": "flustered, blushing, eyes wide, mouth open"
+    },
+    "frustrated": {
+      "look": "frustrated, eyes squeezed shut, a tear down one cheek"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a toothy grin"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, a small curled smile"
+    },
+    "pouting": {
+      "look": "pouting, one cheek puffed out"
+    },
+    "sad": {
+      "look": "sad, brows drooping, a small frown"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, laughing nervously, a sweat drop"
+    },
+    "shy": {
+      "look": "shy, blushing, glancing aside, lips parted"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, a small frown"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a toothy grin"
+    },
+    "surprised": {
+      "look": "surprised, pupils shrunk, mouth open"
+    },
+    "unimpressed": {
+      "look": "unimpressed, eyes narrowed, mouth flat"
+    },
+    "whining": {
+      "look": "whining, half-lidded eyes, mouth open in a groan"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, lips parted"
+    }
+  }
+}

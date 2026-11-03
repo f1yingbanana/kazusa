@@ -1,0 +1,138 @@
+{
+  "outfits": {
+    "gym": "a blue track jacket with white stripes over navy gym shorts",
+    "pajamas": "a loose white sleeveless nightshirt with a colorful print, black bike shorts, hair down",
+    "camp": "a cream knit beanie, a beige parka over a maroon sweater, hair in braids"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, a small frown"
+    },
+    "camp-annoyed": {
+      "look": "annoyed, brows furrowed, lips pressed"
+    },
+    "camp-curious": {
+      "look": "curious, eyes wide, mouth a small o"
+    },
+    "camp-grinning": {
+      "look": "grinning, a toothy smile"
+    },
+    "camp-happy": {
+      "look": "happy, eyes shut, a gentle smile"
+    },
+    "camp-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "camp-neutral": {
+      "look": "neutral, a relaxed small smile"
+    },
+    "camp-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "camp-shocked": {
+      "look": "shocked, blank round eyes, a sweat drop, mouth open"
+    },
+    "camp-smug": {
+      "look": "smug, tongue poking out, a sly smile"
+    },
+    "camp-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "camp-teary": {
+      "look": "teary, eyes squeezed shut, tears beading, mouth wobbling"
+    },
+    "camp-unimpressed": {
+      "look": "unimpressed, a blank half-lidded stare"
+    },
+    "camp-wailing": {
+      "look": "wailing, eyes squeezed shut, tears beading, mouth wide open"
+    },
+    "curious": {
+      "look": "curious, eyes wide, mouth a small o"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, brows furrowed, a small frown"
+    },
+    "gym-curious": {
+      "look": "curious, eyes wide, mouth a small o"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut, a gentle smile"
+    },
+    "gym-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "gym-neutral": {
+      "look": "neutral, a relaxed small smile"
+    },
+    "gym-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "gym-shocked": {
+      "look": "shocked, blank round eyes, a sweat drop"
+    },
+    "gym-smug": {
+      "look": "smug, tongue poking out, a sly smile"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a gentle smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "neutral": {
+      "look": "neutral, a relaxed small smile"
+    },
+    "pajamas-curious": {
+      "look": "curious, blushing, mouth a small o"
+    },
+    "pajamas-excited": {
+      "look": "excited, eyes bright, mouth open in a smile"
+    },
+    "pajamas-grinning": {
+      "look": "grinning, a toothy smile"
+    },
+    "pajamas-happy": {
+      "look": "happy, eyes shut, a gentle smile"
+    },
+    "pajamas-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pajamas-neutral": {
+      "look": "neutral, a small smile, a hand at the chin"
+    },
+    "pajamas-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "pajamas-shocked": {
+      "look": "shocked, blank round eyes, a sweat drop, mouth open"
+    },
+    "pajamas-smug": {
+      "look": "smug, tongue poking out, a sly smile"
+    },
+    "pajamas-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "pajamas-teary": {
+      "look": "teary, eyes squeezed shut, tears beading, mouth wobbling"
+    },
+    "pajamas-thinking": {
+      "look": "thinking, brows furrowed, a hand at the chin"
+    },
+    "pajamas-unimpressed": {
+      "look": "unimpressed, a blank half-lidded stare"
+    },
+    "pajamas-wailing": {
+      "look": "wailing, eyes squeezed shut, tears beading, mouth wide open"
+    },
+    "sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "shocked": {
+      "look": "shocked, blank round eyes, a sweat drop"
+    },
+    "smug": {
+      "look": "smug, tongue poking out, a sly smile"
+    }
+  }
+}

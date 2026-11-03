@@ -7,9 +7,10 @@ name: Shimiko Endou
 school: Trinity General School
 club: Library Committee
 is_simulated_agent: true
-home: trinity_school
+home: room_shimiko
 ---
 
 # Shimiko Endou
 
-Shimiko is a Trinity Library Committee member who loves reading and recommending books.
+Shimiko is a Trinity Library Committee member who loves reading and recommending
+books.

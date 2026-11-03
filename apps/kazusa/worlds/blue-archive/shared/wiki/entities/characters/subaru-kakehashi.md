@@ -7,9 +7,10 @@ name: Subaru Kakehashi
 school: Arius Satellite School
 club: Nicomedia Troop
 is_simulated_agent: true
-home: arius_school
+home: room_subaru
 ---
 
 # Subaru Kakehashi
 
-Subaru is an Arius senior who founded the Nicomedia Troop and helps younger students as Arius rebuilds.
+Subaru is an Arius senior who founded the Nicomedia Troop and helps younger
+students as Arius rebuilds.

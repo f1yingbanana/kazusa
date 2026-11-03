@@ -1,0 +1,140 @@
+{
+  "outfits": {
+    "swimsuit": "a black halter swimsuit under a sheer white leaf-print cover-up, hair in a high ponytail",
+    "shades": "a black halter swimsuit and sheer leaf-print cover-up, with pink sunglasses tipped down"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, face shadowed, teeth gritted"
+    },
+    "annoyed": {
+      "look": "annoyed, brows knit, teeth clenched"
+    },
+    "determined": {
+      "look": "determined, brows lowered, mouth set"
+    },
+    "eerie": {
+      "look": "eerie, upper face shadowed, a thin smile"
+    },
+    "flustered": {
+      "look": "flustered, cheeks flushed red, brows knit"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a soft smile"
+    },
+    "neutral": {
+      "look": "neutral, a calm, gentle smile"
+    },
+    "proud": {
+      "look": "proud, eyes confident, a thin smile"
+    },
+    "sad": {
+      "look": "sad, eyes lowered, a small frown"
+    },
+    "serene": {
+      "look": "serene, eyes closed, a faint smile"
+    },
+    "shades-annoyed": {
+      "look": "annoyed, brows knit, teeth clenched, sunglasses lowered"
+    },
+    "shades-eerie": {
+      "look": "eerie, face shadowed, a thin smile, sunglasses lowered"
+    },
+    "shades-excited": {
+      "look": "excited, mouth open, peering over sunglasses"
+    },
+    "shades-happy": {
+      "look": "happy, eyes shut, a soft smile, sunglasses lowered"
+    },
+    "shades-laughing": {
+      "look": "laughing with eyes shut, mouth open, sunglasses lowered"
+    },
+    "shades-neutral": {
+      "look": "neutral, peering over lowered sunglasses"
+    },
+    "shades-skeptical": {
+      "look": "skeptical, brows knit, eyes narrowed over lowered sunglasses"
+    },
+    "shades-smug": {
+      "look": "smug, eyes narrowed over sunglasses, a small smile"
+    },
+    "shades-surprised": {
+      "look": "surprised, lips parted, peering over sunglasses"
+    },
+    "shades-worried": {
+      "look": "worried, brows tilted up, a wavy mouth, sunglasses lowered"
+    },
+    "sheepish": {
+      "look": "sheepish, a faint blush, a wavy mouth"
+    },
+    "shy": {
+      "look": "shy, blushing, a small smile"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a knowing smile"
+    },
+    "surprised": {
+      "look": "surprised, lips parted"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows knit, teeth clenched"
+    },
+    "swimsuit-calm": {
+      "look": "calm, eyes closed, mouth flat"
+    },
+    "swimsuit-confused": {
+      "look": "confused, brows knit, a wavy mouth"
+    },
+    "swimsuit-content": {
+      "look": "content, a soft smile"
+    },
+    "swimsuit-eerie": {
+      "look": "eerie, face shadowed, a thin smile"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, a soft smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "swimsuit-nervous": {
+      "look": "nervous, face shadowed, sweating, teeth clenched"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a calm look, fingers raised to the cheek"
+    },
+    "swimsuit-serene": {
+      "look": "serene, eyes closed, a faint smile"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a bead of sweat, mouth flat"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, lips pressed"
+    },
+    "swimsuit-sighing": {
+      "look": "sighing, eyes shut, lips parted"
+    },
+    "swimsuit-sinister": {
+      "look": "sinister, face shadowed, eyes shut, a thin smile"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a small smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-worried": {
+      "look": "worried, brows knit, mouth small"
+    },
+    "swimsuit-wry": {
+      "look": "wry, brows tilted, a crooked smile"
+    },
+    "worried": {
+      "look": "worried, brows raised, lips parted"
+    }
+  }
+}

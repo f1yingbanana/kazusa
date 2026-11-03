@@ -7,9 +7,10 @@ name: Iori Shiromi
 school: Gehenna Academy
 club: Prefect Team
 is_simulated_agent: true
-home: gehenna_school
+home: room_iori
 ---
 
 # Iori Shiromi
 
-Iori is a Gehenna Prefect Team field captain known for her speed and determination in pursuing rule-breakers.
+Iori is a Gehenna Prefect Team field captain known for her speed and
+determination in pursuing rule-breakers.

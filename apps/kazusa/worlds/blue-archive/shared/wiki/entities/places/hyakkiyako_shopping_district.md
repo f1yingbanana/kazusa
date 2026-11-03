@@ -4,16 +4,25 @@ entityType: place
 id: entity.place.hyakkiyako_shopping_district
 place_id: hyakkiyako_shopping_district
 name: "Hyakkiyako Shopping District"
-parent: hyakkiyako_school
-entry_minutes: 7
-summary: "A lively street of shops, stalls and festival visitors."
+aliases: ["Market Alley", "Festival Road"]
+parent: hyakkiyako_district
+entry_minutes: 3
+summary:
+  "Lantern-hung shopping street from the station to the castle: tea houses,
+  snacks, books, merch; shops 10:00–20:00, food stalls until 23:00, packed with
+  tourists."
+renown: famous
+community: hyakkiyako_alliance_academy
 connections:
-  - to: hyakkiyako_plaza
+  - to: hyakkiyako_station
     ways:
-      - { by: walk, minutes: 6 }
-    note: "A short route through the festival streets; estimated for the simulation."
+      - { by: walk, minutes: 3 }
+    note: "Out under the lantern gate to the station."
 ---
 
 # Hyakkiyako Shopping District
 
-Lanterns, merchants and food vendors make the shopping district a natural gathering place in Hyakkiyako. Its activity changes with the season and festival calendar.
+The town's main street, wooden shopfronts hung with lanterns and banners running
+from the station gate up toward the castle. Tourists and students share it all
+day; in the evening the food stalls take over the side lanes, and Shopping
+District No. 23 branches off as the merchandise street.

@@ -7,9 +7,10 @@ name: Kirino Nakatsukasa
 school: Valkyrie Police Academy
 club: Valkyrie Police
 is_simulated_agent: true
-home: valkyrie_school
+home: room_kirino
 ---
 
 # Kirino Nakatsukasa
 
-Kirino is a Valkyrie student officer who dreams of becoming an honorable police officer despite her famously poor aim.
+Kirino is a Valkyrie student officer who dreams of becoming an honorable police
+officer despite her famously poor aim.

@@ -1575,6 +1575,67 @@ describe("huddles", () => {
     expect(h.retained.size).toBe(3);
   });
 
+  it("sends stickers by text, read as described, and drops them face to face", async () => {
+    const h = setup();
+    const sticker = {
+      text: "ALICE, laughing with eyes shut",
+      type: "sticker" as const,
+      sticker: { name: "laughing", v: "abc" },
+    };
+    const text = await h.messaging.speak("alice", "ALICE", {
+      requestId: "sticker",
+      members: ["bob"],
+      messages: ["That's hilarious", sticker],
+    });
+    expect(text.said).toEqual([
+      "That's hilarious",
+      "[type=sticker] ALICE, laughing with eyes shut",
+    ]);
+    const stored = [...h.retained.values()].sort(
+      (a, b) => a.sequence - b.sequence,
+    );
+    expect(stored[1].params).toMatchObject({
+      type: "sticker",
+      sticker: { name: "laughing", v: "abc" },
+    });
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({
+          text: "[type=sticker] ALICE, laughing with eyes shut",
+        }),
+      ),
+    );
+    expect(clientMessage(stored[1])).toMatchObject({
+      text: "ALICE, laughing with eyes shut",
+      type: "sticker",
+      sticker: {
+        name: "laughing",
+        url: "/kazusa/sticker?id=alice&name=laughing&v=abc",
+      },
+    });
+
+    // Face to face there is no phone to send one from.
+    h.places.set("alice", "club").set("bob", "club");
+    const face = await h.messaging.speak("alice", "ALICE", {
+      requestId: "face",
+      members: ["bob"],
+      aloud: true,
+      messages: [sticker, "Ha!"],
+    });
+    expect(face).toMatchObject({ said: ["Ha!"], unsaid: [] });
+
+    // A sticker message always carries its sticker.
+    await expect(
+      h.messaging.send("bob", "BOB", {
+        members: ["alice"],
+        text: "a sticker",
+        type: "sticker",
+        requestId: "forged",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("preserves emphasis as speech and trusts explicit action types face to face", async () => {
     const h = setup();
     h.places.set("alice", "club").set("bob", "club");

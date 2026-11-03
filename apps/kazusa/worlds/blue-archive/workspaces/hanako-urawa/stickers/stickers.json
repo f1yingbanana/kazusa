@@ -1,0 +1,77 @@
+{
+  "outfits": {
+    "officer": "a short white uniform dress with a navy necktie, a white garrison cap and white boots",
+    "swimsuit": "an oversized white button-up shirt worn loose over a swimsuit"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes gently closed, a faint blushing smile"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a closed smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open, a nervous sweat"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, a faint smile, softly blushing"
+    },
+    "officer-annoyed": {
+      "look": "annoyed, brows drawn together, lips pressed"
+    },
+    "officer-content": {
+      "look": "content, eyes gently closed, a faint smile"
+    },
+    "officer-happy": {
+      "look": "happy, eyes shut, a closed smile"
+    },
+    "officer-laughing": {
+      "look": "laughing with eyes shut, mouth open, a nervous sweat"
+    },
+    "officer-neutral": {
+      "look": "neutral, a calm look, a faint smile"
+    },
+    "officer-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "officer-worried": {
+      "look": "worried, brows drawn together, mouth open"
+    },
+    "sheepish": {
+      "look": "sheepish, brows tilted, a faint smile"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes gently closed, a blushing smile"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut, a closed smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open, a nervous sweat"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, half-lidded eyes, a faint smile"
+    },
+    "swimsuit-playful": {
+      "look": "playful, half-lidded eyes, mouth open in a grin"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, eyes lowered, lips pressed"
+    },
+    "swimsuit-smug": {
+      "look": "smug, half-lidded eyes, a blushing smile"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-thinking": {
+      "look": "thinking, glancing aside, lips pursed"
+    },
+    "worried": {
+      "look": "worried, brows tilted, mouth open"
+    }
+  }
+}

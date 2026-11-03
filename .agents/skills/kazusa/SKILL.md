@@ -114,6 +114,13 @@ hallucinations. Kazusa addresses these through six architectural pillars:
    - **Personal Wiki (`workspaces/<agent_id>/wiki/`)** stores what a specific
      character believes, remembers, and feels about peers, places, and concepts,
      preventing omniscient context leakage.
+   - **`shared/wiki/INDEX.md`** is the World Wiki's front page for humans and
+     the system agent: the world and its moment, the player, where the lore
+     starts, the map's top-level areas, the cast, and the world's conventions.
+     It stays high level (the folders are the listing). Characters never read
+     it, and the memory index skips it (`isPage` in `memory/index.ts`). The
+     `world-building` skill tells the system agent to read it first and keep it
+     current.
 4. **Tool-Grounded State ("Prose is Never a Fact")**:
    - Narrative prose never mutates simulation state. Locations, task leases, and
      social transitions change only when the agent invokes deterministic tools
@@ -211,18 +218,21 @@ apps/kazusa/
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
 │       ├── decisions/                  # `kazusa/jev`: Jev through OpenRouter or TypeSafe, as picked
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
+│       ├── stickers/                   # Per-character sticker sets, GET /kazusa/sticker
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
 ├── worlds/                             # Read-only templates: base.json, <id>/{world.json,shared,workspaces}
 └── world/                              # Git-ignored live world copied by the setup guide; the Gateway's cwd
     ├── openclaw.json                   # Written last by the guide; its existence means setup is done
     ├── shared/wiki/                    # WORLD WIKI (objective truth)
+    │   ├── INDEX.md                    # Front page for humans and the system agent; not a page
     │   ├── entities/{places,characters}/<id>.md
     │   ├── concepts/<topic>.md
     │   └── reports/
     ├── workspaces/<agent_id>/          # Per-agent workspace
     │   ├── SOUL.md | IDENTITY.md | MEMORY.md
     │   ├── memory/YYYY-MM-DD.md
+    │   ├── stickers/                   # <[outfit-]mood>.webp + stickers.json (references/messaging.md)
     │   └── wiki/                       # PERSONAL WIKI (subjective beliefs)
     │       ├── entities/{characters,places}/<id>.md
     │       ├── concepts/<id>.md | syntheses/ | reports/
@@ -238,6 +248,47 @@ apps/kazusa/
   (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
   is the Gateway's cwd, so playing never touches the repo. A new world, or a
   change to one, goes in its template; templates hold no simulation history.
+- **World updates** (`src/world-update/`, the system agent's `world_update` tool
+  and `world-update` skill): bring a live world up to a newer version of its
+  template. The base is `world/.template/`, the template as imported or last
+  updated (text verbatim, every file hashed in `manifest.json`), written by
+  setup (`apps/web/lib/setup/template-snapshot.ts`) and by `finish`. Pages merge
+  three-way per part (each frontmatter key, the lead, each `##` section): a
+  side's unchanged part yields to the other's change; `## Notes` and
+  `## History` union by line; a character's own fields win on her pages, and a
+  card's `name` follows the world; `map` follows the user's `layout` choice;
+  both-changed parts keep the live side and are reported. A card for a place
+  gone everywhere is dropped if it holds nothing the character wrote, otherwise
+  orphaned for the system agent to re-home. With no base (a world from before
+  snapshots), `check` reports `bestAttempt`: a stand-in base is the live page
+  minus play's marks (visit stamps, notes, history, sleep's sections, the
+  layout), so untouched pages take the creator's version and a played-on
+  character page reports its differences; nothing is removed, and `apply` needs
+  `bestAttempt: true`, the user's consent. `renames` in the template's
+  `world.json` (`{ old_id: new_id }`) carry place and concept ids, with every
+  card and position. `apply` needs a paused clock and backs up `shared/`,
+  `workspaces/`, `world.json` and the base to
+  `.state/kazusa/world-update/backups/<stamp>/` (last 3 kept); `finish` refuses
+  a map that doesn't load, re-places characters stranded on a missing place (or
+  everyone, with `rehome: all`) through `place()`, and records the new base;
+  `undo` restores the files. `openclaw.json` is never touched: new characters
+  are reported for registering.
+- **Repo search and the repository boundary** (`src/repo-search/`): the system
+  agent's `grep` searches text files line by line for a regular expression
+  (literal text when the pattern isn't valid), read-only, inside the repository
+  root (outside is refused, symlinks never followed). Paths in and out are
+  relative to the Gateway's cwd, the live world, so results feed `read` and
+  `edit`; the default is the live world. It skips secrets (`.env*`, keys),
+  dependencies, build output, databases and binaries (so `.state` yields only
+  its text files: game state itself is SQLite), the client asset cache, update
+  backups, files over 2 MB, and the update base `.template/` unless `path`
+  points into it. OpenClaw's own file tools (`read`, `write`, `edit`, `ls`,
+  `view_image`, `apply_patch`) otherwise reach anywhere the Gateway can, so a
+  `before_tool_call` guard holds every agent to the same boundary: paths resolve
+  against the agent's `cwd` (else its workspace) and through links, and anything
+  outside the repository or named `.env*` is refused with
+  `kazusa-results#outside-repository` / `#secret-file`. No repository found
+  means refusal, not access.
 - **`npm run dev`** (`scripts/dev.mjs`) installs what's missing and runs the
   frontend. The guide only asks what's missing and writes `world/openclaw.json`
   last, so its existence means setup is done; that is what starts the Gateway.
@@ -470,7 +521,19 @@ connect these modules in process.
 - Replays no past brain turns (`brainHistory`): only the turn under way, which
   the host appends itself when it passes `prompt`. Past turns live in the
   ledgers. Replaying them cost 50-80k tokens a call and taught the model to copy
-  its own tool calls.
+  its own tool calls. What past turns did with tools comes back as a digest
+  instead (`tool-history.ts`, from the brain trace's `readBrainTurns`, a user
+  message after the records, worded by `kazusa-deliveries` sections
+  `tool-history`, `tool-call`, `tool-ok`, `tool-error` and `tool-no-result`):
+  each turn's sim time from its prompt, then one line per call with its
+  arguments as a shape (a `send_message` keeps where it went and how many
+  messages, never the words; prose is cut, ids and paths kept) and its outcome
+  (`ok`, or the error unwrapped from the host's and Zod's envelopes). The newest
+  calls within `contextEngine.toolHistoryMaxTokens` (600) or, for the system
+  agent, `systemAgentToolHistoryMaxTokens` (4,000); 0 turns it off. Results and
+  reasoning never come back. On the live world before it, 25% of `send_message`
+  calls failed, 169 of them for naming no chat while the same session held the
+  right call.
 - Uses native `readSessionTranscriptCatalogPage` in newest-first pages of up to
   200 items, stopping at the simulation-time cutoff. There is no total message
   count cap. Skip undated/invalid timestamps; empty pages with a continuation
@@ -1128,7 +1191,7 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/context_engine.md` — Read when modifying context assembly, session
   naming, memory layers, budgets, or future chat producers.
 - `references/messaging.md` — Read when implementing `send_message`, sender
-  attribution, or direct/group ledger writes.
+  attribution, direct/group ledger writes, or stickers.
 - `references/client.md` — Read when reviewing or building `apps/web`, human
   chat APIs, authentication, live updates, or end-to-end messaging tests. The
   client's overall architecture (shell, views, registries, read-model routes,

@@ -4,17 +4,23 @@ entityType: place
 id: entity.place.trinity_station
 place_id: trinity_station
 name: "Trinity Station"
-aliases: ["monorail station", "Trinity monorail"]
-parent: church_street
-summary: "Monorail station at the end of Church Street; trains to the Kivotos centre every few minutes."
-entry_minutes: 3
+summary:
+  "Southern Line station at the foot of Trinity Street: trains to Kousagi, D.U.
+  Central and Gehenna every 10 minutes, 05:00–00:30."
+map: { x: 0.34, y: 0.6 }
 connections:
-  - to: schale_office
+  - to: church_street
     ways:
-      - { by: monorail, minutes: 25 }
-    note: "Kivotos Central Line to the district centre, then a short walk."
+      - { by: walk, minutes: 3 }
+    note: "Out under the glass roof onto Trinity Street."
+  - to: gehenna_station
+    ways:
+      - { by: train, minutes: 16 }
+    note: "Southern Line across the border. Times include the average wait."
 ---
 
 # Trinity Station
 
-The monorail station at the far end of Church Street. Trains on the Kivotos Central Line leave every few minutes; the platform is crowded at rush hour and nearly empty late at night.
+A stone station with a glass roof at the bottom of Trinity Street. Southern Line
+trains run to Kousagi and D.U. Central one way and across the border to Gehenna
+the other. An arcade sits right beside the exit.

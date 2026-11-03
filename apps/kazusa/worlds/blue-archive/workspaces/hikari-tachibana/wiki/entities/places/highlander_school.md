@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: highlander_school
-name: Highlander Railroad Academy
-learned: familiar place
+name: "Highlander Station Campus"
+learned: always known
 ---
 
-A place I know well.
+Our school lives inside a station. Pretty cool. Badge past the lobby, timetables
+on every wall, conductor caps running everywhere.

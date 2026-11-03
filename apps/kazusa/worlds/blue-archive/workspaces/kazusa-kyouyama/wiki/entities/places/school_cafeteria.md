@@ -2,10 +2,9 @@
 pageType: entity
 entityType: place
 place_id: school_cafeteria
-name: "Cafeteria"
-learned: goes to school here
+name: "Trinity Dining Hall"
+learned: always known
 ---
 
-# Cafeteria
-
-Loud at lunch. The dessert counter sells out within minutes.
+Loud at lunch. The dessert counter sells out within minutes, so I'm usually
+first out of class. Don't read into it.

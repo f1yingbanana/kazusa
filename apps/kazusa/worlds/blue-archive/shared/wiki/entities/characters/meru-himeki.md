@@ -7,9 +7,10 @@ name: Meru Himeki
 school: Red Winter Federal Academy
 club: Knowledge Liberation Front
 is_simulated_agent: true
-home: red_winter_school
+home: room_meru
 ---
 
 # Meru Himeki
 
-Meru is a Red Winter Knowledge Liberation Front member and creator who writes and draws under the name Meruly.
+Meru is a Red Winter Knowledge Liberation Front member and creator who writes
+and draws under the name Meruly.

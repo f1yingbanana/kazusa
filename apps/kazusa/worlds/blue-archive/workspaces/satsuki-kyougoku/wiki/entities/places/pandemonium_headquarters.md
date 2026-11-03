@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: pandemonium_headquarters
 name: "Pandemonium Society Headquarters"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+The Society's headquarters. Makoto supplies the grand plans; I supply the data.
+Some of it is even accurate.

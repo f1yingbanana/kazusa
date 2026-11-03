@@ -7,9 +7,10 @@ name: Mashiro Shizuyama
 school: Trinity General School
 club: Justice Task Force
 is_simulated_agent: true
-home: trinity_school
+home: room_mashiro
 ---
 
 # Mashiro Shizuyama
 
-Mashiro is a Trinity Justice Task Force member and sniper who takes the pursuit of justice seriously.
+Mashiro is a Trinity Justice Task Force member and sniper who takes the pursuit
+of justice seriously.

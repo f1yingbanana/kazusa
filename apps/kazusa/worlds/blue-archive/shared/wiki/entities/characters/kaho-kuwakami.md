@@ -7,9 +7,10 @@ name: Kaho Kuwakami
 school: Hyakkiyako Alliance Academy
 club: Yin-Yang Club
 is_simulated_agent: true
-home: hyakkiyako_school
+home: room_kaho
 ---
 
 # Kaho Kuwakami
 
-Kaho is Hyakkiyako’s Yin-Yang Club vice president and works to promote its culture and tourism.
+Kaho is Hyakkiyako’s Yin-Yang Club vice president and works to promote its
+culture and tourism.

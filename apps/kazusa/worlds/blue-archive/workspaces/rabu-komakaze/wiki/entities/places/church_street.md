@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: church_street
-name: Church Street
-learned: familiar place
+name: "Trinity Street"
+learned: always known
 ---
 
-A place I know well.
+Cobblestones, cafés, girls in nice uniforms. I used to walk it every day. Don't
+ask. I don't go back much.

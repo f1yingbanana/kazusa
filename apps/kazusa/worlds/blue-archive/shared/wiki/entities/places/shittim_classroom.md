@@ -1,16 +1,16 @@
 ---
 pageType: entity
 entityType: place
+id: entity.place.shittim_classroom
 place_id: shittim_classroom
-name: Shittim Chest Classroom
-aliases: [ARONA's classroom, Shittim Chest]
-parent: schale_office
+name: "Shittim Chest Classroom"
+aliases: ["ARONA's classroom"]
+parent: schale_basement
 entry_minutes: 0
 summary:
   "ARONA's digital classroom, enclosed within the Shittim Chest. It has no
   physical exit or walking route to Kivotos. ARONA stays here while helping
   Sensei through the console."
-connections: []
 renown: private
 ---
 

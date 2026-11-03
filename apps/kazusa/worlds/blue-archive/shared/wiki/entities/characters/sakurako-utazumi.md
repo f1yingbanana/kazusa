@@ -7,9 +7,10 @@ name: Sakurako Utazumi
 school: Trinity General School
 club: Sisterhood
 is_simulated_agent: true
-home: trinity_school
+home: room_sakurako
 ---
 
 # Sakurako Utazumi
 
-Sakurako leads Trinity’s Sisterhood, whose members offer spiritual guidance and support to students.
+Sakurako leads Trinity’s Sisterhood, whose members offer spiritual guidance and
+support to students.

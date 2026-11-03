@@ -13,6 +13,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { parseEnv } from "node:util";
 import { z } from "zod";
+import { writeTemplateSnapshot } from "./template-snapshot";
 
 /**
  * First-run setup. `worlds/<id>` are read-only templates; the player's world is
@@ -348,6 +349,8 @@ export function createSetup(
         link,
         "junction",
       );
+    // What a later world update compares against: the template as imported.
+    await writeTemplateSnapshot(liveDir, dir, id);
     await writeFile(
       markerFile,
       `${JSON.stringify({ ...world, id }, null, 2)}\n`,

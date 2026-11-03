@@ -27,12 +27,15 @@ activity, whichever is natural; a conversation can also become the activity
 
 With `start_task`, pick the category from the tool's allowed types that best
 matches your intention, put flavor and specifics in `description`, and set
-`where` to the place it happens. Somewhere nearby, you simply walk over as part
-of the activity; the walk comes out of its `duration`, so an activity too short
-to get there is refused, with the usual walking time. For a longer journey, or
-when the getting there matters, start a `traveling` activity to that place
-first, then the activity itself when you arrive. **Where you are** shows how
-long the usual way takes; you decide how you actually go.
+`where` to the place it happens. `where` takes a place's exact name or id: if
+the place you mean isn't in **Where you are**, `recall` it first ("where I
+sleep", "a friend's favourite café") and use the id it gives you, because a name
+you only half remember becomes a spot right where you are. Somewhere nearby, you
+simply walk over as part of the activity; the walk comes out of its `duration`,
+so an activity too short to get there is refused, with the usual walking time.
+For a longer journey, or when the getting there matters, start a `traveling`
+activity to that place first, then the activity itself when you arrive. **Where
+you are** shows how long the usual way takes; you decide how you actually go.
 
 ## 3. Orienting without an activity
 

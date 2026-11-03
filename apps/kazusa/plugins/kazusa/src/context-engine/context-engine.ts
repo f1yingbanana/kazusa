@@ -6,8 +6,10 @@ import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
+import { createSkillText } from "../skill-text.ts";
+import { renderToolHistory } from "./tool-history.ts";
 
-import type { AssembledContext } from "@kazusa/client";
+import type { AssembledContext, BrainTurn } from "@kazusa/client";
 export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import {
@@ -75,6 +77,12 @@ export async function assembleContext(params: {
   readonly names?: ReadonlyMap<string, string>;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
+  /** Past turns' tool calls in a turn: the system agent gets more. */
+  readonly toolHistoryMaxTokens?: number;
+  /** This brain session's turns, oldest first (`readBrainTurns`). */
+  readonly brainTurns?: readonly BrainTurn[];
+  /** The brain run under way, left out of them. */
+  readonly runId?: string;
 }): Promise<
   Awaited<ReturnType<ContextEngine["assemble"]>> & {
     readonly breakdown: NonNullable<AssembledContext["breakdown"]>;
@@ -179,6 +187,33 @@ export async function assembleContext(params: {
     0,
   );
 
+  // How past turns called tools, so the same mistake isn't made twice. The run
+  // under way is the model's already.
+  const toolHistory = renderToolHistory(
+    (params.brainTurns ?? []).filter((turn) => turn.id !== params.runId),
+    Math.min(
+      Math.max(0, remaining),
+      params.toolHistoryMaxTokens ?? config.toolHistoryMaxTokens,
+    ),
+    (section, values) =>
+      createSkillText(skillLoader)(`kazusa-deliveries#${section}`, values, {
+        agentId: params.agentId,
+      }),
+  );
+  const toolHistoryMessages: Message[] = toolHistory
+    ? [
+        {
+          role: "user",
+          content: `[${formatSimTime(params.simTime)}] ${toolHistory}`,
+          timestamp: params.simTime,
+        },
+      ]
+    : [];
+  remaining -= toolHistoryMessages.reduce(
+    (sum, message) => sum + estimateTokens(message),
+    0,
+  );
+
   // No source quotas or additional clipping beyond the native catalog's display
   // projection. Skip records that cannot fit rather than cutting their text.
   const cutoff = params.simTime - config.shortTermHours * 3_600_000;
@@ -210,7 +245,13 @@ export async function assembleContext(params: {
   // records as assistant/tool messages or persist these synthetic context views.
   // The situation comes before the turn under way: last, it reads as a new
   // prompt after every tool result, and the model answers all over again.
-  const messages = [...context, ...brain.summaries, situation, ...brain.turn];
+  const messages = [
+    ...context,
+    ...toolHistoryMessages,
+    ...brain.summaries,
+    situation,
+    ...brain.turn,
+  ];
   return {
     messages,
     estimatedTokens:
@@ -226,6 +267,7 @@ export async function assembleContext(params: {
       situation: situationTokens,
       history: history.reduce((sum, m) => sum + estimateTokens(m), 0),
       records: context.reduce((sum, m) => sum + estimateTokens(m), 0),
+      tools: toolHistoryMessages.reduce((sum, m) => sum + estimateTokens(m), 0),
     },
   };
 }

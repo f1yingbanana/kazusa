@@ -1,0 +1,79 @@
+{
+  "outfits": {
+    "swimsuit": "a black bikini under a long dark floral wrap, lavender-tinted glasses and a paper parasol"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, a cool flat stare, lips pressed"
+    },
+    "content": {
+      "look": "content, eyes closed, softly blushing"
+    },
+    "excited": {
+      "look": "excited, a sparkle in the eye, mouth open"
+    },
+    "happy": {
+      "look": "happy, a gentle smile, softly blushing"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm, level gaze, lips closed"
+    },
+    "sheepish": {
+      "look": "sheepish, blushing, eyes half-lidded, lips pressed"
+    },
+    "shy": {
+      "look": "shy, blushing, eyes lowered"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, lips parted"
+    },
+    "smug": {
+      "look": "smug, eyes narrowed, a faint smile"
+    },
+    "surprised": {
+      "look": "surprised, blushing, mouth a small o"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, eyes narrowed, a small frown"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a small smile"
+    },
+    "swimsuit-excited": {
+      "look": "excited, sparkling eyes, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a faint smile, eyes softly lowered"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a level gaze behind tinted glasses"
+    },
+    "swimsuit-sighing": {
+      "look": "sighing, eyes closed, lips parted"
+    },
+    "swimsuit-sulking": {
+      "look": "sulking, eyes shut, a small frown"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small round o"
+    },
+    "swimsuit-thinking": {
+      "look": "thinking, eyes lowered, lips slightly parted"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a sweat drop, mouth a small o"
+    },
+    "thinking": {
+      "look": "thinking, eyes lowered, lips closed"
+    },
+    "worried": {
+      "look": "worried, a sweat drop, mouth slightly open"
+    }
+  }
+}

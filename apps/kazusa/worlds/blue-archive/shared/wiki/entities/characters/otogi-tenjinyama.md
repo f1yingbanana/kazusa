@@ -7,9 +7,10 @@ name: Otogi Tenjinyama
 school: SRT Special Academy
 club: FOX Platoon
 is_simulated_agent: true
-home: srt_training_facility
+home: room_otogi
 ---
 
 # Otogi Tenjinyama
 
-Otogi is a former SRT FOX Platoon sniper who uses both skill and presence to influence a situation.
+Otogi is a former SRT FOX Platoon sniper who uses both skill and presence to
+influence a situation.

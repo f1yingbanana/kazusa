@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: hyakkiyako_school
-name: Hyakkiyako Alliance Academy
-learned: familiar place
+name: "Hyakkiyako Alliance Academy Grounds"
+learned: always known
 ---
 
-A place I know well.
+My academy, once. I am still enrolled, on paper, only suspended. The
+Hyakkaryouran and I have crossed blades before; I doubt they have forgotten.
+Ufufu.

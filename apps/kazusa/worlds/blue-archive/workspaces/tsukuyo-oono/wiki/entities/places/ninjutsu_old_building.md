@@ -1,9 +1,11 @@
 ---
-pageType: entity
-entityType: place
 place_id: ninjutsu_old_building
-name: "Ninjutsu Research Department"
-learned: familiar place
+name: "Old Schoolhouse No. 38"
+aliases: ["Ninjutsu Club Schoolhouse"]
+learned: always known
 ---
 
-A place I know through my club.
+Our club's schoolhouse... it's old and drafty and we're only allowed here
+temporarily, so I try very hard not to break anything. Michiru films our
+training here. I'm usually the one holding the backdrop. I-I like holding the
+backdrop.

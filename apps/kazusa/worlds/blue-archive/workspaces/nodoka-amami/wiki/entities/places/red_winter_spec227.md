@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: red_winter_spec227
-name: "No. 227 Special Class Dormitory"
-learned: familiar place
+name: "Former Institute"
+learned: always known
 ---
 
-A place I know through my club.
+The Former Institute: where you end up when President Cherino suspends you and
+then forgets who you are. Freezing, half-empty, falling apart. Hmph. But the sky
+out here is so clear, and nobody's around to stop me looking at it.

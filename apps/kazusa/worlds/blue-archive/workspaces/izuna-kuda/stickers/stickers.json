@@ -1,0 +1,123 @@
+{
+  "outfits": {
+    "gym": "a white short-sleeved gym shirt with pink trim and pink bloomers",
+    "dress": "a frilly pink party dress with a white fur stole and a black handbag",
+    "swimsuit": "a striped bikini top, frayed denim shorts, a visor and a pink neckerchief"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes closed, a little cat-like smile"
+    },
+    "determined": {
+      "look": "determined, brows set, mouth open showing a fang"
+    },
+    "dress-content": {
+      "look": "content, eyes shut, a little cat-like smile"
+    },
+    "dress-crying": {
+      "look": "crying, blank wide eyes, tears and a wobbly mouth"
+    },
+    "dress-determined": {
+      "look": "determined, brows lowered, mouth open showing a fang"
+    },
+    "dress-flustered": {
+      "look": "flustered, wide eyes, a nervous sweat, wailing"
+    },
+    "dress-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "dress-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "dress-pouting": {
+      "look": "pouting, blushing, lips pressed, brows lowered"
+    },
+    "dress-smug": {
+      "look": "smug, eyes narrowed, a fanged grin"
+    },
+    "dress-startled": {
+      "look": "startled, a nervous sweat, mouth open"
+    },
+    "dress-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "dress-worried": {
+      "look": "worried, a nervous sweat, lips parted"
+    },
+    "excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, wide teary eyes, wailing"
+    },
+    "gym-content": {
+      "look": "content, eyes closed, a little cat-like smile"
+    },
+    "gym-determined": {
+      "look": "determined, brows set, mouth open showing a fang"
+    },
+    "gym-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "gym-flustered": {
+      "look": "flustered, wide teary eyes, wailing"
+    },
+    "gym-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "gym-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "gym-wink": {
+      "look": "wink, one eye shut, a toothy grin"
+    },
+    "gym-worried": {
+      "look": "worried, brows tilted, lips pressed small"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-confused": {
+      "look": "confused, eyes wide, lips slightly parted"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a little cat-like smile"
+    },
+    "swimsuit-crying": {
+      "look": "crying, blank wide eyes, tears and a wobbly mouth"
+    },
+    "swimsuit-determined": {
+      "look": "determined, brows set, mouth open showing a fang"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, mouth open showing a fang"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, wide eyes, a nervous sweat, wailing"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a little cat-like smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-wink": {
+      "look": "wink, one eye shut, a toothy grin"
+    },
+    "swimsuit-worried": {
+      "look": "worried, a nervous sweat, mouth open"
+    },
+    "wink": {
+      "look": "wink, one eye shut, a toothy grin"
+    },
+    "worried": {
+      "look": "worried, brows tilted, lips pressed small"
+    }
+  }
+}

@@ -4,16 +4,20 @@ entityType: place
 id: entity.place.outlaw_beach
 place_id: outlaw_beach
 name: "Outlaw Beach"
-parent: odyssey_harbor
-entry_minutes: 40
-summary: "A coastal festival site where several academy jurisdictions meet."
-connections:
-  - to: araba_beach
-    ways:
-      - { by: transit, minutes: 40 }
-    note: "Coastal travel between beach areas; estimated for the simulation."
+parent: kanesaki_port
+entry_minutes: 30
+summary:
+  "A rough stretch of sand beyond the port's breakwater claimed by no school;
+  Helmet Gang festival stalls and fireworks in summer, empty and unpatrolled the
+  rest of the year."
+renown: local
 ---
 
 # Outlaw Beach
 
-The beach has hosted a festival where Saori worked and the Arius Squad visited. Its overlapping jurisdictions can make policing and administration complicated.
+A long, scruffy beach past the port's far breakwater, where three jurisdictions'
+maps fail to agree and so nobody patrols. Every summer the Helmet Gangs throw
+their own festival here: food stalls, cheap fireworks, games with prizes nobody
+checks. Students from respectable schools come for the thrill, and some take
+jobs at the stalls. Out of season it is driftwood, gulls and the occasional
+bonfire.

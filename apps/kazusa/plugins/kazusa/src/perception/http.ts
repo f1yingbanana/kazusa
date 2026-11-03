@@ -10,14 +10,13 @@ import {
   resolveActiveEmbeddedRunSessionId,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { readVisibleSessionTranscriptMessageEntries } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { currentConfig } from "../current-config.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import { brainTurns, withFailure, type RunFailure } from "./brain-trace.ts";
+import { readBrainTurns, withFailure, type RunFailure } from "./brain-trace.ts";
 
 const DEFAULT_TRACE_TURNS = 20;
 const MAX_TRACE_TURNS = 100;
@@ -73,15 +72,7 @@ export function registerBrainTraceHttp(
     });
     const sessionId = entry?.sessionId?.trim();
     const turns = withFailure(
-      sessionId
-        ? brainTurns(
-            await readVisibleSessionTranscriptMessageEntries({
-              agentId,
-              sessionKey,
-              sessionId,
-            }),
-          )
-        : [],
+      sessionId ? await readBrainTurns({ agentId, sessionId }) : [],
       await failureOf(agentId),
     );
     sendJson(res, 200, {

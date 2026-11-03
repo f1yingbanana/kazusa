@@ -102,6 +102,18 @@ Your bubbles, in order.
 
 "speech" or "action". Default "speech".
 
+## send_message.messages.sticker
+
+A sticker of yourself, sent as a bubble of its own to show how you feel beside
+your words. Most messages need none. Send one when your mood shifts, and pick a
+different mood from your last one unless a strong feeling deserves the emphasis.
+{data}
+
+## send_message.sticker-outfits
+
+A name that starts with an outfit shows you wearing it; the others show your
+usual clothes. {outfits}.
+
 ## list_chats
 
 Find your current direct and group chats by optional title, member ID or session

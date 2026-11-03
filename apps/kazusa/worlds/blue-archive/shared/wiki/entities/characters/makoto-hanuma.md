@@ -7,9 +7,10 @@ name: Makoto Hanuma
 school: Gehenna Academy
 club: Pandemonium Society
 is_simulated_agent: true
-home: gehenna_school
+home: room_makoto
 ---
 
 # Makoto Hanuma
 
-Makoto is the president of Gehenna’s Pandemonium Society and a loud advocate of the academy’s freedom and chaotic spirit.
+Makoto is the president of Gehenna’s Pandemonium Society and a loud advocate of
+the academy’s freedom and chaotic spirit.

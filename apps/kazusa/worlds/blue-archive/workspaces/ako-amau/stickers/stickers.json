@@ -1,0 +1,201 @@
+{
+  "outfits": {
+    "gym": "a white gym shirt, a red track jacket, red shorts and a red headband",
+    "naval": "a white sleeveless uniform dress, a white garrison cap and a black necktie",
+    "dress": "a long sleeveless dark teal evening gown with a high slit"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, an anger mark, teeth clenched"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth flat"
+    },
+    "content": {
+      "look": "content, eyes shut, a blushing smile"
+    },
+    "determined": {
+      "look": "determined, brows set, mouth open mid-word"
+    },
+    "dress-angry": {
+      "look": "angry, an anger mark, teeth clenched"
+    },
+    "dress-annoyed": {
+      "look": "annoyed, brows furrowed, mouth flat"
+    },
+    "dress-content": {
+      "look": "content, eyes shut, a blushing smile"
+    },
+    "dress-determined": {
+      "look": "determined, brows set, mouth open mid-word"
+    },
+    "dress-glaring": {
+      "look": "glaring, eyes wide, a pout"
+    },
+    "dress-happy": {
+      "look": "happy, a small pleased smile"
+    },
+    "dress-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "dress-relieved": {
+      "look": "relieved, eyes closed, a gentle smile"
+    },
+    "dress-sheepish": {
+      "look": "sheepish, eyes shut, a sweat drop, a wobbly smile"
+    },
+    "dress-smug": {
+      "look": "smug, a toothy grin"
+    },
+    "dress-sulking": {
+      "look": "sulking, eyes half-lidded, a small frown"
+    },
+    "dress-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "dress-teary": {
+      "look": "teary, eyes squeezed shut, a tear welling, mouth wide open"
+    },
+    "dress-wistful": {
+      "look": "wistful, brows drawn up, lips slightly parted"
+    },
+    "dress-worried": {
+      "look": "worried, a sweat drop, lips pressed"
+    },
+    "frustrated": {
+      "look": "frustrated, eyes wide, teeth gritted"
+    },
+    "glaring": {
+      "look": "glaring, eyes wide, a tight frown"
+    },
+    "gym-angry": {
+      "look": "angry, an anger mark, teeth clenched"
+    },
+    "gym-annoyed": {
+      "look": "annoyed, brows furrowed, mouth flat"
+    },
+    "gym-content": {
+      "look": "content, eyes shut, a blushing smile"
+    },
+    "gym-determined": {
+      "look": "determined, brows set, mouth open mid-word"
+    },
+    "gym-frustrated": {
+      "look": "frustrated, eyes wide, teeth gritted"
+    },
+    "gym-glaring": {
+      "look": "glaring, eyes wide, a tight frown"
+    },
+    "gym-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "gym-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "gym-neutral": {
+      "look": "neutral, lips slightly parted"
+    },
+    "gym-relieved": {
+      "look": "relieved, eyes closed, a gentle smile"
+    },
+    "gym-sad": {
+      "look": "sad, teary eyes, a small frown"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, eyes shut, a sweat drop, a wobbly smile"
+    },
+    "gym-smug": {
+      "look": "smug, a toothy grin"
+    },
+    "gym-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "gym-teary": {
+      "look": "teary, eyes squeezed shut, a tear welling, mouth wide open"
+    },
+    "gym-wistful": {
+      "look": "wistful, eyes half-lidded, lips parted, a faint blush"
+    },
+    "gym-worried": {
+      "look": "worried, a sweat drop, lips pressed"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "naval-angry": {
+      "look": "angry, an anger mark, teeth clenched"
+    },
+    "naval-annoyed": {
+      "look": "annoyed, brows furrowed, mouth flat"
+    },
+    "naval-content": {
+      "look": "content, eyes shut, a small smile"
+    },
+    "naval-determined": {
+      "look": "determined, brows set, mouth open mid-word"
+    },
+    "naval-glaring": {
+      "look": "glaring, eyes wide, a tight frown"
+    },
+    "naval-happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "naval-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "naval-relieved": {
+      "look": "relieved, eyes closed, a gentle smile"
+    },
+    "naval-sad": {
+      "look": "sad, eyes lowered, a wavy frown"
+    },
+    "naval-sheepish": {
+      "look": "sheepish, eyes shut, a sweat drop, a wobbly smile"
+    },
+    "naval-smug": {
+      "look": "smug, a toothy grin"
+    },
+    "naval-sulking": {
+      "look": "sulking, eyes half-lidded, a small frown"
+    },
+    "naval-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "naval-teary": {
+      "look": "teary, eyes squeezed shut, blushing, a tear welling, mouth wide open"
+    },
+    "naval-worried": {
+      "look": "worried, a sweat drop, lips pressed"
+    },
+    "neutral": {
+      "look": "neutral, lips slightly parted"
+    },
+    "relieved": {
+      "look": "relieved, eyes closed, a gentle smile"
+    },
+    "sad": {
+      "look": "sad, teary eyes, a small frown"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a sweat drop, a wobbly smile"
+    },
+    "smug": {
+      "look": "smug, a toothy grin"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "teary": {
+      "look": "teary, eyes squeezed shut, a tear welling, mouth wide open"
+    },
+    "wistful": {
+      "look": "wistful, eyes half-lidded, lips parted, a faint blush"
+    },
+    "worried": {
+      "look": "worried, a sweat drop, lips pressed"
+    }
+  }
+}

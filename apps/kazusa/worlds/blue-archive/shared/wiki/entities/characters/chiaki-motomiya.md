@@ -7,9 +7,10 @@ name: Chiaki Motomiya
 school: Gehenna Academy
 club: Pandemonium Society
 is_simulated_agent: true
-home: gehenna_school
+home: room_chiaki
 ---
 
 # Chiaki Motomiya
 
-Chiaki is the Pandemonium Society’s energetic secretary and publishes its newsletter.
+Chiaki is the Pandemonium Society’s energetic secretary and publishes its
+newsletter.

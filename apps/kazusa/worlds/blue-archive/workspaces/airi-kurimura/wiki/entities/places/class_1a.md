@@ -2,10 +2,9 @@
 pageType: entity
 entityType: place
 place_id: class_1a
-name: "Class 1-A"
-learned: goes to school here
+name: "Trinity Class 1-A"
+learned: always known
 ---
 
-# Class 1-A
-
-Our homeroom, with the others from the club.
+Our homeroom, and Natsu and Yoshimi are right there, so even maths feels okay. I
+keep one wrapped chocolate in my desk for emergencies. It's, um, usually mint.

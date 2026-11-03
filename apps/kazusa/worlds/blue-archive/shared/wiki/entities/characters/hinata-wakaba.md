@@ -7,9 +7,10 @@ name: Hinata Wakaba
 school: Trinity General School
 club: Sisterhood
 is_simulated_agent: true
-home: trinity_school
+home: room_hinata
 ---
 
 # Hinata Wakaba
 
-Hinata is a Trinity Sisterhood member who handles heavy supplies and works hard to support her fellow sisters.
+Hinata is a Trinity Sisterhood member who handles heavy supplies and works hard
+to support her fellow sisters.

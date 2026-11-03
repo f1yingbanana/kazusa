@@ -1,0 +1,104 @@
+{
+  "outfits": {
+    "gym": "a white short-sleeved gym shirt with pink trim and pink bloomers",
+    "swimsuit": "a sheer white sailor-collar top with a blue ribbon over a striped blue bikini"
+  },
+  "stickers": {
+    "excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, swirling eyes, blushing, mouth wobbling"
+    },
+    "gym-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "gym-flustered": {
+      "look": "flustered, swirling eyes, blushing, mouth wobbling"
+    },
+    "gym-happy": {
+      "look": "happy, eyes shut in a gentle smile"
+    },
+    "gym-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "gym-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat drop, mouth open"
+    },
+    "gym-shy": {
+      "look": "shy, blushing, a small closed smile"
+    },
+    "gym-sighing": {
+      "look": "sighing, eyes closed, mouth slightly open"
+    },
+    "gym-stunned": {
+      "look": "stunned, blank white eyes, mouth wavering"
+    },
+    "gym-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "gym-thinking": {
+      "look": "thinking, eyes closed, lips pressed"
+    },
+    "happy": {
+      "look": "happy, eyes shut in a gentle smile"
+    },
+    "neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat drop, mouth open"
+    },
+    "shy": {
+      "look": "shy, blushing, a small closed smile"
+    },
+    "sighing": {
+      "look": "sighing, eyes closed, mouth slightly open"
+    },
+    "stunned": {
+      "look": "stunned, blank white eyes, mouth wavering"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-amazed": {
+      "look": "amazed, wide sparkling eyes, mouth a small o"
+    },
+    "swimsuit-embarrassed": {
+      "look": "embarrassed, blushing, a nervous sweat, mouth wavering"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, swirling eyes, blushing, mouth wobbling"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes shut in a gentle smile"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a calm look, lips closed"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat drop, mouth open"
+    },
+    "swimsuit-shy": {
+      "look": "shy, blushing, a small closed smile"
+    },
+    "swimsuit-sighing": {
+      "look": "sighing, eyes closed, mouth slightly open"
+    },
+    "swimsuit-stunned": {
+      "look": "stunned, blank white eyes, mouth wavering"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-thinking": {
+      "look": "thinking, eyes closed, lips pressed"
+    },
+    "thinking": {
+      "look": "thinking, eyes closed, lips pressed"
+    }
+  }
+}

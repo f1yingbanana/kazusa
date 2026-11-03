@@ -1,0 +1,64 @@
+{
+  "outfits": {
+    "qipao": "a white sleeveless qipao with red trim and pink florals, a red-to-white shawl, white bun covers"
+  },
+  "stickers": {
+    "confused": {
+      "look": "confused, one brow knit, mouth open"
+    },
+    "content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "happy": {
+      "look": "happy, blushing, mouth open in a smile"
+    },
+    "neutral": {
+      "look": "neutral, a calm, gentle smile"
+    },
+    "qipao-annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in protest"
+    },
+    "qipao-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "qipao-displeased": {
+      "look": "displeased, brows knit, lips flat"
+    },
+    "qipao-embarrassed": {
+      "look": "embarrassed, eyes shut, a nervous sweat, an open smile"
+    },
+    "qipao-grinning": {
+      "look": "grinning with eyes shut, teeth showing"
+    },
+    "qipao-happy": {
+      "look": "happy, blushing, mouth open in a smile"
+    },
+    "qipao-neutral": {
+      "look": "neutral, a calm, gentle smile"
+    },
+    "qipao-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "qipao-sheepish": {
+      "look": "sheepish, a nervous sweat, a wobbly smile"
+    },
+    "qipao-shy": {
+      "look": "shy, deeply blushing, lips pressed"
+    },
+    "qipao-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "qipao-worried": {
+      "look": "worried, brows tilted, mouth open unsteadily"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "troubled": {
+      "look": "troubled, brows knit, lips pressed in a wavy line"
+    },
+    "worried": {
+      "look": "worried, brows tilted, blushing, mouth open"
+    }
+  }
+}

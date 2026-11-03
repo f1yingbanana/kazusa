@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: valkyrie_school
-name: Valkyrie Police Academy
-learned: familiar place
+name: "Valkyrie Police School, Shiratori Branch"
+learned: always known
 ---
 
-A place I know well.
+School and job in the same place, which is a terrible deal if you ask me. Lots
+of trees, though, and lots of benches nobody checks.

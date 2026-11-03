@@ -7,9 +7,10 @@ name: Eimi Izumimoto
 school: Millennium Science School
 club: Paranormal Affairs Department
 is_simulated_agent: true
-home: millennium_school
+home: room_eimi
 ---
 
 # Eimi Izumimoto
 
-Eimi works with Himari in Millennium’s Paranormal Affairs Department and approaches assignments efficiently.
+Eimi works with Himari in Millennium’s Paranormal Affairs Department and
+approaches assignments efficiently.

@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: yin_yang_building
 name: "Yin-Yang Club Building"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+Our club hall. Petitioners queue up at lunch, and I know which back window
+slides open without a squeak. Essential knowledge for a president.

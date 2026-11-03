@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: usagi_park
-name: Usagi Park
-learned: familiar place
+name: "Kousagi Park"
+learned: always known
 ---
 
-A place I know well.
+Big park, lots of nice open space. Perfect for fireworks. Apparently the
+neighbours disagree. Boring!

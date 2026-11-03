@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: red_winter_school
-name: Red Winter Federal Academy
-learned: familiar place
+name: "Red Winter Federal Academy Campus"
+learned: always known
 ---
 
-A place I know well.
+The main campus. Big, loud, full of rules. I haven't missed it much since we got
+sent out here.

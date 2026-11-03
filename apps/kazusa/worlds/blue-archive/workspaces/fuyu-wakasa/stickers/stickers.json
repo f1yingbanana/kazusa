@@ -1,0 +1,94 @@
+{
+  "stickers": {
+    "alarmed": {
+      "look": "alarmed, eyes wide, teeth gritted"
+    },
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, teeth gritted"
+    },
+    "confused": {
+      "look": "confused, eyes wide, mouth small"
+    },
+    "delighted": {
+      "look": "delighted, blushing, eyes shut, mouth open"
+    },
+    "dismayed": {
+      "look": "dismayed, face shadowed, sweating, mouth wavy"
+    },
+    "displeased": {
+      "look": "displeased, a small frown"
+    },
+    "embarrassed": {
+      "look": "embarrassed, blushing, glancing away"
+    },
+    "excited": {
+      "look": "excited, blushing, eyes bright, mouth open"
+    },
+    "flustered": {
+      "look": "flustered, blushing, eyes wide, teeth clenched"
+    },
+    "gloomy": {
+      "look": "gloomy, face shadowed, eyes shut"
+    },
+    "grinning": {
+      "look": "grinning with eyes shut, teeth showing"
+    },
+    "happy": {
+      "look": "happy, a soft closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "panicked": {
+      "look": "panicked, swirly eyes, sweating, mouth wide open"
+    },
+    "playful": {
+      "look": "playful, winking with a soft smile"
+    },
+    "pouting": {
+      "look": "pouting, eyes squeezed shut, lips pushed out, a sweat drop"
+    },
+    "resigned": {
+      "look": "resigned, face shadowed, eyes shut, sweating"
+    },
+    "serious": {
+      "look": "serious, eyes wide, lips pressed flat"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, an open smile"
+    },
+    "shy": {
+      "look": "shy, blushing, a soft smile"
+    },
+    "skeptical": {
+      "look": "skeptical, a sidelong glance, lips flat"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed, a faint smile"
+    },
+    "smug": {
+      "look": "smug, half-lidded eyes, a toothy grin"
+    },
+    "stunned": {
+      "look": "stunned, half-lidded eyes, tiny pupils, mouth agape"
+    },
+    "surprised": {
+      "look": "surprised, wide eyes with dot pupils, mouth open"
+    },
+    "teasing": {
+      "look": "teasing, blushing, half-lidded eyes, a sly open smile"
+    },
+    "uneasy": {
+      "look": "uneasy, brows tilted, lips pressed"
+    },
+    "wink": {
+      "look": "wink, one eye shut, a toothy grin"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, lips parted"
+    }
+  }
+}

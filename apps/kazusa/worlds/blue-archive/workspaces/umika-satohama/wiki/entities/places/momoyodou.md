@@ -1,9 +1,10 @@
 ---
-pageType: entity
-entityType: place
 place_id: momoyodou
 name: "Momoyodou"
-learned: familiar place
+aliases: ["Momoyodou Tea House"]
+learned: always known
 ---
 
-A place I know through my club.
+Our tea house and our department's home base! I work shifts in my apron, and
+when it is slow I pull up a seat and talk with whoever looks like they need it!
+Shizuko reads my proposals here, all of them, even the tomato catapult one!

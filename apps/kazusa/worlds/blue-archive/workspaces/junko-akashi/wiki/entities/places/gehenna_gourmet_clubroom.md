@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: gehenna_gourmet_clubroom
 name: "Gourmet Research Society Clubroom"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+Our clubroom. I come to talk about food like a normal person, and Haruna pulls
+out a plan with the word "demolition" in it. ...I still come every day. Somebody
+has to be the sensible one!

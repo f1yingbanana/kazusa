@@ -1,0 +1,160 @@
+{
+  "outfits": {
+    "balaclava": "a blue knit balaclava marked with a big '2', over a navy blazer and teal scarf",
+    "track": "a black zip-up track jacket with white sleeves and teal trim, black gym shorts",
+    "cycling": "a navy-and-white cycling jersey and bib shorts with teal accents, cycling gloves",
+    "swimsuit": "a black one-piece swimsuit with teal side panels, hair in low twin tails"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, brows furrowed, mouth wide open"
+    },
+    "annoyed": {
+      "look": "annoyed, brows furrowed, lips pressed"
+    },
+    "balaclava-angry": {
+      "look": "angry, eyes hard, mouth wide open"
+    },
+    "balaclava-annoyed": {
+      "look": "annoyed, eyes narrowed, lips pressed"
+    },
+    "balaclava-confused": {
+      "look": "confused, mouth slightly open"
+    },
+    "balaclava-determined": {
+      "look": "determined, eyes narrowed, teeth clenched"
+    },
+    "balaclava-happy": {
+      "look": "happy, eyes soft, a faint smile"
+    },
+    "balaclava-neutral": {
+      "look": "neutral, a steady stare through the eye holes"
+    },
+    "balaclava-shocked": {
+      "look": "shocked, eyes wide, teeth clenched"
+    },
+    "balaclava-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "balaclava-teary": {
+      "look": "teary, eyes welling, mouth wobbling open"
+    },
+    "balaclava-unimpressed": {
+      "look": "unimpressed, a half-lidded flat stare"
+    },
+    "balaclava-wincing": {
+      "look": "wincing, eyes squeezed shut, teeth gritted"
+    },
+    "balaclava-worried": {
+      "look": "worried, eyes wide, mouth open and wobbling"
+    },
+    "confused": {
+      "look": "confused, brows raised, mouth slightly open"
+    },
+    "cycling-determined": {
+      "look": "determined, eyes narrowed, lips pressed"
+    },
+    "cycling-happy": {
+      "look": "happy, eyes soft, a small smile"
+    },
+    "cycling-neutral": {
+      "look": "neutral, glancing back, lips parted"
+    },
+    "cycling-sheepish": {
+      "look": "sheepish, a sweat drop, a small frown"
+    },
+    "cycling-sleepy": {
+      "look": "sleepy, eyes closed, lips parted"
+    },
+    "cycling-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "determined": {
+      "look": "determined, brows set, teeth clenched"
+    },
+    "flustered": {
+      "look": "flustered, blushing, teeth showing"
+    },
+    "happy": {
+      "look": "happy, a faint, gentle smile"
+    },
+    "nervous": {
+      "look": "nervous, sweating, teeth clenched"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "sad": {
+      "look": "sad, brows tilted, lips parted"
+    },
+    "sheepish": {
+      "look": "sheepish, a sweat drop, lips pressed"
+    },
+    "shocked": {
+      "look": "shocked, eyes wide, teeth clenched"
+    },
+    "shy": {
+      "look": "shy, blushing, eyes lowered, lips wobbling"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-determined": {
+      "look": "determined, brows lowered, lips pressed"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a soft smile"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, blushing, lips parted"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a sweat drop, a small frown"
+    },
+    "swimsuit-sighing": {
+      "look": "sighing, eyes closed, mouth open"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "teary": {
+      "look": "teary, eyes welling, mouth wobbling open"
+    },
+    "thinking": {
+      "look": "thinking, brows drawn, a slight frown"
+    },
+    "track-angry": {
+      "look": "angry, brows furrowed, mouth wide open"
+    },
+    "track-annoyed": {
+      "look": "annoyed, brows furrowed, lips pressed"
+    },
+    "track-content": {
+      "look": "content, eyes closed, a small smile"
+    },
+    "track-happy": {
+      "look": "happy, a faint, gentle smile"
+    },
+    "track-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "track-sheepish": {
+      "look": "sheepish, a sweat drop, lips pressed"
+    },
+    "track-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "unimpressed": {
+      "look": "unimpressed, a half-lidded flat stare"
+    },
+    "wincing": {
+      "look": "wincing, eyes squeezed shut, teeth gritted"
+    },
+    "worried": {
+      "look": "worried, sweat drops, mouth open and wobbling"
+    }
+  }
+}

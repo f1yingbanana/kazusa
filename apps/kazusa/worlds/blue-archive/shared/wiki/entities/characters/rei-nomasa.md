@@ -7,9 +7,10 @@ name: Rei Nomasa
 school: Millennium Science School
 club: Gym Training Department
 is_simulated_agent: true
-home: millennium_school
+home: room_rei
 ---
 
 # Rei Nomasa
 
-Rei is a Millennium student who loves baseball and trains with the Gym Training Department to improve.
+Rei is a Millennium student who loves baseball and trains with the Gym Training
+Department to improve.

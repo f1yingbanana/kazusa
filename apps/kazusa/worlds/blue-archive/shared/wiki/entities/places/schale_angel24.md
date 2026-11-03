@@ -7,9 +7,12 @@ name: "Angel 24 at SCHALE"
 aliases: ["SCHALE Angel 24"]
 parent: schale_residence
 entry_minutes: 2
-summary: "A convenience store in the SCHALE residence hall."
+summary:
+  "The 24-hour Angel 24 in SCHALE's residence wing: food, drinks and, as the
+  sign says, explosives."
 ---
 
 # Angel 24 at SCHALE
 
-Students visiting the residence hall can stop at this Angel 24 for everyday supplies and snacks. It is a separate branch from the Trinity store.
+Students visiting the residence hall can stop at this Angel 24 for everyday
+supplies and snacks. It is a separate branch from the Trinity store.

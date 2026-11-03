@@ -1,0 +1,137 @@
+{
+  "outfits": {
+    "bunny": "a white tailcoat over a black leotard, white tights and black-and-yellow bunny ears",
+    "pajamas": "a yellow hooded animal onesie with a toothy hood and floppy ears"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows lowered, a wavy frown, cheeks pink"
+    },
+    "bunny-annoyed": {
+      "look": "annoyed, brows lowered, blushing, a wavy frown"
+    },
+    "bunny-content": {
+      "look": "content, eyes closed, a calm smile"
+    },
+    "bunny-crying": {
+      "look": "crying, tears streaming, a bump on the head"
+    },
+    "bunny-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "bunny-neutral": {
+      "look": "neutral, sparkling eyes, a faint smile"
+    },
+    "bunny-pouting": {
+      "look": "pouting, brows furrowed, lips pressed"
+    },
+    "bunny-scared": {
+      "look": "scared, face gone pale, eyes squeezed shut, wailing"
+    },
+    "bunny-sheepish": {
+      "look": "sheepish, eyes squeezed shut, a sweat drop, grinning"
+    },
+    "bunny-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "bunny-teary": {
+      "look": "teary, eyes shut, a tear in the corner, mouth open"
+    },
+    "bunny-wailing": {
+      "look": "wailing, eyes shut, tears streaming, mouth open"
+    },
+    "bunny-worried": {
+      "look": "worried, eyes shadowed, a nervous fanged grin"
+    },
+    "content": {
+      "look": "content, eyes closed, a calm smile"
+    },
+    "crying": {
+      "look": "crying, tears streaming, a bump on the head"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, mouth wobbling open"
+    },
+    "happy": {
+      "look": "happy, a closed-mouth smile, cheeks pink"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "mischievous": {
+      "look": "mischievous, eyes narrowed, a cat-like smirk"
+    },
+    "neutral": {
+      "look": "neutral, a faint closed-mouth smile"
+    },
+    "pajamas-annoyed": {
+      "look": "annoyed, eyes narrowed, blushing, a wavy frown"
+    },
+    "pajamas-content": {
+      "look": "content, eyes closed, a calm smile"
+    },
+    "pajamas-crying": {
+      "look": "crying, tears streaming, a bump on the head"
+    },
+    "pajamas-flustered": {
+      "look": "flustered, blushing hard, mouth wobbling open"
+    },
+    "pajamas-happy": {
+      "look": "happy, a closed-mouth smile, cheeks pink"
+    },
+    "pajamas-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "pajamas-mischievous": {
+      "look": "mischievous, blushing, a cat-like smirk"
+    },
+    "pajamas-neutral": {
+      "look": "neutral, sparkling eyes, a faint smile"
+    },
+    "pajamas-pouting": {
+      "look": "pouting, brows furrowed, lips pressed"
+    },
+    "pajamas-scared": {
+      "look": "scared, face gone pale, eyes squeezed shut, wailing"
+    },
+    "pajamas-sheepish": {
+      "look": "sheepish, eyes squeezed shut, grinning"
+    },
+    "pajamas-smug": {
+      "look": "smug, eyes half-lidded, a sly smile"
+    },
+    "pajamas-sulking": {
+      "look": "sulking, eyes shut, a wavy pout, cheeks pink"
+    },
+    "pajamas-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "pajamas-worried": {
+      "look": "worried, eyes shadowed, a nervous fanged grin"
+    },
+    "pouting": {
+      "look": "pouting, brows furrowed, lips pressed"
+    },
+    "scared": {
+      "look": "scared, face gone pale, eyes squeezed shut, wailing"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes squeezed shut, a sweat drop, grinning"
+    },
+    "shy": {
+      "look": "shy, blushing, eyes averted, lips wavy"
+    },
+    "smug": {
+      "look": "smug, eyes half-lidded, a sly smile"
+    },
+    "sulking": {
+      "look": "sulking, eyes shut, a wavy pout, cheeks pink"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "worried": {
+      "look": "worried, eyes shadowed, a nervous fanged grin"
+    }
+  }
+}

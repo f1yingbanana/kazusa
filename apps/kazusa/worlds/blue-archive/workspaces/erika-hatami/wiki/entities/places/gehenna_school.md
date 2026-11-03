@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: gehenna_school
-name: Gehenna Academy
-learned: familiar place
+name: "Gehenna Academy Campus"
+learned: always known
 ---
 
-A place I know well.
+Campus. Big, old, and kinda pretty at sunset if you know where to stand. I know
+where to stand.

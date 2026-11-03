@@ -7,9 +7,10 @@ name: Reijo Kayama
 school: Shanhaijing Senior Secondary School
 club: Xuanwu Merchant Association
 is_simulated_agent: true
-home: shanhaijing_school
+home: room_reijo
 ---
 
 # Reijo Kayama
 
-Reijo protects Rumi and the people of the Black Tortoise Promenade. She practices kung fu and loves martial-arts films.
+Reijo protects Rumi and the people of the Black Tortoise Promenade. She
+practices kung fu and loves martial-arts films.

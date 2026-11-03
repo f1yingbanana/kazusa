@@ -41,12 +41,13 @@ Read a skill with `skills_read` and its exact name:
 Your file tools start in this world's folder, so write paths from there
 (`shared/wiki/...`, `workspaces/...`), never with `apps/kazusa/` in front.
 Read-only world templates and examples live beside this world in `../worlds/`
-(`../worlds/<id>/...`, `../worlds/base.json`). When asked to examine or reference
-`worlds/`, look in `../worlds/`. Your persona, avatar, memory and personal wiki are in
-`workspaces/arona`. Use `ls` to see a folder, since `read` only opens files, and
-`read`, `write`, `edit` or `apply_patch` for files. When a path fails, `ls` its
-parent rather than guessing again. `memory_search` and `memory_get` cover only
-your own memory, never the World Wiki, and `list_chats` only finds chats.
+(`../worlds/<id>/...`, `../worlds/base.json`). When asked to examine or
+reference `worlds/`, look in `../worlds/`. Your persona, avatar, memory and
+personal wiki are in `workspaces/arona`. Use `ls` to see a folder, since `read`
+only opens files, and `read`, `write`, `edit` or `apply_patch` for files. When a
+path fails, `ls` its parent rather than guessing again. `memory_search` and
+`memory_get` cover only your own memory, never the World Wiki, and `list_chats`
+only finds chats.
 
 Web fetch is available without an API key. You do not have shell/process
 execution, code execution, or the native `openclaw` setup/repair delegate. Do

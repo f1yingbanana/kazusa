@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
+import {
+  readSessionTranscriptCatalogPage,
+  readVisibleSessionTranscriptMessageEntries,
+} from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
@@ -14,6 +17,7 @@ vi.mock("openclaw/plugin-sdk/core", () => ({
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
   readSessionTranscriptCatalogPage: vi.fn(),
+  readVisibleSessionTranscriptMessageEntries: vi.fn(async () => []),
 }));
 
 const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
@@ -186,6 +190,46 @@ describe("Native context-engine registration", () => {
       expect.objectContaining({ agentId: "alice" }),
     );
     expect(result.systemPromptAddition).toContain("send_message");
+  });
+
+  it("reads past tool calls from this brain session's transcript", async () => {
+    const { engine } = await setup();
+    const read = vi.mocked(readVisibleSessionTranscriptMessageEntries);
+    read.mockResolvedValueOnce([
+      {
+        entryId: "e1",
+        seq: 1,
+        role: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "t1", name: "map_route", arguments: {} },
+          ],
+          __openclaw: { runId: "r1" },
+        },
+      },
+      {
+        entryId: "e2",
+        seq: 2,
+        role: "toolResult",
+        message: {
+          role: "toolResult",
+          content: [],
+          toolCallId: "t1",
+        } as never,
+      },
+    ]);
+    const result = await engine.assemble({
+      sessionId: "brain-1",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(read).toHaveBeenLastCalledWith({
+      agentId: "alice",
+      sessionId: "brain-1",
+      sessionKey: "agent:alice:brain",
+    });
+    expect(JSON.stringify(result.messages)).toContain("map_route {} → ok");
   });
 
   it("uses only the canonical session key for ownership and native store resolution", async () => {

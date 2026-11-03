@@ -1,0 +1,49 @@
+{
+  "outfits": {
+    "sundress": "a white sleeveless sundress with ruffled armbands and a wide white sun hat with a flower"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows furrowed, mouth open in protest"
+    },
+    "content": {
+      "look": "content, eyes closed, a soft blush"
+    },
+    "happy": {
+      "look": "happy, a faint, gentle smile"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "serious": {
+      "look": "serious, brows lowered, eyes narrowed, lips pressed"
+    },
+    "sheepish": {
+      "look": "sheepish, a nervous sweat, lips pressed"
+    },
+    "sundress-annoyed": {
+      "look": "annoyed, mouth open in protest"
+    },
+    "sundress-content": {
+      "look": "content, eyes closed, lips relaxed"
+    },
+    "sundress-happy": {
+      "look": "happy, a faint, gentle smile"
+    },
+    "sundress-neutral": {
+      "look": "neutral, a steady, blank look, hand on the hat"
+    },
+    "sundress-serious": {
+      "look": "serious, eyes narrowed, lips pressed"
+    },
+    "sundress-sheepish": {
+      "look": "sheepish, a nervous sweat, lips pressed"
+    },
+    "sundress-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "surprised": {
+      "look": "surprised, mouth a small o"
+    }
+  }
+}

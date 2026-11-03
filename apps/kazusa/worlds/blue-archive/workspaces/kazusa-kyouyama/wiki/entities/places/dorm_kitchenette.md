@@ -2,10 +2,10 @@
 pageType: entity
 entityType: place
 place_id: dorm_kitchenette
-name: "Dorm Kitchenette"
-learned: lives here
+name: "Willow Hall Kitchenette"
+learned: always known
 ---
 
-# Dorm Kitchenette
-
-The shared kitchen off the lounge; the fridge is full of everyone's labelled snacks.
+The shared kitchen off the lounge. The fridge is full of everyone's labelled
+snacks, and mine still get eaten. Breakfast is whatever's left plus a lot of
+milk.

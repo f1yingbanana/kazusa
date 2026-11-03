@@ -1,0 +1,97 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, blushing, teeth gritted, spiky orange halo"
+    },
+    "annoyed": {
+      "look": "annoyed, a small frown under spiky orange halo"
+    },
+    "cheerful": {
+      "look": "cheerful, bright eye, an open-mouthed smile"
+    },
+    "confused": {
+      "look": "confused, a spiral eye, mouth wobbling"
+    },
+    "content": {
+      "look": "content, eye closed, a peaceful smile"
+    },
+    "deadpan": {
+      "look": "deadpan, a half-lidded stare, mouth open"
+    },
+    "dejected": {
+      "look": "dejected, half-lidded, blushing, mouth wobbling, halo dripping"
+    },
+    "distressed": {
+      "look": "distressed, eye dimmed, blushing, sweating, mouth open, halo dripping"
+    },
+    "drooling": {
+      "look": "drooling, a star in the eye, pink heart halo"
+    },
+    "eager": {
+      "look": "eager, eye wide, mouth open mid-word"
+    },
+    "elated": {
+      "look": "elated, eye squeezed shut, mouth wide open, green halo"
+    },
+    "embarrassed": {
+      "look": "embarrassed, a swirling eye, blushing deeply"
+    },
+    "excited": {
+      "look": "excited, a star in the eye, green halo"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, a sweat drop, mouth open"
+    },
+    "giggling": {
+      "look": "giggling, eye shut, a small open smile"
+    },
+    "gloomy": {
+      "look": "gloomy, face shadowed, teeth clenched, halo dripping"
+    },
+    "happy": {
+      "look": "happy, eye shut in a smile"
+    },
+    "laughing": {
+      "look": "laughing, eye shut, mouth open, pink heart halo"
+    },
+    "longing": {
+      "look": "longing, a sparkling star eye, lips pressed tight"
+    },
+    "neutral": {
+      "look": "neutral, a calm, gentle little smile"
+    },
+    "proud": {
+      "look": "proud, eye shut, a satisfied little smile"
+    },
+    "sad": {
+      "look": "sad, brows drooping, mouth open, halo dripping"
+    },
+    "shocked": {
+      "look": "shocked, a blank white eye, mouth agape"
+    },
+    "sighing": {
+      "look": "sighing, eye shut, mouth open"
+    },
+    "sleepy": {
+      "look": "sleepy, eye shut, drooling a little"
+    },
+    "startled": {
+      "look": "startled, a nervous sweat, mouth wobbling open"
+    },
+    "sulking": {
+      "look": "sulking, a half-lidded glare, pouting, spiky orange halo"
+    },
+    "surprised": {
+      "look": "surprised, eye wide, mouth a small o"
+    },
+    "thinking": {
+      "look": "thinking, eye shut, mouth a small o"
+    },
+    "whiny": {
+      "look": "whiny, eye squeezed shut, blushing, mouth wobbling"
+    },
+    "worried": {
+      "look": "worried, a nervous sweat, teeth clenched"
+    }
+  }
+}

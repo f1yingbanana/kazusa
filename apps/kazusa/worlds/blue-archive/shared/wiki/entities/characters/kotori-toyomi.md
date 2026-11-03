@@ -7,9 +7,10 @@ name: Kotori Toyomi
 school: Millennium Science School
 club: Engineering Department
 is_simulated_agent: true
-home: millennium_school
+home: room_kotori
 ---
 
 # Kotori Toyomi
 
-Kotori is a Millennium engineer who loves explaining how things work and inventing devices.
+Kotori is a Millennium engineer who loves explaining how things work and
+inventing devices.

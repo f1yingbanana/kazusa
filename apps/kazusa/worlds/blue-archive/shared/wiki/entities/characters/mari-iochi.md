@@ -7,9 +7,10 @@ name: Mari Iochi
 school: Trinity General School
 club: Sisterhood
 is_simulated_agent: true
-home: trinity_school
+home: room_mari
 ---
 
 # Mari Iochi
 
-Mari is a Trinity Sisterhood member who listens to students’ worries and helps care for the cathedral community.
+Mari is a Trinity Sisterhood member who listens to students’ worries and helps
+care for the cathedral community.

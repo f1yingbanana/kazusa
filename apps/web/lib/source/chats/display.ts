@@ -91,6 +91,8 @@ export function messagePreview(
     const line = actionLine(name, message.text);
     return line.subject + line.rest;
   }
-  if (message.senderId === userId) return `You: ${message.text}`;
-  return isOneOnOne(chat, userId) ? message.text : `${name}: ${message.text}`;
+  // A sticker's text describes the picture; a preview just says what it is.
+  const text = message.type === "sticker" ? "Sticker" : message.text;
+  if (message.senderId === userId) return `You: ${text}`;
+  return isOneOnOne(chat, userId) ? text : `${name}: ${text}`;
 }

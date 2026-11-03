@@ -17,6 +17,8 @@ import {
   readSessionStreams,
   type ContextEngine,
 } from "./context-engine.ts";
+import { readBrainTurns } from "../perception/brain-trace.ts";
+import { currentBrainRun } from "../perception/run-limits.ts";
 import { createSkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
@@ -343,6 +345,20 @@ function createContextEngine(
         simTime: now,
         config,
         skillLoader,
+        toolHistoryMaxTokens:
+          getConfig().agents?.defaults?.systemAgent?.agentId === brainAgentId
+            ? config.systemAgentToolHistoryMaxTokens
+            : config.toolHistoryMaxTokens,
+        runId: currentBrainRun(brainAgentId),
+        brainTurns: await readBrainTurns({
+          agentId: brainAgentId,
+          sessionId: params.sessionId,
+        }).catch((error: unknown) => {
+          api.logger.warn(
+            `Context engine: can't read past tool calls of ${brainAgentId}: ${String(error)}`,
+          );
+          return [];
+        }),
       });
       try {
         const previous = (await recent.lookup(brainAgentId)) ?? [];

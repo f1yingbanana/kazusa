@@ -1,0 +1,122 @@
+{
+  "outfits": {
+    "casual": "a white beret, a white T-shirt under a light-blue pinafore dress, a pendant necklace",
+    "newyear": "a white-to-pink floral kimono with a white fur stole, pink flowers in pinned-up hair"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, a small frown, lips pressed"
+    },
+    "casual-content": {
+      "look": "content, eyes closed, blushing, a soft smile"
+    },
+    "casual-deadpan": {
+      "look": "deadpan, half-lidded blank eyes, blushing, mouth open"
+    },
+    "casual-dismayed": {
+      "look": "dismayed, blank eyes, tears falling, mouth wavy and open"
+    },
+    "casual-flustered": {
+      "look": "flustered, blushing, a nervous sweat, mouth open"
+    },
+    "casual-happy": {
+      "look": "happy, eyes closed, a gentle smile"
+    },
+    "casual-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "casual-neutral": {
+      "look": "neutral, blushing, a faint smile"
+    },
+    "casual-pouting": {
+      "look": "pouting, eyes shut, mouth wavy"
+    },
+    "casual-sad": {
+      "look": "sad, blushing, lips pressed in a small frown"
+    },
+    "casual-sheepish": {
+      "look": "sheepish, glancing aside, blushing, a nervous sweat, a small smile"
+    },
+    "casual-shocked": {
+      "look": "shocked, blank wide eyes, a sweat drop, mouth wide open"
+    },
+    "casual-sighing": {
+      "look": "sighing, eyes closed, lips parted"
+    },
+    "casual-sleepy": {
+      "look": "sleepy, eyes closed, mouth a small o"
+    },
+    "casual-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "deadpan": {
+      "look": "deadpan, half-lidded blank eyes, mouth slightly open"
+    },
+    "dismayed": {
+      "look": "dismayed, blank eyes, a tear and sweat, mouth open"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a serene smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a calm, faint smile"
+    },
+    "newyear-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "newyear-deadpan": {
+      "look": "deadpan, half-lidded blank eyes, mouth open"
+    },
+    "newyear-dismayed": {
+      "look": "dismayed, blank eyes, a tear, mouth wobbling"
+    },
+    "newyear-flustered": {
+      "look": "flustered, blushing, a nervous sweat, mouth open"
+    },
+    "newyear-happy": {
+      "look": "happy, eyes closed, a gentle smile"
+    },
+    "newyear-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "newyear-neutral": {
+      "look": "neutral, blushing, a faint smile"
+    },
+    "newyear-pouting": {
+      "look": "pouting, eyes shut, mouth wavy"
+    },
+    "newyear-sad": {
+      "look": "sad, brows tilted, lips pressed"
+    },
+    "newyear-sheepish": {
+      "look": "sheepish, glancing aside, blushing, a nervous sweat, mouth open"
+    },
+    "newyear-shocked": {
+      "look": "shocked, blank wide eyes, a sweat drop, mouth wide open"
+    },
+    "newyear-sighing": {
+      "look": "sighing, eyes closed, brows tilted, tears at the eye corners"
+    },
+    "newyear-sleepy": {
+      "look": "sleepy, eyes closed, mouth a small o"
+    },
+    "newyear-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "newyear-worried": {
+      "look": "worried, brows tilted, a nervous sweat, lips parted"
+    },
+    "shy": {
+      "look": "shy, blushing, eyes lowered, lips parted"
+    },
+    "sighing": {
+      "look": "sighing, eyes closed, tears at the eye corners, lips parted"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    }
+  }
+}

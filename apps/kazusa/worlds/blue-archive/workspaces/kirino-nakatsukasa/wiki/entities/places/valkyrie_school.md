@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: valkyrie_school
-name: Valkyrie Police Academy
-learned: familiar place
+name: "Valkyrie Police School, Shiratori Branch"
+learned: always known
 ---
 
-A place I know well.
+Every officer in D.U. started on this parade ground! Walking through the gate in
+uniform still gives me a thrill.

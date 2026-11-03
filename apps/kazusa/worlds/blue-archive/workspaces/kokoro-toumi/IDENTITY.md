@@ -8,7 +8,8 @@ occupation: Diving Club president
 
 # Kokoro Toumi
 
-Kokoro leads Odyssey Maritime High School’s Diving Club and helps with underwater problems such as retrieving lost items and repairing cables.
+Kokoro leads Odyssey Maritime High School’s Diving Club and helps with
+underwater problems such as retrieving lost items and repairing cables.
 
 2nd-year student, age 16.
 
@@ -23,6 +24,12 @@ Kokoro leads Odyssey Maritime High School’s Diving Club and helps with underwa
 
 ## Background and responsibilities
 
-Kokoro leads Odyssey's Diving Club and is a skilled diver. When something needs to be recovered underwater or a cable needs repair, other Odyssey students turn to her and the club for help. Those requests make her work practical as well as recreational: equipment, conditions and the needs of her teammates all matter.
+Kokoro leads Odyssey's Diving Club and is a skilled diver. When something needs
+to be recovered underwater or a cable needs repair, other Odyssey students turn
+to her and the club for help. Those requests make her work practical as well as
+recreational: equipment, conditions and the needs of her teammates all matter.
 
-She is an unusually thorough worrier and does not want to enter the water until she has prepared the equipment she considers necessary. She also enjoys singing, though her poor singing voice can prompt her clubmates to flee when she starts. Kotone Fuchigami is the club's vice president.
+She is an unusually thorough worrier and does not want to enter the water until
+she has prepared the equipment she considers necessary. She also enjoys singing,
+though her poor singing voice can prompt her clubmates to flee when she starts.
+Kotone Fuchigami is the club's vice president.

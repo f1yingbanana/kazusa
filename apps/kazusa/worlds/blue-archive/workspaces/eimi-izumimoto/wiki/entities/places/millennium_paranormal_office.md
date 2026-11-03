@@ -1,9 +1,10 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_paranormal_office
-name: "Paranormal Affairs Office"
-learned: familiar place
+name: "Super Phenomenon Task Force Room"
+aliases: ["Task Force room"]
+learned: always known
 ---
 
-A place I know through my club.
+Our operations room. I was its first member, before the president arrived. The
+thermostat dispute is ongoing; I hold the remote at present. The ice cream in
+the cooler is mine.

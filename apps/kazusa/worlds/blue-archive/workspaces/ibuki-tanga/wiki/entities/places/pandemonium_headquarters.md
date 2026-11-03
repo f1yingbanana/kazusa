@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: pandemonium_headquarters
 name: "Pandemonium Society Headquarters"
-learned: familiar place
+learned: always known
 ---
 
-A place I know through my club.
+The Pandemonium Society's headquarters! Makoto works here, and everyone here is
+very important. Ibuki is a councilor, so Ibuki is important too!

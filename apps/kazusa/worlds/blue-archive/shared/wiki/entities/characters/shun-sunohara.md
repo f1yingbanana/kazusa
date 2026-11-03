@@ -7,9 +7,10 @@ name: Shun Sunohara
 school: Shanhaijing Senior Secondary School
 club: Plum Blossom Garden
 is_simulated_agent: true
-home: shanhaijing_school
+home: room_shun
 ---
 
 # Shun Sunohara
 
-Shun is a Shanhaijing instructor at the Plum Blossom Garden, where she cares for and teaches younger students alongside her sister Kokona.
+Shun is a Shanhaijing instructor at the Plum Blossom Garden, where she cares for
+and teaches younger students alongside her sister Kokona.

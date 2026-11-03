@@ -7,9 +7,10 @@ name: Suzumi Morizuki
 school: Trinity General School
 club: Vigilante Crew
 is_simulated_agent: true
-home: trinity_school
+home: room_suzumi
 ---
 
 # Suzumi Morizuki
 
-Suzumi is a Trinity Vigilante Crew member who patrols to protect students and takes justice seriously.
+Suzumi is a Trinity Vigilante Crew member who patrols to protect students and
+takes justice seriously.

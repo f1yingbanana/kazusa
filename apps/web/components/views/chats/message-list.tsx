@@ -292,25 +292,33 @@ export function MessageList({
                                     {participant.name}
                                   </MessageHeader>
                                 ) : null}
-                                <Bubble
-                                  align={align}
-                                  variant={
-                                    pendingMessage?.status === "failed"
-                                      ? "destructive"
-                                      : isSelf
-                                        ? "default"
-                                        : "secondary"
-                                  }
-                                  className={
-                                    pendingMessage?.status === "sending"
-                                      ? "opacity-70"
-                                      : undefined
-                                  }
-                                >
-                                  <BubbleContent className="whitespace-pre-wrap">
-                                    {message.text}
-                                  </BubbleContent>
-                                </Bubble>
+                                {message.type === "sticker" &&
+                                message.sticker ? (
+                                  <StickerImage
+                                    url={message.sticker.url}
+                                    alt={message.text}
+                                  />
+                                ) : (
+                                  <Bubble
+                                    align={align}
+                                    variant={
+                                      pendingMessage?.status === "failed"
+                                        ? "destructive"
+                                        : isSelf
+                                          ? "default"
+                                          : "secondary"
+                                    }
+                                    className={
+                                      pendingMessage?.status === "sending"
+                                        ? "opacity-70"
+                                        : undefined
+                                    }
+                                  >
+                                    <BubbleContent className="whitespace-pre-wrap">
+                                      {message.text}
+                                    </BubbleContent>
+                                  </Bubble>
+                                )}
                                 {isLast ? (
                                   <MessageFooter className="gap-2 font-normal">
                                     <MessageStatus
@@ -442,6 +450,25 @@ function ActionLine({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A character's sticker: the picture alone, without a bubble. Its text is what
+ * it shows, as everyone in the chat reads it.
+ */
+function StickerImage({ url, alt }: { url: string; alt: string }) {
+  return (
+    <img
+      src={url}
+      alt={alt}
+      title={alt}
+      width={128}
+      height={128}
+      loading="lazy"
+      draggable={false}
+      className="size-32 object-contain"
+    />
   );
 }
 

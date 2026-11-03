@@ -4,6 +4,7 @@ import type {
   BrainTurn,
   BrainUsage,
 } from "@kazusa/client";
+import { readVisibleSessionTranscriptMessageEntries } from "openclaw/plugin-sdk/session-transcript-runtime";
 
 export interface RunFailure {
   readonly error: string;
@@ -183,6 +184,19 @@ export function brainTurns(rows: readonly TranscriptRow[]): BrainTurn[] {
   }
   if (prompts.length > 0) open(`waiting:${rows[rows.length - 1].entryId}`);
   return turns;
+}
+
+/** A brain session's turns, from the transcript the host keeps. */
+export async function readBrainTurns(target: {
+  readonly agentId: string;
+  readonly sessionId: string;
+}): Promise<BrainTurn[]> {
+  return brainTurns(
+    await readVisibleSessionTranscriptMessageEntries({
+      ...target,
+      sessionKey: `agent:${target.agentId}:brain`,
+    }),
+  );
 }
 
 /**

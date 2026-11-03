@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_school
-name: Millennium Science School
-learned: familiar place
+name: "Millennium Science School Campus"
+learned: always known
 ---
 
-A place I know well.
+Campus. Big. People stare when I carry the shell crate down the corridor. I walk
+fast. I still owe the Tower an apology for the firework.

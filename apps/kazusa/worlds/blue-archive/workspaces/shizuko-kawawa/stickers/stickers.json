@@ -1,0 +1,58 @@
+{
+  "outfits": {
+    "swimsuit": "a pink frilled bikini, a pink ribbon choker, a cat-eared frilled headband and red hibiscus flowers"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, brows lowered, lips pressed flat"
+    },
+    "confused": {
+      "look": "confused, brows knit, blushing, mouth a small o"
+    },
+    "content": {
+      "look": "content, eyes closed, a soft blushing smile"
+    },
+    "excited": {
+      "look": "excited, eyes bright, mouth open in a smile"
+    },
+    "flustered": {
+      "look": "flustered, swirling eyes, blushing, mouth wide open"
+    },
+    "happy": {
+      "look": "happy, a gentle closed-mouth smile"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, deep blush, teeth clenched"
+    },
+    "swimsuit-happy": {
+      "look": "happy, blushing, a gentle smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open, blushing"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, brows tilted, a small frown"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, blushing, brows raised, mouth open"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes half-closed, a fanged open grin"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "swimsuit-wink": {
+      "look": "wink, mouth open in a cheerful smile"
+    },
+    "swimsuit-worried": {
+      "look": "worried, brows raised, lips parted"
+    }
+  }
+}

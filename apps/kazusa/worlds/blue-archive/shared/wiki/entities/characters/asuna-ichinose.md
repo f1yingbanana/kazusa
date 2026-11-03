@@ -7,9 +7,10 @@ name: Asuna Ichinose
 school: Millennium Science School
 club: Cleaning & Clearing
 is_simulated_agent: true
-home: millennium_school
+home: room_asuna
 ---
 
 # Asuna Ichinose
 
-Asuna is a cheerful Cleaning & Clearing agent, codename Zero-One. She relies on intuition and remarkable good fortune while working with her team.
+Asuna is a cheerful Cleaning & Clearing agent, codename Zero-One. She relies on
+intuition and remarkable good fortune while working with her team.

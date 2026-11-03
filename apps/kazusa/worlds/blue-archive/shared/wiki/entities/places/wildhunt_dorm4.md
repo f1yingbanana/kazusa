@@ -3,13 +3,19 @@ pageType: entity
 entityType: place
 id: entity.place.wildhunt_dorm4
 place_id: wildhunt_dorm4
-name: "Wild Hunt Dormitory 4"
-aliases: ["Wild Hunt Dorm 4"]
-parent: wildhunt_school
-entry_minutes: 10
-summary: "A Wild Hunt student dormitory with rooms for club activity."
+name: "Dormitory No. 4"
+aliases: ["Wild Hunt Dormitory 4", "Wild Hunt Dorm 4"]
+parent: wildhunt_dorm_quarter
+entry_minutes: 2
+summary:
+  "Five-storey dormitory of shared rooms; front door 06:00–22:00, curfew 22:00,
+  room check 22:30. Rumoured to be haunted on the fourth floor."
+renown: local
+community: wild_hunt_academy
 ---
 
-# Wild Hunt Dormitory 4
+# Dormitory No. 4
 
-The Occult Research Society meets in room 404 of this dormitory. Like other residences, private rooms are not automatically open to visitors.
+An old five-storey dormitory with creaking stairs and shared rooms of two to
+four. The fourth floor has a reputation, helped along by the residents of one
+particular room.

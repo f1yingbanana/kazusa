@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: hyakkiyako_school
-name: Hyakkiyako Alliance Academy
-learned: familiar place
+name: "Hyakkiyako Alliance Academy Grounds"
+learned: always known
 ---
 
-A place I know well.
+Our academy! Big castle, big gates, and way at the back, the little schoolhouse
+where history is being made. By us. Ninja history!

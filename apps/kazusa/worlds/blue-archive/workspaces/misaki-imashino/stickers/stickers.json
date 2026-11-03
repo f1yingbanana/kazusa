@@ -1,0 +1,119 @@
+{
+  "outfits": {
+    "unmasked": "a black hoodie under a white oversized jacket, face uncovered",
+    "swimsuit": "a black bandeau bikini under an open beige striped shirt, a black choker"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, brows furrowed"
+    },
+    "confused": {
+      "look": "confused, brows knit, eyes looking up"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, wincing"
+    },
+    "gloomy": {
+      "look": "gloomy, a shadow over the brow, eyes half-lidded"
+    },
+    "neutral": {
+      "look": "neutral, a flat stare above a black face mask"
+    },
+    "sad": {
+      "look": "sad, brows knit, eyes lowered"
+    },
+    "shocked": {
+      "look": "shocked, a shadow over the brow, eyes wide"
+    },
+    "shy": {
+      "look": "shy, eyes averted above the face mask"
+    },
+    "sighing": {
+      "look": "sighing, eyes closed, brows slightly knit"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide above the face mask"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, teeth gritted, a nervous sweat"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blushing, mouth open, sweating"
+    },
+    "swimsuit-gloomy": {
+      "look": "gloomy, brows knit, lips pressed flat"
+    },
+    "swimsuit-happy": {
+      "look": "happy, a faint smile"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a calm, blank look"
+    },
+    "swimsuit-sad": {
+      "look": "sad, eyes lowered, lips pressed"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth open, a bead of sweat"
+    },
+    "swimsuit-worried": {
+      "look": "worried, brows raised, a nervous sweat"
+    },
+    "unmasked-angry": {
+      "look": "angry, a shadow over the brow, teeth gritted"
+    },
+    "unmasked-annoyed": {
+      "look": "annoyed, brows knit, teeth gritted"
+    },
+    "unmasked-confused": {
+      "look": "confused, brows knit, lips parted"
+    },
+    "unmasked-embarrassed": {
+      "look": "embarrassed, blushing, mouth open, sweating"
+    },
+    "unmasked-flustered": {
+      "look": "flustered, blushing, eyes squeezed shut"
+    },
+    "unmasked-gloomy": {
+      "look": "gloomy, a shadow over the brow, sweating"
+    },
+    "unmasked-neutral": {
+      "look": "neutral, a blank, distant stare"
+    },
+    "unmasked-sad": {
+      "look": "sad, eyes downcast, lips closed"
+    },
+    "unmasked-sheepish": {
+      "look": "sheepish, a nervous sweat, glancing aside"
+    },
+    "unmasked-shocked": {
+      "look": "shocked, a shadow over the brow, mouth open"
+    },
+    "unmasked-shy": {
+      "look": "shy, blushing, mouth wavering"
+    },
+    "unmasked-sighing": {
+      "look": "sighing, eyes closed, cheeks blushing, lips parted"
+    },
+    "unmasked-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "unmasked-surprised": {
+      "look": "surprised, mouth open, a bead of sweat"
+    },
+    "unmasked-worried": {
+      "look": "worried, a nervous sweat, lips parted"
+    },
+    "worried": {
+      "look": "worried, brows raised, eyes narrowed"
+    }
+  }
+}

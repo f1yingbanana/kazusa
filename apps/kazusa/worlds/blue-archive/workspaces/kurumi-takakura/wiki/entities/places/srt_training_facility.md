@@ -1,9 +1,8 @@
 ---
-pageType: entity
-entityType: place
 place_id: srt_training_facility
-name: Former SRT Training Facility
-learned: trained here
+name: "SRT Special Academy Campus"
+learned: always known
 ---
 
-A familiar training site from SRT.
+Where FOX was made. Sealed now. I do not go there to be sentimental. I go to
+check the perimeter. Occasionally.

@@ -7,9 +7,10 @@ name: Fuuka Aikiyo
 school: Gehenna Academy
 club: School Lunch Club
 is_simulated_agent: true
-home: gehenna_school
+home: room_fuuka
 ---
 
 # Fuuka Aikiyo
 
-Fuuka helps run Gehenna’s cafeteria, preparing meals for a large student population despite a demanding workload.
+Fuuka helps run Gehenna’s cafeteria, preparing meals for a large student
+population despite a demanding workload.

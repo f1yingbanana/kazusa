@@ -29,6 +29,8 @@ import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
 import { registerLocation } from "./location/register.ts";
 import { registerLocationHttp } from "./location/http.ts";
+import { registerWorldUpdate } from "./world-update/register.ts";
+import { registerRepoSearch } from "./repo-search/register.ts";
 import { registerMemory } from "./memory/register.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
@@ -49,6 +51,8 @@ import {
 import { registerTimelineHttp } from "./timeline/http.ts";
 import { registerUsageHttp } from "./usage/http.ts";
 import { registerStage, stageControl } from "./stage/register.ts";
+import { registerStickerHttp } from "./stickers/http.ts";
+import { createRouteRegistrar } from "./http/helpers.ts";
 
 export default definePluginEntry({
   id: "kazusa",
@@ -136,6 +140,8 @@ export default definePluginEntry({
       visited: memory.visited,
     });
     registerLocationHttp(api, { location });
+    registerWorldUpdate(api, { clock, location });
+    registerRepoSearch(api);
     // On unless a world turns it off: observing is what the client is for.
     const observer =
       (api.pluginConfig?.observer as { enabled?: boolean } | undefined)
@@ -285,5 +291,6 @@ export default definePluginEntry({
         drain: (id) => perception.drain(id),
       }),
     });
+    registerStickerHttp(api, createRouteRegistrar(api));
   },
 });

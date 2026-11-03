@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: red_winter_spec227
-name: "No. 227 Special Class Dormitory"
-learned: familiar place
+name: "Former Institute"
+learned: always known
 ---
 
-A place I know through my club.
+Supposedly a punishment. Honestly, I like it out here better than town: quiet,
+close to the trails, and nobody checking what I put in my kompot. Just watch the
+stairs on the upper floors.

@@ -1,0 +1,55 @@
+{
+  "outfits": {
+    "hotspring": "a white robe with a dark leaf pattern, a dark bowed sash, hair in a side braid"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, eyes narrowed, a slight frown"
+    },
+    "calm": {
+      "look": "calm, eyes closed, lips pressed"
+    },
+    "flustered": {
+      "look": "flustered, blushing, a nervous sweat"
+    },
+    "happy": {
+      "look": "happy, eyes shut, a small open-mouthed smile"
+    },
+    "hotspring-annoyed": {
+      "look": "annoyed, a small wavy frown"
+    },
+    "hotspring-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "hotspring-excited": {
+      "look": "excited, eyes bright, mouth open in a smile"
+    },
+    "hotspring-flustered": {
+      "look": "flustered, blushing and pouting, a nervous sweat"
+    },
+    "hotspring-happy": {
+      "look": "happy, a gentle smile"
+    },
+    "hotspring-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "hotspring-sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth open"
+    },
+    "hotspring-surprised": {
+      "look": "surprised, mouth a small o"
+    },
+    "neutral": {
+      "look": "neutral, eyes half-lidded, mouth flat"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, a nervous sweat, mouth open"
+    },
+    "smug": {
+      "look": "smug, a small knowing smile"
+    },
+    "surprised": {
+      "look": "surprised, lips parted in a small o"
+    }
+  }
+}

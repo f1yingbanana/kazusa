@@ -3,12 +3,17 @@ pageType: entity
 entityType: place
 id: entity.place.class_1a
 place_id: class_1a
-name: "Class 1-A"
-aliases: ["Class 1A", "1-A classroom"]
+name: "Trinity Class 1-A"
 parent: trinity_academic_hall
-summary: "First-year homeroom with tall windows over the courtyard; Airi, Yoshimi and Natsu's class."
+entry_minutes: 1
+summary:
+  "First-year homeroom on the Academic Hall's ground floor, windows over the
+  Rose Courtyard; homeroom 08:30, lessons until 15:20; left unlocked at lunch,
+  locked at 19:00."
 ---
 
-# Class 1-A
+# Trinity Class 1-A
 
-A bright first-year classroom with rows of wooden desks, tall arched windows over the Rose Courtyard and a blackboard that is never quite wiped clean. Airi, Yoshimi and Natsu share this homeroom.
+A bright ground-floor classroom with rows of wooden desks and tall arched
+windows over the Rose Courtyard. The blackboard is never quite wiped clean, and
+someone always has a snack hidden in her desk.

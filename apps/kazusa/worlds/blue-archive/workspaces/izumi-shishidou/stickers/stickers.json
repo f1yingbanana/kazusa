@@ -1,0 +1,129 @@
+{
+  "outfits": {
+    "gym": "a red track jacket with white sleeves over red gym shorts",
+    "newyear": "a red floral kimono with a black fur stole and a gold sash",
+    "swimsuit": "a red bikini and a wide straw sun hat trimmed with hibiscus and sunflowers"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "excited": {
+      "look": "excited, eyes bright, mouth open, drooling"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wide open"
+    },
+    "gym-content": {
+      "look": "content, eyes closed, a soft smile"
+    },
+    "gym-excited": {
+      "look": "excited, eyes bright, mouth open, drooling"
+    },
+    "gym-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wide open"
+    },
+    "gym-happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "gym-hungry": {
+      "look": "hungry, blushing, drooling, mouth open"
+    },
+    "gym-laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "gym-pouting": {
+      "look": "pouting, cheeks puffed, brows lowered"
+    },
+    "gym-shocked": {
+      "look": "shocked, blank dark eyes, mouth agape, sweating"
+    },
+    "gym-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "gym-worried": {
+      "look": "worried, brows tilted, blushing, lips parted"
+    },
+    "happy": {
+      "look": "happy, a small closed-mouth smile"
+    },
+    "hungry": {
+      "look": "hungry, blushing, drooling, mouth open"
+    },
+    "laughing": {
+      "look": "laughing with eyes shut, mouth wide open"
+    },
+    "newyear-dreamy": {
+      "look": "dreamy, eyes closed, blushing, mouth a small o"
+    },
+    "newyear-excited": {
+      "look": "excited, eyes bright, mouth open"
+    },
+    "newyear-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth wide open"
+    },
+    "newyear-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "newyear-pouting": {
+      "look": "pouting, cheeks puffed"
+    },
+    "newyear-sheepish": {
+      "look": "sheepish, glancing aside, a nervous sweat"
+    },
+    "newyear-shocked": {
+      "look": "shocked, blank ring eyes, mouth wide open"
+    },
+    "newyear-surprised": {
+      "look": "surprised, mouth a small o, a crumb on the lip"
+    },
+    "newyear-teary": {
+      "look": "teary, eyes welling up, mouth wobbling"
+    },
+    "newyear-whining": {
+      "look": "whining, eyes shut tight, mouth open"
+    },
+    "pouting": {
+      "look": "pouting, cheeks puffed, brows lowered"
+    },
+    "shocked": {
+      "look": "shocked, blank dark eyes, mouth agape, sweating"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "swimsuit-deadpan": {
+      "look": "deadpan, flat-line eyes, lips parted, a sweat drop"
+    },
+    "swimsuit-dreamy": {
+      "look": "dreamy, eyes closed, blushing, mouth a small o"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, mouth open, holding a watermelon slice"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes shut, mouth open"
+    },
+    "swimsuit-pouting": {
+      "look": "pouting, cheeks puffed"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, glancing aside, blushing, mouth wavy"
+    },
+    "swimsuit-shocked": {
+      "look": "shocked, blank ring eyes, mouth open"
+    },
+    "swimsuit-surprised": {
+      "look": "surprised, mouth a small o, holding a watermelon slice"
+    },
+    "swimsuit-worried": {
+      "look": "worried, eyes lowered, blushing, mouth wobbling"
+    },
+    "worried": {
+      "look": "worried, brows tilted, blushing, lips parted"
+    }
+  }
+}

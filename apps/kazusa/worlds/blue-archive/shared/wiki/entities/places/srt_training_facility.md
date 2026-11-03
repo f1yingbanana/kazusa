@@ -3,18 +3,18 @@ pageType: entity
 entityType: place
 id: entity.place.srt_training_facility
 place_id: srt_training_facility
-name: Former SRT Training Facility
+name: "SRT Special Academy Campus"
+aliases: ["Former SRT Training Facility"]
+parent: kousagi_ward
+entry_minutes: 20
 summary:
-  "A former SRT training facility used by students familiar with the academy."
-connections:
-  - to: central_transit_hub
-    ways:
-      - { by: transit, minutes: 30 }
-    note: "Approximate travel time for the simulation."
+  "The closed SRT academy's training compound: locked gates, empty barracks, a
+  GSC seal on the door."
 community: srt_special_academy
 ---
 
-# Former SRT Training Facility
+# SRT Special Academy Campus
 
-A training site associated with SRT Special Academy. Access and current use
-depend on the people responsible for the facility.
+The compound of the elite academy the General Student Council shut down: a
+training ground, barracks and a firing range behind a locked gate with a council
+seal. Weeds have started on the drill yard.

@@ -7,9 +7,10 @@ name: Satsuki Kyougoku
 school: Gehenna Academy
 club: Pandemonium Society
 is_simulated_agent: true
-home: gehenna_school
+home: room_satsuki
 ---
 
 # Satsuki Kyougoku
 
-Satsuki heads information work for Gehenna’s Pandemonium Society and experiments with persuasion and hypnosis.
+Satsuki heads information work for Gehenna’s Pandemonium Society and experiments
+with persuasion and hypnosis.

@@ -1,9 +1,9 @@
 ---
-pageType: entity
-entityType: place
 place_id: hyakkiyako_school
-name: Hyakkiyako Alliance Academy
-learned: familiar place
+name: "Hyakkiyako Alliance Academy Grounds"
+learned: always known
 ---
 
-A place I know well.
+The academy grounds, and my patrol route after class. Behind the keep, under the
+garden's cherry trees, the bench by the pond: every one of them is a classic
+confession spot. I check them all. For security. Obviously!

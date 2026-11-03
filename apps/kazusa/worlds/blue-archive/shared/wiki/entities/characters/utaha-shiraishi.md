@@ -7,9 +7,10 @@ name: Utaha Shiraishi
 school: Millennium Science School
 club: Engineering Department
 is_simulated_agent: true
-home: millennium_school
+home: room_utaha
 ---
 
 # Utaha Shiraishi
 
-Utaha leads Millennium’s Engineering Department and aims to become a renowned meister who helps people through invention.
+Utaha leads Millennium’s Engineering Department and aims to become a renowned
+meister who helps people through invention.

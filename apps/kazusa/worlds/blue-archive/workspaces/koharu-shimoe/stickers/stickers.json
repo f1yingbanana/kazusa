@@ -1,0 +1,137 @@
+{
+  "outfits": {
+    "track": "a navy-and-white zip-up track jacket with a high collar",
+    "swimsuit": "a black flower-print bikini and a black choker, with no hat"
+  },
+  "stickers": {
+    "angry": {
+      "look": "angry, face shadowed, glaring, teeth gritted"
+    },
+    "annoyed": {
+      "look": "annoyed, brows lowered, shouting"
+    },
+    "confused": {
+      "look": "confused, eyes wide, lips slightly parted"
+    },
+    "flustered": {
+      "look": "flustered, blank white eyes, blushing, mouth wide open"
+    },
+    "happy": {
+      "look": "happy, eyes shut in a smile, mouth open"
+    },
+    "neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "pouting": {
+      "look": "pouting, blushing, glaring with a wobbly mouth"
+    },
+    "sheepish": {
+      "look": "sheepish, a sweat drop, lips pressed"
+    },
+    "shy": {
+      "look": "shy, deep blush, wavy mouth, a sweat drop"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "stunned": {
+      "look": "stunned, blank white eyes, blushing, a sweat drop"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "swimsuit-angry": {
+      "look": "angry, face shadowed, glaring, teeth gritted"
+    },
+    "swimsuit-annoyed": {
+      "look": "annoyed, brows lowered, shouting"
+    },
+    "swimsuit-content": {
+      "look": "content, eyes closed, a gentle smile"
+    },
+    "swimsuit-embarrassed": {
+      "look": "embarrassed, deep blush, eyes lowered, lips parted"
+    },
+    "swimsuit-excited": {
+      "look": "excited, eyes bright, mouth open in a smile"
+    },
+    "swimsuit-flustered": {
+      "look": "flustered, blank white eyes, blushing, mouth open"
+    },
+    "swimsuit-happy": {
+      "look": "happy, eyes gently closed, a soft open-mouthed smile"
+    },
+    "swimsuit-laughing": {
+      "look": "laughing with eyes squeezed shut, mouth wide open"
+    },
+    "swimsuit-neutral": {
+      "look": "neutral, a steady look, a hand at the chin"
+    },
+    "swimsuit-panicked": {
+      "look": "panicked, blank eyes glancing aside, sweating heavily"
+    },
+    "swimsuit-sad": {
+      "look": "sad, brows tilted, lips parted"
+    },
+    "swimsuit-sheepish": {
+      "look": "sheepish, a sweat drop, lips pressed"
+    },
+    "swimsuit-shy": {
+      "look": "shy, deep blush, wavy mouth, a sweat drop"
+    },
+    "swimsuit-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "swimsuit-smug": {
+      "look": "smug, eyes narrowed, a sly half-smile"
+    },
+    "swimsuit-stunned": {
+      "look": "stunned, blank white eyes, blushing, a sweat drop"
+    },
+    "swimsuit-teary": {
+      "look": "teary, blushing, eyes welling, mouth wobbling"
+    },
+    "track-angry": {
+      "look": "angry, face shadowed, glaring, teeth gritted"
+    },
+    "track-annoyed": {
+      "look": "annoyed, brows lowered, shouting"
+    },
+    "track-confused": {
+      "look": "confused, eyes wide, lips slightly parted"
+    },
+    "track-flustered": {
+      "look": "flustered, blank white eyes, blushing, mouth wide open"
+    },
+    "track-happy": {
+      "look": "happy, eyes shut in a smile, mouth open"
+    },
+    "track-neutral": {
+      "look": "neutral, a steady, blank look"
+    },
+    "track-pouting": {
+      "look": "pouting, blushing, glaring with a wobbly mouth"
+    },
+    "track-sheepish": {
+      "look": "sheepish, a sweat drop, lips pressed"
+    },
+    "track-shy": {
+      "look": "shy, deep blush, wavy mouth, a sweat drop"
+    },
+    "track-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "track-stunned": {
+      "look": "stunned, blank white eyes, blushing, a sweat drop"
+    },
+    "track-surprised": {
+      "look": "surprised, eyes wide, mouth open"
+    },
+    "track-worried": {
+      "look": "worried, eyes wide, mouth open, a sweat drop"
+    },
+    "worried": {
+      "look": "worried, eyes wide, mouth open, a sweat drop"
+    }
+  }
+}

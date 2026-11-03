@@ -1,9 +1,10 @@
 ---
-pageType: entity
-entityType: place
 place_id: millennium_paranormal_office
-name: "Paranormal Affairs Office"
-learned: familiar place
+name: "Super Phenomenon Task Force Room"
+aliases: ["Task Force room"]
+learned: always known
 ---
 
-A place I know through my club.
+My assigned post. Himari's ego occupies most of it and the thermostat dispute
+occupies the rest. The equipment, I will admit, is excellent. Do not tell her I
+said so.

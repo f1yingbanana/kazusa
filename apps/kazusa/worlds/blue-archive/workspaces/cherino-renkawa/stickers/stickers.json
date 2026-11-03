@@ -1,0 +1,77 @@
+{
+  "outfits": {
+    "qipao": "a white red-flowered qipao, a fur-trimmed white coat, white gloves, a red hair flower",
+    "hotspring": "a pink-striped happi coat over a white swimsuit, a white hair bow"
+  },
+  "stickers": {
+    "annoyed": {
+      "look": "annoyed, a flat half-lidded glare"
+    },
+    "determined": {
+      "look": "determined, brows furrowed, a stern stare"
+    },
+    "flustered": {
+      "look": "flustered, swirly eyes, a nervous sweat"
+    },
+    "happy": {
+      "look": "happy, eyes shut in a smile, cheeks flushed"
+    },
+    "hotspring-confused": {
+      "look": "confused, swirly eyes, a nervous sweat"
+    },
+    "hotspring-happy": {
+      "look": "happy, eyes shut in a smile"
+    },
+    "hotspring-neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "hotspring-sad": {
+      "look": "sad, brows tilted up, cheeks flushed"
+    },
+    "hotspring-sleepy": {
+      "look": "sleepy, eyes closed"
+    },
+    "hotspring-surprised": {
+      "look": "surprised, eyes gone blank white circles"
+    },
+    "neutral": {
+      "look": "neutral, wide-eyed and steady"
+    },
+    "qipao-annoyed": {
+      "look": "annoyed, eyes squeezed shut, brows furrowed"
+    },
+    "qipao-confused": {
+      "look": "confused, swirly eyes, brows raised, a nervous sweat"
+    },
+    "qipao-determined": {
+      "look": "determined, brows furrowed, twirling a mustache tip"
+    },
+    "qipao-flustered": {
+      "look": "flustered, blushing hard, a tear on the cheek"
+    },
+    "qipao-happy": {
+      "look": "happy, eyes shut in a smile, twirling a mustache tip"
+    },
+    "qipao-neutral": {
+      "look": "neutral, twirling a mustache tip"
+    },
+    "qipao-sleepy": {
+      "look": "sleepy, eyes closed, face relaxed"
+    },
+    "qipao-smug": {
+      "look": "smug, eyes closed, brows raised, twirling a mustache tip"
+    },
+    "qipao-surprised": {
+      "look": "surprised, wide eyes, a sweat drop"
+    },
+    "qipao-teary": {
+      "look": "teary, brows raised, a tear in one eye"
+    },
+    "qipao-wincing": {
+      "look": "wincing, one eye squeezed shut with a tear, brows knit"
+    },
+    "sleepy": {
+      "look": "sleepy, eyes calmly closed"
+    }
+  }
+}

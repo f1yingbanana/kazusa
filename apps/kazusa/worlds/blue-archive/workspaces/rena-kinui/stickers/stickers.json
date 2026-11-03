@@ -1,0 +1,82 @@
+{
+  "stickers": {
+    "angry": {
+      "look": "angry, brows down, mouth open shouting"
+    },
+    "annoyed": {
+      "look": "annoyed, brows knit, mouth slightly open"
+    },
+    "bashful": {
+      "look": "bashful, blushing, brows knit, mouth open"
+    },
+    "calm": {
+      "look": "calm, eyes closed, mouth relaxed"
+    },
+    "deadpan": {
+      "look": "deadpan, a blank half-lidded stare"
+    },
+    "displeased": {
+      "look": "displeased, eyes half-lidded, lips pressed in a wavy line"
+    },
+    "embarrassed": {
+      "look": "embarrassed, blushing, eyes wide, mouth slightly open"
+    },
+    "excited": {
+      "look": "excited, eyes shut, mouth open cheerfully"
+    },
+    "flustered": {
+      "look": "flustered, blushing hard, mouth open in protest"
+    },
+    "grinning": {
+      "look": "grinning with eyes shut, teeth showing"
+    },
+    "happy": {
+      "look": "happy, eyes closed, a gentle smile"
+    },
+    "nervous": {
+      "look": "nervous, a wobbly mouth, a sweat drop"
+    },
+    "neutral": {
+      "look": "neutral, a faint frown, cheeks lightly pink"
+    },
+    "pained": {
+      "look": "pained, eyes squeezed shut, wavy open mouth, sweat drop"
+    },
+    "panicked": {
+      "look": "panicked, blank white eyes, mouth wide open"
+    },
+    "pouting": {
+      "look": "pouting, blushing, glancing aside with a small frown"
+    },
+    "sad": {
+      "look": "sad, eyes shut, brows knit, mouth open in a whine"
+    },
+    "sheepish": {
+      "look": "sheepish, eyes shut, an awkward wavy mouth, a sweat drop"
+    },
+    "shocked": {
+      "look": "shocked, tiny pupils, blushing, mouth agape"
+    },
+    "shy": {
+      "look": "shy, blushing, glancing up, lips pressed small"
+    },
+    "strained": {
+      "look": "strained, eyes shut, a forced wobbly smile, a sweat drop"
+    },
+    "sulking": {
+      "look": "sulking, eyes shut, brows furrowed, small frown"
+    },
+    "surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "suspicious": {
+      "look": "suspicious, eyes narrowed, mouth flat"
+    },
+    "uneasy": {
+      "look": "uneasy, brows knit, a small frown"
+    },
+    "worried": {
+      "look": "worried, brows tilted up, wavy lips"
+    }
+  }
+}

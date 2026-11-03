@@ -1,0 +1,64 @@
+{
+  "outfits": {
+    "pajamas": "a long white frilled nightgown under a dark fringed shawl, hair in a high ponytail"
+  },
+  "stickers": {
+    "content": {
+      "look": "content, eyes gently closed, a faint smile"
+    },
+    "flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open, blushing"
+    },
+    "happy": {
+      "look": "happy, eyes shut in arcs, a soft smile, blushing"
+    },
+    "neutral": {
+      "look": "neutral, a calm, steady look"
+    },
+    "pajamas-content": {
+      "look": "content, eyes gently closed, a faint smile, a pen at the chin"
+    },
+    "pajamas-eerie": {
+      "look": "eerie, face shadowed, eyes shut, a thin smile"
+    },
+    "pajamas-flustered": {
+      "look": "flustered, eyes squeezed shut, mouth open, blushing"
+    },
+    "pajamas-happy": {
+      "look": "happy, eyes shut in arcs, smiling, a pen at the chin"
+    },
+    "pajamas-pleased": {
+      "look": "pleased, eyes open, smiling, a pen at the chin"
+    },
+    "pajamas-pouting": {
+      "look": "pouting, lips pressed, a pen at the chin"
+    },
+    "pajamas-sheepish": {
+      "look": "sheepish, eyes shut, smiling, a bead of sweat"
+    },
+    "pajamas-surprised": {
+      "look": "surprised, eyes wide, mouth a small o"
+    },
+    "pajamas-thinking": {
+      "look": "thinking, mouth small and still, a pen at the chin"
+    },
+    "pajamas-worried": {
+      "look": "worried, a bead of sweat, lips parted"
+    },
+    "pajamas-wry": {
+      "look": "wry, brows raised, a faint smile, a pen at the chin"
+    },
+    "pleased": {
+      "look": "pleased, eyes open, a soft closed-lip smile"
+    },
+    "pouting": {
+      "look": "pouting, lips pressed into a small frown"
+    },
+    "shy": {
+      "look": "shy, brows tilted up, faint blush, lips in a small wavy line"
+    },
+    "worried": {
+      "look": "worried, a bead of sweat, lips parted"
+    }
+  }
+}

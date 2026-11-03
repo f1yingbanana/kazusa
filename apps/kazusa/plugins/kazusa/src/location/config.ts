@@ -8,7 +8,7 @@ export const LOCATION_CONFIG = z.strictObject({
   /** Task categories that move the character to their `where`. */
   travelCategories: z.array(z.string().min(1)).min(1).default(["traveling"]),
   /** Places listed in `Around you`, and again in `Places you know`. */
-  listLimit: z.number().int().min(0).max(50).default(8),
+  listLimit: z.number().int().min(0).max(50).default(16),
   /** What each likelihood word means as a probability, for rolls. */
   likelihood: z
     .strictObject({

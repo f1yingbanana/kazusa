@@ -1,9 +1,10 @@
 ---
-pageType: entity
-entityType: place
 place_id: veritas_clubroom
-name: "Veritas Clubroom"
-learned: familiar place
+name: "Hackers' Lounge"
+aliases: ["Veritas lounge"]
+learned: always known
 ---
 
-A place I know through my club.
+Veritas's base. I rotate the door code every week and keep telling the younger
+members that "it was easy to get in" is not a justification. The air
+conditioning is set to arctic; I keep a cardigan on my chair.

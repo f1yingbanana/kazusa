@@ -23,6 +23,7 @@ const ROUTES = new Map([
   ["move", "POST"],
   ["character/stage", "POST"],
   ["avatar", "GET"],
+  ["sticker", "GET"],
   ["profile", "GET"],
   ["profile/save", "POST"],
   ["models", "GET"],
