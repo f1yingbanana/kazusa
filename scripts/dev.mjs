@@ -21,6 +21,7 @@ import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
+import { dropStoreKeyRefs } from "./provider-keys.mjs";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
@@ -285,6 +286,11 @@ if (!stopping) {
     for (const line of syncSystemAgent(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't update the system agent's tools: ${error.message}`);
+  }
+  try {
+    for (const line of dropStoreKeyRefs(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't finish moving provider keys: ${error.message}`);
   }
   start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,

@@ -32,12 +32,6 @@ const BRAIN_CHANNEL: ChannelPlugin<{ accountId: string }> = {
   },
   // Perception already coalesces inputs; do not add another debounce on handoff.
   defaults: { queue: { debounceMs: 0 } },
-  // OpenClaw ties this channel to all of `plugins.entries.kazusa`, so a new
-  // TypeSafe key would restart it mid-turn. Jev reads that key per call.
-  reload: {
-    configPrefixes: [],
-    noopPrefixes: [`plugins.entries.${CHANNEL_ID}.config.decisions`],
-  },
 };
 
 const brainKey = (agentId: string): string => `agent:${agentId}:brain`;

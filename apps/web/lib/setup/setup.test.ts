@@ -10,22 +10,22 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SYSTEM_AGENT_INCLUDE as SCRIPT_INCLUDE } from "../../../../scripts/system-agent.mjs";
-import { createSetup, SYSTEM_AGENT_INCLUDE, type SecretStore } from "./setup";
+import { createSetup, SYSTEM_AGENT_INCLUDE, type KeyStore } from "./setup";
 
 function write(file: string, text: string) {
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, text);
 }
 
-/** The secret store, without OpenClaw's CLI. */
+/** Auth profiles by provider, without OpenClaw. */
 function memoryStore(
   entries = new Map<string, string>(),
-): SecretStore & { entries: Map<string, string> } {
+): KeyStore & { entries: Map<string, string> } {
   return {
     entries,
-    has: async (name) => entries.has(name),
-    set: async (name, value) => {
-      entries.set(name, value);
+    has: async (provider) => entries.has(provider),
+    set: async (provider, key) => {
+      entries.set(provider, key);
     },
   };
 }
@@ -173,7 +173,7 @@ describe("setup", () => {
       sleep: { enabled: true },
       anchors: { guild: "intimate", city: "familiar" },
     });
-    expect(store.entries.get("OPENROUTER_API_KEY")).toBe("sk-test");
+    expect(store.entries.get("openrouter")).toBe("sk-test");
     expect(existsSync(path.join(app, "world/.state/.env"))).toBe(false);
     expect(
       lstatSync(
@@ -201,15 +201,15 @@ describe("setup", () => {
     expect(kazusa.clock).toBeUndefined();
   });
 
-  it("moves a key from the old keys file into the store", async () => {
+  it("moves a key from the old keys file into a profile", async () => {
     write(path.join(app, "world/.state/.env"), "OPENROUTER_API_KEY=from-env\n");
     await createSetupHere(app).apply({ world: "starter", cast: [] });
-    expect(store.entries.get("OPENROUTER_API_KEY")).toBe("from-env");
+    expect(store.entries.get("openrouter")).toBe("from-env");
   });
 
   it("picks up an unfinished run and keeps what is already there", async () => {
     const setup = createSetupHere(app);
-    store.entries.set("OPENROUTER_API_KEY", "first");
+    store.entries.set("openrouter", "first");
     write(
       path.join(app, "world/workspaces/ann/IDENTITY.md"),
       "---\nname: EDITED\n---\n",
@@ -219,7 +219,7 @@ describe("setup", () => {
       cast: [],
       openrouterKey: "second",
     });
-    expect(store.entries.get("OPENROUTER_API_KEY")).toBe("first");
+    expect(store.entries.get("openrouter")).toBe("first");
     expect(
       readFileSync(path.join(app, "world/workspaces/ann/IDENTITY.md"), "utf8"),
     ).toContain("EDITED");
@@ -234,7 +234,7 @@ describe("setup", () => {
 
   it("reports an imported world and a saved key on the next visit", async () => {
     const setup = createSetupHere(app);
-    store.entries.set("OPENROUTER_API_KEY", "k");
+    store.entries.set("openrouter", "k");
     write(
       path.join(app, "world/world.json"),
       JSON.stringify({
