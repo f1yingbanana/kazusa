@@ -292,6 +292,11 @@ apps/kazusa/
 - **`npm run dev`** (`scripts/dev.mjs`) installs what's missing and runs the
   frontend. The guide only asks what's missing and writes `world/openclaw.json`
   last, so its existence means setup is done; that is what starts the Gateway.
+  It stops the Gateway by closing its stdin (`OPENCLAW_GATEWAY_HOST_LIFELINE`),
+  which drains turns like Ctrl+C even on Windows, where `kill()` can't. It also
+  applies updates staged by Settings → Updates (`scripts/update.mjs`,
+  `.update/pending.json`): stop everything, apply, start the new version in the
+  same terminal. Never change files from inside a running copy instead.
 - **Provider keys** live in OpenClaw's secret store
   (`.state/state/openclaw.sqlite`). Writing a key reference into `openclaw.json`
   reloads every plugin, so `worlds/base.json` writes one for every provider in

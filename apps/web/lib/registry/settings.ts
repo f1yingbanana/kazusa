@@ -1,7 +1,14 @@
-import { BoxesIcon, ChartColumnIcon, PlugIcon, UserIcon } from "lucide-react";
+import {
+  BoxesIcon,
+  ChartColumnIcon,
+  CircleArrowUpIcon,
+  PlugIcon,
+  UserIcon,
+} from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
+import { UpdateSettings } from "@/components/views/settings/update-settings";
 import { UsageSettings } from "@/components/views/settings/usage-settings";
 import type { SettingsCategory } from "./types";
 
@@ -38,6 +45,14 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     icon: ChartColumnIcon,
     order: 20,
     component: UsageSettings,
+  },
+  {
+    id: "updates",
+    label: "Updates",
+    description: "This version, and updating it",
+    icon: CircleArrowUpIcon,
+    order: 30,
+    component: UpdateSettings,
   },
 ].sort((a, b) => a.order - b.order);
 

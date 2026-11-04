@@ -10,17 +10,25 @@
  */
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { syncSystemAgent } from "./system-agent.mjs";
+import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORLD = path.join(ROOT, "apps/kazusa/world");
 const CONFIG = path.join(WORLD, "openclaw.json");
 const ENV_FILE = path.join(WORLD, ".state/.env");
+const UPDATE = updatePaths(ROOT);
 const GATEWAY_PORT = 18789;
 const WEB_PORT = 3000;
 const POLL_MS = 500;
@@ -95,8 +103,36 @@ function isListening(port) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Applies the update Settings staged (`scripts/update.mjs`), then hands this
+ * terminal to the version now on disk. Never settles: this process only waits
+ * for the new one and exits with it.
+ */
+function updateAndRestart() {
+  const result = applyPending(ROOT);
+  if (result)
+    console.log(
+      result.ok
+        ? `\nUpdated to ${result.version}. Starting it.\n`
+        : result.applied
+          ? `\nUpdated to ${result.version}, but installing its dependencies failed: ${result.error}\nTrying again. Your world is unchanged.\n`
+          : `\nCouldn't update to ${result.version}: ${result.error}\nStarting the version you had. Your world is unchanged.\n`,
+    );
+  const next = spawn(process.execPath, process.argv.slice(1), {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: { ...process.env, KAZUSA_RESTARTED: "1" },
+  });
+  // Ctrl+C reaches the new process on its own; this one keeps waiting for it.
+  process.on("SIGINT", () => undefined);
+  process.on("SIGTERM", () => next.kill("SIGTERM"));
+  next.once("exit", (code) => process.exit(code ?? 0));
+  return new Promise(() => undefined);
+}
+
 requireSupportedNode();
-// Before installing: `npm ci` would pull modules out from under a running copy.
+// Before updating or installing: either would pull files out from under a
+// running copy, such as one still stopping for the update it staged.
 for (const [port, name] of [
   [GATEWAY_PORT, "the Gateway"],
   [WEB_PORT, "the frontend"],
@@ -106,23 +142,34 @@ for (const [port, name] of [
       `Port ${port} is already in use, so ${name} can't start. Stop whatever is using it and try again.`,
     );
 }
-if (!existsSync(NEXT) || !PLUGINS.every((dir) => existsSync(dir))) {
+// Staged before the last stop, so nothing has run it yet.
+if (existsSync(UPDATE.pending)) await updateAndRestart();
+clearTrash(ROOT);
+// An update whose `npm ci` failed left a half-installed `node_modules`.
+if (
+  existsSync(UPDATE.reinstall) ||
+  !existsSync(NEXT) ||
+  !PLUGINS.every((dir) => existsSync(dir))
+) {
   console.log("Installing dependencies.");
   execFileSync("npm", ["ci", "--no-audit", "--no-fund"], {
     cwd: ROOT,
     stdio: "inherit",
     shell: process.platform === "win32",
   });
+  rmSync(UPDATE.reinstall, { force: true });
 }
 
 const firstRun = !existsSync(CONFIG);
 const token = gatewayToken();
 const children = new Map();
 let stopping = false;
+let updating = false;
 
 function stop(exitCode, { fromConsole = false } = {}) {
   if (stopping) return;
   stopping = true;
+  clearInterval(updateWatch);
   process.exitCode = exitCode;
   console.log(
     "\nStopping. The Gateway lets running turns finish first, which can take a few minutes.",
@@ -130,9 +177,30 @@ function stop(exitCode, { fromConsole = false } = {}) {
   // Windows has no SIGTERM: kill() ends a child outright, so leave Ctrl+C to do it.
   if (fromConsole && process.platform === "win32") return;
   // A terminal's Ctrl+C reaches the children too; this covers everything else.
-  // Never SIGKILL the Gateway: it can leave agent databases degraded.
-  for (const child of children.values()) child.kill("SIGTERM");
+  // Never kill the Gateway: it can leave agent databases degraded. Closing its
+  // lifeline stops it as Ctrl+C would, even on Windows, where kill() can't.
+  for (const [name, child] of children) {
+    if (name === "gateway") child.stdin.end();
+    else child.kill("SIGTERM");
+  }
 }
+
+// Settings stages an update for this process to apply once everything stops.
+// It waits a poll first, so the page that asked for it hears back.
+let updateSeen = false;
+const updateWatch = setInterval(() => {
+  if (stopping || !existsSync(UPDATE.pending)) return;
+  if (!updateSeen) {
+    updateSeen = true;
+    return;
+  }
+  updating = true;
+  console.log(
+    "\nUpdating Kazusa. It stops first, then starts the new version.",
+  );
+  stop(0);
+  if (children.size === 0) void updateAndRestart();
+}, POLL_MS);
 
 function start(name, command, args, options) {
   const child = spawn(command, args, {
@@ -140,6 +208,8 @@ function start(name, command, args, options) {
     ...options,
   });
   children.set(name, child);
+  // Closing a lifeline the child already let go of isn't an error.
+  child.stdin?.on("error", () => undefined);
   for (const stream of [child.stdout, child.stderr]) {
     let partial = "";
     stream.setEncoding("utf8");
@@ -156,6 +226,10 @@ function start(name, command, args, options) {
   });
   child.once("exit", (code) => {
     children.delete(name);
+    if (updating) {
+      if (children.size === 0) void updateAndRestart();
+      return;
+    }
     if (!stopping) {
       console.error(`[${name}] stopped unexpectedly (exit code ${code}).`);
       stop(code || 1);
@@ -163,7 +237,11 @@ function start(name, command, args, options) {
   });
 }
 
-process.on("SIGINT", () => stop(0, { fromConsole: true }));
+process.on("SIGINT", () => {
+  // Quitting mid-update: the next start applies it instead.
+  updating = false;
+  stop(0, { fromConsole: true });
+});
 process.on("SIGTERM", () => stop(0));
 
 start(
@@ -183,6 +261,8 @@ start(
       ...process.env,
       KAZUSA_GATEWAY_URL: `http://127.0.0.1:${GATEWAY_PORT}`,
       OPENCLAW_GATEWAY_TOKEN: token,
+      // Tells the updater someone can restart Kazusa once it's staged.
+      KAZUSA_SUPERVISED: "1",
     },
   },
 );
@@ -192,8 +272,9 @@ if (!stopping) {
   const url = `http://localhost:${WEB_PORT}`;
   console.log(`\nKazusa is running. Open ${url}\n`);
   // Someone who double-clicked an icon has no terminal habit to fall back on.
+  // After an update, the page that asked for it reloads itself.
   const opener = BROWSER_OPENERS[process.platform];
-  if (opener && (firstRun || PACKAGED))
+  if (opener && !process.env.KAZUSA_RESTARTED && (firstRun || PACKAGED))
     spawn(opener[0], [...opener.slice(1), url], { stdio: "ignore" });
 }
 
@@ -207,10 +288,12 @@ if (!stopping) {
   }
   start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,
+    stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...withBundledNode(process.env),
       OPENCLAW_CONFIG_PATH: "./openclaw.json",
       OPENCLAW_STATE_DIR: "./.state",
+      OPENCLAW_GATEWAY_HOST_LIFELINE: "stdin",
     },
   });
 }

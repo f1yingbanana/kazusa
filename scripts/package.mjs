@@ -2,7 +2,9 @@
 /**
  * Builds an unsigned installer into `dist/` on a Mac: `node scripts/package.mjs
  * <win-x64|darwin-arm64> [version]`. Windows needs `brew install makensis`.
- * `.github/workflows/release.yml` runs this for tags.
+ * `.github/workflows/release.yml` runs this for tags and for `main`. Beside the
+ * installer goes a `.tar.gz` of the same files, which Settings → Updates
+ * downloads (`scripts/update.mjs`).
  *
  * Only git-tracked files are staged, so a local world, its keys and `.env`
  * can't end up in a package. The repo's layout is kept because the world's
@@ -56,6 +58,8 @@ const INCLUDED = [
   "package.json",
   "package-lock.json",
   "scripts/dev.mjs",
+  "scripts/system-agent.mjs",
+  "scripts/update.mjs",
   "apps/",
   "packages/",
   ".agents/skills/",
@@ -257,6 +261,7 @@ UninstPage instfiles
   RMDir /r "$INSTDIR\\scripts"
   RMDir /r "$INSTDIR\\packages"
   RMDir /r "$INSTDIR\\.agents"
+  RMDir /r "$INSTDIR\\.update"
   RMDir /r "$INSTDIR\\apps\\web"
   RMDir /r "$INSTDIR\\apps\\kazusa\\plugins"
   RMDir /r "$INSTDIR\\apps\\kazusa\\shared"
@@ -333,7 +338,8 @@ SectionEnd
  * read-only copy. So the app copies itself to a folder of the player's and runs
  * in Terminal from there, which also keeps the world safe when the app is
  * replaced. Quarantine is cleared on that copy because the player has approved
- * the app by then, and native modules can't load with it set.
+ * the app by then, and native modules can't load with it set. The copy is made
+ * again only for a different app: Settings can update the copy past the app.
  */
 function launcherScript() {
   return `#!/bin/bash
@@ -346,17 +352,28 @@ cat > "$command" <<EOF
 #!/bin/bash
 set -e
 cd "$home"
-if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" VERSION; then
+if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" .bundle-version; then
   echo "Setting up Kazusa. This takes a minute, once per version."
-  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /VERSION --exclude /Kazusa.command "$bundle/" ./
+  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
   xattr -dr com.apple.quarantine . 2>/dev/null || true
-  cp "$bundle/VERSION" VERSION
+  cp "$bundle/VERSION" .bundle-version
 fi
 exec ./node/node scripts/dev.mjs --packaged
 EOF
 chmod +x "$command"
 open -a Terminal "$command"
 `;
+}
+
+/** What an installed copy updates from: the installer's files, nothing else. */
+function buildArchive(stage, name, version) {
+  const output = path.join(DIST, `Kazusa-${version}-${name}.tar.gz`);
+  // No AppleDouble `._` files or extended attributes, which Windows would unpack.
+  run("tar", ["--no-xattrs", "-czf", output, "-C", stage, "."], DIST, {
+    ...process.env,
+    COPYFILE_DISABLE: "1",
+  });
+  console.log(`\nBuilt ${output}`);
 }
 
 function buildDiskImage(stage, version) {
@@ -424,5 +441,6 @@ installForTarget(stage, target);
 await stageNode(stage, target);
 writeFileSync(path.join(stage, "VERSION"), `${version}\n`);
 verify(stage, target);
+buildArchive(stage, name, version);
 const build = target.os === "win32" ? buildInstaller : buildDiskImage;
 console.log(`\nBuilt ${build(stage, version)}`);

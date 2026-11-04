@@ -12,6 +12,9 @@ node_modules/
 dist/
 build/
 
+# Updates staged from Settings (`scripts/update.mjs`)
+.update/
+
 # Logs
 *.log
 npm-debug.log*
