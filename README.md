@@ -147,6 +147,8 @@ for:
 Your world lives in `apps/kazusa/world/`. To start afresh, stop Kazusa with
 Ctrl + C and delete that folder. Run `npm run dev` again to reinitialize.
 
+To update, open **Settings > Updates**. Kazusa downloads the latest release and restarts, keeping your world data unchanged.
+
 ### Talk to **ARONA**
 
 **ARONA** is the built in system admin agent that will help you build your

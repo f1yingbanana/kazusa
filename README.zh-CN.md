@@ -119,6 +119,8 @@ git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 你的世界数据存放在 `apps/kazusa/world/`。需要重新设置的话，只要按 Ctrl +
 C 停止 Kazusa，把那个文件夹删掉即可。重新跑 `npm run dev` 就会初始化。
 
+更新在**设置 > 更新**里。Kazusa会下载新版本并重启，你的现有世界数据不会改变。
+
 ### 与 **ARONA** 对话
 
 **ARONA** 是内置的系统管理员智能体，专门带你一起搭建世界。
