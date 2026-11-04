@@ -24,10 +24,3 @@ creatures sitting on his shoulders.
 ## Also known as
 
 Sir Moore, Moore of the Foragers, the Forager
-
-## Key relationships
-
-- **Needle Knight Leda** (beloved Lady): He follows her.
-- **Malenia, Blade of Miquella** (old abandoner): She abandoned his kind.
-- **Thiollier** (shy friend): Fellow follower.
-- **Romina, Saint of the Bud** (a very kind lady): Rot's saint.

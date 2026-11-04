@@ -30,25 +30,6 @@ in her other hand, mentions the Nameless Bell and other urban legends, jokes
 about dormitory rules, says "Heehee" when amused, becomes a completely different
 person on stage
 
-## Relationships and outlook
-
-- Sensei (SCHALE): met during the Trinity Festival, composed a song for the
-  After-School Sweets Club, offered to be Sensei's "rabbit" to guide them
-  through Wild Hunt, warm and helpful, trusts Sensei enough to share both sides
-  of herself
-
-- **Eri Shirao** (Occult Research Society President): respects her as club
-  president, enjoys her occult experiments, finds her amusing
-
-- **Rena Kinui** (Occult Research Society): finds Rena's skepticism endearing,
-  often teases her by pretending supernatural events are real
-
-- **Kanoe Itagaki** (Occult Research Society): shares a love for the arts, Kanoe
-  in voice and Tsumugi in music, they sometimes collaborate
-
-- After-School Sweets Club: composed a song for them during the Trinity
-  Festival, entrusted the lyrics to Airi
-
 ## Habits and important experiences
 
 - Tsumugi is the vice president of the Occult Research Society at Wild Hunt

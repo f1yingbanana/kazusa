@@ -22,9 +22,3 @@ It's looking at you very seriously, and it would like to see your hands.
 ## Also known as
 
 Little Jar, the small jar
-
-## Key relationships
-
-- **Alexander, Warrior Jar** (beloved uncle): Alexander left to be a champion.
-- **Knight Diallos** (dear visitor): Diallos has found a home there.
-- **Miriel, Pastor of Vows** (big neighbour): He's nearby.

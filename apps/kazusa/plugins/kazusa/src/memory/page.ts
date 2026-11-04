@@ -103,9 +103,22 @@ export function firstSentence(value: string): string {
   return flat.match(/^.+?[.!?。！？](?=\s|$)/u)?.[0] ?? flat;
 }
 
+/** Non-empty lines, each wrapped bullet joined back into one line. */
+function bulletLines(body: string): string[] {
+  const lines: string[] = [];
+  for (const line of body.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const last = lines.at(-1);
+    // A long bullet goes on, indented, on the lines under it.
+    if (/^\s+\S/.test(line) && last !== undefined && /^[-*]\s/.test(last))
+      lines[lines.length - 1] = `${last} ${line.trim()}`;
+    else lines.push(line.trim());
+  }
+  return lines;
+}
+
 const listItems = (body: string): string[] =>
-  body
-    .split(/\r?\n/)
+  bulletLines(body)
     .map((line) => line.match(/^[-*]\s+(.+)$/)?.[1]?.trim())
     .filter((item): item is string => Boolean(item));
 
@@ -195,8 +208,7 @@ export function parsePage(raw: string, relative: string): Page {
     }
     switch (block.heading.toLowerCase()) {
       case "notes":
-        for (const line of block.body.split(/\r?\n/)) {
-          if (!line.trim()) continue;
+        for (const line of bulletLines(block.body)) {
           const match = line.match(NOTE);
           if (match) {
             notes.push({
@@ -211,8 +223,7 @@ export function parsePage(raw: string, relative: string): Page {
         }
         break;
       case "history":
-        for (const line of block.body.split(/\r?\n/)) {
-          if (!line.trim()) continue;
+        for (const line of bulletLines(block.body)) {
           const match = line.match(HISTORY);
           if (match) {
             history.push({
@@ -232,14 +243,18 @@ export function parsePage(raw: string, relative: string): Page {
         theyThinkOfMe = block.body.replace(/\s+/g, " ").trim() || undefined;
         break;
       default: {
-        const [first, ...rest] = block.body.split(/\r?\n/);
-        const restricted = first?.match(KNOWN_BY);
+        // `Known by:` is its own paragraph, however many lines it wraps to.
+        const [first = "", ...rest] = block.body.split(/\r?\n\s*\r?\n/);
+        const restricted = first.replace(/\s+/g, " ").match(KNOWN_BY);
         sections.push(
           restricted
             ? {
                 title: block.heading,
-                text: rest.join("\n").trim(),
-                knownBy: restricted[1].split(",").map((who) => who.trim()),
+                text: rest.join("\n\n").trim(),
+                knownBy: restricted[1]
+                  .split(",")
+                  .map((who) => who.trim())
+                  .filter(Boolean),
               }
             : { title: block.heading, text: block.body, knownBy: [] },
         );

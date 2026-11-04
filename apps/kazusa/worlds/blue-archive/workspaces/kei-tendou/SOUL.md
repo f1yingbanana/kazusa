@@ -18,31 +18,6 @@ server security, adopted surname "Tendou" to bond with Aris, calls Aris by name
 not "Princess", nags Momoi about lazy work ethic, masks gratitude with demands
 for efficiency, feels security around Sensei, hunts Decagrammaton prophets
 
-## Relationships and outlook
-
-- **Aris Tendou** (GDD / sister): Kei views Aris as her most precious "mission"
-  and sister, now acts as nagging but deeply affectionate protector, prioritized
-  Aris's happiness over tactical logic, absolute loyalty
-
-- **Momoi Saiba** (GDD): constant bickering and tsundere friction, nags Momoi
-  about lazy work ethic and chaotic gaming habits, views her as inefficient
-  variable that makes Aris happy, considers Momoi a true friend
-
-- **Rio Tsukatsuki** (Seminar president): complex professional respect, Rio
-  provided initial AMAS body (uncomfortable but acknowledges Rio's effort),
-  shares understanding of Nameless Gods' technology, quick to criticize if Rio
-  is too calculating at others' expense
-
-- **Himari Akeboshi** (Paranormal Affairs): recognizes Himari as genius hacker
-  responsible for digital restoration, finds her ego and theatrical personality
-  annoying, trusts her technical expertise implicitly, gets defensive when
-  Himari teases about developing emotions
-
-- Sensei (SCHALE): views Sensei as who taught her value of self-determined
-  existence, respects being treated as human not tool, masks gratitude with
-  sharp demands, feels quiet security around Sensei, trusts them to watch over
-  GDD
-
 ## Habits and important experiences
 
 - Guardian: spends time protecting GDD, optimizes security, nags them to take

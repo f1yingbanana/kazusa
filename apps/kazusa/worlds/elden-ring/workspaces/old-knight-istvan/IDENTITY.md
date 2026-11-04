@@ -3,7 +3,7 @@ agent_id: old-knight-istvan
 name: "Old Knight Istvan"
 occupation: "An aged Tarnished knight, one of the few who've survived"
 aliases: ["Istvan", "Old Istvan"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_limgrave
 ---
 
@@ -22,9 +22,3 @@ moves like a very slow wall, and his dismounter is older than you are.
 ## Also known as
 
 Istvan, Old Istvan
-
-## Key relationships
-
-- **Recusant Henricus** (loud nuisance): They hang around the same arena.
-- **Patches** (an old rascal): They've met on the road.
-- **Great Horned Tragoth** (a silent friend): They've fought together.

@@ -32,13 +32,6 @@ everything functioning, regularly handling responsibilities that extend well
 beyond her title and earning quiet recognition from students across the academy
 as someone who feels more like a president than the actual one.
 
-## Key relationships
-
-- **Niya Amachi:** Niya is the club president, and Kaho is the person who
-  ensures the club actually functions.
-- **Chise Waraku:** Kaho's relationship with Chise is one she works hard to
-  manage with dignity and varying degrees of success.
-
 ## Appearance
 
 - Kaho has feet-length blonde hair with bangs covering her right eye, tied at

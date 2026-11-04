@@ -11,7 +11,7 @@ aliases:
     "Lord of the Battlefield",
     "Hoarah",
   ]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 ---
 
@@ -35,17 +35,3 @@ aside.
 
 Godfrey, Hoarah Loux, Lord Godfrey, First Elden Lord, Lord of the Battlefield,
 Hoarah
-
-## Key relationships
-
-- **Queen Marika the Eternal** (queen and former wife): She made him Lord and
-  exiled him.
-- **Morgott, the Omen King** (unknown son): Morgott is his Omen son, whom he
-  barely knew.
-- **Godrick the Grafted** (distant descendant): Godrick apes his name and his
-  lion.
-- **Starscourge Radahn** (admirer): Radahn imitated him as a boy.
-- **Nepheli Loux** (unknown line): She shares his old warrior name.
-- **Ancient Dragon Lansseax** (old dragon of the capital): They have both been
-  here a long time.
-- **Serosh** (the lion): He's let him go.

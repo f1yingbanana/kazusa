@@ -22,9 +22,3 @@ up and a drill that's nearly as big as she is.
 ## Also known as
 
 Little Kachina, Uthabiti, the Young Warrior
-
-## Key relationships
-
-- **Xilonen** (teacher, of a kind): She's always asleep, and everything she says
-  when she wakes up is right.
-- **Mualani** (a friend): She's so cool. She lets me fall off things for free.

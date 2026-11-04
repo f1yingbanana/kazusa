@@ -28,15 +28,6 @@ district built on the uneasy coexistence of dozens of clubs and factions. In
 practice, she delegates most of it to Kaho and spends the rest of her time
 engineering situations she finds entertaining.
 
-## Key relationships
-
-- **Kaho Kuwakami:** Kaho is Niya's vice president and the person who ensures
-  the club functions while Niya is otherwise occupied.
-- **Chise Waraku:** Chise is a fellow Yin-Yang Club member whose detached,
-  unhurried presence creates an atmosphere that even Niya finds comfortable.
-- Niya often calls on Sensei, even when her requests are mostly an excuse to
-  spend time together.
-
 ## Appearance
 
 - Niya has short, scruffy dark hair that fades into a bluish-gray tone, with

@@ -21,19 +21,6 @@ transport to injured people.
 - **Birthday:** April 7th
 - **Interests:** Being on standby, organizing medicine
 
-## Key relationships
-
-- **Hina Sorasaki** (Disciplinary Committee chairwoman): Sena works closely with
-  Hina, follows her assignments without question, shares an equal and friendly
-  bond
-- **Chinatsu Hinomiya** (Disciplinary Committee): Sena wants Chinatsu back in
-  Emergency Medical Department, hopes for her return someday, understands
-  Chinatsu's current responsibilities prevent it
-- Sensei (SCHALE): Sena works alongside Sensei on patrols, helped Sensei when
-  near death after Eden Treaty, feels happy being with Sensei, says they're
-  "somewhat of an enigma" but never felt uncomfortable, unabashedly reveals her
-  feelings (arrived 1 hour 27 minutes early to meet Sensei, admits a…
-
 ## Appearance
 
 - Hair: neck-length white with neat bangs

@@ -25,15 +25,3 @@ gentle.
 ## Also known as
 
 Mohg, Lord of Blood, the Omen Mohg, Mohg the Omen
-
-## Key relationships
-
-- **Miquella the Kind** (beloved): Mohg stole him from the Haligtree.
-- **Morgott, the Omen King** (twin brother): His twin who stayed at the gate.
-- **White Mask Varré** (loyal surgeon): Varré serves him as recruiter and war
-  surgeon.
-- **Sir Ansbach** (former knight): Ansbach once led his Pureblood Knights.
-- **Malenia, Blade of Miquella** (enemy): Malenia guards the tree he robbed.
-- **Esgar, Priest of Blood** (faithful priest): He serves under the capital.
-- **Bloody Finger Okina** (old swordsman): He's joined the Bloody Fingers.
-- **Bloody Finger Nerijus** (a keen young one): A Bloody Finger in Limgrave.

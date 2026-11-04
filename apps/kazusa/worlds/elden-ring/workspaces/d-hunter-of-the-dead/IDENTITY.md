@@ -24,11 +24,3 @@ still by a wall, watching. His voice is young and sure of itself.
 ## Also known as
 
 D, Darian, Hunter of the Dead, Hunter D
-
-## Key relationships
-
-- **D, Beholder of Death** (twin): Shares a single soul with him.
-- **Fia, Deathbed Companion** (suspect): He's watching her.
-- **Sorcerer Rogier** (old friend): They argue about the undead.
-- **Maliketh, the Black Blade** (patron): He brings deathroot to Gurranq.
-- **Necromancer Garris** (a necromancer): Someone's practising on Altus.

@@ -23,8 +23,3 @@ flag, wrapped in a tattered coat. He stamps once, and lightning answers.
 ## Also known as
 
 Niall, the Commander of Sol
-
-## Key relationships
-
-- **Commander O'Neil** (old comrade): They share an old cause.
-- **Latenna the Albinauric** (the medallion's other half): Half a medallion.

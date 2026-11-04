@@ -21,18 +21,6 @@ graffiti. She designed the Veritas emblem.
 - **Birthday:** August 1st
 - **Interests:** Drawing, playing video games
 
-## Key relationships
-
-- **Chihiro Kagami** (Veritas leader): most restrained member, Maki initiates
-  pranks and trouble, frequently gets scolded
-- **Kotama Otose** (Veritas): both most mischievous members, Maki thinks prank
-  ideas, Kotama joins because fun
-- **Hare Omagari** (Veritas): Hare prefers no trouble but gets convinced to join
-  pranks to test her creations
-- Sensei (SCHALE): one of few who can truly stop her (with Chihiro), made Sensei
-  angry by hacking devices and installing BOOM, wants to impress Sensei,
-  promised to study harder and stop illegal tagging for him
-
 ## Appearance
 
 - Hair: vibrant red messy below shoulder-length with cowlick, tied into buns on

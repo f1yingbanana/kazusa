@@ -44,9 +44,10 @@ out in their sleep. The world's author edits Markdown and nothing else.
 | Checks the school portal, asks around online                                     | `look_up`: public world pages only.                                                                                               |
 | Believes gossip, misreads people, holds theories                                 | Notes with a source (`told by natsu-yutori`) and a certainty word. Canon never corrects them silently.                            |
 | Guesses what others think of them, and is often wrong                            | **What they think of me** on every people page: a guess with a certainty word, never a mirror of their own view (§3.5).           |
-| Writes down only what would hurt to forget                                       | `remember`, rarely, in the moment.                                                                                                |
+| Writes down what would hurt to forget: a promise, someone new, a change of heart | `remember`, in the moment; small talk is left to sleep.                                                                           |
 | Sleeps on it: keeps the gist, revises opinions, dreams                           | **Sleep consolidation**: one offline pass per real sleep that rewrites views, adds notes, writes the day page and a dream (§7.5). |
 | Forgets details, keeps a general sense                                           | Notes per page are capped; sleep folds the oldest into the page's current view.                                                   |
+| Always has family, friends and home in mind; a café seen once fades              | **People you know** and **Places you know**, ranked by familiarity: recency and frequency over sim time (§7.7).                   |
 | Woken at 3 am, sleeps badly                                                      | A wake cancels the pass; nothing is applied until the next sleep.                                                                 |
 
 Naps shorter than `memory.sleep.minMinutes` (default 180) don't consolidate.
@@ -334,7 +335,9 @@ her tools of her own, allowlisted for her only:
 3. Write personal pages only where the character _colors_ the facts:
    - people they have a relationship with (lead in first person, `relation`,
      open threads, and a `What they think of me` guess that does not simply
-     mirror the lead);
+     mirror the lead). Relationships live only here, never in `IDENTITY.md` or
+     `SOUL.md`: a page is what brings a person to mind and what sleep and
+     `remember` keep current;
    - strong opinions on concepts ("the rivalry is stupid, but Hina scares me");
    - misconceptions (`think so`, `suspect`) and secrets they hold.
 
@@ -342,8 +345,10 @@ her tools of her own, allowlisted for her only:
    text; never give them a page they couldn't know (check depth or `known_by`).
 
 4. Write `MEMORY.md`: lately, goals, plans.
-5. `wiki_lint`, spot-check with `knowledge_explain`, and list the files written
-   for Sensei to review.
+5. `wiki_lint`, spot-check with `knowledge_explain`, and `world_audit`: nobody
+   in `knowNobody`, and one society in `socialGroups`, not one per club (people
+   know their leaders, classmates and neighbors). List the files written for
+   Sensei to review.
 
 **Backfill the current world** (one-off, phase 2)
 
@@ -387,18 +392,19 @@ when you were last here.").
 
 **Tools** (replacing `memory_search`, `memory_get`, `read`, `edit`, `write`):
 
-| Tool                                              | Does                                                                                                                                             |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `recall(query)`                                   | Searches their own wiki, days and `MEMORY.md`, plus world pages at their depth. Returns L1, labelled "yours" or "everyone knows".                |
-| `look_up(topic)`                                  | Searches world pages with renown `known` or `famous`, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.                          |
-| `remember(about, note, source?, certainty?, on?)` | Appends one dated note now. `about` is a name or id (something unknown starts a page) or `me` (`MEMORY.md`, under `## Plans recorded for <on>`). |
+| Tool                                              | Does                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `recall(query)`                                   | Searches their own wiki, days and `MEMORY.md`, plus world pages at their depth. Returns L1, labelled "yours" or "everyone knows".          |
+| `look_up(topic)`                                  | Searches world pages with renown `known` or `famous`, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.                    |
+| `remember(about, note, source?, certainty?, on?)` | Appends one dated note now. `about` is a name or id (someone new starts a page) or `me` (`MEMORY.md`, under `## Plans recorded for <on>`). |
 
 **Conventions** (`context-conventions`, about 120 tokens): people and things you
 know come to mind here; when something is on the tip of your tongue, `recall`
-it; speak from memory, never as someone reading notes; during the day,
-`remember` only what you'd regret forgetting before you sleep (a new person, a
-promise, a shock); sleep sorts out the rest. Plus the second-order belief
-paragraph from §3.5, also in `in-person`.
+it; speak from memory, never as someone reading notes; in the same turn,
+`remember` what is worth keeping past today (a plan or promise, someone new,
+something that changes how you see someone or how they see you); small talk is
+left to sleep. Plus the second-order belief paragraph from §3.5, also in
+`in-person`.
 
 **A turn is one moment** (`src/turn.ts`): at most one activity per 2 minutes,
 blocked in code, and a character may still talk or look things up after it. At
@@ -413,7 +419,9 @@ so tool results stay last and the model doesn't answer its own prompt twice.
 
 - **Parser** (Zod): front matter, layers, sections with `Known by:`, notes,
   history, links (`[[id]]`, backticked ids, front-matter references). Shared by
-  both wikis and lint.
+  both wikis and lint. Prettier wraps long lines, so a note, history line or
+  open thread continues on its indented lines, and `Known by:` is its whole
+  first paragraph.
 - **Index** (`index.ts`): one process-wide cell (`Symbol.for("kazusa.memory")`)
   holding parsed pages by scope (`world` | `agent:<id>`) and an in-memory FTS5
   table of chunks (L0, L1, each bullet or paragraph of a section, each note).
@@ -440,15 +448,25 @@ decision context for Perception.
    if seen, told or `news`).
 2. **Signals**, each producing a ranked list:
 
-   | Signal   | Input                                                                                                                                   |
-   | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-   | Seeds    | current place and trip destination, people noticed or in the huddle, stimulus senders, chats awaiting reply, the current task's `where` |
-   | Mentions | alias matches in the stimulus, the last ledger records, the task description                                                            |
-   | Keywords | BM25 over the stimulus                                                                                                                  |
-   | Semantic | embedding of stimulus + task description (one provider call per brain turn)                                                             |
-   | Graph    | one hop from seeds and mentions; personal edges before world edges                                                                      |
-   | News     | `· news` from the last 3 sim days on pages they could know (2 at most)                                                                  |
-   | Salience | open threads, recent `seen`/notes (sim time), today's day page                                                                          |
+   | Signal      | Input                                                                                                                                   |
+   | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+   | Seeds       | current place and trip destination, people noticed or in the huddle, stimulus senders, chats awaiting reply, the current task's `where` |
+   | Mentions    | alias matches in the stimulus, the last ledger records, the task description                                                            |
+   | Keywords    | BM25 over what they think about (below); a page only keywords found must share two query words (half of them if merely heard of)        |
+   | Semantic    | embedding of what they think about (one provider call per brain turn)                                                                   |
+   | Graph       | one hop from seeds and mentions; personal edges before world edges                                                                      |
+   | News        | `· news` from the last 3 sim days on pages they could know (2 at most)                                                                  |
+   | Salience    | open threads, recent `seen`/notes (sim time), today's day page                                                                          |
+   | Familiarity | what the other signals found, by familiarity (`familiarity.ts`); a prior that never adds a page                                         |
+
+   **What they think about** (`searchText`) is what they perceived: the
+   `- [...]` lines of the delivery, never Kazusa's wording around them. With
+   nothing perceived (a check-in), it is the activity that ended and today's
+   plans in `MEMORY.md` (`plansOn`): what was that, and what's next. A page that
+   keywords alone found needs `MIN_KEYWORD_WORDS` (2) query words, by FTS's
+   stemming (`wordsMatched`), or half of them when it is merely heard of; their
+   own pages need one. Tuned on the 104-case set (`fixtures/cases.ts`): every
+   wanted keyword-only hit kept, about 70% of the unwanted dropped.
 
 3. **Fuse** by weighted reciprocal rank; seeds are pinned.
 4. **Group by id**: a personal page and the world page with the same id are one
@@ -457,13 +475,18 @@ decision context for Perception.
 5. **Render by tier** under `memory.maxTokens` (replaces
    `personalWikiMaxTokens`/`Articles`): top entities at L1 with open threads and
    the newest notes, the next ones as L0 in an "Also:" line. **People you know**
-   is the roster: personal people pages by recency, about 8 tokens each,
-   `memory.rosterLimit` (default 20).
+   is the roster: personal people pages ranked by familiarity (`familiarity.ts`:
+   ACT-R activation over what they did with each person, falling back to the
+   page's last date), about 8 tokens each, `memory.rosterLimit` (default 20),
+   leaving out who On your mind shows and who is in front of them.
 6. **Log** the rendered ids per turn (for sleep input and the context read
    model).
 
-Location's **Places you know** uses the same retriever restricted to places; the
-mental-map rule (known places are exactly the cards) is unchanged.
+Location's **Places you know** is working knowledge, not recollection: home,
+places named this turn or in `MEMORY.md` (the retriever restricted to their own
+place pages, plus literal names), then their cards by the same familiarity. The
+mental-map rule (known places are exactly the cards) is unchanged. A place On
+your mind shows is not listed again.
 
 ### 7.3 Contact
 
@@ -556,6 +579,80 @@ survives.
 SSE `memory` on every write. The client Wiki view shows the world page next to
 each character's page, notes with sources, depth with its reason, per-sleep
 diffs, day pages as a Diary, and lint.
+
+### 7.7 How long-term memory reaches a turn
+
+A person doesn't search their memory; things come to mind. Some always do (home,
+family, the people they see every day), some because of what is happening now,
+and some only when they try. Each is its own part of the prompt, and nothing is
+shown twice.
+
+| Part of the prompt             | Holds                                      | Chosen by                                              |
+| ------------------------------ | ------------------------------------------ | ------------------------------------------------------ |
+| `MEMORY.md` (system prompt)    | who they are lately, goals, today's plans  | the character and sleep                                |
+| Records (`contextEngine`)      | the last day as it happened                | time                                                   |
+| **People you know**            | names and relations, no detail             | familiarity (`memory.rosterLimit`)                     |
+| **Places you know** (Location) | home, places named now, then the most used | familiarity, then distance                             |
+| **On your mind**               | the pages this moment brings up            | cues (§7.2), at their depth (§3.3), `onYourMindTokens` |
+| `recall`, `look_up`            | what is on the tip of the tongue           | the character, by asking                               |
+
+People you know leaves out who On your mind shows and who is present; Places you
+know leaves out the current place, Around you and On your mind. Memory's
+prefetch runs before Location's whereabouts so the two can exclude each other.
+
+**Familiarity** (`familiarity.ts`, keyed store `familiarity`, one record per
+character) is how much they have to do with each person and place. A _use_ is
+something they did, never something they were shown, which would feed itself:
+
+- a message: every recipient uses the sender, and in a chat of six or fewer the
+  sender uses each member (`usesOfMessage`, from Messaging's events);
+- going somewhere (`where` on `start_task`);
+- a note or a page moving: the page's latest date counts as a use, so a world
+  with no history yet still ranks what they last touched.
+
+Uses are counted per **episode** of `memory.familiarity.episodeHours` (24): a
+later contact inside it moves the episode's time on instead of adding a use. Ten
+days of contact count ten times, one long party once, which is the spacing
+effect. Within the hour, nothing changes. The score is ACT-R base-level
+activation, `ln Σ age^-d` (`decay` 0.5), with the `recent` (4) uses kept exactly
+and the older ones estimated from the count and first use (Petrov's hybrid). It
+fades with sim time: a best friend who moved away drifts down over weeks, and a
+stranger from one evening drops below a twice-weekly clubmate the next day.
+
+Familiarity ranks the two lists and nudges On your mind (§7.2): among what this
+moment brought up, what they know best ranks higher. It never adds a page on its
+own, and it never changes depth.
+
+**Who someone is to them** is their personal page, and only that: `relation`,
+their view in their own voice, what they guess the other thinks of them, open
+threads and dated notes. Depth (§3.3) decides how much of the canon they see;
+having a personal page makes it at least familiar. Public figures and a player
+the whole cast knows get `renown: known` or `famous` on their world card, so
+everyone has at least heard of them.
+
+**What comes to mind** is retrieved from what they perceived (§7.2): the lines
+of the delivery, never Kazusa's wording around them. A check-in perceives
+nothing, so it searches the activity that just ended and today's plans: the bell
+rings, and what comes to mind is the promise to meet in the club room, not the
+word "activity". A page found only by keywords must share two query words with
+what was said, or half of them if merely heard of; their own pages need one,
+since a single cue brings back what you wrote yourself.
+
+**Writing it down** happens twice. During the day, `remember` notes a plan or
+promise, someone new, or something that changes how they see someone; a person
+it doesn't know yet gets a page. At night, sleep (§7.5) rewrites views, guesses
+and threads from the day's records, and once a page passes
+`memory.sleep.notesPerPage` folds the oldest notes into the view. So when a page
+comes to mind, they see one blended impression plus the newest notes with their
+sources.
+
+**Checking it**: the 104 cases in `fixtures/cases.ts` run with the unit tests
+(keywords) and need real embeddings for the `semantic` ones. A change to
+retrieval keeps every case passing and is then spot-checked on the live world
+with real query vectors: waking, a check-in, a message from family, from someone
+familiar, and from a stranger, which should bring up nothing about the stranger.
+`world_audit` checks the seeding: `knowNobody` empty, one society in
+`socialGroups`.
 
 ## 8. Replaced and removed
 
@@ -654,6 +751,20 @@ note format.
   wrong beliefs and spend tokens; `recall` and experience are how a character
   learns.
 - **`look_up` is instant**: a quick check inside the turn, logged to `:tasks`.
+- **Familiarity is ACT-R base-level activation over day-long episodes**: it is
+  the standard model of how recency and frequency combine, it fades on sim time,
+  and counting an episode once is what makes regular contact outweigh one long
+  evening. It ranks; it never decides what a character knows.
+- **Retrieval searches what was perceived**: Kazusa's own wording (check-ins,
+  the closing reminder) is shared by every character and matches the wrong
+  pages. A check-in searches the activity and the day's plans instead.
+- **Keyword-only pages need a subject, not a word**: rank fusion only orders, so
+  the top keyword hit scored the same whether it matched "joint pain" or
+  "activity". Matching two query words (half, for what they've merely heard of)
+  is the floor; their own pages need one.
+- **Relationships only in personal pages**: a relationship written in
+  `IDENTITY.md` or `SOUL.md` reaches the system prompt but can never be
+  retrieved, ranked or updated by sleep, and repeats what the page says.
 - **`plugins.slots.memory: "none"`, not our plugin**: claiming the slot would
   mean building a host memory capability for features we removed on purpose.
   `skipBootstrap` only stops files being created, not read.

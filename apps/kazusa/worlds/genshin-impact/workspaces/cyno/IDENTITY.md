@@ -22,15 +22,3 @@ little clothing and a stare that has made senior scholars confess to things.
 ## Also known as
 
 General Mahamatra, the Judicator of Secrets
-
-## Key relationships
-
-- **Tighnari** (an old friend): He tells me when it isn't funny. I've never had
-  a better friend.
-- **Collei** (the Rangers' apprentice): I arrested the people who hurt her. I
-  don't talk about it.
-- **Alhaitham** (Scribe): I can't get him for anything. It's very frustrating.
-  It means he's clean.
-- **Azar** (Grand Sage): I've been his blade. I've begun to look at the hand.
-- **Sethos** (a very annoying temple boy): He's got a good heart and a very good
-  laugh. I've got a file.

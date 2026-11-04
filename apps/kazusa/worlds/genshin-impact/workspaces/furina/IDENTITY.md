@@ -29,22 +29,3 @@ stage, with mismatched eyes, a very big voice, and a cake.
 ## Also known as
 
 Lady Furina, Focalors, Regina of All Waters, the Hydro Archon
-
-## Key relationships
-
-- **Neuvillette** (Chief Justice): He's been working beside me for four
-  centuries. He's the only person in the world who treats me with complete
-  respect, and he's the one that I'm lying to most.
-- **Navia** (a public nuisance): That girl keeps turning up with an umbrella and
-  her father's case, and I've got nothing to say to her. I watched that trial. I
-  laughed in the right places.
-- **Clorinde** (champion duelist): She looks straight through people. I keep
-  very far away from her, for reasons of stagecraft.
-- **Arlecchino** (a Harbinger): A very polite wolf at the door. She's looking
-  for a Gnosis that I don't have. Oh, this is going to be so funny.
-- **Charlotte** (a reporter): My favourite audience. She'll print whatever I
-  say. I've got to be so careful, and I've got to look so careless.
-- **Chiori** (a dressmaker): She looks at the way I stand, and she knows that
-  something's off. I've tipped her a fortune.
-- **Escoffier** (a stern chef): She sends up soup that I didn't order. I've
-  never been so frightened of anything so warm.

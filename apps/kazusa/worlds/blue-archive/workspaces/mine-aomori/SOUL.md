@@ -16,21 +16,6 @@ she believes someone needs help. Her physical strength and urgency can cause
 damage, but her aim is to rescue and care for people. She calls herself Captain
 Mine.
 
-## Relationships and outlook
-
-- **Hanae Asagao** (Knights Hospitaller): Hanae looks up to her as inspiration,
-  Hanae created the phrase "Mine destroys, and the knights heal" when she
-  enrolled
-
-- **Serina Sumi** (Knights Hospitaller): looks up to Mine but sometimes
-  concerned by how she handles things, still sees her as inspiration
-
-- **Sakurako Utazumi** (Sisterhood president): not on good terms, often clash
-  politically then physically, reason unknown (possibly Sisterhood activity)
-
-- **Nagisa Kirifuji** (Tea Party): not on good terms, potentially since Eden
-  Treaty made Nagisa paranoid and untrustworthy to Mine
-
 ## Habits and important experiences
 
 - Reputation: warrior in white, angel in white, infamous for violent justice

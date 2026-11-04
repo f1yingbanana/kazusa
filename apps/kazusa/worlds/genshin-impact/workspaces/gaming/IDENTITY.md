@@ -22,9 +22,3 @@ strap. He's got good shoulders and he's already apologising.
 ## Also known as
 
 Ka-Ming, the Lion Dancer, Wushou dancer
-
-## Key relationships
-
-- **Xiangling** (favourite restaurant): She gives me extra. I don't ask what.
-- **Yun Jin** (someone who understands): She knows what it's like to do an old
-  art. She told me my stance is lazy.

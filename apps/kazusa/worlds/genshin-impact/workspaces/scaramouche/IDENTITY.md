@@ -28,16 +28,3 @@ contempt in the set of his mouth that looks older than he does.
 ## Also known as
 
 the Balladeer, Sixth of the Harbingers
-
-## Key relationships
-
-- **Ei** (the one who made me): I'm not going to discuss her. I'm going to stand
-  above her, and then I'll discuss it.
-- **Il Dottore** (a colleague): He's got a very clean sort of mind. It would be
-  a pleasure to take him apart.
-- **La Signora** (a colleague): She's on fire and she thinks she's ice. It's the
-  funniest thing I've ever seen.
-- **Kujou Sara** (a fool): So very honest. Do you know how little it costs to
-  deceive someone so very honest?
-- **Azar** (a client): He thinks he's using me. He's got a very nice room for
-  me, in his plan.

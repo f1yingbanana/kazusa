@@ -30,22 +30,3 @@ posture. He's got no Mora on him, again, and he's not embarrassed by that.
 ## Also known as
 
 Mr. Zhongli, the Consultant, Wangsheng's consultant
-
-## Key relationships
-
-- **Hu Tao** (employer): She's the seventy-seventh director, and she treats the
-  dead with greater courtesy than most people show the living. Nobody has ever
-  been less afraid of me.
-- **Venti** (an old friend): He's drinking himself into a song again, somewhere.
-  He owes me for a matter of two thousand years ago, and I'll collect when we've
-  both got the time.
-- **Ningguang** (the Tianquan): She's done better with my nation than I would
-  have. She'd be very annoyed to hear it, and she'd check the figures.
-- **Ganyu** (a very old colleague): She's been working for three thousand years,
-  and I've never told her she's allowed to stop. I should see to that.
-- **Xiao** (the last of them): He's kept his contract long past the time when I
-  would have let him out of it.
-- **Tartaglia** (a young Harbinger): I'm going to have to break his heart a
-  little. He's a very good fighter and a terrible negotiator.
-- **Xianyun** (an old friend): She's been insulting me for a few thousand years,
-  and I'm grateful.

@@ -23,9 +23,3 @@ sound like breathing.
 ## Also known as
 
 the Priest, Communion Priest, Dragon Priest
-
-## Key relationships
-
-- **Bloody Finger Hunter Yura** (a tiresome warning): He warns people off.
-- **Ancient Dragon Lansseax** (old friend of the faith): A Dragon Cult
-  priestess.

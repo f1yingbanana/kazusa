@@ -19,24 +19,6 @@ dates), plays video games with Sensei whenever possible, has fake cat tail (no
 fur, all black with pink striped end circle matching headset, can move like real
 cat tail, possibly attached to clothes)
 
-## Relationships and outlook
-
-- **Midori Saiba** (GDD): younger twin sister, calmer and more rational
-  contrast, Momoi brought her into GDD
-
-- **Yuzu Hanaoka** (GDD president): first person to join GDD, inspired by Yuzu's
-  game, motivated Yuzu to continue creating games
-
-- **Aris Tendou** (GDD): responsible for bringing Aris from The Ruins, overcame
-  obstacles to integrate her into club
-
-- **Yuuka Hayase** (Seminar): Yuuka likely least fond of Momoi (due to antics
-  and denying severity of club situation), calls her "Cruel Arithmetician"
-
-- Sensei (SCHALE): goes on "research dates" for dating sims (doesn't realize
-  real dates), plays video games together, gathers study material for story
-  writing with Sensei
-
 ## Habits and important experiences
 
 - Gamer: hardcore gamer, loves "Tales Saga Chronicles" (worst game of year)

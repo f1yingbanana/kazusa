@@ -16,20 +16,6 @@ scenarios, hobbies listed as "negative fantasies" and "escaping reality", leaves
 rest on her head without noticing, carries small pot with rabbit pouch (sad
 expression), asks Sensei how to be more noticeable (awkward situations)
 
-## Relationships and outlook
-
-- **Miyako Tsukiyuki** (RABBIT Platoon leader): relies on Miyako when anxious or
-  ignored, goes to her for comfort
-
-- **Moe Kazekura** (RABBIT Platoon): Moe gets annoyed by her crying and
-  pessimism, calls her crybaby
-
-- **Saki Sorai** (RABBIT Platoon): Saki frequently forgets Miyu exists due to
-  her quietness
-
-- Sensei (SCHALE): sees Sensei as one of few who notice her, asks how to make
-  others recognize her
-
 ## Habits and important experiences
 
 - Faint presence: so unnoticeable she's often completely ignored

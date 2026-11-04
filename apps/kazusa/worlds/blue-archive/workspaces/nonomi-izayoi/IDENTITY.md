@@ -21,20 +21,6 @@ She comes from a wealthy family and often brings snacks for her friends.
 - **Birthday:** September 1st
 - **Interests:** Shopping
 
-## Key relationships
-
-- **Ayane Okusora** (Countermeasures Committee): her ideas often seem absurd to
-  Ayane (like turning task force into idol group to raise money)
-- **Hoshino Takanashi** (Countermeasures Committee): known each other long time
-  (friends year before others), Hoshino naps on her lap, only one who seems to
-  know about Hoshino's past
-- **Shiroko Sunaookami** (Countermeasures Committee): found Shiroko near Abydos
-  building with Hoshino, taking care of her ever since
-- **Serika Kuromi** (Countermeasures Committee): comforts Serika whenever she
-  realizes she's been scammed
-- Sensei (SCHALE): shares aspirations for future, gives lap pillow and ear
-  cleaning, willing to spoil them, calls gifts "snack money"
-
 ## Appearance
 
 - Hair: long pale blonde reaching waist, side bun on left

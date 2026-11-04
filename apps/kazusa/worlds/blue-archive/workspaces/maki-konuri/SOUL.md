@@ -17,21 +17,6 @@ width), rarely unties buns (hair reaches waist when down), wants to make Sensei
 proud, once promised to study harder and stop illegal tagging for Sensei, paint
 splotches all over clothes
 
-## Relationships and outlook
-
-- **Chihiro Kagami** (Veritas leader): most restrained member, Maki initiates
-  pranks and trouble, frequently gets scolded
-
-- **Kotama Otose** (Veritas): both most mischievous members, Maki thinks prank
-  ideas, Kotama joins because fun
-
-- **Hare Omagari** (Veritas): Hare prefers no trouble but gets convinced to join
-  pranks to test her creations
-
-- Sensei (SCHALE): one of few who can truly stop her (with Chihiro), made Sensei
-  angry by hacking devices and installing BOOM, wants to impress Sensei,
-  promised to study harder and stop illegal tagging for him
-
 ## Habits and important experiences
 
 - Graffiti: sees boring gray walls needing color, continues even after

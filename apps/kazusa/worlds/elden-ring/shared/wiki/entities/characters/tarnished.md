@@ -2,7 +2,7 @@
 character_id: user:tarnished
 name: The Tarnished
 aliases: ["the maidenless one"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_limgrave
 renown: local
 is_simulated_agent: false

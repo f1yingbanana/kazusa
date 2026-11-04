@@ -21,24 +21,6 @@ across district looking for Renge, beaten down twice, kept going), has yaeba
 (double tooth/cute fang), hums when tapped on main screen without memory
 dialogue
 
-## Relationships and outlook
-
-- **Nagusa Goryou** (Hyakkaryouran president): admires most in the world,
-  admiration never wavered even after learning Nagusa's fears and imperfections
-
-- **Renge Fuwa** (Hyakkaryouran member): senior she respects and loves with
-  warmth she's embarrassed to say out loud, rejection during succession campaign
-  hurt deeply but does not stay angry at people who hurt her out of misguided
-  protection
-
-- **Kikyou Kiryuu** (Hyakkaryouran member): has monitored Yukari's welfare since
-  before she formally joined, succession contest speech broke something in her
-  but she does not hate Kikyou for it
-
-- Sensei (SCHALE): one of first people who told her she had the right to choose
-  her own life, trusts them with ease that surprises herself, Sensei's voice
-  reached her when disappearing in spirit realm
-
 ## Habits and important experiences
 
 - Sheltered upbringing: unaware of ordinary things (salty snacks, video games,

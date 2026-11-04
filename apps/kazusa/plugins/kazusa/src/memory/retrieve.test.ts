@@ -11,7 +11,13 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryIndex } from "./index.ts";
 import { renderOnYourMind, renderRoster } from "./render.ts";
-import { brainRequest, retrieve, sendersOf, spokenText } from "./retrieve.ts";
+import {
+  brainRequest,
+  retrieve,
+  searchText,
+  sendersOf,
+  spokenText,
+} from "./retrieve.ts";
 
 const NOW = Date.parse("2026-10-25T12:00:00Z");
 let root: string;
@@ -261,16 +267,29 @@ describe("render", () => {
     expect(text).not.toContain("Philosophical");
   });
 
-  it("lists people by recency, addressed by their chat id", () => {
+  it("lists the people most in their life, addressed by their chat id, once", () => {
     write(
       "agents/kazusa/wiki/entities/characters/sensei.md",
       "---\npeer_id: user:sensei\nname: Sensei\nrelation: mentor\n---\nGuides us.\n",
     );
-    expect(
-      renderRoster(index.personal("kazusa").values(), 20, options.nameOf),
-    ).toBe(
-      "Natsu Yutori `natsu` (close friend) · Sensei `user:sensei` (mentor)",
+    const pages = () => index.personal("kazusa").values();
+    const familiar = new Map([
+      ["sensei", 2],
+      ["natsu", 1],
+    ]);
+    expect(renderRoster(pages(), 20, options.nameOf, familiar, new Set())).toBe(
+      "Sensei `user:sensei` (mentor) · Natsu Yutori `natsu` (close friend)",
     );
+    // Someone already in front of them, or On your mind, isn't repeated.
+    expect(
+      renderRoster(
+        pages(),
+        20,
+        options.nameOf,
+        familiar,
+        new Set(["user:sensei"]),
+      ),
+    ).toBe("Natsu Yutori `natsu` (close friend)");
   });
 });
 
@@ -283,9 +302,66 @@ describe("spokenText and the closing reminder", () => {
     ).toBe("hi");
   });
 
-  it("searches a check-in alone by its words", () => {
-    expect(spokenText("[Fri]\nActivity check-in: studying.")).toContain(
-      "studying",
+  it("searches a check-in by the activity and today's plans, not its wording", () => {
+    write(
+      "world/concepts/studying.md",
+      "---\nrenown: famous\n---\n# Studying\n\nActivity check-in planned studying activity.\n",
+    );
+    const request = brainRequest({
+      agentId: "kazusa",
+      prompt:
+        "[Fri]\nActivity check-in: your studying activity was planned to end at 16:00.",
+      task: "Homework in the library",
+      now: NOW,
+    });
+    expect(searchText(request)).toBe("Homework in the library");
+    const found = retrieve(index, {
+      ...request,
+      plans: ["[SOFT_GOAL] After class: crepes with Natsu."],
+    }).map(({ id }) => id);
+    expect(found[0]).toBe("natsu");
+    expect(found).not.toContain("studying");
+  });
+});
+
+describe("keyword floor", () => {
+  beforeEach(() => {
+    write(
+      "world/concepts/bake_sale.md",
+      "---\nrenown: famous\n---\n# Bake Sale\n\nA new stall for cakes and cookies.\n",
+    );
+  });
+
+  it("drops a page that shares a single word by chance", () => {
+    expect(ids("did you see the new movie?")).not.toContain("bake_sale");
+  });
+
+  it("keeps a page that shares a subject", () => {
+    expect(ids("any cookies left from the cakes?")).toContain("bake_sale");
+  });
+
+  it("keeps their own page on one word: they wrote it", () => {
+    expect(ids("would you want it back?")).toContain("past_and_present");
+  });
+});
+
+describe("familiarity", () => {
+  it("raises what they know best among what came up, and adds nothing", () => {
+    const found = (familiarity: Map<string, number>) =>
+      retrieve(index, {
+        agentId: "kazusa",
+        stimulus: "I saw Mine in Gehenna.",
+        now: NOW,
+        familiarity,
+      });
+    const mine = (familiarity: Map<string, number>) =>
+      found(familiarity).find(({ id }) => id === "mine")!;
+    expect(mine(new Map([["mine", 1]])).score).toBeGreaterThan(
+      mine(new Map()).score,
+    );
+    expect(mine(new Map([["mine", 1]])).signals).toContain("familiarity");
+    expect(found(new Map([["trinity", 9]])).map(({ id }) => id)).not.toContain(
+      "trinity",
     );
   });
 });

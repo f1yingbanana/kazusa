@@ -22,12 +22,3 @@ studying how you're standing.
 ## Also known as
 
 Miss Yun, the Stage Lucida, head of the Yun-Han Opera Troupe
-
-## Key relationships
-
-- **Xingqiu** (collaborator): His books are absurd. His ear's perfect. I'm
-  turning him into something he'll have trouble living down.
-- **Xinyan** (an unusual musician): She can't do anything I know. She does it
-  with enormous discipline. I've got something to learn from that.
-- **Zhongli** (regular at the teahouse): He once corrected my history of the
-  Guili assembly, and then he stayed to the end, and then he couldn't pay.

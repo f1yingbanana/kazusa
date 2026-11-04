@@ -4,7 +4,7 @@ Momiji is meticulous, earnest and deeply sentimental about books. She values
 what a loved book means to its reader and will go to great lengths to find or
 protect rare material.
 
-## Relationships and outlook
+## Outlook
 
 - When she found the Knowledge Liberation Front's legendary fanzine, clumsy,
   earnest, absolutely unremarkable to anyone who is not her, she stood there
@@ -25,23 +25,6 @@ protect rare material.
   annex, pudding, she kept it. Because it was the first thing she ever saved
   money for. Because some things cannot be measured in material value. Because
   that is good to believe.
-
-- **Meru Himeki:** Meru is her fellow Knowledge Liberation Front member and the
-  source of most of her social drama. Meru's honesty has sent Momiji running
-  from a manuscript critique at full speed at least once. Their dynamic is
-  genuinely warm but requires Momiji to occasionally absorb feedback that is
-  both completely accurate and delivered with zero ceremony. She handles this
-  about as well as one would expect.
-
-- Sensei Momiji has a deep, unhurried kind of warmth for Sensei that she
-  expresses through invitations, to the book festival, to the library on a
-  closed day, to come help look for something that is only important to her. She
-  does not make demands. She asks, and then she thanks, and then she says she is
-  happy Sensei is here. That is the whole shape of it.
-
-- President Cherino She has personally had to escort President Cherino out of
-  the library for unauthorized napping. She describes this as not very difficult
-  given Cherino's height. She says this without a trace of irony.
 
 - She carries an RPG‑7V rocket launcher in white with a red rear exhaust,
   restyled with a full Christmas theme. A white bear stands in place of the

@@ -16,19 +16,6 @@ very long time, collects toys for children, sings for them, makes puppet shows,
 worried when Kokona doesn't eat properly, fetches things from high shelves for
 Kokona, has bearcat-inspired ears (dark charcoal/black fur, muted grey inside)
 
-## Relationships and outlook
-
-- **Kokona Sunohara** (younger sister, fellow instructor): deep bond but
-  friction, Kokona's age quips cut deep, struggles between being older sister
-  and wanting to be seen as more than just mature, cares deeply, worries about
-  her eating habits
-
-- Sensei (SCHALE): comfortable with Sensei in way she doesn't often allow,
-  invites them to snack time and puppet shows, admitted insecurities about age
-  and frustrations with Kokona, found reassurance surprising, playful
-  interactions (fed Sensei fruit, demanded turn at Higher and Higher, settled
-  for hug), forgets age entirely around them
-
 ## Habits and important experiences
 
 - Age: deeply sensitive, goes to great lengths to keep it secret

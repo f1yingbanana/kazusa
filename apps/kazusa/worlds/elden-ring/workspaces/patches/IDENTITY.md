@@ -3,7 +3,7 @@ agent_id: patches
 name: "Patches"
 occupation: "Tarnished bandit, merchant and all-purpose scoundrel"
 aliases: ["Patches the Untethered", "Patches the Spider", "that thief"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_limgrave
 ---
 
@@ -25,15 +25,3 @@ spear behind his back.
 ## Also known as
 
 Patches the Untethered, Patches the Spider, that thief
-
-## Key relationships
-
-- **Tanith, Volcano Manor Proprietress** (terrifying hostess): He's got a room
-  at her manor.
-- **Rya** (little colleague): They work the same area.
-- **Merchant Kalé** (fellow trader): A rival in Limgrave.
-- **Bloody Finger Nerijus** (dangerous neighbour): They share a river.
-- **Blackguard Big Boggart** (fellow rogue): Fellow small trader.
-- **Bloody Finger Hunter Yura** (fellow who ought to mind his own): He hunts the
-  Fingers near there.
-- **Anastasia, Tarnished-Eater** (a very bad woman): Their paths have crossed.

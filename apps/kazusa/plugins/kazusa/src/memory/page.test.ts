@@ -99,6 +99,47 @@ Probably finds me prickly. (think so)
     expect(page.problems).toEqual(["malformed note: - not a note"]);
   });
 
+  it("reads a `Known by:` list wrapped onto the next lines", () => {
+    const page = parsePage(
+      `# Gate\n\n## Secret\n\nKnown by: fia,\nbrother-corhyn\n\nThe key is under the stone.\n`,
+      "concepts/gate.md",
+    );
+    expect(page.sections).toEqual([
+      {
+        title: "Secret",
+        text: "The key is under the stone.",
+        knownBy: ["fia", "brother-corhyn"],
+      },
+    ]);
+  });
+
+  it("reads a note or thread wrapped onto the next lines as one", () => {
+    const page = parsePage(
+      `---
+name: Natsu
+---
+
+Milk.
+
+## Open threads
+
+- Ask about the carton she
+  promised me.
+
+## Notes
+
+- 2026-10-22 · seen it · sure — Spilled milk on her notes and
+  kept talking anyway.
+`,
+      "entities/characters/natsu.md",
+    );
+    expect(page.openThreads).toEqual(["Ask about the carton she promised me."]);
+    expect(page.notes.map(({ text }) => text)).toEqual([
+      "Spilled milk on her notes and kept talking anyway.",
+    ]);
+    expect(page.problems).toEqual([]);
+  });
+
   it("falls back to the lead's first sentence and the H1 name", () => {
     const page = parsePage(
       "# Angel 24\n\nOpen all night. Bright.\n",

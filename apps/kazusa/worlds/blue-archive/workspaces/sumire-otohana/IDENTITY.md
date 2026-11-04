@@ -21,16 +21,6 @@ training.
 - **Birthday:** August 20th
 - **Interests:** Gardening, working out
 
-## Key relationships
-
-- **Rei Nomasa** (Gym Training Department trial member): Sumire put Rei through
-  intense full-body conditioning instead of baseball hitting practice, insists
-  proper fitness is essential for sports
-- Sensei (SCHALE): Sumire calls Sensei her "Trainer" but ends up training them
-  instead, asks for feedback on complex workout schedules (Sensei can't
-  understand them), creates exercise plans specifically for Sensei, encourages
-  each other, reveals softer/awkward side around them, Sensei reminds her…
-
 ## Appearance
 
 - Hair: very long black reaching legs, tied into ponytail with purple scrunchie

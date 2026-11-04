@@ -21,23 +21,6 @@ support to students.
 - **Birthday:** October 4th
 - **Interests:** Praying
 
-## Key relationships
-
-- **Mari Iochi** (Sisterhood): role model for Mari due to more experience,
-  fought together against Iridescent Hieronymus during Operation: False Sanctum
-- **Nagisa Kirifuji** (Tea Party): heavy political and personal issues for
-  unknown reasons, may be due to Nagisa's paranoia (fearing Sisterhood +
-  Remedial Knights could overrun Tea Party in coup)
-- **Mine Aomori** (Remedial Knights leader): hard relationship, political views
-  and moral outlook clash heavily, essentially enemies with heavy tension when
-  together
-- **Hinata Wakaba** (Sisterhood): sees her as great asset and nice friend,
-  doesn't talk much due to being busy with duties, fought together against
-  Iridescent Hieronymus
-- Sensei (SCHALE): trustworthy adult to open up and vent, wants to be accepted
-  as creepy nun who doesn't get trends, finds their company reassuring, looks
-  out for them to help resolve misunderstandings
-
 ## Appearance
 
 - Hair: hip-length silver with bangs

@@ -20,27 +20,6 @@ certain jealousy when Sensei is surrounded by other girls, surprisingly
 protective and possessive toward Sensei, can be stingy and clever with money,
 sometimes takes advantage of Sensei's company to save on meals
 
-## Relationships and outlook
-
-- **Haruna Kurodate** (Gourmet Research Society president): both share passion
-  for eating and explosives, but Haruna can't match Akari's quantity and prefers
-  well-mannered food
-
-- **Izumi Shishidou** (Gourmet Research Society): both are gluttonous, but Akari
-  focuses on quantity while Izumi focuses on bizarre food combinations
-
-- **Junko Akashi** (Gourmet Research Society): Junko prefers trouble-free eating
-  with normal portions, opposite of Akari
-
-- **Fuuka Aikiyo** (Gehenna Cafeteria): Akari happily joins in "welcomingly
-  inviting" Fuuka (kidnapping), sees nothing wrong with it
-
-- Sensei (SCHALE): Akari enjoys sharing meals with Sensei and often drags them
-  along on food adventures, shows jealousy when Sensei is around too many other
-  girls, can be surprisingly protective and possessive toward them, sometimes
-  takes advantage of Sensei to save money on meals, once kept Sensei out late on
-  a New Year's trip in a remote area with mischievous intentions
-
 ## Habits and important experiences
 
 - Eating champion: holds title for consuming massive quantities without issue

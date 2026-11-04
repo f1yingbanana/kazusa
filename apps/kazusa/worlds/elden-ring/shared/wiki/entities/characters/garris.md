@@ -5,11 +5,11 @@ id: entity.character.garris
 character_id: garris
 name: "Necromancer Garris"
 aliases: ["Garris"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 occupation: "Necromancer, in a cave on Altus"
 renown: local
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: sages_cave
 knows:

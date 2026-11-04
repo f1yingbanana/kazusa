@@ -27,10 +27,3 @@ smells of something very old.
 ## Also known as
 
 Gurranq, Beast Clergyman, the Beast Clergyman, Old Gurranq
-
-## Key relationships
-
-- **Queen Marika the Eternal** (queen and half-sister): She made him her shadow.
-- **Ranni the Witch** (thief): She stole Death from him.
-- **Alecto, Black Knife Ringleader** (thief): A black knife.
-- **D, Hunter of the Dead** (hound with a bag): He brings deathroot.

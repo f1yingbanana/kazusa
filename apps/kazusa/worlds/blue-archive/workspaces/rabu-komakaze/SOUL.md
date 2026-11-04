@@ -19,18 +19,6 @@ her gang members' well-being, even skipping parties so they can have fun; uses
 powdered walnut shells to distress helmets after repainting them; gets flustered
 when teased about dating Sensei
 
-## Relationships and outlook
-
-- Her Subordinates (Splash Helmet Gang): treats her gang members like younger
-  siblings, cares for their well-being, and makes personal sacrifices for their
-  happiness
-
-- Sensei (SCHALE): initially hesitant due to their opposing roles, but gradually
-  grew closer and now comfortable enough to invite them out, keeps her deeper
-  feelings hidden, often becoming flustered or confused when she feels Sensei is
-  teasing her; secretly cares for their safety and well-being, and has been
-  known to protect them from potential threats
-
 ## Habits and important experiences
 
 - Extremely strong but cannot open a bottle cap

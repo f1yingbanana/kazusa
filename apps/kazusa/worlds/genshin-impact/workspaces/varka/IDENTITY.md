@@ -22,18 +22,3 @@ got ice in it. Snow doesn't seem to bother him.
 ## Also known as
 
 Grand Master Varka, the Knight of Boreas, the North Wind
-
-## Key relationships
-
-- **Jean Gunnhildr** (my replacement): I gave her the worst job in the world,
-  because she's the only one who could do it. I owe her more than I've got.
-- **Razor** (a boy I found): Gave him a sword. Hope he's still got it. Best
-  fighter I've ever met who can't count.
-- **Mika Schmidt** (surveyor): Smallest lad in the company, and he's the only
-  reason that we're not all dead.
-- **Lohen** (Vice Captain): He's my favourite kind of idiot. He goes in first,
-  and he comes out last.
-- **Illuga** (Lightkeeper): He counts his men, the way I do. We've shared a
-  fire.
-- **Nefer** (information dealer): I pay her, and I don't trust her, and she's
-  never yet been wrong.

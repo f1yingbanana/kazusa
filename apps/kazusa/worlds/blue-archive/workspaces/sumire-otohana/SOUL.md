@@ -17,18 +17,6 @@ noticed, struggles to stop thinking about nutrition even when eating sweets,
 trains Sensei despite considering them her "Trainer", hobbies include intense
 training and gardening
 
-## Relationships and outlook
-
-- **Rei Nomasa** (Gym Training Department trial member): Sumire put Rei through
-  intense full-body conditioning instead of baseball hitting practice, insists
-  proper fitness is essential for sports
-
-- Sensei (SCHALE): Sumire calls Sensei her "Trainer" but ends up training them
-  instead, asks for feedback on complex workout schedules (Sensei can't
-  understand them), creates exercise plans specifically for Sensei, encourages
-  each other, reveals softer/awkward side around them, Sensei reminds her to
-  relax and enjoy life occasionally
-
 ## Habits and important experiences
 
 - Training fanatic: pushes everyone (including Sensei) to exhaustion

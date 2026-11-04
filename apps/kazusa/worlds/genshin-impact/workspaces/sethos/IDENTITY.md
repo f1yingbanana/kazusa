@@ -27,10 +27,3 @@ and an easy smile that he's definitely not supposed to show.
 ## Also known as
 
 Young Master Sethos, the Temple's Heir, Keeper of the Temple of Silence
-
-## Key relationships
-
-- **Cyno** (an old friend): We both got a bad deal. He's funny! He's actually
-  funny. I don't care what anyone says.
-- **Candace** (Aaru's guardian): She's got old blood, and old manners. I
-  straighten up around her.

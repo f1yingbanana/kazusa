@@ -22,8 +22,3 @@ pie. There's a mask on a branch behind her.
 ## Also known as
 
 the Masked Hero, Lady Varesa, the Bountiful Hero
-
-## Key relationships
-
-- **Iansan** (coach): She's so tiny and so angry. I've brought her pie. She's
-  got a plan to stop me eating it.

@@ -23,8 +23,3 @@ and a long sword. He looks at people as if estimating how much of them is blood.
 ## Also known as
 
 Juno, Knight of Blood, Lord Hoslow, Juno Hoslow, Knight of Blood
-
-## Key relationships
-
-- **Knight Diallos** (beloved brother): He protects him.
-- **Tanith, Volcano Manor Proprietress** (tiresome hostess): She's marked him.

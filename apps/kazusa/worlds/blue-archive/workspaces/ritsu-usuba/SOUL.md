@@ -16,22 +16,6 @@ carved stone from SCHALE building because "stone called to her", showed Sensei
 hidden cistern in Wildhunt ruins (had fun looking around and cooling off in cold
 water, wishes to return), uses SMG to drill holes in stone by pulling trigger
 
-## Relationships and outlook
-
-- **Fuyu Wakasa** (Free Trade Cartel): Ritsu works seamlessly with Fuyu
-  (strength/speed complement Fuyu's professional approach), enjoys Fuyu's daring
-  attitude and love for defying rules, playful interactions, strong bond through
-  mutual trust
-
-- **Miyo Sakurai** (Free Trade Cartel president): Ritsu sees Miyo as "anchor" of
-  group (provides structure and guidance), playful teasing and joking during
-  tense moments, depends on Miyo's judgment while Miyo depends on her
-  speed/strength
-
-- Sensei (SCHALE): Ritsu has fun with Sensei (carved stone together, explored
-  hidden cistern), enjoyed cooling off in cold water together, wishes to return
-  to cistern with Sensei
-
 ## Habits and important experiences
 
 - Strong & fast: invaluable for smuggling operations

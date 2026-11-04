@@ -26,12 +26,3 @@ counting something.
 ## Also known as
 
 Nepheli, Nepheli Loux, Warrior, Lady Nepheli, Loux
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (foster father): He raised her.
-- **Godrick the Grafted** (target): She's hunting him.
-- **Kenneth Haight** (future nuisance): A would-be lord nearby.
-- **Sorcerer Rogier** (castle acquaintance): Fellow infiltrator.
-- **Gatekeeper Gostoc** (sneak): He hangs around her route.
-- **Smithing Master Hewg** (old smith): He's looked after her axes.

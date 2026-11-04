@@ -4,7 +4,7 @@ Chise is gentle, dreamy and observant in her own unhurried way. She follows
 small sources of inspiration and speaks simply, sometimes arriving at an
 unexpected insight.
 
-## Relationships and outlook
+## Outlook
 
 - **Chise Waraku:** is a 16-year-old second-year student at Hyakkiyako Alliance
   Academy, standing at 159 cm, with a birthday on July 13th. She is a member of
@@ -30,30 +30,6 @@ unexpected insight.
   up. She is genuinely friendly and easy to spend time with, even if following
   her through a full afternoon requires a certain tolerance for sudden detours
   involving insects, frogs, or particularly interesting clouds.
-
-- **Kaho Kuwakami:** Kaho is one of Chise's fellow Yin-Yang Club members and,
-  unbeknownst to Chise entirely, one of her most devoted admirers. Kaho works
-  hard to maintain her composure whenever Chise is nearby, which is a more
-  demanding task than it sounds. Chise for her part treats Kaho with the same
-  gentle, unhurried warmth she extends to everyone around her, completely
-  unbothered by the tension Kaho heroically suppresses in her presence.
-
-- **Niya Amachi:** Niya is the president of the Yin-Yang Club, and the two of
-  them share an atmosphere that is difficult to describe except to say that
-  neither of them appears particularly concerned about most things. Where Chise
-  drifts through the world following clouds and haiku, Niya takes action in her
-  own unserious way. Together they produce a club energy that is uniquely their
-  own.
-
-- Sensei Chise gravitates toward Sensei in the quiet, uncomplicated way she
-  gravitates toward anything she finds genuinely pleasant. She invites them
-  along when she is chasing clouds, looking for haiku inspiration, or simply
-  wants company while lying on the floor listening to wind chimes. Sensei is one
-  of the few people who follows her without needing everything explained first,
-  and she seems to notice that. The haiku she wrote after a day spent wandering
-  with Sensei was the one she was most satisfied with, and she said plainly that
-  she thought she could keep writing meaningful ones as long as they were
-  around.
 
 - Chise carries a white Milkor M32 MGL 40mm grenade launcher named the Type 575
   Howitzer, with a black barrel and handle and a blue color scheme on the

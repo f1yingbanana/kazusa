@@ -18,17 +18,6 @@ trying, hobbies include spectating sports events and analyzing yearbooks
 (studies players and teams), has small white bandage on nose (frequent bumps and
 scrapes), wears adhesive bandages on legs, gives high-fives to Sensei
 
-## Relationships and outlook
-
-- **Sumire Otohana** (Gym Training Department leader): Rei finds Sumire's
-  training overwhelmingly intense and exhausting, regrets decision during
-  workouts but follows guidance hoping to improve baseball skills
-
-- Sensei (SCHALE): Rei has deep feelings for Sensei (wishes to be precious to
-  them), gets flustered and feels teased by their comments, trains together with
-  Sensei to improve baseball (tactics and methods), goes to watch baseball
-  matches together, acts like buddies (high-fives, having fun)
-
 ## Habits and important experiences
 
 - Baseball focus: main passion is baseball and want to train for it, not general

@@ -22,10 +22,3 @@ arm. He looks like he'd like to go back down.
 ## Also known as
 
 Monsieur Freminet, the Diver, Pers's maker
-
-## Key relationships
-
-- **Lyney** (big brother): He's so brilliant. He's always covering for me. I've
-  got no idea how to tell him I know.
-- **Lynette** (sister): She looks at me, and I feel safe, and a bit scared.
-- **Arlecchino** (Father): I try really hard.

@@ -19,25 +19,6 @@ operator, ran away), can destroy walls by running into them, stronger when hurt,
 fought Neru Mikamo to a tie, halo drips blood-like substance (disappears when
 drops disconnect, doesn't have physical property, she doesn't care about it)
 
-## Relationships and outlook
-
-- **Ichika Nakamasa** (Justice Task Force): laid-back personality, her attempts
-  to calm Tsurugi always fail (especially when she breaks through walls)
-
-- **Mashiro Shizuyama** (Justice Task Force): fellow member, supported Tsurugi
-  during Summer Sky's Wishlist event
-
-- **Hasumi Hanekawa** (Justice Task Force vice president): replaces Tsurugi for
-  formal matters due to destructive behavior (despite Hasumi being vice
-  president)
-
-- **Neru Mikamo** (C&C): fought her to a tie (strongest of Millennium vs
-  strongest of Trinity)
-
-- Sensei (SCHALE): becomes extremely kind, shy, and feminine around them
-  (opposite of battle persona), hides shyness, constantly stutters and makes
-  mistakes
-
 ## Habits and important experiences
 
 - Strength: strongest in Trinity (debate with Mika), extreme durability,

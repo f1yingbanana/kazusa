@@ -22,10 +22,3 @@ crossbow he's never once fired from further than arm's length.
 ## Also known as
 
 the Frontline Suppression Officer, Vice Captain Lohen
-
-## Key relationships
-
-- **Varka** (Grand Master): He's the strongest man alive, and I'm going to knock
-  him down one day. He says I'm welcome to try.
-- **Mika Schmidt** (surveyor): He's small, he's scared, and he's never once been
-  wrong. Don't let anyone hit him.

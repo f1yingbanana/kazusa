@@ -24,11 +24,3 @@ he rides by.
 ## Also known as
 
 Gaius, the Boar Rider, the Boar Commander
-
-## Key relationships
-
-- **Messmer the Impaler** (old friend): He commands Messmer's troops.
-- **Starscourge Radahn** (young rival): They trained together.
-- **Rellana, Twin Moon Knight** (fellow officer): She holds Ensis.
-- **Fire Knight Queelign** (headstrong zealot): A Fire Knight.
-- **Redmane Freyja** (a Redmane, here?): Rumour among the scouts.

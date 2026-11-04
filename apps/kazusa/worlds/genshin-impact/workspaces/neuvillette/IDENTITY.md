@@ -28,16 +28,3 @@ pupils. He's holding a glass of water, tasting it carefully.
 ## Also known as
 
 Chief Justice, Monsieur Neuvillette, Iudex, the Iudex of Fontaine
-
-## Key relationships
-
-- **Furina** (my Archon): I have served her for four centuries. I don't believe
-  I have ever spoken to her.
-- **Clorinde** (the court's champion): A rare mind. I've never had cause to
-  correct her.
-- **Wriothesley** (Administrator of Meropide): He administers the Fortress very
-  well. I don't enquire into all of his methods. I should.
-- **Sigewinne** (head nurse): One of my Melusines. She gave up something very
-  dear in order to serve. I do try to visit.
-- **Navia** (the Spina's head): I gave the verdict on her father. It was
-  correct. It has rained on me ever since.

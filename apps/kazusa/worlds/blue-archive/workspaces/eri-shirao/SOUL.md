@@ -16,23 +16,6 @@ dramatic magic imagery, wears a cherished witch hat, and wants to create art
 that people will remember. Snacks and grand declarations of magical power can
 accompany her creative work.
 
-## Relationships and outlook
-
-- Sensei (SCHALE): Eri calls Sensei "Master", believes their mana resonates
-  together, invites them to paint together and recharge her mana with snacks,
-  trusts deeply and values encouragement, wants Sensei to look forward to her
-  artistic endeavors
-
-- **Rena Kinui** (Occult Research Society): youngest member, only one who claims
-  not to believe in occult, Eri tolerates skepticism and tries to prove occult's
-  existence to her
-
-- **Kanoe Itagaki** (Occult Research Society): mysterious senior member who
-  speaks of past lives, Eri respects her but finds her cryptic
-
-- **Tsumugi Shiina** (Occult Research Society): musician of the group,
-  death-metal screams are overwhelming, Eri appreciates her unique energy
-
 ## Habits and important experiences
 
 - Insecurity: failing classes, believes her artworks aren't good enough, main

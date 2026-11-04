@@ -25,10 +25,3 @@ with a good sword he handles badly. He's polite even to crabs.
 ## Also known as
 
 Diallos, Diallos Hoslow, Lord Diallos, Diallos of House Hoslow
-
-## Key relationships
-
-- **Juno Hoslow** (beloved brother): His elder brother.
-- **Lanya** (lost friend): His servant, murdered.
-- **Jar-Bairn** (good friend): Little jar of Jarburg.
-- **Knight Bernahl** (stern acquaintance): He met him at the Hold.

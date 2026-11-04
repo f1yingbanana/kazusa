@@ -21,10 +21,3 @@ He looks at you as if you might have stolen something.
 ## Also known as
 
 Arghanthy, Chief Guardian
-
-## Key relationships
-
-- **Adan, Thief of Fire** (the thief): He stole the flame.
-- **The Last Fire Giant** (the charge): It tends the flame.
-- **Queen Marika the Eternal** (the one who set the watch): Marika ordered the
-  Flame guarded.

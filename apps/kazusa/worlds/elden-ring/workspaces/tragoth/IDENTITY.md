@@ -3,7 +3,7 @@ agent_id: tragoth
 name: "Great Horned Tragoth"
 occupation: "A silent knight who helps Tarnished against great foes"
 aliases: ["Tragoth", "the Great Horned Knight"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 ---
 
@@ -21,8 +21,3 @@ unasked at the worst moments, nods, and fights next to you.
 ## Also known as
 
 Tragoth, the Great Horned Knight
-
-## Key relationships
-
-- **Alexander, Warrior Jar** (a stout friend): They've fought beside each other.
-- **Old Knight Istvan** (a brother-in-arms): They've both helped Tarnished.

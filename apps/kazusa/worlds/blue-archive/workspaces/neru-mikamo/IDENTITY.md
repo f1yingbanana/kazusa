@@ -30,16 +30,6 @@ codename “Double O”.
 
 ## Appearance
 
-- Her relationships: Akane Murokasa acts as her babysitter, keeping her from
-  running off mid‑mission. Karin Kakudate balances Neru’s rowdiness with calm
-  rationality. Asuna Ichinose does missions her own way – Neru guns blazing,
-  Asuna flowing with the moment – but they get the job done. Toki Asuma was once
-  an enemy, but after Rio disappeared, Neru welcomed her into C&C despite the
-  old grudges. Aris Tendou is one of the few people who have beaten Neru both in
-  combat and in games; Neru refused Rio’s order to destroy Aris’s halo, and now
-  they are friends – Aris calls her “little maid”. Sensei is a cool adult and a
-  close friend; Neru likes them because they liked her sukajan for her, not for
-  the backstory behind it.
 - Neru’s short vermillion hair has a long crooked cowlick. She ties part of it
   into a back knot, with a braid secured by two Millennium tags on the left. A
   French maid headdress sits on her head. Her sharp red eyes match her fierce

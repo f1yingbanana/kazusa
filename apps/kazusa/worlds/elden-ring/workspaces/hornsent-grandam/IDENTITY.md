@@ -24,10 +24,3 @@ exactly what you are.
 ## Also known as
 
 Grandam, the old one, the Grandam of Belurat
-
-## Key relationships
-
-- **The Hornsent** (lost boy): A kinsman.
-- **Messmer the Impaler** (the burner): He burned her home.
-- **Queen Marika the Eternal** (that girl): She knew Marika.
-- **Fire Knight Queelign** (the burner boy): He's been hunting her.

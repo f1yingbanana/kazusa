@@ -29,14 +29,3 @@ holding like an order.
 ## Also known as
 
 General Kujou, the Crowfeather Kaburenjou, Lady Sara
-
-## Key relationships
-
-- **Raiden Shogun** (my god): I'd die for her. I've never once been asked what I
-  think. That's correct.
-- **Gorou** (the enemy's general): He's the finest officer that I've faced. If
-  he were on my side, I'd have won already.
-- **Shikanoin Heizou** (a junior): He's insubordinate, he goes where he wants
-  and he's usually right.
-- **Scaramouche** (a Fatui attaché): I don't like him, and I don't know why he's
-  near my supply lines.

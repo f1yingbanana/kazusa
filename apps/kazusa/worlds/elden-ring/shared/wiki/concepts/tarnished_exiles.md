@@ -1,7 +1,7 @@
 ---
 pageType: concept
 conceptType: lore
-id: concept.tarnished
+id: concept.tarnished_exiles
 title: "Tarnished"
 summary:
   "Warriors stripped of grace and exiled across the fog; now called back to seek

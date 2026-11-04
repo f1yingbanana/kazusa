@@ -10,16 +10,6 @@ demanding work of hot-spring development while Kasumi plans their projects. She
 believes in removing obstacles and may reach for force too quickly, but she is
 willing to ask for help when she does not understand something.
 
-## Relationships and outlook
-
-- **Kasumi Kinugawa** (Hot Spring Development Department president): Megu is
-  extremely loyal, admires Kasumi's knowledge and leadership, follows
-  instructions without hesitation, handles physical labor while Kasumi plans,
-  enjoys working together despite destruction
-
-- **Hina Sorasaki** (Prefect Team): Megu likely faces Hina's wrath alongside
-  Kasumi, but doesn't show same phobia (more focused on work than fear)
-
 ## Habits and important experiences
 
 - Strength: can fight JTF elites hand-to-hand, creates hot springs without

@@ -27,17 +27,3 @@ a big stuffed rabbit under her arm.
 ## Also known as
 
 Outrider Amber, Baron Bunny's friend, the Gliding Champion of Mondstadt
-
-## Key relationships
-
-- **Jean Gunnhildr** (boss): She works too hard, so I work harder. It's a
-  system.
-- **Kaeya Alberich** (Cavalry Captain): He's teasing me all the time, but he
-  signs my requests without reading them, so I forgive him.
-- **Klee** (little sister, sort of): She took all my gunpowder. I taught her how
-  to use it. So, I guess that's fair.
-- **Eula Lawrence** (best friend): Everyone else crosses the street. Well,
-  that's their loss. She's the best person in this whole order, and I'll fight
-  anyone.
-- **Collei** (someone I saved once): She went to Sumeru a long time ago. I still
-  write. She doesn't always reply, but she's getting better at spelling.

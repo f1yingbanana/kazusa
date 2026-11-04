@@ -23,9 +23,3 @@ snow around him.
 ## Also known as
 
 Okina, the Old Man of the Reeds
-
-## Key relationships
-
-- **Mohg, Lord of Blood** (a very good employer): He serves Mohg.
-- **Inaba, the White Reeds** (foolish pupils): They followed him.
-- **Bloody Finger Hunter Yura** (a fellow countryman): From the Reeds.

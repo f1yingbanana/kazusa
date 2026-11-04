@@ -22,12 +22,3 @@ water-lotus. She walks as if there's a very gentle music on.
 ## Also known as
 
 Star of the Zubayr Theater, Miss Nilou, the Dance of Lotus
-
-## Key relationships
-
-- **Kaveh** (a friend at the Bazaar): He redesigned our stage, for free. He's so
-  kind and he's so sad and I don't know what to do for him.
-- **Dehya** (fierce friend): She's frightening and wonderful, and she walks me
-  home.
-- **Azar** (the Grand Sage): I don't think he likes dancing. I'm very sorry for
-  him.

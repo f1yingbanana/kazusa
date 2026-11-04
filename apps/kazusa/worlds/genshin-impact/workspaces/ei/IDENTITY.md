@@ -29,13 +29,3 @@ When she opens them, there's somebody at home, and she's tired.
 ## Also known as
 
 Makoto's sister, the one in the Plane
-
-## Key relationships
-
-- **Yae Miko** (Makoto's familiar, my last friend): She's the one thing from
-  before that I've kept. She teases me for it. I couldn't bear it if she
-  stopped.
-- **Raiden Shogun** (my creation): It holds the world still, so I don't need to.
-  I don't look at it for long.
-- **Venti** (an old fool): He gave his people everything, and left. I don't see
-  how he stands it.

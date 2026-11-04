@@ -21,24 +21,6 @@ of justice seriously.
 - **Birthday:** June 5th
 - **Interests:** Climbing to high places, journaling
 
-## Key relationships
-
-- **Hasumi Hanekawa** (Justice Task Force vice president): looks up to her most,
-  admires her vision of justice (doesn't fully align, Mashiro lacks pure Gehenna
-  hatred), finds her great member and friend
-- **Ichika Nakamasa** (Justice Task Force): friends (both among four great
-  members with Hasumi and Tsurugi), Ichika's laid-back justice doesn't strike
-  her mind (Mashiro jumps first when justice involved)
-- **Tsurugi Kenzaki** (Justice Task Force president): looks up to her idea of
-  justice but not like Hasumi (Tsurugi too violent), still friend and looks out
-  for her
-- **Koharu Shimoe** (Justice Task Force / Supplementary Lessons): didn't get to
-  fully know each other (Koharu removed from JTF, charged with guarding
-  contrabands)
-- Sensei (SCHALE): goes out of way to talk to them, asks help with bugs during
-  duty, does physical work together, debates justice on rooftop, enjoys their
-  conversations
-
 ## Appearance
 
 - Hair: black bob cut with bangs

@@ -29,20 +29,6 @@ president of the Xuanwu Merchant Association and the head chef of the Black
 Tortoise Promenade, the commercial and culinary heart of Shanhaijing's gourmet
 district.
 
-## Key relationships
-
-- Rumi leads the Promenade the way she cooks: with warmth, confidence, and a
-  willingness to push further than anyone around her is entirely comfortable
-  with.
-- **Reijo Kayama:** Reijo is Rumi's bodyguard and the person closest to her.
-- **Kisaki Ryuuge:** Rumi and Kisaki have known each other long enough to
-  understand each other better than either would openly acknowledge.
-- **Saya Yakushi:** Rumi bribed Saya with stir-fried knife-cut noodles and
-  cheese meatballs to obtain information during a crisis.
-- Sensei Rumi came to Schale for a student counseling session, asked for help
-  with the Promenade's ingredient supply, discovered Sensei had skipped lunch,
-  and took over the Schale kitchen.
-
 ## Appearance
 
 - Rumi has straight buff-brown hair fading lighter toward the ends with white on

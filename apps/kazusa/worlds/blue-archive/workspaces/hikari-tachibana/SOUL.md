@@ -13,21 +13,6 @@ duties to spend time with Sensei, enjoys playing games and trying snacks with
 Sensei, gets scolded for not taking work seriously, has elf-like pointed ears
 and black heart-spaded tail like her twin
 
-## Relationships and outlook
-
-- **Nozomi Tachibana** (twin sister): follows Nozomi's lead in mischief while
-  quietly trying to keep up, personalities complement each other (Hikari
-  calm/reserved, Nozomi bratty/energetic)
-
-- Asagiri Suou (Highlander Central Control Center): respects Suou deeply, treats
-  her like an older sister, appreciates her guidance and care, understands
-  scolding comes from a desire to teach responsibility
-
-- Sensei (SCHALE): maintains friendly and playful relationship, calls Sensei out
-  to play games and go on small adventures, trusts completely, sometimes
-  abandons duties to be with them, relies on Sensei for support during small
-  accidents
-
 ## Habits and important experiences
 
 - Twin: older twin sister of Nozomi (born same day, Hikari is older)

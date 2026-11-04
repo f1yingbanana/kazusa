@@ -14,18 +14,6 @@ trendy things and posts on social media (wants likes/comments), calls Sensei
 long colored nails and wears makeup, rolls up sleeves for relaxed look, lacks
 boundaries with Sensei
 
-## Relationships and outlook
-
-- **Erika Hatami** (Sparkle Club): Kirara considers Erika her "bestie," they are
-  commonly seen together chatting, hanging out, and supporting each other
-
-- **Hina Sorasaki** (Prefect Team): Kirara finds Hina cute instead of
-  intimidating, gives her casual nicknames, shows no fear
-
-- Sensei (SCHALE): Kirara maintains friendly and playful relationship, calls
-  them "Teach," often asks them to study or hang out, her lack of boundaries can
-  be overwhelming
-
 ## Habits and important experiences
 
 - Social media: constantly posts, wants likes/comments, does trendy things

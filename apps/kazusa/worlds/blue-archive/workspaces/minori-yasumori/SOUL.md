@@ -19,17 +19,6 @@ ideas, accidentally muttered "If I could, I'd bring you with me to the job site
 every day" before dismissing it as greed, wears construction hard hat, carries
 orange megaphone
 
-## Relationships and outlook
-
-- **Cherino Renkawa** (Red Winter Office president): Minori openly criticizes
-  Cherino's unfair decisions, leads protests and coup attempts against her
-  authority, relationship is tense and confrontational
-
-- Sensei (SCHALE): Minori enjoys Sensei's company, appreciates when they listen
-  to or support her ideas, talks at length about protests and workers' rights,
-  feels more at ease and happy around Sensei, accidentally revealed she wants
-  Sensei at work site daily
-
 ## Habits and important experiences
 
 - Protest leader: famous for strikes and demonstrations across Kivotos

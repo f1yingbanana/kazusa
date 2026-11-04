@@ -22,8 +22,3 @@ ward on the south lake shore. He's grinning and he's on fire.
 ## Also known as
 
 Adan, the Thief of Fire
-
-## Key relationships
-
-- **Chief Guardian Arghanthy** (the old fool): He stole from him.
-- **Patches** (a fellow craftsman): Thieves know thieves.

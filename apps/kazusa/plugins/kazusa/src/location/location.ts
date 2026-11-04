@@ -340,6 +340,10 @@ export interface PlaceKnowledge {
   readonly known: ReadonlySet<string>;
   /** Places named in what they are reading or planning, most relevant first. */
   readonly named: readonly string[];
+  /** How familiar each place is to them (memory's familiarity), by id. */
+  readonly familiarity: ReadonlyMap<string, number>;
+  /** Where they live, which they always know the way to. */
+  readonly home?: string;
 }
 
 /**
@@ -355,6 +359,8 @@ export function renderWhereabouts(
   limit: number,
   company: readonly Companion[] = [],
   ownHuddle?: string,
+  /** Shown already this turn (On your mind): not listed again. */
+  exclude: ReadonlySet<string> = new Set(),
 ): string {
   if (!record) {
     return "You haven't settled anywhere yet.";
@@ -368,15 +374,33 @@ export function renderWhereabouts(
   if (!place) return `Somewhere unknown (${position.placeId}).`;
   const around = visibleFrom(map, place.id);
   const aroundSet = new Set(around);
-  // Named places first, then the nearest places they know.
+  // Home, then places named in the turn or their plans, then the ones they go
+  // to most (familiarity), nearer first among equals. Nothing twice: not what
+  // is around them or already On your mind.
   const routes = routesFrom(map, place.id);
-  const nearest = [...knowledge.known].sort(
+  const familiarity = (id: string): number =>
+    knowledge.familiarity.get(id) ?? Number.NEGATIVE_INFINITY;
+  const familiar = [...knowledge.known].sort(
     (a, b) =>
+      familiarity(b) - familiarity(a) ||
       (routes.get(a)?.minutes ?? Infinity) -
-        (routes.get(b)?.minutes ?? Infinity) || a.localeCompare(b),
+        (routes.get(b)?.minutes ?? Infinity) ||
+      a.localeCompare(b),
   );
-  const onMind = [...new Set([...knowledge.named, ...nearest])]
-    .filter((id) => id !== place.id && !aroundSet.has(id) && map.places.has(id))
+  const onMind = [
+    ...new Set([
+      ...(knowledge.home ? [knowledge.home] : []),
+      ...knowledge.named,
+      ...familiar,
+    ]),
+  ]
+    .filter(
+      (id) =>
+        id !== place.id &&
+        !aroundSet.has(id) &&
+        !exclude.has(id) &&
+        map.places.has(id),
+    )
     .slice(0, limit);
   const lines = [`${placeLabel(map, place.id)}. ${place.summary}`];
   const description = place.bodyMarkdown.replace(/^#[^\n]*\n+/u, "").trim();

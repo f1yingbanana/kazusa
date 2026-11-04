@@ -979,11 +979,29 @@ connect these modules in process.
   with no card, **Where you are** shows the whole description; starting the next
   activity from that place writes a frontmatter-only stub (atomic, never
   overwriting), after which only the summary shows; the character adds what they
-  remember. **Places you know**: places named (names, aliases, card aliases) in
-  the turn's prompt or `MEMORY.md`, then the nearest cards, capped
-  (`location.listLimit`). Fuzzy recall is the character's own `recall` (see
-  [memory](references/memory.md)), which only reaches the world wiki at their
-  knowledge depth.
+  remember. **Places you know**: home, then places named (names, aliases, card
+  aliases) in the turn's prompt or `MEMORY.md`, then the cards they go to most
+  (familiarity, below), capped (`location.listLimit`), never repeating the
+  current place, Around you, or what On your mind shows (`exclude`, so the
+  context engine runs memory's prefetch before `whereabouts`). Fuzzy recall is
+  the character's own `recall` (see [memory](references/memory.md)), which only
+  reaches the world wiki at their knowledge depth.
+- **Familiarity** (`memory/familiarity.ts`, retained store `"familiarity"`, one
+  record per character): what they did with someone or somewhere, never what
+  they were shown (that would feed itself). Location notes the place of every
+  activity started; a message makes its sender familiar to each recipient, and a
+  chat of six or fewer to the sender (`usesOfMessage`, from Messaging's
+  `message` events in `index.ts`). One use per episode of
+  `memory.familiarity.episodeHours` (24), timed at its latest contact: ten days
+  of contact count ten times, one long party once (the spacing effect;
+  simulated, a 10-minute window let one evening with a stranger outrank a
+  twice-weekly clubmate for a week). Scored as ACT-R base-level activation
+  `ln Σ age^-d` (`decay` 0.5), keeping the `recent` (4) uses exactly and
+  estimating older ones from the count (Petrov's hybrid). A page that moved
+  since (seen, a note) counts as one more use, so a world with no history ranks
+  like recency. It ranks **People you know** and **Places you know** (working
+  knowledge); On your mind stays cue-driven. Nothing ever lists one id twice in
+  a turn.
 - **State**: `"location"` store, one `LocationRecord` per character or player:
   `placeId`, `since`, optional `trip` (task id, destination, depart/arrive at
   the lease's end, places passed with sim times, usual minutes, and for walking
@@ -991,20 +1009,24 @@ connect these modules in process.
   sim time (`positionAt`); no record means the `home` on the world character
   card.
 - **`where` on `start_task`**: required plain string (id, name, alias, or the
-  character's words for a spot where they are, kept as `spot`). A travel
-  category with words that are no place says "You don't know the way to …" and
-  leaves them where they are: a trip needs a route. A travel category
-  (`location.travelCategories`) is a trip scaled to the task's duration; any
-  other activity elsewhere walks over at the usual pace and checks in on arrival
-  (`checkInAt`); an activity too short for that walk is refused with the usual
-  time before any judgment ("Getting from X to Y usually takes 13 minutes, which
-  doesn't fit in this 10-minute activity…"): the walk counts against the
-  duration, and a check-in after the end is a hard error the model must hear.
-  Planning the route is the model's job. `where` also resolves a backticked id
-  inside a label (``Library `school_library` ``), the form prompts show.
-  Mid-trip starts stop at the place being passed; `delay_task` moves a trip's
-  arrival. Journal payloads carry `where`, `from`, `arriveAt`, `usualMinutes`,
-  `spot`.
+  character's words). Words that are no exact place are matched against their
+  own place pages (memory's `places`, `placeMeant` in `location/register.ts`):
+  moving somewhere (a trip or a walk over), a word in common is enough; for a
+  spot where they are, only a name or alias. One match is that place; several
+  are refused (`kazusa-results#where-which`) with each, to say which; none is a
+  `spot` where they are. A travel category with words that are no place says
+  "You don't know the way to …" and leaves them where they are: a trip needs a
+  route. A travel category (`location.travelCategories`) is a trip scaled to the
+  task's duration; any other activity elsewhere walks over at the usual pace and
+  checks in on arrival (`checkInAt`); an activity too short for that walk is
+  refused with the usual time before any judgment ("Getting from X to Y usually
+  takes 13 minutes, which doesn't fit in this 10-minute activity…"): the walk
+  counts against the duration, and a check-in after the end is a hard error the
+  model must hear. Planning the route is the model's job. `where` also resolves
+  a backticked id inside a label (``Library `school_library` ``), the form
+  prompts show. Mid-trip starts stop at the place being passed; `delay_task`
+  moves a trip's arrival. Journal payloads carry `where`, `from`, `arriveAt`,
+  `usualMinutes`, `spot`.
 - **Judgments (`judgment.ts`)** follow Perception's decision pattern: rubric in
   `shared/skills/location-judgment/SKILL.md` frontmatter, one `choice` question,
   the direct decision call (§3.4) owned by the acting agent,

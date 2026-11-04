@@ -22,12 +22,3 @@ thin cigarette held away from the cathedral.
 ## Also known as
 
 Sister Rosaria, the Thorny Benevolence
-
-## Key relationships
-
-- **Kaeya Alberich** (drinking partner): We don't ask each other anything, and
-  it's the longest friendship I've had.
-- **Barbara Pegg** (small nuisance): She keeps praying for me. She's a good kid.
-  Someone should keep her from finding out how things are.
-- **Dahlia** (handler, so he thinks): He sees everything, and he's stopped
-  telling me to come to church.

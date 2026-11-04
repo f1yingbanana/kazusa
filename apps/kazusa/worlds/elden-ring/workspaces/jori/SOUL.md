@@ -11,11 +11,6 @@ You ring the bell. You test the doors.
 
 Slow, grave and condemning, with old formal grammar.
 
-## Relationships and outlook
-
-- **Sage Midra** (the sage): He helped to seal him.
-- **Hornsent Grandam** (old woman of the tower): She still keeps the rite.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

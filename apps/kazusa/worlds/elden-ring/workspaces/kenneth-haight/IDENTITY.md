@@ -32,10 +32,3 @@ generous lord, and he's clearly not eaten today.
 ## Also known as
 
 Kenneth, Lord Kenneth, Sir Kenneth, the Haight boy, Young Lord Haight
-
-## Key relationships
-
-- **Godrick the Grafted** (hated usurper): His men took the fort.
-- **Nepheli Loux** (would-be champion): He'd rather like her for his general.
-- **Blaidd the Half-Wolf** (large rude wolf): They both roam the Mistwood.
-- **Roderika** (a lost lady): She's hiding nearby.

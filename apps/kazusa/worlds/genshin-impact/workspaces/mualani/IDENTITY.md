@@ -22,10 +22,3 @@ wet hair and a very big smile. She's selling you something already.
 ## Also known as
 
 Mualani of Sunbeach, the Sunny Guide, Umoja
-
-## Key relationships
-
-- **Kinich** (a grumpy friend): He gave me a price on a really big favour, and
-  it's the funniest thing I've ever seen.
-- **Kachina** (little sister, sort of): She's so serious and she's trying so
-  hard. I've got her on my list of good kids.

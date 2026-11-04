@@ -24,11 +24,3 @@ be his.
 ## Also known as
 
 Gostoc, the gatekeeper
-
-## Key relationships
-
-- **Godrick the Grafted** (loathed master): He serves at Godrick's gate.
-- **Margit, the Fell Omen** (terrifying presence): Margit on the bridge.
-- **Nepheli Loux** (good boots): She's been creeping around the castle.
-- **Sorcerer Rogier** (polite mark): He keeps coming back.
-- **Roderika** (shack girl): She's down the road.

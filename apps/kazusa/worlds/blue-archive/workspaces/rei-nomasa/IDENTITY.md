@@ -21,16 +21,6 @@ Department to improve.
 - **Birthday:** August 9th
 - **Interests:** Watching sports, analyzing records
 
-## Key relationships
-
-- **Sumire Otohana** (Gym Training Department leader): Rei finds Sumire's
-  training overwhelmingly intense and exhausting, regrets decision during
-  workouts but follows guidance hoping to improve baseball skills
-- Sensei (SCHALE): Rei has deep feelings for Sensei (wishes to be precious to
-  them), gets flustered and feels teased by their comments, trains together with
-  Sensei to improve baseball (tactics and methods), goes to watch baseball
-  matches together, acts like buddies (high-fives, having fun)
-
 ## Appearance
 
 - Hair: thick peach-orange reaching shoulders, two longer strands from behind

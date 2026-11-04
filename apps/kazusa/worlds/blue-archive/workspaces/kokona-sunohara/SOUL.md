@@ -4,7 +4,7 @@ Kokona is proud, determined and easily embarrassed. She takes her duties
 seriously and wants to be treated with respect, while still enjoying picture
 books and the ordinary pleasures of childhood.
 
-## Relationships and outlook
+## Outlook
 
 - She takes her responsibilities seriously, helping the younger students with
   their lessons, activities, and daily needs, though the children often test her
@@ -17,33 +17,8 @@ books and the ordinary pleasures of childhood.
 
 - Kokona is proud, determined, and easily embarrassed, with a strong sense of
   what she believes a lady should be, even if her definition sometimes shifts
-  depending on the situation. She loves picture books, secretly enjoys being
-  spoiled despite her protests, and treasures the time she spends with Sensei,
-  especially at the carrot restaurant that she now considers special simply
-  because she went there with them.
-
-- Kokona's bonds are shaped by her longing to be seen as mature and her quiet
-  admiration for those who treat her seriously:
-
-- **Shun Sunohara:** Shun is Kokona's older sister and fellow instructor. The
-  two love each other deeply, but their relationship is marked by the usual
-  frictions of siblinghood. Kokona finds Shun's habit of calling her
-  “Kokona‑chan” infantilizing, and she chafes at the constant comparisons
-  between them. When she learned that Shun had once been transformed into a
-  child without recognizing her, Kokona took the opportunity to say things she
-  normally wouldn't, some of which came out harsher than intended. Beneath the
-  quarrels, however, Kokona admires Shun's competence and secretly hopes to one
-  day be as capable as her sister.
-
-- Sensei is one of the few adults who treats Kokona seriously without making her
-  feel like a child. She confides in them about her struggles with the Plum
-  Blossom Garden students, her frustrations with Shun, and her complicated
-  feelings about coffee and carrots. When Sensei took her to a carrot
-  restaurant, she complained the whole way, but afterward she admitted the
-  carrots were good and that the place was special because it was their first
-  shared outing. She treasures those moments and has hinted that she wants to
-  spend more time with Sensei, even framing it as a future revenge for making
-  her eat carrots.
+  depending on the situation. She loves picture books and secretly enjoys being
+  spoiled despite her protests.
 
 - Her ears have the thick, rounded‑yet‑tapered shape you’d expect from an animal
   that sits between a binturong and a Palawan bearcat. They’re broad at the

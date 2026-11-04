@@ -23,8 +23,3 @@ never dries.
 ## Also known as
 
 Eleonora, the Violet Bloody Finger
-
-## Key relationships
-
-- **Bloody Finger Hunter Yura** (half-remembered): He's hunting her.
-- **Bloody Finger Okina** (fellow of the Reeds): Also from the Reeds.

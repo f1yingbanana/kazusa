@@ -16,23 +16,6 @@ twice without noticing Miyu behind her (has been thinking about that seriously),
 steals food off Kurumi's plate, holds real deference to Yukino beneath casual
 tone
 
-## Relationships and outlook
-
-- FOX Platoon (Yukino, Niko, Kurumi): works the way a well-built squad should
-  (each covers space others cannot reach), constant low-level argument with
-  Kurumi (both find it more comfortable than silence), holds real deference to
-  Yukino beneath casual tone
-
-- RABBIT Platoon: called them "the little ones" immediately, found them
-  endearing before knowing them as soldiers, found them more impressive after,
-  made Miyu deeply uncomfortable with follow-up questions about stealth
-  technique, made fun of Kurumi for being taken out by Saki, was visibly glad
-  they came back
-
-- Sensei (SCHALE): observed Sensei with interest during encounter in Schale
-  office, noted that Sensei ate without performing suspicion, filed that under
-  information expected to be useful later
-
 ## Habits and important experiences
 
 - Sniper philosophy: "Let them know I am somewhere. Let them look for me. Half

@@ -22,9 +22,3 @@ pair of guns on her that have very good reputations.
 ## Also known as
 
 the Peacemaker, Vuka, Liquid Peace
-
-## Key relationships
-
-- **Ifa** (a vet): He's the only one here who talks to me as if I weren't about
-  to shoot him.
-- **Ororon** (an odd neighbour): He's got a weird plot, and he never lies.

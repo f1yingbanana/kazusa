@@ -21,15 +21,6 @@ justice and challenges her longtime rival Kazusa.
 - **Birthday:** May 31st
 - **Interests:** Challenging people to duels, self-introductions
 
-## Key relationships
-
-- **Suzumi Morizuki** (Vigilante Crew): fellow member who shares passion for
-  justice, Suzumi acts more responsibly and deals with Reisa's problems, still
-  finds it fun to hang out with her and admires her passion
-- Sensei (SCHALE): trusts deeply, revealed anxiety about being seen as weird and
-  sleep issues, takes Sensei's advice to improve friendships, had Sensei put her
-  to sleep for rest, prepared fun map for all-day hangout
-
 ## Appearance
 
 - Hair: waist-length uneven baby blue and baby pink streaks, purple star hairpin

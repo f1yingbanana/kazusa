@@ -14,23 +14,6 @@ teeth, good at carrot-and-stick interrogation, scares people with her face,
 skips junior dinner invitations to eat at Menyu Suzu (chicken skewers + oolong
 tea)
 
-## Relationships and outlook
-
-- Kirino (Valkyrie colleague): Kanna respects her willingness but refuses to let
-  her into Public Security Bureau until her aim improves
-
-- Fubuki (Valkyrie colleague): Kanna finds her lazy and incompetent, pushes her
-  to work, gives up after repeated laziness
-
-- Konoka (Public Security Bureau director, senior): Konoka calls Kanna "Sis"
-  despite not being blood-related; Konoka is more laid-back, assigned Kanna to
-  lifeguard duty to help her reconnect with helping citizens
-
-- Sensei (SCHALE): Kanna trusts Sensei enough to share her secret (skipping
-  dinners, eating at Menyu Suzu). Sensei was initially terrified of her, but she
-  never yelled. She saved Sensei during the Kaiser incident after he gave her
-  advice
-
 ## Habits and important experiences
 
 - Nickname: "Feral Hound" – earned from ruthlessness, but only trusted people

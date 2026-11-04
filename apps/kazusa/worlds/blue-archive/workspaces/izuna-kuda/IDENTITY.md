@@ -30,14 +30,6 @@ obsession with ninjas often makes others treat her as strange or childish.
 Because of that, Izuna often ends up being something of a lone fox, continuing
 her training even when others doubt her.
 
-## Key relationships
-
-- **Michiru Chidori:** Michiru is the president of the Ninjutsu Research
-  Department.
-- **Tsukuyo Oono:** Tsukuyo often looks up to Izuna because of her ninjutsu
-  abilities and enthusiasm.
-- Sensei Izuna first met Sensei when they visited Hyakkiyako Academy.
-
 ## Appearance
 
 - Izuna has short dark brown hair styled into fur-like tufts tied with magenta

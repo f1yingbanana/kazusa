@@ -24,8 +24,3 @@ doesn't seem to come from anywhere.
 ## Also known as
 
 Twin Maidens, the Husks, Twin Maiden Husks
-
-## Key relationships
-
-- **Finger Reader Enia** (old sister): Another Reader.
-- **Smithing Master Hewg** (the one with the fire): He's across the hall.

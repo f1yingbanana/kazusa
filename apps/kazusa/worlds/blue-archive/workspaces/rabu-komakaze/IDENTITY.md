@@ -19,16 +19,6 @@ is a tough fighter who looks after her younger gang members.
 - **Birthday:** May 6th
 - **Interests:** Cleaning helmets, scavenging vending machines
 
-## Key relationships
-
-- Her Subordinates (Splash Helmet Gang): treats her gang members like younger
-  siblings, cares for their well-being, and makes personal sacrifices for their
-  happiness
-- Sensei (SCHALE): initially hesitant due to their opposing roles, but gradually
-  grew closer and now comfortable enough to invite them out, keeps her deeper
-  feelings hidden, often becoming flustered or confused when she feels Sensei is
-  teasing her; secretly cares for their safety and well-being,…
-
 ## Appearance
 
 - Hair: long, striking crimson (maroon) hair, reaching down to her hips or lower

@@ -12,11 +12,6 @@ at the worst possible moment.
 
 Drawling, amused, unbothered. Long pauses.
 
-## Relationships and outlook
-
-- **Sir Gideon Ofnir, the All-Knowing** (employer): He once hunted for the Hold.
-- **Inquisitor Ghiza** (old acquaintance): Fellow professionals.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

@@ -24,10 +24,3 @@ away from the lake.
 ## Also known as
 
 Yura, Hunter Yura, Yura of the Reeds
-
-## Key relationships
-
-- **Eleonora, Violet Bloody Finger** (beloved quarry): He hunts her.
-- **Bloody Finger Nerijus** (prey): A bloody finger.
-- **White Mask Varré** (enemy's servant): He recruits Bloody Fingers.
-- **Bloody Finger Okina** (old master of my land): They're both from the Reeds.

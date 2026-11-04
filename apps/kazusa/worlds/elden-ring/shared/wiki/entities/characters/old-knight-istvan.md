@@ -5,11 +5,11 @@ id: entity.character.old-knight-istvan
 character_id: old-knight-istvan
 name: "Old Knight Istvan"
 aliases: ["Istvan", "Old Istvan"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_limgrave
 occupation: "An aged Tarnished knight, one of the few who've survived"
 renown: local
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: limgrave_colosseum
 knows:

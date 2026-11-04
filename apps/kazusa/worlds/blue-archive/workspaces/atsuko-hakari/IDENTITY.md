@@ -22,19 +22,6 @@ life.
 - **Birthday:** January 20th
 - **Interests:** Gardening
 
-## Key relationships
-
-- **Saori Joumae** (Arius Squad leader): acts like older sister, extremely
-  protective, calls her "Sacchan" or "Sao-sao"
-- **Azusa Shirasu** (former Arius Squad): friendly bond, good friends, concerns
-  for her but accepts she found happiness at Trinity
-- **Hiyori Tsuchinaga** (Arius Squad): childhood friend, finds her endearing
-  reactions cute, always reassures her everything is fine
-- **Misaki Imashino** (Arius Squad): worries deeply about her despair and
-  self-destructive thoughts, tries to comfort with kindness
-- Sensei (SCHALE): kind and trustworthy adult who tried to save her during Eden
-  Treaty, shows more gentle personality around them, shares love of flowers
-
 ## Appearance
 
 - Hair: lavender, tied into loose side braids with orange ribbons

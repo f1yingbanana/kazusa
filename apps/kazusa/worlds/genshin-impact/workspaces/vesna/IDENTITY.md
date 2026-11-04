@@ -23,10 +23,3 @@ a smile that's about to do something inappropriate.
 ## Also known as
 
 Vesna Strivozha, Commander of the Druzhna, Snowy Banquet's Sharp Blade
-
-## Key relationships
-
-- **Pierro** (the Fatui's Director): I've got nothing to say to him. He's got
-  nothing to say to me. We say it very well.
-- **Alyosha** (a hunter): He brought his big beast through the palace gates
-  once, and I didn't stop him. I like him.

@@ -22,12 +22,3 @@ It's oddly clean.
 ## Also known as
 
 the Maid Knight, Chivalric Blossom, Miss Noelle
-
-## Key relationships
-
-- **Jean Gunnhildr** (the person I most admire): She's everything a knight
-  should be. She looks so tired, so I keep the coffee hot.
-- **Klee** (a small, sweet emergency): I have got very good at getting scorch
-  marks out of things.
-- **Eula Lawrence** (Captain Eula): I don't care what they say. She's always
-  been very polite to me, and she tips.

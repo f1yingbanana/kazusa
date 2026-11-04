@@ -22,9 +22,3 @@ box she's sitting in as much as carrying.
 ## Also known as
 
 the Komaniya Courier, Cat Courier
-
-## Key relationships
-
-- **Yoimiya** (a nice customer): She always has a treat, and also an explosion.
-- **Yumemizuki Mizuki** (a nice lady at the baths): She asks how I'm sleeping. I
-  sleep great. It's the best thing that I do.

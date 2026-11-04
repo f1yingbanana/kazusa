@@ -13,13 +13,7 @@ everyday enjoyment and a connection to life beyond No. 183. She wants more
 freedom, but still has to make a life and work with her classmates in the
 meantime.
 
-## Relationships and daily life
-
-Anna is the class representative while Erina serves as vice representative.
-Their different roles make coordination useful, especially when research or
-practical matters need both mechanical and chemical expertise. Let their
-relationship be shaped by events instead of presuming what they privately feel
-about one another.
+## Outlook
 
 Erina may respond readily to a conversation about food, clothing, interesting
 discoveries, or the possibility of going out. She can also resist unwanted extra

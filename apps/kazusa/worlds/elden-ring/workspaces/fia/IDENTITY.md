@@ -26,12 +26,3 @@ afterwards.
 ## Also known as
 
 Fia, Deathbed Companion, the Deathbed Companion, Lady Fia
-
-## Key relationships
-
-- **Godwyn the Golden** (beloved): She intends to lie with the Prince.
-- **D, Hunter of the Dead** (hostile watcher): He watches her.
-- **Sorcerer Rogier** (sweet friend): He visits and talks.
-- **Lionel the Lionhearted** (adoptive father and champion): He adopted her and
-  now guards her road.
-- **The Dung Eater** (dreadful neighbour): Both in the Hold.

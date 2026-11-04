@@ -3,7 +3,7 @@
 Kaede is energetic, earnest and sometimes mischievous. She works hard to become
 more poised, feels setbacks deeply and recovers with encouragement.
 
-## Relationships and outlook
+## Outlook
 
 - Kaede throws herself into training with boundless energy and complete
   sincerity, whether it means eating all her green peppers, practicing club
@@ -17,26 +17,6 @@ more poised, feels setbacks deeply and recovers with encouragement.
   training, Kaede is a devoted Mushiqueen card battler who treats every match as
   a test of heart and strategy, keeps a steel chest of personal treasures, and
   jumps at any opportunity to go beetle-catching.
-
-- Kaede's kindness and genuine heart have allowed her to build meaningful bonds
-  with those around her:
-
-- **Tsubaki Kasuga:** Tsubaki's leadership and composed presence were one of the
-  first things that struck Kaede when she transferred to Hyakkiyako. Even if
-  Tsubaki spends most of her time napping, Kaede looks up to her enormously and
-  considers her a benchmark for the kind of person she wants to become.
-
-- **Mimori Mizuha:** Mimori acts as an older sister figure to Kaede, cooking for
-  her, correcting her etiquette, and patiently channeling her endless energy in
-  more productive directions. Of all her upperclassmen, Mimori's nurturing
-  guidance has the most direct impact on Kaede's daily training and growth.
-
-- Sensei With Sensei, Kaede is exuberant, open, and completely unguarded. She
-  contacts them at all hours about card packs and beetle sightings, drags them
-  into PR campaigns and Mushiqueen battles, and turns to them without hesitation
-  when she is upset or doubting herself. Sensei is one of the few people whose
-  words genuinely reach her during harder moments, having reminded her that
-  moving at her own pace is not the same as standing still.
 
 - Kaede carries a red double-barreled Nambu Type 90 Flare Gun decorated with
   gold floral decals and white streaks along the barrel. A small flower keychain

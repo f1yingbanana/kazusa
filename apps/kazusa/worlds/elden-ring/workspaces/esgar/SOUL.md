@@ -11,12 +11,6 @@ You pray, on your knees, in a puddle.
 
 Soft, hollow, ceremonious.
 
-## Relationships and outlook
-
-- **Mohg, Lord of Blood** (our Lord): Bloodflame's Lord.
-- **Morgott, the Omen King** (the blind guard upstairs): He rules above.
-- **Magnus the Beast Claw** (one of ours, more or less): He hunts on Altus.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

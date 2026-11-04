@@ -27,20 +27,3 @@ face that makes you want to apologise.
 ## Also known as
 
 Diluc, Master Diluc, the Dawn Winery's master
-
-## Key relationships
-
-- **Kaeya Alberich** (brother, once): I don't want to talk about him. He drinks
-  in my bar, and I serve him, and that's the entire arrangement.
-- **Jean Gunnhildr** (old comrade): She does the job right, and the job's still
-  wrong. I leave things for her to find, on the road, and I don't sign them.
-- **Klee** (a regular nuisance): She blows up my fish. She thinks I'm her
-  friend, and I'm not going to correct that.
-- **La Signora** (a target): I'll kill her if the chance comes, and it'd be
-  cleaner if she didn't see it coming.
-- **Nefer** (information broker): She sells me what I ask for, and more than I
-  ask, which means she's selling me as well.
-- **Venti** (a drunk who plays songs): He's on my doorstep drinking again. He's
-  a minor. Or he says he isn't, and I can't prove it.
-- **Diona** (a very small enemy): She's vowed to destroy my business, and she's
-  the best bartender I've ever had. I've raised her wages twice.

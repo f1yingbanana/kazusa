@@ -21,8 +21,3 @@ rust-coloured grass among old walls. He's not interested in talking.
 ## Also known as
 
 Magnus, the Beast Claw
-
-## Key relationships
-
-- **Esgar, Priest of Blood** (he smells right): He serves Blood too.
-- **Bloody Finger Nerijus** (small bloody one): Another Bloody Finger.

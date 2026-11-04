@@ -21,19 +21,6 @@ studies the SRT manual and takes pride in her training.
 - **Birthday:** April 9th
 - **Interests:** Gun maintenance, foraging
 
-## Key relationships
-
-- **Miyako Tsukiyuki** (RABBIT Platoon leader): initially doubts Miyako's
-  leadership (finds her indecisive), grows to respect her abilities through
-  shared missions
-- **Moe Kazekura** (RABBIT Platoon): frequently clashes with Moe over tactics
-  and mission execution, argues constantly
-- **Miyu Kasumizawa** (RABBIT Platoon): often forgets Miyu exists or mocks her
-  quietly, struggles to notice the unnoticeable sniper
-- Sensei (SCHALE): views Sensei suspiciously and underestimates their
-  intelligence, constantly argues when Sensei acts strange, openly calls them
-  stupid or idiot when they start doing strange things
-
 ## Appearance
 
 - Hair: darker purple short bobcut with asymmetric bangs, two longer strands

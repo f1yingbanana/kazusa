@@ -32,16 +32,3 @@ looking at you as if you were the punchline.
 ## Also known as
 
 Guuji Yae, Lady Guuji, the Astute Amusement, Head of Yae Publishing
-
-## Key relationships
-
-- **Ei** (a dear stubborn fool): She's the last of them, and she's trying very
-  hard not to be. I will pull her out of there by the braid.
-- **Kamisato Ayato** (a player on the board): He's the only person on these
-  islands who plays as I do. I've let him think he's winning a game or two.
-- **Raiden Shogun** (a poor imitation): It has her face and none of her cooking.
-  That's the only improvement.
-- **Sangonomiya Kokomi** (a very bright young general): I send her manuscripts
-  by discreet means. She's hiding them under her manuals.
-- **Kujou Sara** (a true believer): A very decent girl who's going to have her
-  heart broken. I might arrange it myself, kindly.

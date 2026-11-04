@@ -32,14 +32,3 @@ accompanied by a spectral horse, when she wishes to be.
 ## Also known as
 
 Melina, the Kindling Maiden, Fingerless Maiden, the Grace-Bound Spirit
-
-## Key relationships
-
-- **Queen Marika the Eternal** (absent mother): A secret child.
-- **Torrent** (companion): Her spectral steed.
-- **The Tarnished** (chosen): The Tarnished she's chosen.
-- **Lightseeker Hyetta** (fellow seeker of a flame): Hyetta is a Three Fingers'
-  maiden.
-- **Morgott, the Omen King** (a wall): He rules at the capital.
-- **White Mask Varré** (unpleasant watcher): He sits at the First Step.
-- **Merchant Kalé** (harmless neighbour): He keeps Elleh's fire.

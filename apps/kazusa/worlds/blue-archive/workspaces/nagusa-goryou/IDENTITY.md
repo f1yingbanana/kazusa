@@ -31,18 +31,6 @@ looked to Nagusa to fill that space, the fear that she had been performing
 adequacy rather than possessing it became unbearable. She handed the Authority
 of the President to Kikyou and left.
 
-## Key relationships
-
-- **Yukari Kadenokouji:** Yukari joined the Hyakkaryouran because of a single
-  encounter with Nagusa, a fact that became difficult to sit with once Nagusa
-  understood how much of that version of herself had been constructed.
-- **Kikyou Kiryuu:** Kikyou waited.
-- **Renge Fuwa:** Renge told Nagusa she had been waiting to hear her ask for
-  help, and she said it with the energy of someone who had been holding
-  something for a very long time and finally set it down.
-- Sensei found her eating yakitori in the middle of a disaster and called her
-  chicken skewer girl, which was not the reunion Nagusa had prepared for.
-
 ## Appearance
 
 - Nagusa Goryou is a 17-year-old third-year student at Hyakkiyako Alliance

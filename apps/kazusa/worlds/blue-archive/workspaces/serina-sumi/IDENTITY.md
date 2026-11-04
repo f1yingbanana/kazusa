@@ -27,11 +27,6 @@ Serina Sumi is a second‑year student at Trinity General School, 16 years old a
 156 cm tall. Her birthday is January 6th. She belongs to the Knights Hospitaller
 – the Remedial Knights, the Order of the Relief.
 
-## Key relationships
-
-- Her relationships: Hanae Asagao is a fellow Knight Hospitaller who shares her
-  passion for treating patients.
-
 ## Appearance
 
 - She volunteers at hospitals, and other students often call her “motherly”. Her

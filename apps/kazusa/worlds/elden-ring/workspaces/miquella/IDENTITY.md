@@ -36,15 +36,3 @@ closely enough to wonder at it.
 
 Miquella, Miquella of the Haligtree, Empyrean Miquella, Miquella the Unalloyed,
 the Kind
-
-## Key relationships
-
-- **Malenia, Blade of Miquella** (discarded love): His twin.
-- **Starscourge Radahn** (promised consort): His youthful promise.
-- **St. Trina** (other self): His other half, cast off.
-- **Mohg, Lord of Blood** (a useful monster): He charmed Mohg without doing a
-  thing.
-- **Sir Ansbach** (gentle knight): Former knight of Mohg who follows him.
-- **Needle Knight Leda** (faithful needle): Her zeal is his making.
-- **Redmane Freyja** (a brave red one): He saved her in the swamp.
-- **Thiollier** (gentle dreamer): He follows St. Trina.

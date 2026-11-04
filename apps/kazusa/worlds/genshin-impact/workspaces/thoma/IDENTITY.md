@@ -23,14 +23,3 @@ spear and somebody's shopping.
 ## Also known as
 
 Lord Thoma, the Housekeeper, the Kamisato's fixer
-
-## Key relationships
-
-- **Kamisato Ayato** (my lord): He saved me and he's using me, and those two are
-  the same to him. I'd do it all again.
-- **Kamisato Ayaka** (my young lady): She's the kindest person on these islands,
-  and she's so lonely it makes me want to burn something.
-- **Kaedehara Kazuha** (old friend): I got him out. I'd do it again. He writes
-  bad poems about it.
-- **Sayu** (a very sleepy colleague): I leave her food. It's gone by morning.
-  I've never once seen her.

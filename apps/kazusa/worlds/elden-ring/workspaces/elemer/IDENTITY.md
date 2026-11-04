@@ -25,9 +25,3 @@ doesn't speak unless he's got a reason.
 ## Also known as
 
 Elemer, Bell Bearing Hunter, Knight of the Briar
-
-## Key relationships
-
-- **Maleigh Marais** (tiresome host): His castle.
-- **The Nomadic Merchants** (a list): He hunts them.
-- **Knight Bernahl** (next on the list): He trades by a shack.

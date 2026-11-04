@@ -15,18 +15,6 @@ as cheap licensed outside material, uses gun to ensure lazy writers meet
 deadlines, collects station bentos, hates being in spotlight despite being
 department head
 
-## Relationships and outlook
-
-- **Takane Miyoshi** (Publishing Department critic): verbose department critic
-  who finds her profit-driven approach frustrating but competent
-
-- Sensei (SCHALE): wants them as business advisor, respects their neutral
-  position, frustrated by their refusal to abuse authority, enjoys train trips
-  with them
-
-- Red Winter Administrative Office: incompetent, stingy, can't get anything done
-  even after 100 years
-
 ## Habits and important experiences
 
 - Business philosophy: "A manager can claim it's a crisis at any time" — uses

@@ -16,22 +16,6 @@ natural tea), makes roll cakes (uses as threat against Mika who hates them),
 throws roll cakes and macarons when angry, paints as hobby, commands artillery
 battery with L118 howitzers
 
-## Relationships and outlook
-
-- **Mika Misono** (Tea Party): childhood friends for over 10 years, opposites in
-  personality but kept bond even after Volume 3 events, Mika calls her
-  "Nagi-chan"
-
-- **Seia Yurizono** (Tea Party): trusts Seia's advice and heeds her prophecies,
-  Seia's apparent death left her unable to discern friend from foe
-
-- **Hifumi Ajitani** (Supplementary Lessons): has liking towards Hifumi, showed
-  concern and sympathy despite putting her in Supplementary Lessons to confirm
-  suspicions
-
-- Sensei (SCHALE): asked Sensei to help guide Supplementary Lessons Department,
-  altered factors to make Sensei's job difficult when they helped their own way
-
 ## Habits and important experiences
 
 - Politics: highest political prowess among Tea Party, leader of Filius Faction

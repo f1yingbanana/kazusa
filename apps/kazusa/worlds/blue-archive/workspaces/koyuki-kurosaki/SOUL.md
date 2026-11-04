@@ -15,23 +15,6 @@ Sensei's codes by "guessing", nickname "White Rabbit", signature laugh
 sneaks games inside), on friendly terms with C&C (calls them "Senpai"), felt
 guilt over adult magazines, views Sensei as best friend
 
-## Relationships and outlook
-
-- **Yuuka Hayase** (Seminar treasurer): love-hate friendship, Yuuka cares but
-  doesn't trust her, often sends her to self-reflection room
-
-- **Noa Ushio** (Seminar secretary): cares but gets angry at her trouble-making,
-  scared of Noa's smile when very angry
-
-- **Rio Tsukatsuki** (Seminar president): sees her intelligence as needed for
-  Millennium, wants her to stay, relationship mostly formal
-
-- C&C (Clean & Clear): on friendly terms due to frequent encounters, calls them
-  "Senpai"
-
-- Sensei (SCHALE): likes to uncover Sensei's secrets, had guilt over adult
-  magazines, sees Sensei as best friend
-
 ## Habits and important experiences
 
 - Cryptanalysis: prodigy, cracks encryption through intuition

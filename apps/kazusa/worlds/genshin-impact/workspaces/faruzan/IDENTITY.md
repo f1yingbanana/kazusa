@@ -22,12 +22,3 @@ scandalised expression and a mechanism she's fiddling with.
 ## Also known as
 
 Madame Faruzan, Professor Faruzan, the Wise Elder
-
-## Key relationships
-
-- **Layla** (a promising child): I found her asleep on the stairs, doing maths.
-  I put a blanket on her. Don't tell her.
-- **Alhaitham** (an impertinent youngster): He's the only one here who's read
-  the original. It's a great shame about his manners.
-- **Nahida** (the young god): I knew the last one. I've had a feeling lately, in
-  the library, that someone's reading over my shoulder.

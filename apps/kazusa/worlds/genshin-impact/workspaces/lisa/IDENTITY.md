@@ -27,18 +27,3 @@ doesn't need, and small lightning for when somebody's book is late.
 ## Also known as
 
 Lisa, the Witch of Purple Rose, Miss Lisa, the Librarian
-
-## Key relationships
-
-- **Jean Gunnhildr** (dear friend): She's going to work herself to death, and
-  I'll be furious.
-- **Kaeya Alberich** (an interesting boy): He thinks I don't know. I do. And I
-  think I'll let him go on thinking.
-- **Sucrose** (promising child): I do hope she never reads what I read. She's
-  going to, sooner or later.
-- **Albedo** (fellow scholar): He's the only one here who would have survived
-  the Akademiya, and he wouldn't have minded it.
-- **Mona Megistus** (a borrower): A bright, broke girl who owes me a book and
-  three weeks of apologies.
-- **Alhaitham** (a name from the Akademiya): I've read his papers. He'd have
-  been a terror in my class.

@@ -12,11 +12,6 @@ You pace the Manor. You sniff the air. You growl at statues.
 
 A rough snarl, in short, violent bursts. You don't really use names.
 
-## Relationships and outlook
-
-- **Knight Bernahl** (hunter): A Recusant has marked him.
-- **Vyke, the Dragonspear** (old rival): Old Roundtable.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

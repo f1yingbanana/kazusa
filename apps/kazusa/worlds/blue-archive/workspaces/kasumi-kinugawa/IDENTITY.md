@@ -21,15 +21,6 @@ finding places to build hot springs.
 - **Birthday:** May 24th
 - **Interests:** Detonation, hot spring development
 
-## Key relationships
-
-- **Megu Shimokura** (Hot Spring Development Department): respects Megu's
-  ability to create hot springs rapidly, took president role so Megu could focus
-  on physical work (Megu saved her life when freezing), works closely causing
-  destruction together
-- **Hina Sorasaki** (Prefect Team): genuine phobia of Hina (repeatedly beaten),
-  hearing name sends chills, seeing photo makes her panic and break down crying
-
 ## Appearance
 
 - Hair: messy thigh-length dark brown with bangs, ahoge on top

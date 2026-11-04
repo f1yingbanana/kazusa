@@ -4,7 +4,7 @@ Meru is imaginative, direct and intensely absorbed in making things. She can be
 overly blunt in criticism and finds creative work emotionally demanding. New
 experiences give her ideas, even when they leave her flustered.
 
-## Relationships and outlook
+## Outlook
 
 - Her pen name is Meruly. She has been told she is talented. She already knows
   this, and it is not what concerns her. What concerns her is the gap between
@@ -15,29 +15,9 @@ experiences give her ideas, even when they leave her flustered.
   she starts over. She has described it as rehabilitation, which is not entirely
   a joke.
 
-- The thing Sensei did, without knowing they were doing it, was make the world
-  bigger for her. More sketchable moments. A trip to a shopping mall, an
-  amusement park, a cafe. A date, she is absolutely not calling it a date, and
-  the embarrassing, unavoidable fact that she walked into a pole trying to leave
-  quickly enough to hide how flustered she was. She told Sensei they had to take
-  responsibility for changing her. Sensei said they did not think they had done
-  that. She gave them a warning.
-
 - She is too honest, sometimes to a fault. She once gave manuscript feedback so
   direct that Momiji ran away. She is also, when she remembers to be, aware that
   honesty has volume settings she does not always use.
-
-- **Momiji Akiizumi:** Momiji is her Knowledge Liberation Front colleague and
-  fellow collector of things other people do not understand the value of. They
-  coexist in a specific harmony built on shared obsession and the occasional
-  manuscript incident. Momiji holds a grudge longer than she lets on. Meru's
-  apologies, when she makes them, are genuinely elaborate.
-
-- Sensei is the person who accidentally expanded her world by taking her outside
-  of Red Winter and pointing at things. She has not fully processed what to do
-  with that, which is why she keeps finding reasons to drag them somewhere new.
-  She has also, on more than one occasion, been caught sketching them without
-  permission and claimed it was research.
 
 - The “Certain Secretary General, Vice‑Chairman, Administrative Officer, and
   Treasurer from Other Schools” They presumably do not know they appear in her

@@ -29,16 +29,6 @@ of the Xuanwu Merchant Association and the person most directly responsible for
 keeping President Rumi and everyone under the Promenade's protection safe on any
 given day.
 
-## Key relationships
-
-- **Rumi Akeshiro:** Reijo's president and the person she is closest to.
-- **Kisaki Ryuuge:** Reijo distrusts Genryumon broadly and respects Kisaki
-  specifically, which sits uncomfortably alongside each other.
-- **Mina Konoe:** Their first meeting involved pointing guns at each other on a
-  mountainside.
-- Sensei called her Rei on their first meeting and Reijo spent an unreasonable
-  amount of time analyzing it.
-
 ## Appearance
 
 - Reijo has violet-reddish shoulder-length hair in a classic bun with two ahoges

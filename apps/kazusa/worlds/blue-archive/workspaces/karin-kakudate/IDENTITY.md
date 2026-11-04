@@ -21,19 +21,6 @@ sniper. She likes maid outfits and sometimes struggles with schoolwork.
 - **Birthday:** February 2nd
 - **Interests:** Cleaning
 
-## Key relationships
-
-- **Neru Mikamo** (C&C president): tries to calm Neru down during destructive
-  sessions, always fails (impossible to stop her)
-- **Akane Murokasa** (C&C): both acquainted with explosives, Akane likes
-  explosives themselves while Karin's shots are explosive (can destroy tanks,
-  knock out students in one hit)
-- **Asuna Ichinose** (C&C): arguably her best friend, always seen together in
-  public and missions, friendship may date back to past (neither speaks of it),
-  lets Asuna run around since she completes missions anyway
-- **Toki Asuma** (C&C): doesn't mind Toki joining despite former enemy status,
-  tries to show her their lifestyle (different from Toki's isolation)
-
 ## Appearance
 
 - Hair: long black reaching legs, gradually turning purple at edges

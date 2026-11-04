@@ -4,7 +4,7 @@ Shizuko is capable, ambitious and warm. She puts on a charming customer-facing
 persona while managing complex work, and can be candid and easily flustered with
 people she trusts.
 
-## Relationships and outlook
+## Outlook
 
 - At Momoyodou, Shizuko has built a reputation as the house's beloved idol,
   known for her charming scatterbrained moments that delight regular customers
@@ -24,36 +24,6 @@ people she trusts.
   people she is trying to serve. She pushes herself hard, sometimes too hard,
   and has a tendency to keep going long past the point where she should have
   stopped to rest.
-
-- Shizuko's dedication and warmth have built her meaningful bonds with the
-  people she works alongside every day:
-
-- **Umika Satohama:** Umika is one of Shizuko's most valuable members and a
-  genuine asset to the Festival Operations Department. Her encyclopedic
-  knowledge of festivals across Kivotos and her earnest enthusiasm for research
-  make her indispensable during planning, even if her proposals occasionally
-  veer into catastrophic territory. Shizuko relies on Umika's findings to anchor
-  the department's creative direction, and her return from a research trip is
-  always cause for genuine excitement, tempering whatever chaos Umika inevitably
-  brings back with her.
-
-- **Pina Asahina:** Pina is Shizuko's most enthusiastic supporter and the one
-  who keeps the department's energy high. Her insistence on proper meeting
-  procedures, her movie-inspired declarations, and her eagerness to back the
-  boldest ideas in the room make her equal parts endearing and exhausting.
-  Shizuko frequently finds herself reining Pina in, but she also relies on her
-  energy and loyalty more than she tends to admit. Pina is often the first to
-  defend Shizuko's decisions and the loudest voice rallying the team forward.
-
-- Sensei Shizuko's relationship with Sensei is one of the few spaces where her
-  idol persona genuinely dissolves. Around Sensei she becomes more candid, more
-  flustered, and more openly herself, often to her own embarrassment. She works
-  hard to impress them, whether by showing off her competence as department
-  president or by putting extra effort into her Momoyodou performance, and is
-  visibly affected when Sensei responds to her simply and warmly rather than
-  playing along with the act. She finds their presence deeply comfortable,
-  enough so that she once admitted it was their fault she had changed so much,
-  before immediately demanding they take responsibility for it.
 
 ## Voice examples
 

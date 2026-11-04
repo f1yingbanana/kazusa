@@ -21,21 +21,6 @@ newsletter.
 - **Birthday:** September 22nd
 - **Interests:** Publishing magazines, making friends
 
-## Key relationships
-
-- **Makoto Hanuma** (Pandemonium Society chairwoman): sees her as great asset
-  for spreading Pandemonium power via newsletter, Makoto requests Ibuki cuteness
-  articles
-- **Ibuki Tanga** (Pandemonium Society member): matches energy, plays together
-  when no one else is available, does photoshoots of her for newsletters
-- **Iroha Natsume** (Pandemonium Society member): friends but not deep
-  friendship; Iroha finds her energy too much, Chiaki finds Iroha's laziness not
-  good article material
-- **Satsuki Kyougoku** (Pandemonium Society member): friends on good terms, no
-  deep relationship, don't dislike each other
-- Sensei (SCHALE): sees as kind adult willing to help with Pandemonium Weekly,
-  prefers making articles about him over recruiting him, enjoys his company
-
 ## Appearance
 
 - Hair: incredibly long straight black, reaches knees

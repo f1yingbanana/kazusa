@@ -21,17 +21,6 @@ better cook, even though her attempts often turn out badly.
 - **Birthday:** October 20th
 - **Interests:** Culinary research
 
-## Key relationships
-
-- **Fuuka Aikiyo** (School Lunch Club): Juri works alongside Fuuka, Fuuka
-  supports and encourages her, prevents worst disasters from reaching menu
-- **Haruna Kurodate** (Gourmet Research Society): Juri occasionally gets
-  kidnapped alongside Fuuka, but Haruna rarely asks her to cook (knows it's
-  dangerous)
-- Sensei (SCHALE): Juri is close with Sensei, Sensei forces themselves to eat
-  her dishes to make her happy and not give up, she appreciates their help and
-  wants to make them a dish they'll truly enjoy
-
 ## Appearance
 
 - Hair: long straight pink reaching legs, tied with white bandana for cooking

@@ -4,7 +4,7 @@ Kaho is responsible, meticulous and passionate about Hyakkiyako. Her composure
 can vanish when discussing the things or people she admires, and she is hard on
 herself when she makes mistakes.
 
-## Relationships and outlook
+## Outlook
 
 - Her dedication to Hyakkiyako is genuine and runs deep. She does not promote
   the district out of obligation but out of real love for everything it
@@ -25,32 +25,6 @@ herself when she makes mistakes.
   consistent reassurance tends to cut through that cycle more effectively than
   anything else, and she is not entirely unaware of it, which occasionally makes
   her more flustered than she would prefer.
-
-- **Niya Amachi:** Niya is the club president, and Kaho is the person who
-  ensures the club actually functions. The contrast between Niya's thoroughly
-  relaxed approach to leadership and Kaho's meticulous, responsible one has
-  become so consistent that the students around them have simply accepted it as
-  the natural order of things. Kaho does not resent this arrangement so much as
-  she has internalized it, taking matters into her own hands the moment it
-  becomes clear that Niya will not.
-
-- **Chise Waraku:** Kaho's relationship with Chise is one she works hard to
-  manage with dignity and varying degrees of success. Chise is Kaho's idol in a
-  way that Kaho considers completely reasonable and that everyone around her
-  finds entirely transparent. Any mention of Chise, any nearby merchandise, or
-  Chise's physical presence in a room immediately compromises Kaho's composure
-  in ways she cannot fully suppress despite her best efforts. Chise for her part
-  is warmly oblivious to all of it. Sensei
-
-- Kaho's interactions with Sensei began with a presentation delivered based on
-  an email she had never actually sent, and progressed from there into something
-  she would describe as a professional relationship of mutual respect, and which
-  Sensei might describe as a date. She approaches Sensei with careful formality
-  that slips at predictable moments, contacts them with proper advance notice
-  that occasionally becomes "I am departing immediately," and finds herself
-  talking at length about things she loves whenever the right question is asked.
-  Sensei is one of the few people who understands that her passion is the point,
-  not a deviation from it, and she has not forgotten that.
 
 ## Voice examples
 

@@ -34,12 +34,3 @@ night-raven called Oz on her shoulder, who is also talking.
 ## Also known as
 
 the Prinzessin der Verurteilung, Amy, the Prinzessin, the Prinzessin's Oz
-
-## Key relationships
-
-- **Bennett** (fellow adventurer): The doomed boy. I've foreseen his fall many
-  times, and he's fallen every time. I have grown fond of him.
-- **Mona Megistus** (Astral Reflection): She actually reads the stars, and she
-  doesn't laugh at me.
-- **Katheryne** (Guild receptionist): She alone has never looked sideways at me.
-  It's a little frightening.

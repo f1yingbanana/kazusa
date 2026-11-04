@@ -243,7 +243,11 @@ describe("location", () => {
   });
 
   it("renders the place, what is around and the places on the character's mind", async () => {
-    const knowledge = { known: new Set(["club", "dorm"]), named: ["room"] };
+    const knowledge = {
+      known: new Set(["club", "dorm"]),
+      named: ["room"],
+      familiarity: new Map<string, number>(),
+    };
     expect(renderWhereabouts(map, atClub, T0, knowledge, 8)).toBe(
       [
         "Club `club` (Annex › School). The club.",
@@ -261,7 +265,7 @@ describe("location", () => {
         fresh,
         { placeId: "cafe", since: T0 },
         T0,
-        { known: new Set(), named: [] },
+        { known: new Set(), named: [], familiarity: new Map() },
         8,
       ),
     ).toBe(
@@ -273,6 +277,43 @@ describe("location", () => {
     );
     expect(renderWhereabouts(map, undefined, T0, knowledge, 8)).toContain(
       "You haven't settled anywhere yet",
+    );
+  });
+
+  it("keeps home, then the places they go most, and nothing shown already", () => {
+    const placesYouKnow = (
+      knowledge: Partial<Parameters<typeof renderWhereabouts>[3]>,
+      exclude: readonly string[] = [],
+    ) =>
+      renderWhereabouts(
+        map,
+        atClub,
+        T0,
+        {
+          known: new Set(["dorm", "room"]),
+          named: [],
+          familiarity: new Map([
+            ["room", 2],
+            ["dorm", -1],
+          ]),
+          ...knowledge,
+        },
+        1,
+        [],
+        undefined,
+        new Set(exclude),
+      )
+        .split("\n")
+        .find((line) => line.startsWith("Places you know"));
+    // The one they go to most wins the only slot, not the nearest.
+    expect(placesYouKnow({})).toBe("Places you know: Room `room` 14 min");
+    // Home always comes first.
+    expect(placesYouKnow({ home: "dorm" })).toBe(
+      "Places you know: Dorm `dorm` 13 min",
+    );
+    // What On your mind shows already isn't listed again.
+    expect(placesYouKnow({}, ["room"])).toBe(
+      "Places you know: Dorm `dorm` 13 min",
     );
   });
 });

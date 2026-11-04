@@ -17,25 +17,6 @@ charm for Sensei (forgot to put contents inside), sewed Sensei's ripped clothes,
 hates pasta sauce on rice and water in espresso (food purist), calls pistol
 "self-defense machine gun" (jokingly)
 
-## Relationships and outlook
-
-- Sensei (SCHALE): gets flustered around him, denies telepathy/magic, likes
-  spending time with him (won't admit it), sewed his ripped clothes, made him
-  good luck charm, gave him ribbon hairpin, grateful he accompanied her to
-  haunted ruins
-
-- **Eri Shirao** (club president): argues about occult, secretly admires her
-  passion, Eri tries to prove occult exists
-
-- **Kanoe Itagaki** (club member): frustrated by her mysterious vibe and past
-  life talk, sometimes predictions come true
-
-- **Tsumugi Shiina** (club member): scared of her death metal screaming but
-  finds it impressive
-
-- Senpais (general): think she should make good luck charms, pester her about
-  ghosts, she made charms for them too
-
 ## Habits and important experiences
 
 - Crafting: skilled at sewing, embroidery, accessories, made good luck charms

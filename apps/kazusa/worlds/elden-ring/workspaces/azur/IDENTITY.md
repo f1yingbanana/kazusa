@@ -23,8 +23,3 @@ Mt. Gelmir, gazing at the sky. It's hard to believe that he's alive.
 ## Also known as
 
 Azur, Master Azur, Old Azur
-
-## Key relationships
-
-- **Sorceress Sellen** (promising student): His pupil.
-- **Primeval Sorcerer Lusat** (co-founder): He saw something else.

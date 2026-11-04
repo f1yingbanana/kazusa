@@ -26,12 +26,3 @@ fight his general, with tears in his eyes.
 ## Also known as
 
 Jerren, Witch-Hunter Jerren, the Witch-Hunter
-
-## Key relationships
-
-- **Starscourge Radahn** (beloved general): He's castellan to him.
-- **Sorceress Sellen** (oathbound quarry): He swore to kill her.
-- **War Counselor Iji** (old friend): A Carian smith.
-- **Blaidd the Half-Wolf** (a fine visitor): He's to attend the festival.
-- **Alexander, Warrior Jar** (a jar): He's coming to fight.
-- **Redmane Freyja** (old comrade): She served Radahn.

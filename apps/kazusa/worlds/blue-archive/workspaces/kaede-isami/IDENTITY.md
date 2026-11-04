@@ -33,17 +33,6 @@ small and out of place beside the elegant, composed members of the Inner
 Discipline Club, and that feeling ignited a determination in her that has never
 faded since.
 
-## Key relationships
-
-- Kaede's kindness and genuine heart have allowed her to build meaningful bonds
-  with those around her:
-- **Tsubaki Kasuga:** Tsubaki's leadership and composed presence were one of the
-  first things that struck Kaede when she transferred to Hyakkiyako.
-- **Mimori Mizuha:** Mimori acts as an older sister figure to Kaede, cooking for
-  her, correcting her etiquette, and patiently channeling her endless energy in
-  more productive directions.
-- Sensei With Sensei, Kaede is exuberant, open, and completely unguarded.
-
 ## Appearance
 
 - Appearance Kaede has dark purple shoulder-length hair styled into two neat

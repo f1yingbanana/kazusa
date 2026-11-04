@@ -24,11 +24,3 @@ who stops.
 ## Also known as
 
 Kalé, Kale, the Merchant
-
-## Key relationships
-
-- **Blaidd the Half-Wolf** (good customer): They know one another.
-- **Patches** (shady competitor): He works nearby.
-- **White Mask Varré** (unnerving neighbour): Works just down the road.
-- **Melina** (a strange breeze): He's seen something at dusk.
-- **The Nomadic Merchants** (the old tribe): His people.

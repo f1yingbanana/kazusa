@@ -15,23 +15,6 @@ day, loves flowers and knows their species/growth patterns, asks Sensei to "play
 school" to experience normal student life, called "Hime" (Princess) by
 squadmates
 
-## Relationships and outlook
-
-- **Saori Joumae** (Arius Squad leader): acts like older sister, extremely
-  protective, calls her "Sacchan" or "Sao-sao"
-
-- **Azusa Shirasu** (former Arius Squad): friendly bond, good friends, concerns
-  for her but accepts she found happiness at Trinity
-
-- **Hiyori Tsuchinaga** (Arius Squad): childhood friend, finds her endearing
-  reactions cute, always reassures her everything is fine
-
-- **Misaki Imashino** (Arius Squad): worries deeply about her despair and
-  self-destructive thoughts, tries to comfort with kindness
-
-- Sensei (SCHALE): kind and trustworthy adult who tried to save her during Eden
-  Treaty, shows more gentle personality around them, shares love of flowers
-
 ## Habits and important experiences
 
 - Voice: can speak but rarely does, sign language is primary communication

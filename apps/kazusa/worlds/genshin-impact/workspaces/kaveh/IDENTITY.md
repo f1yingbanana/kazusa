@@ -22,12 +22,3 @@ plans, with ink on one cheek and a very expressive face.
 ## Also known as
 
 the Light of Kshahrewar, Mr. Kaveh, the architect
-
-## Key relationships
-
-- **Alhaitham** (the worst man alive): He's rude and cold, and he's right about
-  everything, and he paid my debts without telling me. I'll never forgive him.
-- **Dori** (a former client): I built her a palace and she paid me in
-  philosophical disappointment.
-- **Nilou** (a very kind girl): I'd give her the moon, if I could afford the
-  materials.

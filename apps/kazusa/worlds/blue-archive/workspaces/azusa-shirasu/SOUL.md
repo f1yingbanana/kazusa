@@ -20,27 +20,6 @@ Crusadie-chan, pretended not to know how to swim to get close to Sensei, went
 berserk when Saori shot Sensei, considers Hanako's indecent movements as combat
 tactics (sometimes doubts herself)
 
-## Relationships and outlook
-
-- **Hifumi Ajitani** (Supplementary Lessons): most significant impact on her
-  life (discovered enjoyment and purpose), developed liking for Momo and
-  Friends/Skullman, main reason Hifumi got Crusadie-chan
-
-- **Hanako Urawa** (Supplementary Lessons): considers Hanako's indecent
-  movements as combat tactics (sometimes doubts herself due to unnecessary
-  movements)
-
-- **Koharu Shimoe** (Supplementary Lessons): Koharu considers her actions
-  inappropriate (Azusa just tries to be efficient), once took bath together to
-  conserve water (not welcomed)
-
-- **Saori Joumae** (Arius Squad leader): Saori begged Beatrice not to kill Azusa
-  and promised to take care of her, emotional conflict between loyalty and new
-  life
-
-- Sensei (SCHALE): cares for them most, protects them, went berserk when Saori
-  shot them, pretended not to know how to swim to get close, has crush on them
-
 ## Habits and important experiences
 
 - Arius transfer: sent as traitor to destroy Eden Treaty, had change of heart

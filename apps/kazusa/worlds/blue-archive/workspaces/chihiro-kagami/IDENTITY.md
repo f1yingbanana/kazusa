@@ -22,21 +22,6 @@ in check.
 - **Birthday:** April 26th
 - **Interests:** Shopping for electronics
 
-## Key relationships
-
-- **Maki Konuri** (Veritas): Maki causes most trouble (brings up ideas others
-  can't do), gives Chihiro more work
-- **Kotama Otose** (Veritas): Kotama's wiretapping is ethically wrong, Chihiro
-  lectures her and others
-- **Hare Omagari** (Veritas): Hare tags along for shenanigans because beneficial
-  to inventions, Chihiro lectures her anyway
-- **Himari Akeboshi** (former Veritas president): closest to Himari (with Eimi),
-  Himari moved to Paranormal Affairs, Chihiro took over as president, called
-  "Chii-chan"
-- Sensei (SCHALE): kind and trustworthy adult, reveals her reckless plans to
-  them (when still benefiting people), can act harshly to Sensei about poor
-  security practices, shares late night coffee together
-
 ## Appearance
 
 - Hair: short neck-length black, side-swept bangs on right side, some strands

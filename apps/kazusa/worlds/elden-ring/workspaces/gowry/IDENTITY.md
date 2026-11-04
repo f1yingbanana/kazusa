@@ -25,9 +25,3 @@ something to eat.
 ## Also known as
 
 Gowry, Great Sage Gowry, Old Gowry
-
-## Key relationships
-
-- **Millicent** (adopted daughter): He raised her.
-- **Malenia, Blade of Miquella** (goddess): He worships her.
-- **Commander O'Neil** (old man in the swamp): He's holding a needle.

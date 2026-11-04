@@ -18,20 +18,6 @@ falls too low (doesn't intend harm, just doesn't consider consequences), gets
 scolded by Sensei for dangerous inventions, introverted but Utaha forces her on
 stage (embarrasses her), watches fireworks at festivals
 
-## Relationships and outlook
-
-- **Utaha Shiraishi** (Engineering Department head): looks up to her as senior,
-  Utaha forces her to do embarrassing things (showing herself in front of
-  people, standing on stage for new inventions)
-
-- **Kotori Toyomi** (Engineering Department): shares passion for inventing,
-  Kotori is extroverted when talking to crowds (embarrasses Hibiki)
-
-- Sensei (SCHALE): gave Sensei dangerous gifts (typing machine that explodes if
-  speed too low), almost killed them unintentionally, gets scolded, doesn't
-  intend harm just doesn't consider consequences, wants Sensei to watch
-  fireworks with her
-
 ## Habits and important experiences
 
 - Border collie: floppy ears, black tail with white tip

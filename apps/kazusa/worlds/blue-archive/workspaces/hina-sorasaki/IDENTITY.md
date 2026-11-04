@@ -27,15 +27,6 @@ duties.
 - Reputation: Feared as one of strongest students in Kivotos; pillar of Prefect
   Team
 
-## Key relationships
-
-- **Ako Amau** (Prefect Team deputy): devoted assistant, handles paperwork,
-  sometimes overprotective
-- **Iori Shiromi** (Prefect Team member): frontline enforcer, impulsive, loyal
-- **Chinatsu Hinomiya** (Prefect Team member): logistics support, rational
-- **Hoshino Takanashi** (Abydos): mutual respect; Hina monitored her in the
-  past, views her as mentally stronger
-
 ## Appearance
 
 - Hair: knee-length, wavy, white, tied with black and red ribbon

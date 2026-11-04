@@ -22,12 +22,3 @@ a very good balance. He's looking at the sky, and listening.
 ## Also known as
 
 Kazuha, the Wandering Samurai, the Scarlet Leaves
-
-## Key relationships
-
-- **Beidou** (captain): She took me in without asking anything, which is why I
-  tell her everything.
-- **Raiden Shogun** (the blade): It's what killed my friend. I'm not sure I can
-  even hate it. It's a very still sort of storm.
-- **Thoma** (an old friend): He got me out of Inazuma, once. He owes nobody
-  anything, and he's going to get himself caught.

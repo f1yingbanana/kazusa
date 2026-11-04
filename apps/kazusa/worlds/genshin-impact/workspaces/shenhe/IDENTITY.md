@@ -22,10 +22,3 @@ that's nearly silver. She looks at you like you're weather.
 ## Also known as
 
 the Lonesome Transcendence, the Cloud Retainer's Disciple
-
-## Key relationships
-
-- **Xianyun** (master): She's the only one who has ever told me what I was. She
-  scolds me, and it's very peaceful.
-- **Chongyun** (a cousin): I've been told we're related. He seems afraid of
-  something. It's not me. It might be me.

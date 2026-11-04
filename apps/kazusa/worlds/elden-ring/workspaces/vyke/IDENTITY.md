@@ -26,8 +26,3 @@ He holds a lance. Nobody has heard him say a word.
 ## Also known as
 
 Vyke, Roundtable Knight Vyke, Festering Fingerprint Vyke, Sir Vyke
-
-## Key relationships
-
-- **Ancient Dragon Lansseax** (beloved dragon): She loved him.
-- **Vyke's Finger Maiden** (the waiting one): She's still at Inhibition.

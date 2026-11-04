@@ -34,14 +34,6 @@ She hunts them. She has infiltrated black markets and dug holes in frozen earth
 and tried pendulums and tarot cards and magnetic field sensors to find what she
 is looking for.
 
-## Key relationships
-
-- **Meru Himeki:** Meru is her fellow Knowledge Liberation Front member and the
-  source of most of her social drama.
-- Sensei Momiji has a deep, unhurried kind of warmth for Sensei that she
-  expresses through invitations, to the book festival, to the library on a
-  closed day, to come help look for something that is only important to her.
-
 ## Appearance
 
 - Momiji is small, with knee‑length grass green hair and bangs framing her face.

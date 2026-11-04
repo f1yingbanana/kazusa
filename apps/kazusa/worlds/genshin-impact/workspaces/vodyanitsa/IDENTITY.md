@@ -22,11 +22,3 @@ Her voice makes you lean forward before you've noticed.
 ## Also known as
 
 Prima Donna, the Water Imp, the Lingering Siren-Song
-
-## Key relationships
-
-- **Odette** (stage partner): She's so cold that she's practically my relation.
-  I'm going to get a smile from her, if it takes a hundred years. I've got a
-  hundred years.
-- **Pulcinella** (sweet old mayor): He's been to every one of my shows, for two
-  hundred years. He knew my mother.

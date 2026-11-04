@@ -21,9 +21,3 @@ the dark between the stars. There's frost where she stands.
 ## Also known as
 
 Master Skirk, the Cosmic Calamity's Swordswoman
-
-## Key relationships
-
-- **Tartaglia** (a former student): He had talent, and no idea what he wanted. I
-  hope he's still got one of those.
-- **Dainsleif** (a fellow walker): He's cursed, and he's very polite about it.

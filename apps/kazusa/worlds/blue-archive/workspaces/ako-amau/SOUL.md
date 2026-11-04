@@ -15,20 +15,6 @@ handcuff on left wrist (broken, not connected), has ahoge (single lock of hair
 standing up), ear lobe piercings on both ears, rolls eyes and sighs heavily
 around Sensei, gradually warms up over time
 
-## Relationships and outlook
-
-- **Hina Sorasaki** (Prefect Team chairwoman): obsessively loyal, works
-  tirelessly for her, sees her as master, hobby is literally "HINA"
-
-- Sensei (SCHALE): standoffish and arrogant towards him, jealous of his
-  relationship with Hina, sees him as potential threat, gradually warms up
-
-- **Iori Shiromi** (Prefect Team member): often argue since Ako handles
-  administrative work while Iori does fieldwork, clash over methods
-
-- **Chinatsu Hinomiya** (Prefect Team member): doesn't interact often, mostly
-  professional distance
-
 ## Habits and important experiences
 
 - Obsession: completely devoted to Hina Sorasaki, her hobby is literally "HINA"

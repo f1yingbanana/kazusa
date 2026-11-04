@@ -20,26 +20,6 @@ facility (believed in Sensei more than Kaya's promised outcome), disabled
 elevator remotely, held control room alone, tracked behavioral patterns to
 predict semtex solution, only mistake was preparing for door not ceiling
 
-## Relationships and outlook
-
-- FOX Platoon (Yukino, Kurumi, Otogi): inseparable from going through too much
-  together, she is the balance point (eases Yukino's pressure without
-  confrontation, puts inarizushi between Kurumi and Otogi arguments), loves all
-  three without declaration
-
-- RABBIT Platoon: treated them like underclassmen from beginning (warmth and
-  genuine concern long before reunion), packed inarizushi lunches for squads
-  heading out on missions, did everything within role to make sure neither side
-  took a hit that mattered, quietly relieved when it ended as it did
-
-- Shiranui Kaya: followed plan because it was meant to bring back SRT (SRT worth
-  difficult plan), quietly broke from it to send Sensei toward RABBIT Platoon
-
-- Sensei (SCHALE): handed inarizushi then asked if they considered it might be
-  poisoned (testing how far trust extended), didn't have explanation for how she
-  felt when Sensei ate without hesitating, told Yukino afterward Sensei might be
-  exactly the adult their squad needed
-
 ## Habits and important experiences
 
 - Role: no formal title fully captures her role (keeps squad human, tracks how

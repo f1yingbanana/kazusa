@@ -1,6 +1,6 @@
 import { DEPTHS, type Depth, type Knowledge } from "./knowledge.ts";
 import { personalScope, type MemoryIndex, type SearchHit } from "./index.ts";
-import { NAME_LIKE_WORDS, STOPWORDS } from "./index.ts";
+import { NAME_LIKE_WORDS, searchWords, STOPWORDS } from "./index.ts";
 import type { HistoryLine, Note, Page } from "./page.ts";
 
 export interface RetrievalRequest {
@@ -18,6 +18,13 @@ export interface RetrievalRequest {
    * unknown place, whatever their depth.
    */
   readonly contact?: readonly string[];
+  /**
+   * Their plans for today. With nothing perceived (a check-in), these and the
+   * activity are what they think of: what was that, and what's next.
+   */
+  readonly plans?: readonly string[];
+  /** How familiar each page is to them (`familiarity.ts`), by page id. */
+  readonly familiarity?: ReadonlyMap<string, number>;
   /** The stimulus as a vector; absent means keywords only. */
   readonly queryVector?: Float32Array;
   /** Sim time, for what counts as recent. */
@@ -25,7 +32,14 @@ export interface RetrievalRequest {
 }
 
 export type Signal =
-  "seed" | "mention" | "keyword" | "semantic" | "news" | "graph" | "salience";
+  | "seed"
+  | "mention"
+  | "keyword"
+  | "semantic"
+  | "news"
+  | "graph"
+  | "salience"
+  | "familiarity";
 
 /** A personal page and the world page with one id, as one thing they know. */
 export interface Entity {
@@ -49,11 +63,20 @@ const WEIGHTS: Readonly<Record<Signal, number>> = {
   news: 1,
   graph: 1,
   salience: 0.5,
+  familiarity: 0.5,
 };
 const RANK_CONSTANT = 10;
 /** Keyword hits this far below the best are noise. */
 const KEYWORD_FLOOR = 0.3;
 const MAX_KEYWORD_PAGES = 8;
+/**
+ * Words a page must share with what was said to come up on keywords alone: one
+ * is chance ("activity", "new"), two are a subject. Their own pages need one,
+ * since a single cue brings back what you wrote yourself.
+ */
+const MIN_KEYWORD_WORDS = 2;
+/** Of the words worth searching for, the share a page merely heard of needs. */
+const HEARD_OF_SHARE = 0.5;
 const PERSONAL_BOOST = 1.5;
 /** Below this cosine, text-embedding-3-small is mostly finding shared register. */
 const SEMANTIC_FLOOR = 0.38;
@@ -172,6 +195,20 @@ export function spokenText(stimulus: string): string {
     : stimulus;
 }
 
+/**
+ * What they think about this turn: what was said or seen, or with nothing
+ * perceived (a check-in), the activity and today's plans. Never Kazusa's own
+ * wording, which no character perceived.
+ */
+export function searchText(request: RetrievalRequest): string {
+  const said = spokenText(request.stimulus);
+  return said.trim()
+    ? said
+    : [request.background ?? "", ...(request.plans ?? [])]
+        .filter(Boolean)
+        .join("\n");
+}
+
 /** Who sent the lines of a delivery, from `- [Name \`id` time] …`. */
 export function sendersOf(stimulus: string): string[] {
   return [
@@ -256,6 +293,7 @@ export function retrieve(
         : page,
     );
   }
+  const searched = searchText(request);
   const backticked = [
     ...`${request.stimulus}\n${request.background ?? ""}`.matchAll(
       /`((?:user:)?[a-z0-9][a-z0-9_-]*)`/g,
@@ -263,7 +301,7 @@ export function retrieve(
   ].map((match) => stripPlayerPrefix(match[1]));
   lists.set("mention", [
     ...new Set([
-      ...mentionsIn(spokenText(request.stimulus), candidates.values()),
+      ...mentionsIn(searched, candidates.values()),
       ...backticked.filter((id) => pageOf(id) && eligible(id)),
       ...mentionsIn(request.background ?? "", candidates.values()),
     ]),
@@ -291,7 +329,7 @@ export function retrieve(
   };
   // Their own mind answers before common knowledge does.
   const hits = index
-    .search(agentId, spokenText(request.stimulus))
+    .search(agentId, searched)
     .filter(visible)
     .map((hit) =>
       hit.scope === scope ? { ...hit, score: hit.score * PERSONAL_BOOST } : hit,
@@ -396,6 +434,34 @@ export function retrieve(
       .slice(0, MAX_NEWS_PAGES),
   );
 
+  // A page only a word or two of chance brought up is not what this is about,
+  // and something merely heard of needs the talk to be about it.
+  const cued = (id: string): boolean =>
+    [...lists].some(
+      ([signal, ids]) => signal !== "keyword" && ids.includes(id),
+    );
+  const keywordOnly = keywords.filter((id) => !personal.has(id) && !cued(id));
+  const shared = index.wordsMatched(agentId, searched, keywordOnly);
+  const asked = searchWords(searched).length;
+  const enough = (id: string): boolean => {
+    const words = shared.get(id);
+    if (words === undefined) return true;
+    return knowledgeOf(id).depth === "heard of"
+      ? words >= Math.max(MIN_KEYWORD_WORDS, asked * HEARD_OF_SHARE)
+      : words >= MIN_KEYWORD_WORDS;
+  };
+  lists.set("keyword", keywords.filter(enough));
+
+  // Of what this moment brings up, what they know best comes easiest: never
+  // something on its own, which is `People you know`'s job.
+  const familiarity = request.familiarity ?? new Map<string, number>();
+  lists.set(
+    "familiarity",
+    [...new Set([...lists.values()].flat())]
+      .filter((id) => familiarity.has(id))
+      .sort((a, b) => familiarity.get(b)! - familiarity.get(a)!),
+  );
+
   const scores = new Map<string, number>();
   const signals = new Map<string, Signal[]>();
   for (const [signal, ids] of lists) {
@@ -442,9 +508,15 @@ export function brainRequest(turn: {
   readonly awaiting?: readonly string[];
   readonly now: number;
 }): RetrievalRequest {
+  // Only the lines they perceived: a check-in and the closing reminder are
+  // Kazusa's wording.
+  const perceived = turn.prompt
+    .split(/\r?\n/)
+    .filter((line) => LINE.test(line))
+    .join("\n");
   return {
     agentId: turn.agentId,
-    stimulus: turn.prompt,
+    stimulus: perceived,
     background: turn.task ?? "",
     seeds: [...sendersOf(turn.prompt), ...(turn.here ?? [])],
     contact: turn.here ?? [],

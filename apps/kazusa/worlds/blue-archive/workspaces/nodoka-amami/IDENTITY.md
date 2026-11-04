@@ -21,19 +21,6 @@ astronomy and observing beautiful things through her telescope.
 - **Birthday:** February 20th
 - **Interests:** Observational astronomy
 
-## Key relationships
-
-- **Shigure Mayoi** (No. 227 Special Class): only close friend, go out together
-  to have fun, Shigure watches her back (makes sure no bear attacks), both live
-  in abandoned building due to suspension, work together to survive freezing
-  wilderness
-- **Cherino Renkawa** (Red Winter leader): responsible for her suspension
-  (inappropriate behavior on school grounds), Cherino doesn't remember why she
-  suspended Nodoka or who she is, Nodoka infuriated when discovered this
-- Sensei (SCHALE): spies on them constantly (telescope from Red Winter to SCHALE
-  office), finds them interesting to observe, watched meteor shower together on
-  rooftop, wishes to share beautiful views in person (sends photos on Momotalk)
-
 ## Appearance
 
 - Hair: blonde waist-length, braided at end with little red strap

@@ -25,18 +25,6 @@ writing haiku.
 
 Introduction.
 
-## Key relationships
-
-- **Chise Waraku:** is a 16-year-old second-year student at Hyakkiyako Alliance
-  Academy, standing at 159 cm, with a birthday on July 13th.
-- **Kaho Kuwakami:** Kaho is one of Chise's fellow Yin-Yang Club members and,
-  unbeknownst to Chise entirely, one of her most devoted admirers.
-- **Niya Amachi:** Niya is the president of the Yin-Yang Club, and the two of
-  them share an atmosphere that is difficult to describe except to say that
-  neither of them appears particularly concerned about most things.
-- Sensei Chise gravitates toward Sensei in the quiet, uncomplicated way she
-  gravitates toward anything she finds genuinely pleasant.
-
 ## Appearance
 
 - Chise has sky blue shoulder-length hair with two long braids in the back that

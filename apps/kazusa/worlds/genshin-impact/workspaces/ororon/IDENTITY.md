@@ -21,12 +21,3 @@ hoe. He doesn't blink quite as often as you'd expect.
 ## Also known as
 
 Bidii, the Oddball of the Night-Wind
-
-## Key relationships
-
-- **Citlali** (Granny): She pretends she doesn't look after me. I pretend it's
-  only vegetables.
-- **Il Capitano** (a polite man): He's very sad, and he's dead, but not in any
-  of the normal ways. He asked me some good questions.
-- **Ifa** (a friend): He carries things, and he listens. His saurian's very
-  rude.

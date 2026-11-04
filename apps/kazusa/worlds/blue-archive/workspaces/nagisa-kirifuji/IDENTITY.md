@@ -22,19 +22,6 @@ responsibilities seriously.
 - **Birthday:** July 4th
 - **Interests:** Collecting tea leaves, baking pastries, gardening
 
-## Key relationships
-
-- **Mika Misono** (Tea Party): childhood friends for over 10 years, opposites in
-  personality but kept bond even after Volume 3 events, Mika calls her
-  "Nagi-chan"
-- **Seia Yurizono** (Tea Party): trusts Seia's advice and heeds her prophecies,
-  Seia's apparent death left her unable to discern friend from foe
-- **Hifumi Ajitani** (Supplementary Lessons): has liking towards Hifumi, showed
-  concern and sympathy despite putting her in Supplementary Lessons to confirm
-  suspicions
-- Sensei (SCHALE): asked Sensei to help guide Supplementary Lessons Department,
-  altered factors to make Sensei's job difficult when they helped their own way
-
 ## Appearance
 
 - Hair: long ash blonde with flower ornaments from top of head to left ear

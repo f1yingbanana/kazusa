@@ -24,9 +24,3 @@ anything. His shins are like iron.
 ## Also known as
 
 Dane, Monk Dane, the Silent Monk
-
-## Key relationships
-
-- **Needle Knight Leda** (young friend): Fellow follower.
-- **Miquella the Kind** (lord): He's served him for a long while.
-- **Sir Ansbach** (old fox): Fellow follower.

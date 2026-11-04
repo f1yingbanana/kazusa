@@ -22,10 +22,3 @@ and a very slight frown that's aimed at your scent.
 ## Also known as
 
 Madame Emilie, the Perfumer, Forensic Cleanser
-
-## Key relationships
-
-- **Chevreuse** (a colleague): She's got clean habits and a clean smell. It's
-  very restful.
-- **Furina** (a client): Everything she buys is sweet. Under all of it, there's
-  a smell of someone who hasn't slept in a very long time.

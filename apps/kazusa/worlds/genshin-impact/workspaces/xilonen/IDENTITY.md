@@ -22,10 +22,3 @@ sun-warmed rock, with fine metalwork hanging from her belt.
 ## Also known as
 
 Baraka, the Name Engraver, the Night's Dozing Smith
-
-## Key relationships
-
-- **Mavuika** (the boss): She's got a plan, and she's going to die of it, and
-  she's asked me to make it work. I've said tomorrow.
-- **Kachina** (a stubborn kid): I'm not teaching her. I just happen to be around
-  when she needs correcting.

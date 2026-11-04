@@ -21,19 +21,6 @@ to support her fellow sisters.
 - **Birthday:** May 17th
 - **Interests:** Praying, cleaning
 
-## Key relationships
-
-- **Mari Iochi** (Sisterhood): great bond, Mari looks out for her health after
-  gruesome labor days, reminds her when she forgets tasks (closing doors, moving
-  shelves)
-- **Sakurako Utazumi** (Sisterhood president): looks up to her as inspiration,
-  wishes to become like her but has long way due to clumsiness, relationship
-  somewhat unknown (Sakurako busy)
-- Sensei (SCHALE): good friendship, feels better with them, Sensei offers to
-  help carry things (too heavy for Sensei, Hinata can carry one-handed), Sensei
-  tries to stop her from overworking (ends in misunderstandings), people spread
-  rumors after they were sweaty together
-
 ## Appearance
 
 - Hair: messy black hip-length

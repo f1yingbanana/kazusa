@@ -17,18 +17,6 @@ sketches and retro-style sprites. She and her twin Momoi share a love of games
 despite their different temperaments. Playing games together also helped Aris
 learn to communicate and feel at home with the club.
 
-## Relationships and outlook
-
-- **Momoi Saiba** (GDD): twin sister, Momoi is energetic/irrational while Midori
-  is calm/thoughtful, Momoi brought her into GDD
-
-- **Yuzu Hanaoka** (GDD president): nervously told Yuzu she enjoyed her game
-  when first joined, words of affirmation boosted Yuzu's confidence
-
-- **Aris Tendou** (GDD): disagreed with Momoi's plan to bring Aris in (didn't
-  believe it would work), played big part in helping Aris assimilate through
-  video games
-
 ## Habits and important experiences
 
 - Artist: illustrator for GDD, draws retro-style sprites and sketches

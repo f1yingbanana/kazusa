@@ -160,21 +160,27 @@ export function renderOnYourMind(
   return { text: parts.join("\n"), ids };
 }
 
-/** `People you know`: their own people pages, most recently touched first. */
+/**
+ * `People you know`: their own people pages, most familiar first (`scores`,
+ * `familiarity.ts`), leaving out anyone already shown this turn (`exclude`).
+ */
 export function renderRoster(
   pages: Iterable<Page>,
   limit: number,
   worldName: (id: string) => string | undefined,
+  scores: ReadonlyMap<string, number>,
+  exclude: ReadonlySet<string>,
 ): string {
+  const score = (page: Page): number =>
+    scores.get(page.id) ?? Number.NEGATIVE_INFINITY;
   const people = [...pages]
-    .filter((page) => page.kind === "person")
-    .sort((a, b) => {
-      const recent = (page: Page): string =>
-        [page.seen ?? "", ...page.notes.map((note) => note.date)]
-          .sort()
-          .at(-1) ?? "";
-      return recent(b).localeCompare(recent(a)) || a.id.localeCompare(b.id);
-    })
+    .filter(
+      (page) =>
+        page.kind === "person" &&
+        !exclude.has(page.id) &&
+        !(page.personId !== undefined && exclude.has(page.personId)),
+    )
+    .sort((a, b) => score(b) - score(a) || a.id.localeCompare(b.id))
     .slice(0, limit);
   return people
     .map((page) => {

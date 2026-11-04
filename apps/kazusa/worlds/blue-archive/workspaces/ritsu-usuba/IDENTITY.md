@@ -21,20 +21,6 @@ her speed, strength and enthusiasm for exploring.
 - **Birthday:** March 6th
 - **Interests:** Smuggling, quarrying
 
-## Key relationships
-
-- **Fuyu Wakasa** (Free Trade Cartel): Ritsu works seamlessly with Fuyu
-  (strength/speed complement Fuyu's professional approach), enjoys Fuyu's daring
-  attitude and love for defying rules, playful interactions, strong bond through
-  mutual trust
-- **Miyo Sakurai** (Free Trade Cartel president): Ritsu sees Miyo as "anchor" of
-  group (provides structure and guidance), playful teasing and joking during
-  tense moments, depends on Miyo's judgment while Miyo depends on her
-  speed/strength
-- Sensei (SCHALE): Ritsu has fun with Sensei (carved stone together, explored
-  hidden cistern), enjoyed cooling off in cold water together, wishes to return
-  to cistern with Sensei
-
 ## Appearance
 
 - Hair: short light-blonde

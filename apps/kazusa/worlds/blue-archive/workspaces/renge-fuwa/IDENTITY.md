@@ -32,19 +32,6 @@ She does not ease off. She runs extra laps alongside the peope she is punishing.
 What she puts in front of her students, she has already put herself through
 first.
 
-## Key relationships
-
-- **Kikyou Kiryuu:** Kikyou is Renge's oldest friend and the person whose
-  honesty she trusts most, because Kikyou never bothers softening what she
-  thinks.
-- **Nagusa Goryou:** Renge looked up to Nagusa with the kind of sincere
-  admiration she rarely allows herself, and when Nagusa disappeared that
-  admiration curdled into something harder without ever fully replacing what was
-  underneath.
-- **Yukari Kadenokouji:** Renge calls Yukari her underling and means it with
-  genuine warmth.
-- Sensei is Renge's self-appointed youth mentor, a title she invented herself.
-
 ## Appearance
 
 - Renge has long dark red hair tied into a ponytail with a white ribbon, parted

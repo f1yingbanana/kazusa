@@ -32,15 +32,6 @@ Momoyodou, Shizuko carries an enormous workload entirely of her own choosing,
 driven by a genuine love for the smiles festivals and good service bring to the
 people around her.
 
-## Key relationships
-
-- **Umika Satohama:** Umika is one of Shizuko's most valuable members and a
-  genuine asset to the Festival Operations Department.
-- **Pina Asahina:** Pina is Shizuko's most enthusiastic supporter and the one
-  who keeps the department's energy high.
-- Sensei Shizuko's relationship with Sensei is one of the few spaces where her
-  idol persona genuinely dissolves.
-
 ## Appearance
 
 - Shizuko has long brown hair reaching her legs, tied into two short pigtails.

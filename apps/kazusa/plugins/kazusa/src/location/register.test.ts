@@ -115,7 +115,15 @@ const temporary = (prefix: string): string => {
   return dir;
 };
 
-function setup(options: { readonly stage?: Stage } = {}) {
+function setup(
+  options: {
+    readonly stage?: Stage;
+    readonly rememberedPlaces?: (
+      agentId: string,
+      text: string,
+    ) => readonly { readonly id: string; readonly byName: boolean }[];
+  } = {},
+) {
   const wikiDir = temporary("kazusa-wiki-");
   for (const [file, text] of Object.entries(PAGES)) {
     const target = path.join(wikiDir, "entities", file);
@@ -204,6 +212,7 @@ function setup(options: { readonly stage?: Stage } = {}) {
   const sightings: { agentId: string; text: string; metadata: unknown }[] = [];
   const broadcaster = new KazusaRealtimeBroadcaster();
   const broadcasts: StreamEvent[] = [];
+  const uses: { agentId: string; ids: readonly string[]; at: number }[] = [];
   broadcaster.subscribe((event) => broadcasts.push(event));
   const location = registerLocation(api, {
     clock,
@@ -212,6 +221,12 @@ function setup(options: { readonly stage?: Stage } = {}) {
       sightings.push({ agentId, text, metadata });
     },
     ...(options.stage ? { stage: options.stage } : {}),
+    ...(options.rememberedPlaces
+      ? { rememberedPlaces: options.rememberedPlaces }
+      : {}),
+    use: async (agentId, ids, at) => {
+      uses.push({ agentId, ids, at });
+    },
   });
   const extensions = [desires.taskExtension, location.taskExtension!];
   const ledger: { text: string; metadata: unknown }[] = [];
@@ -252,6 +267,7 @@ function setup(options: { readonly stage?: Stage } = {}) {
     ledger,
     sightings,
     broadcasts,
+    uses,
     context,
     call,
     card,
@@ -352,6 +368,70 @@ describe("location registration", () => {
       (stores.get("location")?.values.get("kazusa") as LocationRecord).trip
         ?.purpose,
     ).toEqual({ description: "Cake at the club", minutes: 16 });
+  });
+
+  it("goes to a place they know by their own words, and notes they went", async () => {
+    const { context, uses } = setup({
+      rememberedPlaces: (_agentId, text) =>
+        text.includes("reading") ? [{ id: "library", byName: false }] : [],
+    });
+    const result = await executeStartTask(
+      {
+        type: "traveling",
+        description: "Off to read",
+        duration: 30,
+        afterwards: {},
+        where: "the reading place",
+      },
+      context(),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("to Library");
+    expect(uses).toEqual([
+      { agentId: "kazusa", ids: ["library"], at: expect.any(Number) },
+    ]);
+  });
+
+  it("asks which place when their words could be several", async () => {
+    const { context } = setup({
+      rememberedPlaces: () => [
+        { id: "library", byName: true },
+        { id: "club", byName: true },
+      ],
+    });
+    const result = await executeStartTask(
+      {
+        type: "studying",
+        description: "Homework",
+        duration: 60,
+        afterwards: {},
+        where: "the usual room",
+      },
+      context(),
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain(
+      'More than one place you know could be "the usual room": Library `library`',
+    );
+  });
+
+  it("keeps a spot where they are a spot unless it names a place", async () => {
+    const { context } = setup({
+      // A word in common with the library's page is not a name for it.
+      rememberedPlaces: () => [{ id: "library", byName: false }],
+    });
+    const result = await executeStartTask(
+      {
+        type: "studying",
+        description: "Homework",
+        duration: 60,
+        afterwards: {},
+        where: "my desk",
+      },
+      context(),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("At my desk, in Kazusa's Room");
   });
 
   it("writes nothing anywhere when another extension refuses", async () => {

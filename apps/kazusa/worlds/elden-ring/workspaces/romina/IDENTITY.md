@@ -25,9 +25,3 @@ butterflies.
 ## Also known as
 
 Romina, Saint Romina, Saint of the Bud
-
-## Key relationships
-
-- **Messmer the Impaler** (the one who burned the Bud): His army razed the
-  church.
-- **Moore** (a little one): Foragers honoured the rot.

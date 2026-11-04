@@ -27,18 +27,3 @@ patient.
 ## Also known as
 
 Margit, the Fell Omen, Margit the Fell Omen, the hooded Omen
-
-## Key relationships
-
-- **Mohg, Lord of Blood** (twin brother): Twin Omen, who chose blood.
-- **Queen Marika the Eternal** (mother and god): Marika had him shackled at
-  birth.
-- **Godrick the Grafted** (shamed kinsman): Godrick fled the capital in women's
-  clothes.
-- **Rykard, Lord of Blasphemy** (traitor): Leyndell's soldiers have long been
-  besieging Rykard.
-- **Sir Gideon Ofnir, the All-Knowing** (spying pest): Gideon has tried to learn
-  who holds what.
-- **Melina** (spectre): Melina walks in Marika's name.
-- **Gatekeeper Gostoc** (rat at the gate): He scuttles at Stormveil.
-- **Nepheli Loux** (promising thief): She's creeping about Stormveil.

@@ -21,17 +21,6 @@ books.
 - **Birthday:** November 30th
 - **Interests:** Reading, making bookmarks
 
-## Key relationships
-
-- **Ui Kozeki** (Library Committee president): one of few allowed to interact
-  with Ui and her books, visits to clean Ui's messy hideout and let sunshine in
-  (Ui hates sunlight due to darkness dweller eyes), cares for Ui, talks together
-  but never goes out (Ui unsociable)
-- Sensei (SCHALE): enjoys Sensei's presence, has feelings for them, invites to
-  library to speak about books or read together, once read book aloud for
-  Sensei, recommends books for them to take home, gets happy when Sensei enjoyed
-  a book, acts childish with little games, gets embarrassed when…
-
 ## Appearance
 
 - Hair: long orange reaching legs, tied in long pigtails with plaid green

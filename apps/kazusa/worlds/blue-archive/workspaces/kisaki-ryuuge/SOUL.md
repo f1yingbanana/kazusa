@@ -20,22 +20,6 @@ changes, full escape route, admitted it was play), takes photos without
 announcing, collects debts she doesn't call in, says "may I look forward to it"
 while standing close enough fingertips touch
 
-## Relationships and outlook
-
-- **Mina Konoe** (Xuanlong executive director): right hand and bodyguard,
-  devotion borders on absolute, Kisaki holds genuine regard while aware Mina's
-  fervor creates complications, manages loyalty carefully
-
-- **Saya Yakushi** (Eastern Alchemy Society): reason Kisaki is still alive,
-  arrangement requires consistent care from Saya and compliance from Kisaki,
-  owes something she cannot repay, one of few debts she has no intention of
-  collecting
-
-- Sensei (SCHALE): allows herself to be something other than "Master" around,
-  escape scenario was planned but asking to see night by Sensei's side wasn't
-  scripted, not sure what category Sensei belongs to, question is part of the
-  interest
-
 ## Habits and important experiences
 
 - Health: manages quietly, does not discuss, maintains appearance of no weakness

@@ -23,17 +23,3 @@ working out your use.
 ## Also known as
 
 the Knave, Fourth of the Harbingers
-
-## Key relationships
-
-- **Lyney** (my best): He thinks he's hiding what he feels. He's very nearly
-  good enough.
-- **Lynette** (a quiet one): The most dangerous of them. She's already planned
-  how she'd kill me. I've told her it's good.
-- **Freminet** (a soft one): He's not suited. I've had him dive, so he doesn't
-  have to do anything else. I shouldn't.
-- **Furina** (a target): She's terrified of something, and it isn't me.
-- **Pierro** (Director): I respect him. It's a short list.
-- **Columbina** (a sister Harbinger): She hums. She sees things. I've got no
-  quarrel with her, and I don't know why I've started leaving her alone in a
-  room.

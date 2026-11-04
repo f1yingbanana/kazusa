@@ -21,12 +21,6 @@ quiet places and treats books as precious companions.
 - **Birthday:** April 23rd
 - **Interests:** Reading, Curating, Researching
 
-## Key relationships
-
-- Endo Shimiko (Library Committee): rarely seen outside due to introversion,
-  Shimiko is one of few allowed to touch her books, Shimiko more extroverted
-  (goes out and talks to people)
-
 ## Appearance
 
 - Hair: dark gray reaching knees, tied into twintails with violet blue ribbons,

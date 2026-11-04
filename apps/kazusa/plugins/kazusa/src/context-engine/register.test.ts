@@ -155,6 +155,7 @@ describe("Native context-engine registration", () => {
     const memory = vi.fn(async () => ({
       onYourMind: "Airi `airi` (friend): Likes mint chocolate.",
       roster: "Airi `airi` (friend)",
+      ids: ["airi"],
     }));
     const { engine } = await setup({}, undefined, "/test/workspace", {
       memory,
@@ -171,11 +172,13 @@ describe("Native context-engine registration", () => {
     expect(memory).toHaveBeenCalledWith(
       expect.objectContaining({
         agentId: "alice",
-        stimulus: prompt,
+        // What they perceived, not the delivery's wording around it.
+        stimulus: "- [Airi `airi` Fri]: Want to get ice cream?",
         seeds: ["airi", "bob", "club_room"],
       }),
-      // How much comes to mind is the character's context settings'.
-      { maxTokens: 800, rosterLimit: 20 },
+      // How much comes to mind is the character's context settings'; who is
+      // here is in With you, so not in People you know.
+      { maxTokens: 800, rosterLimit: 20, exclude: ["bob", "club_room"] },
     );
     expect(JSON.stringify(result.messages.at(-1))).toContain(
       "Likes mint chocolate.",
@@ -202,7 +205,11 @@ describe("Native context-engine registration", () => {
   });
 
   it("asks for as many places and recollections as the character's settings allow", async () => {
-    const memory = vi.fn(async () => ({ onYourMind: "", roster: "" }));
+    const memory = vi.fn(async () => ({
+      onYourMind: "Dorm `dorm`: home.",
+      roster: "",
+      ids: ["dorm"],
+    }));
     const whereabouts = vi.fn(async () => undefined);
     const { engine, stores } = await setup({}, undefined, "/test/workspace", {
       memory,
@@ -218,12 +225,15 @@ describe("Native context-engine registration", () => {
       sessionKey: "agent:alice:brain",
       messages: [],
     });
+    // Places you know leaves out what On your mind already shows.
     expect(whereabouts).toHaveBeenCalledWith("alice", expect.any(Number), "", {
       listLimit: 3,
+      exclude: ["dorm"],
     });
     expect(memory).toHaveBeenCalledWith(expect.anything(), {
       maxTokens: 200,
       rosterLimit: 4,
+      exclude: [],
     });
   });
 

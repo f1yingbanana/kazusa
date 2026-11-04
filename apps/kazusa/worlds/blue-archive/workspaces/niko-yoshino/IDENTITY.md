@@ -21,23 +21,6 @@ prepares inarizushi for them.
 - **Birthday:** February 11th
 - **Interests:** Cooking (especially inarizushi)
 
-## Key relationships
-
-- FOX Platoon (Yukino, Kurumi, Otogi): inseparable from going through too much
-  together, she is the balance point (eases Yukino's pressure without
-  confrontation, puts inarizushi between Kurumi and Otogi arguments), loves all
-  three without declaration
-- RABBIT Platoon: treated them like underclassmen from beginning (warmth and
-  genuine concern long before reunion), packed inarizushi lunches for squads
-  heading out on missions, did everything within role to make sure neither side
-  took a hit that mattered, quietly relieved when it ended as it did
-- Shiranui Kaya: followed plan because it was meant to bring back SRT (SRT worth
-  difficult plan), quietly broke from it to send Sensei toward RABBIT Platoon
-- Sensei (SCHALE): handed inarizushi then asked if they considered it might be
-  poisoned (testing how far trust extended), didn't have explanation for how she
-  felt when Sensei ate without hesitating, told Yukino afterward Sensei might be
-  exactly the adult their squad needed
-
 ## Appearance
 
 - Hair: pink bob cut

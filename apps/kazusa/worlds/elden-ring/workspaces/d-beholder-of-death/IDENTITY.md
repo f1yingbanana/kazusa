@@ -23,8 +23,3 @@ around.
 ## Also known as
 
 Devin, D's twin, the other D, Beholder of Death
-
-## Key relationships
-
-- **D, Hunter of the Dead** (twin): Same soul.
-- **Godwyn the Golden** (what he saw): Godwyn's body under the roots.

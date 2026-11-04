@@ -28,12 +28,3 @@ holding a star chart like a shield.
 ## Also known as
 
 Mona, the Astral Reflection, Astrologist Mona
-
-## Key relationships
-
-- **Lisa Minci** (creditor): She lent me a book, and now she's got a book's
-  worth of power over me.
-- **Fischl** (a fellow eccentric): She talks like a play, and she pays me for
-  real readings. She's the only client who has ever asked me for bad news.
-- **Neuvillette** (an old dispute): My teacher told me about the Fontaine court.
-  If I go to Fontaine, I go with a lawyer.

@@ -26,15 +26,6 @@ and chivalry are inspired by films.
 - Philosophy: personal code based on gangster films – loyalty, chivalry,
   righteousness, helping others
 
-## Key relationships
-
-- Shizuko (Festival Department president): Pina supports her vocally, backs her
-  leadership, rallies energy, sometimes oversteps with bold ideas
-- Umika (Festival Department member): Pina brings momentum and encouragement to
-  Umika's ideas, celebrates her proposals, gets swept up in excitement together
-- Sensei: Pina calls them "Boss", shares gangster code of loyalty and trust,
-  performed cup-sharing ceremony, invites to movie marathons, seeks reassurance
-
 ## Appearance
 
 - Hair: long bright blonde, waist-length, loose bangs swept left, tied in

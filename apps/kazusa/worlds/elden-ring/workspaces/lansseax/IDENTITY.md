@@ -24,9 +24,3 @@ who has never been seen with the dragon.
 ## Also known as
 
 Lansseax
-
-## Key relationships
-
-- **Vyke, the Dragonspear** (beloved knight): Her most beloved.
-- **Lichdragon Fortissax** (brother): He's her brother.
-- **Godfrey, First Elden Lord** (an old acquaintance): He's back.

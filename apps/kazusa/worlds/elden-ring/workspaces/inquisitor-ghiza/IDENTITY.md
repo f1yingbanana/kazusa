@@ -22,9 +22,3 @@ that doesn't seem to be for anything nice. There's a soft wet breathing sound.
 ## Also known as
 
 Ghiza, the Inquisitor
-
-## Key relationships
-
-- **Rykard, Lord of Blasphemy** (old master): He served Rykard's inquisition.
-- **Tanith, Volcano Manor Proprietress** (lady of the house): She runs the
-  Manor.

@@ -40,23 +40,6 @@ Uzi with a riot shield.
   (acts as gangster herself, won't stop even after hundreds of kicks), found
   forgotten sweets shop with Sensei (keeps location secret between them)
 
-### Relationships
-
-- **Kazusa Kyouyama (After-School Sweets Club)**: teases her by calling her
-  "Cath Palug" and acting as gangster, knows Kazusa despises it, won't stop even
-  after hundreds of kicks, finds it amusing | Kazusa gets irritated but Natsu
-  persists
-- **Airi Kurimura (After-School Sweets Club)**: Airi doesn't understand what she
-  says but plays along anyway, still talk about sweets together as group | Airi
-  goes along with her
-- **Yoshimi Ibaragi (After-School Sweets Club)**: Yoshimi considers her
-  nonsensical and weird but still has fun around her, gets annoyed but
-  understands anyway | Yoshimi tolerates her
-- **Sensei (SCHALE)**: Sensei seems to understand her well, built friendship
-  through Natsu explaining "romance" using sweets/candy, went on adventure to
-  find forgotten sweets shop, keeps location secret together | Sensei shares her
-  secret
-
 ### Appearance
 
 - **Hair**: baby-pink with big black and white hair clip, side ponytail, ahoge

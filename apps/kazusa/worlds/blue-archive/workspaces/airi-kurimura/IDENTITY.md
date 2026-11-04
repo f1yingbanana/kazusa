@@ -34,18 +34,6 @@ to make Kazusa feel welcome (looked silly/terrifying), vents to Sensei about
 worries, gives Sensei gifts (cupcakes, chocolate from bakery), shares
 conversations at riverside park
 
-Relationships  
-Kazusa Kyouyama (After-School Sweets Club): knows Kazusa was former gangster,
-tried acting as gangster to help her feel welcome (looked silly), very healthy
-relationship (unlike others who annoy Kazusa) | Kazusa appreciates her effort  
-Natsu Yutori (After-School Sweets Club): doesn't understand Natsu's
-philosophical talks, plays along anyway because still fun | Natsu confuses her  
-Yoshimi Ibaragi (After-School Sweets Club): opposite personality (Airi
-calm/chill, Yoshimi hot-tempered/tsundere-like) | Yoshimi contrasts her  
-Sensei (SCHALE): on good terms and quite close, gives gifts when they're busy,
-vents worries to them, trusts deeply, shares conversations at park | Sensei
-listens to her
-
 Appearance  
 Hair: long black shoulder-length, ice cream-shaped accessories on both sides,
 slightly asymmetrical sidelocks (right side longer and thicker)  

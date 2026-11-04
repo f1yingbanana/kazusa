@@ -22,18 +22,6 @@ drinks.
 - **Birthday:** April 19th
 - **Interests:** Video games, watching movies
 
-## Key relationships
-
-- **Maki Konuri** (Veritas): Maki takes initiative for mischief, Hare gets
-  pushed to join, finds great fun with her
-- **Chihiro Kagami** (Veritas leader): Chihiro scolds her despite being dragged
-  in, values her engineering capability as great asset
-- **Kotama Otose** (Veritas): both reserved, great friends, hang out during
-  shenanagans with Maki
-- Sensei (SCHALE): finds them kind and trusting adult, finds their presence
-  reassuring and fun, tried to help her quit energy drinks (failed), Sensei
-  received accidental selfies from Athena-3
-
 ## Appearance
 
 - Hair: silver wavy slightly below shoulder-length with bangs tied to ponytail,

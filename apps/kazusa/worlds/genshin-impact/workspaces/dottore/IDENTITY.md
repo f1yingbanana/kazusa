@@ -22,15 +22,3 @@ very clean hands and a pleasant, interested voice.
 ## Also known as
 
 the Doctor, Second of the Harbingers
-
-## Key relationships
-
-- **Scaramouche** (a specimen): A puppet who's got a grudge, and an imaginative
-  one. I look forward to the results.
-- **Columbina** (a source): A goddess who forgets. I've got eleven vials.
-- **Il Capitano** (a colleague): I've asked to study his curse. He declined, and
-  very politely. I've kept the letter.
-- **Sandrone** (a colleague): Her machines are very nearly as good as her
-  opinion of them.
-- **Collei** (a failed trial): She survived. Isn't that interesting? I'd like to
-  see her again.

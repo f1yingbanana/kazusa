@@ -89,9 +89,18 @@ Brought up from their wiki and surroundings each turn, by what is going on:
   people, places and things in the moment comes to mind (the "On your mind" part
   of a turn), from their own wiki and what the World Wiki says they would know.
   The people and places lists below are counted on their own.
-- **People they know** (default 20): listed so they can reach them.
-- **Places** (default 16): listed around them, and again among the places they
-  know.
+- **People they know** (default 20): the people most in their life, listed so
+  they can reach them. "Most in their life" is what they have done together,
+  recently and often (talking, texting), so a friend they talk to every day
+  stays on the list and someone met once drifts off it.
+- **Places** (default 16): their home, then places named in what just happened
+  or in their plans, then the places they go to most; and, separately, as many
+  of the places around them.
+
+Nothing is listed twice: someone in front of them, or already in what they
+recall, isn't repeated among the people they know, and the same goes for places.
+To start an activity somewhere, a character can name a place, or use their own
+words for one they know; if the words could mean several, they are asked which.
 
 ## World and character settings
 

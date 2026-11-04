@@ -23,9 +23,3 @@ Altus. There's a smile on him that isn't very good.
 ## Also known as
 
 Godefroy, Godefroy of the Golden Lineage
-
-## Key relationships
-
-- **Godrick the Grafted** (inferior kinsman): Fellow grafter.
-- **Sir Gideon Ofnir, the All-Knowing** (an unwelcome scholar): He's been
-  reading about him.

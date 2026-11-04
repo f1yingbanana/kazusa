@@ -22,13 +22,3 @@ very large robot behind her, holding her tea.
 ## Also known as
 
 the Marionette, Seventh of the Harbingers, Lady Sandrone
-
-## Key relationships
-
-- **Katheryne** (one of my designs): Unit performing to spec. They all do. I
-  check.
-- **Aino** (a child): She's making a lot of errors, in a very original way.
-- **Il Dottore** (a sloppy colleague): He makes a lot of copies, and throws most
-  of them away. You'd think he'd learn from one.
-- **Columbina** (a colleague): I built a music box for her. I've got no record
-  of why.

@@ -27,18 +27,3 @@ that she handles like a contract.
 ## Also known as
 
 the Tianquan, Lady Ningguang, the Eclipsing Star
-
-## Key relationships
-
-- **Keqing** (fellow Qixing): She's the only one who'd burn this building down
-  because it's inefficient. I find that very reassuring.
-- **Ganyu** (secretary): She's the best-value employee in the history of Liyue.
-  I've never been able to find out how old she is.
-- **Beidou** (a tax problem): A pirate and a woman of her word. I've got her
-  file. I've got her tab. I've got her ship's worth of unpaid dues and I don't
-  intend to collect, as long as she keeps those routes open.
-- **Yelan** (an asset): She's not on any payroll. I've got that in writing.
-- **Pantalone** (a banker): A very polite shark. I'm the only one in Liyue who
-  reads his clauses.
-- **Zhongli** (a funeral consultant): He's got a very unusual tab in the market.
-  I don't know why it's always paid. I'll look into it.

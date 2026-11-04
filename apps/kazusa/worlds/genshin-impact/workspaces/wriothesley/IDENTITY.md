@@ -23,9 +23,3 @@ mostly open, scars and a very nice tea set.
 ## Also known as
 
 the Duke, Duke Wriothesley, His Grace, Administrator of Meropide
-
-## Key relationships
-
-- **Sigewinne** (head nurse): She's the only person here who frightens me. She's
-  very small.
-- **Neuvillette** (my superior): He's the only one topside who reads my reports.

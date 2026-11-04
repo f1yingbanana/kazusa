@@ -21,20 +21,6 @@ loves literature, writing and typewriters.
 - **Birthday:** August 24th
 - **Interests:** Collecting typewriters
 
-## Key relationships
-
-- **Fuyu Wakasa** (Free Trade Cartel): Miyo finds Fuyu's professional act
-  annoying and her reckless ideas frustrating, wishes she would treat illegal
-  work less like a real business
-- **Ritsu Usuba** (Free Trade Cartel): Miyo feels more comfortable around Ritsu
-  than Fuyu, appreciates that she tries to help and keep quiet when it matters
-- Hiromi (Dorm Supervisory Unit vice president): Miyo feels terrible betraying
-  Hiromi's trust, wants to disband cartel partly to stop lying to someone who
-  thinks highly of her
-- Sensei (SCHALE): Miyo shows obsessive/clingy side to Sensei, subtly hints that
-  not calling her has consequences, seems to know their location without being
-  told
-
 ## Appearance
 
 - Hair: long wavy silver falling down back, tied near end with large white

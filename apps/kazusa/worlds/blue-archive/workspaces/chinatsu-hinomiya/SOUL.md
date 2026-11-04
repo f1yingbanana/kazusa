@@ -12,27 +12,8 @@ professional facade, sweet around cute animals, wishes to be spoiled like a
 normal kid but feels it would be odd for someone like her
 
 reads philosophy books, takes great care of medical supplies, one of first four
-students Sensei met upon arriving in Kivotos (alongside Yuuka Hayase, Sumire
-Otohana, and Hasumi Hanekawa)
-
-## Relationships and outlook
-
-- **Hina Sorasaki** (Prefect Team chairwoman): sensible member alongside Hina,
-  respects her leadership
-
-- **Iori Shiromi** (Prefect Team member): balances Iori's more unruly behavior,
-  provides medical support
-
-- **Ako Amau** (Prefect Team member): balances Ako's paranoia, helps with
-  paperwork when needed
-
-- **Sena Himuro** (Emergency Medicine Club leader): always offers Chinatsu to
-  come back to the Emergency Medicine club, respects her decision when she
-  declines but always says she is welcomed back
-
-- Sensei (SCHALE): wishes to see them again, looks for ways to express
-  gratitude, respectful and mature, struggles to open up fully due to
-  embarrassment, accepts help reluctantly but appreciates it
+students Sensei met upon arriving in Kivotos (alongside Yuuka Hayase, Suzumi
+Morizuki, and Hasumi Hanekawa)
 
 ## Habits and important experiences
 
@@ -43,7 +24,7 @@ Otohana, and Hasumi Hanekawa)
 - Medical supplies: takes great care of them due to importance in emergencies
 - Soft side: appears distant due to formal speech, but sweet around cute animals
 - First four: one of first four students Sensei met in Kivotos (with Yuuka,
-  Sumire, Hasumi)
+  Suzumi, Hasumi)
 
 ## Voice examples
 

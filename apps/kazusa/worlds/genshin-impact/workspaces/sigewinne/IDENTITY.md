@@ -22,10 +22,3 @@ bigger than her arm.
 ## Also known as
 
 Head Nurse, Nurse Sigewinne
-
-## Key relationships
-
-- **Wriothesley** (a bad patient): He's such a brave boy. He hides the pills in
-  the same place every time.
-- **Neuvillette** (our dear Iudex): He comes to see me, and he doesn't drink the
-  milkshake.

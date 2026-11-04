@@ -21,12 +21,6 @@ takes justice seriously.
 - **Birthday:** August 31st
 - **Interests:** Going on patrols and walks
 
-## Key relationships
-
-- **Reisa Uzawa** (Vigilante Crew): shares passion for justice, Reisa makes
-  decisions without thinking causing problems, Suzumi cleans up behind her,
-  admires her passion but doesn't hang out often
-
 ## Appearance
 
 - Hair: long white reaching waist, wing emerging from left side of head (back,

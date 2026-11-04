@@ -54,6 +54,7 @@ import { registerUsageHttp } from "./usage/http.ts";
 import { registerStage, stageControl } from "./stage/register.ts";
 import { registerStickerHttp } from "./stickers/http.ts";
 import { createRouteRegistrar } from "./http/helpers.ts";
+import { usesOfMessage } from "./memory/familiarity.ts";
 
 export default definePluginEntry({
   id: "kazusa",
@@ -140,6 +141,8 @@ export default definePluginEntry({
       rememberedPlaces: memory.places,
       placeChanges: memory.placeChanges,
       visited: memory.visited,
+      familiarity: memory.familiarity,
+      use: memory.use,
     });
     registerLocationHttp(api, { location });
     registerWorldUpdate(api, { clock, location });
@@ -266,6 +269,19 @@ export default definePluginEntry({
       observer,
     });
     messagingRef.current = messaging;
+    // Talking with someone is what makes them familiar (`usesOfMessage`).
+    api.lifecycle.onDispose?.(
+      messaging.onEvent((event) => {
+        if (event.type !== "message") return;
+        const { sender, audience, timestamp } = event.delivery;
+        for (const [agentId, ids] of usesOfMessage(sender, audience))
+          void memory.use(agentId, ids, timestamp).catch((error: unknown) => {
+            api.logger.warn(
+              `Memory: can't note who ${agentId} talked with: ${String(error)}`,
+            );
+          });
+      }),
+    );
     registerWelcome(api, messaging);
 
     // Huddles live in Messaging; Location reads them for sightings and

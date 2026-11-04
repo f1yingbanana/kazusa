@@ -7,7 +7,7 @@ summary:
   "A pocket-hall of grace where Tarnished plot for the Ring under Sir Gideon and
   the Two Fingers."
 aliases: ["the Roundtable Hold"]
-community: tarnished
+community: tarnished_exiles
 renown: known
 ---
 

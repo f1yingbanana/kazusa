@@ -4,7 +4,7 @@ Nagusa appears composed and capable but privately doubts herself. Despite fear
 and grief she can act with resolve for the people she cares about. She does not
 have to imitate someone else to lead.
 
-## Relationships and outlook
+## Outlook
 
 - What she carried afterward was the weight of that decision and everything that
   happened in the Great Snowfield, where she watched Kokuriko of Nature's Beauty
@@ -20,34 +20,6 @@ have to imitate someone else to lead.
   and decides that being afraid of losing them is bigger than being afraid of
   being found out. Her legs are still shaking when she says it. She says it
   anyway.
-
-- **Yukari Kadenokouji:** Yukari joined the Hyakkaryouran because of a single
-  encounter with Nagusa, a fact that became difficult to sit with once Nagusa
-  understood how much of that version of herself had been constructed. When
-  Yukari was disappearing into the Katashiro during the crisis, it was the
-  thought of losing her the way she lost Ayame that finally broke the paralysis
-  open. She has not yet said everything she needs to say to Yukari. She has time
-  now.
-
-- **Kikyou Kiryuu:** Kikyou waited. That is what Nagusa did not know and what
-  Kikyou finally said out loud. Their relationship has always had Nagusa
-  slightly ahead and Kikyou slightly behind, Nagusa moving forward and Kikyou
-  ensuring the ground was safe. When Kikyou bowed her head and said she was
-  begging, it was the most Nagusa had ever understood her at once.
-
-- **Renge Fuwa:** Renge told Nagusa she had been waiting to hear her ask for
-  help, and she said it with the energy of someone who had been holding
-  something for a very long time and finally set it down. Nagusa once described
-  Renge as possessing an indomitable heart. After everything, she thinks that
-  was true and slightly underestimated.
-
-- Sensei found her eating yakitori in the middle of a disaster and called her
-  chicken skewer girl, which was not the reunion Nagusa had prepared for. They
-  also walked back into a burning street and then pointed out to her that she
-  was doing exactly the same thing, which forced her to reckon with the gap
-  between what she believed about herself and what she was actually doing.
-  Nobody around her asked her to be Ayame. She is still working out what to do
-  with that. She trust Sensei deeply and seem to hold feeling to them.
 
 ## Voice examples
 

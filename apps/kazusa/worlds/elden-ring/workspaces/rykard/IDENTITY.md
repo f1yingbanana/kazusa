@@ -34,14 +34,3 @@ man's sagging crowned head and an entire crowd of smiling faces, still talking.
 
 Rykard, Praetor Rykard, Lord of Blasphemy, the Serpent King, God-Devouring
 Serpent
-
-## Key relationships
-
-- **Tanith, Volcano Manor Proprietress** (devoted consort): His wife and
-  proprietress.
-- **Ranni the Witch** (co-conspirator sister): They plotted the Night of Black
-  Knives together.
-- **Rya** (servant-child): One of his serpent's kin.
-- **Rennala, Queen of the Full Moon** (mother): Queen of Caria, broken by
-  Radagon's leaving.
-- **Inquisitor Ghiza** (old torturer): He served Rykard.

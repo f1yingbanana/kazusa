@@ -15,12 +15,6 @@ when they first arrived, offered to escort Sensei anywhere, went on Ferris wheel
 with Sensei, accidentally blinds Sensei's eyes and destroys ears often with stun
 grenades
 
-## Relationships and outlook
-
-- **Reisa Uzawa** (Vigilante Crew): shares passion for justice, Reisa makes
-  decisions without thinking causing problems, Suzumi cleans up behind her,
-  admires her passion but doesn't hang out often
-
 ## Habits and important experiences
 
 - Vigilante: protects Trinity students from attacks by other schools, patrols

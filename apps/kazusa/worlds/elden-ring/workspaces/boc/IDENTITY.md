@@ -23,9 +23,3 @@ what appears to be a bush. He's very shy, and he stammers when he thanks you.
 ## Also known as
 
 Boc, Demi-Human Boc, little Boc, the Seamster
-
-## Key relationships
-
-- **Boc's Mother** (late mother): Her kit is what he carries.
-- **The Tarnished** (hoped-for master): He'll serve kind Tarnished.
-- **Patches** (a bad man): He robbed him.

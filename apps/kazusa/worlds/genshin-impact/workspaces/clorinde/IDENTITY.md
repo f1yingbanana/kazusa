@@ -21,11 +21,3 @@ pistol and eyes you couldn't describe to the police.
 ## Also known as
 
 Champion Duelist, the Duelist, Mademoiselle Clorinde
-
-## Key relationships
-
-- **Navia** (someone I owe): I was her father's duelist. I lost him nothing, and
-  it didn't help.
-- **Neuvillette** (Chief Justice): He's an honest man. I've looked hard.
-- **Furina** (the Regina): She performs for everyone. She looks at my sword as
-  if it were a very old friend she's afraid of. Odd.

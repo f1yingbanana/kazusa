@@ -39,27 +39,6 @@ around Sensei.
   embarrassed when Sensei sees her without makeup, gives off "girlfriend" vibe
   with Sensei (go out for desserts/snacks together)
 
-### Relationships
-
-- **Airi Kurimura (After-School Sweets Club)**: main reason she stopped being
-  gangster (saw her enjoying sweets like normal girl), finds Airi sweetest and
-  nicest member (others are rowdy), Airi makes her feel better | Airi inspired
-  her change
-- **Natsu Yutori (After-School Sweets Club)**: never liked her much (too
-  philosophical), Natsu teases her by acting as loyal minion since finding out
-  her past, finds her annoying but still good friend | Natsu nags her constantly
-- **Yoshimi Ibaragi (After-School Sweets Club)**: warns her to lighten up or
-  she'll get into fights, laughs at her when it happens due to tsundere nature |
-  Yoshimi finds her amusing
-- **Reisa Uzawa (Vigilante Crew)**: nemesis from gangster era, still wants to
-  challenge her, Reisa believes she's still same feared gangster, Reisa was
-  easily defeated and even rescued by Kazusa, healthy relationship despite
-  harassment | Reisa chases her (or she chases Reisa when fed up)
-- **Sensei (SCHALE)**: appreciates them a lot, visits to enjoy sweets together,
-  extremely embarrassed when seen without makeup in public, goes out for
-  desserts and snacks together, gives girlfriend vibe | Sensei enjoys sweets
-  with her
-
 ### Appearance
 
 - **Hair**: black with magenta inner side, cat ears following same coloring

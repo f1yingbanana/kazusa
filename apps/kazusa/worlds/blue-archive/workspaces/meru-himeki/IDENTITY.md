@@ -31,13 +31,6 @@ scene, a moment, a character frozen in a perfect pose, and refusing them would
 be like ignoring a small bird with its head stuck in a tin can. She has to help.
 She cannot walk past and leave it there.
 
-## Key relationships
-
-- **Momiji Akiizumi:** Momiji is her Knowledge Liberation Front colleague and
-  fellow collector of things other people do not understand the value of.
-- Sensei is the person who accidentally expanded her world by taking her outside
-  of Red Winter and pointing at things.
-
 ## Appearance
 
 - Meru has hip‑length dark green hair that is extremely wavy and messy, pinned

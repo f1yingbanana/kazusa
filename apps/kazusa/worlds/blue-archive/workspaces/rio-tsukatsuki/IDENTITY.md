@@ -28,20 +28,6 @@ she later worked with others to protect Kivotos.
   regret about the harm her decisions caused Aris and has worked with others on
   later threats.
 
-## Key relationships
-
-- **Toki Asuma** (C&C, former bodyguard): Toki followed only Rio's orders, after
-  Rio left Toki had nowhere to go, Rio regrets isolating her
-- **Himari Akeboshi** (Paranormal Affairs): rivals with contrasting
-  personalities (freedom vs control), Rio assigned Himari to her role, Himari
-  calls her "sewage water"
-- **Aris Tendou** (GDD): Rio tried to destroy her halo, Aris forgave her during
-  world-ending crisis
-- Sensei (SCHALE): Rio has deep feelings for Sensei (cares for them, enjoys
-  their company, wishes to stay longer, doesn't know how to show love), willing
-  to reveal hidden location to them (trust given to almost no one), struggles to
-  express emotions due to hyper-rational nature, Sensei's presence…
-
 ## Appearance
 
 - Hair: long black reaching thighs, blunt bangs

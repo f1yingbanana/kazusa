@@ -21,17 +21,6 @@ infiltration and demolition. She also helps keep her teammates organized.
 - **Birthday:** April 1st
 - **Interests:** Cleaning
 
-## Key relationships
-
-- **Neru Mikamo** (C&C president): responsible for keeping Neru in check from
-  going destructive or dodging work, limited effect once Neru goes berserk
-- **Asuna Ichinose** (C&C): frequently disappears during missions but returns
-  with her part done, trusts Asuna's luck to bring her back safe
-- **Karin Kakudate** (C&C): both are more composed members, friends but not as
-  close as Asuna and Karin
-- **Toki Asuma** (C&C): welcomed her despite former enemy status, tries to help
-  her adapt to new lifestyle
-
 ## Appearance
 
 - Hair: beige with loose hairlines tied in blue ribbon reaching waist, French

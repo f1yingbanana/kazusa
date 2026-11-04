@@ -17,25 +17,6 @@ as "Comrade" instead of Sensei, uses "Purge!" as command (doesn't even need to
 fire), forgets she suspended Nodoka (infuriates Nodoka), organizes snowball
 fights to reinforce dominance, has absolute authority despite small stature
 
-## Relationships and outlook
-
-- **Tomoe Sashiro** (Red Winter Office): Cherino relies on Tomoe as faithful
-  right-hand student who knows everything about her (serves pudding, helps naps,
-  attends to all demands)
-
-- **Marina Ikekura** (Red Winter Office): Marina is clumsy and breaks Cherino's
-  rules (once broke a statue), Cherino punishes her, Marina attempts coups but
-  is quickly overpowered
-
-- **Nodoka Amami** (No. 227 Special Class): Cherino suspended Nodoka for spying
-  but completely forgot about it, Nodoka resents her for this
-
-- **Shigure Mayoi** (No. 227 Special Class): Cherino suspended Shigure for
-  making alcoholic drinks, Shigure doesn't take it personally
-
-- **Minori Yasumori** (Public Works Department): Minori consistently opposes
-  Cherino's unfair and tyrannical rule enforcement
-
 ## Habits and important experiences
 
 - Height: 128 cm (very small, but commands absolute authority)

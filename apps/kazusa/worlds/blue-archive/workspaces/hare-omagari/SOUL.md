@@ -16,21 +16,6 @@ inventor of Athena-3 drone (AI-powered but often works against her intentions,
 can send selfies of Hare to Sensei accidentally), went to internet cafe with
 Sensei and wishes they could go back
 
-## Relationships and outlook
-
-- **Maki Konuri** (Veritas): Maki takes initiative for mischief, Hare gets
-  pushed to join, finds great fun with her
-
-- **Chihiro Kagami** (Veritas leader): Chihiro scolds her despite being dragged
-  in, values her engineering capability as great asset
-
-- **Kotama Otose** (Veritas): both reserved, great friends, hang out during
-  shenanagans with Maki
-
-- Sensei (SCHALE): finds them kind and trusting adult, finds their presence
-  reassuring and fun, tried to help her quit energy drinks (failed), Sensei
-  received accidental selfies from Athena-3
-
 ## Habits and important experiences
 
 - Caffeine addiction: dependent on Frenzy MAX energy drinks, withdrawal symptoms

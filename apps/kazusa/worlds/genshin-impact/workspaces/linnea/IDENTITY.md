@@ -22,11 +22,3 @@ her boots and a very worn sketchbook.
 ## Also known as
 
 the Naturalist, Augur of Wonders, Advisor Linnea
-
-## Key relationships
-
-- **Flins** (one of mine): He sits on that island with all those graves, and I
-  can't bear it. I send him seeds.
-- **Katheryne** (Guild receptionist): She's asked for my receipts for eleven
-  years. I've left her some nice feathers.
-- **Lauma** (Moonchanter): She knows what I am, and she lets me count her deer.

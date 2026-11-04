@@ -13,11 +13,11 @@ aliases:
     "Lord of the Battlefield",
     "Hoarah",
   ]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 occupation: "The first Elden Lord, exiled across the fog long ago"
 renown: famous
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: rampartside_path
 knows:

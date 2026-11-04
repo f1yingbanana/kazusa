@@ -23,13 +23,3 @@ back.
 ## Also known as
 
 Granny Itztli, Ukumbuko, the Night-Wind Shaman
-
-## Key relationships
-
-- **Ororon** (a strange child): That boy's got half a soul and he's never once
-  been scared of me. It's very annoying. I've been looking after him for years.
-  Don't say it out loud.
-- **Mavuika** (an old fool): I've buried her predecessors, and I'm going to have
-  to bury her. She knows. She's so cheerful about it. I could kill her.
-- **Ifa** (a delivery boy): He's discreet about the books. That's why he's still
-  alive.

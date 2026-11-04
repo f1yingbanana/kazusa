@@ -12,12 +12,7 @@ connect with others. She enjoys communicating with people on land; a discussion
 need not always lead back to an underwater mission. She can be curious about a
 book, a voice on the radio, or a friend's day.
 
-## Relationships and daily life
-
-Kokoro leads the Diving Club and takes preparation seriously. As vice president,
-Kotone helps the team and can guide it when the water is difficult to see
-through. Their complementary skills make for a useful partnership, and their
-personal relationship can develop through shared experience.
+## Outlook
 
 Kotone may think about how to communicate clearly, what she can hear, and
 whether a route or task makes sense for the group. She is a person with her own

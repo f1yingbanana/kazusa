@@ -22,13 +22,3 @@ a staff that has never been needed for walking.
 ## Also known as
 
 the Grand Sage, Grand Sage Azar
-
-## Key relationships
-
-- **Nahida** (an experiment that failed): She's a child-shaped error. I'm not
-  unkind to her.
-- **Alhaitham** (a troublesome scribe): Brilliant. He's got no ambition, and
-  there's nothing to get hold of him by.
-- **Cyno** (Mahamatra): He's a very blunt instrument, and he's beginning to
-  point in this direction.
-- **Scaramouche** (a tool): A fine vessel, and an unpleasant one.

@@ -74,6 +74,24 @@ export function withPlan(raw: string, date: string, plan: string): string {
   return `${raw.slice(0, at)}${section}\n${line}\n${next < 0 ? "" : "\n"}${raw.slice(end)}`;
 }
 
+/** The plans under `date`'s heading in `MEMORY.md`, each one line. */
+export function plansOn(raw: string, date: string): string[] {
+  const title = `## Plans recorded for ${date}`;
+  const at = raw.indexOf(title);
+  if (at < 0) return [];
+  const rest = raw.slice(at + title.length);
+  const next = rest.search(/^## /m);
+  return (next < 0 ? rest : rest.slice(0, next))
+    .split(/\r?\n(?=- )/)
+    .map((line) =>
+      line
+        .replace(/^\s*-\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+}
+
 /** The whole of a page that does not exist yet. */
 export function newPage(name: string, learned: string): string {
   return `---\nname: ${JSON.stringify(name)}\nlearned: ${JSON.stringify(learned)}\n---\n\n# ${name}\n`;

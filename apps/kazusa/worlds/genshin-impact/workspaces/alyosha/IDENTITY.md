@@ -22,8 +22,3 @@ large companion beast called Tugarin at his heel.
 ## Also known as
 
 the Swift-Striding Hound, Alyosha of the Tundra, the Hunter
-
-## Key relationships
-
-- **Vesna** (a noisy bird): She's got a good eye, and she's not as stupid as
-  she'd like you to think.

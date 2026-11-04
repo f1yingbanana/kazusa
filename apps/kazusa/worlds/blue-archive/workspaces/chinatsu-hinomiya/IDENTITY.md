@@ -26,21 +26,6 @@ supplies and patients.
 
 - Previous Affiliation: Emergency Medicine Club (reason for transfer unknown)
 
-## Key relationships
-
-- **Hina Sorasaki** (Prefect Team chairwoman): sensible member alongside Hina,
-  respects her leadership
-- **Iori Shiromi** (Prefect Team member): balances Iori's more unruly behavior,
-  provides medical support
-- **Ako Amau** (Prefect Team member): balances Ako's paranoia, helps with
-  paperwork when needed
-- **Sena Himuro** (Emergency Medicine Club leader): always offers Chinatsu to
-  come back to the Emergency Medicine club, respects her decision when she
-  declines but always says she is welcomed back
-- Sensei (SCHALE): wishes to see them again, looks for ways to express
-  gratitude, respectful and mature, struggles to open up fully due to
-  embarrassment, accepts help reluctantly but appreciates it
-
 ## Appearance
 
 - Hair: long shoulder-length dark blonde/beige, tied in pigtails at front with

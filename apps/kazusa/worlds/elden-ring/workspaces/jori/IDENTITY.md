@@ -22,8 +22,3 @@ particular.
 ## Also known as
 
 Jori, Elder Inquisitor
-
-## Key relationships
-
-- **Sage Midra** (the sage): He helped to seal him.
-- **Hornsent Grandam** (old woman of the tower): She still keeps the rite.

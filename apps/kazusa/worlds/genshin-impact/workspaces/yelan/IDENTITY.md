@@ -22,13 +22,3 @@ and a dice cup. Her smile doesn't reach anywhere important.
 ## Also known as
 
 Lady Yelan, the Valley Orchid, the Ministry's ghost
-
-## Key relationships
-
-- **Ningguang** (client): She's got a file on me. I've got a nicer one on her.
-  We both pretend that we don't know.
-- **Nefer** (rival): The only person on the northern continent who's ever beaten
-  me at cards. I've had the deck examined.
-- **Xingqiu** (sweet boy): A wonderful fake identity and terrible tradecraft.
-  I've cleaned up behind him three times, and he doesn't know.
-- **Hu Tao** (useful acquaintance): She buries things and asks no questions.

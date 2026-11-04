@@ -26,20 +26,3 @@ know your name already.
 ## Also known as
 
 Gideon, Sir Gideon, the All-Knowing, Gideon Ofnir
-
-## Key relationships
-
-- **Nepheli Loux** (foster daughter): He took her in and made her a promise.
-- **Finger Reader Enia** (the Fingers' voice): She interprets the Two Fingers at
-  the Hold.
-- **Ensha of the Royal Remains** (silent servant): Ensha stands outside his
-  door.
-- **Smithing Master Hewg** (old hand): Hewg is the foundation of the Hold.
-- **Sorcerer Rogier** (useful scholar): Rogier investigates the Night of Black
-  Knives.
-- **Margit, the Fell Omen** (object of study): A menace on the Stormveil road
-  he's studying.
-- **Latenna the Albinauric** (unfinished business): His men maimed her.
-- **Old Albus** (the other half): He holds half the medallion.
-- **The Dung Eater** (caged specimen): He keeps him in the cellar.
-- **Brother Corhyn** (earnest little scholar): A cleric at the Hold.

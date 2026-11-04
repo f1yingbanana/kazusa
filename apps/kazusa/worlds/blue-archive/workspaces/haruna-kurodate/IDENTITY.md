@@ -21,24 +21,6 @@ with an eye for ingredients, presentation and atmosphere.
 - **Birthday:** March 1st
 - **Interests:** Foodie touring, making foodie lists
 
-## Key relationships
-
-- **Akari Wanibuchi** (Gourmet Research Society): Haruna sees Akari as chaotic
-  in both attitude and appetite (eats absurd amounts, while Haruna eats little
-  but focuses on taste and presentation)
-- **Junko Akashi** (Gourmet Research Society): Haruna considers Junko the most
-  sensible member, but still drags her into all club activities (even when Junko
-  wishes she wasn't involved)
-- **Izumi Shishidou** (Gourmet Research Society): Haruna sees Izumi's bizarre
-  food combinations as an opportunity to discover the ultimate taste (always
-  looks forward to her experiments)
-- **Fuuka Aikiyo** (Gehenna Cafeteria): Haruna believes no other cooking
-  compares to Fuuka's, frequently kidnaps her to force her to cook for the club
-  (1v4, Fuuka can't resist)
-- Sensei (SCHALE): Haruna brings Sensei to try food combinations and rituals,
-  discovered food tastes better when eating with them (failed to replicate
-  alone), enjoys sharing meals with Sensei
-
 ## Appearance
 
 - Hair: long silver tied in braids with beige ribbon on left side

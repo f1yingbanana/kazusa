@@ -24,9 +24,3 @@ at your footsteps.
 ## Also known as
 
 Irina, Lady Irina
-
-## Key relationships
-
-- **Castellan Edgar** (father): He's her father.
-- **Godrick the Grafted** (our lord): Her father's commander.
-- **Leonine Misbegotten** (what chased me): It led the rising.

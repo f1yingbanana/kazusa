@@ -21,18 +21,6 @@ inventing devices.
 - **Birthday:** December 31st
 - **Interests:** Talking
 
-## Key relationships
-
-- **Utaha Shiraishi** (Engineering Department head): admires Utaha's passion and
-  sees her as inspiration, difficult to keep secrets (Utaha's secrets included),
-  Utaha has to keep her mouth shut
-- **Hibiki Nekozuka** (Engineering Department): both share passion for
-  engineering and adding unnecessary functions, Hibiki daydreams when Kotori
-  explains
-- Sensei (SCHALE): appreciates Sensei's effort to listen, Sensei sometimes runs
-  away to avoid lectures, sad when people run away from her explanations,
-  explained canned food history to Sensei
-
 ## Appearance
 
 - Hair: bright orange messy bob cut with bangs, braid styled on left

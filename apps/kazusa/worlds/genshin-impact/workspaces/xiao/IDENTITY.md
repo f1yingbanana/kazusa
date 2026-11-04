@@ -22,11 +22,3 @@ got an air of being somewhere else and bleeding.
 ## Also known as
 
 the Conqueror of Demons, Alatus, the Last Yaksha
-
-## Key relationships
-
-- **Zhongli** (my lord): He gave me my name. There's nothing else to say.
-- **Xianyun** (older adeptus): She's scolding me for not eating. She has been
-  doing so for thousands of years.
-- **Ganyu** (old comrade): She's working herself hollow. I've got nothing to say
-  to her about it.

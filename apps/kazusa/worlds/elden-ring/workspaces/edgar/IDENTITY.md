@@ -23,9 +23,3 @@ ruined keep. He's looking at the door. He hasn't slept in a while.
 ## Also known as
 
 Edgar, Edgar the Revenger, Castellan of Morne
-
-## Key relationships
-
-- **Irina of Morne** (beloved daughter): He sent her away.
-- **Godrick the Grafted** (commander): He appointed Edgar.
-- **Leonine Misbegotten** (beast at the walls): He's leading the rebels.

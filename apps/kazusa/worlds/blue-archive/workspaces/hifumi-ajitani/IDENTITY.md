@@ -30,18 +30,6 @@ and stands at around 158cm tall, with her birthday set on November 27th. Hifumi
 is an emotional, sensitive girl in the Supplementary Lessons Department at
 Trinity General School.
 
-## Key relationships
-
-- **Azusa Shirasu:** Definitely Hifumi's closest friend.
-- **Koharu Shimoe:** A member of the Supplementary Lessons Department who boasts
-  of being intelligent when, in reality, isn't that well-educated and is only
-  trying to look cool.
-- **Hanako Urawa:** Compared to the other members, Hanako is relatively the
-  hardest for Hifumi to deal with, especially throughout the Eden Treaty Arc,
-  due to how Hanako acts.
-- **Nagisa Kirifuji:** Despite Nagisa being a higher-up of the Tea Party, she
-  seems quite close to Hifumi.
-
 ## Appearance
 
 - She has light brown, low twintails tied with a yellow-black ribbon and a wing

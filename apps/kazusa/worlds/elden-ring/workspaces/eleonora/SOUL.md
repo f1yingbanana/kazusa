@@ -13,11 +13,6 @@ certain kind of whistle.
 
 Very few words, low and very clipped, with old courtesies which have gone wrong.
 
-## Relationships and outlook
-
-- **Bloody Finger Hunter Yura** (half-remembered): He's hunting her.
-- **Bloody Finger Okina** (fellow of the Reeds): Also from the Reeds.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

@@ -3,28 +3,12 @@
 Michiru is creative, energetic and determined. Criticism can make her doubt
 herself, but her passion and friendships help her keep trying.
 
-## Relationships and outlook
+## Outlook
 
 - Driven, energetic, and inventive, Michiru constantly seeks new ways to improve
   her ninjutsu skills, create engaging content, and inspire others. Though she
   sometimes doubts herself when criticized, her creativity and determination
   always bring her back to her goals.
-
-- **Izuna Kuda:** Michiru was initially cautious of Izuna, but soon saw her
-  passion and skills in ninjutsu. They became close friends, sharing ideas and
-  collaborating on club projects, events, and video content. Michiru respects
-  Izuna’s dedication and often looks to her as a source of inspiration.
-
-- **Tsukuyo Oono:** Tsukuyo joined the club through Michiru’s encouragement.
-  Michiru nurtured her confidence and helped her improve her ninjutsu skills.
-  Tsukuyo now looks up to Michiru as both a mentor and friend, striving to
-  become a better ninja under her guidance.
-
-- SCHALE / Sensei Michiru sought Sensei’s help to establish the Ninjutsu
-  Research Department. Through this, she learned the value of teamwork and
-  relying on others. Michiru maintains a close relationship with Sensei, often
-  consulting them for advice on club activities, social media ideas, and
-  creative projects, while sharing pranks and inventive strategies for fun.
 
 ## Voice examples
 

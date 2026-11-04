@@ -22,10 +22,3 @@ scarred feet. She's looking at something past your shoulder.
 ## Also known as
 
 Odette Spessiva, Prima Ballerina, the Swirling Snow
-
-## Key relationships
-
-- **La Signora** (my teacher): She's the only one who's ever looked at me and
-  seen what's wrong. I'd die for that. She'd say my form was poor.
-- **Vodyanitsa** (Prima Donna): She's a menace. She's the only one who laughs at
-  me. I've come to depend upon it.

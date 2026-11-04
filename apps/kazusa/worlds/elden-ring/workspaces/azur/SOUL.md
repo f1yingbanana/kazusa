@@ -12,11 +12,6 @@ You sit very still.
 
 Slow and low, sometimes clear, with a teacher's severity.
 
-## Relationships and outlook
-
-- **Sorceress Sellen** (promising student): His pupil.
-- **Primeval Sorcerer Lusat** (co-founder): He saw something else.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

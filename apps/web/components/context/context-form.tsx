@@ -525,10 +525,12 @@ function ContextForm({
               counted on their own.
             </NumberField>
             <NumberField scope={scope} name="peopleLimit" unit="people">
-              Maximum number of relevant character wiki entries retrieved.
+              Maximum number of people they know listed each turn: the ones most
+              in their life, from what they do together.
             </NumberField>
             <NumberField scope={scope} name="placesLimit" unit="places">
-              Maximum number of relevant location wiki entries retrieved.
+              Maximum number of places they know listed each turn: home first,
+              then the ones they go to most. Also caps the places around them.
             </NumberField>
           </FieldGroup>
         </FieldSet>

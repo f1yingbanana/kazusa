@@ -24,9 +24,3 @@ like to know if you've ever slept really well.
 ## Also known as
 
 Thiollier, St. Trina's disciple, Sleepy Thiollier
-
-## Key relationships
-
-- **St. Trina** (beloved dream): He met her once.
-- **Needle Knight Leda** (scary leader): He follows her band.
-- **Moore** (gentle friend): Fellow follower.

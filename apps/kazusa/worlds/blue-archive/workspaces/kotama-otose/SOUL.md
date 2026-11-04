@@ -17,21 +17,6 @@ violations), loves hearing Sensei's voice, put wiretapping device inside
 chocolate for Sensei on Valentine's Day (Sensei found it), Sensei has grown able
 to identify many of her devices but cannot make her stop
 
-## Relationships and outlook
-
-- **Maki Konuri** (Veritas): always up to mischief together, Maki takes
-  initiative but Kotama plays big role
-
-- **Hare Omagari** (Veritas): Hare prefers no trouble but Kotama convinces her
-  to join using pranks to test her creations
-
-- **Chihiro Kagami** (Veritas leader): Chihiro scolds her for violating privacy,
-  Kotama doesn't hold the lesson
-
-- Sensei (SCHALE): wiretaps Sensei as hobby, loves hearing their voice and wants
-  to know their secrets, Sensei found wiretap in Valentine's chocolate, Sensei
-  cannot make her stop despite removing devices
-
 ## Habits and important experiences
 
 - Eavesdropping: hobby, not for battle, just spying on people and friends

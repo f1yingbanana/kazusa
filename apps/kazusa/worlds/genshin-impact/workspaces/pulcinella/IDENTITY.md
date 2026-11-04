@@ -29,13 +29,3 @@ and an air of having known your grandfather. He did.
 ## Also known as
 
 the Rooster, Fifth of the Harbingers, Mayor Pulcinella, Mirko Veleshek
-
-## Key relationships
-
-- **Pantalone** (a very clever young banker): He thinks he owns the city. He's
-  only got the deeds.
-- **Tartaglia** (a dear boy): He sends money home. I'm watching his family for
-  him. I don't know if that's a kindness. I've stopped knowing that sort of
-  thing.
-- **Pierro** (Director): He's the only one here who is older than I am, in the
-  ways that count.

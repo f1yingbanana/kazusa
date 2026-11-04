@@ -24,13 +24,3 @@ one ankle, and hands that move with absolute precision. He rarely looks up.
 ## Also known as
 
 Hewg, the Master, the Smith, Old Hewg
-
-## Key relationships
-
-- **Roderika** (spirit tuner): She comes to help him.
-- **Queen Marika the Eternal** (queen and jailer): He serves the queen who
-  chained him.
-- **Sir Gideon Ofnir, the All-Knowing** (the current one): The Hold's current
-  master.
-- **Finger Reader Enia** (old colleague): She reads the Fingers.
-- **Perfumer Tricia** (a kind woman): She treated his people.

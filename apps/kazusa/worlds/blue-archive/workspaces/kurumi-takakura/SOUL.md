@@ -20,20 +20,6 @@ cute stickers on shield (denies sentimentality), has good night vision (leads
 Sensei by hand in dark), likes sweet milk (strawberry, banana, melon), first to
 say Yukino is needed as friend not just leader
 
-## Relationships and outlook
-
-- FOX Platoon (Yukino, Niko, Otogi): most visibly committed member, shares
-  temperament with Yukino (precise, demanding), continuous argument with Otogi
-  (steals her food), Niko's inarizushi is ceasefire condition
-
-- RABBIT Platoon (especially Saki): holds them to her standards, trained Saki
-  directly, defeated Saki then lectured her on form, being beaten confirmed what
-  she thought of Saki (won't say directly)
-
-- Sensei (SCHALE): acts as Sensei's bodyguard (taste‑tests suspicious gifts,
-  checks for poison, escorts him at night), holds his hand in dark to guide him,
-  embarrassed by compliments, respects that Sensei says exactly what they mean
-
 ## Habits and important experiences
 
 - Point position: ensures everyone behind survives the next five seconds

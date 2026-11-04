@@ -28,10 +28,3 @@ half-unravelled and a thesis held like a teddy bear.
 ## Also known as
 
 Rtawahist student, the Sleeping Stargazer
-
-## Key relationships
-
-- **Faruzan** (an old professor): She's been so kind about it, in a way that
-  makes me want to climb under the desk.
-- **Alhaitham** (the Scribe): He looked at my paper, and he said, "This part's
-  correct." I've been thinking about it for a week.

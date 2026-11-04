@@ -8,6 +8,7 @@ import {
   newPage,
   withNote,
   withNoteCap,
+  plansOn,
   withPlan,
 } from "./writes.ts";
 
@@ -63,6 +64,18 @@ describe("withPlan", () => {
     expect(withPlan(raw, "2026-10-31", "Bake.")).toContain(
       "## Plans recorded for 2026-10-31\n\n- Bake.\n",
     );
+  });
+});
+
+describe("plansOn", () => {
+  it("reads one day's plans, each as one line", () => {
+    const raw =
+      "## Plans recorded for 2026-10-30\n\n- [HARD_BLOCK] 16:00 Meet Airi\n  at the club room.\n- Bake.\n\n## Plans recorded for 2026-10-31\n\n- Rest.\n";
+    expect(plansOn(raw, "2026-10-30")).toEqual([
+      "[HARD_BLOCK] 16:00 Meet Airi at the club room.",
+      "Bake.",
+    ]);
+    expect(plansOn(raw, "2026-11-01")).toEqual([]);
   });
 });
 

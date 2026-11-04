@@ -22,8 +22,3 @@ hurried in his life. There's something unpleasant about how still his hands are.
 ## Also known as
 
 Rileigh, the Idle
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (employer): He once hunted for the Hold.
-- **Inquisitor Ghiza** (old acquaintance): Fellow professionals.

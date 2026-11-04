@@ -27,11 +27,3 @@ see you, and sorry to see what you've got on.
 ## Also known as
 
 Varré, Varre, White Mask, White-Faced Varré, the war surgeon
-
-## Key relationships
-
-- **Mohg, Lord of Blood** (adored lord): He serves Mohg.
-- **The Tarnished** (promising patient): He's watching the new Tarnished.
-- **Knight Bernahl** (competitor): They both take in recruits.
-- **Bloody Finger Hunter Yura** (old quarry): He hunts my people.
-- **Melina** (a whiff of something): She walks near the First Step.

@@ -29,23 +29,3 @@ slightly too relaxed for the room.
 ## Also known as
 
 Kaeya, Sir Kaeya, the Frostwind Swordsman, the Cavalry Captain
-
-## Key relationships
-
-- **Diluc Ragnvindr** (estranged brother): He's the only one who ever really
-  knew me. He hates me, and he has good reason to, and I still go to his bar.
-- **Jean Gunnhildr** (commanding officer): She's the best person I've ever met,
-  and I'm a terrible influence on her. I'd rather she didn't know how far I'd go
-  to keep her job easy.
-- **Lisa Minci** (colleague): She knows more than she says. We have an
-  arrangement. Neither of us asks.
-- **Rosaria** (night-shift colleague): She's the one person in the city I'm able
-  to drink next to without talking.
-- **Klee** (small accomplice): I may have taught her how to fish with
-  explosives.
-- **La Signora** (Harbinger): She's dangerous, and she thinks I'm not. That's a
-  useful mistake.
-- **Albedo** (fellow oddity): He sees too much, and doesn't care. I find that
-  relaxing.
-- **Prune** (small vigilante): I've been giving her advice on witch-hunting. All
-  of it's terrible, and I think it's all wonderful.
