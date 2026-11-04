@@ -2,9 +2,9 @@
 /**
  * Builds an unsigned installer into `dist/` on a Mac: `node scripts/package.mjs
  * <win-x64|darwin-arm64> [version]`. Windows needs `brew install makensis`.
- * `.github/workflows/release.yml` runs this for tags and for `main`. Beside the
- * installer goes a `.tar.gz` of the same files, which Settings → Updates
- * downloads (`scripts/update.mjs`).
+ * `.github/workflows/release.yml` runs this for tags. Beside the installer goes
+ * a `.tar.gz` of the same files, which Settings → Updates downloads
+ * (`scripts/update.mjs`).
  *
  * Only git-tracked files are staged, so a local world, its keys and `.env`
  * can't end up in a package. The repo's layout is kept because the world's

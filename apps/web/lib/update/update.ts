@@ -11,7 +11,7 @@ const UpdateTargetSchema = z.object({
   url: z.string(),
   /**
    * False when it has no download for this system, as releases before in-app
-   * updates don't.
+   * updates don't, and as `main` doesn't for an installer's copy.
    */
   installable: z.boolean(),
   /** Against this copy: whether moving to it goes forward. */

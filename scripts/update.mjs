@@ -5,8 +5,8 @@
  *
  * - **git**: a clone, with git installed. Fetches from GitHub and checks out.
  * - **packaged**: the installer's copy, running on its own Node. Swaps in the
- *   archive the release workflow builds for this system. `main` comes from the
- *   rolling `head` prerelease, since nothing here can build the frontend.
+ *   archive the release workflow builds for this system, so only releases:
+ *   nothing here can build `main`.
  * - **source**: anything else, such as GitHub's source zip. Swaps in GitHub's
  *   source archive and reinstalls dependencies.
  *
@@ -40,11 +40,6 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "f1yingbanana/kazusa";
 const API = `https://api.github.com/repos/${REPO}`;
-/**
- * The prerelease `.github/workflows/release.yml` rebuilds from every push to
- * `main`.
- */
-const HEAD_RELEASE = "head";
 const WORLD = "apps/kazusa/world";
 /** `scripts/package.mjs` targets, by `${process.platform}-${process.arch}`. */
 const PACKAGE_TARGETS = {
@@ -214,25 +209,15 @@ async function latestRelease(kind) {
   };
 }
 
+/** A packaged copy can see how far `main` is ahead, but not install it. */
 async function latestDevelopment(kind) {
-  if (kind === "packaged") {
-    const release = await github(`/releases/tags/${HEAD_RELEASE}`);
-    if (!release) return null;
-    return {
-      version: release.name,
-      ref: refOf(release.name),
-      date: release.published_at,
-      url: release.html_url,
-      archive: packagedArchive(release),
-    };
-  }
   const commit = await github("/commits/main");
   return {
     version: commit.sha.slice(0, 7),
     ref: commit.sha,
     date: commit.commit.committer.date,
     url: commit.html_url,
-    archive: sourceArchive(commit.sha),
+    archive: kind === "packaged" ? null : sourceArchive(commit.sha),
   };
 }
 
@@ -333,16 +318,15 @@ export async function stage(root, to) {
   const here = current(root, kind);
   const blocked = blockedReason(here);
   if (blocked) throw new Error(blocked);
+  if (kind === "packaged" && to === "development")
+    throw new Error(
+      "Development builds need a copy installed with git and Node.js.",
+    );
   const target =
     to === "release"
       ? await latestRelease(kind)
       : await latestDevelopment(kind);
-  if (!target)
-    throw new Error(
-      to === "release"
-        ? "There's no release yet."
-        : "There's no development build yet.",
-    );
+  if (!target) throw new Error("There's no release yet.");
   let pending;
   if (kind === "git") {
     const ref =
@@ -379,7 +363,7 @@ export async function stage(root, to) {
       kind,
       to,
       version:
-        !packaged && to === "development"
+        to === "development"
           ? await describeCommit(target.ref)
           : target.version,
       // GitHub's source archives hold one folder named for the commit.

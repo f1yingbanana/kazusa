@@ -1,19 +1,12 @@
 # Pushing a version tag (`v0.2.0` or `0.2.0`) publishes both installers, and the
-# archives Settings → Updates installs from. Every push to `main` replaces the
-# `head` prerelease with archives of it, for "Development" updates. Running it
-# by hand from the Actions tab builds and checks them without publishing.
+# archives Settings → Updates installs from. Running it by hand from the Actions
+# tab builds and checks them without publishing.
 name: Release
 
 on:
   push:
     tags: ["v[0-9]*", "[0-9]*"]
-    branches: [main]
   workflow_dispatch:
-
-# Only the newest `main` matters; a release always finishes.
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type == 'branch' }}
 
 jobs:
   build:
@@ -21,8 +14,6 @@ jobs:
     # Windows. The bundled Node is whichever version runs the build.
     runs-on: macos-15
     timeout-minutes: 60
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,8 +21,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24.19.0
-      # A tag's name, else `git describe` (`0.1.3-2-gef08f9b`), which
-      # `scripts/update.mjs` reads the commit back out of.
+      # A tag's name, else `git describe` (`0.1.3-2-gef08f9b`) for a run by hand.
       - id: version
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then version="$GITHUB_REF_NAME"
@@ -96,25 +86,3 @@ jobs:
           **Mac (Apple silicon):** drag Kazusa to Applications and open it. If macOS blocks it, go to System Settings > Privacy & Security and choose Open Anyway. To update, use Settings > Updates, or replace the app.
           To quit, press Ctrl+C in Kazusa's terminal window and wait for it to finish."
           fi
-
-  # One `head` prerelease at a time, so `releases/latest` never sees it.
-  publish-head:
-    needs: [build, verify-windows]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      VERSION: ${{ needs.build.outputs.version }}
-      GH_REPO: ${{ github.repository }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: installers
-          path: installers
-      - run: |
-          gh release delete head --yes --cleanup-tag || true
-          gh release create head installers/Kazusa-*.tar.gz \
-            --prerelease --latest=false --target "$GITHUB_SHA" --title "$VERSION" \
-            --notes "The latest build of main, for Settings > Updates > Development. Not a release: it may be broken."

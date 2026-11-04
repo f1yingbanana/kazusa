@@ -256,9 +256,17 @@ export function UpdateSettings() {
                     </>
                   ) : null
                 }
-                note="Unreleased. The newest changes, and the least tested."
+                note={
+                  development?.installable === false
+                    ? "Unreleased. Installing it needs a copy set up with git and Node.js."
+                    : "Unreleased. The newest changes, and the least tested."
+                }
                 action={
-                  development ? (
+                  // An installer's copy only takes releases.
+                  development &&
+                  (development.installable ||
+                    development.status === "current" ||
+                    development.status === "older") ? (
                     <TargetAction
                       target={development}
                       primary={false}
