@@ -82,6 +82,11 @@ export interface ToolExecutionContext {
   readonly store: TaskStore;
   readonly clock: Pick<Clock, "time">;
   readonly minDuration: number;
+  /** A `kazusa-results` section, filled: what an activity change says. */
+  readonly text: (
+    section: string,
+    values: Readonly<Record<string, string | number>>,
+  ) => string;
   readonly prepare?: (
     transition: TaskTransition,
   ) => Promise<readonly PreparedTaskCommit[]>;

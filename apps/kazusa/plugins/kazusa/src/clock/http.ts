@@ -37,6 +37,7 @@ export const DEFAULT_CAPABILITIES: Readonly<
   desires: "live",
   stage: "live",
   models: "live",
+  context: "live",
   profile: "live",
   wiki: "live",
   brain: "live",

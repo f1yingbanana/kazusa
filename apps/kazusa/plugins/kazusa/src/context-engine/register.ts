@@ -9,10 +9,12 @@ import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import type { AssembledContext } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
 import type { StateStore } from "../state.ts";
-import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
+import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
+import { contextSettings, contextSettingsBase } from "./settings.ts";
 import {
   assembleContext,
   ledgerWindowEnd,
+  ledgerCutoff,
   renderLedgerRecords,
   readSessionStreams,
   type ContextEngine,
@@ -22,7 +24,7 @@ import { currentBrainRun } from "../perception/run-limits.ts";
 import { createSkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
-import { personName } from "../identity.ts";
+import { pluginSkillText } from "../skill-text.ts";
 import type { MemoryPrefetch } from "../memory/register.ts";
 import { brainRequest, type RetrievalRequest } from "../memory/retrieve.ts";
 
@@ -43,6 +45,7 @@ interface ContextEngineDeps {
     agentId: string,
     at: number,
     evidence: string,
+    options?: { readonly listLimit?: number },
   ) => Promise<string | undefined>;
   /** Whether someone else is where the character is: face to face. */
   readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
@@ -54,6 +57,7 @@ interface ContextEngineDeps {
   /** What comes to mind this turn; absent means no memory module. */
   readonly memory?: (
     request: RetrievalRequest,
+    options?: { readonly maxTokens?: number; readonly rosterLimit?: number },
   ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster">>;
 }
 
@@ -154,11 +158,16 @@ async function readExperiences(
     now,
     cutoff: since,
   });
+  const skillText = pluginSkillText(api);
+  // Sized and rendered alike, so the night reads all that fits.
+  const deliveries = (section: string): string =>
+    skillText(`kazusa-deliveries#${section}`, {}, { agentId });
   const through = ledgerWindowEnd({
     sessionsContext,
     since,
     now,
     tokenBudget: SLEEP_RECORD_TOKENS,
+    text: deliveries,
   });
   const speakers = [
     ...new Set(
@@ -171,11 +180,6 @@ async function readExperiences(
       ),
     ),
   ].filter((id) => id !== agentId);
-  const names = new Map(
-    await Promise.all(
-      speakers.map(async (id) => [id, await personName(api, id)] as const),
-    ),
-  );
   return {
     speakers,
     through,
@@ -184,8 +188,9 @@ async function readExperiences(
       simTime: through,
       cutoff: since,
       tokenBudget: Number.POSITIVE_INFINITY,
-      names,
-    }),
+      trimTo: 1,
+      text: deliveries,
+    }).text,
   };
 }
 
@@ -214,6 +219,12 @@ function createContextEngine(
     namespace: "tasks",
     retention: "retained",
   });
+  const settings = contextSettings(api);
+  // Where each character's records started last turn, so the start holds and
+  // the provider keeps them cached. Losing it costs one re-read.
+  const recordsStarts = api.runtime.state.openKeyedStore<{
+    readonly from: number;
+  }>({ namespace: "records", retention: "retained" });
   return {
     info: {
       id: "kazusa",
@@ -270,7 +281,30 @@ function createContextEngine(
       const brainAgentId = owner.agentId;
       await clock.init();
       const now = clock.time();
-      const cutoff = now - config.shortTermHours * 3_600_000;
+      // The world's and this character's choices in Settings, over the config.
+      const chosen = await settings
+        .resolve(contextSettingsBase(api.pluginConfig), brainAgentId)
+        .then(({ effective }) => effective)
+        .catch((error: unknown) => {
+          api.logger.warn(
+            `Context engine: can't read ${brainAgentId}'s context settings: ${String(error)}`,
+          );
+          return contextSettingsBase(api.pluginConfig);
+        });
+      const turnConfig: ContextEngineConfig = {
+        ...config,
+        shortTermHours: chosen.shortTermHours,
+        ledgerMaxTokens: chosen.ledgerMaxTokens,
+        maxContextTokens: chosen.maxContextTokens,
+        ledgerGridHours: chosen.ledgerGridHours,
+        ledgerTrimTo: chosen.ledgerTrimTo,
+        toolHistoryMaxTokens: chosen.toolHistoryTokens,
+      };
+      const cutoff = ledgerCutoff(
+        now,
+        turnConfig.shortTermHours,
+        turnConfig.ledgerGridHours,
+      );
       const { storePath, streams } = await ownLedgers(
         api,
         getConfig,
@@ -288,6 +322,8 @@ function createContextEngine(
         feeling,
         place,
         company,
+        recordsStart,
+        session,
       ] = await Promise.all([
         readSessionStreams({
           agentId: brainAgentId,
@@ -301,24 +337,24 @@ function createContextEngine(
         presence?.(brainAgentId, now) ?? [],
         awaitingReplies?.(brainAgentId, cutoff) ?? [],
         feelings?.(brainAgentId, now),
-        whereabouts?.(brainAgentId, now, params.prompt ?? ""),
+        whereabouts?.(brainAgentId, now, params.prompt ?? "", {
+          listLimit: chosen.placesLimit,
+        }),
         inCompany?.(brainAgentId, now) ?? false,
+        recordsStarts.lookup(brainAgentId).catch((error: unknown) => {
+          api.logger.warn(
+            `Context engine: can't read where ${brainAgentId}'s records start: ${String(error)}`,
+          );
+          return undefined;
+        }),
+        // Its `contextTokens` is the model's window, which the host budgets.
+        api.runtime.agent.session
+          .getSessionEntryAsync({
+            agentId: brainAgentId,
+            sessionKey: `agent:${brainAgentId}:brain`,
+          })
+          .catch(() => undefined),
       ]);
-      // Everyone the records speak of, named from their own identity.
-      const speakers = new Set(
-        Object.values(sessionsContext).flatMap((items) =>
-          items.flatMap((item) =>
-            item.sender ? [item.sender.identity.id] : [],
-          ),
-        ),
-      );
-      const names = new Map(
-        await Promise.all(
-          [...speakers].map(
-            async (id) => [id, await personName(api, id)] as const,
-          ),
-        ),
-      );
       const recollection = await memory?.(
         brainRequest({
           agentId: brainAgentId,
@@ -328,10 +364,10 @@ function createContextEngine(
           awaiting: awaiting.map((chat) => chat.sender),
           now,
         }),
+        { maxTokens: chosen.onYourMindTokens, rosterLimit: chosen.peopleLimit },
       );
       const assembled = await assembleContext({
         run: params,
-        names,
         agentId: brainAgentId,
         workspaceDir,
         sessionsContext,
@@ -343,13 +379,17 @@ function createContextEngine(
         whereabouts: place,
         inCompany: company,
         simTime: now,
-        config,
+        config: turnConfig,
+        ...(session?.contextTokens
+          ? { contextWindow: session.contextTokens }
+          : {}),
         skillLoader,
         toolHistoryMaxTokens:
           getConfig().agents?.defaults?.systemAgent?.agentId === brainAgentId
             ? config.systemAgentToolHistoryMaxTokens
-            : config.toolHistoryMaxTokens,
+            : turnConfig.toolHistoryMaxTokens,
         runId: currentBrainRun(brainAgentId),
+        ...(recordsStart ? { recordsFrom: recordsStart.from } : {}),
         brainTurns: await readBrainTurns({
           agentId: brainAgentId,
           sessionId: params.sessionId,
@@ -360,6 +400,19 @@ function createContextEngine(
           return [];
         }),
       });
+      try {
+        if (
+          assembled.recordsFrom !== undefined &&
+          assembled.recordsFrom !== recordsStart?.from
+        )
+          await recordsStarts.register(brainAgentId, {
+            from: assembled.recordsFrom,
+          });
+      } catch (error: unknown) {
+        api.logger.warn(
+          `Context engine: could not keep where records start: ${String(error)}`,
+        );
+      }
       try {
         const previous = (await recent.lookup(brainAgentId)) ?? [];
         await recent.register(

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { formatSimTime } from "../context-engine/format.ts";
 import type {
   ActiveTask,
   DelayTaskParams,
@@ -120,10 +121,22 @@ export async function executeStartTask(
   const lease = extensions.task;
   await ctx.store.register(ctx.agentId, lease);
   const priorSummary = params.summary?.trim();
-  const started = `Started ${lease.type} task: "${lease.description}".${extensions.notes} Scheduled to conclude at ${lease.endAt} (${Math.round(lease.duration)} minutes).`;
-  const message = priorTask
-    ? `Concluded ${priorTask.type} task.${priorSummary ? ` Summary: "${priorSummary}".` : ""} ${started}`
-    : started;
+  const started = ctx.text("task-started", {
+    type: lease.type,
+    description: lease.description,
+    notes: extensions.notes,
+    until: formatSimTime(Date.parse(lease.endAt)),
+    minutes: Math.round(lease.duration),
+  });
+  const message = !priorTask
+    ? started
+    : priorSummary
+      ? ctx.text("task-finished-summary", {
+          type: priorTask.type,
+          summary: priorSummary,
+          started,
+        })
+      : ctx.text("task-finished", { type: priorTask.type, started });
   const payload = {
     taskId: lease.id,
     type: lease.type,
@@ -181,8 +194,18 @@ export async function executeDelayTask(
   const lease = extensions.task;
   await ctx.store.register(ctx.agentId, lease);
 
-  const reason = params.reason ? ` Reason: ${params.reason}.` : "";
-  const message = `Delayed current task by ${additionalDuration} minutes. New completion time: ${lease.endAt}.${reason}${extensions.notes}`;
+  const reason = params.reason?.trim();
+  const delayed = {
+    minutes: additionalDuration,
+    until: formatSimTime(Date.parse(lease.endAt)),
+    notes: extensions.notes,
+  };
+  const message = reason
+    ? ctx.text("task-delayed-reason", {
+        ...delayed,
+        reason: /[.!?]$/.test(reason) ? reason : `${reason}.`,
+      })
+    : ctx.text("task-delayed", delayed);
   const payload = {
     taskId: lease.id,
     additionalMinutes: additionalDuration,

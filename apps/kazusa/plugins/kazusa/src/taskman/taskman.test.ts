@@ -9,6 +9,7 @@ import {
   type TaskStore,
   type ToolExecutionContext,
 } from "./types.ts";
+import { bundledSkillText } from "../skill-text.ts";
 
 function createInMemoryTaskStore(): TaskStore {
   const tasks = new Map<string, ActiveTask>();
@@ -46,6 +47,8 @@ function makeContext(): {
         time: (): number => new Date("2026-10-21T08:00:00.000Z").getTime(),
       },
       minDuration: 15,
+      text: (section, values) =>
+        bundledSkillText()(`kazusa-results#${section}`, values),
       async appendTaskLedgerEntry(
         message: string,
         timestamp: number,
@@ -129,7 +132,7 @@ describe("Taskman", () => {
     expect(messages.at(-1)).toBe(
       `${replacement.message}\n\n> *What an ending. I need to tell Mira about it.*`,
     );
-    expect(replacement.message).toContain("Concluded having fun task");
+    expect(replacement.message).toContain("Finished having fun");
     expect(replacement.message).toContain("Finished the final chapter.");
     expect(replacement.message).not.toContain("What an ending.");
     // This reflection belongs to the historical event, not the new active task.
@@ -160,8 +163,23 @@ describe("Taskman", () => {
     expect(messages.at(-1)).toBe(
       `${delayed.message}\n\n> *I can hear the melody, but the harmony keeps slipping away.*`,
     );
-    expect(delayed.message).toContain("The last exercise needs more work");
+    expect(delayed.message).toBe(
+      "Delayed 15 min, until Wed 2026-10-21 09:15. Reason: The last exercise needs more work.",
+    );
     expect(delayed.message).not.toContain("I can hear the melody");
+  });
+
+  it("ends a delay's reason with one stop, whatever the model wrote", async () => {
+    const { context } = makeContext();
+    await executeStartTask(
+      { type: "studying", description: "Studying", duration: 60 },
+      context,
+    );
+    const delayed = await executeDelayTask(
+      { additionalDuration: 5, reason: "Nearly done." },
+      context,
+    );
+    expect(delayed.message).toMatch(/Reason: Nearly done\.$/);
   });
 
   it("does not record a monologue when there is no task to delay", async () => {
@@ -342,7 +360,7 @@ describe("Taskman check-ins", () => {
       "2026-10-21T08:12:00.000Z",
     ]);
     expect(messages.at(-1)).toContain(
-      "You walk over first. Scheduled to conclude at 2026-10-21T08:12:00.000Z (12 minutes).",
+      "You walk over first. Until Wed 2026-10-21 08:12 (12 min).",
     );
   });
 });

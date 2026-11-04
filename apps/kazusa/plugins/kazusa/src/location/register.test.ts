@@ -25,6 +25,7 @@ import type { Stimulus } from "../stimulus.ts";
 import type { LocationRecord } from "./location.ts";
 import { registerLocation } from "./register.ts";
 import { createStage, type Stage, type StageRecord } from "../stage/stage.ts";
+import { bundledSkillText } from "../skill-text.ts";
 
 const T0 = Date.parse("2026-10-27T16:00:00.000Z");
 const minutes = (n: number): number => T0 + n * 60_000;
@@ -219,6 +220,8 @@ function setup(options: { readonly stage?: Stage } = {}) {
     store: tasks,
     clock: { time: () => now },
     minDuration: 10,
+    text: (section, values) =>
+      bundledSkillText()(`kazusa-results#${section}`, values),
     prepare: async (transition) =>
       Promise.all(extensions.map((extension) => extension.prepare(transition))),
     appendTaskLedgerEntry: async (text, _timestamp, metadata) => {
@@ -300,7 +303,7 @@ describe("location registration", () => {
     );
     expect(result.success).toBe(true);
     expect(result.message).toContain(
-      'Started traveling task: "Walking to the club". Traveling from Kazusa\'s Room to Club Room (usually 14 min on foot, 8 by bike); arriving Tue 2026-10-27 16:14. Scheduled to conclude',
+      'Started traveling: "Walking to the club". Traveling from Kazusa\'s Room to Club Room (usually 14 min on foot, 8 by bike); arriving Tue 2026-10-27 16:14. Until',
     );
     expect(ledger.at(-1)?.metadata).toMatchObject({
       kind: "task.started",
@@ -342,7 +345,7 @@ describe("location registration", () => {
     );
     expect(result.success).toBe(true);
     expect(result.message).toContain(
-      "You walk over from Kazusa's Room first (usually 14 min on foot, 8 by bike), arriving Tue 2026-10-27 16:14. You'll check in when you get there. Scheduled to conclude at 2026-10-27T16:14:00.000Z (14 minutes).",
+      "You walk over from Kazusa's Room first (usually 14 min on foot, 8 by bike), arriving Tue 2026-10-27 16:14. You'll check in when you get there. Until Tue 2026-10-27 16:14 (14 min).",
     );
     // The lease checks in on arrival; what she came for travels with the trip.
     expect(

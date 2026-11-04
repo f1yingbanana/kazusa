@@ -2,10 +2,12 @@ import {
   BoxesIcon,
   ChartColumnIcon,
   CircleArrowUpIcon,
+  HistoryIcon,
   PlugIcon,
   UserIcon,
 } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
+import { ContextSettings } from "@/components/views/settings/context-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
 import { UpdateSettings } from "@/components/views/settings/update-settings";
@@ -37,6 +39,14 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     icon: BoxesIcon,
     order: 10,
     component: ModelSettings,
+  },
+  {
+    id: "context",
+    label: "Context",
+    description: "How much characters remember each turn",
+    icon: HistoryIcon,
+    order: 15,
+    component: ContextSettings,
   },
   {
     id: "usage",

@@ -26,24 +26,16 @@ export function formatSessionHeader(sessionKey: string): string {
 }
 
 /**
- * One record: `[<speaker> HH:mm] <text>`. The date is on the group's header. A
- * person's id is shown the first time only, to keep long days small.
+ * One record for the decision model: `[<speaker> <sim time>] <text>`, each
+ * person by id. A character's own records are worded by their skills
+ * (`renderLedgerRecords`).
  */
 export function formatEnvelopeRecord(params: {
   sessionKey: string;
   message: SessionCatalogTranscriptItem;
   timestamp: number;
-  /** Trusted names by id; never the catalog's own label. */
-  names?: ReadonlyMap<string, string>;
-  /**
-   * People already introduced by id in this block; updated here. Blocks with a
-   * dated header pass it, and times shorten to the hour and minute.
-   */
-  named?: Set<string>;
 }): string {
-  const time = params.named
-    ? dayjs.utc(params.timestamp).format("HH:mm")
-    : formatSimTime(params.timestamp);
+  const time = formatSimTime(params.timestamp);
   const text = params.message.text?.trim() ?? "";
 
   const stream = formatSessionHeader(params.sessionKey);
@@ -55,17 +47,8 @@ export function formatEnvelopeRecord(params: {
   // Roles, dialogue, display names and peer keys are never author evidence.
   const sender = params.message.sender?.identity.id;
   const owner = params.sessionKey.split(":")[1];
-  // The id attributes; the name beside it is only to read, and comes from the
-  // character's own identity, never the catalog's label.
   let speaker = "unknown";
-  if (sender) {
-    const name = params.names?.get(sender);
-    if (sender === owner) speaker = params.named ? "you" : "(self)";
-    else if (name && params.named?.has(sender)) speaker = name;
-    else {
-      speaker = personLabel(name, sender);
-      params.named?.add(sender);
-    }
-  }
+  if (sender)
+    speaker = sender === owner ? "(self)" : personLabel(undefined, sender);
   return `\n\n[${speaker} ${time}] ${text}`;
 }

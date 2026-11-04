@@ -127,6 +127,52 @@ describe("skill text", () => {
     });
   });
 
+  it("leaves validation-only keywords out of what the model reads", () => {
+    const [dir] = roots({
+      "skills/kazusa-tools/SKILL.md": "## send_message\nSay it.",
+    });
+    const text = createSkillText({ getCandidateRoots: () => [dir] });
+    const tool = describeTool(text, {
+      name: "send_message",
+      parameters: {
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: {
+          // A field may be called what a keyword is.
+          pattern: { type: "string", maxLength: 512, pattern: "^chat:" },
+          messages: {
+            type: "array",
+            minItems: 1,
+            maxItems: 9,
+            items: {
+              anyOf: [
+                { type: "string", minLength: 1, maxLength: 4000 },
+                { type: "string", enum: ["happy", "sad"] },
+              ],
+            },
+          },
+        },
+      },
+    });
+    expect(tool.parameters).toEqual({
+      type: "object",
+      properties: {
+        pattern: { type: "string" },
+        messages: {
+          type: "array",
+          minItems: 1,
+          maxItems: 9,
+          items: {
+            anyOf: [
+              { type: "string" },
+              { type: "string", enum: ["happy", "sad"] },
+            ],
+          },
+        },
+      },
+    });
+  });
+
   it("has every section Kazusa's own code asks for", () => {
     const text = bundledSkillText();
     for (const ref of [

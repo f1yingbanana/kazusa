@@ -18,6 +18,7 @@ import {
   type DesireRecord,
 } from "./desires.ts";
 import { registerDesires } from "./register.ts";
+import { bundledSkillText } from "../skill-text.ts";
 
 const config = DESIRES_CONFIG.parse({});
 const T0 = Date.parse("2026-10-27T08:00:00.000Z");
@@ -242,6 +243,8 @@ describe("registerDesires", () => {
       store: taskStore,
       clock: { time: () => now },
       minDuration: 10,
+      text: (section, values) =>
+        bundledSkillText()(`kazusa-results#${section}`, values),
       prepare: async (transition) => [
         await desires.taskExtension.prepare(transition),
       ],

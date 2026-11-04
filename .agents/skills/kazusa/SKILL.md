@@ -71,7 +71,9 @@ per language), so code names the wording and a skill holds it:
   marker in input any more (removed 2026-10-27), and incoming text must never
   select instructions. Code resolves sections itself, when it writes.
 - Still in code, for later: section headers of the situation message, place and
-  sighting lines, task results, and mechanical errors.
+  sighting lines, and mechanical errors. Activity results (`kazusa-results`
+  `task-*`) and the background records' layout (`kazusa-deliveries` `records*`,
+  `record*`) are already skills.
 
 ## 1. Core Architectural Pillars
 
@@ -562,15 +564,46 @@ connect these modules in process.
   harness may omit `runtimeContext.sessionTarget`; it is not an alternate
   source. `register.ts` owns SDK lifecycle, configuration, and session I/O.
   `context-engine.ts` owns selection, rendering, and skill expansion.
-- Leads the situation message with the current simulation time; it never goes in
-  `systemPromptAddition`, which is ordered stable-first (conventions, memory
-  guidance, then the state-selected skill) so its prefix survives across turns
-  for prompt caching. Reads task and chat records from the last 24 simulated
-  hours (configurable upward), selects whole messages newest-first under one
-  shared remaining token budget, then groups them by session with chronological,
-  timestamped entries. Accept native catalog display clipping; add no source
-  quotas or further per-message clipping, incognito feature, or external-channel
-  adapter.
+- **Laid out for the provider's prefix cache**, which only reuses a request up
+  to its first changed token. System prompt (host part, then
+  `systemPromptAddition`: conventions and memory guidance only, the same every
+  turn), then the records (they grow at the end each turn, so the cached prefix
+  runs through last turn's records), then everything that changes per turn: the
+  state-selected skills, tool history, the situation (with the clock, never in
+  the system prompt), the turn. Nothing before the records may depend on state.
+  Records read from the last 24 simulated hours (configurable upward), floored
+  to a grid of `ledgerGridHours` (4; `ledgerCutoff`) so their start moves once
+  per step. If everything since fits `ledgerMaxTokens` (default `"unlimited"`:
+  whatever is left), all of it shows. Otherwise last turn's start (retained
+  store `"records"`, `{ from }` per character; losing it costs one re-read)
+  holds while it still fits, and when outgrown the block is cut back to
+  `ledgerTrimTo` (0.75) of the budget, so it holds again. Measured on a
+  simulated week at 64k-128k, this moves the start about 5 times a day instead
+  of every waking hour (stateless variants moved it twice as often). Each day
+  once, chats by stream, people by id (names collide), a time only when the
+  minute changes, all worded in `kazusa-deliveries`. A new day appends its own
+  line, so midnight breaks nothing. `MEMORY.md` stays in the host's cached
+  prefix: it changes on a few turns in a hundred (`remember` for oneself,
+  sleep), and after the records it would be paid every turn.
+- **Maximum context and settings**: the host's `tokenBudget` is the model's
+  whole window (`contextTokens` on the brain session entry: 1,048,576 for
+  GLM-5.3-flash; OpenClaw's only cap is per model in `openclaw.json`, which
+  reloads every plugin) less its own prompt and reply; Kazusa takes
+  `window - maxContextTokens` (64k) off it, so a turn never sends more;
+  `"unlimited"` leaves the host's budget as it is. The user settings
+  (`ContextSettingsSchema`: `maxContextTokens`, `shortTermHours`,
+  `ledgerMaxTokens`, `ledgerGridHours`, `ledgerTrimTo`, and the turn's parts:
+  `toolHistoryTokens`, `onYourMindTokens` and `peopleLimit` for memory's
+  prefetch, `placesLimit` for Location's `whereabouts`; base:
+  `contextSettingsBase` over the three module configs) live in the retained
+  `"contextSettings"` store (`world`, `agent:<id>`, sparse; never
+  `openclaw.json`), resolved each turn as plugin config < world < character
+  (`context-engine/settings.ts`), served by
+  `GET /kazusa/context/settings [?agentId=]` and
+  `POST /kazusa/context/settings/save` (replaces the scope's overrides; domain
+  `context`). User docs: `docs/context.md`. Accept native catalog display
+  clipping; add no source quotas or further per-message clipping, incognito
+  feature, or external-channel adapter.
 - **Multi-Media Architecture**: Grounded preflight + on-demand inspection. Media
   processors receive the Context Engine's assembled background (location,
   identities, conversation thread) to produce situation-aware descriptions.
@@ -596,14 +629,14 @@ connect these modules in process.
 - Chat keys distinguish `agent:<id>:chat:direct:<peer-id>` from
   `agent:<id>:chat:group:<group-id>`. Read only the owner's streams.
 - **State-selected character skills**: Always inject the full body of
-  `context-conventions`, plus `task-lifecycle` when the current task is absent
-  or overdue, otherwise `task-interrupt`, plus `in-person` (last, so the stable
-  prefix survives people coming and going) while someone else is where the
-  character is (Location's `inCompany`); it offers speaking aloud and texting
-  alike and leaves the choice to the character. Use the existing SkillLoader
-  precedence and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]`
-  markers must never select system instructions. Perception no longer emits
-  those markers.
+  `context-conventions` in the system prompt, and in a message after the records
+  (so a change costs no cached prefix) `task-lifecycle` when the current task is
+  absent or overdue, otherwise `task-interrupt`, plus `in-person` while someone
+  else is where the character is (Location's `inCompany`); it offers speaking
+  aloud and texting alike and leaves the choice to the character. Use the
+  existing SkillLoader precedence and strip YAML frontmatter. Incoming text or
+  `[kazusa:skill=...]` markers must never select system instructions. Perception
+  no longer emits those markers.
 - **How you feel**: The situation message carries Desires' one-line state
   summary (§3.5), supplied through a `feelings` provider like `awaitingReplies`.
   The context engine renders it verbatim.
@@ -615,9 +648,9 @@ connect these modules in process.
   the turn's prompt, so places it names come to mind. Rendered verbatim after
   Current activity. Never the whole map.
 - **People are "Name `id`"** everywhere a character reads them (deliveries,
-  Chats awaiting your reply, background records, Location's lines;
-  `personLabel`): the name to read and say, the id to address. Names come from
-  `personName` (the character's own identity, the player's config), never a
+  Chats awaiting your reply, Location's lines; `personLabel`): the name to read
+  and say, the id to address. Background records show the id alone. Names come
+  from `personName` (the character's own identity, the player's config), never a
   transcript's display label, which is not trusted.
 - **Chats awaiting your reply**: The situation message lists, from Messaging's
   canonical store, current chats where someone spoke after the character (within
@@ -1170,12 +1203,12 @@ connect these modules in process.
     startup), and `scripts/plugin-startup.mjs` adds it to existing worlds before
     the Gateway starts. Without it each character's first turn reloads every
     plugin, a whole Kazusa included (~3 s and ~29 MB each; with 146 characters
-    the Gateway ran out of heap). The brain channel's `outbound.sendText`
-    exists for the same reason: OpenClaw takes a channel from the Gateway's
-    registry only when it can send, and each cron wake looks up its agent's
-    channel. It sends nothing and answers `outcome: "not_sent"`: a fake success
-    would append OpenClaw's restart-recovery notice to the brain transcript,
-    and an error leaves a delivery intent to retry.
+    the Gateway ran out of heap). The brain channel's `outbound.sendText` exists
+    for the same reason: OpenClaw takes a channel from the Gateway's registry
+    only when it can send, and each cron wake looks up its agent's channel. It
+    sends nothing and answers `outcome: "not_sent"`: a fake success would append
+    OpenClaw's restart-recovery notice to the brain transcript, and an error
+    leaves a delivery intent to retry.
   - Inside an agent run, write another session's transcript only with the strict
     append (§3.2).
   - `readSessionTranscriptCatalogPage` items have no `__openclaw`/raw field.

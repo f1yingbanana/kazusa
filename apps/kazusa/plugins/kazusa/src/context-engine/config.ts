@@ -5,8 +5,30 @@ const allowance = (value: number) =>
 
 export const CONTEXT_ENGINE_CONFIG = z.strictObject({
   shortTermHours: z.number().min(24).default(24),
-  /** Past records in a turn; `recall` is for anything older. */
-  ledgerMaxTokens: allowance(3_000),
+  /**
+   * Past records in a turn; `recall` is for anything older. `"unlimited"` gives
+   * them whatever `maxContextTokens` leaves.
+   */
+  ledgerMaxTokens: z
+    .union([z.number().int().min(0), z.literal("unlimited")])
+    .default("unlimited"),
+  /**
+   * The most one brain call may send, everything included, below the model's
+   * own window: OpenClaw allows a model all of it (a million for some).
+   */
+  maxContextTokens: z
+    .union([z.number().int().min(16_000), z.literal("unlimited")])
+    .default(64_000),
+  /**
+   * The records start on this grid of sim hours, so the start moves (and the
+   * provider re-reads them) once per step, not every turn.
+   */
+  ledgerGridHours: z.number().positive().max(24).default(4),
+  /**
+   * When the records outgrow their budget, they are cut back to this share of
+   * it, and keep that start until they outgrow it again.
+   */
+  ledgerTrimTo: z.number().gt(0).max(1).default(0.75),
   /** Past turns' tool calls and their outcomes; 0 leaves them out. */
   toolHistoryMaxTokens: allowance(600),
   /** The same for the system agent, whose jobs span many calls. */

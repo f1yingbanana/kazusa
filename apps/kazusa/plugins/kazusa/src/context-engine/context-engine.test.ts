@@ -5,13 +5,16 @@ import { describe, expect, it, vi } from "vitest";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleContext,
+  ledgerCutoff,
   ledgerWindowEnd,
+  renderLedgerRecords,
   type ContextEngine,
 } from "./context-engine.ts";
 import type { BrainTurn } from "@kazusa/client";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import { sharedDir } from "../shared-dir.ts";
+import { bundledSkillText } from "../skill-text.ts";
 
 vi.mock("openclaw/plugin-sdk/core", () => ({
   buildMemorySystemPromptAddition: vi.fn(() => ""),
@@ -107,8 +110,15 @@ const assistantBase = {
 
 const CLOCK = `[${formatSimTime(NOW)}] Current simulation time\n\n`;
 
+/** The skills chosen by state: a stamp alone on the first line. */
+const isGuidance = (message: unknown): boolean =>
+  /"content":"\[[^\]]+\]\\n\\n/u.test(JSON.stringify(message));
+const guidanceOf = (result: { messages: readonly unknown[] }): string =>
+  JSON.stringify(result.messages.filter(isGuidance));
+const withoutGuidance = (messages: readonly unknown[]): unknown[] =>
+  messages.filter((message) => !isGuidance(message));
 const withoutSituation = (messages: readonly unknown[]): unknown[] =>
-  messages.filter(
+  withoutGuidance(messages).filter(
     (message) => !JSON.stringify(message).includes("] Current simulation time"),
   );
 
@@ -127,10 +137,8 @@ describe("Context assembly", () => {
       },
     });
     expect(loader.loadSkill).toHaveBeenCalledTimes(2);
-    expect(result.systemPromptAddition).toContain(
-      "task-lifecycle instructions",
-    );
-    expect(result.systemPromptAddition).not.toMatch(/secret|task-interrupt/);
+    expect(guidanceOf(result)).toContain("task-lifecycle instructions");
+    expect(guidanceOf(result)).not.toMatch(/secret|task-interrupt/);
   });
 
   it.each(["context-conventions", "task-lifecycle"])(
@@ -165,12 +173,175 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[`bob` 12:00] Hello Alice");
-    expect(text).toContain("[you 12:00] Hello Bob");
-    expect(text).toContain("[`carol` 12:00] Hello everyone");
-    expect(text).toContain("[`bob` 12:00] Welcome");
-    expect(text).toContain("[`bob` 12:00] Role is not identity");
-    expect(text).toContain("[you 12:00] Metadata identifies self");
+    expect(text).toContain("[bob 12:00] Hello Alice");
+    expect(text).toContain("[you] Hello Bob");
+    expect(text).toContain("[carol] Hello everyone");
+    expect(text).toContain("[bob] Welcome");
+    expect(text).toContain("[bob] Role is not identity");
+    expect(text).toContain("[you] Metadata identifies self");
+  });
+
+  it("dates each day once, names people by id, and times a line when its minute changes", async () => {
+    const result = await assemble({
+      sessionsContext: {
+        "agent:alice:chat:direct:bob": [
+          incoming("Night", "bob", Date.parse("2026-10-22T23:00:00Z")),
+          incoming("Morning", "bob", NOW - 120_000),
+          incoming("Still there?", "bob", NOW - 119_000),
+          { ...incoming("Here", "alice"), type: "agentMessage" },
+        ],
+        "agent:alice:tasks": [event("You see Bob.", NOW - 60_000)],
+      },
+    });
+    expect(result.messages[0]).toMatchObject({
+      content: [
+        "[Thu 2026-10-22 00:00] What you remember of the last while",
+        "",
+        "# Thu 2026-10-22",
+        "### chat:direct:bob",
+        "[bob 23:00] Night",
+        "# Fri 2026-10-23",
+        "### chat:direct:bob",
+        "[bob 11:58] Morning",
+        "[bob] Still there?",
+        "### tasks",
+        "[11:59] You see Bob.",
+        "### chat:direct:bob",
+        "[you 12:00] Here",
+      ].join("\n"),
+    });
+  });
+
+  it("keeps the system prompt the same whatever the state, with its skills after the records", async () => {
+    const skillLoader: SkillLoader = {
+      ...testSkillLoader,
+      loadSkill: vi.fn(async (name: string) => `skill:${name}`),
+    };
+    const sessionsContext = {
+      "agent:alice:tasks": [event("A record.", NOW - 60_000)],
+    };
+    const task = (endAt: string): ActiveTask => ({
+      id: "t",
+      type: "studying",
+      description: "Reading",
+      startedAt: "2026-10-23T11:00:00.000Z",
+      endAt,
+      duration: 60,
+    });
+    const due = await assemble({
+      skillLoader,
+      sessionsContext,
+      activeTask: task("2026-10-23T11:30:00.000Z"),
+    });
+    const busy = await assemble({
+      skillLoader,
+      sessionsContext,
+      inCompany: true,
+      activeTask: task("2026-10-23T13:00:00.000Z"),
+    });
+    expect(busy.systemPromptAddition).toBe(due.systemPromptAddition);
+    expect(due.systemPromptAddition).not.toContain("task-lifecycle");
+    const order = (messages: readonly unknown[]): string[] =>
+      messages.map((message) => JSON.stringify(message));
+    expect(order(due.messages)[0]).toContain("What you remember");
+    expect(order(due.messages)[1]).toContain("skill:task-lifecycle");
+    expect(order(busy.messages)[1]).toContain(
+      "skill:task-interrupt\\n\\nskill:in-person",
+    );
+    expect(order(busy.messages).at(-1)).toContain("Current simulation time");
+  });
+
+  it("starts the records on the grid, so the start moves once a step", () => {
+    expect(ledgerCutoff(Date.parse("2026-10-23T14:34:00Z"), 24, 4)).toBe(
+      Date.parse("2026-10-22T12:00:00Z"),
+    );
+    expect(ledgerCutoff(Date.parse("2026-10-23T14:34:00Z"), 24, 1)).toBe(
+      Date.parse("2026-10-22T14:00:00Z"),
+    );
+  });
+
+  it("keeps a turn under the world's maximum when the model allows far more", async () => {
+    const result = await assemble({
+      contextWindow: 1_000_000,
+      // What the host leaves after its own prompt and the reply.
+      tokenBudget: 990_000,
+      config: CONTEXT_ENGINE_CONFIG.parse({ maxContextTokens: 64_000 }),
+      sessionsContext: {
+        "agent:alice:tasks": Array.from({ length: 4_000 }, (_, index) =>
+          event(
+            `moment ${index} ${"x".repeat(150)}`,
+            NOW - (4_000 - index) * 10_000,
+          ),
+        ),
+      },
+    });
+    // 64k less the 10k the host keeps for itself.
+    expect(result.estimatedTokens).toBeLessThanOrEqual(54_000);
+    // Unlimited records take most of what is left, cut back to leave room.
+    expect(result.breakdown.records).toBeGreaterThan(30_000);
+    expect(JSON.stringify(result.messages)).toContain("moment 3999 ");
+  });
+
+  it("lets a turn use the model's whole window when the maximum is unlimited", async () => {
+    const result = await assemble({
+      contextWindow: 1_000_000,
+      tokenBudget: 990_000,
+      config: CONTEXT_ENGINE_CONFIG.parse({ maxContextTokens: "unlimited" }),
+      sessionsContext: {
+        "agent:alice:tasks": Array.from({ length: 4_000 }, (_, index) =>
+          event(
+            `moment ${index} ${"x".repeat(150)}`,
+            NOW - (4_000 - index) * 10_000,
+          ),
+        ),
+      },
+    });
+    // All 4,000 records fit the host's budget, far past 64k.
+    expect(result.breakdown.records).toBeGreaterThan(100_000);
+    expect(result.estimatedTokens).toBeLessThanOrEqual(990_000);
+  });
+
+  describe("records over their budget", () => {
+    const text = (section: string): string =>
+      bundledSkillText()(`kazusa-deliveries#${section}`);
+    const steps = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, index) =>
+        event(`step ${from + index}`, NOW - (200 - from - index) * 30_000),
+      );
+    const render = (count: number, keepFrom?: number) =>
+      renderLedgerRecords({
+        sessionsContext: { "agent:alice:tasks": steps(count) },
+        simTime: NOW,
+        cutoff: NOW - 86_400_000,
+        tokenBudget: 300,
+        trimTo: 0.75,
+        ...(keepFrom === undefined ? {} : { keepFrom }),
+        text,
+      });
+    const used = (records: { text: string }): number =>
+      estimateTokens({ role: "user", content: records.text, timestamp: NOW });
+
+    it("shows everything since the cutoff when it fits, whatever was kept", () => {
+      const all = render(10, NOW);
+      expect(all.text).toContain("step 0");
+      expect(all.from).toBe(Date.parse(steps(1)[0].timestamp ?? ""));
+    });
+
+    it("cuts back to the trim share, then keeps that start while it fits", () => {
+      const first = render(80);
+      expect(used(first)).toBeLessThanOrEqual(225);
+      expect(used(first)).toBeGreaterThan(200);
+      expect(first.text).toContain("step 79");
+      // A few more: the same start, so the provider's cached prefix holds.
+      const next = render(84, first.from);
+      expect(next.from).toBe(first.from);
+      expect(used(next)).toBeLessThanOrEqual(300);
+      expect(next.text).toContain("step 83");
+      // Outgrown: cut back again, further on.
+      const later = render(120, first.from);
+      expect(later.from).toBeGreaterThan(first.from ?? 0);
+      expect(used(later)).toBeLessThanOrEqual(225);
+    });
   });
 
   it("uses metadata in both chat kinds, never names or speaker tags in dialogue", async () => {
@@ -183,8 +354,8 @@ describe("Context assembly", () => {
       },
     });
     const text = JSON.stringify(result.messages);
-    expect(text).toContain("[`carol` 12:00] bob: A quotation");
-    expect(text).toContain("[`bob` 12:00] [speaker:alice] A quotation");
+    expect(text).toContain("[carol 12:00] bob: A quotation");
+    expect(text).toContain("[bob] [speaker:alice] A quotation");
     expect(text).not.toContain("Display name, not identity");
   });
 
@@ -202,10 +373,8 @@ describe("Context assembly", () => {
     });
     const text = JSON.stringify(result.messages);
     expect(text).toContain("[unknown 12:00] [speaker:bob] Legacy message");
-    expect(text).toContain("[unknown 12:00] carol: Legacy message");
-    expect(text).toContain(
-      "[unknown 12:00] Outgoing without projected metadata",
-    );
+    expect(text).toContain("[unknown] carol: Legacy message");
+    expect(text).toContain("[unknown] Outgoing without projected metadata");
   });
 
   it("excludes undated and out-of-window records, retaining cutoff boundaries", async () => {
@@ -280,7 +449,7 @@ describe("Context assembly", () => {
 
   it("makes tasklessness explicit and supplies simulation time", async () => {
     const result = await assemble();
-    expect(result.messages).toEqual([
+    expect(withoutGuidance(result.messages)).toEqual([
       user(`${CLOCK}### Current activity\nNo activity has been chosen yet.`),
     ]);
     // The clock stays out of the system prompt so its prefix can be cached.
@@ -299,7 +468,7 @@ describe("Context assembly", () => {
         },
       ],
     });
-    expect(result.messages).toEqual([
+    expect(withoutGuidance(result.messages)).toEqual([
       user(
         [
           `[${formatSimTime(NOW)}] Current simulation time`,
@@ -316,7 +485,7 @@ describe("Context assembly", () => {
 
   it("renders desire states verbatim below the current activity", async () => {
     const result = await assemble({ feelings: "energy: fine · satiety: low" });
-    expect(result.messages).toEqual([
+    expect(withoutGuidance(result.messages)).toEqual([
       user(
         [
           `[${formatSimTime(NOW)}] Current simulation time`,
@@ -337,10 +506,10 @@ describe("Context assembly", () => {
       loadSkill: vi.fn(async (name) => `${name} instructions`),
     };
     const alone = await assemble({ skillLoader: loader });
-    expect(alone.systemPromptAddition).not.toContain("in-person");
+    expect(guidanceOf(alone)).not.toContain("in-person");
     const together = await assemble({ skillLoader: loader, inCompany: true });
-    expect(together.systemPromptAddition).toMatch(
-      /task-lifecycle instructions\n\nin-person instructions$/,
+    expect(guidanceOf(together)).toMatch(
+      /task-lifecycle instructions\\n\\nin-person instructions"/,
     );
   });
 
@@ -349,7 +518,7 @@ describe("Context assembly", () => {
       whereabouts: "Club Room `club` (School). Smells of vanilla.",
       feelings: "energy: fine",
     });
-    expect(result.messages).toEqual([
+    expect(withoutGuidance(result.messages)).toEqual([
       user(
         [
           `[${formatSimTime(NOW)}] Current simulation time`,
@@ -564,7 +733,7 @@ describe("Context assembly", () => {
               metadata: { internal: "private-metadata" },
             };
       const result = await assemble({ activeTask, skillLoader: loader });
-      expect(result.systemPromptAddition).toContain(`${skill} instructions`);
+      expect(guidanceOf(result)).toContain(`${skill} instructions`);
       const text = JSON.stringify(result.messages);
       expect(text).toContain(status);
       expect(text).not.toMatch(
@@ -636,9 +805,7 @@ describe("Context assembly", () => {
     expect(result.systemPromptAddition).toContain(
       "Skill content for my-conventions",
     );
-    expect(result.systemPromptAddition).toContain(
-      "Skill content for my-lifecycle",
-    );
+    expect(guidanceOf(result)).toContain("Skill content for my-lifecycle");
   });
 });
 
@@ -663,6 +830,7 @@ describe("ledgerWindowEnd", () => {
         sessionsContext,
         since: 0,
         now: 9_000,
+        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
         tokenBudget: 100_000,
       }),
     ).toBe(9_000);
@@ -674,9 +842,43 @@ describe("ledgerWindowEnd", () => {
         sessionsContext,
         since: 0,
         now: 9_000,
+        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
         tokenBudget: 150,
       }),
     ).toBeLessThan(3_000);
+  });
+
+  it("reads as much as fits once rendered the way sleep renders it", () => {
+    const text = (section: string) =>
+      bundledSkillText()(`kazusa-deliveries#${section}`);
+    const streams = {
+      "agent:alice:tasks": Array.from({ length: 200 }, (_, index) =>
+        event(`moment ${index}`, NOW - (200 - index) * 60_000),
+      ),
+    };
+    const since = NOW - 86_400_000;
+    const through = ledgerWindowEnd({
+      sessionsContext: streams,
+      since,
+      now: NOW,
+      tokenBudget: 500,
+      text,
+    });
+    const { text: rendered } = renderLedgerRecords({
+      sessionsContext: streams,
+      simTime: through,
+      cutoff: since,
+      tokenBudget: Number.POSITIVE_INFINITY,
+      trimTo: 1,
+      text,
+    });
+    const used = estimateTokens({
+      role: "user",
+      content: rendered,
+      timestamp: NOW,
+    });
+    expect(used).toBeLessThanOrEqual(500);
+    expect(used).toBeGreaterThan(450);
   });
 
   it("always moves forward past one oversized record", () => {
@@ -685,6 +887,7 @@ describe("ledgerWindowEnd", () => {
         sessionsContext,
         since: 0,
         now: 9_000,
+        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
         tokenBudget: 1,
       }),
     ).toBe(1_000);
