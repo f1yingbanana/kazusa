@@ -466,7 +466,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                 <QuestionnaireDescription>
                   {status.hasKey
                     ? "You are ready to start."
-                    : "Characters need a model to think. One OpenRouter key covers chat, decisions and memory search, and it's kept in OpenClaw's secret store on this computer."}
+                    : "Characters need a model to think. One OpenRouter key covers chat, decisions and memory search, and it's kept with OpenClaw's saved sign-ins on this computer."}
                 </QuestionnaireDescription>
                 {status.hasKey ? null : (
                   <div className="flex flex-col gap-3">

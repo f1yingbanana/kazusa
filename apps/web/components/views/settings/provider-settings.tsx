@@ -57,7 +57,7 @@ function describe(error: unknown) {
 /** Where the key comes from, in the user's words. */
 function keyLine(provider: ProviderSummary) {
   switch (provider.key) {
-    case "store":
+    case "profile":
       return "Key saved";
     case "env":
       return "Key from the environment";
@@ -69,8 +69,8 @@ function keyLine(provider: ProviderSummary) {
 }
 
 /**
- * One pasted key. It is sent once and never shown again: the store keeps no
- * readable copy for the page to fetch back.
+ * One pasted key. It is sent once and never shown again: no route reads a saved
+ * key back for the page.
  */
 function KeyForm({
   provider,
@@ -216,7 +216,7 @@ function ConnectedRow({
           </span>
         )}
         {/* Any other source was set by hand, and stays the user's to change. */}
-        {provider.key === "store" ? (
+        {provider.key === "profile" ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -285,13 +285,12 @@ function AddRow({
 }
 
 /**
- * Connect a model provider by pasting its key. The key goes to OpenClaw's
- * secret store and the catalog is asked again, so the provider's models are in
- * the pickers before the form closes, with no reload of the page or the
- * Gateway: the provider's reference to the store was written when the world was
- * made, so only the store changes. Keys wired up by hand (an environment
- * variable, another reference in `openclaw.json`) show where they come from and
- * stay the user's to change.
+ * Connect a model provider by pasting its key. The key becomes an OpenClaw auth
+ * profile and the catalog is asked again, so the provider's models are in the
+ * pickers before the form closes, with no reload of the page or the Gateway: a
+ * profile lives outside `openclaw.json`. Keys wired up by hand (an environment
+ * variable, a key in `openclaw.json`) show where they come from and stay the
+ * user's to change.
  */
 export function ProviderSettings() {
   const providers = useProviders();

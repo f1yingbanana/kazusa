@@ -84,7 +84,7 @@ export const MEMORY_CONFIG = z.strictObject({
       notesPerPage: 30,
     }),
   /**
-   * The key is that model provider's, wherever OpenClaw keeps it (secret store,
+   * The key is that model provider's, wherever OpenClaw keeps it (auth profile,
    * environment or config). No key means keywords only.
    */
   embedding: z

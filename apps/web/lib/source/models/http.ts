@@ -90,7 +90,7 @@ export async function fetchProviders(
   return ProvidersResponseSchema.parse(data);
 }
 
-/** Saves the key in OpenClaw's secret store; the provider uses it at once. */
+/** Saves the key as an OpenClaw auth profile; the provider uses it at once. */
 export async function saveProviderKey(
   baseUrl: string,
   payload: ProviderKeyPayload,

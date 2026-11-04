@@ -14,8 +14,6 @@ import {
   type ProviderSummary,
   type ProvidersResponse,
 } from "@kazusa/client";
-import { z } from "zod";
-import { TYPESAFE_KEY_PATH } from "../decisions/jev.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
@@ -23,22 +21,13 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import { PROVIDERS, type ProviderEntry } from "./catalog.ts";
-
-const StoreRefSchema = z.object({
-  source: z.literal("store"),
-  provider: z.string(),
-  id: z.string(),
-});
-type StoreRef = z.infer<typeof StoreRefSchema>;
-
-const StoreListSchema = z.object({
-  entries: z.array(z.object({ name: z.string() })),
-});
+import { authProfileKeys, type ProviderKeys } from "./keys.ts";
 
 export interface ProvidersDeps {
   /** As written: the runtime snapshot holds resolved keys, not references. */
   readonly readConfig: () => OpenClawConfig;
   readonly env: () => NodeJS.ProcessEnv;
+  readonly keys: ProviderKeys;
   /** Calls a Gateway method with the Gateway's own token (admin scope). */
   readonly call: (method: string, params: unknown) => Promise<unknown>;
 }
@@ -49,34 +38,18 @@ export function availableProviders(config: OpenClawConfig): ProviderEntry[] {
   return PROVIDERS.filter((entry) => !allow || allow.includes(entry.plugin));
 }
 
-/** The key reference as written, wherever this entry keeps it. */
-function keyRef(config: OpenClawConfig, entry: ProviderEntry): unknown {
-  if (entry.keyIn === "provider")
-    return config.models?.providers?.[entry.id]?.apiKey;
-  let node: unknown = config.plugins?.entries?.kazusa?.config;
-  for (const key of TYPESAFE_KEY_PATH.split(".")) {
-    node = z.record(z.string(), z.unknown()).safeParse(node).data?.[key];
-  }
-  return node;
-}
-
-const storeRef = (
-  config: OpenClawConfig,
-  entry: ProviderEntry,
-): StoreRef | undefined => StoreRefSchema.safeParse(keyRef(config, entry)).data;
-
 export function keySource(
   config: OpenClawConfig,
   entry: ProviderEntry,
   env: NodeJS.ProcessEnv,
-  stored: ReadonlySet<string>,
+  keys: ProviderKeys,
 ): ProviderKeySource {
-  const apiKey = keyRef(config, entry);
-  if (apiKey !== undefined) {
-    const ref = storeRef(config, entry);
-    if (!ref) return "config";
-    return stored.has(ref.id) ? "store" : "none";
-  }
+  // A key written into `openclaw.json` is the user's to change there, and a
+  // store reference there hides a profile from model discovery. The ones
+  // Kazusa once wrote go before the Gateway starts (`scripts/provider-keys.mjs`).
+  if (config.models?.providers?.[entry.id]?.apiKey !== undefined)
+    return "config";
+  if (keys.has(entry.id)) return "profile";
   return entry.envVars.some((name) => env[name]?.trim()) ? "env" : "none";
 }
 
@@ -84,27 +57,48 @@ function summary(
   config: OpenClawConfig,
   entry: ProviderEntry,
   env: NodeJS.ProcessEnv,
-  stored: ReadonlySet<string>,
+  keys: ProviderKeys,
 ): ProviderSummary {
   return {
     id: entry.id,
     label: entry.label,
     ...(entry.hint ? { hint: entry.hint } : {}),
     ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
-    keyName: storeRef(config, entry)?.id ?? entry.keyName,
-    key: keySource(config, entry, env, stored),
+    keyName: entry.keyName,
+    key: keySource(config, entry, env, keys),
   };
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * Provider keys live in OpenClaw's secret store. Every provider's reference to
- * its entry is written into `openclaw.json` once, when the world is made
- * (`worlds/base.json`), because writing one later reloads every plugin. So
- * saving or removing a key only changes the store, which OpenClaw re-resolves
- * at once for a referenced name. A reference the user changed by hand (an
- * environment variable, a file) is reported and left alone.
+ * `models.authRefresh` and `secrets.*` need `operator.admin`, which a
+ * Gateway-authenticated HTTP route doesn't carry; like Usage, ask as the CLI
+ * does, with the Gateway's token.
+ */
+export const adminCall =
+  (api: OpenClawPluginApi) =>
+  (method: string, params: unknown): Promise<unknown> =>
+    callGatewayFromCli(
+      method,
+      {
+        token: resolveAuthToken(api),
+        timeout: String(REQUEST_TIMEOUT_MS),
+        json: true,
+      },
+      params,
+      { progress: false },
+    );
+
+/** Makes the Gateway read a changed profile at once, without a reload. */
+export const refreshAuth = (call: ProvidersDeps["call"]): Promise<unknown> =>
+  call("models.authRefresh", { operation: "login" });
+
+/**
+ * Provider keys live in OpenClaw auth profiles (`keys.ts`). Saving or removing
+ * one changes only the shared auth store, then asks the Gateway to read it
+ * again, so `openclaw.json` never changes and no plugin reloads. A key the user
+ * wrote into `openclaw.json` is reported and left alone.
  */
 export function registerProvidersHttp(
   api: OpenClawPluginApi,
@@ -113,34 +107,16 @@ export function registerProvidersHttp(
   const deps: ProvidersDeps = {
     readConfig: () => getRuntimeConfigSourceSnapshot() ?? getRuntimeConfig(),
     env: () => process.env,
-    // `secrets.*` need `operator.admin`, which a Gateway-authenticated HTTP
-    // route doesn't carry; like Usage, ask as the CLI does, with the token.
-    call: (method, params) =>
-      callGatewayFromCli(
-        method,
-        {
-          token: resolveAuthToken(api),
-          timeout: String(REQUEST_TIMEOUT_MS),
-          json: true,
-        },
-        params,
-        { progress: false },
-      ),
+    keys: authProfileKeys,
+    call: adminCall(api),
     ...overrides,
   };
   const route = createRouteRegistrar(api);
 
-  const stored = async (): Promise<Set<string>> =>
-    new Set(
-      StoreListSchema.parse(
-        await deps.call("secrets.store.list", {}),
-      ).entries.map((entry) => entry.name),
-    );
-
   const find = (id: string): ProviderEntry | undefined =>
     availableProviders(deps.readConfig()).find((entry) => entry.id === id);
 
-  const respond = async (
+  const respond = (
     res: Parameters<Parameters<typeof route>[2]>[1],
     entry: ProviderEntry,
   ) =>
@@ -151,22 +127,16 @@ export function registerProvidersHttp(
         deps.readConfig(),
         entry,
         deps.env(),
-        await stored(),
+        deps.keys,
       ) satisfies ProviderSummary,
     );
-
-  /** The store entry this provider reads, or why there isn't one to change. */
-  const target = (entry: ProviderEntry): StoreRef | string =>
-    storeRef(deps.readConfig(), entry) ??
-    `${entry.label} reads its key from somewhere else set in openclaw.json; change it there.`;
 
   route("providers", "GET", async (_req, res) => {
     const config = deps.readConfig();
     const env = deps.env();
-    const names = await stored();
     sendJson(res, 200, {
       providers: availableProviders(config).map((entry) =>
-        summary(config, entry, env, names),
+        summary(config, entry, env, deps.keys),
       ),
     } satisfies ProvidersResponse);
   });
@@ -178,17 +148,17 @@ export function registerProvidersHttp(
       sendJson(res, 404, { error: `Unknown provider: ${payload.provider}.` });
       return;
     }
-    const ref = target(entry);
-    if (typeof ref === "string") {
-      sendJson(res, 409, { error: ref });
+    if (
+      keySource(deps.readConfig(), entry, deps.env(), deps.keys) === "config"
+    ) {
+      sendJson(res, 409, {
+        error: `${entry.label} reads its key from openclaw.json; change it there.`,
+      });
       return;
     }
-    await deps.call("secrets.store.set", {
-      name: ref.id,
-      value: payload.key,
-      kind: "secret",
-    });
-    await respond(res, entry);
+    await deps.keys.save(entry.id, payload.key);
+    await refreshAuth(deps.call);
+    respond(res, entry);
   });
 
   route("providers/remove", "POST", async (req, res) => {
@@ -200,12 +170,8 @@ export function registerProvidersHttp(
       sendJson(res, 404, { error: `Unknown provider: ${provider}.` });
       return;
     }
-    const ref = target(entry);
-    if (typeof ref === "string") {
-      sendJson(res, 409, { error: ref });
-      return;
-    }
-    await deps.call("secrets.store.delete", { name: ref.id });
-    await respond(res, entry);
+    await deps.keys.remove(entry.id, deps.readConfig());
+    await refreshAuth(deps.call);
+    respond(res, entry);
   });
 }

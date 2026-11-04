@@ -29,21 +29,27 @@ export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
  */
 export const OPENROUTER_KEY = "OPENROUTER_API_KEY";
 
-/** OpenClaw's secret store for the live world, where provider keys live. */
-export interface SecretStore {
-  readonly has: (name: string) => Promise<boolean>;
-  readonly set: (name: string, value: string) => Promise<void>;
+/**
+ * Where the live world keeps provider keys: OpenClaw auth profiles, named
+ * `<provider>:manual` as the plugin names them (`providers/keys.ts`).
+ */
+export interface KeyStore {
+  readonly has: (provider: string) => Promise<boolean>;
+  readonly set: (provider: string, key: string) => Promise<void>;
 }
 
-const StoreListSchema = z.array(z.object({ name: z.string() }));
+const ProfileIdsSchema = z.array(z.string());
 
 /**
- * Through OpenClaw's CLI, which writes the store directly: setup runs before
- * the Gateway exists. About a second a call.
+ * Through OpenClaw's plugin SDK in a child Node process, with the world's
+ * state: setup runs before the Gateway exists. About a second a call.
  */
-export function cliSecretStore(appDir: string): SecretStore {
+export function sdkKeyStore(appDir: string): KeyStore {
   const liveDir = path.join(appDir, "world");
-  const cli = path.join(appDir, "../../node_modules/openclaw/openclaw.mjs");
+  const sdk = path.join(
+    appDir,
+    "../../node_modules/openclaw/dist/plugin-sdk/provider-auth.js",
+  );
   const options = {
     cwd: liveDir,
     env: {
@@ -52,43 +58,50 @@ export function cliSecretStore(appDir: string): SecretStore {
       OPENCLAW_STATE_DIR: path.join(liveDir, ".state"),
     },
   };
-  const run = promisify(execFile);
+  const script = (body: string) => [
+    "--input-type=module",
+    "-e",
+    `const sdk = await import(${JSON.stringify(sdk)});\n${body}`,
+  ];
   return {
-    has: async (name) => {
-      if (!existsSync(path.join(liveDir, ".state"))) return false;
-      const { stdout } = await run(
+    has: async (provider) => {
+      if (!existsSync(options.env.OPENCLAW_STATE_DIR)) return false;
+      const { stdout } = await promisify(execFile)(
         process.execPath,
-        [cli, "secrets", "store", "list", "--json"],
+        script(
+          "process.stdout.write(JSON.stringify(Object.keys(sdk.ensureAuthProfileStore().profiles)));",
+        ),
         options,
       );
-      return StoreListSchema.parse(JSON.parse(stdout)).some(
-        (entry) => entry.name === name,
+      return ProfileIdsSchema.parse(JSON.parse(stdout)).includes(
+        `${provider}:manual`,
       );
     },
-    set: async (name, value) => {
+    set: async (provider, key) => {
       await mkdir(options.env.OPENCLAW_STATE_DIR, { recursive: true });
       await new Promise<void>((resolve, reject) => {
         const child = execFile(
           process.execPath,
-          [
-            cli,
-            "secrets",
-            "store",
-            "set",
-            name,
-            "--kind",
-            "secret",
-            "--value-file",
-            "-",
-          ],
+          script(`let key = "";
+for await (const chunk of process.stdin) key += chunk;
+const saved = await sdk.upsertAuthProfileWithLock({
+  profileId: ${JSON.stringify(`${provider}:manual`)},
+  credential: { type: "api_key", provider: ${JSON.stringify(provider)}, key },
+});
+if (!saved) throw new Error("the key store is busy");`),
           options,
           (error) => {
             if (!error) resolve();
-            // The CLI's message never holds the key: it arrives on stdin.
-            else reject(new Error(`Couldn't store ${name}: ${error.message}`));
+            // The message never holds the key: it arrives on stdin.
+            else
+              reject(
+                new Error(
+                  `Couldn't save the ${provider} key: ${error.message}`,
+                ),
+              );
           },
         );
-        child.stdin?.end(value);
+        child.stdin?.end(key);
       });
     },
   };
@@ -252,7 +265,7 @@ async function characterGroups(
 
 export function createSetup(
   appDir: string,
-  store: SecretStore = cliSecretStore(appDir),
+  keys: KeyStore = sdkKeyStore(appDir),
 ) {
   const worldsDir = path.join(appDir, "worlds");
   const liveDir = path.join(appDir, "world");
@@ -325,9 +338,10 @@ export function createSetup(
         (a, b) => Number(a.id === "starter") - Number(b.id === "starter"),
       ),
       imported,
-      hasKey: Boolean(
-        (await keyOutsideStore()) || (await store.has(OPENROUTER_KEY)),
-      ),
+      // Once a world exists its Gateway owns the auth store; setup is over.
+      hasKey:
+        existsSync(configFile) ||
+        Boolean((await keyOutsideProfile()) || (await keys.has("openrouter"))),
     };
   }
 
@@ -363,8 +377,8 @@ export function createSetup(
     );
   }
 
-  /** A key from before keys moved to the store: the environment or `.env`. */
-  async function keyOutsideStore(): Promise<string | undefined> {
+  /** A key from before keys moved into profiles: the environment or `.env`. */
+  async function keyOutsideProfile(): Promise<string | undefined> {
     return (
       process.env[OPENROUTER_KEY]?.trim() ||
       parseEnv(await savedEnv())[OPENROUTER_KEY]?.trim() ||
@@ -373,13 +387,13 @@ export function createSetup(
   }
 
   /**
-   * Into the secret store. A key already there wins, as a key already in `.env`
+   * Into an auth profile. A key already there wins, as a key already in `.env`
    * did, so finishing an interrupted run never swaps it.
    */
-  async function storeKey(typed: string | undefined): Promise<void> {
-    if (await store.has(OPENROUTER_KEY)) return;
-    const key = typed ?? (await keyOutsideStore());
-    if (key) await store.set(OPENROUTER_KEY, key);
+  async function saveKey(typed: string | undefined): Promise<void> {
+    if (await keys.has("openrouter")) return;
+    const key = typed ?? (await keyOutsideProfile());
+    if (key) await keys.set("openrouter", key);
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
@@ -461,7 +475,7 @@ export function createSetup(
     if (!(await status()).worlds.some(({ id }) => id === request.world))
       throw new Error(`Unknown world: ${request.world}`);
     await importWorld(request.world);
-    await storeKey(request.openrouterKey);
+    await saveKey(request.openrouterKey);
     await writeConfig(request);
   }
 

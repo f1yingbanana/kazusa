@@ -297,25 +297,30 @@ apps/kazusa/
   applies updates staged by Settings → Updates (`scripts/update.mjs`,
   `.update/pending.json`): stop everything, apply, start the new version in the
   same terminal. Never change files from inside a running copy instead.
-- **Provider keys** live in OpenClaw's secret store
-  (`.state/state/openclaw.sqlite`). Writing a key reference into `openclaw.json`
-  reloads every plugin, so `worlds/base.json` writes one for every provider in
-  `src/providers/catalog.ts` up front
-  (`models.providers.<id>.apiKey: { source: "store", provider: "default", id: "<VAR>" }`;
-  TypeSafe's at `plugins.entries.kazusa.config.decisions.typesafeApiKey`, a
-  manifest `secretInputs` path read with `getPreparedPluginSecretInput`).
-  `catalog.test.ts` keeps them in step. Settings → Models only calls
-  `secrets.store.set`/`delete` (admin scope, so `callGatewayFromCli` with the
-  token, like Usage), which OpenClaw re-resolves live; it never writes config.
-  Costs: each provider without a key logs a cold-secret warning pair at start
-  and on every store change; Kazusa's brain channel declares
-  `plugins.entries.kazusa.config.decisions` a no-op reload prefix, or a TypeSafe
-  key change would restart it (OpenClaw ties a channel to all of its plugin's
-  config); a reference disables the environment fallback, so `.env` keys only
-  count for a provider whose reference was removed by hand. Read references from
-  `getRuntimeConfigSourceSnapshot()` (the runtime snapshot holds resolved keys).
-  Baseten and Cohere aren't offered: their plugins reject a key-only entry. The
-  setup guide stores OpenRouter's key with the CLI before the Gateway exists.
+- **Provider keys** are OpenClaw auth profiles named `<provider>:manual`, in the
+  shared auth store (`.state/state/openclaw.sqlite`; `src/providers/keys.ts`,
+  SDK `openclaw/plugin-sdk/provider-auth`). A profile is the only place a key
+  reaches live model discovery: a secret store reference reaches it only as a
+  placeholder (no models), and a store reference whose entry is gone makes the
+  provider `unavailable` even beside a profile. Settings → Models saves with
+  `upsertAuthProfileWithLock`, removes Kazusa's own profile with
+  `removeProviderAuthProfilesWithLock({ profileIds })`, then calls
+  `models.authRefresh` (admin scope, so `callGatewayFromCli` with the token,
+  like Usage). Nothing touches `openclaw.json`, so nothing reloads. Never use
+  `models.authSetApiKey`, `models.authLogout`, `paste-api-key` or `paste-token`:
+  each also rewrites `openclaw.json` (`auth.profiles`,
+  `models.providers.<id>.apiKey`), which reloads every plugin. A key written
+  into `openclaw.json` by hand reports as `config` and can't be changed from
+  Settings. TypeSafe has no plugin; Jev reads its `typesafe:manual` profile with
+  `resolveApiKeyForProvider`. `worlds/base.json` has no key references. Worlds
+  made by 0.1.3 and 0.2.0 had store references: `providers/migrate.ts` copies
+  each stored key into a profile at `gateway_start` (`secrets.resolve`), and
+  `scripts/provider-keys.mjs` drops a reference whose profile exists (or whose
+  entry is gone) before the next Gateway start, then soft-deletes its store
+  entry. Those two files, the manifest's `decisions.typesafeApiKey` schema and
+  `TYPESAFE_KEY_PATH` are marked deprecated; remove them all together once no
+  such world is left. The setup guide saves OpenRouter's key as a profile
+  through the SDK in a child Node process before the Gateway exists.
 - **Gateway token**: required even on loopback, because without it any website
   can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
   `.env`, and hands it to the frontend's proxy. Plugin routes read it from

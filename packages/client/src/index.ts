@@ -389,13 +389,13 @@ export const ModelsResponseSchema = z.object({
 export type ModelsResponse = z.infer<typeof ModelsResponseSchema>;
 
 /**
- * Where a provider's key comes from. `store`: OpenClaw's secret store, through
- * a reference Kazusa wrote. `env`: an environment variable (the world's
- * `.state/.env`, read at Gateway start). `config`: anything else written into
- * `openclaw.json` by hand. `none`: no key.
+ * Where a provider's key comes from. `profile`: the OpenClaw auth profile
+ * Kazusa saves a pasted key in. `env`: an environment variable (the world's
+ * `.state/.env`, read at Gateway start). `config`: anything written into
+ * `openclaw.json` by hand. `none`: no key Kazusa can see.
  */
 export const ProviderKeySourceSchema = z.enum([
-  "store",
+  "profile",
   "env",
   "config",
   "none",
@@ -410,7 +410,7 @@ export const ProviderSummarySchema = z.object({
   hint: z.string().optional(),
   /** Where to create a key. */
   keysUrl: z.string().url().optional(),
-  /** The secret store entry and environment variable it uses. */
+  /** The environment variable it reads when no profile holds a key. */
   keyName: z.string(),
   key: ProviderKeySourceSchema,
 });
@@ -423,9 +423,9 @@ export const ProvidersResponseSchema = z.object({
 export type ProvidersResponse = z.infer<typeof ProvidersResponseSchema>;
 
 /**
- * POST /kazusa/providers/key. Saves `key` in the secret store entry the
- * provider already points at, so nothing in `openclaw.json` changes. Answers
- * with the provider; its models need a catalog refresh.
+ * POST /kazusa/providers/key. Saves `key` as the provider's auth profile, so
+ * nothing in `openclaw.json` changes and nothing reloads. Answers with the
+ * provider; its models need a catalog refresh.
  */
 export const ProviderKeyPayloadSchema = z.object({
   provider: z.string().min(1),
@@ -433,7 +433,7 @@ export const ProviderKeyPayloadSchema = z.object({
 });
 export type ProviderKeyPayload = z.infer<typeof ProviderKeyPayloadSchema>;
 
-/** POST /kazusa/providers/remove. Forgets a key Kazusa stored. */
+/** POST /kazusa/providers/remove. Forgets the key Kazusa saved, and only that. */
 export const ProviderRemovePayloadSchema = z.object({
   provider: z.string().min(1),
 });

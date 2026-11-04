@@ -4,10 +4,10 @@ import type {
   DecisionProviderV1,
   ProviderDecisionOutcome,
 } from "openclaw/plugin-sdk/decisions";
-import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-runtime";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf-runtime";
 import { z } from "zod";
 import { modelSelection } from "../models/selection.ts";
+import { authProfileKeys } from "../providers/keys.ts";
 
 /**
  * Jev, as the one decision model OpenClaw is configured with: `kazusa/jev`.
@@ -46,7 +46,9 @@ export const routeRef = (route: JevRoute): string =>
 
 /**
  * TypeSafe's key: a secret reference in Kazusa's own config, declared in the
- * manifest's `secretInputs`, since TypeSafe is no model provider.
+ * manifest's `secretInputs`, since TypeSafe is no model provider. deprecated:
+ * Jev reads the `typesafe:manual` auth profile; only `providers/migrate.ts`
+ * reads this, to move a key from worlds made by 0.1.3 and 0.2.0.
  */
 export const TYPESAFE_KEY_PATH = "decisions.typesafeApiKey";
 
@@ -177,8 +179,6 @@ const post: JevDeps["post"] = async ({
 /** Keys wherever OpenClaw keeps them; the route from Kazusa's selection. */
 export function gatewayJevDeps(api: OpenClawPluginApi): JevDeps {
   const selection = modelSelection(api);
-  const typesafeKey = (): string | undefined =>
-    getPreparedPluginSecretInput(DECISION_PROVIDER_ID, TYPESAFE_KEY_PATH).value;
   return {
     route: async () => {
       const { decision } = await selection.read();
@@ -187,20 +187,19 @@ export function gatewayJevDeps(api: OpenClawPluginApi): JevDeps {
         JEV_ROUTES[0]
       );
     },
+    // TypeSafe is no model provider, so only its auth profile can hold a key.
     keyConfigured: (provider) =>
-      provider === "typesafe"
-        ? Boolean(typesafeKey())
-        : api.runtime.modelAuth.isProviderApiKeyConfigured({
-            provider,
-            cfg: api.runtime.config.current() as Parameters<
-              typeof api.runtime.modelAuth.isProviderApiKeyConfigured
-            >[0]["cfg"],
-          }),
+      authProfileKeys.has(provider) ||
+      (provider !== "typesafe" &&
+        api.runtime.modelAuth.isProviderApiKeyConfigured({
+          provider,
+          cfg: api.runtime.config.current() as Parameters<
+            typeof api.runtime.modelAuth.isProviderApiKeyConfigured
+          >[0]["cfg"],
+        })),
     resolveKey: async (provider) =>
-      provider === "typesafe"
-        ? typesafeKey()
-        : (await api.runtime.modelAuth.resolveApiKeyForProvider({ provider }))
-            .apiKey,
+      (await api.runtime.modelAuth.resolveApiKeyForProvider({ provider }))
+        .apiKey,
     post,
   };
 }

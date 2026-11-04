@@ -13,10 +13,10 @@ type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 function setup(
   initial: Record<string, unknown>,
   env: NodeJS.ProcessEnv = {},
-  stored: readonly string[] = [],
+  saved: readonly string[] = [],
 ) {
   const config = initial as OpenClawConfig;
-  const store = new Set<string>(stored);
+  const profiles = new Map<string, string>(saved.map((id) => [id, "k"]));
   const routes: Record<string, Handler> = {};
   const api = {
     registerHttpRoute: vi.fn((opts: { path: string; handler: Handler }) => {
@@ -26,15 +26,19 @@ function setup(
   const deps = {
     readConfig: () => config,
     env: () => env,
-    call: vi.fn(async (method: string, params: unknown) => {
-      const { name } = params as { name?: string };
-      if (method === "secrets.store.set" && name) store.add(name);
-      if (method === "secrets.store.delete" && name) store.delete(name);
-      return { entries: [...store].map((entry) => ({ name: entry })) };
-    }),
+    keys: {
+      has: (provider: string) => profiles.has(provider),
+      save: vi.fn(async (provider: string, key: string) => {
+        profiles.set(provider, key);
+      }),
+      remove: vi.fn(async (provider: string) => {
+        profiles.delete(provider);
+      }),
+    },
+    call: vi.fn(async () => ({ refreshed: true })),
   } satisfies ProvidersDeps;
   registerProvidersHttp(api, deps);
-  return { routes, deps, store };
+  return { routes, deps, profiles };
 }
 
 async function call(
@@ -64,86 +68,69 @@ async function call(
   return { status, body: JSON.parse(json || "{}") as unknown };
 }
 
-const ref = (id: string) => ({ source: "store", provider: "default", id });
-
-/** A world as `worlds/base.json` makes it: every reference written up front. */
+/** A world as `worlds/base.json` makes it, plus one key set by hand. */
 const WORLD = {
-  plugins: {
-    allow: ["kazusa", "openrouter", "venice", "zai"],
-    entries: {
-      kazusa: {
-        config: { decisions: { typesafeApiKey: ref("TYPESAFE_API_KEY") } },
-      },
-    },
-  },
+  plugins: { allow: ["kazusa", "openrouter", "venice", "zai"] },
   models: {
     providers: {
-      openrouter: { apiKey: ref("OPENROUTER_API_KEY") },
-      venice: { apiKey: ref("VENICE_API_KEY") },
       zai: { apiKey: { source: "env", provider: "default", id: "ZAI_KEY" } },
     },
   },
 };
 
 describe("registerProvidersHttp", () => {
-  it("says where each key comes from, counting a store entry only once it exists", async () => {
-    const { routes } = setup(WORLD, {}, ["OPENROUTER_API_KEY"]);
+  it("says where each key comes from", async () => {
+    const { routes } = setup(WORLD, { VENICE_API_KEY: "v" }, ["openrouter"]);
     const { body } = await call(routes["/kazusa/providers"], "GET");
     const { providers } = ProvidersResponseSchema.parse(body);
     expect(providers.map(({ id, key }) => [id, key])).toEqual([
-      ["openrouter", "store"],
+      ["openrouter", "profile"],
       ["typesafe", "none"],
-      ["venice", "none"],
+      ["venice", "env"],
       ["zai", "config"],
     ]);
   });
 
-  it("saves and removes a key in the store, never in the config", async () => {
-    const { routes, deps, store } = setup(WORLD);
+  it("saves and removes a key as an auth profile, never in the config", async () => {
+    const { routes, deps, profiles } = setup(WORLD);
     const before = JSON.stringify(WORLD);
     const saved = await call(routes["/kazusa/providers/key"], "POST", {
       provider: "venice",
       key: " vapi_x ",
     });
-    expect(ProviderSummarySchema.parse(saved.body).key).toBe("store");
-    expect(deps.call).toHaveBeenCalledWith("secrets.store.set", {
-      name: "VENICE_API_KEY",
-      value: "vapi_x",
-      kind: "secret",
+    expect(ProviderSummarySchema.parse(saved.body).key).toBe("profile");
+    expect(profiles.get("venice")).toBe("vapi_x");
+    expect(deps.call).toHaveBeenCalledWith("models.authRefresh", {
+      operation: "login",
     });
     const removed = await call(routes["/kazusa/providers/remove"], "POST", {
       provider: "venice",
     });
     expect(ProviderSummarySchema.parse(removed.body).key).toBe("none");
-    expect(store.has("VENICE_API_KEY")).toBe(false);
+    expect(profiles.has("venice")).toBe(false);
+    expect(deps.call).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(WORLD)).toBe(before);
   });
 
-  it("keeps TypeSafe's key behind Kazusa's own reference", async () => {
-    const { routes, deps } = setup(WORLD);
+  it("saves TypeSafe's key as a profile too", async () => {
+    const { routes, profiles } = setup(WORLD);
     const { body } = await call(routes["/kazusa/providers/key"], "POST", {
       provider: "typesafe",
       key: "ts",
     });
-    expect(ProviderSummarySchema.parse(body).key).toBe("store");
-    expect(deps.call).toHaveBeenCalledWith("secrets.store.set", {
-      name: "TYPESAFE_API_KEY",
-      value: "ts",
-      kind: "secret",
-    });
+    expect(ProviderSummarySchema.parse(body).key).toBe("profile");
+    expect(profiles.get("typesafe")).toBe("ts");
   });
 
-  it("leaves a reference set by hand alone", async () => {
+  it("leaves a key set by hand in openclaw.json alone", async () => {
     const { routes, deps } = setup(WORLD);
     const { status } = await call(routes["/kazusa/providers/key"], "POST", {
       provider: "zai",
       key: "z",
     });
     expect(status).toBe(409);
-    expect(deps.call).not.toHaveBeenCalledWith(
-      "secrets.store.set",
-      expect.anything(),
-    );
+    expect(deps.keys.save).not.toHaveBeenCalled();
+    expect(deps.call).not.toHaveBeenCalled();
   });
 
   it("refuses a provider whose plugin isn't allowed", async () => {

@@ -12,16 +12,10 @@ export interface ProviderEntry {
   readonly label: string;
   readonly hint?: string;
   readonly keysUrl?: string;
-  /** Where Kazusa stores the key, and the variable OpenClaw reads first. */
+  /** The variable OpenClaw reads first when no auth profile holds a key. */
   readonly keyName: string;
   /** Every variable the plugin reads a key from, `keyName` included. */
   readonly envVars: readonly string[];
-  /**
-   * Where its reference to the store sits: `models.providers.<id>.apiKey` for a
-   * model provider, Kazusa's own config for TypeSafe, whose Jev only Kazusa
-   * calls (`decisions/jev.ts`).
-   */
-  readonly keyIn: "provider" | "kazusa";
 }
 
 const entry = (
@@ -33,7 +27,6 @@ const entry = (
   plugin: id,
   label,
   envVars: [rest.keyName],
-  keyIn: "provider",
   ...rest,
 });
 
@@ -145,9 +138,8 @@ export const PROVIDERS: readonly ProviderEntry[] = [
     plugin: "kazusa",
     hint: "Jev decisions, billed by TypeSafe",
     keyName: "TYPESAFE_API_KEY",
-    // A plugin secret input is read from its reference only, never the environment.
+    // Only Kazusa's Jev calls it, and it reads the auth profile alone.
     envVars: [],
-    keyIn: "kazusa",
   }),
   entry("together", "Together AI", {
     hint: "Hosted open models",
