@@ -244,6 +244,7 @@ export const DomainSchema = z.enum([
   "wiki",
   "brain",
   "usage",
+  "context",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -546,6 +547,73 @@ export const ThinkingSelectResponseSchema = z.object({
 });
 export type ThinkingSelectResponse = z.infer<
   typeof ThinkingSelectResponseSchema
+>;
+
+/* ========================================================================== */
+/* Read model: context (GET /kazusa/context/settings)                         */
+/* ========================================================================== */
+
+/**
+ * How much a character remembers and sends to its model each turn. The world
+ * sets these; a character may override any of them. Kept in Kazusa's store, so
+ * a change reloads nothing.
+ */
+export const ContextSettingsSchema = z.object({
+  /** How far back records reach, in sim hours. */
+  shortTermHours: z
+    .number()
+    .min(24)
+    .max(24 * 30),
+  /** Records' share of a turn; `"unlimited"` takes what the maximum leaves. */
+  ledgerMaxTokens: z.union([z.number().int().min(0), z.literal("unlimited")]),
+  /**
+   * The most one brain call sends, everything included; `"unlimited"` is the
+   * model's whole window.
+   */
+  maxContextTokens: z.union([
+    z.number().int().min(16_000),
+    z.literal("unlimited"),
+  ]),
+  /** The records' start moves in steps of this many sim hours. */
+  ledgerGridHours: z.number().positive().max(24),
+  /** Share of their budget the records are cut back to when outgrown. */
+  ledgerTrimTo: z.number().gt(0).max(1),
+  /** `On your mind`: recollections each turn brings up, in tokens. */
+  onYourMindTokens: z.number().int().min(0).max(32_000),
+  /** `People you know`: how many. */
+  peopleLimit: z.number().int().min(0).max(200),
+  /** `Where you are`: places around them and places they know, each. */
+  placesLimit: z.number().int().min(0).max(50),
+  /** Their past tool calls, in tokens. */
+  toolHistoryTokens: z.number().int().min(0).max(32_000),
+});
+export type ContextSettings = z.infer<typeof ContextSettingsSchema>;
+
+/** One scope's own choices; absent fields inherit. */
+export const ContextOverridesSchema = ContextSettingsSchema.partial();
+export type ContextOverrides = z.infer<typeof ContextOverridesSchema>;
+
+export const ContextSettingsResponseSchema = z.object({
+  agentId: z.string().optional(),
+  /** What this scope inherits: the world's for a character, built-in for it. */
+  inherited: ContextSettingsSchema,
+  overrides: ContextOverridesSchema,
+  /** What turns use: `inherited` with `overrides` on top. */
+  effective: ContextSettingsSchema,
+  /** The model's own window, when a character's session knows it. */
+  modelContextTokens: z.number().int().positive().optional(),
+});
+export type ContextSettingsResponse = z.infer<
+  typeof ContextSettingsResponseSchema
+>;
+
+/** Replaces one scope's overrides. Omit `agentId` for the world. */
+export const ContextSettingsSavePayloadSchema = z.object({
+  agentId: z.string().min(1).optional(),
+  overrides: ContextOverridesSchema,
+});
+export type ContextSettingsSavePayload = z.infer<
+  typeof ContextSettingsSavePayloadSchema
 >;
 
 /* ========================================================================== */

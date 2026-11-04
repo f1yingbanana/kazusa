@@ -26,6 +26,8 @@ const ROUTES = new Map([
   ["sticker", "GET"],
   ["profile", "GET"],
   ["profile/save", "POST"],
+  ["context/settings", "GET"],
+  ["context/settings/save", "POST"],
   ["models", "GET"],
   ["model", "POST"],
   ["thinking", "POST"],

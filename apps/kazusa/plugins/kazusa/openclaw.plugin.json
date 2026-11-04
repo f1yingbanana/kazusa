@@ -175,9 +175,26 @@
         "type": "object",
         "properties": {
           "ledgerMaxTokens": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 32000
+            "oneOf": [
+              { "type": "integer", "minimum": 0 },
+              { "const": "unlimited" }
+            ]
+          },
+          "maxContextTokens": {
+            "oneOf": [
+              { "type": "integer", "minimum": 16000 },
+              { "const": "unlimited" }
+            ]
+          },
+          "ledgerGridHours": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 24
+          },
+          "ledgerTrimTo": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
           },
           "toolHistoryMaxTokens": {
             "type": "integer",

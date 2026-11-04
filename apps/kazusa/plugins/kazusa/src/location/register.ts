@@ -88,6 +88,8 @@ export interface LocationService {
     agentId: string,
     at: number,
     evidence: string,
+    /** `listLimit` from the character's context settings. */
+    options?: { readonly listLimit?: number },
   ) => Promise<string | undefined>;
   /**
    * Completes a finished trip when a task deadline fires, and returns what the
@@ -920,7 +922,7 @@ export function registerLocation(
       await save(id, current);
       await moved(id, current, undefined, at, together);
     },
-    whereabouts: async (agentId, at, evidence) => {
+    whereabouts: async (agentId, at, evidence, options) => {
       const world = currentWorld();
       if (!world) return undefined;
       const current = await record(agentId);
@@ -961,7 +963,7 @@ export function registerLocation(
         current,
         at,
         await knowledge(world.map, agentId, evidence),
-        config.listLimit,
+        options?.listLimit ?? config.listLimit,
         company,
         ownHuddle,
       );

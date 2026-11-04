@@ -135,6 +135,13 @@ written, and a missing page is created. `id` and `name` stay read-only: they
 come from `plugins.entries.kazusa.config.user`, because chats, personal wiki
 pages and the stored position are all keyed by the id.
 
+### Built: context settings
+
+| Route                                | Request / response                                                                                                                                                        | Backed by                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET /kazusa/context/settings`       | `?agentId=` optional → `ContextSettingsResponse` (`inherited`, `overrides`, `effective`, and for a character `modelContextTokens` from their brain session)               | Retained `"contextSettings"` store (`world`, `agent:<id>`) over the plugin config |
+| `POST /kazusa/context/settings/save` | `ContextSettingsSavePayload` (`agentId?`, `overrides`: the scope's whole set; a field left out inherits) → `ContextSettingsResponse`; 400 out of range, 404 unknown agent | Same store; the next brain turn reads it. No SSE: the writer refetches            |
+
 ### Built: models
 
 | Route                   | Request / response                                                                                                                                                                                                                                                                                                                                                             | Backed by                                                                                                                             |

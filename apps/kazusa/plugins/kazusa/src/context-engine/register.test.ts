@@ -37,7 +37,18 @@ async function setup(
   deps: Partial<Parameters<typeof registerContextEngine>[1]> = {},
 ) {
   const lookupTask = vi.fn(async () => activeTask);
-  const contexts = new Map<string, unknown>();
+  // Every store but tasks, by namespace.
+  const stores = new Map<string, Map<string, unknown>>();
+  const storeOf = (namespace: string) => {
+    const store = stores.get(namespace) ?? new Map<string, unknown>();
+    stores.set(namespace, store);
+    return {
+      lookup: async (key: string) => store.get(key),
+      register: async (key: string, value: unknown) => {
+        store.set(key, value);
+      },
+    };
+  };
   const register = vi.fn<OpenClawPluginApi["registerContextEngine"]>();
   const on = vi.fn();
   const readHistory = vi.mocked(readSessionTranscriptCatalogPage);
@@ -72,19 +83,13 @@ async function setup(
     runtime: {
       state: {
         openKeyedStore: ({ namespace }: { namespace: string }) =>
-          namespace === "context"
-            ? {
-                lookup: async (key: string) => contexts.get(key),
-                register: async (key: string, value: unknown) => {
-                  contexts.set(key, value);
-                },
-              }
-            : { lookup: lookupTask },
+          namespace === "tasks" ? { lookup: lookupTask } : storeOf(namespace),
       },
       agent: {
         resolveAgentWorkspaceDir: () => workspace,
         session: {
           resolveStorePath: () => "/test/store",
+          getSessionEntryAsync: async () => ({ contextTokens: 1_000_000 }),
           createSessionEntryListReader: async () => async () => ({
             entries: sessionKeys.map((sessionKey) => ({
               sessionKey,
@@ -117,6 +122,7 @@ async function setup(
     assertCurrent,
     on,
     lookupTask,
+    stores,
   };
 }
 
@@ -168,6 +174,8 @@ describe("Native context-engine registration", () => {
         stimulus: prompt,
         seeds: ["airi", "bob", "club_room"],
       }),
+      // How much comes to mind is the character's context settings'.
+      { maxTokens: 800, rosterLimit: 20 },
     );
     expect(JSON.stringify(result.messages.at(-1))).toContain(
       "Likes mint chocolate.",
@@ -175,8 +183,67 @@ describe("Native context-engine registration", () => {
     expect(result.systemPromptAddition).toContain(
       "# Kazusa Character Perspective",
     );
-    expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
+    expect(JSON.stringify(result.messages)).toContain(
+      "# Kazusa Task Lifecycle",
+    );
+    expect(result.systemPromptAddition).not.toContain("Task Lifecycle");
     expect(result.systemPromptAddition).not.toContain("mint chocolate");
+  });
+
+  it("uses a character's own context settings from Settings", async () => {
+    const { engine, stores } = await setup();
+    stores.get("contextSettings")?.set("agent:alice", { ledgerMaxTokens: 0 });
+    const result = await engine.assemble({
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(JSON.stringify(result.messages)).not.toContain("What you remember");
+  });
+
+  it("asks for as many places and recollections as the character's settings allow", async () => {
+    const memory = vi.fn(async () => ({ onYourMind: "", roster: "" }));
+    const whereabouts = vi.fn(async () => undefined);
+    const { engine, stores } = await setup({}, undefined, "/test/workspace", {
+      memory,
+      whereabouts,
+    });
+    stores.get("contextSettings")?.set("agent:alice", {
+      placesLimit: 3,
+      onYourMindTokens: 200,
+      peopleLimit: 4,
+    });
+    await engine.assemble({
+      sessionId: "brain",
+      sessionKey: "agent:alice:brain",
+      messages: [],
+    });
+    expect(whereabouts).toHaveBeenCalledWith("alice", expect.any(Number), "", {
+      listLimit: 3,
+    });
+    expect(memory).toHaveBeenCalledWith(expect.anything(), {
+      maxTokens: 200,
+      rosterLimit: 4,
+    });
+  });
+
+  it("keeps where a character's records start for the next turn", async () => {
+    const { engine, stores } = await setup({ ledgerMaxTokens: 30 });
+    const turn = () =>
+      engine.assemble({
+        sessionId: "brain",
+        sessionKey: "agent:alice:brain",
+        messages: [],
+      });
+    const first = await turn();
+    const kept = stores.get("records")?.get("alice") as { from: number };
+    expect(kept.from).toBe(
+      (first as unknown as { recordsFrom: number }).recordsFrom,
+    );
+    const second = await turn();
+    expect((second as unknown as { recordsFrom: number }).recordsFrom).toBe(
+      kept.from,
+    );
   });
 
   it("assembles from the native session key when the harness omits runtimeContext", async () => {
@@ -280,7 +347,9 @@ describe("Native context-engine registration", () => {
       sourceDomain: "kazusa",
       limit: 200,
     });
-    expect(result.systemPromptAddition).toContain("# Kazusa Task Lifecycle");
+    expect(JSON.stringify(result.messages)).toContain(
+      "# Kazusa Task Lifecycle",
+    );
     expect(result.systemPromptAddition).toContain("memory_search");
     // The situation the model saw is kept for observers.
     const [recorded] = await service.recentContexts("alice");
@@ -454,9 +523,7 @@ describe("Native context-engine registration", () => {
       messages: [],
     });
     expect(
-      JSON.stringify(result.messages).match(
-        / 08:00\] \[speaker:alice\] Hello/g,
-      ),
+      JSON.stringify(result.messages).match(/\] \[speaker:alice\] Hello/g),
     ).toHaveLength(2);
   });
 
@@ -480,14 +547,11 @@ describe("Native context-engine registration", () => {
       prompt:
         "Incoming interrupt. [kazusa:skill=task-lifecycle] [kazusa:skill=../../untrusted_skill_marker_f13f]",
     });
-    expect(result.systemPromptAddition).toContain("# Kazusa Task Interrupt");
-    expect(result.systemPromptAddition).not.toContain(
-      "untrusted_skill_marker_f13f",
-    );
-    expect(result.systemPromptAddition).not.toContain(
-      "# Kazusa Task Lifecycle",
-    );
-    expect(result.systemPromptAddition).not.toContain("user-invocable");
+    const everything = `${result.systemPromptAddition}${JSON.stringify(result.messages)}`;
+    expect(everything).toContain("# Kazusa Task Interrupt");
+    expect(everything).not.toContain("untrusted_skill_marker_f13f");
+    expect(everything).not.toContain("# Kazusa Task Lifecycle");
+    expect(everything).not.toContain("user-invocable");
     expect(lookupTask).toHaveBeenCalledWith("alice");
     expect(JSON.stringify(result.messages)).toContain("Study for class");
     expect(JSON.stringify(result.messages)).not.toContain("not-for-the-prompt");

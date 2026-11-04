@@ -295,6 +295,8 @@ export function registerTaskman(
       store,
       clock,
       minDuration: config.minDuration,
+      text: (section, values) =>
+        text(`kazusa-results#${section}`, values, { agentId }),
       async prepare(transition) {
         const prepared = [];
         for (const extension of extensions) {

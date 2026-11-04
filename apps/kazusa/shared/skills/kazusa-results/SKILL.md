@@ -1,14 +1,16 @@
 ---
 name: kazusa-results
 description:
-  "What a character is told when a tool call is refused. Each section is one
-  result. Override only the sections you change."
+  "What a character is told when a tool call is refused, and what an activity
+  change says (its record and its result). Each section is one result. Override
+  only the sections you change."
 user-invocable: false
 disable-model-invocation: true
 ---
 
 Facts only: what to do about them is the other skills' to say. `{placeholders}`
-are filled by code.
+are filled by code. `{until}` is a sim time; `{notes}` is what Location adds
+(where it happens, the way there), each starting with a space.
 
 ## already-said
 
@@ -50,3 +52,23 @@ You aren't there, so nobody in it can hear you.
 ## secret-file
 
 {path} holds secrets, so this did not run.
+
+## task-started
+
+Started {type}: "{description}".{notes} Until {until} ({minutes} min).
+
+## task-finished
+
+Finished {type}. {started}
+
+## task-finished-summary
+
+Finished {type}: "{summary}". {started}
+
+## task-delayed
+
+Delayed {minutes} min, until {until}.{notes}
+
+## task-delayed-reason
+
+Delayed {minutes} min, until {until}. Reason: {reason}{notes}

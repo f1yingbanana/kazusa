@@ -129,10 +129,16 @@ export function bundledSkillText(): SkillText {
 type Schema = Record<string, unknown>;
 
 /**
+ * Keywords that only police input, which every tool parses itself: the model
+ * pays for them on every call and learns nothing from them.
+ */
+const VALIDATION_ONLY = ["$schema", "pattern", "minLength", "maxLength"];
+
+/**
  * A tool as `kazusa-tools` words it: its description from `## <name>`, and each
  * field's from `## <name>.<field>` (nested fields `<name>.<field>.<field>`),
  * where a skill has one. What code put in a field's description becomes
- * `{data}`.
+ * `{data}`. Validation-only keywords are left out of what the model reads.
  */
 export function describeTool<T extends { name: string; parameters?: unknown }>(
   text: SkillText,
@@ -144,7 +150,9 @@ export function describeTool<T extends { name: string; parameters?: unknown }>(
     if (!schema || typeof schema !== "object" || Array.isArray(schema))
       return schema;
     const node = schema as Schema;
-    const next: Schema = { ...node };
+    const next: Schema = Object.fromEntries(
+      Object.entries(node).filter(([key]) => !VALIDATION_ONLY.includes(key)),
+    );
     if (node.properties && typeof node.properties === "object")
       next.properties = Object.fromEntries(
         Object.entries(node.properties as Schema).map(([key, field]) => {

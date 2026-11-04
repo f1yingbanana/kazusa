@@ -1,13 +1,18 @@
 ---
 name: kazusa-deliveries
 description:
-  "What Kazusa adds to the input that wakes or reaches a character. Each section
-  is one piece. Override only the sections you change."
+  "What Kazusa adds to the input that wakes or reaches a character, and how its
+  records of the last while are laid out. Each section is one piece. Override
+  only the sections you change."
 user-invocable: false
 disable-model-invocation: true
 ---
 
-`{placeholders}` are filled by code.
+`{placeholders}` are filled by code. In the records, `{who}` is a person's id,
+or `record-you` / `record-unknown`; `{time}` is `HH:mm`, left out
+(`record-same-minute`) when it is the minute of the line above; `record-seen` is
+what happened to you (`### tasks`), always timed. A section can't hold a line
+starting `## `, so days are `# `.
 
 ## before-replying
 
@@ -44,3 +49,37 @@ error: {error}
 ## tool-no-result
 
 no result
+
+## records
+
+What you remember of the last while
+
+{records}
+
+## records-day
+
+# {date}
+
+## records-chat
+
+### {chat}
+
+## record
+
+[{who} {time}] {text}
+
+## record-same-minute
+
+[{who}] {text}
+
+## record-seen
+
+[{time}] {text}
+
+## record-you
+
+you
+
+## record-unknown
+
+unknown

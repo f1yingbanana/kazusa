@@ -73,8 +73,6 @@ export async function assembleContext(params: {
   readonly whereabouts?: string;
   /** Someone else is here, so the in-person skill applies. */
   readonly inCompany?: boolean;
-  /** Names of the people in these records, by id. */
-  readonly names?: ReadonlyMap<string, string>;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
   /** Past turns' tool calls in a turn: the system agent gets more. */
@@ -83,10 +81,19 @@ export async function assembleContext(params: {
   readonly brainTurns?: readonly BrainTurn[];
   /** The brain run under way, left out of them. */
   readonly runId?: string;
+  /** Where last turn's records started (`recordsFrom`), to keep it cached. */
+  readonly recordsFrom?: number;
+  /**
+   * The model's own window, which `run.tokenBudget` is reckoned from; the
+   * world's `maxContextTokens` takes the difference off it.
+   */
+  readonly contextWindow?: number;
 }): Promise<
   Awaited<ReturnType<ContextEngine["assemble"]>> & {
     readonly breakdown: NonNullable<AssembledContext["breakdown"]>;
     readonly situationText: string;
+    /** Where these records start, for the next turn. */
+    readonly recordsFrom?: number;
   }
 > {
   const { config, run, skillLoader } = params;
@@ -94,7 +101,19 @@ export async function assembleContext(params: {
     agentId: params.agentId,
     workspaceDir: params.workspaceDir,
   };
-  const budget = Math.max(0, run.tokenBudget ?? Number.POSITIVE_INFINITY);
+  // The host leaves the model's whole window, less its own prompt and reply;
+  // the world allows less. Without the window, the maximum alone applies.
+  // `"unlimited"` leaves the host's budget: the model's whole window.
+  const hostBudget = run.tokenBudget ?? Number.POSITIVE_INFINITY;
+  const maximum = config.maxContextTokens;
+  const budget = Math.max(
+    0,
+    maximum === "unlimited"
+      ? hostBudget
+      : params.contextWindow === undefined
+        ? Math.min(hostBudget, maximum)
+        : hostBudget - Math.max(0, params.contextWindow - maximum),
+  );
   const conventionsSkill = config.skills.conventions;
   const lifecycleSkill = config.skills.lifecycle;
   const interruptSkill = config.skills.interrupt;
@@ -109,13 +128,20 @@ export async function assembleContext(params: {
     needsActivity ? lifecycleSkill : interruptSkill,
     resolutionContext,
   );
-  // Last, so the stable prefix survives people coming and going.
   const inPerson = params.inCompany
     ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
     : undefined;
+  const deliveries = (
+    section: string,
+    values?: Readonly<Record<string, string | number>>,
+  ): string =>
+    createSkillText(skillLoader)(`kazusa-deliveries#${section}`, values, {
+      agentId: params.agentId,
+    });
 
-  // Ordered from most to least stable so the provider can reuse the prefix
-  // across turns. The clock lives in the situation message, never here.
+  // Only what is the same every turn, so the provider reuses the whole system
+  // prompt and the records after it. The clock lives in the situation message,
+  // never here.
   const systemPromptAddition = [
     baseConventions,
     buildMemorySystemPromptAddition({
@@ -124,17 +150,23 @@ export async function assembleContext(params: {
       agentId: params.agentId,
       agentSessionKey: run.sessionKey,
     }),
-    behavior,
-    inPerson,
   ]
     .filter(Boolean)
     .join("\n\n");
+  // The skills chosen by state change between turns, so they come after the
+  // records, which grow every turn and are never reused past their end anyway.
+  const guidance: Message = {
+    role: "user",
+    content: `[${formatSimTime(params.simTime)}]\n\n${[behavior, inPerson].filter(Boolean).join("\n\n")}`,
+    timestamp: params.simTime,
+  };
   const systemPromptTokens = estimateTokens({
     role: "user",
     content: systemPromptAddition,
     timestamp: params.simTime,
   });
-  if (systemPromptTokens > budget) {
+  const skillTokens = systemPromptTokens + estimateTokens(guidance);
+  if (skillTokens > budget) {
     throw new Error(
       "Kazusa context budget cannot fit its system prompt additions.",
     );
@@ -176,10 +208,10 @@ export async function assembleContext(params: {
     timestamp: params.simTime,
   };
   const situationTokens = estimateTokens(situation);
-  if (systemPromptTokens + situationTokens > budget) {
+  if (skillTokens + situationTokens > budget) {
     throw new Error("Kazusa context budget cannot fit current activity.");
   }
-  let remaining = budget - systemPromptTokens - situationTokens;
+  let remaining = budget - skillTokens - situationTokens;
   const brain = brainHistory(run.messages, run.prompt);
   const history = [...brain.summaries, ...brain.turn];
   remaining -= history.reduce(
@@ -195,10 +227,7 @@ export async function assembleContext(params: {
       Math.max(0, remaining),
       params.toolHistoryMaxTokens ?? config.toolHistoryMaxTokens,
     ),
-    (section, values) =>
-      createSkillText(skillLoader)(`kazusa-deliveries#${section}`, values, {
-        agentId: params.agentId,
-      }),
+    deliveries,
   );
   const toolHistoryMessages: Message[] = toolHistory
     ? [
@@ -216,27 +245,38 @@ export async function assembleContext(params: {
 
   // No source quotas or additional clipping beyond the native catalog's display
   // projection. Skip records that cannot fit rather than cutting their text.
-  const cutoff = params.simTime - config.shortTermHours * 3_600_000;
-  const recordsText = renderLedgerRecords({
+  const records = renderLedgerRecords({
     sessionsContext: params.sessionsContext,
     simTime: params.simTime,
-    cutoff,
-    tokenBudget: Math.min(remaining, config.ledgerMaxTokens),
-    ...(params.names ? { names: params.names } : {}),
+    cutoff: ledgerCutoff(
+      params.simTime,
+      config.shortTermHours,
+      config.ledgerGridHours,
+    ),
+    tokenBudget:
+      config.ledgerMaxTokens === "unlimited"
+        ? remaining
+        : Math.min(remaining, config.ledgerMaxTokens),
+    trimTo: config.ledgerTrimTo,
+    ...(params.recordsFrom === undefined
+      ? {}
+      : { keepFrom: params.recordsFrom }),
+    text: deliveries,
   });
 
   // Leads with our own sim-time stamp: the host stamps any message without one,
   // in its own format.
-  // Stamped with where it starts, not now: an unchanging first line keeps the
+  // Stamped with the day it starts, not now: an unchanging first line keeps the
   // whole block in the provider's cache, and any stamp stops the host's own.
-  const recordsDay = recordsText.match(/\(\w{3} (\d{4}-\d{2}-\d{2})\)/)?.[1];
-  const recordsFrom = recordsDay ? Date.parse(`${recordsDay}T00:00:00Z`) : NaN;
-  const stamp = Number.isFinite(recordsFrom) ? recordsFrom : params.simTime;
-  const context: Message[] = recordsText
+  const stamp =
+    records.from === undefined
+      ? params.simTime
+      : Math.floor(records.from / DAY_MS) * DAY_MS;
+  const context: Message[] = records.text
     ? [
         {
           role: "user",
-          content: `[${formatSimTime(stamp)}] What you remember of the last while\n\n${recordsText}`,
+          content: `[${formatSimTime(stamp)}] ${deliveries("records", { records: records.text })}`,
           timestamp: stamp,
         },
       ]
@@ -247,6 +287,7 @@ export async function assembleContext(params: {
   // prompt after every tool result, and the model answers all over again.
   const messages = [
     ...context,
+    guidance,
     ...toolHistoryMessages,
     ...brain.summaries,
     situation,
@@ -258,12 +299,13 @@ export async function assembleContext(params: {
       messages.reduce((sum, message) => sum + estimateTokens(message), 0) +
       systemPromptTokens,
     systemPromptAddition,
+    ...(records.from === undefined ? {} : { recordsFrom: records.from }),
     situationText:
       typeof situation.content === "string"
         ? situation.content
         : JSON.stringify(situation.content),
     breakdown: {
-      skills: systemPromptTokens,
+      skills: skillTokens,
       situation: situationTokens,
       history: history.reduce((sum, m) => sum + estimateTokens(m), 0),
       records: context.reduce((sum, m) => sum + estimateTokens(m), 0),
@@ -283,7 +325,6 @@ export function packLedgerRecords(params: {
   readonly simTime: number;
   readonly cutoff: number;
   readonly tokenBudget: number;
-  readonly names?: ReadonlyMap<string, string>;
 }): Map<string, string[]> {
   const { sessionsContext, simTime, cutoff, tokenBudget } = params;
   const records = Object.entries(sessionsContext)
@@ -309,7 +350,6 @@ export function packLedgerRecords(params: {
   for (const event of records.reverse()) {
     const record = formatEnvelopeRecord({
       ...event,
-      ...(params.names ? { names: params.names } : {}),
     });
     const streamHeader = `### ${formatSessionHeader(event.sessionKey)}`;
     const group = selected.get(event.sessionKey);
@@ -334,25 +374,50 @@ export function packLedgerRecords(params: {
   return selected;
 }
 
-/** The speaker, time and any group header around one record's text. */
-const RECORD_OVERHEAD_TOKENS = 20;
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
 /**
- * Their records, oldest first, so new ones only ever append and the provider's
- * prompt cache survives. When the budget trims, the start snaps forward to a
- * sim hour, so it also stays put between turns. Whole records only.
+ * Where the records begin: `hours` back, floored to a grid of `gridHours` so
+ * the start moves once per step, not every turn, and the block stays in the
+ * provider's cache in between.
  */
-export function renderLedgerRecords(params: {
-  readonly sessionsContext: Readonly<
-    Record<string, readonly SessionCatalogTranscriptItem[]>
-  >;
-  readonly simTime: number;
-  readonly cutoff: number;
-  readonly tokenBudget: number;
-  readonly names?: ReadonlyMap<string, string>;
-}): string {
-  const { sessionsContext, simTime, cutoff, tokenBudget } = params;
-  const records = Object.entries(sessionsContext)
+export function ledgerCutoff(
+  simTime: number,
+  hours: number,
+  gridHours: number,
+): number {
+  const step = gridHours * HOUR_MS;
+  return Math.floor((simTime - hours * HOUR_MS) / step) * step;
+}
+
+/** Fills a skill template's `{placeholders}` once, without rescanning values. */
+function fill(
+  template: string,
+  values: Readonly<Record<string, string>>,
+): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
+    key in values ? (values[key] ?? whole) : whole,
+  );
+}
+
+type LedgerStreams = Readonly<
+  Record<string, readonly SessionCatalogTranscriptItem[]>
+>;
+
+interface LedgerRecord {
+  readonly sessionKey: string;
+  readonly message: SessionCatalogTranscriptItem;
+  readonly timestamp: number;
+}
+
+/** Readable records from `from` to `to`, oldest first, in the order shown. */
+function ledgerRecords(
+  sessionsContext: LedgerStreams,
+  from: number,
+  to: number,
+): LedgerRecord[] {
+  return Object.entries(sessionsContext)
     .flatMap(([sessionKey, messages]) =>
       messages.flatMap((message) => {
         const timestamp = Date.parse(message.timestamp ?? "");
@@ -360,8 +425,8 @@ export function renderLedgerRecords(params: {
           message.type === "agentMessage") &&
           message.text?.trim() &&
           Number.isFinite(timestamp) &&
-          timestamp >= cutoff &&
-          timestamp <= simTime
+          timestamp >= from &&
+          timestamp <= to
           ? [{ sessionKey, message, timestamp }]
           : [];
       }),
@@ -370,105 +435,176 @@ export function renderLedgerRecords(params: {
       (a, b) =>
         a.timestamp - b.timestamp || a.sessionKey.localeCompare(b.sessionKey),
     );
-  const cost = (at: number): number =>
-    estimateTokens({
-      role: "user",
-      content: fits[at].message.text ?? "",
-      timestamp: fits[at].timestamp,
-    }) + RECORD_OVERHEAD_TOKENS;
-  // A record that could never fit is skipped, not cut, and hides nothing older.
-  const fits = records.filter((record) => {
-    const size = estimateTokens({
-      role: "user",
-      content: record.message.text ?? "",
-      timestamp: record.timestamp,
-    });
-    return size + RECORD_OVERHEAD_TOKENS <= tokenBudget;
-  });
-  let start = 0;
-  let used = 0;
-  for (let at = fits.length - 1; at >= 0; at--) {
-    used += cost(at);
-    if (used <= tokenBudget) continue;
-    start = at + 1;
-    // Snap to the hour unless that throws away most of a busy hour.
-    const hour = 3_600_000;
-    const from = Math.ceil((fits[at].timestamp + 1) / hour) * hour;
-    let snapped = 0;
-    let index = fits.length;
-    while (index > start && fits[index - 1].timestamp >= from) {
-      index--;
-      snapped += cost(index);
-    }
-    if (snapped >= tokenBudget / 2) start = index;
-    break;
-  }
-  const lines: string[] = [];
-  let day = "";
-  let stream = "";
-  const named = new Set<string>();
-  for (const { sessionKey, message, timestamp } of fits.slice(start)) {
-    const header = formatSessionHeader(sessionKey);
-    const date = formatSimTime(timestamp).slice(0, 14);
-    if (date !== day || header !== stream) {
-      lines.push(`### ${header} (${date})`);
-      day = date;
-      stream = header;
-    }
-    lines.push(
-      formatEnvelopeRecord({
-        sessionKey,
-        message,
-        timestamp,
-        ...(params.names ? { names: params.names } : {}),
-        named,
-      }).trim(),
-    );
-  }
-  return lines.join("\n");
 }
 
 /**
- * How far oldest-first records fit a budget: the time to read up to, so
- * whatever doesn't fit stays unread for next time rather than being skipped.
- * Always moves forward, even if one record alone is over budget.
+ * Renders records as a character reads them, every line from
+ * `kazusa-deliveries` (`text`, read once: rendering runs many times while
+ * fitting a budget). People are their ids: names collide, ids don't.
+ */
+function ledgerRenderer(
+  text: (section: string) => string,
+): (records: readonly LedgerRecord[]) => string {
+  const format = {
+    day: text("records-day"),
+    chat: text("records-chat"),
+    record: text("record"),
+    sameMinute: text("record-same-minute"),
+    seen: text("record-seen"),
+    you: text("record-you"),
+    unknown: text("record-unknown"),
+  };
+  return (records) => {
+    const lines: string[] = [];
+    let day = "";
+    let stream = "";
+    let minute = "";
+    for (const { sessionKey, message, timestamp } of records) {
+      const header = formatSessionHeader(sessionKey);
+      const at = formatSimTime(timestamp);
+      const date = at.slice(0, 14);
+      const time = at.slice(15);
+      if (date !== day) {
+        lines.push(fill(format.day, { date }));
+        day = date;
+        stream = "";
+      }
+      if (header !== stream) {
+        lines.push(fill(format.chat, { chat: header }));
+        stream = header;
+      }
+      const words = message.text?.trim() ?? "";
+      if (header === "tasks")
+        lines.push(fill(format.seen, { time, text: words }));
+      else {
+        // The catalog projects __openclaw.senderIdentity into sender.identity.
+        // Roles, dialogue, display names and peer keys are never author
+        // evidence.
+        const sender = message.sender?.identity.id;
+        const who = !sender
+          ? format.unknown
+          : sender === sessionKey.split(":")[1]
+            ? format.you
+            : sender;
+        lines.push(
+          fill(at === minute ? format.sameMinute : format.record, {
+            who,
+            time,
+            text: words,
+          }),
+        );
+      }
+      minute = at;
+    }
+    return lines.join("\n");
+  };
+}
+
+/**
+ * Their records, oldest first, so new ones only ever append and the provider's
+ * prompt cache survives. Everything since `cutoff` when it fits; otherwise last
+ * turn's start (`keepFrom`) while it still fits, else cut back to `trimTo` of
+ * the budget so the start holds again for a while. Whole records only, measured
+ * as rendered (`ledgerRenderer`); `from` is when the first one shown happened,
+ * the next turn's `keepFrom`.
+ */
+export function renderLedgerRecords(params: {
+  readonly sessionsContext: LedgerStreams;
+  readonly simTime: number;
+  readonly cutoff: number;
+  readonly tokenBudget: number;
+  /** Share of the budget to cut back to when the records outgrow it. */
+  readonly trimTo: number;
+  /** Where last turn's records started. */
+  readonly keepFrom?: number;
+  /** A `kazusa-deliveries` section, by name. */
+  readonly text: (section: string) => string;
+}): { readonly text: string; readonly from?: number } {
+  const { simTime, tokenBudget } = params;
+  const records = ledgerRecords(params.sessionsContext, params.cutoff, simTime);
+  if (records.length === 0) return { text: "" };
+  const render = ledgerRenderer(params.text);
+  const tokens = (from: readonly LedgerRecord[]): number =>
+    estimateTokens({ role: "user", content: render(from), timestamp: simTime });
+  // A record that could never fit is skipped, not cut, and hides nothing older.
+  const fits = records.filter((record) => tokens([record]) <= tokenBudget);
+  const fitsFrom = (start: number, budget = tokenBudget): boolean =>
+    tokens(fits.slice(start)) <= budget;
+  // The oldest start within a budget; dropping older records only shrinks the
+  // rendering, so a binary search finds it.
+  const oldestWithin = (budget: number): number => {
+    let low = 0;
+    let high = fits.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (fitsFrom(middle, budget)) high = middle;
+      else low = middle + 1;
+    }
+    return low;
+  };
+  let start = 0;
+  if (!fitsFrom(0)) {
+    const keepFrom = params.keepFrom;
+    const kept =
+      keepFrom === undefined
+        ? -1
+        : fits.findIndex((record) => record.timestamp >= keepFrom);
+    start =
+      kept > 0 && fitsFrom(kept)
+        ? kept
+        : oldestWithin(tokenBudget * params.trimTo);
+    // The newest record alone can be over the trimmed share.
+    if (start >= fits.length) start = oldestWithin(tokenBudget);
+  }
+  const shown = fits.slice(start);
+  return {
+    text: render(shown),
+    ...(shown[0] ? { from: shown[0].timestamp } : {}),
+  };
+}
+
+/**
+ * How far oldest-first records fit a budget, measured as they will be rendered:
+ * the time to read up to, so whatever doesn't fit stays unread for next time
+ * rather than being skipped. Records at one moment stay together. Always moves
+ * forward, even if one record alone is over budget.
  */
 export function ledgerWindowEnd(params: {
-  readonly sessionsContext: Readonly<
-    Record<string, readonly SessionCatalogTranscriptItem[]>
-  >;
+  readonly sessionsContext: LedgerStreams;
   readonly since: number;
   readonly now: number;
   readonly tokenBudget: number;
+  /** A `kazusa-deliveries` section, by name, as `renderLedgerRecords` takes. */
+  readonly text: (section: string) => string;
 }): number {
-  const records = Object.entries(params.sessionsContext)
-    .flatMap(([sessionKey, messages]) =>
-      messages.flatMap((message) => {
-        const timestamp = Date.parse(message.timestamp ?? "");
-        return (message.type === "userMessage" ||
-          message.type === "agentMessage") &&
-          message.text?.trim() &&
-          timestamp >= params.since &&
-          timestamp <= params.now
-          ? [{ sessionKey, message, timestamp }]
-          : [];
-      }),
-    )
-    .sort((a, b) => a.timestamp - b.timestamp);
-  let used = 0;
-  let end: number | undefined;
-  for (const event of records) {
-    const content = formatEnvelopeRecord(event);
-    used += estimateTokens({
+  const records = ledgerRecords(
+    params.sessionsContext,
+    params.since,
+    params.now,
+  );
+  if (records.length === 0) return params.now;
+  const render = ledgerRenderer(params.text);
+  const fitsTo = (end: number): boolean =>
+    estimateTokens({
       role: "user",
-      content,
-      timestamp: event.timestamp,
-    });
-    if (used > params.tokenBudget && end !== undefined && event.timestamp > end)
-      return end;
-    end = event.timestamp;
+      content: render(records.slice(0, end)),
+      timestamp: params.now,
+    }) <= params.tokenBudget;
+  // The most records that fit; adding more only grows the rendering.
+  let low = 1;
+  let high = records.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (fitsTo(middle)) low = middle;
+    else high = middle - 1;
   }
-  return params.now;
+  let end = low;
+  while (
+    end < records.length &&
+    records[end].timestamp === records[end - 1].timestamp
+  )
+    end++;
+  return end === records.length ? params.now : records[end - 1].timestamp;
 }
 
 /**

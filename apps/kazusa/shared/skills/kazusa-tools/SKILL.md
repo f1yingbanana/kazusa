@@ -104,10 +104,9 @@ Your bubbles, in order.
 
 ## send_message.messages.sticker
 
-A sticker of yourself, sent as a bubble of its own to show how you feel beside
-your words. Most messages need none. Send one when your mood shifts, and pick a
-different mood from your last one unless a strong feeling deserves the emphasis.
-{data}
+A sticker of yourself, as a bubble of its own, to show how you feel. Most
+messages need none: send one when your mood shifts, and not the same mood twice
+in a row unless the feeling is strong. {data}
 
 ## send_message.sticker-outfits
 
