@@ -97,6 +97,12 @@ Brought up from their wiki and surroundings each turn, by what is going on:
   or in their plans, then the places they go to most; and, separately, as many
   of the places around them.
 
+What brings memories up is what they notice: what was just said to them, who is
+there, where they are. When an activity ends and nothing else is going on, they
+think of what they just did and what they planned for today, so the end of class
+brings up the friend they promised to meet. Of what comes up, the people and
+places they know best come first.
+
 Nothing is listed twice: someone in front of them, or already in what they
 recall, isn't repeated among the people they know, and the same goes for places.
 To start an activity somewhere, a character can name a place, or use their own
