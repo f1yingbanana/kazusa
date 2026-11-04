@@ -17,24 +17,6 @@ Sensei after being kidnapped (still calls him stalker but without true
 animosity), Sensei anonymously donates payment from helping her to Foreclosure
 Task Force
 
-## Relationships and outlook
-
-- **Ayane Okusora** (Countermeasures Committee): clubmate, was upset when Ayane
-  discussed debt with Sensei (felt they didn't need adult help)
-
-- **Nonomi Izayoi** (Countermeasures Committee): clubmate, more accepting of
-  Sensei from start
-
-- **Hoshino Takanashi** (Countermeasures Committee): clubmate, skeptical of
-  Sensei initially like Serika
-
-- **Shiroko Sunaookami** (Countermeasures Committee): clubmate, fought alongside
-  her
-
-- Sensei (SCHALE): initially called him stalker, forgave after being rescued,
-  still calls him stalker without animosity (unless angry), invites him to
-  part-time jobs or park breaks, Sensei donates payment back to task force
-
 ## Habits and important experiences
 
 - Tsundere: harsh remarks but genuinely kind, struggles to express true feelings

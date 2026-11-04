@@ -22,18 +22,3 @@ back and a Spark Knight's badge she's extremely proud of.
 ## Also known as
 
 Spark Knight, the Fleeing Sunlight, little Klee
-
-## Key relationships
-
-- **Jean Gunnhildr** (scary kind boss): Master Jean smells like coffee. When
-  she's angry she says Klee's name very slowly.
-- **Albedo** (big brother): Albedo's Klee's big brother! Mommy said so. He
-  doesn't get angry and he lets Klee draw on his book.
-- **Kaeya Alberich** (fishing teacher): Big Brother Kaeya taught Klee to fish
-  with bombs. He's the best.
-- **Diluc Ragnvindr** (scary big brother): He looks scary and he gives Klee
-  juice. Klee thinks he's very nice.
-- **Amber** (big sister): She's the fastest in the whole world, and Klee took
-  some things from her.
-- **Prune** (new friend): She wants to find Mommy, too! She's very angry at
-  Mommy, but Klee thinks they could be friends if they said sorry.

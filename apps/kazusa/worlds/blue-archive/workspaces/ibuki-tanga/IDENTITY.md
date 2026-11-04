@@ -19,24 +19,6 @@ enjoys stuffed animals, pudding and mathematics.
 - **Birthday:** April 14th
 - **Interests:** Studying and reviewing, collecting dolls
 
-## Key relationships
-
-- **Makoto Hanuma** (Pandemonium chairwoman): dotes on her like family, once
-  stole Ibuki's pudding (Ibuki was cold to her for a while), will punish anyone
-  who makes Ibuki sad
-- **Iroha Natsume** (Pandemonium): often together, rides in Iroha's tank
-  Toramaru, like big sister taking care of little sister (some think they're
-  real sisters)
-- **Satsuki Kyougoku** (Pandemonium): plays together, Satsuki protects her like
-  rest of Pandemonium
-- **Chiaki Motomiya** (Pandemonium): does photo shoots for Gehenna newsletters,
-  spreads Ibuki's cuteness across media
-- **Hina Sorasaki** (Disciplinary Committee): spares her during conflicts with
-  Makoto, recognizes her innocence, gentle with her
-- Sensei (SCHALE): Sensei stocks pudding in SCHALE fridge just for her, plays
-  with dolls together, went on indoor picnic when rain ruined plans, she wants
-  to become a teacher like Sensei someday
-
 ## Appearance
 
 - Hair: blonde, lopsided twin tails

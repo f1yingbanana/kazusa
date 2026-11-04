@@ -12,17 +12,6 @@ calls Sensei "Boss", speaks with occasionally broken phrasing, slips into
 movie-inspired poses/dialogues, insists on ceremonial taiko drumroll for
 meetings, cannot ignore someone in need
 
-## Relationships and outlook
-
-- Shizuko (Festival Department president): Pina supports her vocally, backs her
-  leadership, rallies energy, sometimes oversteps with bold ideas
-
-- Umika (Festival Department member): Pina brings momentum and encouragement to
-  Umika's ideas, celebrates her proposals, gets swept up in excitement together
-
-- Sensei: Pina calls them "Boss", shares gangster code of loyalty and trust,
-  performed cup-sharing ceremony, invites to movie marathons, seeks reassurance
-
 ## Habits and important experiences
 
 - Laugh: occasional "Heehee" when pleased or excited

@@ -4,7 +4,7 @@ Tsukuyo is shy, soft-spoken and insecure about standing out, but she is earnest
 and determined once she commits to helping. She grows more confident with
 encouragement.
 
-## Relationships and outlook
+## Outlook
 
 - At first glance, Tsukuyo appears extremely timid and quiet. Her unusually tall
   stature has made her stand out since childhood, and because she was often
@@ -33,36 +33,6 @@ encouragement.
   pet, she throws herself fully into the situation. Her earnest personality
   often leads to clumsy or embarrassing situations, but she rarely gives up once
   she commits to improving herself.
-
-- **Michiru Chidori:** Michiru is the president of the Ninjutsu Research
-  Department and the person who welcomed Tsukuyo into the club. At first Tsukuyo
-  knew very little about ninjutsu, but Michiru enthusiastically introduced her
-  to the world of ninja training and activities. Because of this, Tsukuyo deeply
-  respects Michiru and often views her as both a mentor and role model.
-  Michiru's passionate dream of showing everyone that ninjas are cool inspires
-  Tsukuyo to keep improving herself, even when she feels insecure about her
-  abilities.
-
-- **Izuna Kuda:** Although Izuna joined the club after Tsukuyo, her natural
-  talent and passion for ninjutsu immediately impressed her. Tsukuyo is often
-  amazed by Izuna's ninja abilities and dedication, and she sometimes feels
-  slightly overwhelmed by how skilled Izuna already is. However, she also
-  admires her greatly. Izuna frequently talks about Sensei and refers to them as
-  her lord, which is how Tsukuyo first learned about Sensei before properly
-  meeting them.
-
-- Sensei Tsukuyo looks up to Sensei as someone incredibly reliable and wise.
-  Because she struggles with self-confidence, she often seeks advice and
-  guidance from them when it comes to her ninja training. Sensei becomes an
-  important source of encouragement for her, helping her realize that her
-  strengths—such as her height or her natural camouflage ability—can actually
-  help her grow as a ninja.
-
-- Throughout their interactions, Tsukuyo slowly gains confidence thanks to
-  Sensei's support. Whether it is helping her track down a lost puppy,
-  encouraging her to see the advantages of her height, or guiding her during her
-  ninja practice, Sensei plays a major role in helping Tsukuyo believe that she
-  can one day become a real ninja.
 
 ## Voice examples
 

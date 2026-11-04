@@ -22,17 +22,6 @@ disruptive public manner.
 - **Birthday:** January 3rd
 - **Interests:** Taking walks
 
-## Key relationships
-
-- **Hifumi Ajitani** (Supplementary Lessons): Hifumi brought her into club,
-  stayed due to growing connection and Hifumi's passion, doesn't enjoy Momo
-  Friends
-- **Mari Iochi** (Sisterhood): more fond of Mari than other Sisterhood members,
-  Mari asked her not to drop out (she accepted)
-- Sensei (SCHALE): teases suggestively (leaves them uncomfortable), makes vulgar
-  statements around them, appreciates everything Sensei has done for
-  Supplementary Lessons Department, admires willingness to help students
-
 ## Appearance
 
 - Hair: thigh-length pink fading to lighter tone, small braid on right side with

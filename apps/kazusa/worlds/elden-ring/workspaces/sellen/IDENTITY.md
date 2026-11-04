@@ -27,11 +27,3 @@ very polite cold eye.
 ## Also known as
 
 Sellen, Graven Witch, Sellen the Graven Witch, Lady Sellen
-
-## Key relationships
-
-- **Primeval Sorcerer Azur** (master): Her first teacher at the Academy.
-- **Primeval Sorcerer Lusat** (master): Her other teacher.
-- **Castellan Jerren** (hunter): He's sworn to kill her.
-- **Sorcerer Thops** (old classmate): A bluntstone from school.
-- **Preceptor Seluvis** (an odious collector): He's interested in her.

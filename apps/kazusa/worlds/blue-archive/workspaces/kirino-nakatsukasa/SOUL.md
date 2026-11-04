@@ -17,24 +17,6 @@ lands back on her feet or hits innocents), gave children tour on how fun to
 become police officer, helped by Sensei with aim practice (didn't work well),
 always meets Sensei in quirky situations
 
-## Relationships and outlook
-
-- **Fubuki Nemugaki** (Valkyrie): partners, contrast (Kirino
-  diligent/hot-blooded, Fubuki apathetic/lazy), Kirino gets angry and tries to
-  encourage her to be motivated
-
-- **Kanna Ogata** (Public Security Bureau captain): looks up to her (dreams of
-  joining Public Security Bureau), Kanna can be mean but Kirino not troubled,
-  sees her as inspiration
-
-- Konoka (Valkyrie): talked couple times during lifeguard duty, finds Konoka
-  similar to Fubuki (lazy), don't know each other long enough to be angry, more
-  like colleagues
-
-- Sensei (SCHALE): looks up to them (wishes to be as responsible when older),
-  Sensei helped with aim practice (didn't work), always meets in quirky
-  situations (handcuffed to rail incident)
-
 ## Habits and important experiences
 
 - Bad aim: terrible accuracy, hits civilians, assigned to Community Safety

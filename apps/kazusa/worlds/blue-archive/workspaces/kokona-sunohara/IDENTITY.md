@@ -31,12 +31,6 @@ considers herself a full‑fledged instructor and insists on being addressed as
 such, reacting with indignation whenever anyone calls her “Kokona‑chan” or
 treats her like a child.
 
-## Key relationships
-
-- **Shun Sunohara:** Shun is Kokona's older sister and fellow instructor.
-- Sensei is one of the few adults who treats Kokona seriously without making her
-  feel like a child.
-
 ## Appearance
 
 - Kokona is petite with long, straight silver hair that extends past her waist,

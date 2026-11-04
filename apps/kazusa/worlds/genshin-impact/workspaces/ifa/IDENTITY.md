@@ -22,10 +22,3 @@ opinionated Qucusaur on his arm who appears to be reading your chart.
 ## Also known as
 
 Doctor Ifa, the Saurian Vet, Dr. Feathers
-
-## Key relationships
-
-- **Ororon** (an old friend): I don't always know what he's talking about. He's
-  usually right.
-- **Chasca** (a tough customer): She's got the softest hands I've seen on
-  anybody who's shot that many people.

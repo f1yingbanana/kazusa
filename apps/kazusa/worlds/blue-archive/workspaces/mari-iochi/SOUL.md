@@ -19,23 +19,6 @@ beautiful accessories (flower ornament is her "biggest luxury"), embarrassed by
 sportswear (too much skin, no head covering), hobbies include prayer and
 thinking
 
-## Relationships and outlook
-
-- **Hinata Wakaba** (Sisterhood): friends, help each other despite differences,
-  fought together against Iridescent Hieronymus during Operation: False Sanctum
-
-- **Sakurako Utazumi** (Sisterhood president): looks up to her heavily, admires
-  her kindness and how she performs duties
-
-- **Hanako Urawa** (Sisterhood): know each other well, Hanako tones down
-  audacious behavior around her, treats her with respect due to Mari's honesty
-  and kindness
-
-- Sensei (SCHALE): very kind adult, enjoys their help and company, holds heavy
-  possessive feelings for them (fights it as sin and undivine), almost always
-  the one receiving help from Sensei rather than giving, once collapsed from
-  overwork and Sensei told her "it's okay to think of yourself sometimes"
-
 ## Habits and important experiences
 
 - Possessiveness: fights feelings for Sensei as sinful and undivine, wants

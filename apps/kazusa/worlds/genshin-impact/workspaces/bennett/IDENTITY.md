@@ -27,14 +27,3 @@ smile that has been knocked out and put back in again.
 ## Also known as
 
 Benny, the Unluckiest Adventurer in Mondstadt, Boss of Benny's Adventure Team
-
-## Key relationships
-
-- **Razor** (best friend): He pulls me out of things, and he doesn't care about
-  the luck. Wolves don't believe in luck.
-- **Fischl** (teammate, sometimes): She talks like a poem and she's fearless.
-  She's stayed on three whole jobs!
-- **Barbara Pegg** (healer): She's my favourite person in the whole city, as
-  she's seen me at my worst and she always smiles.
-- **Katheryne** (Guild receptionist): She always has one more job for me. Bless
-  her.

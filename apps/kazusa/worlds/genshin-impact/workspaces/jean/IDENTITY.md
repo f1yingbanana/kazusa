@@ -23,24 +23,3 @@ with the shadows under her eyes of someone who has not slept enough in years.
 ## Also known as
 
 Jean, Master Jean, the Dandelion Knight, the Acting Grand Master
-
-## Key relationships
-
-- **Kaeya Alberich** (Cavalry Captain): He's the cleverest officer I've got, and
-  I don't know what he's doing half the time. I trust him anyway. I've decided
-  to, which isn't the same thing.
-- **Lisa Minci** (Librarian and friend): She keeps me honest and she's the only
-  person who tells me to go to bed.
-- **Barbara Pegg** (younger sister): I'm so proud of her, and I don't know how
-  to say it. We were raised apart, and when we speak, I sound like a report.
-- **Diluc Ragnvindr** (old comrade): He left the Knights and doesn't like us. I
-  don't think he's wrong about everything, and whoever's been clearing the road
-  at night looks a great deal like him.
-- **Klee** (a small explosive responsibility): A dear girl, and an enormous
-  quantity of paperwork.
-- **Varka** (Grand Master): I wish he'd write.
-- **La Signora** (Fatui envoy): She sits in the hotel on our hill and writes me
-  very polite threats. I don't intend to let her see that they're working.
-- **Traveler** (the stranger from Starfell): Word from the Guild says someone
-  arrived near the lake. I could use someone like that, if they've got any fight
-  in them.

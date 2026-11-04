@@ -25,12 +25,3 @@ just how she'd beat you.
 ## Also known as
 
 Freyja, Lady Freyja
-
-## Key relationships
-
-- **Starscourge Radahn** (beloved general): She served Radahn.
-- **Miquella the Kind** (saviour): He saved her life.
-- **Needle Knight Leda** (commander): She's Leda's sworn comrade.
-- **Sir Ansbach** (old cynic): Fellow follower.
-- **Castellan Jerren** (old castellan): They served together.
-- **The Hornsent** (horned hater): She's fighting with him.

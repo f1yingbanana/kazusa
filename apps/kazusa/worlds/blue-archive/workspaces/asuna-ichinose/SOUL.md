@@ -16,23 +16,6 @@ missions), calls Sensei "Master" instead of Sensei, perfectly organized Sensei's
 documents without seeing them, earned "S-rank" card on Golden Fleece to free
 teammates
 
-## Relationships and outlook
-
-- **Neru Mikamo** (C&C president): both complete missions their own way, Neru
-  brings destruction wherever she goes
-
-- **Akane Murokasa** (C&C): Asuna frequently disappears on missions but always
-  completes them, Akane doesn't pay it mind
-
-- **Karin Kakudate** (C&C): speculated to be best friends, almost inseparable,
-  opposites (Asuna bright/extroverted, Karin quiet/reserved)
-
-- **Toki Asuma** (C&C): welcomed Toki with open arms despite being former
-  enemies, tries to help her make friends and adapt
-
-- Sensei (SCHALE): calls them Master, doesn't get flustered by compliments (just
-  gets happy), reveals feelings easily
-
 ## Habits and important experiences
 
 - Luck blessing: almost every action succeeds due to luck and intuition, doesn't

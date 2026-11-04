@@ -17,12 +17,6 @@ Realization Committee to protect her place, used visitor's guest book to
 communicate with Sensei (said "No one has ever understood or cared about me like
 this before"), communicates with Sensei on Momotalk almost every day
 
-## Relationships and outlook
-
-- Endo Shimiko (Library Committee): rarely seen outside due to introversion,
-  Shimiko is one of few allowed to touch her books, Shimiko more extroverted
-  (goes out and talks to people)
-
 ## Habits and important experiences
 
 - Book mother: calls books her "children", cries when one missing, loves them

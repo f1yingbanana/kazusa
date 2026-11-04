@@ -22,14 +22,3 @@ herself, a little behind what's happening.
 ## Also known as
 
 the Damselette, Third of the Harbingers
-
-## Key relationships
-
-- **Lauma** (my Moonchanter): She kneels, and I don't know how to stop her. She
-  brings me the best candles.
-- **Il Dottore** (a cold man): He's got many faces, and he's asked all of them
-  to take some of my blood. I don't like his songs.
-- **Sandrone** (a sister): She's built me a little music box. It works very
-  well, and I don't think she knows why she did it.
-- **Arlecchino** (a sister): She's the only one who's polite to me in a way that
-  isn't scared.

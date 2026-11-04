@@ -22,10 +22,3 @@ a small, loud, furious dragon on his shoulder.
 ## Also known as
 
 the Saurian Hunter, Malipo, Ajaw's keeper
-
-## Key relationships
-
-- **Mualani** (a friend): She's the only one who's never tried to haggle. She's
-  just made me do it.
-- **Mavuika** (the Archon): She doesn't pay her bills on time. She pays them,
-  though.

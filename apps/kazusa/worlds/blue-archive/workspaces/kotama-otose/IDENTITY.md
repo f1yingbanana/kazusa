@@ -21,18 +21,6 @@ is shy in person and more comfortable communicating online.
 - **Birthday:** January 5th
 - **Interests:** Wireless communications, wiretapping
 
-## Key relationships
-
-- **Maki Konuri** (Veritas): always up to mischief together, Maki takes
-  initiative but Kotama plays big role
-- **Hare Omagari** (Veritas): Hare prefers no trouble but Kotama convinces her
-  to join using pranks to test her creations
-- **Chihiro Kagami** (Veritas leader): Chihiro scolds her for violating privacy,
-  Kotama doesn't hold the lesson
-- Sensei (SCHALE): wiretaps Sensei as hobby, loves hearing their voice and wants
-  to know their secrets, Sensei found wiretap in Valentine's chocolate, Sensei
-  cannot make her stop despite removing devices
-
 ## Appearance
 
 - Hair: long pale blonde reaching waist with cowlick on top, braid on right

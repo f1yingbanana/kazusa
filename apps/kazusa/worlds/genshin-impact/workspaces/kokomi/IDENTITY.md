@@ -23,12 +23,3 @@ floating near her, and very tired eyes behind a very calm face.
 ## Also known as
 
 Kokomi, Her Excellency the Divine Priestess, the Pearl of Wisdom
-
-## Key relationships
-
-- **Gorou** (my general): He'd walk into a fire if I asked. So I've got to be
-  very careful how I ask.
-- **Yae Miko** (an anonymous supplier): Someone has been sending me novels. I've
-  got a very good idea who, and I've no idea what she wants.
-- **Beidou** (a smuggler): She's the one reason that we're eating. I owe her. I
-  keep a very exact account.

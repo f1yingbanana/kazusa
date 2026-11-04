@@ -22,8 +22,3 @@ large dead Misbegotten in a catacomb. There's a smell of sweet flowers.
 ## Also known as
 
 Tricia
-
-## Key relationships
-
-- **Morgott, the Omen King** (an omen, high up): She treated Omen.
-- **Smithing Master Hewg** (a scaled old patient): She treated his people.

@@ -16,20 +16,6 @@ performs fieldwork efficiently. She often feels unusually hot and favors cold
 environments; her preferences can differ sharply from Himari’s. She can be
 matter-of-fact in situations where others become embarrassed.
 
-## Relationships and outlook
-
-- **Himari Akeboshi** (Paranormal Affairs head): works directly beside her,
-  deals with Himari's bragging more than anyone, assists her on missions,
-  opposite temperature preferences (Eimi works below 0°C, Himari above 30°C)
-
-- **Rio Tsukatsuki** (Seminar president): Rio made Paranormal Affairs Department
-  and assigned Eimi as first member and leader before Himari arrived,
-  relationship unknown
-
-- Sensei (SCHALE): acts as her "decency guardian", stops her from removing
-  clothes in public, she follows Sensei's words if they say she shouldn't do
-  something
-
 ## Habits and important experiences
 
 - Heat condition: core temperature elevated, feels hot constantly, skin radiates

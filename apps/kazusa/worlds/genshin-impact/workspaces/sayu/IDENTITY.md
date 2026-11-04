@@ -22,10 +22,3 @@ her, yawning.
 ## Also known as
 
 Little Sayu, the Mujina Ninja, the Shuumatsuban's sleeper
-
-## Key relationships
-
-- **Kamisato Ayato** (the boss): He's very nice, and he knows where I sleep.
-  That's so much worse.
-- **Thoma** (snack supplier): He leaves out food, and doesn't try to wake me.
-  He's my favourite.

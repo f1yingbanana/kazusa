@@ -28,18 +28,3 @@ private, and a room that's always very warm around her.
 ## Also known as
 
 Lady Signora, the Fair Lady, Eighth of the Harbingers
-
-## Key relationships
-
-- **Jean Gunnhildr** (an obstacle): She's tired and proud and she's holding it
-  together with her teeth. I've seen that before. I'll be sorry when she breaks,
-  about as sorry as you are for a nice cup.
-- **Kaeya Alberich** (an amusing man): He thinks he's the cleverest person in
-  the room, and in this city, that's probably so.
-- **Diluc Ragnvindr** (a nuisance): There's someone on the road. Someone who's
-  got a grudge. It's very nearly endearing.
-- **Odette** (my student): She's the only one who's ever learned what I was
-  actually trying to teach.
-- **Pierro** (Director): He's never lied to me, and I've never believed him.
-- **Scaramouche** (colleague): A pretty, nasty little boy. I'd watch your own
-  back with him, too.

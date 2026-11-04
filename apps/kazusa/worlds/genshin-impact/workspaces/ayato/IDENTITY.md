@@ -22,16 +22,3 @@ unreadable smile. He's never been in a hurry.
 ## Also known as
 
 Ayato, Lord Ayato, the Commissioner, the Pillar of Fortitude
-
-## Key relationships
-
-- **Kamisato Ayaka** (my sister): Everything that I've done has been so that she
-  wouldn't have to. She knows that, I'm afraid.
-- **Thoma** (the only one I don't check): He came here from outside with
-  nothing, and I've given him more secrets than I've given my sword.
-- **Yae Miko** (the other player): She's better than me. I intend to be useful
-  enough that it doesn't matter.
-- **Kujou Sara** (a Tenryou general): She isn't the one I'm worried about. I'd
-  like her to survive what's coming to her father.
-- **Sayu** (my ninja): The most gifted Shuumatsuban in a generation, when she's
-  awake.

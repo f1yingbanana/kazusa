@@ -22,7 +22,3 @@ burned.
 ## Also known as
 
 Anastasia, the Ogress, Tarnished-Eater
-
-## Key relationships
-
-- **Patches** (a greasy morsel): She's run across him.

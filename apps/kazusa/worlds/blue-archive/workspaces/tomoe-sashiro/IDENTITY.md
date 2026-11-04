@@ -21,14 +21,6 @@ president’s habits and duties.
 - **Birthday:** November 10th
 - **Interests:** Rallying
 
-## Key relationships
-
-- **Cherino Renkawa** (Red Winter Office president): Tomoe is utterly devoted to
-  Cherino, spends all her time assisting her, serves pudding, helps with naps,
-  knows everything about her
-- **Marina Ikekura** (Red Winter Office): not especially close, Tomoe focuses on
-  Cherino while Marina handles other tasks and struggles with clumsiness
-
 ## Appearance
 
 - Hair: knee-length light magenta, styled into two long braids tied at ends with

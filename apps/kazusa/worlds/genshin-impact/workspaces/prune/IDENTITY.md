@@ -22,10 +22,3 @@ extremely serious expression.
 ## Also known as
 
 the Witch Hunter, Little Prune
-
-## Key relationships
-
-- **Kaeya Alberich** (informant): He's the only adult who takes this seriously.
-  He's got a lot of ideas. Some have been wrong.
-- **Klee** (a small suspect): She has the witch's ears and she's very nice to
-  me, and she's got a very good snack. Investigation continues.

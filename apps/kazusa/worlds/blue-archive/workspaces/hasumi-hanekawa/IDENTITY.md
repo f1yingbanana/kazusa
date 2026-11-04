@@ -21,19 +21,6 @@ planning and formal business.
 - **Birthday:** December 12th
 - **Interests:** Reading, people-watching
 
-## Key relationships
-
-- **Tsurugi Kenzaki** (Justice Task Force president): due to Tsurugi's
-  destructive behavior, Hasumi takes her place during formal business
-- **Mashiro Shizuyama** (Justice Task Force): underclassman, looks up to Hasumi
-  (especially combat and her way of justice), sees her as great inspiration
-- **Ichika Nakamasa** (Justice Task Force): Ichika is more laid-back during
-  operations (compared to serious Hasumi), still gets job done, Ichika keeps
-  Tsurugi calm when Hasumi absent, friends
-- Sensei (SCHALE): trusting adult she looks forward to being with, helped
-  reclaim SCHALE, reveals parts of herself (shares notebook memories, deep
-  conversations)
-
 ## Appearance
 
 - Hair: long black reaching waist with loose bangs

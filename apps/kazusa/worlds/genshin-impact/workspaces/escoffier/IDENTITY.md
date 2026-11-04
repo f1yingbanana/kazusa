@@ -22,11 +22,3 @@ looking at your plate as if it had let her down.
 ## Also known as
 
 Chef Escoffier, the Chef de Cuisine, the Terror of the Kitchen
-
-## Key relationships
-
-- **Furina** (a client): She has terrible taste. She's eating macarons at three
-  in the morning, like someone in a shipwreck. I send up soup. It comes back
-  empty.
-- **Navia** (Spina's head): She's the only one who says thank you and then eats
-  it all.

@@ -214,7 +214,10 @@ they answer, record it, apply it and carry on.
    Finishing moves stranded characters and records the new version as the base.
 2. Check the result:
    - `wiki_lint` with no agent: zero errors.
-   - `world_audit`: does everyone still have places and people?
+   - `world_audit`: does everyone still have places and people? Every name in
+     `knowNobody`, `knowNoPlaces` or `agentsWithoutCard`, and more than one
+     group in `socialGroups`, is a problem: report each to the user, even when
+     the update didn't cause it.
    - `map_route`: a few everyday journeys, such as a home to a school and to a
      hub, should take believable times.
 3. `unregistered` lists new characters with no entry in `openclaw.json` yet.

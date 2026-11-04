@@ -25,15 +25,3 @@ you over like a dressmaker.
 ## Also known as
 
 Tanith, Lady Tanith, the Proprietress, Tanith the Dancer
-
-## Key relationships
-
-- **Rykard, Lord of Blasphemy** (beloved husband): She serves what remains of
-  him.
-- **Rya** (adopted daughter): She raised her.
-- **Knight Bernahl** (sullen guest): A Recusant of the house.
-- **Patches** (irritant): Another guest.
-- **Inquisitor Ghiza** (old retainer): He's kept on the old work.
-- **Old Knight Istvan** (contract name): Her letters mark him.
-- **Rileigh the Idle** (contract name): Her letters mark him.
-- **Juno Hoslow** (refused the invitation): He spurned her.

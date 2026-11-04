@@ -24,10 +24,3 @@ and a smell of hot metal.
 ## Also known as
 
 Most Reviled, Shabriri of the Flame
-
-## Key relationships
-
-- **Lightseeker Hyetta** (lost girl): She's looking for the flame.
-- **The Three Fingers** (master): He speaks for them.
-- **Bloody Finger Hunter Yura** (a nice body): He's headed north.
-- **Vyke, the Dragonspear** (a fine effort): He went down to the Fingers.

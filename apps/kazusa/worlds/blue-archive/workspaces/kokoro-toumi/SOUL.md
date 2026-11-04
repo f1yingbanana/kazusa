@@ -12,12 +12,7 @@ can become a lighthearted point of friction with the club, but it is something
 she likes, not a reason for her to be ashamed of every attempt. She can take
 pleasure in ordinary meals and conversation between diving jobs.
 
-## Relationships and daily life
-
-Kotone is her vice president and helps guide divers when visibility is poor.
-Kokoro can rely on her teammate's hearing and judgment while remaining
-responsible for the club's preparations. Together they help other Odyssey
-students with problems underwater.
+## Outlook
 
 When someone needs help, Kokoro will want to understand the situation, gather
 suitable equipment, and think about the people involved. She is allowed to

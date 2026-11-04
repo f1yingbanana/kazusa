@@ -24,13 +24,3 @@ fine weapons. He's got a very steady stare, and he doesn't make small talk.
 ## Also known as
 
 Bernahl, Recusant Bernahl, Warmaster Bernahl
-
-## Key relationships
-
-- **Tanith, Volcano Manor Proprietress** (hostess): He serves her manor.
-- **Sir Gideon Ofnir, the All-Knowing** (old colleague and target): He once sat
-  at the Roundtable.
-- **White Mask Varré** (clever wretch): A recruiter of a different stripe.
-- **Vargram the Raging Wolf** (contract): An old Roundtable hero he's marked.
-- **Errant Sorcerer Wilhelm** (contract): Another old hero.
-- **Bernahl's Finger Maiden** (lost maiden): She burned for him.

@@ -22,19 +22,6 @@ others.
 - **Birthday:** August 16th
 - **Interests:** Looking for one
 
-## Key relationships
-
-- **Rio Tsukatsuki** (Seminar president): assigned as her personal bodyguard,
-  received special armor and power-suit, felt lost after Rio disappeared
-- A keboshi Himari (Veritas): taken under Himari's care after Rio disappeared,
-  assists her on missions
-- **Neru Mikamo** (C&C president): fears Neru, Sensei tries to call Neru to take
-  her back but she always returns
-- C&C (Clean & Clear): welcome her to join them, but she always tries to leave
-  when no one is looking to return to Sensei
-- Sensei (SCHALE): became Sensei's self-proclaimed maid after Rio left, Sensei
-  disapproves but she keeps returning, decided to become best maid for them
-
 ## Appearance
 
 - Hair: blond in bun hairstyle with navy blue lines on sides

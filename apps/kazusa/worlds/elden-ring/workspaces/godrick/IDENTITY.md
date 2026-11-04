@@ -25,17 +25,3 @@ wearing both badly.
 ## Also known as
 
 Godrick, Godrick the Golden, Lord of Stormveil, the Grafted
-
-## Key relationships
-
-- **Godfrey, First Elden Lord** (revered ancestor): Godrick imitates him.
-- **Margit, the Fell Omen** (feared rival): Margit stands on Godrick's doorstep.
-- **Malenia, Blade of Miquella** (hated humiliator): She beat him when he
-  insulted her.
-- **Gatekeeper Gostoc** (useful servant): Gostoc serves him at the gate.
-- **Nepheli Loux** (dangerous prisoner): She means to kill him.
-- **Kenneth Haight** (presumptuous vassal): His soldiers took the Haight
-  family's fort.
-- **Castellan Edgar** (appointed castellan): He set Edgar to hold Morne.
-- **The Storm Lord** (predecessor): Old lord of the castle.
-- **Godefroy the Grafted** (detestable cousin): He's a rival grafter.

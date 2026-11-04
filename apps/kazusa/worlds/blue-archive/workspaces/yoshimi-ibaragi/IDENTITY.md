@@ -40,21 +40,6 @@ personality.
   when trying limited edition sweets at cafes, exchanges treats with Sensei as
   tradition, acts like total tsundere around Sensei
 
-### Relationships
-
-- **Kazusa Kyouyama (After-School Sweets Club)**: encourages her to socialize
-  more and avoid fights, finds Kazusa's antics amusing and concerning, steps in
-  when affects her own peace | Kazusa appreciates her concern
-- **Airi Kurimura (After-School Sweets Club)**: calm to Yoshimi's storm, Airi
-  helps balance her passionate outbursts but struggles when Yoshimi gets fired
-  up | Airi keeps her grounded
-- **Natsu Yutori (After-School Sweets Club)**: finds Natsu's philosophical chats
-  confusing, usually manages to catch main point with friends' help | Natsu
-  confuses but entertains her
-- **Sensei (SCHALE)**: goes out to enjoy good food at local cafes together,
-  exchanging treats is fun tradition, playful teasing, acts tsundere around them
-  | Sensei enjoys her company
-
 ### Appearance
 
 - **Hair**: long flowing blonde in bouncy twin tails, tied with pink ribbons

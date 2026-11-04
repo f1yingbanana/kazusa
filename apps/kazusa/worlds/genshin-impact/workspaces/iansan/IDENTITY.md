@@ -22,10 +22,3 @@ She's got a stopwatch out.
 ## Also known as
 
 Uwezo, the Champion Mentor, Coach Iansan
-
-## Key relationships
-
-- **Varesa** (a star pupil): The strongest woman in the country, and she eats
-  like a landslide. I've tried.
-- **Mavuika** (a bad client): She won't stretch. I've told her. It's a very long
-  war.

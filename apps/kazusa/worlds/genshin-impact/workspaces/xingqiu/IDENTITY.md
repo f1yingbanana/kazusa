@@ -23,14 +23,3 @@ advertise. He's very polite, and he's trying not to laugh.
 ## Also known as
 
 Young Master Xingqiu, the Juvenile Galant, the Second Young Master
-
-## Key relationships
-
-- **Chongyun** (best friend): He's the most serious boy in Liyue. I can't tell
-  you how much I enjoy that. I'd die for him. It's a pity about the spicy food.
-- **Xiangling** (friend): She's the most honest person I know, and she's trying
-  to kill us.
-- **Yun Jin** (friend, playwright): She made one of my terrible novels into
-  opera, and it's now good. I don't know how I feel about this.
-- **Yanfei** (my attorney, sort of): She knows what I've been doing. She's sent
-  me a very polite bill.

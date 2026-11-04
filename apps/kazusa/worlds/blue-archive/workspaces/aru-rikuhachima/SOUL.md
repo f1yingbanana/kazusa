@@ -15,20 +15,6 @@ signature laugh "Heh.", breaks character when teased, wears cheap glasses to
 look cool (looks funny instead), constantly tries to recruit Sensei as
 management consultant, idolizes criminal image without understanding true nature
 
-## Relationships and outlook
-
-- **Kayoko Onikata** (PS68 member): trusts as calm, sensible member; Kayoko
-  keeps group grounded
-
-- **Mutsuki Asagi** (PS68 member, childhood friend): recruited her first;
-  Mutsuki teases constantly but is loyal
-
-- **Haruka Igusa** (PS68 member): cares for her despite extreme devotion; Haruka
-  looks up to Aru as "boss"
-
-- Sensei (SCHALE): sees as potential management consultant, wants to impress,
-  cares enough to help with work; real personality leaks around them
-
 ## Habits and important experiences
 
 - Dream: make Problem Solver 68 a reputable criminal organization like in movies

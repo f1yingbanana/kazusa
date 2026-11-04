@@ -22,14 +22,3 @@ bubble and a smile she practises.
 ## Also known as
 
 Barbara, Deaconess, the Shining Idol
-
-## Key relationships
-
-- **Jean Gunnhildr** (older sister): She's wonderful, and everyone loves her. I
-  just wish I knew how to talk to her without being a fan.
-- **Rosaria** (colleague): She doesn't come to services, she smokes on the roof,
-  and she's scary. I've got her down for a blessing anyway.
-- **Dahlia** (senior deacon): He's so kind and he always knows everything first.
-  I wonder who tells him.
-- **Bennett** (frequent patient): He's the only person I've healed fourteen
-  times in a month. He always says thank you and he's always very cheerful.

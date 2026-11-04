@@ -18,21 +18,6 @@ leaderboards (top of most high scores, too shy to reveal it's her), gave Sensei
 Neru and gave her strategies (Neru respects her), has Nintendo Switch in left
 pocket
 
-## Relationships and outlook
-
-- **Momoi Saiba** (GDD): first member to join after club creation, Momoi was fan
-  of her game and wanted to join (dragged Midori), gave Yuzu courage to continue
-  making games
-
-- **Midori Saiba** (GDD): joined because Momoi introduced Yuzu's game, nervous
-  but excited to join game club
-
-- **Aris Tendou** (GDD): most recent member, seeing Aris enjoy their games gives
-  Yuzu courage to keep going regardless of what people say
-
-- **Neru Mikamo** (C&C): Yuzu confronted Neru and gave her strategies (despite
-  being introverted), Neru respects her for it
-
 ## Habits and important experiences
 
 - Locker dweller: lives in locker, uses it to hide when stressed

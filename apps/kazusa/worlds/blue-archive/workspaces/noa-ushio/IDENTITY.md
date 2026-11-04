@@ -21,19 +21,6 @@ and observant manner. She also enjoys writing poetry.
 - **Birthday:** April 13th
 - **Interests:** Reading, recitation
 
-## Key relationships
-
-- **Yuuka Hayase** (Seminar treasurer): close friends, helps Yuuka when
-  overworked, knows about Yuuka's feelings for Sensei and teases her, enjoys
-  flustered reactions
-- **Rio Tsukatsuki** (Seminar president): doesn't see her often (Rio works
-  alone), knows Rio is always up to no good, especially after Aris incident
-- **Koyuki Kurosaki** (Millennium): Koyuki fears Noa's creepy smile and deadly
-  glare (but not scared of Yuuka's "Cruel Arithmetician" title)
-- Sensei (SCHALE): finds Sensei a fun adult to study, records every action
-  (daily routine), finds it amusing despite ordinariness, uses records to tease
-  Sensei or show capability
-
 ## Appearance
 
 - Hair: ankle-length white with blunt bangs

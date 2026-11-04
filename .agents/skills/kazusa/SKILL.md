@@ -197,7 +197,7 @@ file-parsing overhead.
 | **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`          | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
 | **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                              | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
 | **Objective Canon**                   | `shared/wiki/`                                                                                       | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
-| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                              | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports.                                                                                                                                                                                                                                                                                                                                               |
+| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                              | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                       |
 
 ### Directory Map (`apps/kazusa/`)
 
@@ -601,9 +601,10 @@ connect these modules in process.
   (`context-engine/settings.ts`), served by
   `GET /kazusa/context/settings [?agentId=]` and
   `POST /kazusa/context/settings/save` (replaces the scope's overrides; domain
-  `context`). User docs: `docs/context.md`. Accept native catalog display
-  clipping; add no source quotas or further per-message clipping, incognito
-  feature, or external-channel adapter.
+  `context`). What each setting does:
+  [Settings](references/context_engine.md#settings), which the client links to.
+  Accept native catalog display clipping; add no source quotas or further
+  per-message clipping, incognito feature, or external-channel adapter.
 - **Multi-Media Architecture**: Grounded preflight + on-demand inspection. Media
   processors receive the Context Engine's assembled background (location,
   identities, conversation thread) to produce situation-aware descriptions.
@@ -619,8 +620,14 @@ connect these modules in process.
   [memory](references/memory.md)): retrieval over the character's own wiki and
   the world pages their knowledge depth allows, rendered as beliefs, not world
   facts, within `memory.maxTokens`. No other character's wiki is ever eligible.
-  Reuse native workspace bootstrap; keep generic assistant outreach instructions
-  and stale machine-state tables out of character workspace files.
+  Only what they perceived is searched (`searchText`): the delivery's `- [...]`
+  lines, never check-in or reminder wording; a check-in searches the activity
+  that ended and today's plans in `MEMORY.md` (`plansOn`). A page only keywords
+  found must share two query words (half if merely heard of; one for their own
+  pages), and familiarity nudges what came up. How the parts fit together:
+  [memory](references/memory.md) §7.7. Reuse native workspace bootstrap; keep
+  generic assistant outreach instructions and stale machine-state tables out of
+  character workspace files.
 - Uses OpenClaw's native token estimator and owns context management
   (`ownsCompaction: true`). Assembly windows original records; `compact()`
   returns a benign "Nothing to compact" skip for preflight, manual and overflow
@@ -979,11 +986,30 @@ connect these modules in process.
   with no card, **Where you are** shows the whole description; starting the next
   activity from that place writes a frontmatter-only stub (atomic, never
   overwriting), after which only the summary shows; the character adds what they
-  remember. **Places you know**: places named (names, aliases, card aliases) in
-  the turn's prompt or `MEMORY.md`, then the nearest cards, capped
-  (`location.listLimit`). Fuzzy recall is the character's own `recall` (see
-  [memory](references/memory.md)), which only reaches the world wiki at their
-  knowledge depth.
+  remember. **Places you know**: home, then places named (names, aliases, card
+  aliases) in the turn's prompt or `MEMORY.md`, then the cards they go to most
+  (familiarity, below), capped (`location.listLimit`), never repeating the
+  current place, Around you, or what On your mind shows (`exclude`, so the
+  context engine runs memory's prefetch before `whereabouts`). Fuzzy recall is
+  the character's own `recall` (see [memory](references/memory.md)), which only
+  reaches the world wiki at their knowledge depth.
+- **Familiarity** (`memory/familiarity.ts`, retained store `"familiarity"`, one
+  record per character): what they did with someone or somewhere, never what
+  they were shown (that would feed itself). Location notes the place of every
+  activity started; a message makes its sender familiar to each recipient, and a
+  chat of six or fewer to the sender (`usesOfMessage`, from Messaging's
+  `message` events in `index.ts`). One use per episode of
+  `memory.familiarity.episodeHours` (24), timed at its latest contact: ten days
+  of contact count ten times, one long party once (the spacing effect;
+  simulated, a 10-minute window let one evening with a stranger outrank a
+  twice-weekly clubmate for a week). Scored as ACT-R base-level activation
+  `ln Σ age^-d` (`decay` 0.5), keeping the `recent` (4) uses exactly and
+  estimating older ones from the count (Petrov's hybrid). A page that moved
+  since (seen, a note) counts as one more use, so a world with no history ranks
+  like recency. It ranks **People you know** and **Places you know** (working
+  knowledge) and, among what a turn's cues brought up, raises what they know
+  best in On your mind; it never adds a page or changes depth. Nothing ever
+  lists one id twice in a turn.
 - **State**: `"location"` store, one `LocationRecord` per character or player:
   `placeId`, `since`, optional `trip` (task id, destination, depart/arrive at
   the lease's end, places passed with sim times, usual minutes, and for walking
@@ -991,20 +1017,24 @@ connect these modules in process.
   sim time (`positionAt`); no record means the `home` on the world character
   card.
 - **`where` on `start_task`**: required plain string (id, name, alias, or the
-  character's words for a spot where they are, kept as `spot`). A travel
-  category with words that are no place says "You don't know the way to …" and
-  leaves them where they are: a trip needs a route. A travel category
-  (`location.travelCategories`) is a trip scaled to the task's duration; any
-  other activity elsewhere walks over at the usual pace and checks in on arrival
-  (`checkInAt`); an activity too short for that walk is refused with the usual
-  time before any judgment ("Getting from X to Y usually takes 13 minutes, which
-  doesn't fit in this 10-minute activity…"): the walk counts against the
-  duration, and a check-in after the end is a hard error the model must hear.
-  Planning the route is the model's job. `where` also resolves a backticked id
-  inside a label (``Library `school_library` ``), the form prompts show.
-  Mid-trip starts stop at the place being passed; `delay_task` moves a trip's
-  arrival. Journal payloads carry `where`, `from`, `arriveAt`, `usualMinutes`,
-  `spot`.
+  character's words). Words that are no exact place are matched against their
+  own place pages (memory's `places`, `placeMeant` in `location/register.ts`):
+  moving somewhere (a trip or a walk over), a word in common is enough; for a
+  spot where they are, only a name or alias. One match is that place; several
+  are refused (`kazusa-results#where-which`) with each, to say which; none is a
+  `spot` where they are. A travel category with words that are no place says
+  "You don't know the way to …" and leaves them where they are: a trip needs a
+  route. A travel category (`location.travelCategories`) is a trip scaled to the
+  task's duration; any other activity elsewhere walks over at the usual pace and
+  checks in on arrival (`checkInAt`); an activity too short for that walk is
+  refused with the usual time before any judgment ("Getting from X to Y usually
+  takes 13 minutes, which doesn't fit in this 10-minute activity…"): the walk
+  counts against the duration, and a check-in after the end is a hard error the
+  model must hear. Planning the route is the model's job. `where` also resolves
+  a backticked id inside a label (``Library `school_library` ``), the form
+  prompts show. Mid-trip starts stop at the place being passed; `delay_task`
+  moves a trip's arrival. Journal payloads carry `where`, `from`, `arriveAt`,
+  `usualMinutes`, `spot`.
 - **Judgments (`judgment.ts`)** follow Perception's decision pattern: rubric in
   `shared/skills/location-judgment/SKILL.md` frontmatter, one `choice` question,
   the direct decision call (§3.4) owned by the acting agent,

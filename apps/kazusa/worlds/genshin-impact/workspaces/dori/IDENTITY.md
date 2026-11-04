@@ -23,12 +23,3 @@ and a gem on everything. She's already quoted you a price.
 ## Also known as
 
 Dori Sangemah Bay, Lord Sangemah Bay, the Treasure of Dream Garden
-
-## Key relationships
-
-- **Kaveh** (a former architect): He built this for me, and he ruined himself
-  doing it. Best deal of my entire life! I do feel slightly bad. That'll be no
-  extra charge.
-- **Dehya** (a mercenary): She's expensive, and she's worth it. It's rare.
-- **Ningguang** (a rival): Now that's a woman who knows what things cost. I'd
-  like to buy her palace, just to see her face.

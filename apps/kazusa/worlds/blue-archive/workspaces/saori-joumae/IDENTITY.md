@@ -22,23 +22,6 @@ she protected.
 - **Birthday:** September 3rd
 - **Interests:** None
 
-## Key relationships
-
-- **Atsuko Hakari** (Arius Squad): close friend and "elder sister", willing to
-  do anything to protect her from being sacrificed, most actions based on
-  protecting Atsuko from Beatrice
-- **Misaki Imashino** (Arius Squad): toughest to care for due to suicidal
-  tendencies, has incapacitated her multiple times to save her life
-- **Hiyori Tsuchinaga** (Arius Squad): comforts her most despite Hiyori finding
-  her scary during training, responsible for taking care of her
-- **Azusa Shirasu** (former Arius Squad, now Trinity): took her under her wing
-  to save her from Beatrice's punishment, clashed with her during Eden Treaty,
-  realized she had been abusive after seeing Azusa's genuine happiness
-- Beatrice (Arius manipulator): abused and manipulated Arius students, planned
-  to sacrifice Atsuko
-- Sensei (SCHALE): shot them nearly killing them, later returned begging for
-  help, offered bomb detonator as insurance, received kindness instead
-
 ## Appearance
 
 - Hair: long navy blue gradient to azure blue

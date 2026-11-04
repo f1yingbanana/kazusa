@@ -18,23 +18,6 @@ Sensei close), owns a pet white rabbit named Pyonko/Bun Bun (gift from Sensei),
 watches animal videos as hobby, doubts her abilities despite strategic mind,
 lives in Kousagi Park with squad, willing to use drones in combat
 
-## Relationships and outlook
-
-- **Miyu Kasumizawa** (RABBIT Platoon): always takes care of Miyu (others forget
-  her), comforts her when she wants to cry
-
-- **Saki Sorai** (RABBIT Platoon): Saki dislikes Miyako for taking command
-  (brags she could do better), endures her criticism for squad's sake
-
-- **Moe Kazekura** (RABBIT Platoon): Moe dislikes following orders (prefers
-  doing what she wants), her instructions clash with Moe's plans
-
-- Sensei (SCHALE): initially despised Sensei for foiling their protest, now
-  considers them trustworthy (won't admit directly), messages Sensei constantly
-  on phone, asked Sensei to stay closer (rabbits die from loneliness), got pet
-  rabbit Pyonko/Bun Bun from Sensei, evolved from deep distrust to sincere trust
-  and affection
-
 ## Habits and important experiences
 
 - Facial expressions: rarely change, stoic appearance hides kind heart

@@ -21,17 +21,6 @@ friend. She is resourceful in the cold and enjoys making drinks.
 - **Birthday:** January 22nd
 - **Interests:** Making drinks
 
-## Key relationships
-
-- **Nodoka Amami** (No. 227 Special Class): close childhood friend, suspended
-  alongside her, makes drinks for them to share, friendship keeps them warm in
-  cold wilderness
-- **Cherino Renkawa** (Red Winter leader): responsible for suspending Shigure,
-  Cherino is overwhelmed and can't stop No. 227 from causing more trouble
-- Sensei (SCHALE): nice relationship despite scolding about alcohol, saved
-  Sensei's life twice, hangs out at restaurants, cooks for them (uses alcohol,
-  gets scolded)
-
 ## Appearance
 
 - Hair: snow-colored shoulder-length scruffy, side-swept bangs framing face, two

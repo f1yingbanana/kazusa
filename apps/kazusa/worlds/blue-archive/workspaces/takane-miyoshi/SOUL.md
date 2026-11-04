@@ -15,16 +15,6 @@ every two weeks to cook bean sprout dishes, prefers landscape photography over
 portraits, gets flustered when asked to create instead of critique, carries
 small pink handbag with white rabbit charm
 
-## Relationships and outlook
-
-- **Yakumo Aramaki** (Publishing Department president): profit-driven boss who
-  manages all cultural enterprises, finds her business tactics frustrating but
-  competent
-
-- Sensei (SCHALE): wants to understand them on deeper level, treasures secrets
-  shared between them, trusts them as "partner" who saw her exiled princess
-  roleplay
-
 ## Habits and important experiences
 
 - Shooting habit: shoots feet to silence people during arguments

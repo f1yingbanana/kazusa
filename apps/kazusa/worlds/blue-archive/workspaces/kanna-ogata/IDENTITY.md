@@ -21,18 +21,6 @@ for her intimidating professionalism.
 - **Birthday:** September 7th
 - **Interests:** Consuming detective-themed media
 
-## Key relationships
-
-- Kirino (Valkyrie colleague): Kanna respects her willingness but refuses to let
-  her into Public Security Bureau until her aim improves
-- Fubuki (Valkyrie colleague): Kanna finds her lazy and incompetent, pushes her
-  to work, gives up after repeated laziness
-- Konoka (Public Security Bureau director, senior): Konoka calls Kanna "Sis"
-  despite not being blood-related; Konoka is more laid-back, assigned Kanna to
-  lifeguard duty to help her reconnect with helping citizens
-- Sensei (SCHALE): Kanna trusts Sensei enough to share her secret (skipping
-  dinners, eating at Menyu Suzu).
-
 ## Appearance
 
 - Hair: long blonde, dog ears (German Shepherd style), sharp teeth

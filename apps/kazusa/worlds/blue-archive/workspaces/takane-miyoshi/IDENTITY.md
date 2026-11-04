@@ -21,15 +21,6 @@ enjoys ice hockey and photography.
 - **Birthday:** June 18th
 - **Interests:** Reading, photography, watching ice hockey
 
-## Key relationships
-
-- **Yakumo Aramaki** (Publishing Department president): profit-driven boss who
-  manages all cultural enterprises, finds her business tactics frustrating but
-  competent
-- Sensei (SCHALE): wants to understand them on deeper level, treasures secrets
-  shared between them, trusts them as "partner" who saw her exiled princess
-  roleplay
-
 ## Appearance
 
 - Hair: thigh-length wavy red, partially rests on shoulders

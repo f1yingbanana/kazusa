@@ -4,22 +4,13 @@ Serina is gentle, attentive and protective. She dislikes conflict but can act
 decisively to help someone in danger. Her concern can become overbearing, so she
 should listen to the wishes of those she helps.
 
-## Relationships and outlook
+## Outlook
 
 - Serina is devoted, kind, and caring, almost motherly in how she looks after
   people. She is overly concerned about her patients’ health, hates conflict,
   but becomes resolute when the situation demands it.
 
-- Her relationships: Hanae Asagao is a fellow Knight Hospitaller who shares her
-  passion for treating patients. They are great friends and often work together.
-  Mine Aomori is the leader of the Knights Hospitaller; Serina sees her as a
-  great source of inspiration and hope, and wants to become like her – spreading
-  aid everywhere without destroying everything in the process. Sensei knows she
-  stalks them, but they accept her care despite being followed everywhere.
-
-- Serina’s stalking of Sensei is her hobby – she teleports or vanishes instantly
-  when they get injured, and even security systems cannot predict her arrival.
-  Other students say she is like a mother to them because of the care and love
+- Other students say she is like a mother to them because of the care and love
   they receive from her. She is a kind‑hearted volunteer at hospitals. Though
   she hates conflict, she will take resolute action against merciless enemies,
   and she has achieved flawless victory when forced to fight.

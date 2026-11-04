@@ -25,13 +25,3 @@ bearing and a way of tilting his head before saying something unwelcome.
 ## Also known as
 
 Ansbach, Pureblood Knight Ansbach, the old knight
-
-## Key relationships
-
-- **Miquella the Kind** (beloved and suspect): He's been enchanted by him.
-- **Mohg, Lord of Blood** (former lord): He commanded Mohg's knights.
-- **Needle Knight Leda** (young commander): Fellow follower.
-- **Redmane Freyja** (fellow veteran): They both fought.
-- **Moore** (gentle fellow): A follower.
-- **Dryleaf Dane** (the silent monk): Fellow follower.
-- **St. Trina** (a whisper): She's the other half.

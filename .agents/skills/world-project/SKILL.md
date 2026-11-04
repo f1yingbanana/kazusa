@@ -307,8 +307,12 @@ the lore doesn't have to dictate it, as long as nothing contradicts it.
 - **Relationships.** Each person gets pages on those who matter to them, with
   `What they think of me` as a real guess, often wrong. Asymmetry is good: one
   person may barely know the other exists. Think about who'd really cross paths:
-  someone who sells to everyone knows everyone a little. If a setting has true
-  loners, leave them alone, and say so in your report.
+  someone who sells to everyone knows everyone a little. Groups mustn't be
+  islands: people know their own leaders and council, classmates, neighbors and
+  those their group deals with, so `world_audit` should show one society, not a
+  `socialGroups` entry per club. If a setting has true loners, leave them alone,
+  and say so in your report. Relationships live only in these pages, never in
+  `IDENTITY.md` or `SOUL.md`.
 - **Haunts.** Place cards for where they'd know, with a line in their voice.
   Leave some places unknown so that first visits happen.
 - **Beliefs.** Give a few a wrong theory or a private view under

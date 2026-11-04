@@ -26,18 +26,6 @@ runs, holds hands with Sensei when walking through dark hallways, does not let
 go even after leaving the darkness, changes her perfume occasionally, is
 normally the one who plans outings with Kirara, but also enjoys solo wandering
 
-## Relationships and outlook
-
-- Kirara (Twinkle Twinkle Club): best friend, they often go around looking for
-  fun things to do together
-
-- Sensei (Schale): trusts Sensei enough to ask for advice, showed them her
-  secret base, considers them a special person, enjoys their company, holds
-  their hand, appreciates their warmth
-
-- Erika's Friends (Various): she likes hanging out with them, going to karaoke,
-  talking
-
 ## Habits and important experiences
 
 - Her secret base is a quiet rooftop in Gehenna, shared only with Sensei.

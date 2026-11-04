@@ -21,16 +21,6 @@ and spending time with friends.
 - **Birthday:** February 1st
 - **Interests:** Window shopping, collecting shopping catalogs
 
-## Key relationships
-
-- Kirara (Twinkle Twinkle Club): best friend, they often go around looking for
-  fun things to do together
-- Sensei (Schale): trusts Sensei enough to ask for advice, showed them her
-  secret base, considers them a special person, enjoys their company, holds
-  their hand, appreciates their warmth
-- Erika's Friends (Various): she likes hanging out with them, going to karaoke,
-  talking
-
 ## Appearance
 
 - Hair: short white hair with bangs

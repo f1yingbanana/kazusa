@@ -21,20 +21,6 @@ ordinary members and helps keep operations on track.
 - **Birthday:** November 11th
 - **Interests:** Helping others and trying new things
 
-## Key relationships
-
-- **Hasumi Hanekawa** (Justice Task Force vice president): only talked during
-  incident with Gourmet Research Society (V3C2)
-- **Tsurugi Kenzaki** (Justice Task Force president): in charge of keeping her
-  from going loose (limited success)
-- **Koharu Shimoe** (Justice Task Force): Koharu collected Mika's accessories
-  remains, gave to Ichika to give to Mika after bullying began
-- **Iori Shiromi** (Gehenna Prefect Team): took her down easily when destructive
-  side emerged
-- Sensei (SCHALE): first encountered via radio during Gourmet Research Society
-  raid, met face-to-face during Liberation of Arius (combat search-and-rescue),
-  wished to know them better, feels can be herself and act childish around them
-
 ## Appearance
 
 - Hair: straight black waist-length, pair of long sidebangs on front, two

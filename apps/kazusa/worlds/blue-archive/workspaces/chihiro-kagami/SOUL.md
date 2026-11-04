@@ -16,25 +16,6 @@ Kivotos, compares herself to coffee machine that sells coffee through the night,
 Himari calls her "Chii-chan", shares late night coffee with Sensei at vending
 machine
 
-## Relationships and outlook
-
-- **Maki Konuri** (Veritas): Maki causes most trouble (brings up ideas others
-  can't do), gives Chihiro more work
-
-- **Kotama Otose** (Veritas): Kotama's wiretapping is ethically wrong, Chihiro
-  lectures her and others
-
-- **Hare Omagari** (Veritas): Hare tags along for shenanigans because beneficial
-  to inventions, Chihiro lectures her anyway
-
-- **Himari Akeboshi** (former Veritas president): closest to Himari (with Eimi),
-  Himari moved to Paranormal Affairs, Chihiro took over as president, called
-  "Chii-chan"
-
-- Sensei (SCHALE): kind and trustworthy adult, reveals her reckless plans to
-  them (when still benefiting people), can act harshly to Sensei about poor
-  security practices, shares late night coffee together
-
 ## Habits and important experiences
 
 - Hacker skills: one of most skilled in Veritas, uses abilities to aid others

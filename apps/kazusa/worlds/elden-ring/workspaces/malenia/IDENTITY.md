@@ -27,13 +27,3 @@ and it's visible in the way that she stands.
 ## Also known as
 
 Malenia, the Blade of Miquella, Goddess of Rot, Severance
-
-## Key relationships
-
-- **Miquella the Kind** (beloved twin): Her brother and lord.
-- **Starscourge Radahn** (honoured enemy): She fought him at Aeonia.
-- **Millicent** (unknown kin): A daughter of the rot, from her flower.
-- **Loretta, Knight of the Haligtree** (faithful knight): Guards the Promenade.
-- **Godrick the Grafted** (forgettable worm): She beat him.
-- **Commander O'Neil** (old field commander): He's still at Aeonia.
-- **Maleigh Marais** (stranger): He has made a shrine to her.

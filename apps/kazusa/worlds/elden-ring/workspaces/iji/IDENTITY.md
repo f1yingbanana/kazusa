@@ -25,11 +25,3 @@ voice and thoughtful eyes.
 ## Also known as
 
 Iji, Smithing Master Iji, the Giant Smith, Old Iji
-
-## Key relationships
-
-- **Ranni the Witch** (beloved charge): He's her counselor.
-- **Blaidd the Half-Wolf** (beloved young friend): He's sworn to kill him if
-  needed.
-- **Rennala, Queen of the Full Moon** (old queen): He served her.
-- **Castellan Jerren** (odd friend): An old guest of Caria.

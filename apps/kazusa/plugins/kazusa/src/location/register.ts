@@ -12,6 +12,7 @@ import { personLabel } from "../person-label.ts";
 import { createSkillLoader } from "../context-engine/skill-loader.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
+import { pluginSkillText } from "../skill-text.ts";
 import type { PlacePositions } from "@kazusa/client";
 import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
@@ -88,8 +89,14 @@ export interface LocationService {
     agentId: string,
     at: number,
     evidence: string,
-    /** `listLimit` from the character's context settings. */
-    options?: { readonly listLimit?: number },
+    /**
+     * `listLimit` from the character's context settings; `exclude`: ids On your
+     * mind already shows, which Places you know leaves out.
+     */
+    options?: {
+      readonly listLimit?: number;
+      readonly exclude?: readonly string[];
+    },
   ) => Promise<string | undefined>;
   /**
    * Completes a finished trip when a task deadline fires, and returns what the
@@ -182,12 +189,26 @@ export function registerLocation(
     ) => readonly string[];
     /** They took the place in: moved on from it, seen what there was to see. */
     readonly visited?: (agentId: string, placeId: string, at: number) => void;
-    /** Their own cards this text brings up, beyond the names it contains. */
+    /**
+     * Their own cards this text brings up, beyond the names it contains;
+     * `byName` when the text names one.
+     */
     readonly rememberedPlaces?: (
       agentId: string,
       text: string,
       at: number,
-    ) => readonly string[];
+    ) => readonly { readonly id: string; readonly byName: boolean }[];
+    /** How familiar each place is to them now, by id (memory's familiarity). */
+    readonly familiarity?: (
+      agentId: string,
+      at: number,
+    ) => Promise<ReadonlyMap<string, number>>;
+    /** They did something at these places at `at`. */
+    readonly use?: (
+      agentId: string,
+      ids: readonly string[],
+      at: number,
+    ) => Promise<void>;
     /** Offstage characters are nowhere. Absent: everyone is onstage. */
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
@@ -717,6 +738,42 @@ export function registerLocation(
     return { ...item, text };
   };
 
+  const skillText = pluginSkillText(api);
+  /**
+   * The place `where` means: itself when it names a place; otherwise a place
+   * they know that their words bring up. Going somewhere (`moving`), a word in
+   * common is enough; a spot where they are moves them only when it names a
+   * place. Several matches are refused with each of them, to say which.
+   */
+  const placeMeant = (
+    map: WorldMap,
+    agentId: string,
+    where: string,
+    at: number,
+    moving: boolean,
+  ): string => {
+    if (!where.trim() || resolvePlace(map, where)) return where;
+    const matches = (deps.rememberedPlaces?.(agentId, where, at) ?? []).filter(
+      ({ id, byName }) => (moving || byName) && map.places.has(id),
+    );
+    if (matches.length === 1) return matches[0].id;
+    if (matches.length > 1)
+      throw new Error(
+        skillText(
+          "kazusa-results#where-which",
+          {
+            where: where.trim(),
+            places: matches
+              .slice(0, 4)
+              .map(({ id }) => placeLabel(map, id))
+              .join(", "),
+          },
+          { agentId },
+        ),
+      );
+    return where;
+  };
+
   const taskExtension: TaskExtension | undefined = currentWorld() && {
     startTaskParameters: { where: whereParameter(config) },
     delayTaskParameters: {},
@@ -739,7 +796,15 @@ export function registerLocation(
         map,
         current,
         transition,
-        typeof where === "string" ? where : "",
+        transition.kind === "started"
+          ? placeMeant(
+              map,
+              agentId,
+              typeof where === "string" ? where : "",
+              at,
+              config.travelCategories.includes(transition.task.type),
+            )
+          : "",
         config.travelCategories,
       );
       return {
@@ -760,6 +825,14 @@ export function registerLocation(
           });
           if (before !== undefined) await remember(agentId, before, at);
           await moved(agentId, move.record, before, at);
+          // Doing something somewhere is what makes it familiar.
+          const target = move.payload?.where;
+          if (typeof target === "string" && move.payload?.unknown === undefined)
+            await deps.use?.(agentId, [target], at)?.catch((error: unknown) => {
+              warn(
+                `Location: can't note ${agentId} at ${target}: ${String(error)}`,
+              );
+            });
         },
       };
     },
@@ -796,9 +869,16 @@ export function registerLocation(
     };
     return {
       known: new Set(cards.map(({ placeId }) => placeId)),
+      familiarity:
+        (await deps.familiarity?.(agentId, clock.time())) ?? new Map(),
+      ...(currentWorld()?.homes.get(agentId) === undefined
+        ? {}
+        : { home: currentWorld()?.homes.get(agentId) }),
       named: [
         ...new Set([
-          ...(deps.rememberedPlaces?.(agentId, evidence, clock.time()) ?? []),
+          ...(
+            deps.rememberedPlaces?.(agentId, evidence, clock.time()) ?? []
+          ).map(({ id }) => id),
           ...namedIn(evidence),
           ...namedIn(memory),
         ]),
@@ -966,6 +1046,7 @@ export function registerLocation(
         options?.listLimit ?? config.listLimit,
         company,
         ownHuddle,
+        new Set(options?.exclude ?? []),
       );
       const changes =
         position?.kind === "at"

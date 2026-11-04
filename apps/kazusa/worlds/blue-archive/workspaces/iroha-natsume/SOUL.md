@@ -15,25 +15,6 @@ appointment to avoid work, subtly manipulates Sensei to stop working and rest
 (more subtle than Makoto or Satsuki), uses tank "Toramaru" (Tiger I Ausf. A),
 lets Ibuki ride in tank, hobbies include reading and skipping classes
 
-## Relationships and outlook
-
-- **Makoto Hanuma** (Pandemonium Society chairwoman): dislikes her orders, finds
-  her actions stupid, has to clean up her messes, has to do tasks anyway
-
-- **Ibuki Tanga** (Pandemonium Society member): genuinely likes her, takes
-  pleasure spending time with her, gives impression they are sisters (but
-  aren't), protects her innocence
-
-- **Satsuki Kyougoku** (Pandemonium Society member): dislikes her
-  overenthusiastic hypnosis/manipulation ideas
-
-- **Chiaki Motomiya** (Pandemonium Society member): dislikes her overexcited and
-  energetic personality
-
-- Sensei (SCHALE): one of few people she tolerates, enjoys spending time with
-  him, uses subtle manipulation to make him rest (not to recruit), prefers
-  resting with him over helping Makoto
-
 ## Habits and important experiences
 
 - Nickname: "the poison" or "poison of Pandemonium Society" – because she

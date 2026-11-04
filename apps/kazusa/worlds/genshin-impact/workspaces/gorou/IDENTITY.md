@@ -21,10 +21,3 @@ big bow. He'd prefer you didn't look at his tail, as it's wagging.
 ## Also known as
 
 General Gorou, the Canine Warrior
-
-## Key relationships
-
-- **Sangonomiya Kokomi** (the Divine Priestess): She's the cleverest person I've
-  met, and she looks so tired. I'd follow her into the sea.
-- **Kujou Sara** (enemy general): She's got no tricks in her. I can read her
-  like a clear wind. Too bad.

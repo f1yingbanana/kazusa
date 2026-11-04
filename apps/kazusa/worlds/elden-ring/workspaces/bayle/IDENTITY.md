@@ -25,8 +25,3 @@ kill you with what's left.
 ## Also known as
 
 Bayle, the Dread, Dread Bayle, progenitor of the drakes
-
-## Key relationships
-
-- **Dragonlord Placidusax** (hated old lord): They fought.
-- **Igon** (amusing worm): He nearly killed Igon.

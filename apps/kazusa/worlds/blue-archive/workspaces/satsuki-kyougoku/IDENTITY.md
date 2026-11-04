@@ -21,21 +21,6 @@ with persuasion and hypnosis.
 - **Birthday:** April 10th
 - **Interests:** Mind control research, shopping
 
-## Key relationships
-
-- **Makoto Hanuma** (Pandemonium Society chairwoman): acts as her right hand,
-  helps achieve her plans, ordered to hypnotize Sensei
-- **Ibuki Tanga** (Pandemonium Society member): grew small liking to her
-  kindness, sees potential as "adorable weapon" to manipulate people (rejected
-  idea)
-- **Chiaki Motomiya** (Pandemonium Society member): sees as funny friend to hang
-  around, doesn't interact much
-- **Iroha Natsume** (Pandemonium Society member): friends who support each
-  other, not much known about their dynamic
-- Sensei (SCHALE): ordered to hypnotize him to join Pandemonium Society,
-  attempts fail (hypnosis doesn't affect him), uses "torture" (2 unskippable
-  ads, buffering internet, etc.), never gives up
-
 ## Appearance
 
 - Hair: messy waist-length pink, bangs frame face, rests on shoulders reaching

@@ -21,16 +21,3 @@ to reach things on a high shelf. She's followed by a small round bear.
 ## Also known as
 
 Chef Xiangling, the Exquisite Delicacy, Chef Mao's daughter
-
-## Key relationships
-
-- **Xingqiu** (friend): He'll read a whole novel at my table, and he's brave
-  enough to eat what I give him.
-- **Chongyun** (friend): He can't eat anything spicy, which is really sad, so I
-  keep trying!
-- **Beidou** (best customer): She eats anything, and she pays for everyone, and
-  she's got great stories.
-- **Xinyan** (friend): Her music's really loud and she's really nice, and I
-  don't know why people go away.
-- **Gaming** (hungry regular): He eats like the whole lion, and he's the only
-  one who asks what's in it because he wants to know.

@@ -22,8 +22,3 @@ with an air of being very much in the middle of a lecture.
 ## Also known as
 
 Miriam, the Preceptor of the Hall
-
-## Key relationships
-
-- **Ranni the Witch** (former pupil): She taught the princess.
-- **Sorcerer Thops** (a poor student): He was a bluntstone.

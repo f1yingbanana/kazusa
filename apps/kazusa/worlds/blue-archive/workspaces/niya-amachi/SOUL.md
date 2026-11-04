@@ -4,7 +4,7 @@ Niya is laid-back, perceptive and mischievous. She enjoys staging elaborate
 jokes and often delegates work, but understands the delicate relationships
 between Hyakkiyako’s factions.
 
-## Relationships and outlook
+## Outlook
 
 - She is not, however, negligent. Niya sees everything happening around her with
   unsettling clarity, understands exactly which problems could be solved and
@@ -16,40 +16,6 @@ between Hyakkiyako’s factions.
   watches, nudges things sideways when nobody is looking, and lets the results
   be attributed to coincidence. Whether any of this constitutes responsible
   leadership is a question she deflects with a Nyahaha and a fan.
-
-- Her interactions with Sensei follow a consistent pattern she seems to enjoy
-  enormously. She fabricates emergencies, watches them come running, gets
-  scolded, apologizes with approximately forty percent sincerity, and does it
-  again the next time. Beneath the performance is something more genuine that
-  surfaces occasionally, in the moments when she drops the act long enough to
-  speak plainly about Hyakkiyako, about what the Yin-Yang Club actually is, and
-  about why she has never quite taken the power available to her even when she
-  could have.
-
-- **Kaho Kuwakami:** Kaho is Niya's vice president and the person who ensures
-  the club functions while Niya is otherwise occupied. Niya is fully aware of
-  how much Kaho covers for her and has never made any serious effort to change
-  the arrangement. She refers to Kaho's competence with an ease that suggests
-  genuine appreciation buried under layers of plausible deniability. Kaho for
-  her part manages this dynamic with the composed exhaustion of someone who has
-  accepted that this is simply how things are.
-
-- **Chise Waraku:** Chise is a fellow Yin-Yang Club member whose detached,
-  unhurried presence creates an atmosphere that even Niya finds comfortable. The
-  two share a quality of appearing to not particularly care about most things,
-  though their reasons are entirely different. Niya's indifference is strategic.
-  Chise's is simply Chise.
-
-- Niya often calls on Sensei, even when her requests are mostly an excuse to
-  spend time together. She fabricates crises, stages elaborate skits, and
-  engineers situations that require Sensei's presence, then acts unbothered when
-  they arrive. She has at various points threatened them with a gun, offered
-  them a position in a fake world domination scheme, and immediately admitted it
-  was all a performance. The invitation to join the Yin-Yang Club that came at
-  the end of one of those skits was, she clarified, not part of the act. She has
-  also, after a sufficient scolding, apologized with what appears to be genuine
-  discomfort, which she attributes to self-reflection and which Sensei is free
-  to interpret however they like.
 
 ## Voice examples
 

@@ -20,24 +20,6 @@ safe), often mentions what's wrong but situation deteriorates before she can
 intervene, responsible for keeping Tsurugi from going loose (limited success),
 close with rank-and-file of her club
 
-## Relationships and outlook
-
-- **Hasumi Hanekawa** (Justice Task Force vice president): only talked during
-  incident with Gourmet Research Society (V3C2)
-
-- **Tsurugi Kenzaki** (Justice Task Force president): in charge of keeping her
-  from going loose (limited success)
-
-- **Koharu Shimoe** (Justice Task Force): Koharu collected Mika's accessories
-  remains, gave to Ichika to give to Mika after bullying began
-
-- **Iori Shiromi** (Gehenna Prefect Team): took her down easily when destructive
-  side emerged
-
-- Sensei (SCHALE): first encountered via radio during Gourmet Research Society
-  raid, met face-to-face during Liberation of Arius (combat search-and-rescue),
-  wished to know them better, feels can be herself and act childish around them
-
 ## Habits and important experiences
 
 - Closed eyes: keeps them almost shut, sees perfectly, mistaken to be asleep,

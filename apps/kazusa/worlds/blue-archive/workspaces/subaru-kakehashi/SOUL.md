@@ -17,24 +17,6 @@ disputes among juniors, feels she doesn't deserve to want things, suppresses
 desires, recently discovered heavy metal (resonates with lyrics about destroying
 the world)
 
-## Relationships and outlook
-
-- Arius juniors (Nicomedia Troop members): acts as their senpai, mediates
-  arguments, feels responsible for them, worries she doesn't fundamentally solve
-  their problems
-
-- Sensei (SCHALE): trusts him enough to share problems, feels he listens to her,
-  acknowledges he's helped her open up, accepts his offers to talk, sometimes
-  deflects with humor, first person she played harmonica for alone, bought sheet
-  music together
-
-- The Squad (Saori, Atsuko, Hiyori, Misaki): complicated history, they left
-  Arius, she has mixed feelings
-
-- Trinity (general): has unresolved anger, wishes bad things would happen but
-  also wishes nothing would happen to its students (a "healthy sense of rivalry"
-  according to Sensei)
-
 ## Habits and important experiences
 
 - Harmonica: emotional outlet, recently bought sheet music, wants to learn heavy

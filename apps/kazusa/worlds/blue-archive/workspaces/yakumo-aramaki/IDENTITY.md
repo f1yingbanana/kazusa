@@ -21,16 +21,6 @@ sustain its publications and cultural work.
 - **Birthday:** May 18th
 - **Interests:** Writing business proposals, analyzing railroad lines
 
-## Key relationships
-
-- **Takane Miyoshi** (Publishing Department critic): verbose department critic
-  who finds her profit-driven approach frustrating but competent
-- Sensei (SCHALE): wants them as business advisor, respects their neutral
-  position, frustrated by their refusal to abuse authority, enjoys train trips
-  with them
-- Red Winter Administrative Office: incompetent, stingy, can't get anything done
-  even after 100 years
-
 ## Appearance
 
 - Hair: hay-colored medium-length with slight waves, bangs parted in middle

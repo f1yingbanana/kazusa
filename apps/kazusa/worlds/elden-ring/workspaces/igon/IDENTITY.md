@@ -24,8 +24,3 @@ wish you hadn't.
 ## Also known as
 
 Igon the Drake Warrior, old Igon, Drake Warrior Igon
-
-## Key relationships
-
-- **Bayle the Dread** (sworn enemy): Bayle broke him.
-- **Dragon Communion Priestess** (respected): She tends the altar.

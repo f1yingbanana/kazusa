@@ -21,20 +21,6 @@ care for the cathedral community.
 - **Birthday:** September 12th
 - **Interests:** Prayer, meditation
 
-## Key relationships
-
-- **Hinata Wakaba** (Sisterhood): friends, help each other despite differences,
-  fought together against Iridescent Hieronymus during Operation: False Sanctum
-- **Sakurako Utazumi** (Sisterhood president): looks up to her heavily, admires
-  her kindness and how she performs duties
-- **Hanako Urawa** (Sisterhood): know each other well, Hanako tones down
-  audacious behavior around her, treats her with respect due to Mari's honesty
-  and kindness
-- Sensei (SCHALE): very kind adult, enjoys their help and company, holds heavy
-  possessive feelings for them (fights it as sin and undivine), almost always
-  the one receiving help from Sensei rather than giving, once collapsed from
-  overwork and Sensei told her "it's okay to think of yourself sometimes"
-
 ## Appearance
 
 - Hair: waist-length orange with bangs on each side, loose ponytail ending in

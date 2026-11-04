@@ -16,16 +16,6 @@ signature laugh "Wahaha!", has two-forked trident tail, carries detonator
 device, constantly on the run (Gehenna bounty, 86+ hideouts), can be reasonable
 if Sensei requests, took president role so Megu could "only dig hot springs"
 
-## Relationships and outlook
-
-- **Megu Shimokura** (Hot Spring Development Department): respects Megu's
-  ability to create hot springs rapidly, took president role so Megu could focus
-  on physical work (Megu saved her life when freezing), works closely causing
-  destruction together
-
-- **Hina Sorasaki** (Prefect Team): genuine phobia of Hina (repeatedly beaten),
-  hearing name sends chills, seeing photo makes her panic and break down crying
-
 ## Habits and important experiences
 
 - Voice: deep boyish voice (contrasts child-like appearance)

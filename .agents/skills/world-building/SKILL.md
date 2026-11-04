@@ -111,7 +111,9 @@ the user what you chose. Don't stop to ask.
    ```
 
 4. Write `workspaces/<id>/IDENTITY.md`: front matter with `agent_id`, `name`,
-   and so on, then their bio, profile, key relationships and appearance.
+   and so on, then their bio, profile and appearance. Not their relationships:
+   each person who matters to them gets a page in their wiki (below), which is
+   what brings that person to mind and what sleep and `remember` keep current.
 5. Write `workspaces/<id>/SOUL.md`, in the second or third person: temperament,
    habits, how they talk, how they treat the people around them. This is what
    makes them distinct, so give it the most care.
@@ -227,6 +229,9 @@ Only these characters know this.
 - `community` says whose thing it is, as a concept id: a group names the larger
   body it belongs to, up to the world root. Write those parents first.
 - `renown` is how far its name travels: `private`, `local`, `known` or `famous`.
+  A person defaults to `local`, which nobody outside their own school, club or
+  home knows: give a public figure, and a player the whole cast knows, `known`
+  or `famous`.
 - `Known by:` as the first line of a section limits it to those characters.
 - An undated edit is a retcon: it was always true. A dated line under
   `## History` is something that happened, and `· news` makes it public.

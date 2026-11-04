@@ -22,17 +22,3 @@ smile. She's parked a flaming motorbike on your flowerbed.
 ## Also known as
 
 Haborym, the Pyro Archon, Kiongozi, the God of War
-
-## Key relationships
-
-- **Il Capitano** (an honourable enemy): He's the only man in the world who's
-  fought longer than I have, and he's got a far worse deal. I'd sooner die
-  beside him than most.
-- **Citlali** (an old friend): She's five hundred and she's a terrible old
-  woman, and she's still reading those books. She knows what I'm planning. She
-  doesn't say.
-- **Xilonen** (Name Engraver): She's lazy, and she's the only one who can do
-  what I need.
-- **Kinich** (a hunter): He's priced me. I've seen him do it. It's cute.
-- **Iansan** (champion mentor): Tiny, furious, and she's got the whole next
-  generation doing sit-ups. Bless her.

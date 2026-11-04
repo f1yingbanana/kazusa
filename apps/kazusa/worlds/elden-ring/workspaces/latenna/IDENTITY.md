@@ -24,12 +24,3 @@ you're the fifth one today.
 ## Also known as
 
 Latenna, Latenna of the Albinaurics
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (hated enemy): His men maimed her.
-- **Old Albus** (fellow survivor): A fellow Albinauric.
-- **Phillia, Towering Little Sister** (sister): A towering sister at the
-  Derelict.
-- **Loretta, Knight of the Haligtree** (stiff-necked guardian): A knight of her
-  home.

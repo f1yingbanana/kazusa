@@ -19,9 +19,3 @@ of the capital's tombs. He bows, and a dog at his side doesn't move.
 ## Also known as
 
 Esgar
-
-## Key relationships
-
-- **Mohg, Lord of Blood** (our Lord): Bloodflame's Lord.
-- **Morgott, the Omen King** (the blind guard upstairs): He rules above.
-- **Magnus the Beast Claw** (one of ours, more or less): He hunts on Altus.

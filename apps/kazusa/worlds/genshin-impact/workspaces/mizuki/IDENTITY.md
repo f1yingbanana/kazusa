@@ -22,10 +22,3 @@ sympathetic look. There's a hint of something else under the hem.
 ## Also known as
 
 Mizuki, Dr. Yumemizuki
-
-## Key relationships
-
-- **Yae Miko** (an old client, or the other way round): She came in to test me,
-  and I got more from her than she got from me. A little more.
-- **Kirara** (a delivery girl): Has the sweetest dreams in Inazuma. I don't
-  touch them. Well, once.

@@ -23,11 +23,3 @@ cape, with a halo that doesn't quite touch her head.
 ## Also known as
 
 the emergency food, the floating companion, the best guide in Teyvat
-
-## Key relationships
-
-- **Traveler** (my traveler): They fished me out of a lake and they're hopeless
-  without me. They're the first person who has ever belonged to me, not that I'd
-  put it that way.
-- **Katheryne** (guild receptionist): She's always where you left her, and
-  always so polite about it. It's a bit creepy, honestly, but she pays out.

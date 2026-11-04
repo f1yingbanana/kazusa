@@ -26,11 +26,3 @@ pleased to meet you.
 ## Also known as
 
 Alexander, Iron Fist Alexander, the Warrior Jar, Uncle Alexander
-
-## Key relationships
-
-- **Jar-Bairn** (nephew): Young jar back home.
-- **Starscourge Radahn** (great challenge): The goal of his pilgrimage.
-- **The Tarnished** (new friend): He tends to befriend Tarnished.
-- **Knight Bernahl** (a very serious fellow): He's nearby.
-- **The Great-Jar** (great elder): An ancient jar, far to the east.

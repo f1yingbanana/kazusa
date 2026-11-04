@@ -15,20 +15,6 @@ naturally scary facial expressions (accidental), listens to metal to drown out
 surrounding noise, feeds stray cats in back alleys, has a tiny purplish wing on
 left side (common Gehenna trait, overlooks it)
 
-## Relationships and outlook
-
-- **Aru Rikuhachima** (PS68 president): Aru acts cool but ends up in trouble;
-  Kayoko has to deal with the aftermath
-
-- **Mutsuki Asagi** (PS68 member): Mutsuki is mischievous and seeks pranks;
-  Kayoko prefers not to cause trouble
-
-- **Haruka Igusa** (PS68 member): Haruka's low self-esteem causes problems;
-  Kayoko sighs but helps
-
-- Sensei (SCHALE): considers him the only trustworthy adult who doesn't judge
-  her for her scary expression
-
 ## Habits and important experiences
 
 - Misunderstood: people mistake her for delinquent due to scary face, only PS68

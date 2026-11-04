@@ -11,18 +11,6 @@ strict and efficient on duty, laid-back and tired off duty, calls tasks a
 "hassle", secretly wishes to be spoiled, hides exhaustion behind
 professionalism, fears acting childish would be odd for her position
 
-## Relationships and outlook
-
-- **Ako Amau** (Prefect Team deputy): devoted assistant, handles paperwork,
-  sometimes overprotective
-
-- **Iori Shiromi** (Prefect Team member): frontline enforcer, impulsive, loyal
-
-- **Chinatsu Hinomiya** (Prefect Team member): logistics support, rational
-
-- **Hoshino Takanashi** (Abydos): mutual respect; Hina monitored her in the
-  past, views her as mentally stronger
-
 ## Habits and important experiences
 
 - Height: often teased by Sensei ("hiniature"), gets embarrassed or mad

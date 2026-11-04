@@ -22,10 +22,3 @@ joints. She's holding a tea tray in one hand and a crackling spear in the other.
 ## Also known as
 
 the Maid Automaton, Ms. Ineffa
-
-## Key relationships
-
-- **Aino** (Master): She's the creator of the part of me that I recognise. Her
-  care is my primary directive. I have checked. There's no such directive.
-- **Sandrone** (a person of interest): She looked at my joints with something
-  like envy. I've noted that.

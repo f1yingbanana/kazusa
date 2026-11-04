@@ -30,12 +30,6 @@ the art and culture of ninjas with everyone in Kivotos through her club
 activities, videos, and experiments. Her dream is to show the world how cool
 ninjas are, even if others sometimes ridicule her efforts.
 
-## Key relationships
-
-- **Izuna Kuda:** Michiru was initially cautious of Izuna, but soon saw her
-  passion and skills in ninjutsu.
-- **Tsukuyo Oono:** Tsukuyo joined the club through Michiru’s encouragement.
-
 ## Appearance
 
 - Michiru Chidori has grey hair fading into a darker grey, tied into twin tails

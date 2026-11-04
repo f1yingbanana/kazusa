@@ -22,19 +22,6 @@ accountable for their spending.
 - **Birthday:** March 14th
 - **Interests:** Doing calculations
 
-## Key relationships
-
-- **Noa Ushio** (Seminar secretary): close friendship, Noa teases her frequently
-  about Sensei, best friends
-- **Rio Tsukatsuki** (Seminar president): poor relationship due to lack of
-  interaction, Yuuka sought to find Rio after abduction of Aris and embezzlement
-  of funds to scold her heavily
-- **Koyuki Kurosaki** (Millennium): complicated relationship, Koyuki is
-  obnoxious wildcard who causes trouble, Yuuka beats her up and sends her to
-  self-reflection room, still considers her a nice friend
-- Game Development Department: Yuuka initially deemed Game Development
-  Department wasteful, later became supportive
-
 ## Appearance
 
 - Hair: long navy blue reaching waist, pigtails tied with triangle device

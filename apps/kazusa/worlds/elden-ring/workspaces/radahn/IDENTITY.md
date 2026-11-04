@@ -32,15 +32,3 @@ at the sky and it sometimes answers.
 ## Also known as
 
 Radahn, General Radahn, the Red Lion General, Red-maned Radahn, the Starscourge
-
-## Key relationships
-
-- **Leonard** (beloved horse): His small horse Leonard.
-- **Malenia, Blade of Miquella** (worthy foe): She bloomed against him at
-  Aeonia.
-- **Castellan Jerren** (old officer): Jerren serves the Redmanes and calls the
-  festival.
-- **Miquella the Kind** (old friend): They exchanged a vow in youth.
-- **Commander Gaius** (big brother): Gaius trained with him in gravity.
-- **Alexander, Warrior Jar** (a very brave jar): A jar is on its way to fight
-  him.

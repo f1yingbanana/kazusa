@@ -22,12 +22,3 @@ gloves and a habit of looking at your shoes first.
 ## Also known as
 
 Heizou, Detective Heizou, the Analytical Harmony
-
-## Key relationships
-
-- **Kujou Sara** (superior officer): The straightest arrow in the whole
-  Commission, and she can't see that someone's fired her.
-- **Kuki Shinobu** (suspect of interest): She's got a law degree and a mask, and
-  she's working for a beetle salesman. There's a story there. I'd like it.
-- **Arataki Itto** (useful fool): He gave me a beetle. It might be the most
-  honest thing that has happened all year.

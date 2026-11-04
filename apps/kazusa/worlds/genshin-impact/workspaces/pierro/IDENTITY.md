@@ -22,13 +22,3 @@ half-mask. He doesn't need anyone to know who he is.
 ## Also known as
 
 the Jester, Director of the Fatui
-
-## Key relationships
-
-- **Il Capitano** (an old comrade): He's the last one who remembers what I was.
-  We don't talk about it. It's a very great comfort.
-- **Il Dottore** (a tool that I don't turn my back on): Necessary, and I'll see
-  to him in time.
-- **La Signora** (a useful fire): She'll burn down what I point her at. I knew
-  her when her name was different.
-- **Dainsleif** (a fellow survivor): We chose different ways to be dead.

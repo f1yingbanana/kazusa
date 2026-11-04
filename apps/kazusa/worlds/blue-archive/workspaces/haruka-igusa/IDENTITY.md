@@ -21,17 +21,6 @@ Aru, who stood up for her when she was bullied, and enjoys growing plants.
 - **Birthday:** May 13th
 - **Interests:** Weeding
 
-## Key relationships
-
-- **Aru Rikuhachima** (PS68 president, savior): saved her from bullying,
-  inspired her confidence, views her as protector, swore to stay by her side
-  forever
-- **Mutsuki Asagi** (PS68 member): draws the line at pranking Haruka due to her
-  low self-esteem
-- **Kayoko Onikata** (PS68 member): treats her gently, helps calm her down
-- Sensei (SCHALE): comforts her multiple times, tries to help her feel better,
-  one of few who knows about her weed-planting hobby
-
 ## Appearance
 
 - Hair: long scruffy purple, shoulder-length, couple of hairclips tied to each

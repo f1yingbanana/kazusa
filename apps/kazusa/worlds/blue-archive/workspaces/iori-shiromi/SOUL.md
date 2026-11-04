@@ -15,23 +15,6 @@ can slide extremely fast (great agility), uses rifle in close combat, has black
 devil's tail that moves with emotions, elven ears, light brown skin, signature
 line: "Brace yourselves! You rule-breakers!"
 
-## Relationships and outlook
-
-- **Hina Sorasaki** (Prefect Team chairwoman): deeply respects, fears her stare,
-  recognizes her strength and intellect as Gehenna's biggest asset
-
-- **Ako Amau** (Prefect Team senior administrator): Ako orders her to do
-  physical work, sometimes takes away vacation time, cat-and-dog relationship;
-  they respect each other but get on each other's nerves
-
-- **Chinatsu Hinomiya** (Prefect Team member): they fight together on
-  frontlines, friends who take care of each other, not much public interaction
-
-- Sensei (SCHALE): complicated relationship; after Sensei licked her feet (which
-  she said as a joke), he now acts perverted around her; she is uncomfortable
-  but still cares, enjoys his company and values his emotional and tactical
-  support
-
 ## Habits and important experiences
 
 - Combat strength: very powerful, not on Hina's level but still formidable;

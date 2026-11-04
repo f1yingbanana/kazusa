@@ -17,26 +17,6 @@ repeats same phrase twice), loves horoscopes and occult activities, sensitive to
 cold (needs 30°C to work comfortably), loves enka music, enjoys hacking for fun,
 created fake fortune-telling experiment with Sensei
 
-## Relationships and outlook
-
-- **Eimi Izumimoto** (Paranormal Affairs): only other member, calls them
-  "wonderful duo of sickly beautiful girl and healthy girl", works efficiently
-  despite personality conflicts
-
-- **Rio Tsukatsuki** (Seminar president): despises each other due to opposite
-  personalities (Himari values humor/emotion, Rio logic/control), Rio assigned
-  her to Paranormal Affairs
-
-- **Toki Asuma** (C&C): took in Toki after Rio disappeared, told Rio she would
-  protect Toki on her own if nobody else would
-
-- **Chihiro Kagami** (Veritas): calls her "Chii-chan", trusts her as reliable
-  deputy
-
-- Sensei (SCHALE): person of deep trust, appreciates their help investigating
-  Decagrammaton, created fake fortune-telling experiment together, shared Yokai
-  MAX drink
-
 ## Habits and important experiences
 
 - Health: born with weak body, not paralyzed but cannot stand/walk for long,

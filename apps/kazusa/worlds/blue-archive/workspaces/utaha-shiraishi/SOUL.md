@@ -17,22 +17,6 @@ embarrassed when Sensei saw her with greasy hands repairing Thundergun (didn't
 want them to touch equipment), forces Hibiki to meet crowds/embarrass her, made
 Hibiki talk on stage for new inventions
 
-## Relationships and outlook
-
-- **Hibiki Nekozuka** (Engineering Department): junior who looks up to her,
-  Utaha gets her into interesting situations, embarrasses her by forcing her to
-  meet crowds
-
-- **Kotori Toyomi** (Engineering Department): both extroverted and active,
-  constantly embarrass Hibiki together (making her talk on stage)
-
-- **Yuuka Hayase** (Seminar treasurer): Yuuka stressed dealing with damage costs
-  from Utaha's inventions gone wrong (unnecessary additions cause destruction)
-
-- Sensei (SCHALE): shows care by trying to interest them in her Meister work,
-  spent hours making perfect pencil holder for Sensei, got shy and embarrassed
-  when Sensei helped repair Thundergun (didn't want them to see dirty hands)
-
 ## Habits and important experiences
 
 - Perfectionist: spends hours until things are perfect, even pencil holders

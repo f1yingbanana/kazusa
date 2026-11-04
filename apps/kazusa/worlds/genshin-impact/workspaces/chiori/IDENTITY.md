@@ -22,13 +22,3 @@ cuff and a very direct stare at your hem.
 ## Also known as
 
 Miss Chiori, the Thimble's Edge, owner of Chioriya
-
-## Key relationships
-
-- **Furina** (a client): She's very vain, she's very funny and she flinches when
-  you get near her with the tape. It's not what she's like on stage. I've got
-  questions.
-- **Navia** (a friend and a problem): She wears too many ribbons, and she's the
-  only client who pays on time.
-- **Charlotte** (a pest): She's been at my shop with her Kamera. I gave her a
-  very good quote, and then I told her what's wrong with her scarf.

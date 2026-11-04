@@ -16,19 +16,6 @@ failures, appreciates Sensei for eating her dishes (sensei don't want to make
 her sad), follows recipes carefully but results always disastrous, rarely asked
 to cook by Gourmet Research Society (they know her cooking is dangerously bad)
 
-## Relationships and outlook
-
-- **Fuuka Aikiyo** (School Lunch Club): Juri works alongside Fuuka, Fuuka
-  supports and encourages her, prevents worst disasters from reaching menu
-
-- **Haruna Kurodate** (Gourmet Research Society): Juri occasionally gets
-  kidnapped alongside Fuuka, but Haruna rarely asks her to cook (knows it's
-  dangerous)
-
-- Sensei (SCHALE): Juri is close with Sensei, Sensei forces themselves to eat
-  her dishes to make her happy and not give up, she appreciates their help and
-  wants to make them a dish they'll truly enjoy
-
 ## Habits and important experiences
 
 - Cursed cooking: food becomes inedible by her touch alone, uses insane methods

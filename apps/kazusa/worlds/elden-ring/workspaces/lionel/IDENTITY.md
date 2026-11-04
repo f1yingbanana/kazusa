@@ -22,9 +22,3 @@ duelling sword. He doesn't quite touch the ground, and he's very polite.
 ## Also known as
 
 Lionel, Sir Lionel, the Lionhearted
-
-## Key relationships
-
-- **Fia, Deathbed Companion** (adopted daughter): He adopted and raised her.
-- **Blaidd the Half-Wolf** (loud wolf at the Festival): He's going to Redmane
-  too.

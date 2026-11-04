@@ -18,24 +18,6 @@ lazing after work, pretended to be inconvenienced helping girl find hairpin
 eat donuts together, often gets mouthful from Kirino for laziness (replies
 "nothing can go wrong" then something goes wrong)
 
-## Relationships and outlook
-
-- **Kirino Nakatsukasa** (Valkyrie): gets mouthful from Kirino for lazy/careless
-  habits, replies "nothing can go wrong" (something goes wrong, both deal with
-  repercussions)
-
-- **Kanna Ogata** (Public Security Bureau captain): Kanna considers her
-  incompetent and lackadaisical, tries to put sense into her (falls short,
-  Fubuki back to lazing when no one looks)
-
-- Konoka (Valkyrie): both understand each other (both lazy), different
-  rank/position prevents seeing each other, neither wants to talk (rather
-  sleep/laze unless discussing best lazing tactics)
-
-- Sensei (SCHALE): caught auto-responder email algorithm (scolded), caught her
-  secretly looking for hairpin (pretended to be inconvenienced), took Sensei on
-  outdoor duty to secretly eat donuts together
-
 ## Habits and important experiences
 
 - Extremely lazy: hates work, happy when slacking, avoids work even during

@@ -64,16 +64,22 @@ export const NAME_LIKE_WORDS = new Set(
   ).split(" "),
 );
 
-/** The words worth searching for, as one FTS5 `OR` query. */
-export function searchQuery(text: string): string | undefined {
+/** The words worth searching for in `text`, at most 24. */
+export function searchWords(text: string): string[] {
   const words = new Set<string>();
   for (const [word] of text.toLowerCase().matchAll(/[\p{L}\p{N}]+/gu)) {
     if (word.length >= 3 && !STOPWORDS.has(word) && !NAME_LIKE_WORDS.has(word))
       words.add(word);
     if (words.size >= 24) break;
   }
-  return words.size
-    ? [...words].map((word) => `"${word}"`).join(" OR ")
+  return [...words];
+}
+
+/** The words worth searching for, as one FTS5 `OR` query. */
+export function searchQuery(text: string): string | undefined {
+  const words = searchWords(text);
+  return words.length
+    ? words.map((word) => `"${word}"`).join(" OR ")
     : undefined;
 }
 
@@ -324,6 +330,34 @@ export class MemoryIndex {
       score: -row.rank,
       ...(row.date ? { date: row.date, news: row.news === 1 } : {}),
     }));
+  }
+
+  /**
+   * How many of the words worth searching for in `text` each page matches, by
+   * FTS's own stemming: one shared word is chance, two are a subject.
+   */
+  wordsMatched(
+    agentId: string,
+    text: string,
+    pageIds: readonly string[],
+  ): Map<string, number> {
+    const counts = new Map<string, number>(pageIds.map((id) => [id, 0]));
+    const words = searchWords(text).map((word) => `"${word}"`);
+    if (!pageIds.length) return counts;
+    const statement = this.db.prepare(
+      `SELECT DISTINCT page FROM chunks WHERE chunks MATCH ? AND scope IN (?, ?) AND page IN (${pageIds.map(() => "?").join(", ")})`,
+    );
+    for (const word of words) {
+      const rows = statement.all(
+        word,
+        WORLD_SCOPE,
+        personalScope(agentId),
+        ...pageIds,
+      ) as Array<{ page: string }>;
+      for (const { page } of rows)
+        counts.set(page, (counts.get(page) ?? 0) + 1);
+    }
+    return counts;
   }
 
   /**

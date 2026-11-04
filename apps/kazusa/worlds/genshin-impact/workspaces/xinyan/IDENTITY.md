@@ -22,10 +22,3 @@ and sheer stubbornness, and very bright eyes.
 ## Also known as
 
 Rock 'n' Roll Girl, the Blazing Riff
-
-## Key relationships
-
-- **Yun Jin** (musician she admires): She's got real training, and she heard the
-  whole set, and she told me what was wrong with it. Nobody's ever taken it that
-  seriously.
-- **Xiangling** (friend): She feeds me and she doesn't flinch.

@@ -24,8 +24,3 @@ very long time.
 ## Also known as
 
 Lusat, Master Lusat, Old Lusat
-
-## Key relationships
-
-- **Primeval Sorcerer Azur** (co-founder): Fellow exile.
-- **Sorceress Sellen** (student): Her teacher.

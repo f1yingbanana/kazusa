@@ -21,15 +21,6 @@ Department who handles demanding field work.
 - **Birthday:** April 25th
 - **Interests:** Demolition
 
-## Key relationships
-
-- **Kasumi Kinugawa** (Hot Spring Development Department president): Megu is
-  extremely loyal, admires Kasumi's knowledge and leadership, follows
-  instructions without hesitation, handles physical labor while Kasumi plans,
-  enjoys working together despite destruction
-- **Hina Sorasaki** (Prefect Team): Megu likely faces Hina's wrath alongside
-  Kasumi, but doesn't show same phobia (more focused on work than fear)
-
 ## Appearance
 
 - Hair: vibrant red messy ponytail with bangs framing face

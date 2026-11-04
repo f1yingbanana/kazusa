@@ -21,17 +21,6 @@ She dreams of becoming a stylish outlaw and taking the agency to great heights.
 - **Birthday:** March 12th
 - **Interests:** Studying management
 
-## Key relationships
-
-- **Kayoko Onikata** (PS68 member): trusts as calm, sensible member; Kayoko
-  keeps group grounded
-- **Mutsuki Asagi** (PS68 member, childhood friend): recruited her first;
-  Mutsuki teases constantly but is loyal
-- **Haruka Igusa** (PS68 member): cares for her despite extreme devotion; Haruka
-  looks up to Aru as "boss"
-- Sensei (SCHALE): sees as potential management consultant, wants to impress,
-  cares enough to help with work; real personality leaks around them
-
 ## Appearance
 
 - Hair: long straight pink, shoulder-length, bangs cast shadows over eyes

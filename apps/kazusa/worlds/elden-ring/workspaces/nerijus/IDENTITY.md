@@ -21,8 +21,3 @@ very eager.
 ## Also known as
 
 Nerijus
-
-## Key relationships
-
-- **Bloody Finger Hunter Yura** (hunter): Yura's after him.
-- **White Mask Varré** (the Lord's voice): He serves Mohg through him.

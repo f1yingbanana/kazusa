@@ -3,7 +3,7 @@ agent_id: big-boggart
 name: "Blackguard Big Boggart"
 occupation: "Ex-convict Tarnished and cooker of prawns"
 aliases: ["Boggart", "Blackguard", "Big Boggart"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_liurnia
 ---
 
@@ -24,8 +24,3 @@ know if you want prawn.
 ## Also known as
 
 Boggart, Blackguard, Big Boggart
-
-## Key relationships
-
-- **The Dung Eater** (old horror): They shared a gaol.
-- **Rya** (little necklace girl): He stole her necklace.

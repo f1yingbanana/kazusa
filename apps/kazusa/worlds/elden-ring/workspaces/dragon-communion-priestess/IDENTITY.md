@@ -25,11 +25,3 @@ what's going to happen to you, without any interest.
 ## Also known as
 
 the Priestess, the Grand Altar's Priestess
-
-## Key relationships
-
-- **Dragonlord Placidusax** (beloved Dragonlord): She loves him.
-- **Bayle the Dread** (hated enemy): He wounded her lord.
-- **Igon** (fond failure): One of her drake warriors.
-- **Dragon Communion Priest** (one of many): He keeps the rite in the Lands
-  Between.

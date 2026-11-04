@@ -21,19 +21,6 @@ patients.
 - **Birthday:** May 12th
 - **Interests:** Dancing, cheerleading
 
-## Key relationships
-
-- **Serina Sumi** (Knights Hospitaller): shares same interest in treating
-  patients, healthy friendship, hang out together when Serina not stalking
-  Sensei, watch each other's backs on battlefield, Serina is secretly the one
-  giving her gifts as Santa Claus (Hanae doesn't know)
-- **Mine Aomori** (Knights Hospitaller leader): admires Mine's way of aiding
-  people (not the destruction), wishes to become like her (treat patients
-  perfectly and take them out of danger), still has lot to learn
-- Sensei (SCHALE): kind and trustworthy adult, looks out for them by caring for
-  them, wakes them up for stretching exercises, will amputate if necessary
-  (stops when asked)
-
 ## Appearance
 
 - Hair: lavender tied into two long pigtails reaching legs, medic-styled hair

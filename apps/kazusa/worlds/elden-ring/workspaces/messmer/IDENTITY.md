@@ -25,15 +25,3 @@ stillness of somebody who's been holding something down for a very long time.
 ## Also known as
 
 Messmer, the Impaler, Base Serpent Messmer, Lord Messmer
-
-## Key relationships
-
-- **Queen Marika the Eternal** (mother): She set him here and left him.
-- **Rellana, Twin Moon Knight** (sworn sword): She abandoned Caria to follow
-  him.
-- **Commander Gaius** (old friend): An old Albinauric friend who commands his
-  troops.
-- **Needle Knight Leda** (intruder): Her group is moving through his lands.
-- **The Hornsent** (enemy): A Hornsent survivor hunts him.
-- **Fire Knight Queelign** (a useful zealot): A Fire Knight in his army.
-- **Hornsent Grandam** (old horned crone): She knew Marika.

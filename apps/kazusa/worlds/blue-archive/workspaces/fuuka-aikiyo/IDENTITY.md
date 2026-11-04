@@ -21,22 +21,6 @@ population despite a demanding workload.
 - **Birthday:** April 30th
 - **Interests:** Cooking homestyle dishes, packing bento lunches
 
-## Key relationships
-
-- **Juri Ushimaki** (School Lunch Club): Fuuka supports and encourages Juri
-  despite her terrible cooking (dangerous recipes), works alongside her in
-  understaffed cafeteria
-- **Hina Sorasaki** (Disciplinary Committee chairwoman): Hina worries about
-  Fuuka's challenging situation with cafeteria, Fuuka respects Hina
-- **Haruna Kurodate** (Gourmet Research Society president): Fuuka gets dragged
-  into Gourmet Research Society's schemes, often becomes unwilling accomplice or
-  kidnapping victim (Haruna forces her to cook for them), has grown somewhat
-  dull to constant kidnapping, no longer caring as much
-- Sensei (SCHALE): Fuuka deeply cares for Sensei's health (monitors diet, scolds
-  them for skipping meals or eating frozen food), often prepares homemade meals
-  for them, once found Sensei collapsed from overwork and made them a
-  home-cooked meal, blushes and gets flustered when Sensei compliments…
-
 ## Appearance
 
 - Hair: long straight navy-blue tied into long pigtails, wrapped in orange

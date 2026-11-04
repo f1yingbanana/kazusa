@@ -24,10 +24,3 @@ to see you.
 ## Also known as
 
 Miriel, Pastor Miriel, the Pastor, the Turtle Pope
-
-## Key relationships
-
-- **Rennala, Queen of the Full Moon** (remembered bride): She wed Radagon here.
-- **Radagon of the Golden Order** (remembered groom): He swore his vows here.
-- **Sorcerer Thops** (gentle old student): He visits.
-- **Elemer of the Briar** (the night hunter): He has been prowling near there.

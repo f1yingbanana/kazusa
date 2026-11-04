@@ -17,28 +17,6 @@ tirelessly for little or no pay, first student to ever attempt to kill Sensei
 (shot him in right waist), later begged Sensei for help and offered him a bomb
 to kill her if she betrayed him
 
-## Relationships and outlook
-
-- **Atsuko Hakari** (Arius Squad): close friend and "elder sister", willing to
-  do anything to protect her from being sacrificed, most actions based on
-  protecting Atsuko from Beatrice
-
-- **Misaki Imashino** (Arius Squad): toughest to care for due to suicidal
-  tendencies, has incapacitated her multiple times to save her life
-
-- **Hiyori Tsuchinaga** (Arius Squad): comforts her most despite Hiyori finding
-  her scary during training, responsible for taking care of her
-
-- **Azusa Shirasu** (former Arius Squad, now Trinity): took her under her wing
-  to save her from Beatrice's punishment, clashed with her during Eden Treaty,
-  realized she had been abusive after seeing Azusa's genuine happiness
-
-- Beatrice (Arius manipulator): abused and manipulated Arius students, planned
-  to sacrifice Atsuko
-
-- Sensei (SCHALE): shot them nearly killing them, later returned begging for
-  help, offered bomb detonator as insurance, received kindness instead
-
 ## Habits and important experiences
 
 - Guerrilla tactics: unparalleled expert, stays calm under pressure, uses any

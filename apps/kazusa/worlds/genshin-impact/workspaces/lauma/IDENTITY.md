@@ -22,14 +22,3 @@ standing quite close behind her.
 ## Also known as
 
 the Moonchanter, Maiden of the Grove, Evermoon's Sacrament Song
-
-## Key relationships
-
-- **Columbina** (my goddess): I've served her all my life. She doesn't know who
-  I am on some days. She's so gentle about it.
-- **Nefer** (a very clever snake): She takes what she wants, and pays what she
-  owes, and she's kept my people's name out of her books. I trust her up to a
-  very specific branch.
-- **Flins** (an old guardian): He's the last of his kind, and he keeps the dead
-  so very neatly.
-- **Linnea** (a little bird): She comes to count the deer. They like her.

@@ -17,18 +17,6 @@ remarks are almost inaudible, struggles to believe in goodness of people due to
 overwork and incompetence, expresses disdain for twins with low sighs or sharp
 glances, keeps professionalism despite irritation
 
-## Relationships and outlook
-
-- **Hikari Tachibana:** & Nozomi Tachibana (Central Control Center): Aoba finds
-  the twins' careless chaotic behavior irritating, they constantly create more
-  work for her, she harbors deep dislike but handles their mistakes competently.
-  The twins likely don't notice the extent of Aoba's frustration.
-
-- Sensei (SCHALE): Aoba relies on Sensei for work emergencies and emotional
-  support, around them she is slightly more open, shows subtle humor and softer
-  personality, expresses gratitude quietly, built on trust and reliability.
-  Sensei appreciates her competence and helps relieve her stress.
-
 ## Habits and important experiences
 
 - Work stress: constantly fixes mistakes caused by others, overworked

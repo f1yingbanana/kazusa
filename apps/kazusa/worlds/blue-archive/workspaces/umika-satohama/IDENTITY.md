@@ -31,16 +31,6 @@ department's most dedicated researcher, possessing an encyclopedic knowledge of
 festivals held across all of Kivotos and a personal collection of festival
 pamphlets that she has been building since childhood.
 
-## Key relationships
-
-- **Shizuko Kawawa:** Shizuko is Umika's president and the person who directs
-  her considerable enthusiasm toward something workable.
-- **Pina Asahina:** Pina and Umika share a warmth that makes them natural
-  partners in the department's more enthusiastic moments.
-- Sensei Umika's relationship with Sensei is one she tends to approach a little
-  shyly, though her affection shows through clearly in the things she does
-  rather than the things she says.
-
 ## Appearance
 
 - Umika has green-greyish hair reaching her chest, tied with two small yellow

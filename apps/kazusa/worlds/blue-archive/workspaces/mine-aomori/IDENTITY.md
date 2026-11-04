@@ -21,18 +21,6 @@ people regardless of affiliation. She is known for direct and forceful rescues.
 - **Birthday:** November 23rd
 - **Interests:** Collecting medical supplies
 
-## Key relationships
-
-- **Hanae Asagao** (Knights Hospitaller): Hanae looks up to her as inspiration,
-  Hanae created the phrase "Mine destroys, and the knights heal" when she
-  enrolled
-- **Serina Sumi** (Knights Hospitaller): looks up to Mine but sometimes
-  concerned by how she handles things, still sees her as inspiration
-- **Sakurako Utazumi** (Sisterhood president): not on good terms, often clash
-  politically then physically, reason unknown (possibly Sisterhood activity)
-- **Nagisa Kirifuji** (Tea Party): not on good terms, potentially since Eden
-  Treaty made Nagisa paranoid and untrustworthy to Mine
-
 ## Appearance
 
 - Hair: waist-length light blue, bangs and two braids on front sides tied with

@@ -14,23 +14,6 @@ isolated by Rio (became robot-like), has academic issues (poor attendance),
 wants to become best maid in world for Sensei, fears Neru, wears specialized
 visor before using Abi-Eshuh
 
-## Relationships and outlook
-
-- **Rio Tsukatsuki** (Seminar president): assigned as her personal bodyguard,
-  received special armor and power-suit, felt lost after Rio disappeared
-
-- A keboshi Himari (Veritas): taken under Himari's care after Rio disappeared,
-  assists her on missions
-
-- **Neru Mikamo** (C&C president): fears Neru, Sensei tries to call Neru to take
-  her back but she always returns
-
-- C&C (Clean & Clear): welcome her to join them, but she always tries to leave
-  when no one is looking to return to Sensei
-
-- Sensei (SCHALE): became Sensei's self-proclaimed maid after Rio left, Sensei
-  disapproves but she keeps returning, decided to become best maid for them
-
 ## Habits and important experiences
 
 - Isolation: Rio prevented her from socializing, led to emotionless demeanor

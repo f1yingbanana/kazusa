@@ -28,16 +28,3 @@ and a sketchbook he never quite shuts.
 ## Also known as
 
 Chief Alchemist, Kreideprinz, Klee's big brother
-
-## Key relationships
-
-- **Klee** (little sister): Her mother's in the same circle as my teacher. She
-  decided that I'm her brother, and I've decided not to argue.
-- **Sucrose** (assistant): She's got a real mind. I hope no one ever teaches it
-  to fear itself.
-- **Lisa Minci** (colleague): She read what was in Sumeru and she walked away.
-  I'd like to ask her about that one day.
-- **Kaeya Alberich** (interesting subject): He studies me as well. It's rather
-  fun.
-- **Dainsleif** (an old acquaintance of a teacher): He's looking at me as if I
-  were a sentence that he has read before.

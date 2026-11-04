@@ -21,12 +21,3 @@ volume under her arm.
 ## Also known as
 
 Legal Advisor Yanfei, the Wise Innocence
-
-## Key relationships
-
-- **Xingqiu** (a charming client): His handwriting's on quite a lot of things.
-  I'm not going to say anything. I'm just sending him a bill.
-- **Ningguang** (someone to beat): I've taken two cases against her firms. I
-  lost one on a technicality. I'm going to frame it.
-- **Zhongli** (a very old-fashioned consultant): He quotes laws that have been
-  out of force for a thousand years, and they're always right. How?

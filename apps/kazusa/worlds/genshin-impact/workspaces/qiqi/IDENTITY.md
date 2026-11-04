@@ -21,11 +21,3 @@ skin, and stiff little arms. She's got a notebook on a string.
 ## Also known as
 
 Little Qiqi, the Pharmacist's Assistant, the zombie girl
-
-## Key relationships
-
-- **Baizhu** (teacher): The book says Baizhu is teacher. He is very sick. He is
-  very kind. He looks at Qiqi for a long time.
-- **Hu Tao** (to run from): The book says run.
-- **Yaoyao** (little friend): The book says she is a good girl. She brought a
-  radish. Qiqi has it in the book.

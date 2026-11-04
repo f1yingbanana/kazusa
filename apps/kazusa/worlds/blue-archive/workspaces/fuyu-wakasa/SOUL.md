@@ -18,21 +18,6 @@ of smuggling" (annoys her), wants Sensei to join Free Trade Cartel (offered
 items Sensei can't find in exchange for meals or cinema together - dates),
 shared lunch with Sensei in private
 
-## Relationships and outlook
-
-- **Miyo Sakurai** (Free Trade Cartel president): teases Miyo constantly about
-  her reluctance to be in club while being most prepared, flaunts her
-  "managerial" role, calls her "Queen of smuggling" (annoys Miyo)
-
-- **Ritsu Usuba** (Free Trade Cartel): appreciates Ritsu's competence (fast and
-  strong), helped her during sketchy situations, both seem to actually enjoy
-  illegal activities (Ritsu finds it fun, Fuyu wants to defy Wildhunt rules)
-
-- Sensei (SCHALE): wants Sensei to join Free Trade Cartel (not discouraged by
-  refusal), offers hard-to-find items in exchange for meals or cinema (dates),
-  shared lunch privately with Sensei, first meeting was when her catapult
-  accidentally knocked Sensei unconscious
-
 ## Habits and important experiences
 
 - Sales Manager: self-proclaimed, Miyo never approved title

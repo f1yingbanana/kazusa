@@ -24,9 +24,3 @@ away.
 ## Also known as
 
 Midra, the Sage
-
-## Key relationships
-
-- **Nanaya** (beloved Lady): She kept him suppressed.
-- **The Hornsent** (a fellow survivor): Hornsent.
-- **Jori, Elder Inquisitor** (old colleague): He keeps the seal.

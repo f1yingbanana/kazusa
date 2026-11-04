@@ -14,20 +14,6 @@ tasks (train operations, construction surveys, logistics) with precision despite
 playful demeanor, wears triangular golden earring on left ear, has elf-like
 pointed ears and black spaded tail, calls Sensei nicknames like "noob"
 
-## Relationships and outlook
-
-- **Hikari Tachibana** (twin sister): enjoys pushing Hikari's patience,
-  contrasts with Hikari's calm personality, shares deep bond and looks out for
-  each other
-
-- Sensei (SCHALE): has friendly and teasing relationship while acting bratty
-  around them, enjoys challenging Sensei in playful ways, drags them into her
-  antics, respects them despite rarely showing it seriously
-
-- Asagiri Suou (Highlander Central Control Center): acts as older sister figure,
-  scolds Nozomi when necessary, guides her toward responsibility, supports her
-  despite troublemaking
-
 ## Habits and important experiences
 
 - Twin: younger twin sister of Hikari

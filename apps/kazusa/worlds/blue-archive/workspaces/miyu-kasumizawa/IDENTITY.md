@@ -21,17 +21,6 @@ overlook her, but she is highly capable and focused when carrying out her role.
 - **Birthday:** July 12th
 - **Interests:** Pessimism, escapism, collecting pebbles
 
-## Key relationships
-
-- **Miyako Tsukiyuki** (RABBIT Platoon leader): relies on Miyako when anxious or
-  ignored, goes to her for comfort
-- **Moe Kazekura** (RABBIT Platoon): Moe gets annoyed by her crying and
-  pessimism, calls her crybaby
-- **Saki Sorai** (RABBIT Platoon): Saki frequently forgets Miyu exists due to
-  her quietness
-- Sensei (SCHALE): sees Sensei as one of few who notice her, asks how to make
-  others recognize her
-
 ## Appearance
 
 - Hair: long to elbows, thick bangs covering forehead and framing face

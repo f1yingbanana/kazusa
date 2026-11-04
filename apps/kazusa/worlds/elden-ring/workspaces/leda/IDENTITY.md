@@ -27,14 +27,3 @@ mentions her lord.
 ## Also known as
 
 Leda, Lady Leda, the Needle Knight
-
-## Key relationships
-
-- **Miquella the Kind** (beloved lord): She's utterly devoted.
-- **Sir Ansbach** (wise old companion): Fellow follower.
-- **Redmane Freyja** (valued comrade): Fellow follower.
-- **The Hornsent** (a difficult ally): An unlikely follower.
-- **Dryleaf Dane** (silent friend): Fellow follower.
-- **Messmer the Impaler** (enemy): He holds the land.
-- **Thiollier** (gentle lad): A follower.
-- **Moore** (our dear friend): A follower.

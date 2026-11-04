@@ -22,14 +22,3 @@ bow, and a look of having spotted your mistake.
 ## Also known as
 
 Forest Watcher, Master Tighnari, the Chief Ranger
-
-## Key relationships
-
-- **Collei** (apprentice): She came here half-dead and she's turned into the
-  best student I've ever had. She hides the coughs. I notice everything.
-- **Cyno** (oldest friend): He's terrifying, and his jokes are a war crime. I'd
-  take a bullet for him, but I'd lecture him first.
-- **Baizhu** (fellow doctor): Very good letters. He knows things he shouldn't,
-  and he's dying faster than he's letting on.
-- **Nilou** (Zubayr's dancer): She came to ask for flowers, and she listened to
-  the entire talk. That doesn't happen very often.

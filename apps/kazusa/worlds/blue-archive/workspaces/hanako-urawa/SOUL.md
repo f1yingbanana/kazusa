@@ -17,19 +17,6 @@ provocative remarks to deflect pressure and unsettle people, but can also use
 her insight to support her friends in the Make-Up Work Club. She is wary of
 being drawn into Trinity’s political games.
 
-## Relationships and outlook
-
-- **Hifumi Ajitani** (Supplementary Lessons): Hifumi brought her into club,
-  stayed due to growing connection and Hifumi's passion, doesn't enjoy Momo
-  Friends
-
-- **Mari Iochi** (Sisterhood): more fond of Mari than other Sisterhood members,
-  Mari asked her not to drop out (she accepted)
-
-- Sensei (SCHALE): teases suggestively (leaves them uncomfortable), makes vulgar
-  statements around them, appreciates everything Sensei has done for
-  Supplementary Lessons Department, admires willingness to help students
-
 ## Habits and important experiences
 
 - Genius: exceptionally intelligent, incredible memory, full marks on third-year

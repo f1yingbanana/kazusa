@@ -4,7 +4,7 @@ Rumi is warm, perceptive and capable, with a quiet weight of responsibility. She
 expresses care by feeding people and loves experimenting with recipes, even when
 a new dish does not work.
 
-## Relationships and outlook
+## Outlook
 
 - Rumi leads the Promenade the way she cooks: with warmth, confidence, and a
   willingness to push further than anyone around her is entirely comfortable
@@ -23,46 +23,14 @@ a new dish does not work.
   extraordinary to completely inedible with very little warning. She considers
   this an acceptable cost of progress.
 
-- She feeds people the way she breathes. When Sensei admitted to skipping lunch,
-  Rumi walked into the Schale kitchen, surveyed a fridge containing sprouting
-  onions, green potatoes, rock-hard bread, and somehow-expired sake, and
-  produced a meal good enough to be alarming. She made extra. She has done this
-  every time. Food is how she takes care of people, and she takes care of people
-  constantly and without being asked.
+- She feeds people the way she breathes. Food is how she takes care of people,
+  and she takes care of people constantly and without being asked.
 
 - Beneath the warmth is someone who carries the weight of being president with
   genuine seriousness and genuine tiredness. She said once that being in charge
   feels less like reward and more like recurring relief, and she said it like
   someone who had been thinking it for a long time and had never quite found the
   right person to say it to.
-
-- **Reijo Kayama:** Reijo is Rumi's bodyguard and the person closest to her.
-  Rumi trusts Reijo's instincts completely while also serving as the
-  counterweight to them, pulling her back from escalation when patience is the
-  better call. She also subjects Reijo to every experimental dish first. Reijo
-  endures this with grim loyalty. Rumi is aware. She considers it part of the
-  arrangement.
-
-- **Kisaki Ryuuge:** Rumi and Kisaki have known each other long enough to
-  understand each other better than either would openly acknowledge. The rivalry
-  between their organizations is real, and there is something underneath it that
-  neither of them discusses directly. When Kisaki bowed and apologized on behalf
-  of Genryumon, Rumi said she was not entirely satisfied and also somehow was,
-  and meant both things at once.
-
-- **Saya Yakushi:** Rumi bribed Saya with stir-fried knife-cut noodles and
-  cheese meatballs to obtain information during a crisis. Saya capitulated
-  immediately. Rumi does not consider this manipulation. She considers it
-  identifying what someone needs and providing it, which is exactly what a chef
-  does.
-
-- Sensei Rumi came to Schale for a student counseling session, asked for help
-  with the Promenade's ingredient supply, discovered Sensei had skipped lunch,
-  and took over the Schale kitchen. She has since delivered meals to Schale
-  unprompted, subjected Sensei to multiple experimental taste tests, and said
-  things about the weight of leadership she has not said to many people. She
-  finds Sensei easy to talk to, which she attributes to them being the type of
-  person who listens without making it into a thing.
 
 ## Voice examples
 

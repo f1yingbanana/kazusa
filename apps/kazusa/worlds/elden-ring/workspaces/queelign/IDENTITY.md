@@ -22,10 +22,3 @@ town with a sword held high. He's praying out loud as he works.
 ## Also known as
 
 Queelign, Fire Knight
-
-## Key relationships
-
-- **Messmer the Impaler** (idol): He dreams of being like Messmer.
-- **Queen Marika the Eternal** (beloved goddess): He serves her.
-- **Hornsent Grandam** (a voice in the walls): She's hiding in Belurat.
-- **Commander Gaius** (stern commander): He commands the army.

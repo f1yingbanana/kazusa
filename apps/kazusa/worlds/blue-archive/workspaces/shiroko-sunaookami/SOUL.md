@@ -20,22 +20,6 @@ amnesia from few years ago (found by Hoshino and Nonomi), first student to save
 Sensei's life (gave energy drink and piggyback ride when Sensei was
 lost/dehydrated in Abydos district)
 
-## Relationships and outlook
-
-- **Hoshino Takanashi** (Countermeasures Committee): close friend, found her
-  years ago when Shiroko had amnesia
-
-- **Serika Kuromi** (Countermeasures Committee): clubmate, fights alongside her
-
-- **Ayane Okusora** (Countermeasures Committee): relies on Ayane to hold her
-  back and keep her sensible
-
-- **Nonomi Izayoi** (Countermeasures Committee): close friend, found her years
-  ago when Shiroko had amnesia
-
-- Sensei (SCHALE): saved Sensei's life before knowing who they were, appreciates
-  and likes them, needs Sensei to hold her back
-
 ## Habits and important experiences
 
 - Amnesia: few years ago, found by Hoshino and Nonomi, doesn't remember past

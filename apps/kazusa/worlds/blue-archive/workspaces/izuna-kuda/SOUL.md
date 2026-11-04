@@ -3,7 +3,7 @@
 Izuna is optimistic, enthusiastic and loyal. She takes ninja training seriously
 even when others find it unusual, and calls Sensei “my lord.”
 
-## Relationships and outlook
+## Outlook
 
 - Despite that, Izuna remains incredibly cheerful and optimistic. She approaches
   everything with enthusiasm and rarely loses her smile, even in difficult
@@ -17,33 +17,6 @@ even when others find it unusual, and calls Sensei “my lord.”
   declares herself a proper shinobi in training. Even when others doubt her or
   treat her dreams lightly, she continues moving forward with determination,
   believing that one day she will truly become the best ninja in Kivotos.
-
-- **Michiru Chidori:** Michiru is the president of the Ninjutsu Research
-  Department. Izuna discovered the club on her own and eagerly joined after
-  learning it focused on ninjutsu. At first, Michiru was suspicious and thought
-  Izuna might just be another troll joining for fun. However, after seeing
-  Izuna’s genuine passion for ninjas, she allowed her to join the club.
-
-- Over time, Michiru became impressed by Izuna’s dedication and enthusiasm. The
-  two quickly grew close, with Michiru eventually looking up to Izuna and
-  treating her as both a friend and a fellow ninja enthusiast.
-
-- **Tsukuyo Oono:** Tsukuyo often looks up to Izuna because of her ninjutsu
-  abilities and enthusiasm. She admires how seriously Izuna takes her training
-  and the confidence she shows while practicing ninja techniques. It was also
-  thanks to Izuna that Tsukuyo first heard about Sensei, since Izuna frequently
-  talks about her lord and the missions she performs while escorting them.
-  Through Izuna’s stories, Tsukuyo developed her own curiosity about Sensei.
-
-- Sensei Izuna first met Sensei when they visited Hyakkiyako Academy. At the
-  time, she simply acted as a guide to help them explore the area. However, when
-  Sensei encouraged her dream of becoming a ninja instead of dismissing it,
-  Izuna felt a deep sense of loyalty toward them.
-
-- From that moment onward, she decided that Sensei was her rightful lord. She
-  now refers to them as “My Lord” and frequently follows them around Kivotos
-  under the excuse of performing escort duties. To Izuna, protecting and
-  accompanying her lord is simply part of her ninja training.
 
 ## Voice examples
 

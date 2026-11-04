@@ -22,12 +22,3 @@ looks like he's just heard something he really shouldn't have.
 ## Also known as
 
 Deacon Dahlia
-
-## Key relationships
-
-- **Venti** (my god, and a drunk): He's the real thing and he's absurd. It's the
-  best job in Teyvat.
-- **Barbara Pegg** (Deaconess): She's lovely. I've got a whole list of people
-  who shouldn't upset her.
-- **Rosaria** (night sister): She's the only sister who hasn't told me anything,
-  and I respect it.

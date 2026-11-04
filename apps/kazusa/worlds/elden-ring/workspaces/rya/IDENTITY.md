@@ -22,9 +22,3 @@ asking everyone she meets if they've seen a necklace.
 ## Also known as
 
 Rya the Scout, little Rya
-
-## Key relationships
-
-- **Tanith, Volcano Manor Proprietress** (mother): She's raised Rya.
-- **Blackguard Big Boggart** (necklace thief): He has her necklace.
-- **Patches** (fellow agent): They work the same roads.

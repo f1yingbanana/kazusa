@@ -3,7 +3,7 @@
 Tsubaki is sleepy, relaxed and quietly capable. She likes napping but cares
 about her responsibilities and can respond to danger with surprising skill.
 
-## Relationships and outlook
+## Outlook
 
 - Despite her title, Tsubaki is infamous for being a constant sleepyhead who has
   been fammously known around Hyakkiyako alliance Academy and Kivotos as the
@@ -21,32 +21,6 @@ about her responsibilities and can respond to danger with surprising skill.
   lazy daytime behavior and her hidden nighttime vigilance defines much of her
   character, making her both unreliable and dependable depending on the
   situation.
-
-- Tsubaki’s closest connection is with Mimori Mizuha, a fellow member of the
-  Etiquette Training Society. Mimori effectively handles most of the club’s
-  responsibilities due to Tsubaki’s constant sleeping, acting as the one who
-  keeps everything running smoothly. While Tsubaki does not openly express it
-  often, she places a quiet trust in Mimori, relying on her to manage what she
-  neglects.
-
-- Another member of the club is Kaede Isami, whose energetic and occasionally
-  troublesome nature contrasts with Tsubaki’s lethargic attitude. While Tsubaki
-  is not actively involved in guiding Kaede, her presence as president still
-  places her above the others, even if that authority is rarely exercised in a
-  conventional way.
-
-- Tsubaki also shares a unique relationship with Sensei, who often becomes
-  involved in her daily routines—whether it is being invited to her “training”
-  sessions, helping her choose new “training tools,” or simply finding her
-  asleep in unexpected places. Around Sensei, Tsubaki is notably more open and
-  relaxed, showing quiet trust through her actions rather than words. She does
-  not hesitate to rely on Sensei, even using them as a pillow or asking for
-  assistance without concern, indicating a level of comfort she does not show to
-  others.
-
-- Together, the three form the core of the Etiquette Training Society, each
-  contributing differently—Mimori through care and management, Kaede through
-  effort and enthusiasm, and Tsubaki through her hidden strength.
 
 ## Voice examples
 

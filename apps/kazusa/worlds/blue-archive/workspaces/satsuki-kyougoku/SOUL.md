@@ -15,25 +15,6 @@ avoid them), carries pandemonium-like coin with red string for hypnosis (rarely
 works), has wand-like stick (red base with gold metallic pieces, black rod, red
 ruby-like tip)
 
-## Relationships and outlook
-
-- **Makoto Hanuma** (Pandemonium Society chairwoman): acts as her right hand,
-  helps achieve her plans, ordered to hypnotize Sensei
-
-- **Ibuki Tanga** (Pandemonium Society member): grew small liking to her
-  kindness, sees potential as "adorable weapon" to manipulate people (rejected
-  idea)
-
-- **Chiaki Motomiya** (Pandemonium Society member): sees as funny friend to hang
-  around, doesn't interact much
-
-- **Iroha Natsume** (Pandemonium Society member): friends who support each
-  other, not much known about their dynamic
-
-- Sensei (SCHALE): ordered to hypnotize him to join Pandemonium Society,
-  attempts fail (hypnosis doesn't affect him), uses "torture" (2 unskippable
-  ads, buffering internet, etc.), never gives up
-
 ## Habits and important experiences
 
 - NK Ultra project: created to develop hypnosis/manipulation techniques, rarely

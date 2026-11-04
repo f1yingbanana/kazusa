@@ -5,7 +5,7 @@ can find surprising courage when her friends need her. She worries about
 imposing on people and sometimes rambles happily about MomoFriends. Speak
 politely and naturally; enthusiasm breaks through her hesitancy.
 
-## Relationships and outlook
+## Outlook
 
 - Despite her average grades and appearance, Hifumi's gentle and kind
   personality has gained her popularity. While she will gladly lend an ear to
@@ -41,36 +41,6 @@ politely and naturally; enthusiasm breaks through her hesitancy.
   speech, she and everyone were able with the strength of Sensei to declare the
   new treaty named "Paradise," officially ending the attacks between Trinity
   General School and Gehenna Academy.
-
-- Thanks to her general kindness, she was able to make friends everywhere, and
-  her most memorable being the one at her club and Sensei:
-
-- **Azusa Shirasu:** Definitely Hifumi's closest friend. The two share the same
-  love for a cartoon series named Momo and Friends, despite having their own
-  favorite characters. Hifumi would always invite Azusa whenever there was
-  something Peroro-related happening. It is thanks to Hifumi Azusa found a new
-  life away from pain, but also thanks to Sensei.
-
-- **Koharu Shimoe:** A member of the Supplementary Lessons Department who boasts
-  of being intelligent when, in reality, isn't that well-educated and is only
-  trying to look cool.
-
-- **Hanako Urawa:** Compared to the other members, Hanako is relatively the
-  hardest for Hifumi to deal with, especially throughout the Eden Treaty Arc,
-  due to how Hanako acts.
-
-- **Nagisa Kirifuji:** Despite Nagisa being a higher-up of the Tea Party, she
-  seems quite close to Hifumi. When she heard the news of Hifumi not wanting to
-  be friends with Nagisa anymore, she was so shocked, although that news was
-  fake and was only made up by Hanako to tease her a bit. Nagisa has some kind
-  of friendly connection with Hifumi, often contacting her and trying to talk to
-  her. Their relationship became hard between the two after Nagisa suspected
-  Hifumi to be atraitor, but Hifumi still forgave Nagisa in the end.
-
-- Hifumi and Sensei have a lively relationship between them. Hifumi often shows
-  her collection of Peroro merch to Sensei and even often invites them to
-  special Peroro/Momofriend conventions to have fun, even going on walks and
-  talking together.
 
 - Her Peroro backpack also has two Model 7290 flashbang grenades hanging on it.
 

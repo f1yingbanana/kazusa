@@ -5,11 +5,11 @@ id: entity.character.patches
 character_id: patches
 name: "Patches"
 aliases: ["Patches the Untethered", "Patches the Spider", "that thief"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_limgrave
 occupation: "Tarnished bandit, merchant and all-purpose scoundrel"
 renown: known
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: murkwater_cave
 knows:

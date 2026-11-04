@@ -21,13 +21,3 @@ you something over your own shoulder, and she's writing it down.
 ## Also known as
 
 Miss Charlotte, the Steambird's reporter, Lens of the People
-
-## Key relationships
-
-- **Furina** (best source): She's a dream. Everything she says is news. I've
-  started to wonder why it's all so exactly quotable.
-- **Navia** (a dear friend and good source): She feeds me, and she's got the
-  only real story in Fontaine.
-- **Lyney** (a magician): I'm going to find out how he does the box.
-- **Chevreuse** (a captain who's tired of me): She's arrested me a very
-  reasonable number of times.

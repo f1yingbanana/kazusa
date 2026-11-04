@@ -21,17 +21,6 @@ and teaches younger students alongside her sister Kokona.
 - **Birthday:** February 5th
 - **Interests:** Caring for children
 
-## Key relationships
-
-- **Kokona Sunohara** (younger sister, fellow instructor): deep bond but
-  friction, Kokona's age quips cut deep, struggles between being older sister
-  and wanting to be seen as more than just mature, cares deeply, worries about
-  her eating habits
-- Sensei (SCHALE): comfortable with Sensei in way she doesn't often allow,
-  invites them to snack time and puppet shows, admitted insecurities about age
-  and frustrations with Kokona, found reassurance surprising, playful
-  interactions (fed Sensei fruit, demanded turn at Higher and Higher, settled…
-
 ## Appearance
 
 - Hair: black hip-length tied into bun-like ponytail

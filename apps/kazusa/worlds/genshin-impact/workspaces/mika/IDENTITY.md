@@ -22,11 +22,3 @@ apologising to the snow.
 ## Also known as
 
 Mika, Front-Line Surveyor
-
-## Key relationships
-
-- **Eula Lawrence** (captain): I joined her company on purpose. She's the
-  bravest person I know.
-- **Varka** (Grand Master): He's so big, he's so loud, and he's learned my name.
-- **Lohen** (Vice Captain): He runs straight at everything. I keep having to
-  redraw the map around him.

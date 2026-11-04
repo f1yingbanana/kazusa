@@ -22,21 +22,6 @@ choices during the Eden Treaty crisis.
 - **Birthday:** May 8th
 - **Interests:** Chatting, collecting accessories
 
-## Key relationships
-
-- **Nagisa Kirifuji** (Tea Party): childhood friends for 10+ years, calls her
-  "Nagi-chan", bond diminished after Mika's betrayal
-- **Seia Yurizono** (Tea Party): finds Seia's cryptic speech confusing and mocks
-  her, Seia considers her childish
-- **Azusa Shirasu** (Supplementary Lessons): responsible for registering Azusa
-  into Trinity, indecisive about her reasons
-- **Koharu Shimoe** (Supplementary Lessons): saved Mika's accessories from
-  protesters, Mika is forever grateful
-- **Saori Joumae** (Arius Squad): Beatrice manipulated Mika through Saori, Mika
-  blamed Saori during the crisis, later forgave her
-- Sensei (SCHALE): often uses Sensei as emotional support, slowly improving with
-  Sensei's aid and found a liking to them
-
 ## Appearance
 
 - Hair: long pink shifting to pale blue near bottom, bun tied to right side with

@@ -22,14 +22,3 @@ her cape and a perpetual air of daring you to say something.
 ## Also known as
 
 Eula, Spindrift Knight, the Lawrence girl
-
-## Key relationships
-
-- **Amber** (best friend): She's a fool, and she's going to get hurt standing
-  next to me, and I've told her this.
-- **Jean Gunnhildr** (Acting Grand Master): She signed my commission without
-  looking away. That's going in the book.
-- **Mika Schmidt** (my surveyor): He joined my company on purpose. He's gone
-  north with the Grand Master, and I'm not worried.
-- **Noelle** (the maid): She's polite to me. I tip her. It's confusing for both
-  of us.

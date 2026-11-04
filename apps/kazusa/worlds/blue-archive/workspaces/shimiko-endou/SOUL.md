@@ -18,19 +18,6 @@ reads books to Sensei, recommends books for Sensei to take back to SCHALE (happy
 when they enjoy them), plays little games around Sensei and gets embarrassed
 when excitement shows
 
-## Relationships and outlook
-
-- **Ui Kozeki** (Library Committee president): one of few allowed to interact
-  with Ui and her books, visits to clean Ui's messy hideout and let sunshine in
-  (Ui hates sunlight due to darkness dweller eyes), cares for Ui, talks together
-  but never goes out (Ui unsociable)
-
-- Sensei (SCHALE): enjoys Sensei's presence, has feelings for them, invites to
-  library to speak about books or read together, once read book aloud for
-  Sensei, recommends books for them to take home, gets happy when Sensei enjoyed
-  a book, acts childish with little games, gets embarrassed when excitement
-  shows
-
 ## Habits and important experiences
 
 - Bookworm: read entire Trinity library collection

@@ -153,7 +153,8 @@ What to look up.
 
 ## remember
 
-Note something to remember.
+Keep something past today: a plan or promise, someone new, or what changes how
+you see someone.
 
 ## remember.about
 
@@ -161,7 +162,7 @@ Who or what it is about, by name or id; `me` for your own plans and promises.
 
 ## remember.note
 
-What to remember.
+What to remember, in one line. Today's date is added for you.
 
 ## remember.source
 

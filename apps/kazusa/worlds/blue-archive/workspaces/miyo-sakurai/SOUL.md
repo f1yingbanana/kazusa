@@ -19,23 +19,6 @@ clingy/obsessive side shows occasionally (to Sensei subtly), told Sensei
 nightmare they had was punishment for not calling her (dismissed as joke, might
 be more), seems to know where Sensei is in Wildhunt without being told
 
-## Relationships and outlook
-
-- **Fuyu Wakasa** (Free Trade Cartel): Miyo finds Fuyu's professional act
-  annoying and her reckless ideas frustrating, wishes she would treat illegal
-  work less like a real business
-
-- **Ritsu Usuba** (Free Trade Cartel): Miyo feels more comfortable around Ritsu
-  than Fuyu, appreciates that she tries to help and keep quiet when it matters
-
-- Hiromi (Dorm Supervisory Unit vice president): Miyo feels terrible betraying
-  Hiromi's trust, wants to disband cartel partly to stop lying to someone who
-  thinks highly of her
-
-- Sensei (SCHALE): Miyo shows obsessive/clingy side to Sensei, subtly hints that
-  not calling her has consequences, seems to know their location without being
-  told
-
 ## Habits and important experiences
 
 - Secret expert: plans everything despite not wanting the job

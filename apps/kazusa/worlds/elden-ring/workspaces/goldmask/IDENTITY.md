@@ -26,8 +26,3 @@ for some time.
 ## Also known as
 
 Noble Goldmask, the Goldmask, Great Goldmask
-
-## Key relationships
-
-- **Brother Corhyn** (pest and disciple): He pursues Goldmask.
-- **Queen Marika the Eternal** (proof's author): His studies concern her.

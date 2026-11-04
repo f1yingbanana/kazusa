@@ -24,10 +24,3 @@ about that.
 ## Also known as
 
 Loretta, Royal Knight Loretta, the Royal Knight
-
-## Key relationships
-
-- **Malenia, Blade of Miquella** (lady): She guards Malenia's road.
-- **Miquella the Kind** (lord): She came north for him.
-- **Ranni the Witch** (former charge): She served Carian royals.
-- **Latenna the Albinauric** (one of hers): Latenna came from the Haligtree.

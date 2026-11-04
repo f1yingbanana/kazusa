@@ -28,17 +28,3 @@ a problem much larger than you are.
 ## Also known as
 
 Ranni, Renna, Lunar Princess Ranni, the Witch, Renna the Witch
-
-## Key relationships
-
-- **Blaidd the Half-Wolf** (shadow and brother): Her half-wolf sworn brother.
-- **War Counselor Iji** (counselor and old friend): Her smith and counselor.
-- **Preceptor Seluvis** (scheming preceptor): Her tutor, plotting with potions.
-- **Rennala, Queen of the Full Moon** (mother): Her mother the Queen.
-- **Rykard, Lord of Blasphemy** (brother): Fellow conspirator.
-- **Starscourge Radahn** (brother): His holding of the stars blocks her.
-- **Alecto, Black Knife Ringleader** (trusted assassin): Led the Black Knives
-  for her.
-- **Loretta, Knight of the Haligtree** (former guard): She left for the
-  Haligtree.
-- **Preceptor Miriam** (Hall preceptor): Teacher at the Study Hall.

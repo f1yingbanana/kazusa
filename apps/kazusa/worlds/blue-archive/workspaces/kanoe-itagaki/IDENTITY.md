@@ -29,15 +29,6 @@ the Occult Research Society, residing in Room 404 of Dormitory No. 4. Due to her
 mysterious appearance and behavior, rumors have circulated that she herself
 might be an occult entity.
 
-## Key relationships
-
-- **Eri Shirao:** Kanoe respects Eri as the club president and often supports
-  her occult experiments, though she finds Eri's excitement amusing.
-- **Rena Kinui:** Kanoe enjoys teasing Rena, who is the only one who claims not
-  to believe.
-- **Tsumugi Shiina:** Kanoe appreciates Tsumugi's musical talent and sometimes
-  collaborates with her on projects.
-
 ## Appearance
 
 - Appearance Kanoe has long, silvery‑lavender hair with a voluminous, messy

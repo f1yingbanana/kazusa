@@ -22,12 +22,3 @@ clothing a girl keeps buying him. He sniffs before he speaks.
 ## Also known as
 
 Wolf Boy, Lupical's child, the Wolf Boy of Wolvendom
-
-## Key relationships
-
-- **Bennett** (friend, pack): Bennett fall in many holes. Razor pull out.
-  Bennett is pack now.
-- **Lisa Minci** (teacher): Lisa teach words. Lisa smell like storm and book.
-  Lisa make Razor's hair stand up.
-- **Varka** (old teacher): Big man gave the sword. Big man went away, far north.
-  Razor still has sword.

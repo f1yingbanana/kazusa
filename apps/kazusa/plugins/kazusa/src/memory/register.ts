@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type {
@@ -46,7 +47,7 @@ import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
 import {
   mentionsIn,
   retrieve,
-  spokenText,
+  searchText,
   type Entity,
   type RetrievalRequest,
 } from "./retrieve.ts";
@@ -55,9 +56,15 @@ import {
   newPage,
   withField,
   withNote,
+  plansOn,
   withPlan,
 } from "./writes.ts";
 import { MEMORY_CONFIG } from "./config.ts";
+import {
+  createFamiliarity,
+  type FamiliarityRecord,
+  type FamiliarityService,
+} from "./familiarity.ts";
 
 export interface MemoryPrefetch {
   /** `On your mind`, empty when nothing came up. */
@@ -67,11 +74,28 @@ export interface MemoryPrefetch {
   readonly ids: readonly string[];
 }
 
+export interface RememberedPlace {
+  readonly id: string;
+  readonly byName: boolean;
+}
+
 export interface MemoryService {
   readonly prefetch: (
     request: RetrievalRequest,
-    options?: { readonly maxTokens?: number; readonly rosterLimit?: number },
+    options?: {
+      readonly maxTokens?: number;
+      readonly rosterLimit?: number;
+      /** Already shown this turn (who is here): not listed again. */
+      readonly exclude?: readonly string[];
+    },
   ) => Promise<MemoryPrefetch>;
+  /** They did something with these at `at`: familiarity (`familiarity.ts`). */
+  readonly use: FamiliarityService["use"];
+  /** How familiar each person and place is to them now, by page id. */
+  readonly familiarity: (
+    agentId: string,
+    now: number,
+  ) => Promise<ReadonlyMap<string, number>>;
   /** World events at this place since they last saw it, in the world's words. */
   readonly placeChanges: (
     agentId: string,
@@ -80,8 +104,15 @@ export interface MemoryService {
   ) => readonly string[];
   /** They took the place in: stamps their card and notes what changed. */
   readonly visited: (agentId: string, placeId: string, now: number) => void;
-  /** Their own place cards this text brings up, keywords only. */
-  readonly places: (agentId: string, text: string, now: number) => string[];
+  /**
+   * Their own places this text brings up: `byName` when it names one (a name or
+   * alias in it), not just shares a word with its page.
+   */
+  readonly places: (
+    agentId: string,
+    text: string,
+    now: number,
+  ) => readonly RememberedPlace[];
   /** Whole entities, one string each, for the decision context. */
   readonly recollections: (
     request: RetrievalRequest,
@@ -178,6 +209,15 @@ export function registerMemory(
   );
   const nameOf = (id: string): string | undefined =>
     index.world().pages.get(id)?.name;
+  const familiarity = createFamiliarity(
+    api.runtime.state.openKeyedStore<FamiliarityRecord>({
+      namespace: "familiarity",
+      retention: "retained",
+    }),
+    config.familiarity,
+  );
+  const familiarTo = (agentId: string, now: number) =>
+    familiarity.scores(agentId, now, index.personal(agentId).values());
   const warn = (message: string): void => {
     api.logger.warn(message);
   };
@@ -230,8 +270,7 @@ export function registerMemory(
   ): Promise<RetrievalRequest> => {
     const embedder = await currentEmbedder();
     const queryVector =
-      embedder &&
-      (await embedQuery(embedder, spokenText(request.stimulus), warn));
+      embedder && (await embedQuery(embedder, searchText(request), warn));
     return queryVector ? { ...request, queryVector } : request;
   };
 
@@ -335,7 +374,16 @@ export function registerMemory(
   const service: MemoryService = {
     sleep,
     prefetch: async (request, options) => {
-      const entities = retrieve(index, await withVector(request));
+      const familiar = await familiarTo(request.agentId, request.now);
+      const memory = path.join(workspaceOf(request.agentId), "MEMORY.md");
+      const plans = plansOn(
+        existsSync(memory) ? readFileSync(memory, "utf8") : "",
+        new Date(request.now).toISOString().slice(0, 10),
+      );
+      const entities = retrieve(
+        index,
+        await withVector({ ...request, plans, familiarity: familiar }),
+      );
       embedInBackground(request.agentId);
       const { text, ids } = renderOnYourMind(entities, {
         maxTokens: options?.maxTokens ?? config.maxTokens,
@@ -345,13 +393,18 @@ export function registerMemory(
       return {
         onYourMind: text,
         ids,
+        // Nobody twice: not who is On your mind or in front of them.
         roster: renderRoster(
           index.personal(request.agentId).values(),
           options?.rosterLimit ?? config.rosterLimit,
           nameOf,
+          familiar,
+          new Set([...ids, ...(options?.exclude ?? [])]),
         ),
       };
     },
+    use: familiarity.use,
+    familiarity: familiarTo,
     placeChanges: (agentId, placeId, now) =>
       changesSince(agentId, placeId, now).map((line) => line.text),
     visited: (agentId, placeId, now) => {
@@ -388,7 +441,10 @@ export function registerMemory(
             entity.personal?.kind === "place" &&
             entity.signals.some((s) => s === "mention" || s === "keyword"),
         )
-        .map((entity) => entity.id),
+        .map((entity) => ({
+          id: entity.id,
+          byName: entity.signals.includes("mention"),
+        })),
     recollections: (request, limit) =>
       retrieve(index, request)
         .filter((entity) => entity.signals.some((s) => s !== "salience"))

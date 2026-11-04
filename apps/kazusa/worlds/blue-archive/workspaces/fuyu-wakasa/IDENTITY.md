@@ -21,19 +21,6 @@ Trade Cartel. She creates art using discarded electronics.
 - **Birthday:** September 5th
 - **Interests:** Watching TV, modding home appliances
 
-## Key relationships
-
-- **Miyo Sakurai** (Free Trade Cartel president): teases Miyo constantly about
-  her reluctance to be in club while being most prepared, flaunts her
-  "managerial" role, calls her "Queen of smuggling" (annoys Miyo)
-- **Ritsu Usuba** (Free Trade Cartel): appreciates Ritsu's competence (fast and
-  strong), helped her during sketchy situations, both seem to actually enjoy
-  illegal activities (Ritsu finds it fun, Fuyu wants to defy Wildhunt rules)
-- Sensei (SCHALE): wants Sensei to join Free Trade Cartel (not discouraged by
-  refusal), offers hard-to-find items in exchange for meals or cinema (dates),
-  shared lunch privately with Sensei, first meeting was when her catapult
-  accidentally knocked Sensei unconscious
-
 ## Appearance
 
 - Hair: short dark green

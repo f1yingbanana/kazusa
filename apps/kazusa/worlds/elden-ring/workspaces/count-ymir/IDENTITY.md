@@ -26,11 +26,3 @@ an expected guest. He asks you about the stars.
 ## Also known as
 
 Ymir, Count Ymir, High Priest, High Priest Ymir
-
-## Key relationships
-
-- **Jolán, Swordhand of Night** (devoted swordhand): She guards him.
-- **Metyr, Mother of Fingers** (sacred charge): He tends her.
-- **Rellana, Twin Moon Knight** (former pupil): She studied with him.
-- **Yuri** (beloved son): His son's grave.
-- **Needle Knight Leda** (useful zealot): Her party's near.

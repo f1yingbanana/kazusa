@@ -23,19 +23,6 @@ to provide medication), has two mice: Nezusuke (grey/white, with her since age
 permanently alarmed expression, her "loyal assistant and closest friend") and
 Mei (smaller, brown, stays close to Nezusuke)
 
-## Relationships and outlook
-
-- **Kisaki Ryuuge** (Xuanlong Office president): saved Kisaki's life when
-  Shintani Kai's poison nearly killed her, continues to provide medication that
-  keeps poison suppressed, carries responsibility without fanfare, never gives
-  Kisaki reason to feel weight of owing her life
-
-- Sensei (SCHALE): most reliable test subject (didn't volunteer, can't escape),
-  turned them gold, covered in grey fur, accidentally dosed with love potion
-  that made them look like cheese, apologizes afterward, takes them out for
-  noodles, invites them back to lab, baffled and quietly meaningful that Sensei
-  keeps coming back
-
 ## Habits and important experiences
 
 - Degrees: six before finishing elementary school

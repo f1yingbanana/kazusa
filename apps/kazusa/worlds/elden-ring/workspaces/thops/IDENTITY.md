@@ -25,8 +25,3 @@ speak to him.
 ## Also known as
 
 Thops, old Thops
-
-## Key relationships
-
-- **Sorceress Sellen** (idol): He admired her at school.
-- **Miriel, Pastor of Vows** (a dear old neighbour): They're on the same lake.

@@ -22,21 +22,6 @@ despite its mounting debt.
 - **Birthday:** January 2nd
 - **Interests:** Taking naps, procrastinating
 
-## Key relationships
-
-- **Nonomi Izayoi** (Countermeasures Committee): known her long time (friends
-  year before others), naps on her lap, only Nonomi knows her past
-- **Ayane Okusora** (Countermeasures Committee): often gets scolded by Ayane for
-  laziness
-- **Serika Kuromi** (Countermeasures Committee): gets scolded by her too, still
-  cares
-- **Shiroko Sunaookami** (Countermeasures Committee): found Shiroko near Abydos
-  building with Nonomi, taking care of her ever since
-- **Hina Sorasaki** (Gehenna Prefect Team): Hina knows of Hoshino’s formidable
-  abilities and respects her
-- Sensei (SCHALE): initially wary, bonded through aquariums and treasure hunts,
-  Sensei knows her love for fish, one of few who knows her secrets
-
 ## Appearance
 
 - Hair: pink with cowlick reaching down to legs

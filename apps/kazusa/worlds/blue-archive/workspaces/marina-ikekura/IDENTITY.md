@@ -21,19 +21,6 @@ gets lost or into trouble.
 - **Birthday:** November 4th
 - **Interests:** Marching, Charging
 
-## Key relationships
-
-- **Cherino Renkawa** (Red Winter President): Marina serves as Cherino's
-  subordinate but secretly wants to take her position, often fails due to
-  recklessness, admires her but knows nothing about her personal details,
-  occasionally rebels against impossible orders
-- **Tomoe Sashiro** (Red Winter Office): fellow committee member, Tomoe works
-  under direct supervision while Marina handles independent assignments, they
-  share an office but have different responsibilities
-- Sensei (SCHALE): Marina constantly relies on Sensei for help with her duties,
-  calls them whenever she gets lost or confused, sees them as her lifeline for
-  navigating Red Winter's challenges
-
 ## Appearance
 
 - Hair: short blonde pixie cut

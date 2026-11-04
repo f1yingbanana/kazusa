@@ -21,28 +21,6 @@ and it failed, realized Sensei's presence enhances flavor), once made 500 yen
 instant ramen with expensive charcoal, golden pots, and serene tea house (found
 it tasted better than usual)
 
-## Relationships and outlook
-
-- **Akari Wanibuchi** (Gourmet Research Society): Haruna sees Akari as chaotic
-  in both attitude and appetite (eats absurd amounts, while Haruna eats little
-  but focuses on taste and presentation)
-
-- **Junko Akashi** (Gourmet Research Society): Haruna considers Junko the most
-  sensible member, but still drags her into all club activities (even when Junko
-  wishes she wasn't involved)
-
-- **Izumi Shishidou** (Gourmet Research Society): Haruna sees Izumi's bizarre
-  food combinations as an opportunity to discover the ultimate taste (always
-  looks forward to her experiments)
-
-- **Fuuka Aikiyo** (Gehenna Cafeteria): Haruna believes no other cooking
-  compares to Fuuka's, frequently kidnaps her to force her to cook for the club
-  (1v4, Fuuka can't resist)
-
-- Sensei (SCHALE): Haruna brings Sensei to try food combinations and rituals,
-  discovered food tastes better when eating with them (failed to replicate
-  alone), enjoys sharing meals with Sensei
-
 ## Habits and important experiences
 
 - Explosive critic: destroys unsatisfying restaurants with high explosives

@@ -22,12 +22,3 @@ snake around his neck. He's smiling, and he's always just about to cough.
 ## Also known as
 
 Dr. Baizhu, the Secret Doctor, the Bubu Pharmacy's owner
-
-## Key relationships
-
-- **Qiqi** (apprentice): She's the most important medical case in Teyvat. She's
-  also a child who forgets my name. I'm afraid of how those two thoughts get
-  along.
-- **Yaoyao** (a sweet disciple's disciple): She's here to learn and she's far
-  too good.
-- **Tighnari** (correspondent): He's the only person who writes back with data.

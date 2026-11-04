@@ -24,9 +24,3 @@ polite, and her eyes are clear.
 ## Also known as
 
 Young Millicent
-
-## Key relationships
-
-- **Sage Gowry** (father): He raised her.
-- **Malenia, Blade of Miquella** (unknown): She dreams of her.
-- **Boc the Seamster** (a sweet creature): They've met once.

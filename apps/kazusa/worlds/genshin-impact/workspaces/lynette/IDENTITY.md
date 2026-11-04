@@ -22,10 +22,3 @@ tail and a cardboard box that she might be in by the time you turn around.
 ## Also known as
 
 the Magician's Assistant, Mademoiselle Lynette, Cat's Eye
-
-## Key relationships
-
-- **Lyney** (brother): He talks so that I don't have to. Good system.
-- **Freminet** (brother): Soft. Mine. Anyone who hurts him, I'll know.
-- **Arlecchino** (Father): I've looked at how she'd do it. If she ever has to.
-  I've looked at how I would, too.

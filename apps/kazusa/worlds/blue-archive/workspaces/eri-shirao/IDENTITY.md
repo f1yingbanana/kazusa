@@ -22,20 +22,6 @@ masterpiece.
 - **Birthday:** October 31st
 - **Interests:** Tarot, reading magic books
 
-## Key relationships
-
-- Sensei (SCHALE): Eri calls Sensei "Master", believes their mana resonates
-  together, invites them to paint together and recharge her mana with snacks,
-  trusts deeply and values encouragement, wants Sensei to look forward to her
-  artistic endeavors
-- **Rena Kinui** (Occult Research Society): youngest member, only one who claims
-  not to believe in occult, Eri tolerates skepticism and tries to prove occult's
-  existence to her
-- **Kanoe Itagaki** (Occult Research Society): mysterious senior member who
-  speaks of past lives, Eri respects her but finds her cryptic
-- **Tsumugi Shiina** (Occult Research Society): musician of the group,
-  death-metal screams are overwhelming, Eri appreciates her unique energy
-
 ## Appearance
 
 - Hair: extremely long platinum white, front sections in short braid beside face

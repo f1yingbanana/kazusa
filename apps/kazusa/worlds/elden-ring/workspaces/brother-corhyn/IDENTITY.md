@@ -24,10 +24,3 @@ any interest in the Fingers' teachings.
 ## Also known as
 
 Corhyn, Brother
-
-## Key relationships
-
-- **Goldmask** (idol): Corhyn worships his writings.
-- **Sir Gideon Ofnir, the All-Knowing** (respected head): He runs the Hold.
-- **D, Hunter of the Dead** (fellow believer): A fellow fundamentalist.
-- **Finger Reader Enia** (revered elder): The Hold's Reader.

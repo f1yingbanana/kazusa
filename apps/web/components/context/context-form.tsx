@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 /** Where the long version lives: what fills a turn, and how memory is trimmed. */
 export const CONTEXT_DOCS_URL =
-  "https://github.com/f1yingbanana/kazusa/blob/main/docs/context.md";
+  "https://github.com/f1yingbanana/kazusa/blob/main/.agents/skills/kazusa/references/context_engine.md#settings";
 
 const numbers = new Intl.NumberFormat("en-US");
 
@@ -525,10 +525,12 @@ function ContextForm({
               counted on their own.
             </NumberField>
             <NumberField scope={scope} name="peopleLimit" unit="people">
-              Maximum number of relevant character wiki entries retrieved.
+              Maximum number of people they know listed each turn: the ones most
+              in their life, from what they do together.
             </NumberField>
             <NumberField scope={scope} name="placesLimit" unit="places">
-              Maximum number of relevant location wiki entries retrieved.
+              Maximum number of places they know listed each turn: home first,
+              then the ones they go to most. Also caps the places around them.
             </NumberField>
           </FieldGroup>
         </FieldSet>

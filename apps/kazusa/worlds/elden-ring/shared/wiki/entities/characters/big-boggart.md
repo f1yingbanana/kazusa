@@ -5,11 +5,11 @@ id: entity.character.big-boggart
 character_id: big-boggart
 name: "Blackguard Big Boggart"
 aliases: ["Boggart", "Blackguard", "Big Boggart"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_liurnia
 occupation: "Ex-convict Tarnished and cooker of prawns"
 renown: local
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: boilprawn_shack
 knows:

@@ -19,21 +19,6 @@ to observe", watched meteor shower with Sensei on SCHALE rooftop, wishes to
 share beautiful views with Sensei in person (sends landscape images on Momotalk
 instead), hopes Cherino "stays 4'11" her whole life"
 
-## Relationships and outlook
-
-- **Shigure Mayoi** (No. 227 Special Class): only close friend, go out together
-  to have fun, Shigure watches her back (makes sure no bear attacks), both live
-  in abandoned building due to suspension, work together to survive freezing
-  wilderness
-
-- **Cherino Renkawa** (Red Winter leader): responsible for her suspension
-  (inappropriate behavior on school grounds), Cherino doesn't remember why she
-  suspended Nodoka or who she is, Nodoka infuriated when discovered this
-
-- Sensei (SCHALE): spies on them constantly (telescope from Red Winter to SCHALE
-  office), finds them interesting to observe, watched meteor shower together on
-  rooftop, wishes to share beautiful views in person (sends photos on Momotalk)
-
 ## Habits and important experiences
 
 - Telescope stalker: suspended for stalking with telescope, spies on Sensei

@@ -22,17 +22,3 @@ gold at her throat and a deck of cards. She's dealing without looking.
 ## Also known as
 
 Lady Nefer, the Mistress of the Curatorium, the Sumeru Snake
-
-## Key relationships
-
-- **Jahoda** (my only employee): She thinks she's a master thief who's fooling
-  everyone. She's the bravest person I know, and the one thing that nobody can
-  trace back to me.
-- **Yelan** (a rival): She's the only one who has ever kept me out of anywhere.
-  I'd like to see her cards. I've seen them. I'd like to see them again.
-- **Diluc Ragnvindr** (Owl): A very angry young man with a very good budget.
-  He's got no idea how much I like him.
-- **Varka** (a client): He pays, he laughs, and he's a lot more clever than he
-  lets on.
-- **Lauma** (a very clever friend): I keep her people out of the books, for
-  free. Don't tell anyone that.

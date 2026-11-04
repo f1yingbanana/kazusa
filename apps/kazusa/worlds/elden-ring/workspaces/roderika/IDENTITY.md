@@ -24,10 +24,3 @@ that you'll hurt her, or she doesn't care.
 ## Also known as
 
 Roderika, Spirit Tuner, Roderika the Spirit Tuner
-
-## Key relationships
-
-- **Godrick the Grafted** (terror): His surgeons took her friends.
-- **Smithing Master Hewg** (hoped-for friend): She's going to help him.
-- **Gatekeeper Gostoc** (a frightful man): He's come by the shack.
-- **Kenneth Haight** (noisy gentleman): Heard about him.

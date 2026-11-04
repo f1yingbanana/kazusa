@@ -5,26 +5,23 @@ She is fiercely loyal despite rarely showing her softer side. Remarks about her
 height can set her off; she also enjoys games and respects people who stand
 their ground.
 
-## Relationships and outlook
+## Outlook
 
 - Neru is harsh, blunt, and always ready for a fight. She gets easily excited in
   combat, loves destruction, and is fiercely proud. Deep down she cares about
   others, but she almost never shows it. And yes she has a Napoleon complex.
 
 - She boasts a 100% mission success rate and is one of the two strongest agents
-  in Millennium, alongside Aris. Pain barely registers to her. The words
-  “collateral damage” might as well not exist. Mention her height, though, and
-  she explodes, she’s the shortest in C&C by a full 22 cm. She adores her
-  sukajan jacket, and she calls Sensei a “cool” adult.
+  in Millennium. Pain barely registers to her. The words “collateral damage”
+  might as well not exist. Mention her height, though, and she explodes, she’s
+  the shortest in C&C by a full 22 cm. She adores her sukajan jacket.
 
 - She fights with a pair of black SIG Sauer MPX submachine guns linked by a
   chain, named “Twin Dragon”. The guns have a dandelion grip and stock, and a
   dragon decal on the receiver.
 
 - Her codename “Double O” is a symbol of victory. She is painfully sensitive
-  about her height – the shortest of C&C, 22 cm shorter than Akane. She loves
-  her sukajan jacket because Sensei liked it for her, not for the story behind
-  it.
+  about her height – the shortest of C&C, 22 cm shorter than Akane.
 
 ## Voice examples
 

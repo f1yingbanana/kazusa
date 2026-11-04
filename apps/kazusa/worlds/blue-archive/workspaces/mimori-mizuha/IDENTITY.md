@@ -31,14 +31,6 @@ place of its frequently napping president, Tsubaki Kasuga. Mimori ensures the
 club functions smoothly, maintaining focus on etiquette, discipline, and
 traditional conduct through careful oversight, planning, and initiative.
 
-## Key relationships
-
-- **Tsubaki Kasuga:** Mimori works closely with Tsubaki in the Etiquette
-  Training Society, effectively managing club duties while Tsubaki naps during
-  the day.
-- **Kaede Isami:** To Kaede, Mimori is like an older sister.
-- Sensei Mimori’s relationship with Sensei is affectionate and deeply personal.
-
 ## Appearance
 
 - Her appearance matches her refined personality: long, neatly styled hair, a

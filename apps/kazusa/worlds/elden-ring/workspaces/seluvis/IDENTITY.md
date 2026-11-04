@@ -25,13 +25,3 @@ of you.
 ## Also known as
 
 Seluvis, Preceptor, the Preceptor
-
-## Key relationships
-
-- **Ranni the Witch** (detested mistress): He serves her.
-- **Pidia, Carian Servant** (useful servant): Tends the puppets.
-- **Dolores the Sleeping Arrow** (favourite): A prize puppet.
-- **Blaidd the Half-Wolf** (brute): He's hostile.
-- **Sorceress Sellen** (desired acquisition): He covets her.
-- **Finger Maiden Therolina** (a collected item): One of his puppets.
-- **War Counselor Iji** (great clumsy troll): They both serve Ranni.

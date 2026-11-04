@@ -22,16 +22,6 @@ love of games.
 - **Birthday:** December 8th
 - **Interests:** Drawing
 
-## Key relationships
-
-- **Momoi Saiba** (GDD): twin sister, Momoi is energetic/irrational while Midori
-  is calm/thoughtful, Momoi brought her into GDD
-- **Yuzu Hanaoka** (GDD president): nervously told Yuzu she enjoyed her game
-  when first joined, words of affirmation boosted Yuzu's confidence
-- **Aris Tendou** (GDD): disagreed with Momoi's plan to bring Aris in (didn't
-  believe it would work), played big part in helping Aris assimilate through
-  video games
-
 ## Appearance
 
 - Hair: long shoulder-length strawberry blonde, bangs tied into several pigtails

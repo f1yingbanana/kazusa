@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ContextSettings } from "@kazusa/client";
 import {
+  CONTEXT_DOCS_URL,
   ContextSettingsForm,
   describeSetting,
   SETTING_LABELS,
@@ -74,7 +75,15 @@ export function CharacterContextSection({ entity }: { entity: EntityRef }) {
           <DialogHeader>
             <DialogTitle>Memory and context for {name}</DialogTitle>
             <DialogDescription>
-              Each setting follows the world until you change it here.
+              Each setting follows the world until you change it here.{" "}
+              <a
+                href={CONTEXT_DOCS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                How memory and context work
+              </a>
             </DialogDescription>
           </DialogHeader>
           <ContextSettingsForm

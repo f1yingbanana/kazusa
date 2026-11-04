@@ -24,9 +24,3 @@ him.
 ## Also known as
 
 Placidusax, the Dragonlord, the Elder Lord, the Old Lord
-
-## Key relationships
-
-- **Bayle the Dread** (old traitor): Bayle betrayed him and maimed him.
-- **Dragon Communion Priestess** (loyal vassal): She has served him.
-- **Maliketh, the Black Blade** (a guest under my roof): His sanctum's in Farum.

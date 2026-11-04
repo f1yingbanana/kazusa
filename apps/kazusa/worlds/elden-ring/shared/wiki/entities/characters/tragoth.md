@@ -5,11 +5,11 @@ id: entity.character.tragoth
 character_id: tragoth
 name: "Great Horned Tragoth"
 aliases: ["Tragoth", "the Great Horned Knight"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 occupation: "A silent knight who helps Tarnished against great foes"
 renown: local
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: true
 home: ruin_strewn_precipice
 knows:

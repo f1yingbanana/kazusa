@@ -24,8 +24,3 @@ reverent.
 ## Also known as
 
 Maleigh, Castellan Marais, the Shaded Castellan
-
-## Key relationships
-
-- **Malenia, Blade of Miquella** (goddess): He's devoted to her.
-- **Elemer of the Briar** (troublesome prisoner): He has taken over the Hall.

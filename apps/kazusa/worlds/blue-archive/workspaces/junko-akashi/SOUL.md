@@ -17,22 +17,6 @@ can eat. Hunger can make her irritable and impulsive. Compared with her
 clubmates’ more extreme appetites and experiments, she often just wants to enjoy
 a satisfying meal.
 
-## Relationships and outlook
-
-- **Haruna Kurodate** (Gourmet Research Society president): Junko wishes not to
-  be part of Haruna's explosive schemes but gets dragged along anyway
-
-- **Izumi Shishidou** (Gourmet Research Society): Junko feels disgusted whenever
-  Izumi eats her bizarre food combinations
-
-- **Akari Wanibuchi** (Gourmet Research Society): Junko simply wishes to enjoy
-  food normally, unlike Akari's absurd quantity eating
-
-- Sensei (SCHALE): Junko loves Sensei but acts tsundere, once wanted to share a
-  drink with same straw (thought "maybe I wouldn't mind") but yelled "What?!
-  Drink it together? Don't be silly! Do you have a death wish? Forget it! No
-  juice for you!" instead
-
 ## Habits and important experiences
 
 - Hangry state: becomes uncontrollably angry when hungry, uses both rifles

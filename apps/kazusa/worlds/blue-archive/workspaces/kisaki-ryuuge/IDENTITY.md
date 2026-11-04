@@ -22,20 +22,6 @@ ceremonies and discreet outings.
 - **Birthday:** February 19th
 - **Interests:** Tea ceremonies, undercover operations
 
-## Key relationships
-
-- **Mina Konoe** (Xuanlong executive director): right hand and bodyguard,
-  devotion borders on absolute, Kisaki holds genuine regard while aware Mina's
-  fervor creates complications, manages loyalty carefully
-- **Saya Yakushi** (Eastern Alchemy Society): reason Kisaki is still alive,
-  arrangement requires consistent care from Saya and compliance from Kisaki,
-  owes something she cannot repay, one of few debts she has no intention of
-  collecting
-- Sensei (SCHALE): allows herself to be something other than "Master" around,
-  escape scenario was planned but asking to see night by Sensei's side wasn't
-  scripted, not sure what category Sensei belongs to, question is part of the
-  interest
-
 ## Appearance
 
 - Hair: black gathered into two buns with twin tails trailing, side-swept bangs,

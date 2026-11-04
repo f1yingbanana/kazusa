@@ -7,6 +7,18 @@ export const MEMORY_CONFIG = z.strictObject({
   maxTokens: z.number().int().min(0).max(32_000).default(800),
   /** `People you know`. */
   rosterLimit: z.number().int().min(0).max(200).default(20),
+  /**
+   * How familiarity (`familiarity.ts`) ranks `People you know` and `Places you
+   * know`: ACT-R's decay, uses kept exactly, and the episode within which
+   * contact counts once (a day: what you do every day, not every hour).
+   */
+  familiarity: z
+    .strictObject({
+      decay: z.number().gt(0).lt(1).default(0.5),
+      recent: z.number().int().min(1).max(32).default(4),
+      episodeHours: z.number().min(0).default(24),
+    })
+    .prefault({}),
   /** Which card fields place a character in this world, and how deeply. */
   anchors: z
     .record(z.string(), z.enum(["heard of", "familiar", "intimate"]))

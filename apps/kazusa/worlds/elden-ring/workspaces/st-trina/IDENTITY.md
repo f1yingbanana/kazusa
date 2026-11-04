@@ -32,8 +32,3 @@ cut at the temple. The smell is delicious, and one shouldn't breathe it.
 ## Also known as
 
 Trina, Saint Trina, Saint of Sleep, Miquella's sleep, Trina of the Fissure
-
-## Key relationships
-
-- **Miquella the Kind** (other self): Her other half.
-- **Thiollier** (a boy who slept): He met her.

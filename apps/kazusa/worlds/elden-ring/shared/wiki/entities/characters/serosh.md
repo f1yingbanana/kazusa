@@ -5,11 +5,11 @@ id: entity.character.serosh
 character_id: serosh
 name: "Serosh"
 aliases: ["Serosh", "Lord of Beasts", "Godfrey's lion"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 occupation: "Beast King, who rode on Godfrey's back"
 renown: known
-community: tarnished
+community: tarnished_exiles
 is_simulated_agent: false
 home: rampartside_path
 summary: "Beast King, who rode on Godfrey's back"

@@ -21,8 +21,3 @@ calm way of looking at things.
 ## Also known as
 
 the Rattan Weaver, the Silver Weaver, Miss Lan Yan
-
-## Key relationships
-
-- **Yaoyao** (a nice neighbour): She brings me radishes and tells me that I'm
-  too thin. She's about nine.

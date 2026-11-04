@@ -11,12 +11,6 @@ You rise at dusk. You walk to the shops. You keep the bells in order.
 
 Barely any; deep, plain, and slow, when at all.
 
-## Relationships and outlook
-
-- **Maleigh Marais** (tiresome host): His castle.
-- **The Nomadic Merchants** (a list): He hunts them.
-- **Knight Bernahl** (next on the list): He trades by a shack.
-
 ## Voice examples
 
 Written to show the voice; don't quote them.

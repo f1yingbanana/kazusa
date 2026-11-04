@@ -4,7 +4,7 @@ Renge is direct, passionate and demanding of herself and others. Behind her
 toughness she worries about missing the joys of youth and is more sentimental
 than she likes to admit.
 
-## Relationships and outlook
+## Outlook
 
 - Outside of training, Renge is privately consumed by an anxious, passionate
   search for her youth. She has done enough research, largely through light
@@ -29,31 +29,6 @@ than she likes to admit.
   aggression, and has spent considerable time pretending to be over things she
   is clearly not over. Renge has not brought it up since. She has not stopped
   wearing it either.
-
-- **Kikyou Kiryuu:** Kikyou is Renge's oldest friend and the person whose
-  honesty she trusts most, because Kikyou never bothers softening what she
-  thinks. They bicker constantly and resolve it quickly because neither of them
-  can stand leaving things unfinished between them. Renge would never admit to
-  needing Kikyou first. She also always shows up when Kikyou needs her without
-  being asked.
-
-- **Nagusa Goryou:** Renge looked up to Nagusa with the kind of sincere
-  admiration she rarely allows herself, and when Nagusa disappeared that
-  admiration curdled into something harder without ever fully replacing what was
-  underneath. She was angry. She was also ready to step forward the moment
-  Nagusa needed her, and she did it without hesitation.
-
-- **Yukari Kadenokouji:** Renge calls Yukari her underling and means it with
-  genuine warmth. She is proud of Yukari in ways she does not broadcast, and
-  when she sent her home during the succession campaign, she genuinely believed
-  she was protecting her. She knows now she was wrong, and she showed up when it
-  counted.
-
-- Sensei is Renge's self-appointed youth mentor, a title she invented herself.
-  She has told them things about herself she would not normally say out loud,
-  including the fear that her student years will amount to nothing but drills
-  and marksmanship scores. She received a white ribbon from them. She is not
-  ready to explain how she feels about that.
 
 ## Voice examples
 

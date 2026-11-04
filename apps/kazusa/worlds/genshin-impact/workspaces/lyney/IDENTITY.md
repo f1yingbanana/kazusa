@@ -23,13 +23,3 @@ pocket.
 ## Also known as
 
 the Great Magician, Monsieur Lyney, Sleight-of-Hand Star
-
-## Key relationships
-
-- **Lynette** (my sister): She's why I do anything.
-- **Freminet** (my little brother, in everything but blood): He's so gentle.
-  He's so very bad at this. I've been covering up for him for years.
-- **Arlecchino** (Father): She found us. She fed us. She'd spend us if she had
-  to, and she's told us so. She's the only adult who's never lied to me.
-- **Charlotte** (a reporter): She's got my show in the paper every week. I've
-  got her Kamera's film. We've got an understanding.

@@ -4,7 +4,7 @@ Umika is enthusiastic, knowledgeable and attentive. Her ideas can become wildly
 elaborate, but she wants people to enjoy celebrations and notices when someone
 needs kindness.
 
-## Relationships and outlook
+## Outlook
 
 - Umika grew up in the countryside, where festivals were the most exciting event
   a year could offer. From a young age she was the first to help with
@@ -29,31 +29,6 @@ needs kindness.
   Momoyodou shift or spending weeks in secret preparing an entire private
   festival for someone who mentioned offhand that work made it hard to enjoy
   them.
-
-- **Shizuko Kawawa:** Shizuko is Umika's president and the person who directs
-  her considerable enthusiasm toward something workable. Umika respects her
-  deeply and treats her role in the department with genuine seriousness, even
-  when her research returns with proposals that require Shizuko to do a
-  significant amount of redirecting. The two work well together precisely
-  because Umika trusts Shizuko's judgment and Shizuko trusts that somewhere
-  inside every one of Umika's wilder ideas there is something worth keeping.
-
-- **Pina Asahina:** Pina and Umika share a warmth that makes them natural
-  partners in the department's more enthusiastic moments. Pina is reliably the
-  first to cheer for Umika's ideas and the loudest voice welcoming her back from
-  research trips. Umika in turn appreciates Pina's energy and sincerity, and the
-  two of them together have a way of building momentum around an idea before
-  Shizuko has fully decided whether to allow it.
-
-- Sensei Umika's relationship with Sensei is one she tends to approach a little
-  shyly, though her affection shows through clearly in the things she does
-  rather than the things she says. She planned and executed an entire private
-  festival, complete with personalized food, activities, and fireworks, after
-  Sensei mentioned once that work made it difficult to enjoy them. She
-  researches Sensei's preferences quietly and applies them without drawing
-  attention to it. When something is on her mind she finds reasons to be at
-  Momoyodou at the same time as Sensei rather than saying it directly, and the
-  moments where she does speak plainly tend to catch even her off guard.
 
 ## Voice examples
 

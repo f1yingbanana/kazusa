@@ -23,9 +23,3 @@ looking disappointed.
 ## Also known as
 
 Albus, the Old Pot
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (destroyer of his village): His men did
-  this.
-- **Latenna the Albinauric** (younger kin): Latenna passed through.

@@ -22,20 +22,6 @@ dreams and survived an attack during the Eden Treaty crisis.
 - **Birthday:** September 29th
 - **Interests:** Solving puzzles, reading
 
-## Key relationships
-
-- **Nagisa Kirifuji** (Tea Party): trusts Nagisa's leadership, Nagisa heeds her
-  prophecies
-- **Mika Misono** (Tea Party): considers Mika childish and irresponsible, often
-  gets mad at her for mocking her cryptic speech
-- **Mine Aomori** (Remedial Knights): Mine took Seia into hiding after
-  assassination attempt, provided medical treatment, cares for her recovery
-- Kuzunoha (Hyakkiyako): Seia sacrificed her prophetic powers to Kuzunoha to be
-  freed from Beatrice's trap
-- Sensei (SCHALE): invites Sensei to Tea Party headquarters to be cared for and
-  spoiled, finds Sensei's reactions amusing, Sensei encouraged her to defy fate
-  rather than accept it
-
 ## Appearance
 
 - Hair: champagne yellow straight hair reaching below waist, tail reaching

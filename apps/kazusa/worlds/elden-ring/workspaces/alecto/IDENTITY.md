@@ -23,8 +23,3 @@ It's very hard to see her. It always has been.
 ## Also known as
 
 Alecto, the Ringleader, Black Knife Ringleader
-
-## Key relationships
-
-- **Ranni the Witch** (employer): She gave Alecto the knife.
-- **Black Knife Tiche** (beloved daughter): She fell covering her mother.

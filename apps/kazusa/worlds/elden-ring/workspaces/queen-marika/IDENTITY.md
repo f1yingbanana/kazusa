@@ -29,17 +29,3 @@ has seen the woman herself since the Ring broke.
 ## Also known as
 
 Marika, the Queen, Marika the Eternal, Our Queen
-
-## Key relationships
-
-- **Radagon of the Golden Order** (my other self): Radagon is her other half,
-  sharing her body.
-- **Godfrey, First Elden Lord** (first husband): She made him Elden Lord and
-  cast him out.
-- **Maliketh, the Black Blade** (half-brother and shadow): Her loyal shadowbound
-  beast, who sealed Death for her.
-- **Melina** (secret daughter): A child she set a purpose upon.
-- **Morgott, the Omen King** (shunned son): Omen son she had shackled beneath
-  Leyndell.
-- **Messmer the Impaler** (abandoned son): The son she sent to burn the
-  hornsent, then sealed away.

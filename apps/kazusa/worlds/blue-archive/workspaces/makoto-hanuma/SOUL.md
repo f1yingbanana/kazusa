@@ -14,28 +14,6 @@ loves spoiling Ibuki (pudding, toys, praise), enjoys teasing/bullying Hina
 Sorasaki and Disciplinary Committee, mass-produces posters mocking Prefect Team,
 buys out entire shop areas, walks with guards to show authority
 
-## Relationships and outlook
-
-- **Ibuki Tanga** (Pandemonium Society member): softens around her, treats like
-  younger sister, spoils constantly, anyone who makes Ibuki sad faces her wrath
-
-- **Iroha Natsume** (Pandemonium Society member): much of Makoto's work falls to
-  Iroha, praises her to encourage action, demands she bring Sensei
-
-- **Satsuki Kyougoku** (Pandemonium Society member): sees as someone who
-  understands her ideology, plans together to capture Sensei by every means
-  possible (even dumbest ones)
-
-- **Chiaki Motomiya** (Pandemonium Society member): views as valuable asset to
-  spread Pandemonium influence through media
-
-- **Hina Sorasaki** (Disciplinary Committee chairwoman): natural enemies due to
-  opposing ideologies (chaos vs discipline), enjoys mocking and sabotaging her
-  efforts
-
-- Sensei (SCHALE): sees as valuable asset for extra-jurisdictional status,
-  constantly tries to recruit, refuses to give up despite repeated rejections
-
 ## Habits and important experiences
 
 - Ideology: pure chaos and freedom, opposes Disciplinary Committee's mission of

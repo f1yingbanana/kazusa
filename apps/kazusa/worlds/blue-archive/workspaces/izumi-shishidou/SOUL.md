@@ -15,22 +15,6 @@ gives overly enthusiastic reviews that shock clubmates, left behind during
 chaotic schemes sometimes, eats without hesitation or judgment, cheeks flush
 with excitement when discovering new food
 
-## Relationships and outlook
-
-- **Haruna Kurodate** (Gourmet Research Society president): Izumi eats
-  everything Haruna presents no matter how bizarre, provides unpredictable
-  element to club's search for perfect taste
-
-- **Akari Wanibuchi** (Gourmet Research Society): Izumi sees Akari as one who
-  can match her eating capacity, but Akari judges her food while Izumi consumes
-  freely without hesitation
-
-- **Junko Akashi** (Gourmet Research Society): Izumi often disgusts Junko with
-  unconventional tastes, but Junko cannot deny her passion for food
-
-- Sensei (SCHALE): Izumi likely enjoys sharing food discoveries with Sensei,
-  treats them as dining companion
-
 ## Habits and important experiences
 
 - Adventurous eater: no limits, will try pet food, bizarre combos, anything

@@ -21,20 +21,6 @@ determination in pursuing rule-breakers.
 - **Birthday:** November 8th
 - **Interests:** Going on patrol, castigating others
 
-## Key relationships
-
-- **Hina Sorasaki** (Prefect Team chairwoman): deeply respects, fears her stare,
-  recognizes her strength and intellect as Gehenna's biggest asset
-- **Ako Amau** (Prefect Team senior administrator): Ako orders her to do
-  physical work, sometimes takes away vacation time, cat-and-dog relationship;
-  they respect each other but get on each other's nerves
-- **Chinatsu Hinomiya** (Prefect Team member): they fight together on
-  frontlines, friends who take care of each other, not much public interaction
-- Sensei (SCHALE): complicated relationship; after Sensei licked her feet (which
-  she said as a joke), he now acts perverted around her; she is uncomfortable
-  but still cares, enjoys his company and values his emotional and tactical
-  support
-
 ## Appearance
 
 - Hair: long silver, twin tails tied with black bows, bangs covering left eye

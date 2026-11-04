@@ -91,8 +91,10 @@ deferred (§5).
   - the place, its areas and its `summary`; on a first visit, "New to you; you
     take it all in: <description>";
   - **Around you**: visible places with usual times;
-  - **Places you know**: places named in this turn's input or `MEMORY.md`, then
-    the nearest places they have cards for (capped by `location.listLimit`);
+  - **Places you know**: home, then places named in this turn's input or
+    `MEMORY.md`, then the places they have cards for that they go to most
+    (memory's familiarity), capped by `location.listLimit`, never what Around
+    you or On your mind already shows;
   - **With you**: people they have noticed here and their own huddle's members,
     with activity and huddle address;
   - or, on the way: "On your way from … to …; near … now. Arriving …".

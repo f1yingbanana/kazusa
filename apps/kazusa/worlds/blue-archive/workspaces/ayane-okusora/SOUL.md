@@ -16,24 +16,6 @@ letter asking Schale for supplies/ammo (led to Sensei coming to Abydos),
 grateful for Sensei's help with debt and during ammo shortages, controls medic
 drone from laptop
 
-## Relationships and outlook
-
-- **Hoshino Takanashi** (Countermeasures Committee): deals with her laid-back
-  but odd proposals
-
-- **Serika Kuromi** (Countermeasures Committee): works alongside her, both care
-  about school's future
-
-- **Nonomi Izayoi** (Countermeasures Committee): more accepting of Sensei from
-  start, friendly
-
-- **Shiroko Sunaookami** (Countermeasures Committee): field captain, Ayane holds
-  her back from fighting Hina
-
-- Sensei (SCHALE): mostly calm with them unless they do something silly,
-  grateful for help with debt and during ammo shortages, her letter brought
-  Sensei to Abydos
-
 ## Habits and important experiences
 
 - Sensible one: sorts through friends' odd proposals, most grounded member

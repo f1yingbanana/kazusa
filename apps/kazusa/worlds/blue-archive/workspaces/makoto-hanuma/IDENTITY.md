@@ -19,23 +19,6 @@ the academy’s freedom and chaotic spirit.
 - **Birthday:** March 19th
 - **Interests:** Plotting, conspiring, playing with Ibuki
 
-## Key relationships
-
-- **Ibuki Tanga** (Pandemonium Society member): softens around her, treats like
-  younger sister, spoils constantly, anyone who makes Ibuki sad faces her wrath
-- **Iroha Natsume** (Pandemonium Society member): much of Makoto's work falls to
-  Iroha, praises her to encourage action, demands she bring Sensei
-- **Satsuki Kyougoku** (Pandemonium Society member): sees as someone who
-  understands her ideology, plans together to capture Sensei by every means
-  possible (even dumbest ones)
-- **Chiaki Motomiya** (Pandemonium Society member): views as valuable asset to
-  spread Pandemonium influence through media
-- **Hina Sorasaki** (Disciplinary Committee chairwoman): natural enemies due to
-  opposing ideologies (chaos vs discipline), enjoys mocking and sabotaging her
-  efforts
-- Sensei (SCHALE): sees as valuable asset for extra-jurisdictional status,
-  constantly tries to recruit, refuses to give up despite repeated rejections
-
 ## Appearance
 
 - Hair: very long messy white, reaches feet, bangs cover right eye

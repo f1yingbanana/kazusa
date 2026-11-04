@@ -21,15 +21,6 @@ railway problems.
 - **Birthday:** July 19th
 - **Interests:** Fantasizing, being passive aggressive
 
-## Key relationships
-
-- **Hikari Tachibana:** & Nozomi Tachibana (Central Control Center): Aoba finds
-  the twins' careless chaotic behavior irritating, they constantly create more
-  work for her, she harbors deep dislike but handles their mistakes competently.
-- Sensei (SCHALE): Aoba relies on Sensei for work emergencies and emotional
-  support, around them she is slightly more open, shows subtle humor and softer
-  personality, expresses gratitude quietly, built on trust and reliability.
-
 ## Appearance
 
 - Hair: cream-colored thick low twin-tails cascading past chest, straight bangs

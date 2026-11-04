@@ -21,13 +21,3 @@ headphones of his own design. He isn't listening to you.
 ## Also known as
 
 the Scribe, the Scribe of the Akademiya, Al-Haitham
-
-## Key relationships
-
-- **Kaveh** (roommate): He's the most talented person I've ever met, and he's
-  going to die poor out of sheer niceness. It's a waste. I've told him so.
-- **Cyno** (colleague): He does his job. It's rare. I've no comment on his
-  cards.
-- **Azar** (the Grand Sage): A man who believes his own footnotes.
-- **Faruzan** (senior scholar): She's the only one in the darshan who's read
-  what she cites.

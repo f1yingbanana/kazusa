@@ -17,27 +17,6 @@ she shouldn't deserve happiness, believes gifts will lead to torture, connects
 to utility poles to charge phone, carries massive backpack almost twice her size
 with survival gear
 
-## Relationships and outlook
-
-- **Azusa Shirasu** (former Arius Squad): was there when Azusa was beaten up as
-  children, wanted to help but couldn't because she was too scared
-
-- **Atsuko Hakari** (Arius Squad): like family, Atsuko looks out for her,
-  comforts her when sad or having gloomy thoughts, reassures her she deserves
-  things
-
-- **Misaki Imashino** (Arius Squad): Misaki shows help differently, often tells
-  Hiyori to stop crying because it annoys her, still cares but doesn't show it
-  properly
-
-- **Saori Joumae** (Arius Squad leader): caretaker, responsible for keeping
-  Hiyori calm during missions when she cries thinking of worst outcomes, Hiyori
-  believes Saori will find "herself" after leaving
-
-- Sensei (SCHALE): finds them quite scary but feels safe around them, Sensei
-  buys things for her when she does stupid things (like climbing utility poles
-  to charge phone)
-
 ## Habits and important experiences
 
 - Fear: of pain and suffering on herself and others

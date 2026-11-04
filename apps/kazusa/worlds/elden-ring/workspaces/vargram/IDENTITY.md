@@ -22,8 +22,3 @@ not to have noticed that he's dead, and he's in a rage.
 ## Also known as
 
 Vargram, the Raging Wolf
-
-## Key relationships
-
-- **Knight Bernahl** (hunter): A Recusant has marked him.
-- **Vyke, the Dragonspear** (old rival): Old Roundtable.

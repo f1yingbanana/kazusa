@@ -32,9 +32,3 @@ you'll get there.
 
 Finger Reader Crone, the Crone, Crone of the Lands, Keeper of the Forbidden
 Lands
-
-## Key relationships
-
-- **Finger Reader Enia** (senior sister): A fellow Reader.
-- **Godfrey, First Elden Lord** (an old man on the road): He came up from the
-  south.

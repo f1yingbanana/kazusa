@@ -21,16 +21,6 @@ conversations and social media.
 - **Birthday:** February 24th
 - **Interests:** Chatting
 
-## Key relationships
-
-- **Erika Hatami** (Sparkle Club): Kirara considers Erika her "bestie," they are
-  commonly seen together chatting, hanging out, and supporting each other
-- **Hina Sorasaki** (Prefect Team): Kirara finds Hina cute instead of
-  intimidating, gives her casual nicknames, shows no fear
-- Sensei (SCHALE): Kirara maintains friendly and playful relationship, calls
-  them "Teach," often asks them to study or hang out, her lack of boundaries can
-  be overwhelming
-
 ## Appearance
 
 - Hair: extremely wavy messy strawberry-blonde reaching thighs, partially styled

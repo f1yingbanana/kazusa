@@ -32,13 +32,6 @@ side of what Kisaki directs, and places herself between Kisaki and anything that
 might threaten her, which is a role she takes with complete and unironic
 seriousness.
 
-## Key relationships
-
-- **Kisaki Ryuuge:** Mina's reason for being in Genryumon and the person she is
-  most unreservedly devoted to.
-- Sensei is the person Mina works alongside and, over time, the person she has
-  conversations with that she would not have with anyone else.
-
 ## Appearance
 
 - Mina has long green hair gathered into a circular Chinese braid with a

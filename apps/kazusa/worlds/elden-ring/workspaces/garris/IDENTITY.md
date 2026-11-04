@@ -3,7 +3,7 @@ agent_id: garris
 name: "Necromancer Garris"
 occupation: "Necromancer, in a cave on Altus"
 aliases: ["Garris"]
-faction: tarnished
+faction: tarnished_exiles
 realm: realm_altus
 ---
 
@@ -20,9 +20,3 @@ something under a very dirty sheet.
 ## Also known as
 
 Garris
-
-## Key relationships
-
-- **D, Hunter of the Dead** (a persecutor): He's chasing necromancers.
-- **Fia, Deathbed Companion** (a colleague, in a sense): Also works with the
-  dead.

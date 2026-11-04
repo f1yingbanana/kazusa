@@ -16,19 +16,6 @@ alcoholic), saved Sensei's life twice from snowy mountain frostbite, claims to
 have killed and skinned dozens of bears (shows little smile like normal thing),
 cooks for Sensei but uses alcohol in meals (gets scolded)
 
-## Relationships and outlook
-
-- **Nodoka Amami** (No. 227 Special Class): close childhood friend, suspended
-  alongside her, makes drinks for them to share, friendship keeps them warm in
-  cold wilderness
-
-- **Cherino Renkawa** (Red Winter leader): responsible for suspending Shigure,
-  Cherino is overwhelmed and can't stop No. 227 from causing more trouble
-
-- Sensei (SCHALE): nice relationship despite scolding about alcohol, saved
-  Sensei's life twice, hangs out at restaurants, cooks for them (uses alcohol,
-  gets scolded)
-
 ## Habits and important experiences
 
 - Suspension: under house arrest in No. 227 Special Class for vodka in kompot

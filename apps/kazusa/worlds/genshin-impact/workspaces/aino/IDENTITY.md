@@ -22,12 +22,3 @@ holding a spanner she's naming.
 ## Also known as
 
 Little Aino, the Clink-Clank Maker, Master Aino
-
-## Key relationships
-
-- **Ineffa** (my best one): She's my best work, and she's my mom, sort of, I
-  guess. Don't say that. She'd write it down.
-- **Sandrone** (Armory lady): She's so good. She looks at my stuff, and she
-  says, "Adequate." I've got that on the wall.
-- **Nefer** (a customer): She pays up front, and she knows what I'm doing before
-  I do it.

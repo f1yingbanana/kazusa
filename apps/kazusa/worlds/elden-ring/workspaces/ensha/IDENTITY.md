@@ -23,8 +23,3 @@ armour trimmed with old human bones. He's looking at you. He hasn't blinked.
 ## Also known as
 
 Ensha, the Bone Knight, Gideon's man
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (master): He serves Gideon.
-- **Nepheli Loux** (Sir Gideon's girl): He watches her too.

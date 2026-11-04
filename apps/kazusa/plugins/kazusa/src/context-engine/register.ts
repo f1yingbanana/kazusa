@@ -45,7 +45,10 @@ interface ContextEngineDeps {
     agentId: string,
     at: number,
     evidence: string,
-    options?: { readonly listLimit?: number },
+    options?: {
+      readonly listLimit?: number;
+      readonly exclude?: readonly string[];
+    },
   ) => Promise<string | undefined>;
   /** Whether someone else is where the character is: face to face. */
   readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
@@ -57,8 +60,12 @@ interface ContextEngineDeps {
   /** What comes to mind this turn; absent means no memory module. */
   readonly memory?: (
     request: RetrievalRequest,
-    options?: { readonly maxTokens?: number; readonly rosterLimit?: number },
-  ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster">>;
+    options?: {
+      readonly maxTokens?: number;
+      readonly rosterLimit?: number;
+      readonly exclude?: readonly string[];
+    },
+  ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster" | "ids">>;
 }
 
 /**
@@ -320,7 +327,6 @@ function createContextEngine(
         here,
         awaiting,
         feeling,
-        place,
         company,
         recordsStart,
         session,
@@ -337,9 +343,6 @@ function createContextEngine(
         presence?.(brainAgentId, now) ?? [],
         awaitingReplies?.(brainAgentId, cutoff) ?? [],
         feelings?.(brainAgentId, now),
-        whereabouts?.(brainAgentId, now, params.prompt ?? "", {
-          listLimit: chosen.placesLimit,
-        }),
         inCompany?.(brainAgentId, now) ?? false,
         recordsStarts.lookup(brainAgentId).catch((error: unknown) => {
           api.logger.warn(
@@ -364,7 +367,22 @@ function createContextEngine(
           awaiting: awaiting.map((chat) => chat.sender),
           now,
         }),
-        { maxTokens: chosen.onYourMindTokens, rosterLimit: chosen.peopleLimit },
+        {
+          maxTokens: chosen.onYourMindTokens,
+          rosterLimit: chosen.peopleLimit,
+          // Who is in front of them is in With you already.
+          exclude: here,
+        },
+      );
+      // After memory: Places you know leaves out what On your mind shows.
+      const place = await whereabouts?.(
+        brainAgentId,
+        now,
+        params.prompt ?? "",
+        {
+          listLimit: chosen.placesLimit,
+          exclude: recollection?.ids ?? [],
+        },
       );
       const assembled = await assembleContext({
         run: params,

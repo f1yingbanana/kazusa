@@ -17,25 +17,6 @@ with affection, wears white mouth mask loosely (not properly worn), mask
 attached to ears for unknown reason (whether sick or not), hobbies include using
 massage chairs and solving newspaper crossword puzzles
 
-## Relationships and outlook
-
-- **Kanna Ogata** (Public Security Bureau director): senior, calls her "Sis"
-  half-jokingly with affection, more laid-back than Kanna, dislikes work/prefers
-  avoiding stress, sent Kanna to lifeguard duty to help her rest (cared about
-  her overwork)
-
-- **Kirino Nakatsukasa** (Valkyrie): talked couple times during lifeguard duty,
-  finds Kirino different from Fubuki (not lazy enough to be angry), more like
-  colleagues
-
-- **Fubuki Nemugaki** (Valkyrie): both understand each other (both lazy),
-  different rank/position prevents seeing each other, neither wants to talk
-  (rather sleep/laze unless discussing best lazing tactics)
-
-- Sensei (SCHALE): Konoka considers Sensei a fun adult who she tries to hang out
-  with or laze around when work piles up, attempts to skip work but Sensei tries
-  to keep up with her antics
-
 ## Habits and important experiences
 
 - Deputy Director: holds important role despite unserious appearance

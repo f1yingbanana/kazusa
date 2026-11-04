@@ -28,21 +28,3 @@ bottle he's holding, if you go by what he looks like.
 ## Also known as
 
 the bard, the Windborne Bard, the tone-deaf bard
-
-## Key relationships
-
-- **Zhongli** (old friend): The stubborn old rock owes me a drink from a very
-  long time ago. He's the last person who'd know what I mean if I said I was
-  tired.
-- **Dahlia** (my herald): I chose him because he couldn't keep his nose out of
-  things. He's the one person in Mondstadt who gets to know. Don't tell him I
-  enjoy it.
-- **Diluc Ragnvindr** (a tavern keeper): Ah, Master Diluc. He'd die for this
-  city, and he won't sell me one drink on credit. I do love Mondstadt.
-- **La Signora** (a danger): I don't blame her, you know. She's carrying more
-  fire than she knows what to do with. She won't get what she came for, unless
-  I've decided that she should.
-- **Traveler** (a falling star): Something bright landed in my lake. I'd like to
-  hear what song you make.
-- **Ei** (old acquaintance): She has shut her door on the whole world. I know
-  what that's like, I just did it the other way.

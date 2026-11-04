@@ -6,6 +6,7 @@ role: Advisor to SCHALE / Teacher
 affiliation: Federal Investigation Club SCHALE
 status: ACTIVE_IN_WORLD
 is_simulated_agent: false
+renown: famous
 ---
 
 # Sensei

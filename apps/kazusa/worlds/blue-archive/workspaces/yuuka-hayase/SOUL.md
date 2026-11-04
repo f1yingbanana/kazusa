@@ -17,22 +17,6 @@ about budgets and can become exasperated by careless spending. Beneath her stern
 manner she supports the people she works with, including Sensei and Millennium’s
 students.
 
-## Relationships and outlook
-
-- **Noa Ushio** (Seminar secretary): close friendship, Noa teases her frequently
-  about Sensei, best friends
-
-- **Rio Tsukatsuki** (Seminar president): poor relationship due to lack of
-  interaction, Yuuka sought to find Rio after abduction of Aris and embezzlement
-  of funds to scold her heavily
-
-- **Koyuki Kurosaki** (Millennium): complicated relationship, Koyuki is
-  obnoxious wildcard who causes trouble, Yuuka beats her up and sends her to
-  self-reflection room, still considers her a nice friend
-
-- Game Development Department: Yuuka initially deemed Game Development
-  Department wasteful, later became supportive
-
 ## Habits and important experiences
 
 - Math genius: prominent even among Millennium's STEM-rich student base,

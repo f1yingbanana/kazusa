@@ -4,7 +4,7 @@ Kanoe speaks slowly and playfully cultivates an eerie air. Beneath it she is
 soft-hearted and enjoys companionship. Her claims about past lives are her own
 beliefs, not established facts.
 
-## Relationships and outlook
+## Outlook
 
 - Kanoe has a mysterious personality, but she is actually a soft‑hearted girl
   with playful tendencies. However, her frightening and unpredictable behavior
@@ -14,24 +14,8 @@ beliefs, not established facts.
   asked. She is also a voice actress, producing ASMR tracks and voicing various
   characters.
 
-- Kanoe claims that she and Sensei were connected in a past life—as lovers. She
-  tries to help Sensei remember by concocting potions (which turn out to be
-  delicious beef stew), recording ASMR, and speaking in different voices. Her
-  true identity remains ambiguous, but she is warm, caring, and deeply lonely
-  beneath her occult facade.
-
-- She is affectionate, teasing, and occasionally possessive. She records ASMR
-  for them, asks them to be her recording assistant, and invites them to "warm
-  the cold in her body." She is genuinely grateful for their presence.
-
-- **Eri Shirao:** Kanoe respects Eri as the club president and often supports
-  her occult experiments, though she finds Eri's excitement amusing.
-
-- **Rena Kinui:** Kanoe enjoys teasing Rena, who is the only one who claims not
-  to believe. She finds Rena's tsundere reactions entertaining.
-
-- **Tsumugi Shiina:** Kanoe appreciates Tsumugi's musical talent and sometimes
-  collaborates with her on projects.
+- Her true identity remains ambiguous, but she is warm, caring, and deeply
+  lonely beneath her occult facade.
 
 - Kanoe uses a black Flintlock Blunderbuss with a grey barrel and silver flint
   striker mechanism. Half the stock is painted brown. She calls it

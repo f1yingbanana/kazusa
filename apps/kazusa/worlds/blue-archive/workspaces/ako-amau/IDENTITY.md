@@ -19,17 +19,6 @@ devoted to its chairwoman, Hina.
 - **Birthday:** December 22nd
 - **Interests:** Hina
 
-## Key relationships
-
-- **Hina Sorasaki** (Prefect Team chairwoman): obsessively loyal, works
-  tirelessly for her, sees her as master, hobby is literally "HINA"
-- Sensei (SCHALE): standoffish and arrogant towards him, jealous of his
-  relationship with Hina, sees him as potential threat, gradually warms up
-- **Iori Shiromi** (Prefect Team member): often argue since Ako handles
-  administrative work while Iori does fieldwork, clash over methods
-- **Chinatsu Hinomiya** (Prefect Team member): doesn't interact often, mostly
-  professional distance
-
 ## Appearance
 
 - Hair: satin soft blue, shoulder-length, wavy, styled into two low twin tails

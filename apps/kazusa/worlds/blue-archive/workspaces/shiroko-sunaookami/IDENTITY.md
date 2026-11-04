@@ -22,18 +22,6 @@ her school.
 - **Birthday:** May 16th
 - **Interests:** Jogging, training, cycling
 
-## Key relationships
-
-- **Hoshino Takanashi** (Countermeasures Committee): close friend, found her
-  years ago when Shiroko had amnesia
-- **Serika Kuromi** (Countermeasures Committee): clubmate, fights alongside her
-- **Ayane Okusora** (Countermeasures Committee): relies on Ayane to hold her
-  back and keep her sensible
-- **Nonomi Izayoi** (Countermeasures Committee): close friend, found her years
-  ago when Shiroko had amnesia
-- Sensei (SCHALE): saved Sensei's life before knowing who they were, appreciates
-  and likes them, needs Sensei to hold her back
-
 ## Appearance
 
 - Hair: grey shoulder-length long bob cut, wolf ears (insides black/dark grey,

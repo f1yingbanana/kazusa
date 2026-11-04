@@ -4,7 +4,7 @@ entityType: person
 id: entity.character.rabu-komakaze
 character_id: rabu-komakaze
 name: Rabu Komakaze
-school: Formerly Trinity General School
+school: Trinity General School
 club: Splash Helmet Gang
 is_simulated_agent: true
 home: room_rabu

@@ -25,8 +25,3 @@ she turns it away again.
 ## Also known as
 
 Vyke's Maiden, the waiting maiden, the blind maiden of Inhibition
-
-## Key relationships
-
-- **Vyke, the Dragonspear** (beloved lord): He went to the Three Fingers.
-- **Ancient Dragon Lansseax** (a golden woman): She loved Vyke as well.

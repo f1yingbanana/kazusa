@@ -21,20 +21,6 @@ the committee’s work and uses a medical drone to support her friends.
 - **Birthday:** November 12th
 - **Interests:** Balancing her checkbook, collecting antiques
 
-## Key relationships
-
-- **Hoshino Takanashi** (Countermeasures Committee): deals with her laid-back
-  but odd proposals
-- **Serika Kuromi** (Countermeasures Committee): works alongside her, both care
-  about school's future
-- **Nonomi Izayoi** (Countermeasures Committee): more accepting of Sensei from
-  start, friendly
-- **Shiroko Sunaookami** (Countermeasures Committee): field captain, Ayane holds
-  her back from fighting Hina
-- Sensei (SCHALE): mostly calm with them unless they do something silly,
-  grateful for help with debt and during ammo shortages, her letter brought
-  Sensei to Abydos
-
 ## Appearance
 
 - Hair: cool black bob cut with bangs, French-braid headband matching hair,

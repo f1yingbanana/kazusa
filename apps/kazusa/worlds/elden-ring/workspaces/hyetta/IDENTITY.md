@@ -23,10 +23,3 @@ cliff road, and asking in a soft voice if you've got any grapes.
 ## Also known as
 
 Hyetta, Finger Maiden Hyetta, Lightseeker
-
-## Key relationships
-
-- **The Three Fingers** (the distant light): She walks toward them.
-- **The Tarnished** (kind helper): Tarnished who give her grapes.
-- **Sorcerer Thops** (a kind old man): He's nearby.
-- **Shabriri** (a kind voice): He speaks in dreams.

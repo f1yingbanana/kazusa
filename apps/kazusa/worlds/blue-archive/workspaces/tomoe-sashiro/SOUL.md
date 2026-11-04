@@ -15,15 +15,6 @@ Cherino, rarely interacts with other students, can speak to crowds easily
 (propaganda style), carries traditional Russian towel over forearms, wears
 fluffy white Russian-style hat
 
-## Relationships and outlook
-
-- **Cherino Renkawa** (Red Winter Office president): Tomoe is utterly devoted to
-  Cherino, spends all her time assisting her, serves pudding, helps with naps,
-  knows everything about her
-
-- **Marina Ikekura** (Red Winter Office): not especially close, Tomoe focuses on
-  Cherino while Marina handles other tasks and struggles with clumsiness
-
 ## Habits and important experiences
 
 - Devotion: knows everything about Cherino, obsessed to point of isolation

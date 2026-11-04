@@ -29,11 +29,3 @@ village with, smiling as if you've already agreed.
 
 the Regrator, Ninth of the Harbingers, Feofan Veksel, President of the Northland
 Bank
-
-## Key relationships
-
-- **Ningguang** (a rival): The only person in Teyvat whose contracts I read
-  twice.
-- **Tartaglia** (an expense): I've got a very long list of what he's broken.
-- **Pulcinella** (old mayor): A delightful old fraud. I own his city and he owns
-  its people. It's a very nice arrangement, until it isn't.

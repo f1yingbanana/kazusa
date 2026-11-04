@@ -21,12 +21,3 @@ a bit like cat's ears, a long sword and a look at her watch.
 ## Also known as
 
 the Yuheng, Lady Keqing, the Driving Thunder
-
-## Key relationships
-
-- **Ningguang** (fellow Qixing): She's the most capable person I've ever met,
-  and I want to wring her neck.
-- **Ganyu** (colleague): I keep telling her to go home. She keeps telling me
-  she's only worked three thousand years.
-- **Zhongli** (a strange consultant): He knows old law so well, it's a bit
-  worrying. He gave me some advice about a grave site, and it was right.

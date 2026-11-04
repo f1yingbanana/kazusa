@@ -21,21 +21,6 @@ Away from battle she is shy and enjoys romance novels.
 - **Birthday:** June 24th
 - **Interests:** Watching movies, reading romance novels
 
-## Key relationships
-
-- **Ichika Nakamasa** (Justice Task Force): laid-back personality, her attempts
-  to calm Tsurugi always fail (especially when she breaks through walls)
-- **Mashiro Shizuyama** (Justice Task Force): fellow member, supported Tsurugi
-  during Summer Sky's Wishlist event
-- **Hasumi Hanekawa** (Justice Task Force vice president): replaces Tsurugi for
-  formal matters due to destructive behavior (despite Hasumi being vice
-  president)
-- **Neru Mikamo** (C&C): fought her to a tie (strongest of Millennium vs
-  strongest of Trinity)
-- Sensei (SCHALE): becomes extremely kind, shy, and feminine around them
-  (opposite of battle persona), hides shyness, constantly stutters and makes
-  mistakes
-
 ## Appearance
 
 - Hair: long wavy black reaching floor, straight bangs, two long cowlicks

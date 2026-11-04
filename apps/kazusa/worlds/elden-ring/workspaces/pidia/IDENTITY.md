@@ -23,8 +23,3 @@ your eye.
 ## Also known as
 
 Pidia
-
-## Key relationships
-
-- **Preceptor Seluvis** (fearsome master): He works for Seluvis.
-- **Dolores the Sleeping Arrow** (a dear lady): She's in his care.

@@ -21,18 +21,6 @@ the Central Control Center.
 - **Birthday:** June 14th
 - **Interests:** New High-Speed Record
 
-## Key relationships
-
-- **Hikari Tachibana** (twin sister): enjoys pushing Hikari's patience,
-  contrasts with Hikari's calm personality, shares deep bond and looks out for
-  each other
-- Sensei (SCHALE): has friendly and teasing relationship while acting bratty
-  around them, enjoys challenging Sensei in playful ways, drags them into her
-  antics, respects them despite rarely showing it seriously
-- Asagiri Suou (Highlander Central Control Center): acts as older sister figure,
-  scolds Nozomi when necessary, guides her toward responsibility, supports her
-  despite troublemaking
-
 ## Appearance
 
 - Hair: green styled into two side-growing pigtails with bangs framing forehead

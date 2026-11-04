@@ -19,25 +19,6 @@ the club.
 - **Birthday:** March 25th
 - **Interests:** Video games (RPGs)
 
-## Key relationships
-
-- **Yuzu Hanaoka** (GDD president): clubmate, plays games together, Yuzu is only
-  one better at arcade games
-- **Momoi Saiba** (GDD): brought her from The Ruins to join GDD, plays games
-  together
-- **Midori Saiba** (GDD): taught her to communicate through video games, gave
-  hand-me-down clothes
-- **Rio Tsukatsuki** (Seminar president): Rio abducted her and tried to destroy
-  her halo (out of overprotectiveness), Aris forgave her (friends communicate
-  feelings without words), Rio eventually acknowledged her as "hero"
-- **Neru Mikamo** (C&C): had brutal confrontation, caused Aris to develop fear
-  of maids (still calls Neru "little maid"), later overcame fear
-- **Himari Akeboshi** (Paranormal Affairs): ordered Aris under Sensei's
-  supervision to help against Decagrammaton
-- Sensei (SCHALE): under Sensei's supervision for Decagrammaton threat, calls
-  Sensei "mascot" of party (no combat use but cheers everyone up), goes on
-  "adventures" together
-
 ## Appearance
 
 - Hair: absurdly long glossy black reaching floor, tied to headband and clip on

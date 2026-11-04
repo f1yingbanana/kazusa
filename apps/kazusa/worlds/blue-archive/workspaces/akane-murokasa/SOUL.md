@@ -16,23 +16,10 @@ housekeeping), acts as babysitter for Neru (keeps her from dodging work to play
 games), calls Sensei "Master" occasionally like Asuna, openly says she misses
 Sensei and wishes to meet them, once fell asleep in Sensei's bed from exhaustion
 
-## Relationships and outlook
+## Outlook
 
-Akane appreciates Sensei and can be warm and generous toward them. She also
-takes pride in supporting her C&C teammates and can show a playful side while
-working with them.
-
-- **Neru Mikamo** (C&C president): responsible for keeping Neru in check from
-  going destructive or dodging work, limited effect once Neru goes berserk
-
-- **Asuna Ichinose** (C&C): frequently disappears during missions but returns
-  with her part done, trusts Asuna's luck to bring her back safe
-
-- **Karin Kakudate** (C&C): both are more composed members, friends but not as
-  close as Asuna and Karin
-
-- **Toki Asuma** (C&C): welcomed her despite former enemy status, tries to help
-  her adapt to new lifestyle
+Akane takes pride in supporting her C&C teammates and can show a playful side
+while working with them.
 
 ## Habits and important experiences
 

@@ -18,24 +18,6 @@ alongside Hifumi, Azusa and Hanako. She likes to act confident and strict, but
 can be easily flustered. Her concern for Mika led her to help when other
 students mistreated her.
 
-## Relationships and outlook
-
-- **Azusa Shirasu** (Supplementary Lessons): considers Azusa's actions
-  inappropriate (Azusa just tries to be efficient)
-
-- **Hifumi Ajitani** (Supplementary Lessons): modest friendship, doesn't share
-  taste for Momo Friends/Peroro (finds them weird/ridiculous)
-
-- **Hasumi Hanekawa** (Justice Task Force vice president): looks up to her
-  greatly
-
-- **Mika Misono** (Trinity): saved Mika's accessories from being burned during
-  protests, earned Mika's trust, became very close friend
-
-- Sensei (SCHALE): constant delusional fantasies about them (much to Sensei's
-  annoyance), calls for help with grades or tasks, likes them deeply, cried and
-  needed hug after Sensei jumped from boulder during low tide
-
 ## Habits and important experiences
 
 - Delusional: believes Sensei has fantasies about her, sees lewdness everywhere

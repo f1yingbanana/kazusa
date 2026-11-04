@@ -23,8 +23,3 @@ the red bog. A small army of ghostly soldiers forms up when he raises it.
 ## Also known as
 
 O'Neil, the Commander of Aeonia
-
-## Key relationships
-
-- **Malenia, Blade of Miquella** (the Lady): He fought for her.
-- **Commander Niall** (fellow standard-bearer): They bore the same standard.

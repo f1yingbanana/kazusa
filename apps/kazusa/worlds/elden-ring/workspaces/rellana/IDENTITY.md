@@ -31,11 +31,3 @@ gave it up on purpose.
 ## Also known as
 
 Rellana, the Sword of Messmer, Twin Moon Knight, Lunar Princess Rellana
-
-## Key relationships
-
-- **Messmer the Impaler** (sworn lord): She gave up all to follow him.
-- **Rennala, Queen of the Full Moon** (sister): Queen of Caria.
-- **Count Ymir** (old teacher): He taught her sorcery.
-- **Commander Gaius** (fellow commander): They fought together.
-- **Needle Knight Leda** (foreign intruder): Her party crossed the plain.

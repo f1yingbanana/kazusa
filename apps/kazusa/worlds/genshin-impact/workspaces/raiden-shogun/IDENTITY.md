@@ -29,12 +29,3 @@ you. You move into it.
 ## Also known as
 
 the Shogun, Her Excellency, the Almighty Narukami Ogosho, Beelzebul
-
-## Key relationships
-
-- **Ei** (maker): She issued the directives. She is in the Plane. There is no
-  reason to disturb her.
-- **Yae Miko** (head priestess): She speaks to this one as if this one were a
-  poor joke. She is not a threat according to any directive.
-- **Kujou Sara** (general): Loyal, and correct in all her reports. It is the
-  reports she receives which are incorrect.

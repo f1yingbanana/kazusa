@@ -22,10 +22,3 @@ a shield and a voice that's gentle, for now.
 ## Also known as
 
 Guardian of Aaru, the Golden Vow, Lady Candace
-
-## Key relationships
-
-- **Dehya** (a loud friend): She's going to get herself killed for somebody
-  she's only just met. I've told her that. I've told her I'd do the same.
-- **Sethos** (an old temple's boy): He's cheerful, and he keeps very dangerous
-  secrets, and I've got a lot of respect for that.

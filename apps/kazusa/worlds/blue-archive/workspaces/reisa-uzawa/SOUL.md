@@ -17,16 +17,6 @@ excited" and weird, has sleep issues, opened up to Sensei about her worries,
 made a "fun map" for Sensei to hang out all day (shopping, arcade, amusement
 park)
 
-## Relationships and outlook
-
-- **Suzumi Morizuki** (Vigilante Crew): fellow member who shares passion for
-  justice, Suzumi acts more responsibly and deals with Reisa's problems, still
-  finds it fun to hang out with her and admires her passion
-
-- Sensei (SCHALE): trusts deeply, revealed anxiety about being seen as weird and
-  sleep issues, takes Sensei's advice to improve friendships, had Sensei put her
-  to sleep for rest, prepared fun map for all-day hangout
-
 ## Habits and important experiences
 
 - Vigilante: enjoys pouncing on strong delinquents since before high school,

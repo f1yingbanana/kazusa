@@ -22,19 +22,6 @@ about her team.
 - **Birthday:** January 7th
 - **Interests:** Watching bunny videos
 
-## Key relationships
-
-- **Miyu Kasumizawa** (RABBIT Platoon): always takes care of Miyu (others forget
-  her), comforts her when she wants to cry
-- **Saki Sorai** (RABBIT Platoon): Saki dislikes Miyako for taking command
-  (brags she could do better), endures her criticism for squad's sake
-- **Moe Kazekura** (RABBIT Platoon): Moe dislikes following orders (prefers
-  doing what she wants), her instructions clash with Moe's plans
-- Sensei (SCHALE): initially despised Sensei for foiling their protest, now
-  considers them trustworthy (won't admit directly), messages Sensei constantly
-  on phone, asked Sensei to stay closer (rabbits die from loneliness), got pet
-  rabbit Pyonko/Bun Bun from Sensei, evolved from deep distrust to…
-
 ## Appearance
 
 - Hair: thigh-length silver with bangs framing face, small side ponytail with

@@ -30,14 +30,6 @@ dedicated to studying and promoting ninjutsu throughout Kivotos. Although she is
 still inexperienced with ninja techniques, Tsukuyo works hard alongside her
 clubmates to learn more about the art and slowly grow into a capable ninja.
 
-## Key relationships
-
-- **Michiru Chidori:** Michiru is the president of the Ninjutsu Research
-  Department and the person who welcomed Tsukuyo into the club.
-- **Izuna Kuda:** Although Izuna joined the club after Tsukuyo, her natural
-  talent and passion for ninjutsu immediately impressed her.
-- Sensei Tsukuyo looks up to Sensei as someone incredibly reliable and wise.
-
 ## Appearance
 
 - Tsukuyo has waist-length dark purple hair with a yellow inner layer, styled

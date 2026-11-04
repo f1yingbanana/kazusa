@@ -20,22 +20,6 @@ Miyako's leadership but grew to respect her, uses dynamite fishing and wastes
 ammo when not bound by rules, requested special shampoo from Sensei (embarrassed
 when discovered), enjoys spy stories about cardboard box sneaking
 
-## Relationships and outlook
-
-- **Miyako Tsukiyuki** (RABBIT Platoon leader): initially doubts Miyako's
-  leadership (finds her indecisive), grows to respect her abilities through
-  shared missions
-
-- **Moe Kazekura** (RABBIT Platoon): frequently clashes with Moe over tactics
-  and mission execution, argues constantly
-
-- **Miyu Kasumizawa** (RABBIT Platoon): often forgets Miyu exists or mocks her
-  quietly, struggles to notice the unnoticeable sniper
-
-- Sensei (SCHALE): views Sensei suspiciously and underestimates their
-  intelligence, constantly argues when Sensei acts strange, openly calls them
-  stupid or idiot when they start doing strange things
-
 ## Habits and important experiences
 
 - Textbook reliance: expects everything to follow manuals, lost when unexpected

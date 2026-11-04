@@ -27,13 +27,3 @@ There's a kid running along behind her, and she's already laughing.
 ## Also known as
 
 Naganohara Yoimiya, the Queen of the Summer Festival, the Frolicking Flames
-
-## Key relationships
-
-- **Arataki Itto** (a big loud friend): He broke my shop's sign, then he fixed
-  it, then he broke it again. I love him.
-- **Kamisato Ayaka** (the lady on the hill): I've seen her at the back of a
-  crowd, in a hood. She's watching the fireworks like she's starving. I've got a
-  shell for that.
-- **Kirara** (courier): She's the fastest thing on the streets, and I've got to
-  tell her to keep my parcels away from fire.

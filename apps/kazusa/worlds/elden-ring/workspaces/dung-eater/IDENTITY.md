@@ -31,10 +31,3 @@ a voice that makes you want to wash.
 ## Also known as
 
 Dung Eater, the Loathsome Dung Eater, Seedbed Curse man, the Dung Eater
-
-## Key relationships
-
-- **Sir Gideon Ofnir, the All-Knowing** (jailer): Gideon has shut him up.
-- **Morgott, the Omen King** (envied kin): An Omen who bows.
-- **Blackguard Big Boggart** (old cellmate): They shared a gaol.
-- **Finger Reader Enia** (old sack): She's just up the stairs.

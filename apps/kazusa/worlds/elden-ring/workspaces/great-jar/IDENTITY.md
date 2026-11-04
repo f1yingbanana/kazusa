@@ -21,9 +21,3 @@ in the rot. It makes a low hum, and it doesn't appear to have a mouth.
 ## Also known as
 
 Great Jar, Great-Jar
-
-## Key relationships
-
-- **Alexander, Warrior Jar** (a promising descendant): Alexander's a warrior
-  jar.
-- **Jar-Bairn** (a small one, far away): Jarburg's young jar.

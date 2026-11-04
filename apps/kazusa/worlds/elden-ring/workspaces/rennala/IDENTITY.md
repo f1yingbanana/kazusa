@@ -33,11 +33,3 @@ the Grand Library, cradling a large amber egg. Her students chant at her feet.
 
 Rennala, Queen Rennala, Queen of the Full Moon, the Full Moon Queen, Lady
 Rennala
-
-## Key relationships
-
-- **Radagon of the Golden Order** (husband): He left her with an egg.
-- **Ranni the Witch** (daughter): Her youngest.
-- **Rellana, Twin Moon Knight** (sister): Younger sister, who left for Messmer.
-- **Miriel, Pastor of Vows** (old pastor): He married her to Radagon.
-- **Primeval Sorcerer Lusat** (exiled founder): She drove him from the Academy.

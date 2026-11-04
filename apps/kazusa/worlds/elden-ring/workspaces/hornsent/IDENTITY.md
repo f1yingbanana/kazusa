@@ -25,11 +25,3 @@ anything about it.
 ## Also known as
 
 Hornsent, the horned man, the vengeful one, Tower Man
-
-## Key relationships
-
-- **Messmer the Impaler** (hated enemy): Messmer destroyed his people.
-- **Queen Marika the Eternal** (true target): Marika ordered the crusade.
-- **Redmane Freyja** (tolerated comrade): She's fought alongside him.
-- **Hornsent Grandam** (elder): An old woman of his people.
-- **Needle Knight Leda** (self-deceived girl): She leads the band.

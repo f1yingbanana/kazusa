@@ -24,9 +24,3 @@ She doesn't look at you for long.
 ## Also known as
 
 Jolán, Jolan, Swordhand of Night, Swordhand Jolán
-
-## Key relationships
-
-- **Count Ymir** (her only star): She serves him.
-- **Swordhand of Night Anna** (sister): Her sister, a fellow swordhand.
-- **Yuri** (his son): The grave outside.

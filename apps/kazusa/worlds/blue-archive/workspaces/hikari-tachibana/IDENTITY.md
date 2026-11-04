@@ -21,19 +21,6 @@ Center with her twin sister Nozomi.
 - **Birthday:** June 14th
 - **Interests:** Practicing bizarre driving skills, observing ants
 
-## Key relationships
-
-- **Nozomi Tachibana** (twin sister): follows Nozomi's lead in mischief while
-  quietly trying to keep up, personalities complement each other (Hikari
-  calm/reserved, Nozomi bratty/energetic)
-- Asagiri Suou (Highlander Central Control Center): respects Suou deeply, treats
-  her like an older sister, appreciates her guidance and care, understands
-  scolding comes from a desire to teach responsibility
-- Sensei (SCHALE): maintains friendly and playful relationship, calls Sensei out
-  to play games and go on small adventures, trusts completely, sometimes
-  abandons duties to be with them, relies on Sensei for support during small
-  accidents
-
 ## Appearance
 
 - Hair: hip-length wavy light lime-colored, two extra-long waist-length strands

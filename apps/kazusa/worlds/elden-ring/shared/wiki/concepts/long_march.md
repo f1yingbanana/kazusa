@@ -7,7 +7,7 @@ summary:
   "The exile of Godfrey's warriors across the Sea of Fog; only their descendants
   came back."
 aliases: ["the Long March"]
-community: tarnished
+community: tarnished_exiles
 renown: known
 ---
 

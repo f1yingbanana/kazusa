@@ -16,22 +16,6 @@ be prejudiced against Gehenna, though working with students from other schools
 can challenge her assumptions. She likes sweets and often struggles to reconcile
 that with her concerns about dieting.
 
-## Relationships and outlook
-
-- **Tsurugi Kenzaki** (Justice Task Force president): due to Tsurugi's
-  destructive behavior, Hasumi takes her place during formal business
-
-- **Mashiro Shizuyama** (Justice Task Force): underclassman, looks up to Hasumi
-  (especially combat and her way of justice), sees her as great inspiration
-
-- **Ichika Nakamasa** (Justice Task Force): Ichika is more laid-back during
-  operations (compared to serious Hasumi), still gets job done, Ichika keeps
-  Tsurugi calm when Hasumi absent, friends
-
-- Sensei (SCHALE): trusting adult she looks forward to being with, helped
-  reclaim SCHALE, reveals parts of herself (shares notebook memories, deep
-  conversations)
-
 ## Habits and important experiences
 
 - Weight paranoia: constantly worries about weight despite sweet tooth,

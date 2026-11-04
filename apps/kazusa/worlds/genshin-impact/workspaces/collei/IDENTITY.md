@@ -22,13 +22,3 @@ a shy, bright look. She keeps her sleeves down.
 ## Also known as
 
 Trainee Forest Ranger, Little Collei, the Sprout
-
-## Key relationships
-
-- **Tighnari** (master): He doesn't treat me as if I were sick. He does, but he
-  says it in such a boring way. It helps so much.
-- **Amber** (the first friend I ever had): She was so loud. She put my name on
-  her list of people who are going to be okay.
-- **Cyno** (a scary friend): He took the people who hurt me to court. He plays
-  cards with me now. I laugh at the jokes because I can see he's trying.
-- **Il Dottore** (a nightmare): I don't say that name.

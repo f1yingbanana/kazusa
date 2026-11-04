@@ -21,21 +21,6 @@ the consequences of Makoto’s plans. She commands a tank named Toramaru.
 - **Birthday:** November 16th
 - **Interests:** Reading, loafing around
 
-## Key relationships
-
-- **Makoto Hanuma** (Pandemonium Society chairwoman): dislikes her orders, finds
-  her actions stupid, has to clean up her messes, has to do tasks anyway
-- **Ibuki Tanga** (Pandemonium Society member): genuinely likes her, takes
-  pleasure spending time with her, gives impression they are sisters (but
-  aren't), protects her innocence
-- **Satsuki Kyougoku** (Pandemonium Society member): dislikes her
-  overenthusiastic hypnosis/manipulation ideas
-- **Chiaki Motomiya** (Pandemonium Society member): dislikes her overexcited and
-  energetic personality
-- Sensei (SCHALE): one of few people she tolerates, enjoys spending time with
-  him, uses subtle manipulation to make him rest (not to recruit), prefers
-  resting with him over helping Makoto
-
 ## Appearance
 
 - Hair: bushy, messy, wavy, waist-length red-purplish, bangs frame face

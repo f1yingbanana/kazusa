@@ -21,22 +21,6 @@ Resolution Council.
 - **Birthday:** August 8th
 - **Interests:** Spinning yarn, reading military history, sunbathing
 
-## Key relationships
-
-- **Renge Fuwa** (Hyakkaryouran): oldest friend, contacts first when something
-  important happens, argue constantly and resolve fast (she cannot stop calling,
-  Renge cannot stop answering)
-- **Nagusa Goryou** (Hyakkaryouran president): most complicated relationship,
-  admired sincerely, waited for her without saying so, resented abandonment
-  without saying so, caused real harm trying to manage Nagusa's choices from
-  outside, apologized by putting head on Nagusa's chest and asking her…
-- **Yukari Kadenokouji** (Hyakkaryouran): monitored her welfare since before she
-  formally joined, believed she was protecting her by sending her away (was
-  wrong), fought beside her when it mattered
-- Sensei (SCHALE): started as functional working relationship, lent them books,
-  asked to sit with them for no explained reason, felt "baffling" when they
-  showed up with gifts while she had fever, still technically baffled
-
 ## Appearance
 
 - Skin: pale
