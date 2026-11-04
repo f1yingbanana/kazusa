@@ -381,11 +381,19 @@ describe("Perception host integration", () => {
     ]);
   });
 
-  it("registers an internal ingress channel with no outbound adapter", () => {
+  it("registers an internal ingress channel whose outbound sends nothing", async () => {
     const h = setup();
     const { plugin } = h.registerChannel.mock.calls[0][0];
     expect(plugin.id).toBe("kazusa");
-    expect(plugin.outbound).toBeUndefined();
+    // Present so OpenClaw resolves the channel from the Gateway's registry.
+    expect(plugin.outbound?.deliveryMode).toBe("direct");
+    await expect(
+      plugin.outbound?.sendText?.({ cfg: {}, to: "x", text: "hi" }),
+    ).resolves.toEqual({
+      channel: "kazusa",
+      messageId: "",
+      outcome: "not_sent",
+    });
     expect(plugin.config.listAccountIds({})).toEqual(["default"]);
   });
 

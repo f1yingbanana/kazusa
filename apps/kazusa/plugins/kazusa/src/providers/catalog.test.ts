@@ -13,7 +13,10 @@ const base = JSON.parse(
     models?: unknown;
     plugins: {
       allow: string[];
-      entries: { kazusa: { config: Record<string, unknown> } };
+      entries: Record<
+        string,
+        { config?: Record<string, unknown>; hooks?: Record<string, unknown> }
+      >;
     };
   };
 };
@@ -27,7 +30,25 @@ describe("worlds/base.json", () => {
     for (const entry of PROVIDERS)
       expect(base.config.plugins.allow).toContain(entry.plugin);
     expect(base.config.models).toBeUndefined();
-    expect(base.config.plugins.entries.kazusa.config.decisions).toBeUndefined();
+    expect(
+      base.config.plugins.entries.kazusa?.config?.decisions,
+    ).toBeUndefined();
+  });
+
+  /*
+   * A character's turn needs its model's provider plugin. OpenClaw starts one
+   * with the Gateway only for an explicit hook policy here (or a model named in
+   * config, which Kazusa's own model pick never is); otherwise each character's
+   * first turn loads every plugin again, a whole Kazusa included.
+   */
+  it("starts every provider plugin with the Gateway", () => {
+    const plugins = new Set(
+      PROVIDERS.map((entry) => entry.plugin).filter((id) => id !== "kazusa"),
+    );
+    for (const id of plugins)
+      expect(base.config.plugins.entries[id]?.hooks).toEqual({
+        allowPromptInjection: true,
+      });
   });
 
   it("decides with Kazusa", () => {

@@ -167,7 +167,10 @@
               "enabled": false
             }
           },
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "codex": {
           "config": {
@@ -180,76 +183,148 @@
           "enabled": true
         },
         "openrouter": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "venice": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "google": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "huggingface": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "nvidia": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "ollama": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "openai": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "opencode-go": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "together": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "xai": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "byteplus": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "cerebras": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "chutes": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "deepinfra": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "deepseek": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "fireworks": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "groq": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "mistral": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "moonshot": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "novita": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "qwen": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "synthetic": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "volcengine": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         },
         "zai": {
-          "enabled": true
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
         }
       }
     },
