@@ -1160,6 +1160,22 @@ connect these modules in process.
   interfaces or runtime checks in the codebase.
 - **OpenClaw Runtime Pitfalls (verified live on 2026.10.5, 2026-10-27)**:
   - The plugin may be registered several times per process (§3).
+  - Each character's workspace differs from the Gateway's (`./workspaces`), so a
+    character's turn borrows the Gateway's Kazusa only through a registry that
+    already holds its model's provider plugin. OpenClaw starts a provider plugin
+    with the Gateway only if config names one of its models or its entry has an
+    explicit hook policy, and Kazusa's model pick lives in its own store. So
+    `worlds/base.json` gives every provider plugin
+    `hooks.allowPromptInjection: true` (the default behaviour; it only changes
+    startup), and `scripts/plugin-startup.mjs` adds it to existing worlds before
+    the Gateway starts. Without it each character's first turn reloads every
+    plugin, a whole Kazusa included (~3 s and ~29 MB each; with 146 characters
+    the Gateway ran out of heap). The brain channel's `outbound.sendText`
+    exists for the same reason: OpenClaw takes a channel from the Gateway's
+    registry only when it can send, and each cron wake looks up its agent's
+    channel. It sends nothing and answers `outcome: "not_sent"`: a fake success
+    would append OpenClaw's restart-recovery notice to the brain transcript,
+    and an error leaves a delivery intent to retry.
   - Inside an agent run, write another session's transcript only with the strict
     append (§3.2).
   - `readSessionTranscriptCatalogPage` items have no `__openclaw`/raw field.

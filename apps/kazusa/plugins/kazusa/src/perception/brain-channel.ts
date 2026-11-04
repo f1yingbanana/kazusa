@@ -32,6 +32,21 @@ const BRAIN_CHANNEL: ChannelPlugin<{ accountId: string }> = {
   },
   // Perception already coalesces inputs; do not add another debounce on handoff.
   defaults: { queue: { debounceMs: 0 } },
+  // Sends nothing. OpenClaw only takes a channel from the Gateway's registry
+  // when it can send: a cron wake resolves its agent's channel for the message
+  // tool's format prompt, and without this each character's first wake loads
+  // every plugin again, a whole Kazusa included. `not_sent` is OpenClaw's
+  // intentional omission: a fake success would append its restart-recovery
+  // notice to the brain transcript, and an error leaves a delivery to retry.
+  outbound: {
+    deliveryMode: "direct",
+    sendText: () =>
+      Promise.resolve({
+        channel: CHANNEL_ID,
+        messageId: "",
+        outcome: "not_sent",
+      }),
+  },
 };
 
 const brainKey = (agentId: string): string => `agent:${agentId}:brain`;
