@@ -601,9 +601,10 @@ connect these modules in process.
   (`context-engine/settings.ts`), served by
   `GET /kazusa/context/settings [?agentId=]` and
   `POST /kazusa/context/settings/save` (replaces the scope's overrides; domain
-  `context`). User docs: `docs/context.md`. Accept native catalog display
-  clipping; add no source quotas or further per-message clipping, incognito
-  feature, or external-channel adapter.
+  `context`). What each setting does:
+  [Settings](references/context_engine.md#settings), which the client links to.
+  Accept native catalog display clipping; add no source quotas or further
+  per-message clipping, incognito feature, or external-channel adapter.
 - **Multi-Media Architecture**: Grounded preflight + on-demand inspection. Media
   processors receive the Context Engine's assembled background (location,
   identities, conversation thread) to produce situation-aware descriptions.

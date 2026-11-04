@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 /** Where the long version lives: what fills a turn, and how memory is trimmed. */
 export const CONTEXT_DOCS_URL =
-  "https://github.com/f1yingbanana/kazusa/blob/main/docs/context.md";
+  "https://github.com/f1yingbanana/kazusa/blob/main/.agents/skills/kazusa/references/context_engine.md#settings";
 
 const numbers = new Intl.NumberFormat("en-US");
 
