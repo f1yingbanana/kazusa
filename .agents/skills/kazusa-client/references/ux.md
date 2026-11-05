@@ -199,11 +199,17 @@ rehoused as a stage view.
   a doubled name. A speech run right after the same sender's action skips its
   name header. The list preview narrates actions the same way ("Sensei waves",
   never "You waves") and prefixes group and huddle lines with the speaker.
-- **Presence-aware header:** a DM shows the partner's presence ring and current
-  activity (task icon, "Reading · 34m left"; typing overrides it). A group shows
-  up to three stacked presence avatars and member names. A reply that hasn't
-  come yet then has visible context. Tapping the header reopens the inspector.
-  Member management (groups only) stays a separate icon button.
+- **Presence-aware header:** the title and subtitle are plain text; only what
+  says where it goes is clickable. A DM shows the partner's avatar (opens them)
+  and current activity (task icon, "Reading · 34m left"; typing overrides it). A
+  group's subtitle names the members; a huddle's title is the place (a link to
+  it) over "In person · names". Groups and huddles show up to four member faces
+  with presence rings on the right (hidden below `sm`), each opening that
+  person, its tooltip saying what they are doing; "+N" opens the chat. Then one
+  contextual action (Add people in a group, Call people over in a huddle, Talk
+  in person in a DM when you stand together) and Details (ⓘ), pressed while the
+  inspector already shows the chat's subject. Observed chats get faces and
+  Details only.
 - **The inspector follows the open chat:** opening a chat selects its subject
   (the partner of a DM, otherwise the chat: members with their activity, and a
   huddle's place). It is a quiet selection: below `xl` it does not pop the
@@ -273,35 +279,46 @@ does not belong. Prefer one line of facts to a card; icons only where they tell
 kinds apart; no system jargon (ids, "stimuli", brain states the presence ring
 already shows).
 
-**Character:**
+**Character:** the panel answers, without scrolling, who they are, what they are
+doing and how they feel. Everything else folds under its title (the inspector
+frame's `fold`), with its key fact beside the folded title, and the viewer's
+open or folded choice carries over to every character.
 
 1. **Header:** presence avatar (large), name (id on hover), occupation ·
-   affiliation, and "NPC"/"Player" only for those kinds. Icon buttons: Message
-   (DM) and star.
-2. **Now:** the task (category and times on one mono line with `34m left`,
-   description clamped to three lines, tap to expand, progress bar), then where:
-   the place with its area and how long they have been there, and who else is
-   there (people they have not noticed are dimmed, "Hasn't noticed them" on
-   hover); or, on a trip, "To <place> · arrives 20:40" and "Near <place>, then
-   <purpose>". Then "Writing in <chat>" while composing.
-3. **Desires:** one row per catalog desire in catalog order: prettified name
-   (description on hover), a bar segmented at the world's state boundaries, and
-   the state word the brain reads. Desires are background pressure, not a chore
-   list, so the section stays quiet: the lowest state is emphasized, a desire
-   the current task is moving gets the accent, a tick at its declared target and
-   `→ full by 07:00`, and one forecast line names the next state drop among
-   desires nothing is raising ("Satiety turns low in 38m"). That answers both
-   "why did she pick this task?" and "what will she want next?". Levels are
-   computed on the client from the closed-form record; no numbers are shown
-   (they are in the meter's ARIA value).
-4. **Recent:** the last ~5 journal events for this actor (`RECENT_KINDS`: the
-   Timeline's defaults minus the `mind` facet, so neither messages nor attention
-   bookkeeping), plus "Open in Timeline".
-5. **About:** role, traits and aliases (not ones equal to the id or name), plus
-   `bodyMarkdown` rendered verbatim in a collapsed block.
-6. **Model** (live agents only): chat model and reasoning level, each saying
-   whether it follows the world default or was chosen for this character, with
-   "Use world default" to undo a choice.
+   affiliation (two lines at most), and "NPC"/"Player" only for those kinds. A
+   failed turn is one red line, "Latest turn failed: …", whose whole error opens
+   on click. Then one row: labeled Message (hidden while their direct chat is
+   the one open), and Talk in person (same place) or Go there; Stop only while
+   they are thinking; star and a ⋯ menu (Peek at brain, Their chats, Open in
+   Timeline) at the end.
+2. **Now:** the task as one line (category icon and label, `34m left`; the
+   start–end times on hover), the description clamped to two lines (tap to
+   expand), the progress bar; then the place on one line (`2h here`, the area on
+   hover) and who else is there: one person as their chip ("With <Airi>", which
+   selects her), more as up to four faces and "With Airi and 3 others", which
+   opens the full list (people they have not noticed are dimmed, "Hasn't noticed
+   them" on hover). On a trip, "To <place> · arrives 20:40" and "Near <place>,
+   then <purpose>". Then "Writing in <chat>" while composing.
+3. **Desires:** background pressure, so it stays quiet: only desires below the
+   world's initial state, or ones the current task is moving (accent, target
+   tick, trend arrow), get a row: prettified name, a bar segmented at the
+   world's state boundaries, and the state word the brain reads. "Nothing
+   pressing. All fine or better." when none do; "4 more" / "Show all 7" shows
+   the rest (remembered). When each changes ("Rising to full by 07:00", "Turns
+   low in 38m") is in the name's hover with the description, never a line of its
+   own. Levels are computed on the client from the closed-form record; no
+   numbers are shown (they are in the meter's ARIA value).
+4. **Recent** (folded; "Task started at 23:15"): the last 3 journal events for
+   this actor (`RECENT_KINDS`: the Timeline's defaults minus the `mind` facet,
+   so neither messages nor attention bookkeeping), plus "Open in Timeline".
+5. **About** (folded; their role): role, traits and aliases (not ones equal to
+   the id or name), plus `bodyMarkdown` rendered verbatim in a collapsed block.
+6. **Model** (live agents only; folded; the model's name, "(world)" when it
+   follows the default): chat model and reasoning level, each saying whether it
+   follows the world default or was chosen for this character, with "Use world
+   default" to undo a choice.
+7. **Memory and context** (live agents only; folded; "Follows the world" or how
+   many settings are theirs).
 
 The player's chats with a character are one tap away through Message and the
 Chats list, so there is no Conversations section.

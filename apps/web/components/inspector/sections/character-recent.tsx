@@ -5,15 +5,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TimelineRow } from '@/components/views/timeline/timeline-row'
 import { useRecentEvents } from '@/hooks/use-timeline'
 import { useNavigate } from '@/hooks/use-url-state'
-import { RECENT_KINDS } from '@/lib/registry/timeline-kinds'
+import { RECENT_KINDS, TIMELINE_KINDS } from '@/lib/registry/timeline-kinds'
 import type { EntityRef } from '@/lib/state/entity-ref'
+import { formatSimTime } from '@/lib/time/sim'
 
 /**
  * The Timeline stream component, filtered to one actor and a few rows: what
  * they did, without messages (already in Chats) or attention bookkeeping.
  */
 export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
-  const { events, isLoading } = useRecentEvents(entity.id, 5, RECENT_KINDS)
+  const { events, isLoading } = useRecentEvents(entity.id, 3, RECENT_KINDS)
   const navigate = useNavigate()
 
   if (isLoading) {
@@ -47,4 +48,12 @@ export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
       </Button>
     </div>
   )
+}
+
+/** Folded: what they did last, and when. Shares the section's request. */
+export function CharacterRecentSummary({ entity }: { entity: EntityRef }) {
+  const { events } = useRecentEvents(entity.id, 3, RECENT_KINDS)
+  const latest = events[0]
+  if (!latest) return null
+  return <>{`${TIMELINE_KINDS[latest.kind].label} at ${formatSimTime(latest.simTime)}`}</>
 }

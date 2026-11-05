@@ -289,7 +289,12 @@ export function MessageList({
                             <Message key={message.id} align={align}>
                               {!isSelf ? (
                                 isLast ? (
-                                  <MessageAvatar>
+                                  // Lifted by exactly the footer (h-4) and its
+                                  // gap, so it sits level with the bubble's
+                                  // foot. The kit's guess (2rem) lifted it past
+                                  // a one-line bubble's top, where the group's
+                                  // `content-visibility` clipped it.
+                                  <MessageAvatar className="group-has-data-[slot=message-footer]/message:-translate-y-5">
                                     <ParticipantAvatar
                                       participant={participant}
                                     />
@@ -335,7 +340,7 @@ export function MessageList({
                                   </Bubble>
                                 )}
                                 {isLast ? (
-                                  <MessageFooter className="gap-2 font-normal">
+                                  <MessageFooter className="h-4 gap-2 font-normal">
                                     <MessageStatus
                                       message={message}
                                       pending={pendingMessage}
@@ -466,7 +471,8 @@ function ActionLine({
         {line.rest}
       </p>
       {pending || observed ? (
-        <span className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+        // Inset like a bubble's footer, so receipts line up in one column.
+        <span className="flex h-4 items-center justify-end gap-2 pr-3 text-xs text-muted-foreground">
           <MessageStatus
             message={message}
             pending={pending}

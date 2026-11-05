@@ -135,6 +135,51 @@ function dropAt(
   return cursor + ((current - floor) / drain) * HOUR;
 }
 
+/**
+ * When this desire next falls a state, and into which; `undefined` while the
+ * task raises it or it never will.
+ */
+export function dropOf(
+  config: DesiresConfig,
+  record: DesireRecord | undefined,
+  desire: DesireDefinition,
+  at: number,
+): DesireDrop | undefined {
+  if (!record) return undefined;
+  if (trendOf(config, record, desire, at)?.direction === "up") return undefined;
+  const when = dropAt(config, record, desire, at);
+  if (when === undefined) return undefined;
+  const index = stateIndex(config, levelAt(config, record, desire, at));
+  return {
+    desire: desire.name,
+    state: config.states[index - 1]?.name ?? "",
+    at: when,
+  };
+}
+
+/**
+ * Worth a row at a glance: below the state everyone starts in (pressure the
+ * brain feels), or being moved by the current task (why they're doing it),
+ * unless `paused` (offstage), when nothing moves.
+ */
+export function isNotable(
+  config: DesiresConfig,
+  record: DesireRecord | undefined,
+  desire: DesireDefinition,
+  at: number,
+  paused = false,
+): boolean {
+  const initial = Math.max(
+    0,
+    config.states.findIndex(({ name }) => name === config.initial),
+  );
+  const index = stateIndex(config, levelAt(config, record, desire, at));
+  return (
+    index < initial ||
+    (!paused && trendOf(config, record, desire, at) !== undefined)
+  );
+}
+
 export interface DesireDrop {
   readonly desire: string;
   /** The lower state it falls into. */
@@ -154,15 +199,8 @@ export function nextDrop(
   if (!record) return undefined;
   let soonest: DesireDrop | undefined;
   for (const desire of config.catalog) {
-    if (trendOf(config, record, desire, at)?.direction === "up") continue;
-    const when = dropAt(config, record, desire, at);
-    if (when === undefined || (soonest && soonest.at <= when)) continue;
-    const index = stateIndex(config, levelAt(config, record, desire, at));
-    soonest = {
-      desire: desire.name,
-      state: config.states[index - 1]?.name ?? "",
-      at: when,
-    };
+    const drop = dropOf(config, record, desire, at);
+    if (drop && (!soonest || drop.at < soonest.at)) soonest = drop;
   }
   return soonest;
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronLeftIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { ChevronLeftIcon, InfoIcon, SpeechIcon } from "lucide-react";
 import type { CharacterSummary } from "@kazusa/client";
+import { AddPeople } from "@/components/inspector/sections/chat-controls";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
 import { taskIcon } from "@/components/entities/task-icon";
 import { Button } from "@/components/ui/button";
@@ -12,18 +13,293 @@ import {
 } from "@/components/ui/tooltip";
 import { useCharacterStatus, useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
-import { usePlace } from "@/hooks/use-location";
-import { useSelection } from "@/hooks/use-url-state";
+import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
+import { useNavigate, useSelection } from "@/hooks/use-url-state";
 import { formatTypingLabel } from "@/lib/format";
 import type { Typist } from "@/lib/live/realtime-provider";
 import { chatSubject, isOneOnOne, listNames } from "@/lib/source/chats/display";
-import type { ChatInfo } from "@/lib/source/chats/types";
-import { sameEntity } from "@/lib/state/entity-ref";
+import type { Chat, ChatInfo } from "@/lib/source/chats/types";
+import { sameEntity, type EntityRef } from "@/lib/state/entity-ref";
 import { requestInspector } from "@/lib/state/inspector-request";
 import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 
-const MAX_STACK = 3;
+const MAX_FACES = 4;
+
+/**
+ * Who you are talking with and what they are up to, at the top of a chat. The
+ * title is plain text; what can be clicked says where it goes: a DM's avatar
+ * and each member's face open that person, the place opens the place, and
+ * Details shows the whole chat (pressed while the inspector already does).
+ * `own` is the player's own sent chat, for its one contextual action: Add
+ * people to a group, call people over in person, or talk in person with the
+ * partner of a DM standing where you are.
+ */
+export function ChatHeader({
+  chat,
+  own,
+  userId,
+  typists,
+  onBack,
+}: {
+  chat: ChatInfo;
+  own?: Chat;
+  userId: string;
+  typists: readonly Typist[];
+  onBack: () => void;
+}) {
+  const { byId } = useCharacters();
+  const [selection, select] = useSelection();
+  const place = usePlace(chat.placeId);
+  const isDirect = isOneOnOne(chat, userId);
+  const others = chat.members.filter((id) => id !== userId);
+  const partnerId = isDirect ? others[0] : undefined;
+  const partner = partnerId ? byId.get(partnerId) : undefined;
+  const typing = typists.length > 0;
+
+  const subject = chatSubject(chat, userId);
+  const showing = subject !== null && sameEntity(subject, selection);
+  const show = (ref: EntityRef | null) => {
+    if (ref) select(ref);
+    requestInspector();
+  };
+
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-2 sm:px-3">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="lg:hidden"
+        onClick={onBack}
+      >
+        <ChevronLeftIcon />
+        <span className="sr-only">Back to chats</span>
+      </Button>
+
+      {partnerId ? (
+        <button
+          type="button"
+          onClick={() => show({ kind: "character", id: partnerId })}
+          className="shrink-0 rounded-full outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <PresenceAvatar
+            id={partnerId}
+            name={partner?.name ?? chat.name}
+            avatarUrl={partner?.avatarUrl}
+            kind={partner?.kind}
+            size="md"
+          />
+          <span className="sr-only">{`About ${partner?.name ?? chat.name}`}</span>
+        </button>
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="truncate text-sm leading-tight font-semibold">
+          {chat.type === "huddle" && place ? (
+            // Just the place: "In person" below says it's a conversation, and
+            // a narrow header would cut "Talking at …" before the place.
+            <button
+              type="button"
+              title={place.summary}
+              onClick={() => show({ kind: "place", id: place.id })}
+              className="max-w-full truncate rounded-sm text-left underline decoration-muted-foreground/40 underline-offset-2 outline-none hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {place.name}
+            </button>
+          ) : (
+            chat.name
+          )}
+        </h2>
+        <p
+          className={cn(
+            "flex min-w-0 items-center gap-1 text-xs leading-tight text-muted-foreground",
+            typing && "shimmer text-primary",
+          )}
+        >
+          {typing ? (
+            <span className="truncate">
+              {isDirect
+                ? "typing…"
+                : formatTypingLabel(
+                    typists.map((t) => t.senderName),
+                    chat.type === "huddle" ? "about to speak" : undefined,
+                  )}
+            </span>
+          ) : chat.type === "huddle" ? (
+            <>
+              <SpeechIcon aria-hidden className="size-3 shrink-0" />
+              <span className="truncate">
+                {`${chat.ended ? "Was in person" : "In person"} · ${
+                  listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
+                  "just you"
+                }`}
+              </span>
+            </>
+          ) : isDirect ? (
+            <Activity character={partner} />
+          ) : (
+            <span className="truncate">
+              {listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
+                "Just you"}
+            </span>
+          )}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        {!isDirect && others.length > 0 ? (
+          <Faces
+            ids={others}
+            onPick={(id) => show({ kind: "character", id })}
+            onMore={() => show(subject)}
+          />
+        ) : null}
+        {own && (own.type === "group" || own.type === "huddle") ? (
+          <AddPeople chat={own} placeName={place?.name} compact />
+        ) : null}
+        {own && partnerId ? <TalkInPerson id={partnerId} /> : null}
+        {subject ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-pressed={showing}
+                  className={cn(showing && "bg-muted text-foreground")}
+                  onClick={() => show(subject)}
+                />
+              }
+            >
+              <InfoIcon />
+              <span className="sr-only">Details</span>
+            </TooltipTrigger>
+            <TooltipContent>Details</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
+/**
+ * Everyone else in a group or huddle as faces with their presence rings, so who
+ * is thinking or typing shows at a glance; each opens that person. Hidden on
+ * narrow screens, where the subtitle's names say who is there.
+ */
+function Faces({
+  ids,
+  onPick,
+  onMore,
+}: {
+  ids: readonly string[];
+  onPick: (id: string) => void;
+  onMore: () => void;
+}) {
+  const shown = ids.slice(0, MAX_FACES);
+  const rest = ids.length - shown.length;
+  return (
+    <div className="mr-1 hidden items-center sm:flex">
+      {shown.map((id, index) => (
+        <Face key={id} id={id} first={index === 0} onPick={onPick} />
+      ))}
+      {rest > 0 ? (
+        <button
+          type="button"
+          onClick={onMore}
+          className="-ml-1.5 flex size-7 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground ring-2 ring-background outline-none tabular-nums hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          {`+${rest}`}
+          <span className="sr-only">{`and ${rest} more: details`}</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function Face({
+  id,
+  first,
+  onPick,
+}: {
+  id: string;
+  first: boolean;
+  onPick: (id: string) => void;
+}) {
+  const { byId } = useCharacters();
+  const character = byId.get(id);
+  const status = useCharacterStatus(
+    character?.kind === "agent" ? id : undefined,
+  );
+  const name = character?.name ?? id;
+  const doing =
+    status?.brain === "thinking"
+      ? "Thinking"
+      : status?.composingIn.length
+        ? "Typing"
+        : status?.task?.description;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={() => onPick(id)}
+            className={cn(
+              "relative rounded-full outline-none hover:z-10 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+              !first && "-ml-1.5",
+            )}
+          />
+        }
+      >
+        <PresenceAvatar
+          id={id}
+          name={name}
+          avatarUrl={character?.avatarUrl}
+          kind={character?.kind}
+          size="sm"
+          className="ring-2 ring-background"
+        />
+        <span className="sr-only">{`About ${name}`}</span>
+      </TooltipTrigger>
+      <TooltipContent className="flex max-w-56 flex-col">
+        <span className="font-medium">{name}</span>
+        {doing ? (
+          <span className="line-clamp-2 opacity-80">{doing}</span>
+        ) : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** In a DM with someone standing where you are: talk face to face instead. */
+function TalkInPerson({ id }: { id: string }) {
+  const navigate = useNavigate();
+  const player = usePlayer();
+  const position = usePosition(id);
+  const together =
+    position?.kind === "at" &&
+    player.placeId !== undefined &&
+    position.placeId === player.placeId;
+  if (!together) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => navigate({ view: "chats", "chats.talk": id })}
+          />
+        }
+      >
+        <SpeechIcon />
+        <span className="sr-only">Talk in person</span>
+      </TooltipTrigger>
+      <TooltipContent>Talk in person</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * What a reply that hasn't come yet is waiting on: "Reading · 34m left". Task
@@ -51,161 +327,5 @@ function Activity({ character }: { character: CharacterSummary | undefined }) {
         <span className="shrink-0 font-mono tabular-nums">{`· ${formatSimDuration(task.endAt - now)} left`}</span>
       ) : null}
     </>
-  );
-}
-
-/**
- * Tapping the identity area reopens the inspector on the chat's subject: the
- * character for a DM, the chat (each member's activity) otherwise. A huddle
- * names where it is happening: it is face to face, not on the phone.
- */
-export function ChatHeader({
-  chat,
-  userId,
-  typists,
-  onBack,
-  onOpenMembers,
-}: {
-  chat: ChatInfo;
-  userId: string;
-  typists: readonly Typist[];
-  onBack: () => void;
-  /** Absent where membership can't be changed from here. */
-  onOpenMembers?: () => void;
-}) {
-  const { byId } = useCharacters();
-  const [selection, select] = useSelection();
-  const place = usePlace(chat.placeId);
-  const isDirect = isOneOnOne(chat, userId);
-  const others = chat.members.filter((id) => id !== userId);
-  const partner = isDirect ? byId.get(others[0] ?? "") : undefined;
-  const known = others
-    .map((id) => byId.get(id))
-    .filter((c): c is CharacterSummary => Boolean(c));
-
-  const target = chatSubject(chat, userId);
-  const isSelected = target !== null && sameEntity(target, selection);
-  const typing = typists.length > 0;
-
-  const identity = (
-    <>
-      {!isDirect ? (
-        <span aria-hidden className="flex shrink-0 items-center pl-0.5">
-          {known.slice(0, MAX_STACK).map((member, index) => (
-            <PresenceAvatar
-              key={member.id}
-              id={member.id}
-              name={member.name}
-              avatarUrl={member.avatarUrl}
-              kind={member.kind}
-              size="sm"
-              className={cn("ring-2 ring-background", index > 0 && "-ml-2")}
-            />
-          ))}
-        </span>
-      ) : (
-        <PresenceAvatar
-          id={others[0] ?? chat.id}
-          name={partner?.name ?? chat.name}
-          avatarUrl={partner?.avatarUrl}
-          kind={partner?.kind}
-          size="md"
-        />
-      )}
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm leading-tight font-semibold">
-          {chat.name}
-        </span>
-        <span
-          className={cn(
-            "flex min-w-0 items-center gap-1 text-xs leading-tight text-muted-foreground",
-            typing && "shimmer text-primary",
-          )}
-        >
-          {typing ? (
-            <span className="truncate">
-              {isDirect
-                ? "typing…"
-                : formatTypingLabel(
-                    typists.map((t) => t.senderName),
-                    chat.type === "huddle" ? "about to speak" : undefined,
-                  )}
-            </span>
-          ) : chat.type === "huddle" ? (
-            <>
-              <MapPinIcon aria-hidden className="size-3 shrink-0" />
-              <span className="truncate">{`${chat.ended ? "Was in person" : "In person"} at ${place?.name ?? "the same place"}`}</span>
-            </>
-          ) : !isDirect ? (
-            <span className="truncate">
-              {listNames(known.map((member) => member.name)) || "Just you"}
-            </span>
-          ) : (
-            <Activity character={partner} />
-          )}
-        </span>
-      </span>
-    </>
-  );
-
-  return (
-    <header className="flex h-14 shrink-0 items-center gap-1 border-b px-2">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="lg:hidden"
-        onClick={onBack}
-      >
-        <ChevronLeftIcon />
-        <span className="sr-only">Back to chats</span>
-      </Button>
-
-      {target ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                onClick={() => {
-                  select(target);
-                  requestInspector();
-                }}
-                aria-pressed={isSelected}
-              />
-            }
-            className={cn(
-              "flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 text-left outline-none hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-ring",
-              isSelected && "bg-accent/60",
-            )}
-          >
-            {identity}
-          </TooltipTrigger>
-          <TooltipContent>
-            {isDirect ? `About ${partner?.name ?? chat.name}` : "Chat details"}
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 px-2">
-          {identity}
-        </div>
-      )}
-
-      {chat.type === "group" && !chat.draft && onOpenMembers ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button variant="ghost" size="sm" onClick={onOpenMembers} />
-            }
-          >
-            <UsersIcon data-icon="inline-start" />
-            <span className="font-mono text-xs tabular-nums">
-              {chat.members.length}
-            </span>
-            <span className="sr-only">Manage members</span>
-          </TooltipTrigger>
-          <TooltipContent>Manage members</TooltipContent>
-        </Tooltip>
-      ) : null}
-    </header>
   );
 }

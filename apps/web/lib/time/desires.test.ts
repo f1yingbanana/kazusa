@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { DesireRecord, DesiresConfig } from "@kazusa/client";
-import { desireLabel, levelsAt, nextDrop, stateOf, trendOf } from "./desires";
+import {
+  desireLabel,
+  dropOf,
+  isNotable,
+  levelsAt,
+  nextDrop,
+  stateOf,
+  trendOf,
+} from "./desires";
 import { MINUTE } from "./sim";
 
 const config: DesiresConfig = {
@@ -118,6 +126,45 @@ describe("desire trends and forecast", () => {
     );
     expect(nextDrop(config, record, T0)).toBeUndefined();
     expect(nextDrop(config, undefined, T0)).toBeUndefined();
+  });
+
+  it("forecasts each desire's own drop, except one being raised", () => {
+    const record = fresh({ energy: 60, satiety: 30 });
+    // Energy drains 4/h from 60 to the fine floor at 50: 2.5 hours.
+    expect(dropOf(config, record, desire("energy"), T0)).toEqual({
+      desire: "energy",
+      state: "low",
+      at: minutes(150),
+    });
+    const eating = {
+      ...record,
+      effects: {
+        taskId: "meal",
+        until: minutes(30),
+        byDesire: { satiety: { target: 100, rate: 150 } },
+      },
+    };
+    expect(dropOf(config, eating, desire("satiety"), T0)).toBeUndefined();
+  });
+
+  it("calls a desire notable below the initial state or while a task moves it", () => {
+    const record = fresh({ energy: 30, satiety: 90 });
+    expect(isNotable(config, record, desire("energy"), T0)).toBe(true);
+    expect(isNotable(config, record, desire("satiety"), T0)).toBe(false);
+    expect(isNotable(config, record, desire("social"), T0)).toBe(false);
+    const chatting = {
+      ...record,
+      effects: {
+        taskId: "chat",
+        until: minutes(60),
+        byDesire: { social: { target: 100, rate: 40 } },
+      },
+    };
+    expect(isNotable(config, chatting, desire("social"), T0)).toBe(true);
+    // Offstage nothing moves, so the task's effect alone doesn't count.
+    expect(isNotable(config, chatting, desire("social"), T0, true)).toBe(false);
+    expect(isNotable(config, chatting, desire("energy"), T0, true)).toBe(true);
+    expect(isNotable(config, undefined, desire("social"), T0)).toBe(false);
   });
 
   it("prettifies catalog names", () => {

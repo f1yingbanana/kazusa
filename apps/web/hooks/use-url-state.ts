@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   parseEntityRef,
   serializeEntityRef,
@@ -10,9 +10,13 @@ import {
 
 export type UrlPatch = Readonly<Record<string, string | null | undefined>>;
 
-/** URL is the navigation state: `view`, `sel`, and each view's namespaced params. */
+/**
+ * URL is the navigation state: `view`, `sel`, and each view's namespaced
+ * params. The app is one page, so a change is the native History API, which
+ * Next syncs into `useSearchParams` without a server round trip (a router
+ * navigation took about half a second, and showed the old state meanwhile).
+ */
 export function useNavigate() {
-  const router = useRouter();
   const pathname = usePathname();
   return useCallback(
     (patch: UrlPatch, mode: "push" | "replace" = "push") => {
@@ -22,9 +26,13 @@ export function useNavigate() {
         else next.set(key, value);
       }
       const search = next.toString();
-      router[mode](search ? `${pathname}?${search}` : pathname, { scroll: false });
+      const url = search ? `${pathname}?${search}` : pathname;
+      // Re-picking what is already open isn't a step Back should undo.
+      if (url === `${window.location.pathname}${window.location.search}`) return;
+      if (mode === "push") window.history.pushState(null, "", url);
+      else window.history.replaceState(null, "", url);
     },
-    [router, pathname],
+    [pathname],
   );
 }
 

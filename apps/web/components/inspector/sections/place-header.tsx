@@ -29,7 +29,7 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 pr-8">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {path.length ? (
             <nav

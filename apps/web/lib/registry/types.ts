@@ -50,6 +50,13 @@ export interface InspectorSection {
    * unconditionally. Defaults to every entity.
    */
   readonly useApplies?: (entity: EntityRef) => boolean;
+  /**
+   * Foldable under its title, starting `open` or `closed` until the viewer
+   * picks (remembered per section, across entities). Absent: always shown.
+   */
+  readonly fold?: "open" | "closed";
+  /** One short line beside the title while folded (e.g. the model's name). */
+  readonly summary?: ComponentType<{ readonly entity: EntityRef }>;
 }
 
 /** One page of the Settings section, listed in its sidebar. */

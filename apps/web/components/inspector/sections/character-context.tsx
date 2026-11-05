@@ -96,3 +96,21 @@ export function CharacterContextSection({ entity }: { entity: EntityRef }) {
     </div>
   );
 }
+
+/** Folded: whether they follow the world, or how many settings are theirs. */
+export function CharacterContextSummary({ entity }: { entity: EntityRef }) {
+  const { data } = useContextSettings(entity.id);
+  if (!data) return null;
+  const own = Object.values(data.overrides).filter(
+    (value) => value !== undefined,
+  ).length;
+  return (
+    <>
+      {own === 0
+        ? "Follows the world"
+        : own === 1
+          ? "1 of their own"
+          : `${own} of their own`}
+    </>
+  );
+}

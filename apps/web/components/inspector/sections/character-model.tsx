@@ -99,3 +99,13 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
     </div>
   )
 }
+
+/** Folded: the model they run on, and whether it is their own pick. */
+export function CharacterModelSummary({ entity }: { entity: EntityRef }) {
+  const { data } = useModels(entity.id)
+  if (!data?.current) return null
+  // Outside the catalog the ref is all there is: its last part reads best.
+  const known = refName(data.models, data.current)
+  const name = known === data.current ? (data.current.split('/').pop() ?? known) : known
+  return <>{data.overrides?.model ? name : `${name} (world)`}</>
+}
