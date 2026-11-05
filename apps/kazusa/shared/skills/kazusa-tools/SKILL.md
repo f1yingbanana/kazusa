@@ -84,7 +84,8 @@ The chat's address, e.g. chat:direct:bob or chat:huddle:k3x9p2m0qa.
 
 ## send_message.messages
 
-Your bubbles, in order.
+Your bubbles, in order. By text, each is a short message: a few words or one
+sentence. Aloud, each is a line you say: a sentence or two.
 
 ## send_message.messages.type
 

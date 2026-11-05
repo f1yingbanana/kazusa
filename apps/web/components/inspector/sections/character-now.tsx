@@ -1,15 +1,25 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDownIcon, FootprintsIcon, MapPinIcon, PenLineIcon, UsersIcon, type LucideIcon } from 'lucide-react'
+import {
+  AudioLinesIcon,
+  ChevronDownIcon,
+  FootprintsIcon,
+  MapPinIcon,
+  PenLineIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import type { TaskSummary } from '@kazusa/client'
-import { CharacterChip, ChatChip, PlaceChip } from '@/components/entities/chips'
+import { CharacterChip, ChatChip, PlaceChip, useChatTitle } from '@/components/entities/chips'
 import { PresenceAvatar } from '@/components/entities/presence-avatar'
 import { taskIcon, taskLabel } from '@/components/entities/task-icon'
 import { useCharacter, useCharacterStatus, useCharacters } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
-import { useLocationRecord, useOccupancy, usePlaces } from '@/hooks/use-location'
+import { useLocationRecord, useOccupancy, usePlace, usePlaces } from '@/hooks/use-location'
 import { areaPath, positionAt, type PlaceIndex, type Position } from '@/lib/location/places'
+import { listNames } from '@/lib/source/chats/display'
+import { useKazusaConfig } from '@/lib/state/config-store'
 import type { EntityRef } from '@/lib/state/entity-ref'
 import { formatSimDuration, formatSimTime, progress } from '@/lib/time/sim'
 import { cn } from '@/lib/utils'
@@ -18,7 +28,7 @@ const MAX_FACES = 4
 
 /**
  * What the character is doing and where, in one glance: the task, then the
- * place (or the trip), who else is there, and any chat being written in.
+ * place (or the trip), who else is there, and any chat being typed or spoken in.
  * Brain state is left to the presence ring on the avatar.
  */
 export function CharacterNowSection({ entity }: { entity: EntityRef }) {
@@ -59,15 +69,39 @@ export function CharacterNowSection({ entity }: { entity: EntityRef }) {
     <div className="flex flex-col gap-3">
       {task ? <Task task={task} now={now} /> : null}
       {position && places ? <Where id={entity.id} places={places} position={position} now={now} noticed={record?.noticed} /> : null}
-      {status?.composingIn.length ? (
-        <Line icon={PenLineIcon}>
-          <span className="text-muted-foreground">Writing in</span>
-          {status.composingIn.map((chatId) => (
-            <ChatChip key={chatId} id={chatId} />
-          ))}
-        </Line>
-      ) : null}
+      {status?.composingIn.map((chatId) => <Composing key={chatId} id={entity.id} chatId={chatId} />)}
     </div>
+  )
+}
+
+/**
+ * A chat they are composing in, said the way it happens: typed to someone,
+ * typed in a group, or said aloud where they stand. The chip opens the chat.
+ */
+function Composing({ id, chatId }: { id: string; chatId: string }) {
+  const { type, mine, members, placeId } = useChatTitle(chatId)
+  const place = usePlace(placeId)
+  const { byId } = useCharacters()
+  const config = useKazusaConfig()
+  // The player's own chats may leave the player out of their members.
+  const everyone = mine && !members.includes(config.userId) ? [...members, config.userId] : members
+  // Empty when the chat can't be read: then it is just "A chat".
+  const others = listNames(everyone.filter((other) => other !== id).map((other) => byId.get(other)?.name ?? other))
+
+  if (type === 'huddle') {
+    return (
+      <Line icon={AudioLinesIcon}>
+        <span className="text-muted-foreground">{place ? 'Speaking at' : others ? 'Speaking to' : 'Speaking in'}</span>
+        <ChatChip id={chatId} label={place?.name ?? (others || undefined)} />
+      </Line>
+    )
+  }
+  const to = type === 'direct' && others
+  return (
+    <Line icon={PenLineIcon}>
+      <span className="text-muted-foreground">{to ? 'Typing to' : 'Typing in'}</span>
+      <ChatChip id={chatId} label={to ? others : undefined} />
+    </Line>
   )
 }
 

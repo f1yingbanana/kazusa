@@ -55,7 +55,8 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const failure = status?.brain === "thinking" ? undefined : status?.failure;
   const { available: canObserve } = useObservedChat(null);
   const [brainOpen, setBrainOpen] = useState(false);
-  // Message is redundant while their direct chat is the one open.
+  // Message is redundant while their direct chat is the one open, and Talk in
+  // person while you are already talking with them there.
   const view = useParam("view");
   const openChatId = useParam("chats.id");
   const { chats } = useChats();
@@ -66,6 +67,8 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
         (draft?.id === openChatId ? draft : undefined))
       : undefined;
   const inTheirDm = open?.type === "direct" && open.members.includes(entity.id);
+  const inTheirHuddle =
+    open?.type === "huddle" && open.members.includes(entity.id);
 
   if (!character) {
     return (
@@ -121,46 +124,49 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
 
       {failure ? <FailureLine error={failure.error} /> : null}
 
-      <div className="flex items-center gap-1.5">
-        {canMessage && !inTheirDm ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({ view: "chats", "chats.dm": character.id })
-            }
-          >
-            <MessageCircleIcon data-icon="inline-start" />
-            Message
-          </Button>
-        ) : null}
-        {canMessage && together ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({ view: "chats", "chats.talk": character.id })
-            }
-          >
-            <SpeechIcon data-icon="inline-start" />
-            Talk in person
-          </Button>
-        ) : canGo ? (
-          <Button
-            variant="outline"
-            size="sm"
-            title={`Go to ${there.name}`}
-            onClick={() => void player.moveTo?.(there.id)}
-          >
-            <MapPinIcon data-icon="inline-start" />
-            Go there
-          </Button>
-        ) : null}
-        {isAgent ? (
-          <CharacterStopButton id={character.id} name={character.name} />
-        ) : null}
+      {/* The buttons wrap rather than push Watch and More out of the panel. */}
+      <div className="flex items-start gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {canMessage && !inTheirDm ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate({ view: "chats", "chats.dm": character.id })
+              }
+            >
+              <MessageCircleIcon data-icon="inline-start" />
+              Message
+            </Button>
+          ) : null}
+          {canMessage && together && !inTheirHuddle ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate({ view: "chats", "chats.talk": character.id })
+              }
+            >
+              <SpeechIcon data-icon="inline-start" />
+              Talk in person
+            </Button>
+          ) : canGo ? (
+            <Button
+              variant="outline"
+              size="sm"
+              title={`Go to ${there.name}`}
+              onClick={() => void player.moveTo?.(there.id)}
+            >
+              <MapPinIcon data-icon="inline-start" />
+              Go there
+            </Button>
+          ) : null}
+          {isAgent ? (
+            <CharacterStopButton id={character.id} name={character.name} />
+          ) : null}
+        </div>
 
-        <span className="ml-auto flex shrink-0 items-center">
+        <span className="flex shrink-0 items-center">
           <Tooltip>
             <TooltipTrigger
               render={

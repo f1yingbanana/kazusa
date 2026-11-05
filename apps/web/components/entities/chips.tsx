@@ -124,11 +124,14 @@ export function useChatTitle(id: string): {
   };
 }
 
+/** `label` names it from where it is shown, in place of its own title. */
 export function ChatChip({
   id,
+  label,
   className,
 }: {
   id: string;
+  label?: string;
   className?: string;
 }) {
   const { title, type } = useChatTitle(id);
@@ -143,7 +146,7 @@ export function ChatChip({
       }
     >
       <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate">{title}</span>
+      <span className="truncate">{label ?? title}</span>
     </button>
   );
 }
