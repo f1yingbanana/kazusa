@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parseEnv } from "node:util";
+import { PROVIDERS, type ProviderEntry } from "@kazusa/client";
 import { z } from "zod";
 import { writeTemplateSnapshot } from "./template-snapshot";
 
@@ -29,12 +30,40 @@ export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
  */
 export const OPENROUTER_KEY = "OPENROUTER_API_KEY";
 
+/** A provider the setup guide offers a key for, from the shared catalog. */
+export type SetupProvider = Pick<
+  ProviderEntry,
+  "id" | "label" | "hint" | "keysUrl"
+>;
+
+const setupProvider = (id: string): SetupProvider | undefined => {
+  const entry = PROVIDERS.find((candidate) => candidate.id === id);
+  return (
+    entry && {
+      id: entry.id,
+      label: entry.label,
+      ...(entry.hint ? { hint: entry.hint } : {}),
+      ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
+    }
+  );
+};
+
+/**
+ * Which providers the guide offers, in order: Kazusa's `models.providers`,
+ * which also decides whose key runs the world's starting model (the plugin's
+ * `models/config.ts`).
+ */
+const OfferedSchema = z.object({
+  models: z.object({ providers: z.array(z.string()).default([]) }).prefault({}),
+});
+
 /**
  * Where the live world keeps provider keys: OpenClaw auth profiles, named
  * `<provider>:manual` as the plugin names them (`providers/keys.ts`).
  */
 export interface KeyStore {
-  readonly has: (provider: string) => Promise<boolean>;
+  /** Providers with a key saved by Kazusa. */
+  readonly saved: () => Promise<readonly string[]>;
   readonly set: (provider: string, key: string) => Promise<void>;
 }
 
@@ -64,8 +93,8 @@ export function sdkKeyStore(appDir: string): KeyStore {
     `const sdk = await import(${JSON.stringify(sdk)});\n${body}`,
   ];
   return {
-    has: async (provider) => {
-      if (!existsSync(options.env.OPENCLAW_STATE_DIR)) return false;
+    saved: async () => {
+      if (!existsSync(options.env.OPENCLAW_STATE_DIR)) return [];
       const { stdout } = await promisify(execFile)(
         process.execPath,
         script(
@@ -73,8 +102,8 @@ export function sdkKeyStore(appDir: string): KeyStore {
         ),
         options,
       );
-      return ProfileIdsSchema.parse(JSON.parse(stdout)).includes(
-        `${provider}:manual`,
+      return ProfileIdsSchema.parse(JSON.parse(stdout)).flatMap((id) =>
+        id.endsWith(":manual") ? [id.slice(0, -":manual".length)] : [],
       );
     },
     set: async (provider, key) => {
@@ -142,7 +171,12 @@ export const SetupRequestSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
     .optional(),
-  openrouterKey: z.string().trim().min(1).optional(),
+  key: z
+    .object({
+      provider: z.string().min(1),
+      value: z.string().trim().min(1),
+    })
+    .optional(),
 });
 export type SetupRequest = z.infer<typeof SetupRequestSchema>;
 
@@ -174,7 +208,10 @@ export interface SetupStatus {
   readonly worlds: readonly WorldOption[];
   /** The world already copied by an earlier, unfinished run. */
   readonly imported: string | null;
-  readonly hasKey: boolean;
+  /** The providers offered a key, in order; empty once configured. */
+  readonly providers: readonly SetupProvider[];
+  /** Whose key an earlier, unfinished run saved. */
+  readonly savedKey: SetupProvider | null;
 }
 
 /** What `memory.anchors` defaults to in the plugin. */
@@ -339,9 +376,9 @@ export function createSetup(
       ),
       imported,
       // Once a world exists its Gateway owns the auth store; setup is over.
-      hasKey:
-        existsSync(configFile) ||
-        Boolean((await keyOutsideProfile()) || (await keys.has("openrouter"))),
+      ...(existsSync(configFile)
+        ? { providers: [], savedKey: null }
+        : { providers: await offered(), savedKey: await savedKey() }),
     };
   }
 
@@ -386,23 +423,49 @@ export function createSetup(
     );
   }
 
+  async function readBase() {
+    return BaseSchema.parse(
+      JSON.parse(await readFile(path.join(worldsDir, "base.json"), "utf8")),
+    );
+  }
+
+  async function offered(): Promise<SetupProvider[]> {
+    const { models } = OfferedSchema.parse(
+      (await readBase()).config.plugins.entries.kazusa.config,
+    );
+    return models.providers.flatMap((id) => setupProvider(id) ?? []);
+  }
+
+  /** An offered provider's key in a profile, else one from the old keys file. */
+  async function savedKey(): Promise<SetupProvider | null> {
+    const saved = await keys.saved();
+    return (
+      (await offered()).find(({ id }) => saved.includes(id)) ??
+      ((await keyOutsideProfile())
+        ? (setupProvider("openrouter") ?? null)
+        : null)
+    );
+  }
+
   /**
    * Into an auth profile. A key already there wins, as a key already in `.env`
    * did, so finishing an interrupted run never swaps it.
    */
-  async function saveKey(typed: string | undefined): Promise<void> {
-    if (await keys.has("openrouter")) return;
-    const key = typed ?? (await keyOutsideProfile());
-    if (key) await keys.set("openrouter", key);
+  async function saveKey(typed: SetupRequest["key"]): Promise<void> {
+    const saved = await keys.saved();
+    if ((await offered()).some(({ id }) => saved.includes(id))) return;
+    const key = typed ?? {
+      provider: "openrouter",
+      value: await keyOutsideProfile(),
+    };
+    if (key.value) await keys.set(key.provider, key.value);
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
     const world = WorldSchema.parse(
       JSON.parse(await readFile(markerFile, "utf8")),
     );
-    const base = BaseSchema.parse(
-      JSON.parse(await readFile(path.join(worldsDir, "base.json"), "utf8")),
-    );
+    const base = await readBase();
     const agents = await directories(path.join(liveDir, "workspaces"));
     const name = await characterName(
       path.join(liveDir, "workspaces"),
@@ -474,12 +537,21 @@ export function createSetup(
     if (existsSync(configFile)) return;
     if (!(await status()).worlds.some(({ id }) => id === request.world))
       throw new Error(`Unknown world: ${request.world}`);
+    if (
+      request.key &&
+      !(await offered()).some(({ id }) => id === request.key?.provider)
+    )
+      throw new Error(`Unknown provider: ${request.key.provider}`);
     await importWorld(request.world);
-    await saveKey(request.openrouterKey);
+    await saveKey(request.key);
     await writeConfig(request);
   }
 
   return { status, apply, files: { config: configFile, env: envFile } };
 }
 
-export const setup = createSetup(path.resolve(process.cwd(), "../kazusa"));
+// Untraced: Turbopack would otherwise watch everything under the live world,
+// whose state the Gateway writes all the time, and reload every open page.
+export const setup = createSetup(
+  path.resolve(/* turbopackIgnore: true */ process.cwd(), "../kazusa"),
+);

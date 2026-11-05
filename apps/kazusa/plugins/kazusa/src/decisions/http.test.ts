@@ -1,6 +1,7 @@
 import { Socket } from "node:net";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
+import { MODELS_CONFIG } from "../models/config.ts";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { DecisionModelsResponseSchema } from "@kazusa/client";
 import {
@@ -29,6 +30,7 @@ function setup(keys: readonly string[]) {
   registerDecisionModelsHttp(api, {
     selection,
     keyConfigured: (provider) => keys.includes(provider),
+    config: MODELS_CONFIG.parse({}),
   });
   return { routes, selection };
 }
@@ -70,7 +72,16 @@ describe("decision model routes", () => {
       [
         ["openrouter/jev-latest", true],
         ["typesafe/jev-latest", false],
+        ["openrp/typesafe/jev-1.14.0", false],
       ],
+    );
+  });
+
+  it("decides through OpenRP with only an OpenRP key", async () => {
+    const { routes } = setup(["openrp"]);
+    const { body } = await call(routes["/kazusa/models/decision"], "GET");
+    expect(DecisionModelsResponseSchema.parse(body).current).toBe(
+      "openrp/typesafe/jev-1.14.0",
     );
   });
 

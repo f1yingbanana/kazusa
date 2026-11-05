@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { MODELS_CONFIG } from "../models/config.ts";
 import type { DecisionBatch } from "openclaw/plugin-sdk/decisions";
 import {
   createJevProvider,
   JEV_ROUTES,
   type JevDeps,
   type JevRoute,
+  jevRoute,
 } from "./jev.ts";
 
 const batch: DecisionBatch = {
@@ -50,6 +52,7 @@ function keys(
   const keyOf: Record<string, string | undefined> = {
     openrouter: env.OPENROUTER_API_KEY,
     typesafe: env.TYPESAFE_API_KEY,
+    openrp: env.OPENRP_API_KEY,
   };
   return {
     route: async () => picked,
@@ -74,6 +77,48 @@ function provider(
   };
 }
 
+describe("jevRoute", () => {
+  const keys =
+    (...providers: string[]) =>
+    (provider: string) =>
+      providers.includes(provider);
+  const config = MODELS_CONFIG.parse({});
+
+  it("follows the pick while its key works", () => {
+    expect(
+      jevRoute("typesafe/jev-latest", keys("openrouter", "typesafe"), config)
+        .provider,
+    ).toBe("typesafe");
+  });
+
+  it("otherwise takes the first route with a key", () => {
+    expect(jevRoute(undefined, keys("typesafe"), config).provider).toBe(
+      "typesafe",
+    );
+    expect(
+      jevRoute("openrouter/jev-latest", keys("typesafe"), config).provider,
+    ).toBe("typesafe");
+  });
+
+  it("takes the listed providers first, and nothing it wasn't asked for", () => {
+    const both = keys("openrouter", "typesafe");
+    expect(
+      jevRoute(undefined, both, { ...config, providers: ["typesafe"] })
+        .provider,
+    ).toBe("typesafe");
+    expect(
+      jevRoute(undefined, both, { ...config, decision: ["Other"] }).provider,
+    ).toBe("openrouter");
+  });
+
+  it("with no key anywhere, keeps the pick or the first route", () => {
+    expect(jevRoute("typesafe/jev-latest", keys(), config).provider).toBe(
+      "typesafe",
+    );
+    expect(jevRoute(undefined, keys(), config).provider).toBe("openrouter");
+  });
+});
+
 describe("Jev decision provider", () => {
   it("reaches Jev through OpenRouter with only an OpenRouter key", async () => {
     const { jev, post } = provider({ OPENROUTER_API_KEY: "or-key" });
@@ -95,6 +140,37 @@ describe("Jev decision provider", () => {
     const request = post.mock.calls[0]?.[0];
     expect(request?.url).toBe("https://api.typesafe.ai/v1/systemone");
     expect(request?.apiKey).toBe("ts-key");
+  });
+
+  it("reaches Jev through OpenRP, reading its Diamonds reply", async () => {
+    const { jev, post } = provider(
+      { OPENRP_API_KEY: "rp-key" },
+      // As OpenRP answered on 2026-11-04.
+      {
+        body: {
+          model: "jev-1.14.0",
+          answers: { urgent: { type: "noul", noul: 0.56 } },
+          usage: { input_tokens: 283, output_tokens: 21, diamonds: 0.012 },
+        },
+      },
+      JEV_ROUTES.find((route) => route.provider === "openrp"),
+    );
+    const outcome = await jev.evaluate(
+      { ...batch, questions: { urgent: batch.questions.urgent } },
+      context(),
+    );
+    const request = post.mock.calls[0]?.[0];
+    expect(request?.url).toBe("https://openrp.ai/api/v1/systemone");
+    expect(request?.apiKey).toBe("rp-key");
+    expect(JSON.parse(request?.body ?? "").model).toBe("typesafe/jev-1.14.0");
+    expect(outcome).toEqual({
+      status: "ok",
+      result: {
+        model: "jev-1.14.0",
+        answers: { urgent: { type: "boolean", probabilityTrue: 0.56 } },
+        usage: { inputTokens: 283, outputTokens: 21 },
+      },
+    });
   });
 
   it("isn't ready and sends nothing without a key", async () => {

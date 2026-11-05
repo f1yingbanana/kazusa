@@ -86,6 +86,7 @@
         "openai",
         "opencode-go",
         "openrouter",
+        "openrp",
         "qwen",
         "synthetic",
         "together",
@@ -116,7 +117,8 @@
           "../../../node_modules/@openclaw/synthetic-provider",
           "../../../node_modules/@openclaw/venice-provider",
           "../../../node_modules/@openclaw/volcengine-provider",
-          "../../../node_modules/@openclaw/zai-provider"
+          "../../../node_modules/@openclaw/zai-provider",
+          "../../../node_modules/@openrp-ai/openclaw-provider"
         ]
       },
       "entries": {
@@ -143,14 +145,19 @@
               "decisionHistoryItems": 60,
               "decisionWikiMaxArticles": 4
             },
+            "models": {
+              "providers": ["openrp", "openrouter"],
+              "chat": [
+                "GLM 5.3 Flash",
+                "MiMo V2.6 Flash",
+                "DeepSeek V4.1 Flash"
+              ],
+              "decision": ["Jev"],
+              "embedding": ["text-embedding-3-small"]
+            },
             "memory": {
               "sleep": {
                 "enabled": true
-              },
-              "embedding": {
-                "baseUrl": "https://openrouter.ai/api/v1",
-                "provider": "openrouter",
-                "model": "openai/text-embedding-3-small"
               }
             },
             "perception": {
@@ -183,6 +190,12 @@
           "enabled": true
         },
         "openrouter": {
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
+        },
+        "openrp": {
           "enabled": true,
           "hooks": {
             "allowPromptInjection": true

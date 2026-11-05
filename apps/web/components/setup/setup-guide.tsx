@@ -220,13 +220,12 @@ function NoKeyWarning() {
         <p>
           Until a provider has a key, nobody can reply or act, the admin
           included. You&apos;ll land in Settings, under Models: paste a key for
-          OpenRouter or any other provider there, and its models are ready at
-          once.
+          any provider there, and its models are ready at once.
         </p>
         <p>
-          An OpenRouter key also covers decisions and memory search. With
-          another provider, characters react to everything (slower, and it costs
-          more) and remember by keywords only.
+          Decisions and memory search use whichever of your providers offers
+          them, such as OpenRP or OpenRouter. Without one, characters react to
+          everything (slower, and it costs more) and remember by keywords only.
         </p>
       </AlertDescription>
     </Alert>
@@ -307,6 +306,9 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [now] = useState(() => new Date());
   const [date, setDate] = useState(now);
   const [time, setTime] = useState(() => format(now, "HH:mm"));
+  // Offered in `models.providers` order (`worlds/base.json`).
+  const [providerId, setProviderId] = useState(status.providers[0]?.id);
+  const provider = status.providers.find(({ id }) => id === providerId);
   const [key, setKey] = useState("");
   const [skipKey, setSkipKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -330,9 +332,20 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
             },
           ]),
       ...(pickingCast ? [{ name: "cast" }, { name: "time" }] : []),
-      { name: "keys" },
+      {
+        name: "keys",
+        ...(status.savedKey
+          ? {}
+          : { choices: status.providers.map(({ id }) => ({ value: id })) }),
+      },
     ],
-    [status.imported, status.worlds, pickingCast],
+    [
+      status.imported,
+      status.worlds,
+      pickingCast,
+      status.savedKey,
+      status.providers,
+    ],
   );
 
   const chooseWorld = (option: WorldOption) => {
@@ -350,7 +363,8 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
 
   const submit = async () => {
     if (!world || submitting) return;
-    if (!status.hasKey && !skipKey && !key.trim()) {
+    const typed = provider && !skipKey ? key.trim() : "";
+    if (!status.savedKey && !skipKey && !typed) {
       setError("Paste a key, or skip this for now.");
       return;
     }
@@ -365,7 +379,9 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
         ...(pickingCast
           ? { startAt: `${format(date, "yyyy-MM-dd")}T${time}` }
           : {}),
-        ...(key.trim() && !skipKey ? { openrouterKey: key.trim() } : {}),
+        ...(provider && typed
+          ? { key: { provider: provider.id, value: typed } }
+          : {}),
       }),
     }).catch(() => null);
     setSubmitting(false);
@@ -387,7 +403,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
           <Starting
             paused={pickingCast}
             systemAgent={world.systemAgent}
-            keyless={!status.hasKey && skipKey}
+            keyless={!status.savedKey && skipKey}
           />
         ) : (
           <>
@@ -459,46 +475,71 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
 
               <QuestionnaireItem name="keys">
                 <QuestionnaireTitle>
-                  {status.hasKey
-                    ? "Your OpenRouter key is saved"
+                  {status.savedKey
+                    ? `Your ${status.savedKey.label} key is saved`
                     : "Connect a model provider"}
                 </QuestionnaireTitle>
                 <QuestionnaireDescription>
-                  {status.hasKey
+                  {status.savedKey
                     ? "You are ready to start."
-                    : "Characters need a model to think. One OpenRouter key covers chat, decisions and memory search, and it's kept with OpenClaw's saved sign-ins on this computer."}
+                    : "Characters need a model to think. Your key is kept with OpenClaw's saved sign-ins on this computer."}
                 </QuestionnaireDescription>
-                {status.hasKey ? null : (
+                {status.savedKey ? null : (
                   <div className="flex flex-col gap-3">
-                    {skipKey ? null : (
-                      <Field data-invalid={Boolean(error)}>
-                        <FieldLabel htmlFor="setup-openrouter-key">
-                          OpenRouter API key
-                        </FieldLabel>
-                        <Input
-                          id="setup-openrouter-key"
-                          type="password"
-                          autoComplete="off"
-                          placeholder="sk-or-…"
-                          value={key}
-                          onChange={(event) => setKey(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") void submit();
-                          }}
-                          aria-invalid={Boolean(error)}
-                        />
-                        <FieldDescription>
-                          <a
-                            className="underline"
-                            href="https://openrouter.ai/keys"
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Create a key
-                          </a>{" "}
-                          and add credits to your account.
-                        </FieldDescription>
-                      </Field>
+                    {skipKey || !provider ? null : (
+                      <>
+                        <QuestionnaireChoices>
+                          {status.providers.map((option) => (
+                            <QuestionnaireChoice
+                              key={option.id}
+                              value={option.id}
+                              checked={providerId === option.id}
+                              onChange={() => {
+                                setProviderId(option.id);
+                                setError(null);
+                              }}
+                            >
+                              <span className="font-medium">
+                                {option.label}
+                              </span>
+                              {option.hint ? (
+                                <QuestionnaireChoiceDescription>
+                                  {option.hint}
+                                </QuestionnaireChoiceDescription>
+                              ) : null}
+                            </QuestionnaireChoice>
+                          ))}
+                        </QuestionnaireChoices>
+                        <Field data-invalid={Boolean(error)}>
+                          <FieldLabel htmlFor="setup-key">
+                            {provider.label} API key
+                          </FieldLabel>
+                          <Input
+                            id="setup-key"
+                            type="password"
+                            autoComplete="off"
+                            placeholder="Paste your key"
+                            value={key}
+                            onChange={(event) => setKey(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") void submit();
+                            }}
+                            aria-invalid={Boolean(error)}
+                          />
+                          {provider.keysUrl ? (
+                            <FieldDescription>
+                              <a
+                                className="underline"
+                                href={provider.keysUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Get your {provider.label} key
+                              </a>
+                            </FieldDescription>
+                          ) : null}
+                        </Field>
+                      </>
                     )}
                     <Button
                       type="button"
@@ -510,7 +551,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                       }}
                     >
                       {skipKey
-                        ? "Add an OpenRouter key instead"
+                        ? "Add a key instead"
                         : "Skip for now, or use another provider"}
                     </Button>
                     {skipKey ? <NoKeyWarning /> : null}

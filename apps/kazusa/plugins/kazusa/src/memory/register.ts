@@ -35,6 +35,7 @@ import {
   openAiEmbedder,
   type Embedder,
 } from "./embeddings.ts";
+import { modelsConfig } from "../models/config.ts";
 import { modelSelection } from "../models/selection.ts";
 import {
   configuredChoice,
@@ -229,6 +230,7 @@ export function registerMemory(
   const models = registerEmbeddingModels(api, {
     selection: modelSelection(api),
     configured: configuredChoice(config.embedding),
+    config: modelsConfig(api.pluginConfig),
     useVectors: (vectors) => index.useVectors(vectors),
     progress: () => {
       index.world(); // loads the world wiki if no turn has yet

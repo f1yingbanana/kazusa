@@ -321,8 +321,15 @@ apps/kazusa/
   entry is gone) before the next Gateway start, then soft-deletes its store
   entry. Those two files, the manifest's `decisions.typesafeApiKey` schema and
   `TYPESAFE_KEY_PATH` are marked deprecated; remove them all together once no
-  such world is left. The setup guide saves OpenRouter's key as a profile
-  through the SDK in a child Node process before the Gateway exists.
+  such world is left. The setup guide offers the providers in Kazusa's
+  `models.providers` (`worlds/base.json`; labels and key links from the shared
+  catalog, `PROVIDERS` in `@kazusa/client`) and saves the picked one's key as
+  its profile through the SDK in a child Node process before the Gateway exists.
+  It writes no model: the plugin works out the starting model from the keys
+  there are. OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
+  `@openrp-ai/openclaw-provider` (from the openrp repo), a dependency of
+  `apps/kazusa` loaded by path from `base.json` like the official
+  `@openclaw/*-provider` packages.
 - **Gateway token**: required even on loopback, because without it any website
   can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
   `.env`, and hands it to the frontend's proxy. Plugin routes read it from
@@ -331,22 +338,44 @@ apps/kazusa/
   `model`/`thinking` per agent, `decision`/`embedding` for the world), never
   `openclaw.json`, because OpenClaw reloads every plugin on a model change,
   `decisionModel` included (verified: Kazusa force-retired mid-call). The same
-  model through two providers is two choices (whose key pays):
-  - **Chat**: over the configured primary.
+  model through two providers is two choices (whose key pays). Unpicked, or once
+  a pick's key is gone, each role runs the first model of its list in Kazusa's
+  `models` config (`models.chat`, `models.decision`, `models.embedding`;
+  `src/models/config.ts`) that a provider with a working key serves, matched by
+  name or last id segment (`preferred`: "GLM 5.3 Flash" finds
+  `openrouter/z-ai/glm-5.3-flash` and `zai/glm-5.3-flash`), through the first
+  provider in `models.providers` that has it:
+  - **Chat**: a pick, else an agent's own model in `openclaw.json`, else the
+    world's starting model (`src/models/starting.ts`), else the configured
+    primary. Matching needs the catalog, so the starting model is kept in the
+    `"models"` store under `starting`, worked out again at `gateway_start`
+    (`models.list` through `callGatewayFromCli`, re-read for ~10 s while a new
+    world's catalog fills; never `refresh: true` there, which stopped the whole
+    process tree) and on every world catalog read, which Settings does after
+    each key change; turns only read it, waiting for the start-up one.
   - **Decisions**: `agents.defaults.decisionModel` is fixed at `kazusa/jev`, our
     one decision provider (`src/decisions/jev.ts`), which reads the pick per
-    call and posts to OpenRouter's or TypeSafe's System One endpoint
-    (`JEV_ROUTES`). OpenRouter requires non-empty `instructions`. The official
-    `typesafe` plugin isn't used: it can't reach OpenRouter, and switching to it
-    would mean a config change.
-  - **Memory search**: over `memory.embedding` (`baseUrl`, `provider`, `model`);
-    choices in `src/memory/embedding-models.ts`, each naming the `vectors` it
-    makes. The index's `useVectors` switches sets (all kept), so the same model
-    through another provider costs nothing and a new model re-embeds in the
-    background. OpenClaw's embedding adapters are private to its memory plugin
-    since July 2026, hence our own client.
+    call and posts to OpenRouter's, TypeSafe's or OpenRP's System One endpoint
+    (OpenRP serves only the pinned `typesafe/jev-1.14.0`) (`JEV_ROUTES`),
+    unpicked by `models.decision` (`jevRoute`), else the first route. OpenRouter
+    requires non-empty `instructions`. The official `typesafe` plugin isn't
+    used: it can't reach OpenRouter, and switching to it would mean a config
+    change.
+  - **Memory search**: choices in `src/memory/embedding-models.ts`, each naming
+    the `vectors` it makes. The index's `useVectors` switches sets (all kept),
+    so the same model through another provider costs nothing and a new model
+    re-embeds in the background. Unpicked: a hand-configured `memory.embedding`
+    endpoint (`baseUrl`, `provider`, `model`, not one of the listed choices)
+    while its key works, else `models.embedding`, else keywords. Picking `null`
+    clears the pick. OpenClaw's embedding adapters are private to its memory
+    plugin since July 2026, hence our own client.
 
-  One OpenRouter key covers all three. Embeddings and Jev ask
+  One OpenRouter or OpenRP key covers all three. Whether a provider has a key is
+  `providerKeyConfigured` (`providers/keys.ts`): Kazusa's profile, then
+  OpenClaw's `isProviderApiKeyConfigured`, which misses a profile for a provider
+  outside OpenClaw's bundle such as OpenRP; a provider gains decisions or memory
+  search by an entry in `JEV_ROUTES` or `EMBEDDING_MODELS` whose name the config
+  lists, and worlds with its key use it unpicked. Embeddings and Jev ask
   `api.runtime.modelAuth` for the key per call (plaintext for plugins; no
   sentinel), so a key saved while running works at once.
 
@@ -1231,14 +1260,16 @@ connect these modules in process.
     `worlds/base.json` gives every provider plugin
     `hooks.allowPromptInjection: true` (the default behaviour; it only changes
     startup), and `scripts/plugin-startup.mjs` adds it to existing worlds before
-    the Gateway starts. Without it each character's first turn reloads every
-    plugin, a whole Kazusa included (~3 s and ~29 MB each; with 146 characters
-    the Gateway ran out of heap). The brain channel's `outbound.sendText` exists
-    for the same reason: OpenClaw takes a channel from the Gateway's registry
-    only when it can send, and each cron wake looks up its agent's channel. It
-    sends nothing and answers `outcome: "not_sent"`: a fake success would append
-    OpenClaw's restart-recovery notice to the brain transcript, and an error
-    leaves a delivery intent to retry.
+    the Gateway starts. The same script first loads and allows, by its manifest
+    id, any plugin path in `base.json` a world made before it lacks. Without it
+    each character's first turn reloads every plugin, a whole Kazusa included
+    (~3 s and ~29 MB each; with 146 characters the Gateway ran out of heap). The
+    brain channel's `outbound.sendText` exists for the same reason: OpenClaw
+    takes a channel from the Gateway's registry only when it can send, and each
+    cron wake looks up its agent's channel. It sends nothing and answers
+    `outcome: "not_sent"`: a fake success would append OpenClaw's
+    restart-recovery notice to the brain transcript, and an error leaves a
+    delivery intent to retry.
   - Inside an agent run, write another session's transcript only with the strict
     append (§3.2).
   - `readSessionTranscriptCatalogPage` items have no `__openclaw`/raw field.

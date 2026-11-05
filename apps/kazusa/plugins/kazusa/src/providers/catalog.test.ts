@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PROVIDERS } from "./catalog.ts";
+import { PROVIDERS } from "@kazusa/client";
 
 const base = JSON.parse(
   readFileSync(
@@ -15,7 +15,12 @@ const base = JSON.parse(
       allow: string[];
       entries: Record<
         string,
-        { config?: Record<string, unknown>; hooks?: Record<string, unknown> }
+        {
+          config?: Record<string, unknown> & {
+            models?: { providers?: string[] };
+          };
+          hooks?: Record<string, unknown>;
+        }
       >;
     };
   };
@@ -49,6 +54,16 @@ describe("worlds/base.json", () => {
       expect(base.config.plugins.entries[id]?.hooks).toEqual({
         allowPromptInjection: true,
       });
+  });
+
+  it("offers only providers it can run at setup", () => {
+    const offered = base.config.plugins.entries.kazusa?.config?.models;
+    expect(offered?.providers?.length).toBeGreaterThan(0);
+    for (const id of offered?.providers ?? []) {
+      const entry = PROVIDERS.find((candidate) => candidate.id === id);
+      expect(entry?.id).toBe(id);
+      expect(base.config.plugins.allow).toContain(entry?.plugin);
+    }
   });
 
   it("decides with Kazusa", () => {

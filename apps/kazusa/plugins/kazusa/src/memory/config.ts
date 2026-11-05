@@ -41,7 +41,9 @@ export const MEMORY_CONFIG = z.strictObject({
       notesPerPage: 30,
     }),
   /**
-   * The key is that model provider's, wherever OpenClaw keeps it (auth profile,
+   * Your own OpenAI-compatible endpoint, run before `models.embedding` while
+   * its key works; one of `EMBEDDING_MODELS` here is only one more choice. The
+   * key is that model provider's, wherever OpenClaw keeps it (auth profile,
    * environment or config). No key means keywords only.
    */
   embedding: z

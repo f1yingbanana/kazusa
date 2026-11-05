@@ -8,27 +8,33 @@ type Hook = (event: unknown, ctx: { sessionKey?: string }) => Promise<unknown>;
 function setup(
   selected: ModelSelection,
   agents: Record<string, ModelSelection> = {},
+  config: Record<string, unknown> = {},
+  call: (method: string, params: unknown) => Promise<unknown> = vi.fn(),
 ) {
   const hooks: Record<string, Hook> = {};
   const api = {
     config: {},
+    logger: { info: vi.fn(), warn: vi.fn() },
     registerHttpRoute: vi.fn(),
     on: vi.fn((name: string, hook: Hook) => {
       hooks[name] = hook;
     }),
     runtime: {
+      config: { current: () => config },
       state: {
         openKeyedStore: () => ({
           lookup: async (key: string) =>
             key === "world" ? selected : agents[key],
-          register: vi.fn(),
+          register: vi.fn(async (key: string, value: ModelSelection) => {
+            agents[key] = value;
+          }),
           entries: async () => [],
         }),
       },
     },
   } as unknown as OpenClawPluginApi;
-  registerModels(api);
-  return hooks.before_model_resolve;
+  registerModels(api, { call });
+  return Object.assign(hooks.before_model_resolve, { hooks });
 }
 
 describe("registerModels", () => {
@@ -51,6 +57,56 @@ describe("registerModels", () => {
     expect(
       await unpicked({ prompt: "" }, { sessionKey: "agent:airi:brain" }),
     ).toBeUndefined();
+  });
+
+  it("runs an unpicked world on its starting model, unless an agent has its own", async () => {
+    const hook = setup(
+      {},
+      { starting: { model: "openrp/zai/glm-5.3-flash" } },
+      {
+        agents: { entries: { airi: { model: { primary: "venice/qwen3" } } } },
+      },
+    );
+    expect(await hook({}, { sessionKey: "agent:kazusa:brain" })).toEqual({
+      providerOverride: "openrp",
+      modelOverride: "zai/glm-5.3-flash",
+    });
+    expect(await hook({}, { sessionKey: "agent:airi:brain" })).toBeUndefined();
+  });
+
+  it("works out the starting model at start, waiting out a catalog not ready yet", async () => {
+    vi.useFakeTimers();
+    const listing = (models: unknown[]) => ({ models });
+    const call = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Retry the request."))
+      .mockResolvedValueOnce(listing([]))
+      .mockResolvedValue(
+        listing([
+          {
+            id: "zai/glm-5.3-flash",
+            name: "GLM-5.3-Flash",
+            provider: "openrp",
+            available: true,
+          },
+        ]),
+      );
+    const hook = setup({}, {}, { agents: { entries: { arona: {} } } }, call);
+    await hook.hooks.gateway_start?.({}, {});
+    // A turn arriving meanwhile waits for it.
+    const turn = hook({}, { sessionKey: "agent:arona:brain" });
+    await vi.runAllTimersAsync();
+    expect(await turn).toEqual({
+      providerOverride: "openrp",
+      modelOverride: "zai/glm-5.3-flash",
+    });
+    // A failed read is tried again like an empty one.
+    expect(call).toHaveBeenCalledTimes(3);
+    expect(call).toHaveBeenCalledWith("models.list", {
+      agentId: "arona",
+      view: "all",
+    });
+    vi.useRealTimers();
   });
 
   it("resolves the brain's owner independently of other agents", async () => {

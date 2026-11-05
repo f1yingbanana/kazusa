@@ -21,7 +21,7 @@ import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
-import { startProviderPlugins } from "./plugin-startup.mjs";
+import { loadNewPlugins, startProviderPlugins } from "./plugin-startup.mjs";
 import { dropStoreKeyRefs } from "./provider-keys.mjs";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
@@ -42,12 +42,12 @@ const PACKAGED = process.argv.includes("--packaged");
 const NEXT = path.join(ROOT, "node_modules/next/dist/bin/next");
 const OPENCLAW = path.join(ROOT, "node_modules/openclaw/openclaw.mjs");
 // New worlds load these plugins by path, so an older install has to pick up
-// any added since.
+// any added since. Every dependency but OpenClaw itself is a plugin.
 const PLUGINS = Object.keys(
   JSON.parse(readFileSync(path.join(ROOT, "apps/kazusa/package.json"), "utf8"))
     .dependencies,
 )
-  .filter((name) => name.startsWith("@openclaw/"))
+  .filter((name) => name !== "openclaw")
   .map((name) => path.join(ROOT, "node_modules", name));
 const BROWSER_OPENERS = {
   darwin: ["open"],
@@ -292,6 +292,11 @@ if (!stopping) {
     for (const line of dropStoreKeyRefs(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't finish moving provider keys: ${error.message}`);
+  }
+  try {
+    for (const line of loadNewPlugins(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't add new plugins to this world: ${error.message}`);
   }
   try {
     for (const line of startProviderPlugins(ROOT)) console.log(line);

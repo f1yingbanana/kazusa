@@ -4,7 +4,8 @@ import {
   type EmbeddingModelOption,
   type EmbeddingModelsResponse,
 } from "@kazusa/client";
-import { currentConfig } from "../current-config.ts";
+import { preferred, type ModelsConfig } from "../models/config.ts";
+import { providerKeyConfigured } from "../providers/keys.ts";
 import type { ModelSelectionStore } from "../models/selection.ts";
 import {
   createRouteRegistrar,
@@ -60,6 +61,20 @@ export const EMBEDDING_MODELS: readonly EmbeddingChoice[] = [
     vectors: OPENAI_LARGE,
   },
   {
+    provider: "openrp",
+    model: OPENAI_SMALL,
+    name: "text-embedding-3-small",
+    baseUrl: "https://openrp.ai/api/v1",
+    vectors: OPENAI_SMALL,
+  },
+  {
+    provider: "openrp",
+    model: OPENAI_LARGE,
+    name: "text-embedding-3-large",
+    baseUrl: "https://openrp.ai/api/v1",
+    vectors: OPENAI_LARGE,
+  },
+  {
     provider: "openrouter",
     model: OPENAI_SMALL,
     name: "text-embedding-3-small",
@@ -101,7 +116,10 @@ export function configuredChoice(embedding: {
 }
 
 export interface EmbeddingModels {
-  /** The choice in force: the one picked here, else the configured one. */
+  /**
+   * The choice in force: the pick while its key works, else the unpicked
+   * default. With no key for either, recall uses keywords.
+   */
   readonly current: () => Promise<EmbeddingChoice>;
   /** Whether the provider has a key right now. */
   readonly usable: (choice: EmbeddingChoice) => boolean;
@@ -109,36 +127,56 @@ export interface EmbeddingModels {
 
 /**
  * The memory search model, picked like the chat model: kept in Kazusa's
- * selection (`ModelSelection.embedding`), with `memory.embedding` as the
- * default, so a switch reloads nothing. Switching changes which stored vectors
- * the index reads; pages without one are embedded in the background, and recall
- * leans on keywords until then.
+ * selection (`ModelSelection.embedding`), so a switch reloads nothing.
+ * Unpicked, a hand-configured `memory.embedding` endpoint runs while its key
+ * works, else the first of `models.embedding` a provider with a key serves.
+ * Switching changes which stored vectors the index reads; pages without one are
+ * embedded in the background, and recall leans on keywords until then.
  */
 export function registerEmbeddingModels(
   api: OpenClawPluginApi,
   deps: {
     readonly selection: ModelSelectionStore;
     readonly configured: EmbeddingChoice;
+    readonly config: Pick<ModelsConfig, "embedding" | "providers">;
     readonly useVectors: (vectors: string) => void;
     readonly progress: () => { embedded: number; total: number };
     /** Embeds what the new choice lacks, without waiting. */
     readonly fillIn: () => void;
+    /** Whether the provider has a key right now. */
+    readonly keyConfigured?: (provider: string) => boolean;
   },
 ): EmbeddingModels {
   const choices = (): EmbeddingChoice[] =>
     EMBEDDING_MODELS.some((choice) => refOf(choice) === refOf(deps.configured))
       ? [...EMBEDDING_MODELS]
       : [...EMBEDDING_MODELS, deps.configured];
+  const keyConfigured =
+    deps.keyConfigured ??
+    ((provider: string) => providerKeyConfigured(api, provider));
   const usable = (choice: EmbeddingChoice): boolean =>
-    api.runtime.modelAuth.isProviderApiKeyConfigured({
-      provider: choice.provider,
-      cfg: currentConfig(api),
-    });
-  const current = async (): Promise<EmbeddingChoice> => {
-    const picked = (await deps.selection.read()).embedding;
-    return (
-      choices().find((choice) => refOf(choice) === picked) ?? deps.configured
+    keyConfigured(choice.provider);
+  const unpicked = (): EmbeddingChoice => {
+    const { configured } = deps;
+    const own = !EMBEDDING_MODELS.some(
+      (choice) => refOf(choice) === refOf(configured),
     );
+    if (own && usable(configured)) return configured;
+    return (
+      preferred(
+        choices().filter(usable),
+        deps.config.embedding,
+        deps.config.providers,
+        (choice) => ({ ...choice, id: choice.model }),
+      ) ?? configured
+    );
+  };
+  const current = async (): Promise<EmbeddingChoice> => {
+    const { embedding } = await deps.selection.read();
+    const picked = choices().find((choice) => refOf(choice) === embedding);
+    if (picked && usable(picked)) return picked;
+    const fallback = unpicked();
+    return usable(fallback) ? fallback : (picked ?? fallback);
   };
 
   const state = async (): Promise<EmbeddingModelsResponse> => {
@@ -146,7 +184,7 @@ export function registerEmbeddingModels(
     deps.useVectors(choice.vectors);
     return {
       current: refOf(choice),
-      configured: refOf(deps.configured),
+      configured: refOf(unpicked()),
       options: choices().map((option): EmbeddingModelOption => {
         const available = usable(option);
         return {
@@ -172,7 +210,7 @@ export function registerEmbeddingModels(
     );
     const choice = ref
       ? choices().find((option) => refOf(option) === ref)
-      : deps.configured;
+      : unpicked();
     if (!choice) {
       sendJson(res, 404, { error: `${ref} isn't a memory search model.` });
       return;
@@ -183,7 +221,8 @@ export function registerEmbeddingModels(
       });
       return;
     }
-    await deps.selection.update({ embedding: refOf(choice) });
+    // No ref clears the pick, so the default follows keys again.
+    await deps.selection.update({ embedding: ref ? refOf(choice) : undefined });
     deps.useVectors(choice.vectors);
     deps.fillIn();
     sendJson(res, 200, (await state()) satisfies EmbeddingModelsResponse);
