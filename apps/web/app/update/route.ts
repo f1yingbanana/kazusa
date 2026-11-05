@@ -4,7 +4,7 @@ import { runUpdater } from "@/lib/update/run";
 
 /** Stays the same until the frontend restarts. */
 const BOOT = String(Date.now());
-/** GitHub allows 60 calls an hour without a token, and a check makes up to four. */
+/** GitHub allows 60 calls an hour without a token, and a check makes up to five. */
 const CHECK_TTL_MS = 2 * 60_000;
 const StageSchema = z.object({ to: z.enum(["release", "development"]) });
 
