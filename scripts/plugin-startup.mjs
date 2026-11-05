@@ -48,7 +48,41 @@ export function startProviderPlugins(root) {
   ];
 }
 
+/**
+ * A world loads plugins by the paths `base.json` had when it was made. One
+ * added since (OpenRP's provider) is loaded and allowed here, by the id in its
+ * manifest: a path missing from a world means the plugin came after it, not
+ * that its player turned it off. One not installed yet is left for the next
+ * start. Run before `startProviderPlugins`, which only starts plugins the world
+ * allows.
+ */
+export function loadNewPlugins(root) {
+  const worldDir = path.join(root, "apps/kazusa/world");
+  const configFile = path.join(worldDir, "openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const base = JSON.parse(
+    readFileSync(path.join(root, "apps/kazusa/worlds/base.json"), "utf8"),
+  );
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const plugins = (config.plugins ??= {});
+  const paths = ((plugins.load ??= {}).paths ??= []);
+  const added = (base.config?.plugins?.load?.paths ?? [])
+    .filter((dir) => !paths.includes(dir))
+    .flatMap((dir) => {
+      const manifest = path.join(worldDir, dir, "openclaw.plugin.json");
+      if (!existsSync(manifest)) return [];
+      const { id } = JSON.parse(readFileSync(manifest, "utf8"));
+      paths.push(dir);
+      if (plugins.allow && !plugins.allow.includes(id)) plugins.allow.push(id);
+      return [id];
+    });
+  if (!added.length) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [`This world now loads new plugins: ${added.join(", ")}.`];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
 }

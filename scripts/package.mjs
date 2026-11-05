@@ -58,6 +58,8 @@ const INCLUDED = [
   "package.json",
   "package-lock.json",
   "scripts/dev.mjs",
+  "scripts/plugin-startup.mjs",
+  "scripts/provider-keys.mjs",
   "scripts/system-agent.mjs",
   "scripts/update.mjs",
   "apps/",

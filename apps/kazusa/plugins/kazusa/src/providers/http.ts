@@ -8,8 +8,10 @@ import {
   getRuntimeConfigSourceSnapshot,
 } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import {
+  PROVIDERS,
   ProviderKeyPayloadSchema,
   ProviderRemovePayloadSchema,
+  type ProviderEntry,
   type ProviderKeySource,
   type ProviderSummary,
   type ProvidersResponse,
@@ -20,7 +22,6 @@ import {
   resolveAuthToken,
   sendJson,
 } from "../http/helpers.ts";
-import { PROVIDERS, type ProviderEntry } from "./catalog.ts";
 import { authProfileKeys, type ProviderKeys } from "./keys.ts";
 
 export interface ProvidersDeps {

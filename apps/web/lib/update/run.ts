@@ -1,8 +1,11 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
 
-/** The repository's root: the frontend runs from `apps/web`. */
-const ROOT = path.resolve(process.cwd(), "../..");
+/**
+ * The repository's root: the frontend runs from `apps/web`. Untraced, or
+ * Turbopack would watch the whole repository, the live world's state included.
+ */
+const ROOT = path.resolve(/* turbopackIgnore: true */ process.cwd(), "../..");
 const UPDATER = path.join(ROOT, "scripts/update.mjs");
 
 export type UpdaterResult =

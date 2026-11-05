@@ -28,6 +28,7 @@
     "@openclaw/venice-provider": "2026.10.5",
     "@openclaw/volcengine-provider": "2026.10.5",
     "@openclaw/zai-provider": "2026.10.5",
+    "@openrp-ai/openclaw-provider": "0.1.0",
     "openclaw": "^2026.10.5"
   }
 }

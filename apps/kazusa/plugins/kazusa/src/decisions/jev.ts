@@ -6,15 +6,21 @@ import type {
 } from "openclaw/plugin-sdk/decisions";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf-runtime";
 import { z } from "zod";
+import {
+  modelsConfig,
+  preferred,
+  type ModelsConfig,
+} from "../models/config.ts";
 import { modelSelection } from "../models/selection.ts";
-import { authProfileKeys } from "../providers/keys.ts";
+import { authProfileKeys, providerKeyConfigured } from "../providers/keys.ts";
 
 /**
  * Jev, as the one decision model OpenClaw is configured with: `kazusa/jev`.
  * Which provider runs it is a Kazusa choice (`ModelSelection.decision`), read
  * per call, because changing OpenClaw's `decisionModel` reloads every plugin.
- * Both serve TypeSafe's System One API; OpenRouter's also needs non-empty
- * `instructions` and adds fields the check below ignores.
+ * All serve TypeSafe's System One API; OpenRouter's also needs non-empty
+ * `instructions`, and OpenRouter and OpenRP add fields the check below ignores
+ * (OpenRP's `usage.diamonds` replaces a dollar `cost`).
  */
 export const DECISION_PROVIDER_ID = "kazusa";
 
@@ -39,10 +45,41 @@ export const JEV_ROUTES: readonly JevRoute[] = [
     name: "Jev",
     url: "https://api.typesafe.ai/v1/systemone",
   },
+  {
+    provider: "openrp",
+    // OpenRP serves only this pinned Jev; `typesafe/jev-latest` 404s.
+    model: "typesafe/jev-1.14.0",
+    name: "Jev",
+    url: "https://openrp.ai/api/v1/systemone",
+  },
 ];
 
 export const routeRef = (route: JevRoute): string =>
   `${route.provider}/${route.model}`;
+
+/**
+ * The route decisions take: the pick while its key works, else the first of
+ * `models.decision` a provider with a key serves, so a world decides with
+ * whichever provider it has.
+ */
+export function jevRoute(
+  decision: string | undefined,
+  keyConfigured: (provider: string) => boolean,
+  config: Pick<ModelsConfig, "decision" | "providers">,
+): JevRoute {
+  const picked = JEV_ROUTES.find((route) => routeRef(route) === decision);
+  if (picked && keyConfigured(picked.provider)) return picked;
+  return (
+    preferred(
+      JEV_ROUTES.filter((route) => keyConfigured(route.provider)),
+      config.decision,
+      config.providers,
+      (route) => ({ ...route, id: route.model }),
+    ) ??
+    picked ??
+    JEV_ROUTES[0]
+  );
+}
 
 /**
  * TypeSafe's key: a secret reference in Kazusa's own config, declared in the
@@ -179,24 +216,16 @@ const post: JevDeps["post"] = async ({
 /** Keys wherever OpenClaw keeps them; the route from Kazusa's selection. */
 export function gatewayJevDeps(api: OpenClawPluginApi): JevDeps {
   const selection = modelSelection(api);
+  const config = modelsConfig(api.pluginConfig);
+  // TypeSafe is no model provider, so only its auth profile can hold a key.
+  const keyConfigured = (provider: string): boolean =>
+    provider === "typesafe"
+      ? authProfileKeys.has(provider)
+      : providerKeyConfigured(api, provider);
   return {
-    route: async () => {
-      const { decision } = await selection.read();
-      return (
-        JEV_ROUTES.find((route) => routeRef(route) === decision) ??
-        JEV_ROUTES[0]
-      );
-    },
-    // TypeSafe is no model provider, so only its auth profile can hold a key.
-    keyConfigured: (provider) =>
-      authProfileKeys.has(provider) ||
-      (provider !== "typesafe" &&
-        api.runtime.modelAuth.isProviderApiKeyConfigured({
-          provider,
-          cfg: api.runtime.config.current() as Parameters<
-            typeof api.runtime.modelAuth.isProviderApiKeyConfigured
-          >[0]["cfg"],
-        })),
+    route: async () =>
+      jevRoute((await selection.read()).decision, keyConfigured, config),
+    keyConfigured,
     resolveKey: async (provider) =>
       (await api.runtime.modelAuth.resolveApiKeyForProvider({ provider }))
         .apiKey,

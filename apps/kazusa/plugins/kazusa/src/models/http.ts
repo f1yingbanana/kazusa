@@ -24,6 +24,7 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import type { ModelSelectionStore } from "./selection.ts";
+import type { StartingModel } from "./starting.ts";
 
 type Config = ReturnType<typeof getRuntimeConfig>;
 
@@ -66,6 +67,7 @@ export interface ModelsDeps {
   }) => Promise<unknown>;
   readonly readConfig: () => Config;
   readonly selection: ModelSelectionStore;
+  readonly starting: StartingModel;
 }
 
 function primaryOf(config: Config, agentId?: string): string | undefined {
@@ -73,6 +75,21 @@ function primaryOf(config: Config, agentId?: string): string | undefined {
     return resolveAgentEffectiveModelPrimary(config, agentId);
   const model = config.agents?.defaults?.model;
   return typeof model === "string" ? model : model?.primary;
+}
+
+/**
+ * What a scope runs unpicked: an agent's own model in `openclaw.json`, else the
+ * world's starting model, else OpenClaw's primary.
+ */
+export function unpickedModel(
+  config: Config,
+  agentId: string | undefined,
+  starting: string | undefined,
+): string | undefined {
+  const own =
+    agentId !== undefined &&
+    resolveAgentConfig(config, agentId)?.model !== undefined;
+  return (own ? undefined : starting) ?? primaryOf(config, agentId);
 }
 
 /** Drops `ultra` and anything newer than the client knows. */
@@ -85,7 +102,43 @@ function thinkingOptions(
   });
 }
 
-const gatewayDeps: Omit<ModelsDeps, "selection"> = {
+/**
+ * The models in a `models.list` payload a character could run, aliased from
+ * `shortlist`. Characters act through tools, so a model that can't call them
+ * can't run a brain. Absent means supported, as in OpenClaw's own check.
+ * `models.list` reports no output modality, so text output can't be checked
+ * here; OpenClaw's OpenRouter discovery and models.dev import skip non-text
+ * models themselves. A provider with no key (a bundled plugin nobody connected,
+ * such as the Claude CLI) isn't a choice; a rejected or cooling key still
+ * shows, with why.
+ */
+export function catalogModels(
+  payload: unknown,
+  shortlist: Readonly<Record<string, { readonly alias?: string }>> = {},
+): ModelOption[] {
+  return ModelsListResultSchema.parse(payload)
+    .models.filter((model) => model.supportsTools !== false)
+    .filter((model) => model.unavailableReason !== "missing-auth")
+    .map((model): ModelOption => {
+      const ref = `${model.provider}/${model.id}`;
+      return {
+        ref,
+        provider: model.provider,
+        id: model.id,
+        name: model.name,
+        alias: model.alias ?? shortlist[ref]?.alias,
+        available: model.available !== false,
+        unavailableReason: model.unavailableReason,
+        contextWindow: model.contextWindow,
+        reasoning: model.reasoning,
+        thinkingLevels: thinkingOptions(model.thinkingLevels),
+        thinkingDefault: ThinkingLevelSchema.safeParse(model.thinkingDefault)
+          .data,
+      };
+    });
+}
+
+const gatewayDeps: Omit<ModelsDeps, "selection" | "starting"> = {
   list: async ({ agentId, refresh }) => {
     const response = await dispatchGatewayMethod(
       "models.list",
@@ -110,7 +163,7 @@ const gatewayDeps: Omit<ModelsDeps, "selection"> = {
  */
 export function registerModelsHttp(
   api: OpenClawPluginApi,
-  overrides: Pick<ModelsDeps, "selection"> & Partial<ModelsDeps>,
+  overrides: Pick<ModelsDeps, "selection" | "starting"> & Partial<ModelsDeps>,
 ): void {
   const deps: ModelsDeps = { ...gatewayDeps, ...overrides };
 
@@ -139,9 +192,7 @@ export function registerModelsHttp(
     // World requests retain the first configured agent's catalog view.
     const agentId = targetId ?? listAgentIds(config)[0];
     if (!agentId) throw new Error("No characters are configured.");
-    const result = ModelsListResultSchema.parse(
-      await deps.list({ agentId, refresh }),
-    );
+    const result = await deps.list({ agentId, refresh });
     // Only for aliases: the shortlist isn't shown as its own group.
     const shortlist = {
       ...config.agents?.defaults?.models,
@@ -150,32 +201,12 @@ export function registerModelsHttp(
         : resolveAgentConfig(config, targetId)?.models),
     };
     const selected = await deps.selection.read(targetId);
-    // Characters act through tools, so a model that can't call them can't run a
-    // brain. Absent means supported, as in OpenClaw's own check. `models.list`
-    // reports no output modality, so text output can't be checked here; OpenClaw's
-    // OpenRouter discovery and models.dev import skip non-text models themselves.
-    // A provider with no key (a bundled plugin nobody connected, such as the
-    // Claude CLI) isn't a choice; a rejected or cooling key still shows, with why.
-    const models = result.models
-      .filter((model) => model.supportsTools !== false)
-      .filter((model) => model.unavailableReason !== "missing-auth")
-      .map((model): ModelOption => {
-        const ref = `${model.provider}/${model.id}`;
-        return {
-          ref,
-          provider: model.provider,
-          id: model.id,
-          name: model.name,
-          alias: model.alias ?? shortlist[ref]?.alias,
-          available: model.available !== false,
-          unavailableReason: model.unavailableReason,
-          contextWindow: model.contextWindow,
-          reasoning: model.reasoning,
-          thinkingLevels: thinkingOptions(model.thinkingLevels),
-          thinkingDefault: ThinkingLevelSchema.safeParse(model.thinkingDefault)
-            .data,
-        };
-      });
+    const models = catalogModels(result, shortlist);
+    // Only the world's view decides the world's starting model.
+    const starting =
+      targetId === undefined
+        ? await deps.starting.update(models)
+        : await deps.starting.current();
     return {
       ...(targetId === undefined
         ? {}
@@ -183,11 +214,11 @@ export function registerModelsHttp(
             agentId: targetId,
             overrides: await deps.selection.overrides(targetId),
           }),
-      current: selected.model ?? primaryOf(config, targetId),
-      configured: primaryOf(config, targetId),
+      current: selected.model ?? unpickedModel(config, targetId, starting),
+      configured: unpickedModel(config, targetId, starting),
       thinking: selected.thinking,
       models,
-      providers: result.providerOutcomes ?? [],
+      providers: ModelsListResultSchema.parse(result).providerOutcomes ?? [],
     };
   };
 
@@ -215,7 +246,13 @@ export function registerModelsHttp(
       const selected = await deps.selection.read(agentId);
       sendJson(res, 200, {
         ...(agentId === undefined ? {} : { agentId }),
-        current: selected.model ?? primaryOf(deps.readConfig(), agentId),
+        current:
+          selected.model ??
+          unpickedModel(
+            deps.readConfig(),
+            agentId,
+            await deps.starting.current(),
+          ),
       } satisfies ModelSelectResponse);
       return;
     }

@@ -19,6 +19,7 @@ import {
   type DecisionUsageBucket,
 } from "./decisions/usage.ts";
 import { registerDecisionModelsHttp } from "./decisions/http.ts";
+import { modelsConfig } from "./models/config.ts";
 import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
 import {
@@ -80,6 +81,7 @@ export default definePluginEntry({
     registerDecisionModelsHttp(api, {
       selection: modelSelection(api),
       keyConfigured: jev.keyConfigured,
+      config: modelsConfig(api.pluginConfig),
     });
     registerHostPromptEdits(
       api,
@@ -125,7 +127,7 @@ export default definePluginEntry({
       clock,
       broadcaster,
       feelings: desires.feelings,
-      modelOf: async (agentId) => (await models.read(agentId)).model,
+      modelOf: models.model,
       experiences: async (agentId, since, now) =>
         (await contextRef.current?.experiences(agentId, since, now)) ?? {
           text: "",
@@ -221,7 +223,7 @@ export default definePluginEntry({
         );
       },
       thinking: async (agentId) => (await models.read(agentId)).thinking,
-      model: async (agentId) => (await models.read(agentId)).model,
+      model: models.model,
     });
     registerBrainHttp(api);
     registerBrainTraceHttp(

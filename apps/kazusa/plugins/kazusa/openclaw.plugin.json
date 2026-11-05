@@ -18,6 +18,41 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "models": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Which providers the setup guide offers, and what each model role runs until one is picked: the first listed model a provider with a key serves, matched by name or the last part of its id.",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": ["openrp", "openrouter"],
+            "description": "Provider ids the setup guide offers a key for, in order. Among providers with a key serving a listed model, the first listed runs it."
+          },
+          "chat": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": [
+              "GLM 5.3 Flash",
+              "MiMo V2.6 Flash",
+              "DeepSeek V4.1 Flash"
+            ],
+            "description": "Chat models, best first. Without one, the configured primary runs."
+          },
+          "decision": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": ["Jev"],
+            "description": "Decision models, best first. Without one, the first route."
+          },
+          "embedding": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": ["text-embedding-3-small"],
+            "description": "Memory search models, best first, after a hand-configured memory.embedding endpoint. Without one, recall uses keywords."
+          }
+        }
+      },
       "perception": {
         "type": "object",
         "properties": {

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { startProviderPlugins } from "./plugin-startup.mjs";
+import { loadNewPlugins, startProviderPlugins } from "./plugin-startup.mjs";
 
 const policy = { allowPromptInjection: true };
 
@@ -86,5 +86,54 @@ describe("startProviderPlugins", () => {
   it("does nothing before a world exists", () => {
     const { root } = repo(undefined);
     expect(startProviderPlugins(root)).toEqual([]);
+  });
+});
+
+describe("loadNewPlugins", () => {
+  const OPENRP = "../../../node_modules/@openrp-ai/openclaw-provider";
+  const MISSING = "../../../node_modules/@openclaw/not-installed-provider";
+  /** Base lists Kazusa, OpenRP's package (installed) and one not installed. */
+  const withLoadPaths = (root) => {
+    const file = path.join(root, "apps/kazusa/worlds/base.json");
+    const base = JSON.parse(readFileSync(file, "utf8"));
+    base.config.plugins.load = {
+      paths: ["../plugins/kazusa", OPENRP, MISSING],
+    };
+    writeFileSync(file, JSON.stringify(base));
+    const plugin = path.join(root, "node_modules/@openrp-ai/openclaw-provider");
+    mkdirSync(plugin, { recursive: true });
+    writeFileSync(
+      path.join(plugin, "openclaw.plugin.json"),
+      JSON.stringify({ id: "openrp" }),
+    );
+    return root;
+  };
+
+  it("loads and allows, by its manifest id, a plugin added after the world was made", () => {
+    const { root, read } = repo({
+      plugins: {
+        allow: ["kazusa", "zai"],
+        load: { paths: ["../plugins/kazusa"] },
+      },
+    });
+    expect(loadNewPlugins(withLoadPaths(root))).toEqual([
+      "This world now loads new plugins: openrp.",
+    ]);
+    // One not installed yet waits for the next start.
+    expect(read().plugins).toEqual({
+      allow: ["kazusa", "zai", "openrp"],
+      load: { paths: ["../plugins/kazusa", OPENRP] },
+    });
+    expect(loadNewPlugins(root)).toEqual([]);
+  });
+
+  it("leaves a world without an allowlist allowing everything", () => {
+    const { root, read } = repo({
+      plugins: { load: { paths: ["../plugins/kazusa"] } },
+    });
+    loadNewPlugins(withLoadPaths(root));
+    expect(read().plugins).toEqual({
+      load: { paths: ["../plugins/kazusa", OPENRP] },
+    });
   });
 });

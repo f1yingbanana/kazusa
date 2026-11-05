@@ -7,8 +7,10 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { EmbeddingModelsResponseSchema } from "@kazusa/client";
+import { MODELS_CONFIG } from "../models/config.ts";
 import {
   configuredChoice,
+  type EmbeddingChoice,
   EMBEDDING_MODELS,
   registerEmbeddingModels,
 } from "./embedding-models.ts";
@@ -26,7 +28,10 @@ const OPENROUTER_SMALL = configuredChoice({
   model: "openai/text-embedding-3-small",
 });
 
-function setup(keys: readonly string[]) {
+function setup(
+  keys: readonly string[],
+  configured: EmbeddingChoice = OPENROUTER_SMALL,
+) {
   const routes: Record<string, Handler> = {};
   const rows = new Map<string, ModelSelection>();
   const api = {
@@ -49,10 +54,12 @@ function setup(keys: readonly string[]) {
       },
       entries: async () => [],
     }),
-    configured: OPENROUTER_SMALL,
+    configured,
+    config: MODELS_CONFIG.parse({}),
     useVectors: vi.fn(),
     progress: () => ({ embedded: 3, total: 4 }),
     fillIn: vi.fn(),
+    keyConfigured: (provider: string) => keys.includes(provider),
   };
   const models = registerEmbeddingModels(api, deps);
   return { routes, deps, models };
@@ -122,6 +129,58 @@ describe("embedding models", () => {
       { ref: "mistral/mistral-embed" },
     );
     expect(status).toBe(409);
+  });
+
+  it("runs the first listed model a provider with a key serves", async () => {
+    const ref = async (keys: readonly string[], picked?: string) => {
+      const { deps, models } = setup(keys);
+      if (picked) await deps.selection.update({ embedding: picked });
+      const choice = await models.current();
+      return `${choice.provider}/${choice.model}`;
+    };
+    expect(await ref(["openrouter", "openai"])).toBe(
+      "openrouter/openai/text-embedding-3-small",
+    );
+    expect(await ref(["openai", "google"])).toBe(
+      "openai/text-embedding-3-small",
+    );
+    // Not listed: no key for a listed model means keywords, not Gemini.
+    expect(await ref(["google"])).toBe(
+      "openrouter/openai/text-embedding-3-small",
+    );
+    // A pick whose key is gone gives way; with no key at all it stays.
+    expect(await ref(["openai"], "google/gemini-embedding-001")).toBe(
+      "openai/text-embedding-3-small",
+    );
+    expect(await ref([], "google/gemini-embedding-001")).toBe(
+      "google/gemini-embedding-001",
+    );
+  });
+
+  it("runs a hand-configured endpoint first while its key works", async () => {
+    const custom = configuredChoice({
+      baseUrl: "http://localhost:4000/v1",
+      provider: "openai",
+      model: "my-embed",
+    });
+    expect((await setup(["openai"], custom).models.current()).model).toBe(
+      "my-embed",
+    );
+    expect((await setup(["openrouter"], custom).models.current()).model).toBe(
+      "openai/text-embedding-3-small",
+    );
+  });
+
+  it("goes back to the default by clearing the pick", async () => {
+    const { routes, deps } = setup(["openrouter", "openai"]);
+    const select = routes["/kazusa/models/embedding/select"];
+    await call(select, "POST", { ref: "openai/text-embedding-3-small" });
+    const { status, body: raw } = await call(select, "POST", { ref: null });
+    expect(status).toBe(200);
+    const body = EmbeddingModelsResponseSchema.parse(raw);
+    expect(body.current).toBe("openrouter/openai/text-embedding-3-small");
+    expect(body.configured).toBe("openrouter/openai/text-embedding-3-small");
+    expect((await deps.selection.read()).embedding).toBeUndefined();
   });
 
   it("keeps a hand-configured endpoint as its own choice", () => {

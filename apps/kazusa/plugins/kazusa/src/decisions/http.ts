@@ -8,28 +8,30 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
+import type { ModelsConfig } from "../models/config.ts";
 import type { ModelSelectionStore } from "../models/selection.ts";
-import { JEV_ROUTES, routeRef } from "./jev.ts";
+import { JEV_ROUTES, jevRoute, routeRef } from "./jev.ts";
 
 /**
  * The decision model, picked like the chat model: the same Jev under each
- * provider whose key can run it, kept in Kazusa's selection. A pick takes
- * effect on the next decision, with nothing written to `openclaw.json`.
+ * provider whose key can run it, kept in Kazusa's selection; unpicked, or once
+ * its key is gone, the first of `models.decision` with a key (`jevRoute`). A
+ * pick takes effect on the next decision, with nothing written to
+ * `openclaw.json`.
  */
 export function registerDecisionModelsHttp(
   api: OpenClawPluginApi,
   deps: {
     readonly selection: ModelSelectionStore;
     readonly keyConfigured: (provider: string) => boolean;
+    readonly config: ModelsConfig;
   },
 ): void {
   const route = createRouteRegistrar(api);
 
   const state = async (): Promise<DecisionModelsResponse> => {
     const { decision } = await deps.selection.read();
-    const current =
-      JEV_ROUTES.find((option) => routeRef(option) === decision) ??
-      JEV_ROUTES[0];
+    const current = jevRoute(decision, deps.keyConfigured, deps.config);
     return {
       current: routeRef(current),
       options: JEV_ROUTES.map((option) => {

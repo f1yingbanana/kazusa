@@ -3,7 +3,9 @@ import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { registerModelsHttp, type ModelsDeps } from "./http.ts";
+import { MODELS_CONFIG } from "./config.ts";
 import { createModelSelection, type ModelSelection } from "./selection.ts";
+import { createStartingModel } from "./starting.ts";
 import {
   ModelsResponseSchema,
   ModelSelectResponseSchema,
@@ -74,7 +76,10 @@ function memoryStore() {
   };
 }
 
-function setup(config: Record<string, unknown>) {
+function setup(
+  config: Record<string, unknown>,
+  starting: readonly string[] = ["GLM 5.3 Flash"],
+) {
   const routes: Record<string, Handler> = {};
   const api = {
     config: {},
@@ -82,11 +87,16 @@ function setup(config: Record<string, unknown>) {
       routes[opts.path] = opts.handler;
     }),
   } as unknown as OpenClawPluginApi;
-  const selection = createModelSelection(memoryStore());
+  const store = memoryStore();
+  const selection = createModelSelection(store);
   const deps = {
     list: vi.fn(async (_params: Parameters<ModelsDeps["list"]>[0]) => LIST),
     readConfig: () => config,
     selection,
+    starting: createStartingModel(
+      store,
+      MODELS_CONFIG.parse({ chat: starting }),
+    ),
   } satisfies ModelsDeps;
   registerModelsHttp(api, deps);
   return { routes, deps, selection };
@@ -366,6 +376,30 @@ describe("registerModelsHttp", () => {
       configured: "zai/glm-5.3",
       overrides: {},
     });
+  });
+
+  it("runs an unpicked world on the first starting model a key serves", async () => {
+    const { routes, deps } = setup(CONFIG, ["Claude Opus", "GLM 5.3"]);
+    const world = await call(routes["/kazusa/models"], "GET", "/");
+    // Opus's key was rejected, so the next one runs, ahead of the primary.
+    expect(world.body).toMatchObject({
+      current: "zai/glm-5.3",
+      configured: "zai/glm-5.3",
+    });
+    expect(await deps.starting.current()).toBe("zai/glm-5.3");
+    const agent = await call(routes["/kazusa/models"], "GET", "/?agentId=airi");
+    expect(agent.body.current).toBe("zai/glm-5.3");
+    const reset = await call(routes["/kazusa/model"], "POST", "/", {
+      ref: null,
+    });
+    expect(reset.body).toEqual({ current: "zai/glm-5.3" });
+  });
+
+  it("falls back to the primary when no starting model is served", async () => {
+    const { routes, deps } = setup(CONFIG, ["Kimi K3"]);
+    const world = await call(routes["/kazusa/models"], "GET", "/");
+    expect(world.body.configured).toBe("zai/glm-5.3-flash");
+    expect(await deps.starting.current()).toBeUndefined();
   });
 
   it("rejects unknown agents on every route before reading a catalog or writing", async () => {

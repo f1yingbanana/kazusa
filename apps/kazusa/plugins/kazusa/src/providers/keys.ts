@@ -1,4 +1,8 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
+import type {
+  OpenClawConfig,
+  OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
+import { currentConfig } from "../current-config.ts";
 import {
   ensureAuthProfileStore,
   listProfilesForProvider,
@@ -48,3 +52,18 @@ export const authProfileKeys: ProviderKeys = {
     if (!removed) throw new Error("The key store is busy. Try again.");
   },
 };
+
+/**
+ * Whether a key for `provider` is there: Kazusa's profile, or anywhere OpenClaw
+ * looks. OpenClaw's own check misses a profile for a provider from a plugin
+ * outside its bundle (OpenRP's, live 2026-11-04), so ask both.
+ */
+export const providerKeyConfigured = (
+  api: OpenClawPluginApi,
+  provider: string,
+): boolean =>
+  authProfileKeys.has(provider) ||
+  api.runtime.modelAuth.isProviderApiKeyConfigured({
+    provider,
+    cfg: currentConfig(api),
+  });

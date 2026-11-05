@@ -23,7 +23,7 @@ function memoryStore(
 ): KeyStore & { entries: Map<string, string> } {
   return {
     entries,
-    has: async (provider) => entries.has(provider),
+    saved: async () => [...entries.keys()],
     set: async (provider, key) => {
       entries.set(provider, key);
     },
@@ -40,10 +40,22 @@ function fixture(): string {
     JSON.stringify({
       systemAgent: { skills: ["kazusa"] },
       config: {
-        agents: { defaults: { heartbeat: { every: "0m" } } },
+        agents: {
+          defaults: {
+            heartbeat: { every: "0m" },
+            models: { "openrouter/z-ai/glm-5.3-flash": {} },
+            model: { primary: "openrouter/z-ai/glm-5.3-flash" },
+          },
+        },
         plugins: {
           entries: {
-            kazusa: { config: { memory: { sleep: { enabled: true } } } },
+            kazusa: {
+              config: {
+                memory: { sleep: { enabled: true } },
+                // An unknown id is dropped from the guide.
+                models: { providers: ["openrp", "nobody", "openrouter"] },
+              },
+            },
           },
         },
       },
@@ -109,8 +121,17 @@ describe("setup", () => {
     expect(status).toMatchObject({
       configured: false,
       imported: null,
-      hasKey: false,
+      savedKey: null,
     });
+    // In config order, labelled and linked from the provider catalog.
+    expect(status.providers).toEqual([
+      expect.objectContaining({
+        id: "openrp",
+        label: "OpenRP",
+        keysUrl: "https://openrp.ai/settings/api-keys",
+      }),
+      expect.objectContaining({ id: "openrouter", label: "OpenRouter" }),
+    ]);
     expect(status.worlds.map(({ id }) => id)).toEqual([
       "cast-world",
       "starter",
@@ -138,7 +159,7 @@ describe("setup", () => {
       world: "cast-world",
       cast: ["ann"],
       startAt: "2027-01-01T06:30",
-      openrouterKey: "sk-test",
+      key: { provider: "openrouter", value: "sk-test" },
     });
     const made = config();
     expect(Object.keys(made.agents.entries).sort()).toEqual([
@@ -174,6 +195,9 @@ describe("setup", () => {
       anchors: { guild: "intimate", city: "familiar" },
     });
     expect(store.entries.get("openrouter")).toBe("sk-test");
+    expect(made.agents.defaults.model).toEqual({
+      primary: "openrouter/z-ai/glm-5.3-flash",
+    });
     expect(existsSync(path.join(app, "world/.state/.env"))).toBe(false);
     expect(
       lstatSync(
@@ -201,6 +225,31 @@ describe("setup", () => {
     expect(kazusa.clock).toBeUndefined();
   });
 
+  it("saves the key for whichever offered provider was picked", async () => {
+    await createSetupHere(app).apply({
+      world: "starter",
+      cast: [],
+      key: { provider: "openrp", value: "sk-rp" },
+    });
+    expect(store.entries.get("openrp")).toBe("sk-rp");
+    expect(store.entries.has("openrouter")).toBe(false);
+    // The plugin picks the model from the keys there are; config stays as is.
+    expect(config().agents.defaults.model).toEqual({
+      primary: "openrouter/z-ai/glm-5.3-flash",
+    });
+  });
+
+  it("refuses a key for a provider it doesn't offer", async () => {
+    await expect(
+      createSetupHere(app).apply({
+        world: "starter",
+        cast: [],
+        key: { provider: "nobody", value: "k" },
+      }),
+    ).rejects.toThrow("Unknown provider");
+    expect(store.entries.size).toBe(0);
+  });
+
   it("moves a key from the old keys file into a profile", async () => {
     write(path.join(app, "world/.state/.env"), "OPENROUTER_API_KEY=from-env\n");
     await createSetupHere(app).apply({ world: "starter", cast: [] });
@@ -217,9 +266,10 @@ describe("setup", () => {
     await setup.apply({
       world: "cast-world",
       cast: [],
-      openrouterKey: "second",
+      key: { provider: "openrp", value: "second" },
     });
     expect(store.entries.get("openrouter")).toBe("first");
+    expect(store.entries.has("openrp")).toBe(false);
     expect(
       readFileSync(path.join(app, "world/workspaces/ann/IDENTITY.md"), "utf8"),
     ).toContain("EDITED");
@@ -247,7 +297,7 @@ describe("setup", () => {
     );
     expect(await setup.status()).toMatchObject({
       imported: "starter",
-      hasKey: true,
+      savedKey: expect.objectContaining({ id: "openrouter" }),
       configured: false,
     });
   });

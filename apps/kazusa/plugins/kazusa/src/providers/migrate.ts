@@ -10,7 +10,7 @@ import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-r
 import { z } from "zod";
 import { inBackground } from "../background.ts";
 import { DECISION_PROVIDER_ID, TYPESAFE_KEY_PATH } from "../decisions/jev.ts";
-import { PROVIDERS } from "./catalog.ts";
+import { PROVIDERS } from "@kazusa/client";
 import { adminCall, refreshAuth } from "./http.ts";
 import { authProfileKeys, type ProviderKeys } from "./keys.ts";
 

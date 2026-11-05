@@ -27,10 +27,9 @@ export async function POST(request: Request): Promise<Response> {
       { error: "That setup request is not valid." },
       { status: 400 },
     );
-  if (
-    parsed.data.openrouterKey &&
-    (await keyWorks(parsed.data.openrouterKey)) === false
-  )
+  // OpenRP has no free way to check a key: its model list answers anyone.
+  const { key } = parsed.data;
+  if (key?.provider === "openrouter" && (await keyWorks(key.value)) === false)
     return Response.json(
       {
         field: "key",
