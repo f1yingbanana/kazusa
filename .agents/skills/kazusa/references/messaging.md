@@ -367,6 +367,18 @@ ID; Perception owns its existing deduplication and adoption policy. There is no
 cross-store transaction or claim of exactly-once brain execution. `IGNORE` keeps
 the chat record.
 
+**Read receipts** are the one attention fact a sender sees. A recipient copy's
+`readAt` is the sim time its brain was shown the message: Perception's `onRead`
+fires when a delivery is adopted (after any `response_latency` wait, or when a
+deferred message is picked up) and when `recover()` finds a handoff the brain
+already took. `markRead` stamps the copies and emits SSE `read`. In a text chat
+every unread copy up to the newest message shown is read, as opening a chat
+shows everything above it. Face to face the wait is short, and only the lines
+taken in count (the client says "observed"): a line let go unheard, stale or
+tuned out, isn't heard later. Ignored, waiting and offstage messages stay
+unread. Humans have no copies, so no receipts. `clientMessage` projects
+`receipts: [{ id, readAt? }]`, one per recipient copy.
+
 ## Paced speech (outbox)
 
 A person types bubble by bubble, and can be cut off. Each bubble in `messages`

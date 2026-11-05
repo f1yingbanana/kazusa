@@ -40,6 +40,15 @@ export const ChatMessageSchema = z.object({
    * history has it.
    */
   createdAt: z.number().optional(),
+  /**
+   * Each character it reached, and when (sim time) their brain was shown it:
+   * read, in a text chat (or a later message there, as opening a chat shows
+   * it); observed, face to face. One that hasn't yet has no `readAt`. Humans
+   * have no receipts.
+   */
+  receipts: z
+    .array(z.object({ id: z.string(), readAt: z.number().optional() }))
+    .optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
@@ -202,6 +211,17 @@ export const MessageStreamEventSchema = z.object({
 });
 export type MessageStreamEvent = z.infer<typeof MessageStreamEventSchema>;
 
+/** A character read these messages (and every earlier one of theirs here). */
+export const ReadStreamEventSchema = z.object({
+  type: z.literal("read"),
+  chatId: z.string(),
+  readerId: z.string(),
+  /** Sim time. */
+  readAt: z.number(),
+  messageIds: z.array(z.string()),
+});
+export type ReadStreamEvent = z.infer<typeof ReadStreamEventSchema>;
+
 export const ConnectedEventSchema = z.object({
   type: z.literal("connected"),
   typing: z.array(TypingStreamEventSchema),
@@ -216,6 +236,7 @@ export type ChatsStreamEvent = z.infer<typeof ChatsStreamEventSchema>;
 export const ChatStreamEventSchema = z.discriminatedUnion("type", [
   MessageStreamEventSchema,
   TypingStreamEventSchema,
+  ReadStreamEventSchema,
   ConnectedEventSchema,
   ChatsStreamEventSchema,
 ]);
@@ -1546,6 +1567,7 @@ export const ObserverConnectedEventSchema = ConnectedEventSchema.extend({
 export const StreamEventSchema = z.discriminatedUnion("type", [
   MessageStreamEventSchema,
   TypingStreamEventSchema,
+  ReadStreamEventSchema,
   ObserverConnectedEventSchema,
   ChatsStreamEventSchema,
   StatusStreamEventSchema,

@@ -96,3 +96,58 @@ export function messagePreview(
   if (message.senderId === userId) return `You: ${text}`;
   return isOneOnOne(chat, userId) ? text : `${name}: ${text}`;
 }
+
+/**
+ * Where something of the player's stands: sent, or taken in by every character
+ * it reached (read in a text chat, observed face to face).
+ */
+export interface Receipt {
+  readonly read: boolean;
+  /** Who has taken it in so far, first first. */
+  readonly readers: readonly string[];
+  /** How many characters it reached. */
+  readonly total: number;
+  /** When the last of them took it in (sim time), once all have. */
+  readonly readAt?: number;
+}
+
+/** Undefined where there are no receipts: said only to people. */
+export function messageReceipt(
+  message: Pick<ChatMessage, "receipts">,
+): Receipt | undefined {
+  const receipts = message.receipts;
+  if (!receipts?.length) return undefined;
+  const read = receipts
+    .flatMap((receipt) =>
+      receipt.readAt === undefined ? [] : [{ ...receipt, at: receipt.readAt }],
+    )
+    .sort((a, b) => a.at - b.at);
+  const all = read.length === receipts.length;
+  return {
+    read: all,
+    readers: read.map((receipt) => receipt.id),
+    total: receipts.length,
+    ...(all ? { readAt: read.at(-1)?.at } : {}),
+  };
+}
+
+/**
+ * "Read 14:32", "Read by Airi · 1 of 3" or "Sent"; face to face, "Observed by
+ * Airi 14:32", "Observed by everyone 14:32" or "Not observed yet".
+ */
+export function receiptLabel(
+  receipt: Receipt,
+  nameOf: NameOf,
+  formatTime: (at: number) => string,
+  inPerson = false,
+): string {
+  const names = listNames(receipt.readers.map(nameOf));
+  if (receipt.read && receipt.readAt !== undefined) {
+    const at = formatTime(receipt.readAt);
+    if (receipt.total > 1)
+      return `${inPerson ? "Observed" : "Read"} by everyone ${at}`;
+    return inPerson ? `Observed by ${names} ${at}` : `Read ${at}`;
+  }
+  if (!receipt.readers.length) return inPerson ? "Not observed yet" : "Sent";
+  return `${inPerson ? "Observed" : "Read"} by ${names} · ${receipt.readers.length} of ${receipt.total}`;
+}

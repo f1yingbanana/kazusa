@@ -164,7 +164,11 @@ export function registerMessaging(
       Partial<
         Pick<
           Perception,
-          "onAdopted" | "attachSpeech" | "attachConversations" | "judgeSpeech"
+          | "onAdopted"
+          | "onRead"
+          | "attachSpeech"
+          | "attachConversations"
+          | "judgeSpeech"
         >
       >;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
@@ -357,7 +361,10 @@ export function registerMessaging(
             type: "observed",
             event: event.typing,
           });
-      } else if (!event.delivery.audience.some(isUser)) {
+      } else if (
+        event.type === "message" &&
+        !event.delivery.audience.some(isUser)
+      ) {
         deps.broadcaster?.broadcast({
           type: "observed",
           event: {
@@ -399,6 +406,19 @@ export function registerMessaging(
       throw new Error(`Unknown character agent: ${agentId}.`);
     return { agentId, config, agents };
   };
+
+  // What the brain was shown is read: the sender sees a read receipt.
+  deps.perception.onRead?.(async (delivery) => {
+    try {
+      await messaging.markRead(
+        delivery.agentId,
+        delivery.keys,
+        delivery.sessionKeys ?? [],
+      );
+    } catch (err: unknown) {
+      api.logger.warn(`Messaging read receipts error: ${String(err)}`);
+    }
+  });
 
   // Taking up a message shows as typing in its chat until the turn ends or
   // the character speaks there.

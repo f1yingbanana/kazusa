@@ -319,7 +319,13 @@ export function registerMessagingHttp(
             message: clientMessage(event.delivery),
           });
       } else if (event.audience.includes(user.id)) {
-        write(event.type === "typing" ? event.typing : { type: "chats" });
+        write(
+          event.type === "typing"
+            ? event.typing
+            : event.type === "read"
+              ? event.read
+              : { type: "chats" },
+        );
       }
     });
     const unsubscribeBroadcaster = options?.broadcaster?.subscribe(write);

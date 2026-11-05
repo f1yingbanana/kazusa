@@ -18,6 +18,7 @@ import type {
   ChatType,
   ChatsResponse,
   MessagesResponse,
+  ReadStreamEvent,
 } from "@kazusa/client";
 import type { Chat, ChatInfo, MessageType } from "@/lib/source/chats/types";
 import type { KazusaConfig } from "@/lib/state/config-store";
@@ -148,6 +149,30 @@ export function appendMessageToPages(
   // History gets this from the stored record; a live message arrives as it's sent.
   const timed = { ...message, createdAt: message.createdAt ?? Date.now() };
   return [{ ...first, messages: [...first.messages, timed] }, ...rest];
+}
+
+/** A character read these messages: their receipts gain the time. */
+export function markReadInPages(
+  pages: MessagesResponse[] | undefined,
+  { readerId, readAt, messageIds }: ReadStreamEvent,
+) {
+  if (!pages) return pages;
+  const ids = new Set(messageIds);
+  return pages.map((page) => ({
+    ...page,
+    messages: page.messages.map((message) =>
+      ids.has(message.id) && message.receipts
+        ? {
+            ...message,
+            receipts: message.receipts.map((receipt) =>
+              receipt.id === readerId && receipt.readAt === undefined
+                ? { ...receipt, readAt }
+                : receipt,
+            ),
+          }
+        : message,
+    ),
+  }));
 }
 
 export function updateChatPreview<

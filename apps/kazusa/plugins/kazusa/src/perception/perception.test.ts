@@ -1164,6 +1164,52 @@ describe("Brain handoff custody", () => {
     expect(h.deliver.mock.calls[1][0].ids).toEqual(["a"]);
   });
 
+  it("tells read listeners what the brain was shown, once adopted", async () => {
+    const h = setupWake();
+    const read = vi.fn();
+    h.router.onRead(read);
+    await h.router.receive("alice", stimulus("a"));
+    expect(read).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ids: ["a"],
+        keys: [stimulusKey(stimulus("a"))],
+      }),
+    );
+  });
+
+  it("never counts an ignored stimulus as read", async () => {
+    const h = setup();
+    h.evaluateDecision.mockResolvedValue({
+      status: "ok",
+      result: {
+        answers: {
+          wake_decision: { type: "choice", choice: "IGNORE" },
+          response_latency: { type: "score", score: 0 },
+        },
+      },
+    });
+    const read = vi.fn();
+    h.router.onRead(read);
+    await h.router.receive("alice", stimulus("a"));
+    expect(h.deliver).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("on restart, counts a handoff the brain transcript has as read", async () => {
+    const h = setupWake();
+    h.deliver.mockRejectedValueOnce(
+      new Error("Connection failed after possible acceptance"),
+    );
+    await expect(h.router.receive("alice", stimulus("a"))).rejects.toThrow(
+      "possible acceptance",
+    );
+    const restarted = h.restart({ adopted: async () => true });
+    const read = vi.fn();
+    restarted.onRead(read);
+    await restarted.recover();
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ ids: ["a"] }));
+  });
+
   it("does not interpret a successful return without adoption as acceptance", async () => {
     const h = setupWake();
     h.deliver.mockResolvedValueOnce();

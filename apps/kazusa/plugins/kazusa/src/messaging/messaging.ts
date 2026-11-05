@@ -3,6 +3,7 @@ import { bundledSkillText, type SkillText } from "../skill-text.ts";
 import type {
   ChatMessage,
   MessagesResponse,
+  ReadStreamEvent,
   TypingStreamEvent,
 } from "@kazusa/client";
 import { KeyedAsyncQueue, OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -11,7 +12,7 @@ import { shutdownSignal } from "../shutdown.ts";
 import { stickerUrl } from "../stickers/stickers.ts";
 import type { CurrentSpeech } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
-import type { Stimulus } from "../stimulus.ts";
+import { stimulusKey, type Stimulus } from "../stimulus.ts";
 import {
   Floors,
   SPEECH_RATES,
@@ -72,6 +73,8 @@ export interface MessageCopy {
   messageId?: string;
   published?: boolean;
   notified?: boolean;
+  /** Recipients: when (sim time) their brain was shown it, or a later one. */
+  readAt?: number;
 }
 
 /**
@@ -191,7 +194,12 @@ export type MessagingEvent =
       readonly typing: TypingStreamEvent;
       readonly audience: readonly string[];
     }
-  | { readonly type: "chats"; readonly audience: readonly string[] };
+  | { readonly type: "chats"; readonly audience: readonly string[] }
+  | {
+      readonly type: "read";
+      readonly read: ReadStreamEvent;
+      readonly audience: readonly string[];
+    };
 
 /** One projection shared by history, send responses and live message events. */
 export function clientMessage(
@@ -199,6 +207,12 @@ export function clientMessage(
   /** The stored record's real time. A receipt stays the same on a retry. */
   createdAt?: number,
 ): ChatMessage {
+  const receipts = delivery.copies
+    .filter((copy) => copy.role === "user")
+    .map((copy) => ({
+      id: copy.agentId,
+      ...(copy.readAt === undefined ? {} : { readAt: copy.readAt }),
+    }));
   return {
     id: delivery.id,
     requestId: delivery.params.requestId,
@@ -218,6 +232,7 @@ export function clientMessage(
       : {}),
     timestamp: delivery.timestamp,
     ...(createdAt === undefined ? {} : { createdAt }),
+    ...(receipts.length ? { receipts } : {}),
   };
 }
 
@@ -1961,6 +1976,82 @@ export class Messaging {
       }
       return result.sort((a, b) => a.timestamp - b.timestamp);
     });
+  }
+
+  /**
+   * The brain was shown these stimuli (`keys`, as Perception keys them). In a
+   * text chat everything up to the latest of them is read, as opening a chat
+   * shows everything above it; face to face only the lines taken in are, since
+   * a line let go unheard isn't heard later.
+   */
+  async markRead(
+    agentId: string,
+    keys: readonly string[],
+    sessionKeys: readonly string[],
+  ): Promise<void> {
+    PARTICIPANT_ID.parse(agentId);
+    const shown = new Set(keys);
+    const chats = new Set(sessionKeys);
+    if (!shown.size || !chats.size) return;
+    const events = await this.serial.enqueue("messages", async () => {
+      await this.init();
+      const readAt = this.deps.clock.time();
+      const unread = new Map<
+        string,
+        { delivery: MessageDelivery; copy: MessageCopy; seen: boolean }[]
+      >();
+      const upTo = new Map<string, number>();
+      for (const { value } of await this.deps.store.entries()) {
+        // An unsettled delivery's live copy, so its other progress isn't lost.
+        const delivery = this.deliveries.get(value.id) ?? value;
+        const copy = delivery.copies.find(
+          (item) =>
+            item.agentId === agentId &&
+            item.role === "user" &&
+            chats.has(item.sessionKey),
+        );
+        if (!copy) continue;
+        const seen = shown.has(
+          stimulusKey({ id: delivery.id, sessionKey: copy.sessionKey }),
+        );
+        if (seen)
+          upTo.set(
+            delivery.chatId,
+            Math.max(upTo.get(delivery.chatId) ?? 0, delivery.sequence),
+          );
+        if (copy.readAt === undefined)
+          unread.set(delivery.chatId, [
+            ...(unread.get(delivery.chatId) ?? []),
+            { delivery, copy, seen },
+          ]);
+      }
+      const events: MessagingEvent[] = [];
+      for (const [chatId, sequence] of upTo) {
+        const read = (unread.get(chatId) ?? []).filter(
+          ({ delivery, copy, seen }) =>
+            delivery.sequence <= sequence &&
+            (seen || !copy.sessionKey.includes(":chat:huddle:")),
+        );
+        if (!read.length) continue;
+        for (const { delivery, copy } of read)
+          await this.updateCopy(delivery, copy, { readAt });
+        events.push({
+          type: "read",
+          read: {
+            type: "read",
+            chatId,
+            readerId: agentId,
+            readAt,
+            messageIds: read.map(({ delivery }) => delivery.id),
+          },
+          audience: [
+            ...new Set(read.flatMap(({ delivery }) => delivery.audience)),
+          ],
+        });
+      }
+      return events;
+    });
+    for (const event of events) this.emit(event);
   }
 
   /** Conversation facts for the participant's own chat ledger keys. */
