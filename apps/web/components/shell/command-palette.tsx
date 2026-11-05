@@ -20,6 +20,10 @@ import { usePlaces } from "@/hooks/use-location";
 import { useNavigate } from "@/hooks/use-url-state";
 import { placeName } from "@/lib/location/places";
 import { STAGE_VIEWS } from "@/lib/registry/views";
+import { openChatPatch } from "@/lib/source/chats/display";
+import type { ChatInfo } from "@/lib/source/chats/types";
+import { useKazusaConfig } from "@/lib/state/config-store";
+import { markQuietSelection } from "@/lib/state/inspector-request";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 
 /** The palette isn't virtualized; only the latest of others' chats are listed. */
@@ -42,6 +46,7 @@ export function CommandPalette({
   const { chats } = useChats();
   const { chats: observed } = useObservedChats();
   const places = usePlaces();
+  const config = useKazusaConfig();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -60,6 +65,13 @@ export function CommandPalette({
   function go(patch: Record<string, string | null>) {
     navigate(patch);
     onOpenChange(false);
+  }
+
+  // As from the chat list: the inspector follows without covering the chat.
+  function openChat(chat: ChatInfo) {
+    const patch = openChatPatch(chat, config.userId);
+    if (patch.sel) markQuietSelection(patch.sel);
+    go(patch);
   }
 
   const people = useMemo(
@@ -101,7 +113,7 @@ export function CommandPalette({
                   <CommandItem
                     key={chat.id}
                     value={`chat ${chat.name} ${chat.id}`}
-                    onSelect={() => go({ view: "chats", "chats.id": chat.id })}
+                    onSelect={() => openChat(chat)}
                   >
                     <Icon />
                     <span className="truncate">{chat.name}</span>
@@ -118,7 +130,7 @@ export function CommandPalette({
                   <CommandItem
                     key={chat.id}
                     value={`chat ${chat.name} ${chat.id}`}
-                    onSelect={() => go({ view: "chats", "chats.id": chat.id })}
+                    onSelect={() => openChat(chat)}
                   >
                     <Icon />
                     <span className="truncate">{chat.name}</span>

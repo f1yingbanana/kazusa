@@ -74,3 +74,9 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
     </div>
   );
 }
+
+/** Folded: their role, the one line that says most about who they are. */
+export function CharacterProfileSummary({ entity }: { entity: EntityRef }) {
+  const { detail } = useCharacterDetail(entity.id);
+  return detail?.role ? <>{detail.role}</> : null;
+}

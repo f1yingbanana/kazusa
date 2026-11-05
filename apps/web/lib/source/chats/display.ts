@@ -1,5 +1,5 @@
 import type { ChatMessage } from "@kazusa/client";
-import type { EntityRef } from "../../state/entity-ref";
+import { serializeEntityRef, type EntityRef } from "../../state/entity-ref";
 import type { ChatInfo } from "./types";
 
 type NameOf = (id: string) => string;
@@ -40,16 +40,32 @@ export function chatTitle(
 }
 
 /**
- * What the inspector shows for an open chat: the partner of a direct chat,
- * otherwise the chat itself (members, and a huddle's place). A draft group has
- * nothing to show yet.
+ * What the inspector shows for an open chat: the partner of a direct chat (or
+ * of a talk in person not started yet), otherwise the chat itself (members, and
+ * a huddle's place), a draft group included.
  */
 export function chatSubject(chat: ChatInfo, userId: string): EntityRef | null {
-  if (isOneOnOne(chat, userId)) {
-    const partner = chat.members.find((id) => id !== userId);
-    return partner ? { kind: "character", id: partner } : null;
+  const others = chat.members.filter((id) => id !== userId);
+  if (isOneOnOne(chat, userId) || (chat.draft && others.length === 1)) {
+    return others[0] ? { kind: "character", id: others[0] } : null;
   }
-  return chat.draft ? null : { kind: "chat", id: chat.id };
+  return { kind: "chat", id: chat.id };
+}
+
+/**
+ * Opens a chat and points the inspector at its subject in one URL change, so
+ * the inspector never shows the previous selection beside the new chat.
+ */
+export function openChatPatch(
+  chat: ChatInfo,
+  userId: string,
+): Record<string, string> {
+  const subject = chatSubject(chat, userId);
+  return {
+    view: "chats",
+    "chats.id": chat.id,
+    ...(subject ? { sel: serializeEntityRef(subject) } : {}),
+  };
 }
 
 /**

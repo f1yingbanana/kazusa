@@ -11,12 +11,14 @@ import {
 } from "@/lib/source/chats/http";
 import { useCharacters } from "@/hooks/use-characters";
 import { chatTitle } from "@/lib/source/chats/display";
+import { observedChatsKey } from "@/lib/source/observe/http";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import { saveConfig, useKazusaConfig } from "@/lib/state/config-store";
 import type {
   ChatMessage,
   ChatType,
   ChatsResponse,
+  ManageChatPayload,
   MessagesResponse,
   ReadStreamEvent,
 } from "@kazusa/client";
@@ -261,31 +263,51 @@ export function useChatActions() {
     };
   }
 
-  async function changeMembers(
-    sessionKey: string,
-    action: "add_members" | "remove_members",
-    members: string[],
-  ) {
-    const response = await manageChat(
-      config.baseUrl,
-      {
-        sessionKey,
-        action,
-        members,
-      },
-      config.token,
-    );
+  /**
+   * Renames a group or changes who is in it. Leaving drops it from the player's
+   * chats (it is read-only under Other chats from then on).
+   */
+  async function manage(payload: ManageChatPayload) {
+    const response = await manageChat(config.baseUrl, payload, config.token);
+    const left = !response.chat.members.includes(config.userId);
     await mutate(
       chatsKey(config),
       (current?: ChatsResponse) =>
         current && {
           ...current,
-          chats: current.chats.map((chat) =>
-            chat.id === response.chat.id ? response.chat : chat,
-          ),
+          chats: left
+            ? current.chats.filter((chat) => chat.id !== response.chat.id)
+            : current.chats.map((chat) =>
+                chat.id === response.chat.id ? response.chat : chat,
+              ),
         },
       { revalidate: true },
     );
+    if (left) await mutate(observedChatsKey(config));
+    return response.chat;
+  }
+
+  /**
+   * Calls people standing where you are over to your conversation in person: an
+   * action said aloud to them, which brings in anyone not already talking with
+   * someone else.
+   */
+  async function callOver(chat: Chat, members: string[], text: string) {
+    const response = await sendMessage(
+      config.baseUrl,
+      {
+        requestId: crypto.randomUUID(),
+        text,
+        type: "action",
+        aloud: true,
+        members,
+      },
+      config.token,
+    );
+    commitSentMessage(response.chatId, response.message);
+    await mutate(chatsKey(config));
+    if (response.chatId !== chat.id) await mutate(observedChatsKey(config));
+    return response;
   }
 
   async function refreshChats() {
@@ -296,7 +318,8 @@ export function useChatActions() {
     send,
     commitSentMessage,
     createChat,
-    changeMembers,
+    manage,
+    callOver,
     refreshChats,
   };
 }

@@ -17,7 +17,6 @@ import type {
 import { ChatFailure } from "./chat-failure";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
-import { MembersSheet } from "./members-sheet";
 import { MessageList } from "./message-list";
 import { useRealtime } from "@/lib/live/realtime-provider";
 
@@ -33,13 +32,11 @@ export function ChatView({
   onBack: () => void;
   onSent: (chat: Chat) => void;
 }) {
-  const { characters, byId } = useCharacters();
-  const agents = characters.filter((character) => character.kind === "agent");
+  const { byId } = useCharacters();
   const { config, send, commitSentMessage, refreshChats } = useChatActions();
   const { typingByChat } = useRealtime();
   const messagesState = useMessages(chat.draft ? null : chat.id);
   const [pending, setPending] = useState<PendingMessage[]>([]);
-  const [membersOpen, setMembersOpen] = useState(false);
 
   const typists = typingByChat[chat.id] ?? [];
 
@@ -151,10 +148,10 @@ export function ChatView({
     >
       <ChatHeader
         chat={chat}
+        own={chat.draft ? undefined : chat}
         userId={config.userId}
         typists={typists}
         onBack={onBack}
-        onOpenMembers={() => setMembersOpen(true)}
       />
 
       <MessageList
@@ -185,16 +182,6 @@ export function ChatView({
         onTyping={handleTyping}
         disabled={chat.draft && pending.length > 0}
       />
-
-      {chat.type === "group" && !chat.draft ? (
-        <MembersSheet
-          open={membersOpen}
-          onOpenChange={setMembersOpen}
-          chat={chat}
-          agents={agents}
-          resolve={resolve}
-        />
-      ) : null}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { StarIcon } from 'lucide-react'
 import type { CharacterSummary } from '@kazusa/client'
 import { useCharacterStatus } from '@/hooks/use-characters'
@@ -29,6 +29,7 @@ export const CharacterRow = memo(function CharacterRow({
   onSelect,
   className,
   trailing,
+  action,
 }: {
   character: CharacterSummary
   selected: boolean
@@ -37,6 +38,8 @@ export const CharacterRow = memo(function CharacterRow({
   className?: string
   /** Replaces the remaining-time readout (e.g. an arrival time). */
   trailing?: string
+  /** One more control beside the star, shown like it on hover or focus. */
+  action?: ReactNode
 }) {
   const status = useCharacterStatus(
     character.kind === 'agent' ? character.id : undefined,
@@ -110,6 +113,7 @@ export const CharacterRow = memo(function CharacterRow({
           </span>
         ) : null}
       </button>
+      {action}
       <button
         type="button"
         onClick={() => toggleWatch(character.id)}

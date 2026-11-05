@@ -35,8 +35,10 @@ import {
 } from "@/components/ui/message-scroller";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useFollowBottom } from "@/hooks/use-follow-bottom";
+import { useSelection } from "@/hooks/use-url-state";
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
 import type { BrainActivity } from "@/lib/source/brain/activity";
@@ -47,6 +49,7 @@ import {
   receiptLabel,
 } from "@/lib/source/chats/display";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
+import { requestInspector } from "@/lib/state/inspector-request";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
 import { BrainActivityRows, BrainThinking } from "./tool-activity";
@@ -289,11 +292,7 @@ export function MessageList({
                             <Message key={message.id} align={align}>
                               {!isSelf ? (
                                 isLast ? (
-                                  <MessageAvatar>
-                                    <ParticipantAvatar
-                                      participant={participant}
-                                    />
-                                  </MessageAvatar>
+                                  <SenderAvatar participant={participant} />
                                 ) : (
                                   <div aria-hidden className="w-8 shrink-0" />
                                 )
@@ -335,7 +334,7 @@ export function MessageList({
                                   </Bubble>
                                 )}
                                 {isLast ? (
-                                  <MessageFooter className="gap-2 font-normal">
+                                  <MessageFooter className="h-4 gap-2 font-normal">
                                     <MessageStatus
                                       message={message}
                                       pending={pendingMessage}
@@ -380,9 +379,7 @@ export function MessageList({
                   messageId={`typing-${typist.senderId}`}
                 >
                   <Message align="start">
-                    <MessageAvatar>
-                      <ParticipantAvatar participant={participant} />
-                    </MessageAvatar>
+                    <SenderAvatar participant={participant} />
                     <MessageContent className="gap-1">
                       {isGroup ? (
                         <MessageHeader>{participant.name}</MessageHeader>
@@ -466,7 +463,8 @@ function ActionLine({
         {line.rest}
       </p>
       {pending || observed ? (
-        <span className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+        // Inset like a bubble's footer, so receipts line up in one column.
+        <span className="flex h-4 items-center justify-end gap-2 pr-3 text-xs text-muted-foreground">
           <MessageStatus
             message={message}
             pending={pending}
@@ -477,6 +475,46 @@ function ActionLine({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/*
+ * Where the sender's avatar sits: centered on the bubble's last line, which
+ * makes it centered on a one-line bubble. The line's middle is the bubble's
+ * border (1px), bottom padding (0.5rem) and half its line (text-sm relaxed:
+ * 0.875rem × 1.625 / 2) above the bubble's foot; the 2rem avatar's middle is
+ * 1rem above its own. Under a footer (h-4 plus the gap-1 above it) the avatar
+ * rises 1.25rem more. The kit's own lift (2rem) overshot a one-line bubble,
+ * past the group's `content-visibility` box, which clipped the avatar's top.
+ */
+const AVATAR_LIFT =
+  "translate-y-[calc(-1*(1px+0.2109375rem))] group-has-data-[slot=message-footer]/message:translate-y-[calc(-1*(1px+1.4609375rem))]";
+
+/** The sender's face beside their bubble; a character's opens their details. */
+function SenderAvatar({ participant }: { participant: Participant }) {
+  const { byId } = useCharacters();
+  const [, select] = useSelection();
+  const face = <ParticipantAvatar participant={participant} />;
+  const character = participant.isSelf ? undefined : byId.get(participant.id);
+  return (
+    <MessageAvatar className={AVATAR_LIFT}>
+      {character ? (
+        <button
+          type="button"
+          onClick={() => {
+            select({ kind: "character", id: character.id });
+            requestInspector();
+          }}
+          // Inset: the avatar's frame clips anything outside the circle.
+          className="rounded-full outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+        >
+          {face}
+          <span className="sr-only">{`About ${character.name}`}</span>
+        </button>
+      ) : (
+        face
+      )}
+    </MessageAvatar>
   );
 }
 
@@ -545,8 +583,8 @@ function MessageStatus({
   const label = receiptLabel(receipt, nameOf, formatTime, inPerson);
   const Icon = receipt.read ? CheckCheckIcon : CheckIcon;
   return (
+    // The check before the time, so times end the line in one column.
     <span className="flex items-center gap-1">
-      {time}
       <Icon
         role="img"
         aria-label={label}
@@ -557,6 +595,7 @@ function MessageStatus({
       >
         <title>{label}</title>
       </Icon>
+      {time}
     </span>
   );
 }

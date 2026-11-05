@@ -18,7 +18,10 @@ import { useRealtime } from "@/lib/live/realtime-provider";
 import { chatSubject } from "@/lib/source/chats/display";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
-import { markQuietSelection } from "@/lib/state/inspector-request";
+import {
+  keepsLinkedSelection,
+  markQuietSelection,
+} from "@/lib/state/inspector-request";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { ChatView } from "./chat-view";
 import { ChatsPanel } from "./chats-panel";
@@ -58,27 +61,23 @@ export function ChatsView() {
     setActiveChat(open?.id ?? null);
   }, [open?.id, setActiveChat]);
 
-  // Opening a chat always points the inspector at it (the partner of a DM),
-  // whatever was selected before; picking something else afterwards sticks.
-  // A link that opens a chat with a selection already set keeps it.
+  // Opening a chat, or coming back to Chats with one open, points the inspector
+  // at it (the partner of a DM), whatever was selected before; picking
+  // something else afterwards sticks. A page loaded from a link that names a
+  // selection too keeps it.
   const subject = open ? chatSubject(open, config.userId) : null;
   const subjectKey = subject ? serializeEntityRef(subject) : null;
-  const synced = useRef<string | null>(null);
-  const keepDeepLink = useRef<boolean | null>(null);
+  const selParam = useParam("sel");
+  const followed = useRef<string | null>(null);
   useEffect(() => {
-    if (keepDeepLink.current === null) {
-      const params = new URLSearchParams(window.location.search);
-      keepDeepLink.current = params.has("chats.id") && params.has("sel");
-    }
-    if (synced.current === subjectKey) return;
-    synced.current = subjectKey;
-    if (!subjectKey) return;
-    if (keepDeepLink.current) {
-      keepDeepLink.current = false;
-      return;
-    }
+    if (!subjectKey || followed.current === subjectKey) return;
+    followed.current = subjectKey;
+    // Most ways in (the chat list, ⌘K) already selected it with the chat.
+    if (selParam === subjectKey) return;
+    if (keepsLinkedSelection("chats.id")) return;
     markQuietSelection(subjectKey);
     navigate({ sel: subjectKey }, "replace");
+    // `selParam` is read, not followed: picking someone else afterwards sticks.
   }, [subjectKey, navigate]);
 
   useEffect(() => {

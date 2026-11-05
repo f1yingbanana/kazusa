@@ -15,7 +15,10 @@ import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useNavigate, useParam } from "@/hooks/use-url-state";
 import type { SectionSidebarProps } from "@/lib/registry/types";
+import { openChatPatch } from "@/lib/source/chats/display";
+import type { ChatInfo } from "@/lib/source/chats/types";
 import { setDraftChat } from "@/lib/state/chat-draft";
+import { markQuietSelection } from "@/lib/state/inspector-request";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import {
   setObservedCollapsed,
@@ -79,9 +82,21 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
     );
   const memberName = member ? (byId.get(member)?.name ?? member) : null;
 
-  function openChat(id: string) {
-    navigate({ view: "chats", "chats.id": id });
+  // Opening a chat also points the inspector at it, in the same URL change,
+  // including the one already open (after looking at someone else).
+  function openChat(chat: ChatInfo) {
+    const patch = openChatPatch(chat, config.userId);
+    if (patch.sel) markQuietSelection(patch.sel);
+    navigate(patch);
     onOpened?.();
+  }
+
+  function openChatById(id: string) {
+    const chat =
+      allMine.find((candidate) => candidate.id === id) ??
+      observed.chats.find((candidate) => candidate.id === id);
+    if (chat) openChat(chat);
+    else navigate({ view: "chats", "chats.id": id });
   }
 
   return (
@@ -142,7 +157,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
             isLoading={isLoading}
             query={query}
             selectedChatId={chatId}
-            onSelect={openChat}
+            onSelect={openChatById}
             onNewGroup={() => setNewGroupOpen(true)}
             quietWhenEmpty={hasOthers || Boolean(memberName)}
           />
@@ -155,7 +170,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               selectedChatId={chatId}
               open={othersOpen}
               onToggle={() => setObservedCollapsed(othersOpen)}
-              onSelect={openChat}
+              onSelect={openChatById}
               scrollRef={scrollRef}
             />
           ) : null}
@@ -194,7 +209,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
         onOpenChange={setNewGroupOpen}
         onCreated={(chat) => {
           setDraftChat(chat);
-          openChat(chat.id);
+          openChat(chat);
         }}
       />
     </div>

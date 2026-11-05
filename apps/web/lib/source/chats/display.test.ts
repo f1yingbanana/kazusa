@@ -3,6 +3,7 @@ import {
   actionLine,
   chatSubject,
   chatTitle,
+  openChatPatch,
   messagePreview,
   messageReceipt,
   receiptLabel,
@@ -32,6 +33,43 @@ describe("chatTitle", () => {
   it("names a direct chat after the partner, not their id", () => {
     const dm = chat({ name: "kazusa", members: ["kazusa", "user:me"] });
     expect(chatTitle(dm, "user:me", nameOf)).toBe("Kazusa");
+  });
+
+  it("points the inspector at a draft group, or the one person a draft is with", () => {
+    const group = chat({
+      id: "draft:1",
+      type: "group",
+      members: ["user:me", "kazusa", "yutori-natsu"],
+      draft: true,
+    });
+    expect(chatSubject(group, "user:me")).toEqual({
+      kind: "chat",
+      id: "draft:1",
+    });
+    const talk = chat({
+      type: "huddle",
+      members: ["user:me", "kazusa"],
+      draft: true,
+    });
+    expect(chatSubject(talk, "user:me")).toEqual({
+      kind: "character",
+      id: "kazusa",
+    });
+  });
+
+  it("opens a chat with its subject selected in the same change", () => {
+    const dm = chat({ id: "d", members: ["kazusa", "user:me"] });
+    expect(openChatPatch(dm, "user:me")).toEqual({
+      view: "chats",
+      "chats.id": "d",
+      sel: "character:kazusa",
+    });
+    const group = chat({
+      id: "group:g",
+      type: "group",
+      members: ["user:me", "kazusa", "yutori-natsu"],
+    });
+    expect(openChatPatch(group, "user:me").sel).toBe("chat:group:g");
   });
 
   it("names a direct chat between two others after both of them", () => {

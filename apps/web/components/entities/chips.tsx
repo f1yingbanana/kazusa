@@ -13,6 +13,8 @@ import { useObservedChat } from "@/hooks/use-observed-chats";
 import { useCharacter } from "@/hooks/use-characters";
 import { usePlace } from "@/hooks/use-location";
 import { useNavigate } from "@/hooks/use-url-state";
+import type { Chat } from "@/lib/source/chats/types";
+import { useDraftChat } from "@/lib/state/chat-draft";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { cn } from "@/lib/utils";
 import { PresenceAvatar } from "./presence-avatar";
@@ -82,9 +84,14 @@ export function useChatTitle(id: string): {
   members: readonly string[];
   ended?: boolean;
   placeId?: string;
+  /** Not sent yet: it starts with the player's first message. */
+  draft?: boolean;
 } {
   const { chats } = useChats();
-  const mine = chats.find((chat) => chat.id === id);
+  const draft = useDraftChat();
+  const mine: Chat | undefined =
+    chats.find((chat) => chat.id === id) ??
+    (draft?.id === id ? draft : undefined);
   const { chat: observed } = useObservedChat(mine ? null : id);
   if (mine) {
     return {
@@ -94,6 +101,7 @@ export function useChatTitle(id: string): {
       readable: true,
       members: mine.members,
       placeId: mine.placeId,
+      draft: mine.draft,
     };
   }
   if (observed) {

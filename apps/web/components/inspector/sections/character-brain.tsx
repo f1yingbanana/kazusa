@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { BrainTurn } from "@kazusa/client";
 import {
   BotIcon,
-  BrainIcon,
   CircleAlertIcon,
   LoaderCircleIcon,
   UserIcon,
@@ -27,11 +26,6 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -44,7 +38,6 @@ import { useBrainTrace } from "@/hooks/use-brain";
 import { useFollowBottom } from "@/hooks/use-follow-bottom";
 import { useCharacterStatus } from "@/hooks/use-characters";
 import { formatCost, formatTokens } from "@/lib/format";
-import { useSources } from "@/lib/source/provider";
 
 const PAGE_TURNS = 20;
 const MAX_TURNS = 100;
@@ -195,48 +188,31 @@ function BrainTraceBody({ id, thinking }: { id: string; thinking: boolean }) {
 }
 
 /** Peeks at the brain session: prompts, thinking, tool calls, tokens and model. */
-export function CharacterBrainButton({
+/** The current brain session's turns, followed live while open. */
+export function CharacterBrainSheet({
   id,
   name,
+  open,
+  onOpenChange,
 }: {
   id: string;
   name: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const { resolved } = useSources();
   const thinking = useCharacterStatus(id)?.brain === "thinking";
-  const [open, setOpen] = useState(false);
-
-  if (resolved.brain !== "live") return null;
-
   return (
-    <>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setOpen(true)}
-            />
-          }
-        >
-          <BrainIcon />
-          <span className="sr-only">{`Peek at ${name}'s brain`}</span>
-        </TooltipTrigger>
-        <TooltipContent>Peek at brain</TooltipContent>
-      </Tooltip>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-full gap-0 sm:max-w-xl">
-          <SheetHeader className="border-b">
-            <SheetTitle>{`${name}'s brain`}</SheetTitle>
-            <SheetDescription>
-              {thinking ? "Thinking now. " : ""}Turns from the current session,
-              newest at the bottom, in real time.
-            </SheetDescription>
-          </SheetHeader>
-          <BrainTraceBody id={id} thinking={thinking} />
-        </SheetContent>
-      </Sheet>
-    </>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full gap-0 sm:max-w-xl">
+        <SheetHeader className="border-b">
+          <SheetTitle>{`${name}'s brain`}</SheetTitle>
+          <SheetDescription>
+            {thinking ? "Thinking now. " : ""}Turns from the current session,
+            newest at the bottom, in real time.
+          </SheetDescription>
+        </SheetHeader>
+        {open ? <BrainTraceBody id={id} thinking={thinking} /> : null}
+      </SheetContent>
+    </Sheet>
   );
 }

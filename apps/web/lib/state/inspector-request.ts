@@ -34,3 +34,21 @@ export function isQuietSelection(key: string | null): boolean {
 export function settleQuietSelection(key: string | null): void {
   if (key !== quietKey) quietKey = null;
 }
+
+/*
+ * A view that points the inspector at what it opens leaves a link's own
+ * selection alone, but only for the page as it was loaded: once anyone has
+ * navigated, opening something always shows it.
+ */
+const loadedSearch =
+  typeof window === "undefined" ? null : window.location.search;
+let linkHonored = false;
+
+/** True once per page load, while the URL is still the link that named both. */
+export function keepsLinkedSelection(param: string): boolean {
+  if (linkHonored || loadedSearch === null) return false;
+  linkHonored = true;
+  if (window.location.search !== loadedSearch) return false;
+  const params = new URLSearchParams(loadedSearch);
+  return params.has(param) && params.has("sel");
+}

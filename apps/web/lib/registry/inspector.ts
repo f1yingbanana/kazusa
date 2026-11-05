@@ -1,10 +1,22 @@
-import { CharacterContextSection } from "@/components/inspector/sections/character-context";
+import {
+  CharacterContextSection,
+  CharacterContextSummary,
+} from "@/components/inspector/sections/character-context";
 import { CharacterDesiresSection } from "@/components/inspector/sections/character-desires";
 import { CharacterHeaderSection } from "@/components/inspector/sections/character-header";
-import { CharacterModelSection } from "@/components/inspector/sections/character-model";
+import {
+  CharacterModelSection,
+  CharacterModelSummary,
+} from "@/components/inspector/sections/character-model";
 import { CharacterNowSection } from "@/components/inspector/sections/character-now";
-import { CharacterProfileSection } from "@/components/inspector/sections/character-profile";
-import { CharacterRecentSection } from "@/components/inspector/sections/character-recent";
+import {
+  CharacterProfileSection,
+  CharacterProfileSummary,
+} from "@/components/inspector/sections/character-profile";
+import {
+  CharacterRecentSection,
+  CharacterRecentSummary,
+} from "@/components/inspector/sections/character-recent";
 import { ChatSummarySection } from "@/components/inspector/sections/chat-summary";
 import { PlaceHeaderSection } from "@/components/inspector/sections/place-header";
 import { PlacePeopleSection } from "@/components/inspector/sections/place-people";
@@ -14,8 +26,9 @@ import type { InspectorSection } from "./types";
 
 /**
  * Header sections render without a title. Each section answers one question a
- * watcher asks; anything deeper is a link into a stage view. Later: Attention,
- * Relationships.
+ * watcher asks; anything deeper is a link into a stage view. What a glance
+ * doesn't need folds (`fold`), with its key fact as the folded `summary`.
+ * Later: Attention, Relationships.
  */
 export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
   {
@@ -49,6 +62,8 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     order: 20,
     requires: ["timeline"],
     component: CharacterRecentSection,
+    fold: "closed",
+    summary: CharacterRecentSummary,
   },
   {
     id: "character.profile",
@@ -57,6 +72,8 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     order: 40,
     requires: ["characters"],
     component: CharacterProfileSection,
+    fold: "closed",
+    summary: CharacterProfileSummary,
   },
   {
     id: "character.model",
@@ -66,6 +83,8 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     requires: ["characters", "models"],
     component: CharacterModelSection,
     useApplies: useRunsOnModel,
+    fold: "closed",
+    summary: CharacterModelSummary,
   },
   {
     id: "character.context",
@@ -75,6 +94,8 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     requires: ["characters", "context"],
     component: CharacterContextSection,
     useApplies: useRunsOnModel,
+    fold: "closed",
+    summary: CharacterContextSummary,
   },
   {
     id: "chat.summary",
