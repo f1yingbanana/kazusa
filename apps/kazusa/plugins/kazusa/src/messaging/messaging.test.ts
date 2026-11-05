@@ -1386,6 +1386,46 @@ describe("paced speech", () => {
     expect(outbox.size).toBe(0);
   });
 
+  it("says a goodbye on the way out when they leave while waiting to speak", async () => {
+    // Live, a goodbye sent with start_task was lost: the line waited for the
+    // floor while the move took the speaker out of the conversation.
+    const h = setup();
+    for (const who of ["alice", "bob", "carol"]) h.places.set(who, "club");
+    const club = await h.messaging.talk("alice", ["bob", "carol"]);
+    const address = club.sessionKey.replace("agent:alice:", "");
+    h.setSpeed(0.000_001); // Every line would take days to say.
+    // Carol holds the floor with a long story; Alice waits to say goodbye.
+    const carol = h.messaging.speak("carol", "CAROL", {
+      requestId: "story",
+      sessionKey: address,
+      messages: ["So the thing about the vending machine is this."],
+    });
+    await vi.waitFor(() =>
+      expect(h.messaging.currentSpeech("carol")).toBeDefined(),
+    );
+    const goodbye = h.messaging.speak("alice", "ALICE", {
+      requestId: "bye",
+      sessionKey: address,
+      messages: ["Sorry, I have to run. See you!", "Bye, Bob."],
+    });
+    await vi.waitFor(() =>
+      expect(h.messaging.currentSpeech("alice")).toBeDefined(),
+    );
+    await h.messaging.leavePlace("alice", "ALICE", "club", {
+      toward: "Main Gate",
+      at: NOW,
+    });
+    expect(await goodbye).toMatchObject({ status: "delivered" });
+    // Said before she went, over Carol, heard by both.
+    expect(texts(h.retained)).toEqual([
+      "Sorry, I have to run. See you!",
+      "Bye, Bob.",
+      "leaves, heading toward Main Gate",
+    ]);
+    expect(h.messaging.interrupt("carol")).toBe(true);
+    await carol;
+  });
+
   it("never lets another instance flush a plan still being said, or taken back", async () => {
     // Live: another instance's outbox flush sent the bubbles an interrupted
     // speaker was told "nobody saw", so the character said them twice.

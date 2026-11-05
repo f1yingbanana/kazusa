@@ -177,6 +177,11 @@ interface Speech {
   sessionKey?: string;
   /** Settles once it is over, said or stopped: the next send may begin. */
   readonly ended: Promise<void>;
+  /**
+   * Aborted when the speaker leaves: whatever they were about to say is said on
+   * the way out, at once, over whoever is talking.
+   */
+  readonly hurry: AbortController;
 }
 
 export type MessagingEvent =
@@ -1282,6 +1287,12 @@ export class Messaging {
   ): Promise<void> {
     PARTICIPANT_ID.parse(who);
     void name;
+    // A goodbye sent with the move is said on the way out, before they go:
+    // what they were waiting to say goes at once, over whoever is talking.
+    // Outside the queue, which those lines need.
+    const saying = [...(this.speeches.get(who) ?? [])];
+    for (const speech of saying) speech.hurry.abort();
+    await Promise.all(saying.map((speech) => speech.ended));
     await this.serial.enqueue("messages", async () => {
       await this.init();
       for (const chat of [...this.chats.values()]) {
@@ -1558,6 +1569,7 @@ export class Messaging {
       ...(target.sessionKey
         ? { sessionKey: ownChatSession(sender, target.sessionKey) }
         : {}),
+      hurry: new AbortController(),
       ended: new Promise<void>((resolve) => {
         end = resolve;
       }),
@@ -1589,6 +1601,12 @@ export class Messaging {
       | undefined;
     /** A line cut off partway: what was heard of it. */
     let cut: string | undefined;
+    // A stopping Gateway, or the speaker leaving, lets the rest go at once.
+    const released = AbortSignal.any([
+      this.deps.release ?? shutdownSignal(),
+      speech.hurry.signal,
+    ]);
+    const hurry = speech.hurry.signal;
     try {
       if (live) {
         // One thing after another: live, a later send cut off an earlier one
@@ -1631,7 +1649,8 @@ export class Messaging {
             : undefined;
         if (chat) {
           const sessionKey = chatSummary(chat, sender).sessionKey;
-          const released = this.deps.release ?? shutdownSignal();
+          if (!judged && speech.hurry.signal.aborted)
+            judged = { floor: "CUT_IN", pace: 1 };
           if (!judged) {
             const floor = this.floors.contested(chat.id, sender, plan.id);
             judged = await this.judgeSpeech(sender, {
@@ -1676,6 +1695,7 @@ export class Messaging {
           );
           paced = await sleepSim(this.deps.clock, ms, signal, {
             release: released,
+            hurry,
           });
         } else if (
           first &&
@@ -1702,7 +1722,7 @@ export class Messaging {
             speechClock,
             typingMs(sticker ? "" : text),
             signal,
-            { release: this.deps.release ?? shutdownSignal() },
+            { release: released, hurry },
           );
         }
         signal.throwIfAborted();

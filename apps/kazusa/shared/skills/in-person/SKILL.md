@@ -29,8 +29,9 @@ someone you know is somewhere in the crowd, a text can make more sense.
     address. You leave the one you were in, and those still in it see you go.
   - To step back without going anywhere, because you've stopped following it or
     have something else to do here, `manage_chat` `leave` the conversation.
-    Walking away leaves it too. A conversation that is over can't be joined:
-    `talk` to them to start another.
+    Walking away leaves it too, and what you were still waiting to say is said
+    as you go: a goodbye can go with the `start_task` that takes you away. A
+    conversation that is over can't be joined: `talk` to them to start another.
   - Past five or six people, it is a crowd rather than a conversation: it is
     hard to get a word in, and people turn to the ones near them.
   - In a group, people take turns. Not every line needs an answer from you, and

@@ -177,10 +177,14 @@ and the rest; the character reads only the counts and `heard`. `QUEUE_NEXT`
 talks through it: both lines are heard. A run that ends (its abort signal) drops
 the line unheard, as before.
 
-**Membership changes.** A send to a huddle the speaker has left fails as it did.
-Huddles no longer merge ([conversations](conversations.md)), and someone saying
-a line or waiting for the floor can't be turned into a side conversation: they
-are talking to the group.
+**Membership changes.** Leaving the place says what the speaker was still
+waiting to say, at once and over whoever is talking, before they go: a goodbye
+sent with the `start_task` that moves them was otherwise lost behind the floor
+(`leavePlace` hurries their speeches and waits for them). A send to a huddle the
+speaker has already left fails as it did. Huddles no longer merge
+([conversations](conversations.md)), and someone saying a line or waiting for
+the floor can't be turned into a side conversation: they are talking to the
+group.
 
 **Who skips the floor:** players (real-time typing, always heard at once), the
 system agent (wall-time pacing) and recovered plans. Text chats have no floor.

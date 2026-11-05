@@ -194,28 +194,37 @@ function pause(
  * current speed and is re-checked every `pollMs`, so speed changes and clock
  * advances apply mid-wait, and a paused clock holds the wait where it is.
  * Returns false only when `release` lets go of a frozen wait (the Gateway is
- * stopping); the caller then finishes at once.
+ * stopping), or `hurry` cuts any wait short (a speaker is leaving); the caller
+ * then finishes at once.
  */
 export async function sleepSim(
   clock: Pick<Clock, "now">,
   simMs: number,
   signal: AbortSignal,
-  options: { readonly release?: AbortSignal; readonly pollMs?: number } = {},
+  options: {
+    readonly release?: AbortSignal;
+    readonly hurry?: AbortSignal;
+    readonly pollMs?: number;
+  } = {},
 ): Promise<boolean> {
-  const { release, pollMs = 250 } = options;
+  const { release, hurry, pollMs = 250 } = options;
+  const either = [release, hurry].filter((wake) => wake !== undefined);
+  const frozenUntil = either.length > 1 ? AbortSignal.any(either) : either[0];
   const target = clock.now().simTime + simMs;
   for (;;) {
     signal.throwIfAborted();
     const { simTime, speed } = clock.now();
     if (simTime >= target) return true;
+    if (hurry?.aborted) return false;
     if (speed <= 0) {
       if (release?.aborted) return false;
-      await pause(pollMs, signal, release);
+      await pause(pollMs, signal, frozenUntil);
       continue;
     }
     await pause(
       Math.min(pollMs, Math.ceil((target - simTime) / speed)),
       signal,
+      hurry,
     );
   }
 }

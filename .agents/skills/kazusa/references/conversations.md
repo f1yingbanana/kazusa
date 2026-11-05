@@ -64,7 +64,7 @@ Live world, 2026-11-05 (sim time 2026-11-02 15:39, paused at lunch):
 | 10  | Turn to some of a group: a side talk        | `talk` with some of your own conversation         | Built        |
 | 11  | Big groups splinter past four to six        | Crowd guidance, tuning out (§4), side talks       | This design  |
 | 12  | Drift out when not following                | Tuning out (§4)                                   | This design  |
-| 13  | Say goodbye, then leave                     | Speaking, then stepping back or walking away      | Built        |
+| 13  | Say goodbye, then leave                     | Leaving says what you were waiting to say         | Built        |
 | 14  | Step back to do something else here         | `manage_chat` `leave`                             | Built        |
 | 15  | A conversation ends when everyone is silent | Quiet rule (§5)                                   | Designed     |
 | 16  | Announce to everyone ("listen up")          | `announce` (§5)                                   | Designed     |
