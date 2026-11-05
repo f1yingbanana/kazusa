@@ -112,7 +112,8 @@ export interface StartTaskParams {
 }
 
 export interface DelayTaskParams {
-  readonly additionalDuration?: number;
+  /** How much longer from now the activity will take, as they estimate it. */
+  readonly minutesLeft: number;
   readonly reason?: string;
   /** One or two sentences in the character's voice, as plain text. */
   readonly monologue?: string;
@@ -133,7 +134,6 @@ export interface TaskStartedPayload extends Readonly<Record<string, unknown>> {
 /** `task.delayed` journal fields; extensions add their own beside them. */
 export interface TaskDelayedPayload extends Readonly<Record<string, unknown>> {
   readonly taskId: string;
-  readonly additionalMinutes: number;
   readonly endAt: number;
   readonly reason?: string;
   readonly monologue?: string;

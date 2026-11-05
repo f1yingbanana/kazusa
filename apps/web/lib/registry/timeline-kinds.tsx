@@ -76,9 +76,9 @@ export const TIMELINE_KINDS: KindMap = {
     salience: "normal",
     fact: (event) => (
       <>
-        Extended the current task by{" "}
+        Extended the current task, ending in{" "}
         <span className="font-mono">
-          {formatSimDuration(event.payload.additionalMinutes * MINUTE)}
+          {formatSimDuration(Math.max(0, event.payload.endAt - event.simTime))}
         </span>
       </>
     ),

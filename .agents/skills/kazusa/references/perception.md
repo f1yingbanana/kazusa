@@ -105,7 +105,8 @@ properties rather than writing explicit `undefined`; tests enforce that same
 contract. Recovery never blindly repeats possibly adopted work: it checks each
 delivery still in custody against the brain transcript (`adoptedByBrain`). Found
 means the turn ran, so its stimuli become processed; missing means they return
-to pending. Only without that check does it quarantine (`stopped`). A restart
+to pending. Only without that check does it quarantine (`stopped`); see §8.6 for
+the other ways a character comes to be stopped and how it ends. A restart
 tombstone on `:brain` is cleared by the brain channel, which then retries the
 handoff once (SKILL §3.4).
 
@@ -299,7 +300,8 @@ Perception employs three mechanisms:
 ### 4.1 Ingestion Debouncing & Coalescing Window
 
 - When a stimulus arrives, Perception initiates a brief perceptual coalescing
-  window (`coalesceWindowMs = 500ms`).
+  window (`coalesceWindowMs`, 10 s by default; 250 ms when the stimulus is
+  someone talking face to face).
 - Any additional stimuli arriving within this window are grouped into a single
   **incoming bundle**.
 - This guarantees multi-line chat bursts (common on Discord/Telegram) are
@@ -691,8 +693,8 @@ interleave naturally in Kazusa:
 
 - **Scenario**: Alice is meditating quietly in her room (brain is idle).
 - **09:00:00.100**: Her 30-minute meditation task deadline fires.
-- **09:00:00.250**: Within the 500ms coalescing window, Bob sends a message:
-  _"Good morning! Are you free for coffee?"_
+- **09:00:00.250**: Within the coalescing window, Bob sends a message: _"Good
+  morning! Are you free for coffee?"_
 - **Coalescing**: Perception bundles both stimuli into a single sensory intake:
   ```text
   Incoming chats: [{"sender":"bob","text":"Good morning! Are you free for coffee?"}]
@@ -706,27 +708,29 @@ interleave naturally in Kazusa:
 
 ---
 
-### 8.6 Proposed Unified Taskless and Overdue Check-in
+### 8.6 Overdue and Taskless Check-ins
 
-A consumed one-shot deadline can leave an expired task if the brain omits
-`start_task`/`delay_task`; a new character can have no task and no first alarm.
-Both cases need the same activity check-in, not a fabricated resting lease.
+A consumed one-shot deadline leaves an overdue activity when a turn ends without
+`start_task`/`delay_task`: the run failed, hit its limit, or the model chose
+nothing. A new character can have no activity and no first alarm. Both get the
+same check-in, not a fabricated resting lease: the character is still at what
+they were doing, over time, until they decide otherwise.
 
-The current proposal is one service scan every 60 real seconds plus a startup
-scan. Skip paused simulation, busy brains, pending deliveries/queued perception,
-explicit stops, recovery quarantine, and tasks whose check-in is still in the
-future. Taskman detects eligibility; Perception rechecks it under its serial
-queue and exclusively owns admission. Existing exact task-deadline cron remains.
+The idle supervisor (`taskman/supervisor.ts`) runs every 60 real seconds
+(`taskman.supervisor.intervalMs`) and wakes up to two characters a tick
+(`maxAgentsPerTick`). It skips a paused clock, offstage characters, a thinking
+brain and an activity still under way. Everyone else gets `idleWake`: a
+`task-idle:<id>:<sim time>` stimulus that is delivered without asking Jev and is
+dropped as stale once a new activity starts. Queued items don't skip a check-in;
+picking up the phone shows them too. One check-in waits at a time: asking again
+re-offers the one already queued.
 
-Use neutral lifecycle perceptions, unique nudge-occurrence IDs, retained
-adoption and cooldown state, and one outstanding wake per character. Recheck
-expected task state before dispatch and select skill from current state at
-assembly. Do not route background checks through ordinary `receive()` unchanged:
-it can clear the explicit stop flag. After five adopted unresolved checks, warn
-and use a fixed 15-minute retry interval until a future task resets the counter.
-
-This scheduler is **not implemented yet**. Full design and acceptance cases:
-[Character brain context and activity check-ins](../../../../apps/kazusa/docs/brain-context.md).
+**Stopped.** A run that ends in an error or is aborted (run limit, provider
+failure, shutdown), and a handoff that fails, set `stopped`, which holds the
+whole queue. A new stimulus clears it when no handoff is in custody; the
+supervisor's check-in is that stimulus for an overdue character, so a failed run
+is picked back up within a tick or a few. A handoff still in custody is settled
+only by `recover()` at the next start (§2).
 
 ---
 
@@ -736,7 +740,7 @@ This scheduler is **not implemented yet**. Full design and acceptance cases:
 
 | Setting               | Default | Scope                                                                                                                                                               |
 | :-------------------- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `coalesceWindowMs`    | `500`   | Milliseconds to debounce incoming rapid-fire messages into a single sensory bundle.                                                                                 |
+| `coalesceWindowMs`    | `10000` | Milliseconds to debounce incoming rapid-fire messages into a single sensory bundle (250 at most face to face).                                                      |
 | `maxConcurrentBrains` | `16`    | Brains starting to think at once, across the cast. A waiting character holds no reservation; what arrives meanwhile joins the one turn built when their slot opens. |
 | `maxBatchSize`        | `16`    | Maximum stimuli consolidated and admitted together into a single brain turn.                                                                                        |
 
@@ -917,7 +921,7 @@ survive restarts; `recover()` and the next drain re-arm the timer.
 | Mid-task reaction turn, another message arrives | Busy `DEFER` keeps it for the task boundary instead of forcing another turn right after this one.        |
 | Sleeping 23:00–07:00, message at 02:00          | `DEFER`; the character wakes up to their messages.                                                       |
 | A group message wakes two characters            | Different latency scores (plus jitter) stagger them; the later one sees the earlier reply in its ledger. |
-| Idle supervisor tick while items wait           | Skipped (`queued > 0`); the next wake is already scheduled.                                              |
+| Idle supervisor tick while items wait           | Activity still on: skipped. Activity over: an idle check-in, and what waited comes with it.              |
 | Clock paused                                    | `notBefore` cannot pass and tasks cannot end; nothing fires.                                             |
 
 ### 12.4 Paced speech and steering

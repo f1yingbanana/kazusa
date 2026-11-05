@@ -1278,7 +1278,7 @@ export const TaskDelayedEventSchema = z.object({
   kind: z.literal("task.delayed"),
   payload: z.object({
     taskId: z.string(),
-    additionalMinutes: z.number(),
+    /** The new end, estimated from the time of the event. */
     endAt: z.number(),
     reason: z.string().optional(),
     monologue: z.string().optional(),

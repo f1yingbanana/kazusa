@@ -6,6 +6,8 @@ import {
   registerBrainRunLimits,
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
+import type { Clock } from "../clock/clock.ts";
+import type { ClockChangeListener } from "../clock/types.ts";
 
 const native = vi.hoisted(() => ({
   abort: vi.fn(() => true),
@@ -29,10 +31,12 @@ function setup(
   runId = "run-1",
 ) {
   const hooks = new Map<string, Hook>();
+  const disposers: (() => void)[] = [];
   const api = {
     pluginConfig: { perception: limits },
     logger: { warn: vi.fn() },
     on: (name: string, hook: Hook) => hooks.set(name, hook),
+    lifecycle: { onDispose: (dispose: () => void) => disposers.push(dispose) },
     runtime: {
       config: {
         current: () => ({
@@ -41,7 +45,17 @@ function setup(
       },
     },
   } as unknown as OpenClawPluginApi;
-  const finish = registerBrainRunLimits(api, () => 0);
+  let speed = 1;
+  const listeners = new Set<ClockChangeListener>();
+  const clock = {
+    time: () => 0,
+    now: () => ({ simTime: 0, speed }),
+    onClockChange: (listener: ClockChangeListener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  } as unknown as Pick<Clock, "time" | "now" | "onClockChange">;
+  const finish = registerBrainRunLimits(api, clock);
   const ctx = {
     runId,
     sessionKey: "agent:alice:brain",
@@ -49,9 +63,19 @@ function setup(
   };
   const call = (name: string, event: Record<string, unknown>) =>
     hooks.get(name)?.(event, ctx);
-  ended.push(() => finish(runId));
+  ended.push(() => {
+    finish(runId);
+    disposers.splice(0).forEach((dispose) => dispose());
+  });
   return {
     api,
+    /** Pauses or resumes the world, telling every listener. */
+    setSpeed: (next: number) => {
+      const before = { simTime: 0, speed, formatted: "" };
+      speed = next;
+      for (const listener of listeners)
+        void listener({ simTime: 0, speed, formatted: "" }, before);
+    },
     finish: () => finish(runId),
     ctx,
     call,
@@ -118,6 +142,41 @@ describe("brain run hard budgets", () => {
     expect(h.tool("b")).toMatchObject({ block: true });
     expect(h.tool("c", "send_message")).toBeUndefined();
     expect(native.abort).not.toHaveBeenCalled();
+  });
+  it("still lets a run that is out of time choose what comes next", () => {
+    const h = setup();
+    h.start("m1");
+    h.tool("a");
+    h.tool("b");
+    expect(h.tool("c")).toMatchObject({ block: true });
+    expect(h.tool("d", "start_task")).toBeUndefined();
+    expect(h.tool("e", "delay_task")).toBeUndefined();
+  });
+  it("spends none of a character's time while the clock is paused", () => {
+    vi.useFakeTimers();
+    const h = setup();
+    h.start("m1");
+    vi.advanceTimersByTime(3000);
+    h.setSpeed(0);
+    vi.advanceTimersByTime(60_000);
+    expect(native.abort).not.toHaveBeenCalled();
+    h.setSpeed(1);
+    expect(h.tool("a")).toBeUndefined();
+    vi.advanceTimersByTime(1000);
+    expect(h.tool("b")).toMatchObject({ block: true });
+    vi.advanceTimersByTime(999);
+    expect(native.abort).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(native.abort).toHaveBeenCalledTimes(1);
+  });
+  it("keeps the system agent's time running while the clock is paused", () => {
+    vi.useFakeTimers();
+    const h = setup({ systemAgent: { maxRunSeconds: 5 } });
+    h.ctx.sessionKey = "agent:arona:brain";
+    h.start("m1");
+    h.setSpeed(0);
+    vi.advanceTimersByTime(5000);
+    expect(native.abort).toHaveBeenCalledTimes(1);
   });
   it("gives the configured system agent its own limits", () => {
     const h = setup({

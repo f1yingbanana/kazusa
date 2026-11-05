@@ -166,17 +166,21 @@ export async function executeDelayTask(
     return { success: false, message: "No active task in progress to delay." };
   }
 
-  const additionalDuration = Math.max(
-    1,
-    Math.round(params.additionalDuration ?? 5),
+  if (!Number.isFinite(params.minutesLeft)) {
+    return { success: false, message: ctx.text("task-no-estimate", {}) };
+  }
+  // From now, not from the planned end: an activity that already ran over
+  // would otherwise still be over after it was extended. Never earlier than
+  // planned, though: that would hurry a trip along (start_task changes plans).
+  const endAt = Math.max(
+    Date.parse(current.endAt),
+    timestamp + Math.max(1, Math.round(params.minutesLeft)) * 60_000,
   );
   const task: ActiveTask = {
     ...current,
     id: current.id ?? randomUUID(),
-    duration: current.duration + additionalDuration,
-    endAt: new Date(
-      new Date(current.endAt).getTime() + additionalDuration * 60_000,
-    ).toISOString(),
+    duration: (endAt - Date.parse(current.startedAt)) / 60_000,
+    endAt: new Date(endAt).toISOString(),
   };
   const extensions = await commitExtensions(ctx, {
     kind: "delayed",
@@ -196,7 +200,7 @@ export async function executeDelayTask(
 
   const reason = params.reason?.trim();
   const delayed = {
-    minutes: additionalDuration,
+    minutes: Math.round((Date.parse(lease.endAt) - timestamp) / 60_000),
     until: formatSimTime(Date.parse(lease.endAt)),
     notes: extensions.notes,
   };
@@ -208,7 +212,6 @@ export async function executeDelayTask(
     : ctx.text("task-delayed", delayed);
   const payload = {
     taskId: lease.id,
-    additionalMinutes: additionalDuration,
     endAt: Date.parse(lease.endAt),
     reason: params.reason,
     monologue: params.monologue,

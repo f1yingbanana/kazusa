@@ -51,11 +51,11 @@ night's sleep: { "energy": "low→full" }. Desires: {data}
 
 ## delay_task
 
-Move the end of your current activity later by N minutes.
+Keep at your current activity for longer: estimate when you will be done.
 
-## delay_task.additionalDuration
+## delay_task.minutesLeft
 
-Additional minutes.
+How many more minutes from now until you expect to finish.
 
 ## delay_task.reason
 

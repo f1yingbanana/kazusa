@@ -298,7 +298,7 @@ describe("location registration", () => {
       "afterwards",
       "where",
     ]);
-    expect(required("delay_task")).toEqual(["afterwards"]);
+    expect(required("delay_task")).toEqual(["minutesLeft", "afterwards"]);
   });
 
   it("starts everyone at home, records the trip and settles the arrival", async () => {
@@ -466,7 +466,7 @@ describe("location registration", () => {
     );
     setNow(minutes(5));
     const delayed = await executeDelayTask(
-      { additionalDuration: 10, reason: "Flat tyre", afterwards: {} },
+      { minutesLeft: 15, reason: "Flat tyre", afterwards: {} },
       ctx,
     );
     expect(delayed.message).toContain(

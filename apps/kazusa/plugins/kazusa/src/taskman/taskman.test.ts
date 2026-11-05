@@ -76,7 +76,7 @@ describe("Taskman", () => {
     expect(first.task.startedAt).toBe(next.task.startedAt);
     expect(first.task.id).not.toBe(next.task.id);
     expect(first.task.id).toMatch(/^[\da-f-]{36}$/);
-    const delayed = await executeDelayTask({ additionalDuration: 5 }, context);
+    const delayed = await executeDelayTask({ minutesLeft: 30 }, context);
     expect(delayed.task?.id).toBe(next.task.id);
     expect(delayed.task?.endAt).not.toBe(next.task.endAt);
   });
@@ -149,7 +149,7 @@ describe("Taskman", () => {
     );
     const delayed = await executeDelayTask(
       {
-        additionalDuration: 15,
+        minutesLeft: 75,
         reason: "The last exercise needs more work",
         monologue:
           "I can hear the melody, but the harmony keeps slipping away.",
@@ -164,9 +164,62 @@ describe("Taskman", () => {
       `${delayed.message}\n\n> *I can hear the melody, but the harmony keeps slipping away.*`,
     );
     expect(delayed.message).toBe(
-      "Delayed 15 min, until Wed 2026-10-21 09:15. Reason: The last exercise needs more work.",
+      "Extended: 75 more min, until Wed 2026-10-21 09:15. Reason: The last exercise needs more work.",
     );
     expect(delayed.message).not.toContain("I can hear the melody");
+  });
+
+  it("extends an activity that ran over from now, not from its planned end", async () => {
+    const { context } = makeContext();
+    await context.store.register("alice", {
+      id: "lunch",
+      type: "eating",
+      description: "Lunch",
+      startedAt: "2026-10-21T06:00:00.000Z",
+      endAt: "2026-10-21T07:00:00.000Z",
+      duration: 60,
+    });
+    const delayed = await executeDelayTask({ minutesLeft: 20 }, context);
+    expect(delayed.task).toMatchObject({
+      id: "lunch",
+      endAt: "2026-10-21T08:20:00.000Z",
+      duration: 140,
+    });
+    expect(delayed.message).toBe(
+      "Extended: 20 more min, until Wed 2026-10-21 08:20.",
+    );
+  });
+
+  it("never brings an activity's end forward", async () => {
+    const { context } = makeContext();
+    await executeStartTask(
+      { type: "traveling", description: "Bus to town", duration: 60 },
+      context,
+    );
+    const delayed = await executeDelayTask({ minutesLeft: 10 }, context);
+    expect(delayed.task?.endAt).toBe("2026-10-21T09:00:00.000Z");
+    expect(delayed.message).toBe(
+      "Extended: 60 more min, until Wed 2026-10-21 09:00.",
+    );
+  });
+
+  it("refuses an extension with no estimate, writing nothing", async () => {
+    const { context, messages } = makeContext();
+    await executeStartTask(
+      { type: "studying", description: "Studying", duration: 60 },
+      context,
+    );
+    const before = await context.store.lookup("alice");
+    const delayed = await executeDelayTask(
+      {} as Parameters<typeof executeDelayTask>[0],
+      context,
+    );
+    expect(delayed).toMatchObject({
+      success: false,
+      message: expect.stringContaining("minutesLeft"),
+    });
+    expect(await context.store.lookup("alice")).toEqual(before);
+    expect(messages).toHaveLength(1);
   });
 
   it("ends a delay's reason with one stop, whatever the model wrote", async () => {
@@ -176,7 +229,7 @@ describe("Taskman", () => {
       context,
     );
     const delayed = await executeDelayTask(
-      { additionalDuration: 5, reason: "Nearly done." },
+      { minutesLeft: 5, reason: "Nearly done." },
       context,
     );
     expect(delayed.message).toMatch(/Reason: Nearly done\.$/);
@@ -185,7 +238,7 @@ describe("Taskman", () => {
   it("does not record a monologue when there is no task to delay", async () => {
     const { context, messages } = makeContext();
     const result = await executeDelayTask(
-      { monologue: "I need more time." },
+      { minutesLeft: 10, monologue: "I need more time." },
       context,
     );
 

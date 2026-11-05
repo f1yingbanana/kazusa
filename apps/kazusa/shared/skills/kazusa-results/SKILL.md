@@ -79,11 +79,15 @@ Finished {type}: "{summary}". {started}
 
 ## task-delayed
 
-Delayed {minutes} min, until {until}.{notes}
+Extended: {minutes} more min, until {until}.{notes}
 
 ## task-delayed-reason
 
-Delayed {minutes} min, until {until}. Reason: {reason}{notes}
+Extended: {minutes} more min, until {until}. Reason: {reason}{notes}
+
+## task-no-estimate
+
+Not extended: it needs `minutesLeft`, how many more minutes from now.
 
 ## where-which
 

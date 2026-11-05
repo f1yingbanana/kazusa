@@ -2723,6 +2723,61 @@ describe("Foreseen stimuli", () => {
     expect(h.deliveries[0]?.ids).toContain("while-away");
   });
 
+  it("brings a queue left by a cut-off run along with the overdue check-in", async () => {
+    // Live: a run that hit its limit while a message waited stopped the
+    // character, and the supervisor skipped anyone with a queue (2026-11-05).
+    const h = setup();
+    h.tasks.set("alice", {
+      id: "lunch",
+      type: "eating",
+      description: "Lunch",
+      duration: 30,
+      startedAt: new Date(NOW - 3_600_000).toISOString(),
+      endAt: new Date(NOW - 1_800_000).toISOString(),
+    });
+    h.states.set("alice", {
+      pending: [{ ...stimulus("waiting"), action: "QUEUE_NEXT" }],
+      brainRun: "cut-off",
+    });
+    await h.router.ended("alice", "cut-off", true);
+    expect(h.deliveries).toEqual([]);
+    await h.router.idleWake("alice");
+    expect(h.snapshot().stopped).toBe(false);
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.deliveries[0]?.ids).toEqual([`task-idle:alice:${NOW}`, "waiting"]);
+  });
+
+  it("keeps one check-in waiting however often the supervisor asks", async () => {
+    const h = setup();
+    // A handoff nobody confirmed holds the queue until a restart settles it.
+    h.states.set("alice", {
+      pending: [{ ...stimulus("held"), action: "QUEUE_NEXT" }],
+      deliveries: [
+        {
+          id: "unconfirmed",
+          agentId: "alice",
+          mode: "followup",
+          message: "held",
+          ids: ["held"],
+          keys: [stimulusKey(stimulus("held"))],
+        },
+      ],
+      stopped: true,
+    });
+    await h.router.idleWake("alice");
+    h.setTime(NOW + 60_000);
+    await h.router.idleWake("alice");
+    h.setTime(NOW + 120_000);
+    await h.router.idleWake("alice");
+    expect(h.deliveries).toEqual([]);
+    expect(
+      h
+        .snapshot()
+        .pending.filter((item) => item.idle)
+        .map(({ id }) => id),
+    ).toEqual([`task-idle:alice:${NOW}`]);
+  });
+
   it("leaves a sighting that has not happened out of what was waiting", async () => {
     const confirm = vi.fn<NonNullable<PerceptionDeps["confirm"]>>(
       async (_agentId, item) => ({ ...item, text: "Bob waves." }),

@@ -185,7 +185,7 @@ describe("startIdleSupervisor", () => {
     }
   });
 
-  it("skips agents when brain is thinking or has queued stimuli", async () => {
+  it("skips a thinking brain but checks in on an idle one with a queue", async () => {
     vi.useFakeTimers();
     try {
       const clock = createMockClock(1_000_000, 1);
@@ -228,7 +228,9 @@ describe("startIdleSupervisor", () => {
       });
 
       await vi.advanceTimersByTimeAsync(2500);
-      expect(idleWake).toHaveBeenCalledTimes(1);
+      // A failed run can leave a queue nothing else will deliver.
+      expect(idleWake).toHaveBeenCalledTimes(2);
+      expect(idleWake).toHaveBeenCalledWith("busy-queue");
       expect(idleWake).toHaveBeenCalledWith("free-agent");
 
       dispose();
