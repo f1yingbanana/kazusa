@@ -14,7 +14,7 @@ import { sharedDir } from "./shared-dir.ts";
 /**
  * Wording a character reads, kept in skills rather than code, so a world, a
  * character or a translation can change it. A reference names one `## section`
- * of a skill, `kazusa-results#already-said`; code says only which, and fills
+ * of a skill, `kazusa-results#aloud-not-here`; code says only which, and fills
  * its `{placeholders}`.
  *
  * Each section resolves on its own along the skill precedence, so an override

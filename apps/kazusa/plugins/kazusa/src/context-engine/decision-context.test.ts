@@ -6,10 +6,12 @@ import {
   assembleDecisionContext,
   buildDecisionQuestions,
   parsePerceptionSkill,
+  quietConversationOf,
   textTokens,
   truncateText,
 } from "./decision-context.ts";
 import type { Stimulus } from "../stimulus.ts";
+import { parseSkillMarkdown } from "./skill-loader.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 const message: Stimulus = {
@@ -269,6 +271,210 @@ describe("Bounded decision evidence", () => {
     expect(Object.keys(rubric.questions.attention_allocation.criteria)).toEqual(
       ["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"],
     );
+    // How they say it is asked on its own: pace always, the floor if taken.
+    const speech = { sessionKey: "agent:alice:chat:huddle:club" };
+    expect(
+      buildDecisionQuestions("busy_thinking", rubric, false, {
+        ...speech,
+        floor: { speaking: ["bob"], waiting: 0 },
+      }),
+    ).toEqual({
+      speaking_pace: {
+        type: "score",
+        instructions: expect.stringContaining("How fast do they say it?"),
+        criteria: expect.arrayContaining([
+          { pace: 1, description: "Ordinary conversational pace." },
+        ]),
+      },
+      floor: {
+        type: "choice",
+        instructions: expect.stringContaining("How badly do they want in?"),
+        criteria: {
+          CUT_IN: expect.any(String),
+          NEXT: expect.any(String),
+          WAIT: expect.any(String),
+        },
+      },
+    });
+    expect(
+      Object.keys(
+        buildDecisionQuestions("busy_thinking", rubric, false, speech),
+      ),
+    ).toEqual(["speaking_pace"]);
+  });
+
+  it("keeps every world's own rubric at the shipped version, with every question", async () => {
+    // Worlds without phones reword the rubric, which copies all of it; a copy
+    // left at version 7 never asked about the floor, pace or tuning out.
+    const { readFile, readdir } = await import("node:fs/promises");
+    const read = (path: string) =>
+      readFile(new URL(path, import.meta.url), "utf8");
+    const version = (text: string) =>
+      (
+        parseSkillMarkdown(text).frontmatter?.metadata as {
+          rubricVersion?: string;
+        }
+      )?.rubricVersion;
+    const shipped = await read("../../../../shared/skills/perception/SKILL.md");
+    const questions = Object.keys(parsePerceptionSkill(shipped).questions);
+    const worlds = await readdir(
+      new URL("../../../../worlds/", import.meta.url),
+      {
+        withFileTypes: true,
+      },
+    );
+    const rubrics: Record<string, { version?: string; questions: string[] }> =
+      {};
+    for (const world of worlds) {
+      if (!world.isDirectory()) continue;
+      const own = await read(
+        `../../../../worlds/${world.name}/shared/skills/perception/SKILL.md`,
+      ).catch(() => undefined);
+      if (own)
+        rubrics[world.name] = {
+          version: version(own),
+          questions: Object.keys(parsePerceptionSkill(own).questions),
+        };
+    }
+    expect(Object.keys(rubrics).length).toBeGreaterThan(0);
+    // Keyed by world, so a failure names the one left behind.
+    expect(rubrics).toEqual(
+      Object.fromEntries(
+        Object.keys(rubrics).map((name) => [
+          name,
+          { version: version(shipped), questions },
+        ]),
+      ),
+    );
+  });
+
+  it("asks someone quiet in a conversation of three or more whether they still follow it", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const rubric = await readFile(
+      new URL("../../../../shared/skills/perception/SKILL.md", import.meta.url),
+      "utf8",
+    );
+    const line: Stimulus = {
+      id: "lunch-1",
+      sender: "bob",
+      sessionKey: "agent:alice:chat:huddle:lunch",
+      timestamp: NOW,
+      text: "Anyway, the vending machine ate my coins again.",
+    };
+    const lunch = {
+      sessionKey: "agent:alice:chat:huddle:lunch",
+      kind: "huddle" as const,
+      title: "Talking at the cafeteria",
+      memberCount: 5,
+      lastSpokeAt: NOW - 12 * 60_000,
+      unanswered: 9,
+      waitingSince: NOW - 11 * 60_000,
+    };
+    const batch = (
+      overrides: Partial<Parameters<typeof assembleDecisionBatch>[0]> = {},
+    ) =>
+      assembleDecisionBatch({
+        agentId: "alice",
+        simTime: NOW,
+        brainStatus: "idle",
+        incomingBundle: [line],
+        pendingQueue: [],
+        sessionsContext: {},
+        chats: [lunch],
+        rubric,
+        ...overrides,
+      });
+    const asked = batch();
+    expect(asked.questions.still_following).toMatchObject({
+      type: "choice",
+      instructions: expect.stringContaining("Are they still following it?"),
+      criteria: {
+        FOLLOWING: expect.any(String),
+        TUNED_OUT: expect.any(String),
+      },
+    });
+    expect(asked.state).toMatchObject({
+      quietIn: { conversation: "chat:huddle:lunch", quietMinutes: 12 },
+    });
+    expect(quietConversationOf(asked)).toBe("chat:huddle:lunch");
+    // Never spoke there: counted from the first line they heard.
+    expect(
+      batch({ chats: [{ ...lunch, lastSpokeAt: null }] }).state,
+    ).toMatchObject({ quietIn: { quietMinutes: 11 } });
+
+    const notAsked = [
+      // Spoke a moment ago.
+      batch({ chats: [{ ...lunch, lastSpokeAt: NOW - 3 * 60_000 }] }),
+      // Just came back to it: silence counts from rejoining.
+      batch({ chats: [{ ...lunch, joinedAt: NOW - 2 * 60_000 }] }),
+      // A pair can't drift: the other is talking to you.
+      batch({ chats: [{ ...lunch, memberCount: 2 }] }),
+      // A group text isn't a conversation in person.
+      batch({ chats: [{ ...lunch, kind: "group" }] }),
+      // Nothing of it in what they are hearing now.
+      batch({ incomingBundle: [message] }),
+      // About to speak, not hearing.
+      batch({ speech: { sessionKey: lunch.sessionKey } }),
+      // Thinking: maybe answering that very conversation, or waiting to speak.
+      batch({ brainStatus: "busy_thinking" }),
+      // The setting allows longer silences.
+      batch({
+        config: CONTEXT_ENGINE_CONFIG.parse({ decisionQuietMinutes: 20 }),
+      }),
+    ];
+    for (const result of notAsked) {
+      expect(result.questions.still_following).toBeUndefined();
+      expect(result.state).not.toHaveProperty("quietIn");
+      expect(quietConversationOf(result)).toBeUndefined();
+    }
+    // A world's older rubric without the question never asks.
+    const older = parsePerceptionSkill(rubric);
+    const { still_following: _following, ...questions } = older.questions;
+    expect(
+      batch({ rubric: { ...older, questions } }).questions.still_following,
+    ).toBeUndefined();
+  });
+
+  it("shows who has the floor, and refuses to judge speech without a rubric for it", () => {
+    expect(
+      assemble({
+        brainStatus: "busy_thinking",
+        incomingBundle: [],
+        speech: {
+          sessionKey: "agent:alice:chat:huddle:club",
+          floor: { speaking: ["bob"], turn: "bob", waiting: 1 },
+        },
+      }),
+    ).toMatchObject({
+      speech: {
+        conversation: expect.stringContaining("huddle"),
+        floor: {
+          speakingNow: ["bob"],
+          whoseTurn: "bob",
+          othersWaitingToSpeak: 1,
+        },
+      },
+    });
+    expect(assemble()).toMatchObject({ speech: null });
+    const older = parsePerceptionSkill(`---
+rubric:
+  instructions: Judge.
+  questions:
+    wake_decision:
+      criteria: { WAKE: Now. }
+    attention_allocation:
+      criteria: { STEER: Now. }
+    response_latency:
+      criteria:
+        - { minutes: 0, description: Now. }
+        - { minutes: 5, description: Soon. }
+---
+`);
+    expect(() =>
+      buildDecisionQuestions("busy_thinking", older, false, {
+        sessionKey: "agent:alice:chat:huddle:club",
+      }),
+    ).toThrow("no speech questions");
   });
 
   it("parses prompt instructions and criteria dynamically from perception skill YAML frontmatter", () => {

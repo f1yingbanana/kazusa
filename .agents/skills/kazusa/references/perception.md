@@ -838,6 +838,7 @@ One `DecisionBatch` carries every question; this adds no Jev latency.
 | :---- | :--------------------------------------------------------------- | :------------------------------------ |
 | Idle  | `wake_decision`: `WAKE`, `DEFER`, `IGNORE`                       | `response_latency` (score, see below) |
 | Busy  | `attention_allocation`: `STEER`, `QUEUE_NEXT`, `DEFER`, `IGNORE` | —                                     |
+| Both  | —                                                                | `still_following` (see below)         |
 
 - `IGNORE` is final. Ignored keys are kept in `ignoredIds` (bounded like
   `processedIds`); `Perception.noticed()` excludes them, so an ignored message
@@ -850,6 +851,13 @@ One `DecisionBatch` carries every question; this adds no Jev latency.
   batch, interpolates the fractional score in `log(1 + minutes)` space, and
   applies ±20% jitter so characters with the same score do not reply in
   lockstep. It is used only when the choice is `WAKE`.
+- `still_following` (`FOLLOWING`, `TUNED_OUT`) is asked only of an idle brain,
+  when the incoming lines include the character's own conversation in person of
+  three or more and they have said nothing there for
+  `contextEngine.decisionQuietMinutes` (10); the state then carries `quietIn`.
+  `TUNED_OUT` takes them out of it silently and discards what was said there as
+  ignored, unless the main answer wakes them for lines all from there; see
+  [conversations](conversations.md) §4.
 - A failed or missing latency answer means zero delay, matching the fail-open
   policy.
 - Task deadlines and idle check-ins still bypass Jev when the brain is idle.

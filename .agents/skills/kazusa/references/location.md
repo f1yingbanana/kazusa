@@ -25,14 +25,16 @@ and everything else is evidence for them:
    `notice` (do you notice them?). Getting in is not judged: arriving brings a
    character to the door, and whether it opens is theirs to play out from the
    place's description, like the rest of the activity.
-5. **Huddles**: face-to-face conversations, formed by speaking aloud.
+5. **Huddles**: face-to-face conversations, formed by turning to people (`talk`,
+   see [conversations](conversations.md)).
 
-The character-facing surface is two tool parameters (`where` on `start_task`,
-`aloud` on `send_message`) and no new tools. Nothing is refused by rule: the
-only errors are malformed calls (and an activity too short for the walk to it),
-and anything that depends on circumstances is either judged (noticing) or played
-out by the character from the description (getting in). A frontmatter flag is
-never added for something a description can say.
+The character-facing surface was two tool parameters (`where` on `start_task`,
+`aloud` on `send_message`); starting a conversation in person is now its own
+tool, `talk` (2026-11-05). Nothing is refused by rule: the only errors are
+malformed calls (and an activity too short for the walk to it), and anything
+that depends on circumstances is either judged (noticing) or played out by the
+character from the description (getting in). A frontmatter flag is never added
+for something a description can say.
 
 **Code vs. judgment.** Code owns routing, travel time, position as a closed form
 of sim time, check-in times, who is where, huddle membership, and seeded rolls.
@@ -201,19 +203,21 @@ source go into journal payloads, never into the character's text.
 ### 4.6 Huddles (Messaging)
 
 A conversation kind, `huddle` (`chat:huddle:<id>`, with a `placeId`).
-`send_message` with `members` and `aloud: true` speaks to people at the
-speaker's place (Messaging asks Location's `placeOf`) and speaking aloud brings
-the people addressed, and anyone they are talking with, into the speaker's
-huddle (groups merge; a merged huddle keeps `mergedInto` so replies to its old
-address land in the new one), or joins theirs, or starts one. Speaking into a
-huddle's address at its place walks over to it, leaving the speaker's other one.
-Location calls `leavePlace` on every move, which posts the leave line to those
-still in it; moving to another huddle posts `*moves to another conversation*`. A
-huddle needs two: when one is left it dissolves, and they have already heard the
-other go. Same frozen-audience rule as all chats; `manage_chat` refuses huddles.
-Group chats announce their membership changes the same way: each `manage_chat`
-change posts a line in the actor's voice, heard by those going before they go
-and by those coming once they are in.
+`talk({ members })` turns to people at the speaker's place (Messaging asks
+Location's `placeOf`), one person's move at a time: to people in another huddle
+the speaker walks over to it, to some of their own a side conversation splits
+off, and people in none join the speaker's or start one; huddles never merge
+(older merged ones keep `mergedInto`, so replies to an old address land in the
+new one). See [conversations](conversations.md). Speaking into a huddle's
+address at its place walks over to it, leaving the speaker's other one. Location
+calls `leavePlace` on every move, which posts the leave line to those still in
+it; moving to another huddle posts `*moves to another conversation*`. A huddle
+needs two: when one is left it dissolves, and they have already heard the other
+go. Same frozen-audience rule as all chats; `manage_chat` only `leave`s a huddle
+(stepping back while staying at the place). Group chats announce their
+membership changes the same way: each `manage_chat` change posts a line in the
+actor's voice, heard by those going before they go and by those coming once they
+are in.
 
 ### 4.7 Module boundaries and read models
 
@@ -248,10 +252,9 @@ and by those coming once they are in.
 - **Player trips**: the player has no lease, so for now they go straight there
   (`POST /kazusa/move`, the same `place()` as the operator's `location.place`):
   those there may notice them come in, and leaving takes them out of their
-  huddles. Speaking aloud (`/kazusa/send` with `aloud`) then brings the people
-  addressed, and anyone they are talking with, into the player's huddle. Walking
-  (a trip without a lease, settled by a timer or the next request) is still
-  open.
+  huddles. Speaking aloud (`/kazusa/send` with `aloud`) then turns to the people
+  addressed the way `talk` does. Walking (a trip without a lease, settled by a
+  timer or the next request) is still open.
 - **Walking together**: sharing a trip and talking on the way.
 - **Client** (Phase 5): place tree, in-transit, place inspector, huddle threads,
   map renderer, Player lens, an SSE `location` event, and the `location.noticed`

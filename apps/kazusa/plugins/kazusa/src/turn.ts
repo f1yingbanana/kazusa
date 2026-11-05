@@ -6,15 +6,10 @@
 export interface Turn {
   /** Lookups so far: `recall`, `look_up`, `list_chats`. */
   lookups: number;
-  /** Who was told what so far, with the tool call that said it. */
-  readonly said: Map<string, string | undefined>;
 }
 
 const CELL = Symbol.for("kazusa.turn");
-const FRESH = (): Turn => ({
-  lookups: 0,
-  said: new Map(),
-});
+const FRESH = (): Turn => ({ lookups: 0 });
 
 function turns(): Map<string, Turn> {
   const holder = globalThis as unknown as Record<
@@ -85,28 +80,4 @@ export function chooseActivity(
     return false;
   choices().set(agentId, { ...now, callId });
   return true;
-}
-
-/** Short enough to say again on purpose: "hi", "really?". */
-const MIN_REPEAT_CHARS = 15;
-
-/** Whether this `send_message` says only what this turn already said. */
-export function repeatsItself(
-  turn: Turn,
-  params: Record<string, unknown>,
-  callId: string | undefined,
-): boolean {
-  const to = JSON.stringify(params.sessionKey ?? params.members);
-  const keys = (Array.isArray(params.messages) ? params.messages : [])
-    .map((message: string | { text?: unknown }) =>
-      String(typeof message === "string" ? message : message?.text).trim(),
-    )
-    .filter((text) => text.length >= MIN_REPEAT_CHARS)
-    .map((text) => `${to}\0${text}`);
-  // One call can reach this hook through several registrations.
-  const fresh = (key: string): boolean =>
-    !turn.said.has(key) || turn.said.get(key) === callId;
-  if (keys.length && !keys.some(fresh)) return true;
-  for (const key of keys) turn.said.set(key, callId);
-  return false;
 }

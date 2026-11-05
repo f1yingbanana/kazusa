@@ -21,7 +21,11 @@ import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
-import { loadNewPlugins, startProviderPlugins } from "./plugin-startup.mjs";
+import {
+  allowChatStarters,
+  loadNewPlugins,
+  startProviderPlugins,
+} from "./plugin-startup.mjs";
 import { dropStoreKeyRefs } from "./provider-keys.mjs";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
@@ -297,6 +301,11 @@ if (!stopping) {
     for (const line of loadNewPlugins(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't add new plugins to this world: ${error.message}`);
+  }
+  try {
+    for (const line of allowChatStarters(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't let characters start chats: ${error.message}`);
   }
   try {
     for (const line of startProviderPlugins(ROOT)) console.log(line);

@@ -33,21 +33,40 @@ import {
   type MessageDelivery,
   type MessagingDeps,
   type OutboxPlan,
+  type SpeechResult,
 } from "./messaging.ts";
 import {
   AGENT_ID,
+  CREATE_GROUP,
   LIST_CHATS,
+  TALK,
+  chatAddress,
   MANAGE_CHAT,
   isUser,
   readAs,
   sendMessageSchema,
   type ChatConversation,
+  type ChatSummary,
 } from "./conversations.ts";
+import { SPEECH_RATES } from "./floor.ts";
+import { appendLedgerEntry } from "../ledger.ts";
 
 /** `plugins.entries.kazusa.config.messaging`. */
 const MESSAGING_CONFIG = z.strictObject({
   /** Bubbles (said or done) one `send_message` may carry. */
   maxBubbles: z.number().int().min(1).max(32).default(9),
+  /**
+   * Face to face, what each writing system's characters take to say per second
+   * at an ordinary pace; a speaker's own pace scales it.
+   */
+  speechRates: z
+    .strictObject({
+      letters: z.number().min(1).max(50).default(SPEECH_RATES.letters),
+      han: z.number().min(1).max(50).default(SPEECH_RATES.han),
+      kana: z.number().min(1).max(50).default(SPEECH_RATES.kana),
+      hangul: z.number().min(1).max(50).default(SPEECH_RATES.hangul),
+    })
+    .prefault({}),
 });
 
 /**
@@ -58,7 +77,42 @@ const SHARED_MESSAGING_STATE = Symbol.for("kazusa.messaging.state");
 
 function sharedMessagingState(): MessagingState {
   const scope = globalThis as { [SHARED_MESSAGING_STATE]?: MessagingState };
-  return (scope[SHARED_MESSAGING_STATE] ??= createMessagingState());
+  const state = (scope[SHARED_MESSAGING_STATE] ??= createMessagingState());
+  // Left by an older version of this code in the same process: fill in what
+  // it didn't have, keeping what it holds.
+  const fresh = createMessagingState();
+  for (const key of Object.keys(fresh) as (keyof MessagingState)[])
+    if (!(key in state)) Object.assign(state, { [key]: fresh[key] });
+  return state;
+}
+
+/**
+ * What a character reads back from `send_message`: whether it went out and,
+ * when cut off, how many bubbles were said and what was heard of the one cut
+ * short. Its words are in its own call already; repeating them costs tokens.
+ */
+export function speechReply(result: SpeechResult): Record<string, unknown> {
+  if (result.status !== "interrupted") return { status: result.status };
+  const said = result.said.length - (result.heard === undefined ? 0 : 1);
+  return {
+    status: result.status,
+    said,
+    of: said + result.unsaid.length,
+    ...(result.heard === undefined ? {} : { heard: result.heard }),
+  };
+}
+
+/** A chat `create_group` or `talk` opened, as its starter reads it. */
+function opened(chat: ChatSummary) {
+  const reply = {
+    sessionKey: chatAddress(chat.sessionKey),
+    title: chat.title,
+    members: chat.members,
+  };
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(reply) }],
+    details: chat,
+  };
 }
 
 /** Read optional roster presentation without changing canonical authorship. */
@@ -107,7 +161,12 @@ export function registerMessaging(
   deps: {
     readonly clock: Pick<Clock, "init" | "time" | "now">;
     readonly perception: Pick<Perception, "receive"> &
-      Partial<Pick<Perception, "onAdopted" | "attachSpeech">>;
+      Partial<
+        Pick<
+          Perception,
+          "onAdopted" | "attachSpeech" | "attachConversations" | "judgeSpeech"
+        >
+      >;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
     /** Let the player read chats they aren't in (`observer.enabled`). */
@@ -116,6 +175,10 @@ export function registerMessaging(
     readonly placeOf?: MessagingDeps["placeOf"];
     /** Lets go of anything frozen on a paused clock; the process's shutdown. */
     readonly release?: AbortSignal;
+    /** A line in a character's own records; `appendLedgerEntry` by default. */
+    readonly appendLedger?: (
+      entry: Parameters<typeof appendLedgerEntry>[1],
+    ) => Promise<void>;
   },
 ): Messaging {
   const getConfig = () => currentConfig(api);
@@ -124,6 +187,8 @@ export function registerMessaging(
     api.pluginConfig?.messaging ?? {},
   );
   const text = pluginSkillText(api);
+  const appendLedger =
+    deps.appendLedger ?? ((entry) => appendLedgerEntry(api, entry));
   const messaging = new Messaging({
     api,
     text,
@@ -227,6 +292,12 @@ export function registerMessaging(
       });
     },
     receive: (agentId, stimulus) => deps.perception.receive(agentId, stimulus),
+    ...(deps.perception.judgeSpeech
+      ? {
+          judgeSpeech: deps.perception.judgeSpeech.bind(deps.perception),
+        }
+      : {}),
+    speechRates: messagingConfig.speechRates,
     warn: (message) => api.logger.warn(message),
     ...(deps.placeOf ? { placeOf: deps.placeOf } : {}),
   });
@@ -236,6 +307,33 @@ export function registerMessaging(
   deps.perception.attachSpeech?.({
     current: (agentId) => messaging.currentSpeech(agentId),
     interrupt: (agentId) => messaging.interrupt(agentId),
+  });
+  // Attention decides someone stopped following a conversation in person: out
+  // of it, and a note in their own records so their next turn knows.
+  deps.perception.attachConversations?.({
+    tuneOut: async (agentId, conversation) => {
+      const left = await messaging.tuneOut(agentId, conversation);
+      if (!left) return false;
+      const others = left.members.filter((member) => member !== agentId);
+      const names = await Promise.all(
+        others.map((id) => personName(api, id, getConfig())),
+      );
+      const who =
+        names.length <= 1
+          ? (names[0] ?? "")
+          : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+      await appendLedger({
+        agentId,
+        stream: "tasks",
+        text: text(
+          "kazusa-deliveries#tuned-out",
+          { people: who, address: conversation },
+          { agentId },
+        ),
+        timestamp: deps.clock.time(),
+      });
+      return true;
+    },
   });
   if (deps.broadcaster) {
     const unsubscribeJournal = messaging.onEvent((event) => {
@@ -302,26 +400,27 @@ export function registerMessaging(
     return { agentId, config, agents };
   };
 
+  // Taking up a message shows as typing in its chat until the turn ends or
+  // the character speaks there.
   deps.perception.onAdopted?.(async (delivery) => {
-    if (!delivery.sessionKeys?.length) return;
+    // Face to face, typing shows someone saying a line, never thinking.
+    const chats = delivery.sessionKeys?.filter(
+      (sessionKey) => !sessionKey.includes(":chat:huddle:"),
+    );
+    if (!chats?.length) return;
     try {
       const config = getConfig();
       const name = await characterName(api, config, delivery.agentId);
-      for (const sessionKey of delivery.sessionKeys) {
-        await messaging.setTyping(
-          delivery.agentId,
-          name,
-          sessionKey,
-          true,
-          delivery.id,
-        );
+      for (const sessionKey of chats) {
+        await messaging.setTyping(delivery.agentId, name, sessionKey, true);
       }
     } catch (err: unknown) {
       api.logger.warn(`Messaging auto-typing error: ${String(err)}`);
     }
   });
 
-  const activeRuns = new Map<string, string>();
+  // A turn that ends has nothing left to type. Adoption comes before the
+  // run's start event, so start must not clear it.
   api.agent.events.registerAgentEventSubscription({
     id: "messaging-typing",
     streams: ["lifecycle"],
@@ -331,14 +430,7 @@ export function registerMessaging(
         .object({ phase: z.enum(["start", "end", "error"]) })
         .safeParse(event.data);
       if (!owner || owner.rest !== "brain" || !data.success) return;
-      if (data.data.phase === "start") {
-        activeRuns.set(owner.agentId, event.runId);
-        messaging.clearTyping(owner.agentId, undefined, undefined, event.runId);
-      } else {
-        messaging.clearTyping(owner.agentId, event.runId);
-        if (activeRuns.get(owner.agentId) === event.runId)
-          activeRuns.delete(owner.agentId);
-      }
+      if (data.data.phase !== "start") messaging.clearTyping(owner.agentId);
     },
   });
 
@@ -427,14 +519,47 @@ export function registerMessaging(
                 config.agents?.defaults?.systemAgent?.agentId,
                 signal,
               );
-              // Message hashes are bookkeeping, not something the character reads.
-              // `status`, `said` and `unsaid` tell an interrupted send; the
-              // skills explain them.
-              const { messageIds: _messageIds, ...speech } = details;
               return {
-                content: [{ type: "text", text: JSON.stringify(speech) }],
+                content: [
+                  { type: "text", text: JSON.stringify(speechReply(details)) },
+                ],
                 details,
               };
+            },
+          },
+          {
+            ...worded("create_group", z.toJSONSchema(CREATE_GROUP)),
+            label: "Create Group Chat",
+            async execute(_id, input: unknown) {
+              const { agentId, config, agents } = caller(context);
+              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+                await untilRunning(deps.clock, release);
+              const { members, title } = CREATE_GROUP.parse(input);
+              return opened(
+                await messaging.createGroup(
+                  agentId,
+                  members,
+                  title ?? null,
+                  context.assertInvocationCurrent,
+                  agents,
+                ),
+              );
+            },
+          },
+          {
+            ...worded("talk", z.toJSONSchema(TALK)),
+            label: "Talk",
+            async execute(_id, input: unknown) {
+              const { agentId, config } = caller(context);
+              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+                await untilRunning(deps.clock, release);
+              return opened(
+                await messaging.talk(
+                  agentId,
+                  TALK.parse(input).members,
+                  context.assertInvocationCurrent,
+                ),
+              );
             },
           },
           {
@@ -447,8 +572,12 @@ export function registerMessaging(
                 LIST_CHATS.parse(input),
                 context.assertInvocationCurrent,
               );
+              const chats = result.map((chat) => ({
+                ...chat,
+                sessionKey: chatAddress(chat.sessionKey),
+              }));
               return {
-                content: [{ type: "text", text: JSON.stringify(result) }],
+                content: [{ type: "text", text: JSON.stringify(chats) }],
                 details: { chats: result },
               };
             },
@@ -485,8 +614,12 @@ export function registerMessaging(
                 context.assertInvocationCurrent,
                 agents,
               );
+              const chat = {
+                ...result,
+                sessionKey: chatAddress(result.sessionKey),
+              };
               return {
-                content: [{ type: "text", text: JSON.stringify(result) }],
+                content: [{ type: "text", text: JSON.stringify(chat) }],
                 details: result,
               };
             },
@@ -494,7 +627,15 @@ export function registerMessaging(
         ];
       },
     },
-    { names: ["send_message", "list_chats", "manage_chat"] },
+    {
+      names: [
+        "send_message",
+        "create_group",
+        "talk",
+        "list_chats",
+        "manage_chat",
+      ],
+    },
   );
 
   registerMessagingHttp(

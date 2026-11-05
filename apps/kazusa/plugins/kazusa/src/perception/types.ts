@@ -56,6 +56,11 @@ export interface DecisionTrace {
   readonly latencyScore?: number;
   /** Why the fallback was taken. */
   readonly note?: string;
+  /**
+   * The conversation in person (its address) they stopped following: its lines
+   * in this batch went unheard, and they left it.
+   */
+  readonly tunedOut?: string;
 }
 
 /** One retained attention decision for a stimulus batch. */
@@ -84,6 +89,15 @@ export interface CurrentSpeech {
 export interface SpeechSource {
   readonly current: (agentId: string) => CurrentSpeech | undefined;
   readonly interrupt: (agentId: string) => boolean;
+}
+
+/** Conversations attention can take someone out of. */
+export interface ConversationSource {
+  /**
+   * Stop following a conversation in person: out of it, without a word. Whether
+   * they left (not when no longer in it, or one of a pair).
+   */
+  readonly tuneOut: (agentId: string, conversation: string) => Promise<boolean>;
 }
 
 /**

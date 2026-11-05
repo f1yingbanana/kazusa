@@ -2,7 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadNewPlugins, startProviderPlugins } from "./plugin-startup.mjs";
+import {
+  allowChatStarters,
+  loadNewPlugins,
+  startProviderPlugins,
+} from "./plugin-startup.mjs";
 
 const policy = { allowPromptInjection: true };
 
@@ -135,5 +139,42 @@ describe("loadNewPlugins", () => {
     expect(read().plugins).toEqual({
       load: { paths: ["../plugins/kazusa", OPENRP] },
     });
+  });
+});
+
+describe("allowChatStarters", () => {
+  it("lets every list that may send start chats, once", () => {
+    const { root, read } = repo({
+      tools: { alsoAllow: ["start_task", "send_message", "list_chats"] },
+      // Characters are keyed by id, as worlds keep them.
+      agents: {
+        entries: {
+          a: { tools: { alsoAllow: ["send_message", "talk"] } },
+          b: { tools: { alsoAllow: ["recall"] } },
+          c: { workspace: "./workspaces/c" },
+        },
+      },
+    });
+    expect(allowChatStarters(root)).toHaveLength(1);
+    const world = read();
+    expect(world.tools.alsoAllow).toEqual([
+      "start_task",
+      "send_message",
+      "create_group",
+      "talk",
+      "list_chats",
+    ]);
+    expect(world.agents.entries.a.tools.alsoAllow).toEqual([
+      "send_message",
+      "create_group",
+      "talk",
+    ]);
+    expect(world.agents.entries.b.tools.alsoAllow).toEqual(["recall"]);
+    expect(world.agents.entries.c).toEqual({ workspace: "./workspaces/c" });
+    expect(allowChatStarters(root)).toEqual([]);
+  });
+
+  it("does nothing without a world", () => {
+    expect(allowChatStarters(repo().root)).toEqual([]);
   });
 });

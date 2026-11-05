@@ -16,7 +16,16 @@ import {
   formatSessionHeader,
   formatSimTime,
 } from "../context-engine/format.ts";
-import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
+import {
+  quietConversationOf,
+  type DecisionContextAssembler,
+} from "../context-engine/decision-context.ts";
+import {
+  FLOOR_CHOICES,
+  paceAt,
+  type SpeechFacts,
+  type SpeechJudgment,
+} from "../messaging/floor.ts";
 import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
@@ -32,6 +41,7 @@ import {
   type PerceptionConfig,
   type PerceptionDecisionRecord,
   type SpeechSource,
+  type ConversationSource,
   type Stimulus,
 } from "./types.ts";
 import { BrainSlots } from "./brain-slots.ts";
@@ -72,6 +82,11 @@ const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 const isHuddle = (item: Stimulus): boolean =>
   item.sessionKey.includes(":chat:huddle:");
 
+/** `shared/skills/perception/SKILL.md` `metadata.rubricVersion`. */
+const RUBRIC_VERSION = "10";
+
+const PACE_ANCHORS = z.array(z.looseObject({ pace: z.number().positive() }));
+
 /*
  * A way to take back each steer in custody, by delivery id. A run's end may
  * reach a different registration from the one that sent the steer, so the whole
@@ -106,6 +121,30 @@ export interface PerceptionState {
   processedIds?: string[];
   /** The ignored subset: discarded on purpose, never shown to the brain. */
   ignoredIds?: string[];
+  /**
+   * Conversations in person they stopped following, and when (sim time):
+   * whatever was said there until then goes unheard, even arriving later.
+   */
+  tunedOut?: { conversation: string; at: number }[];
+}
+
+/** Said where they had already stopped listening. */
+function unheard(
+  state: PerceptionState,
+  item: { readonly sessionKey: string; readonly timestamp: number },
+): boolean {
+  const conversation = formatSessionHeader(item.sessionKey);
+  return (state.tunedOut ?? []).some(
+    (entry) =>
+      entry.conversation === conversation && item.timestamp <= entry.at,
+  );
+}
+
+/** Keys discarded on purpose: never shown to the brain, never redelivered. */
+function discard(state: PerceptionState, keys: Iterable<string>): void {
+  const all = [...keys];
+  state.processedIds = [...(state.processedIds ?? []), ...all].slice(-1_000);
+  state.ignoredIds = [...(state.ignoredIds ?? []), ...all].slice(-1_000);
 }
 
 /*
@@ -251,6 +290,7 @@ export class Perception {
   private readonly debounceReadyAt = new Map<string, number>();
   private readonly readinessTimers = new Map<string, NodeJS.Timeout>();
   private speech?: SpeechSource;
+  private conversations?: ConversationSource;
   private readonly adoptedListeners = new Set<
     (delivery: PerceptionDelivery) => void | Promise<void>
   >();
@@ -331,6 +371,10 @@ export class Perception {
       (state) => {
         // Drop duplicates of recently adopted or ignored stimuli
         if (state.processedIds?.includes(stimulusKey(stimulus))) {
+          return;
+        }
+        if (unheard(state, stimulus)) {
+          discard(state, [stimulusKey(stimulus)]);
           return;
         }
 
@@ -622,6 +666,11 @@ export class Perception {
   /** Let attention see, and cut off, what the character is saying. */
   attachSpeech(source: SpeechSource): void {
     this.speech = source;
+  }
+
+  /** Let attention take someone out of a conversation they stopped following. */
+  attachConversations(source: ConversationSource): void {
+    this.conversations = source;
   }
 
   onAdopted(
@@ -1011,24 +1060,35 @@ export class Perception {
               queuedReview,
             );
       this.assertCurrent();
+      // Out of a conversation they stopped following before anything else, so
+      // what is left is judged on its own. Only a leave that happened counts.
+      const { tunedOut, ...judged } = decision;
+      const heard = tunedOut
+        ? await this.stopFollowing(agentId, state, fresh, tunedOut)
+        : fresh;
+      const left = tunedOut !== undefined && heard !== fresh;
       // In-person attention has no simulated phone-check delay. Keep Jev's
       // choice: a person may still decline to engage or finish an activity.
       const inPerson = this.deps.realtime;
       const realtime =
-        decision.delayMs > 0 && inPerson
+        judged.delayMs > 0 && inPerson
           ? (
-              await Promise.all(fresh.map((item) => inPerson(agentId, item)))
+              await Promise.all(heard.map((item) => inPerson(agentId, item)))
             ).some(Boolean)
           : false;
-      const effective = realtime ? { ...decision, delayMs: 0 } : decision;
+      const effective: AttentionDecision & DecisionTrace = {
+        ...judged,
+        ...(realtime ? { delayMs: 0 } : {}),
+        ...(left ? { tunedOut } : {}),
+      };
       const { action, delayMs } = effective;
       await this.recordDecision(agentId, effective, fresh, busy, task);
       // start_task/delay_task can execute while Jev is evaluating.
       const currentTask = await this.taskStore.lookup(agentId);
-      const current = fresh.filter((item) => this.isCurrent(item, currentTask));
+      const current = heard.filter((item) => this.isCurrent(item, currentTask));
       for (const item of current) delete item.reviewAfterRun;
       const stale = new Set(
-        fresh
+        heard
           .filter((item) => !this.isCurrent(item, currentTask))
           .map(stimulusKey),
       );
@@ -1105,6 +1165,51 @@ export class Perception {
     }
   }
 
+  /**
+   * They stopped following a conversation in person: out of it, and everything
+   * said there so far goes unheard, as ignored lines do: this batch's, and any
+   * still waiting, unless already handed to the brain. Returns what they still
+   * heard, or the same batch when they couldn't leave (no longer in it, or a
+   * pair: the other is talking to them). Attention routing never fails over
+   * it.
+   */
+  private async stopFollowing(
+    agentId: string,
+    state: PerceptionState,
+    bundle: PendingItem[],
+    conversation: string,
+  ): Promise<PendingItem[]> {
+    let left = false;
+    try {
+      left =
+        (await this.conversations?.tuneOut(agentId, conversation)) ?? false;
+    } catch (error) {
+      this.warn(error);
+    }
+    if (!left) return bundle;
+    state.tunedOut = [
+      ...(state.tunedOut ?? []).filter(
+        (entry) => entry.conversation !== conversation,
+      ),
+      { conversation, at: this.deps.clock.time() },
+    ].slice(-8);
+    const handedOver = new Set(state.deliveries?.flatMap((item) => item.keys));
+    const gone = new Set(
+      [...bundle, ...state.pending]
+        .filter(
+          (item) =>
+            unheard(state, item) &&
+            !keysOf(item).some((key) => handedOver.has(key)),
+        )
+        .flatMap(keysOf),
+    );
+    state.pending = state.pending.filter(
+      (item) => !gone.has(stimulusKey(item)),
+    );
+    discard(state, gone);
+    return bundle.filter((item) => !gone.has(stimulusKey(item)));
+  }
+
   private async classify(
     agentId: string,
     state: PerceptionState,
@@ -1153,6 +1258,8 @@ export class Perception {
         if (signal.aborted) onAbort();
       });
       let anchors: number[] = [];
+      /** The conversation `still_following` asked about, if it was asked. */
+      let quietIn: string | undefined;
       const work = async (): Promise<DecisionOutcome> => {
         const speech = busy ? this.speech?.current(agentId) : undefined;
         const batch = await assemble(agentId, {
@@ -1177,6 +1284,9 @@ export class Perception {
           signal,
         });
         signal.throwIfAborted();
+        quietIn = batch.questions.still_following
+          ? quietConversationOf(batch)
+          : undefined;
         const latency = batch.questions.response_latency;
         if (latency?.type === "score") {
           const parsed = LATENCY_ANCHORS.safeParse(latency.criteria);
@@ -1186,15 +1296,30 @@ export class Perception {
         return evaluate(batch, {
           agentId,
           purpose: `perception.${question}`,
-          rubricVersion: "7",
+          rubricVersion: RUBRIC_VERSION,
           timeoutMs: this.config.decisionTimeoutMs,
           signal,
         });
       };
       const outcome = await Promise.race([work(), aborted]);
-      const answer =
-        outcome.status === "ok" ? outcome.result.answers[question] : undefined;
-      if (answer?.type === "choice") {
+      const following =
+        outcome.status === "ok"
+          ? outcome.result.answers.still_following
+          : undefined;
+      const verdict = (): AttentionDecision & DecisionTrace => {
+        const answer =
+          outcome.status === "ok"
+            ? outcome.result.answers[question]
+            : undefined;
+        if (answer?.type !== "choice") {
+          if (outcome.status !== "ok") {
+            this.warn(
+              `Decision unavailable: ${outcome.reason}; falling back to ${fallback}`,
+            );
+            return admit(`decision unavailable: ${outcome.reason}`);
+          }
+          return admit(`no choice answer to ${question}`);
+        }
         const { choice } = answer;
         const model = { source: "model", choice } as const;
         if (choice === "IGNORE")
@@ -1219,14 +1344,19 @@ export class Perception {
             latencyScore: latency.score,
           };
         return admit(`unusable answer ${choice} to ${question}`);
-      }
-      if (outcome.status !== "ok") {
-        this.warn(
-          `Decision unavailable: ${outcome.reason}; falling back to ${fallback}`,
-        );
-        return admit(`decision unavailable: ${outcome.reason}`);
-      }
-      return admit(`no choice answer to ${question}`);
+      };
+      const result = verdict();
+      // Waking for these very lines means they still follow them; otherwise
+      // tuning out holds for that conversation, whatever the main answer.
+      const wholly = bundle.every(
+        (item) => formatSessionHeader(item.sessionKey) === quietIn,
+      );
+      return quietIn &&
+        following?.type === "choice" &&
+        following.choice === "TUNED_OUT" &&
+        !(wholly && result.action === "STEER")
+        ? { ...result, tunedOut: quietIn }
+        : result;
     } catch (error) {
       this.assertCurrent(); // Disposal is cancellation, never a fallback brain turn.
       this.warn(error);
@@ -1234,6 +1364,99 @@ export class Perception {
     } finally {
       clearTimeout(timer);
       if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  /**
+   * How a character says what they are about to say aloud: how fast they talk,
+   * and, when someone else has the floor, how badly they want in. Their own
+   * impulse, not a stimulus: asked outside the attention lock, and never
+   * recorded as attention. Anything unusable is the next pause at an ordinary
+   * pace, never a cut-in.
+   */
+  async judgeSpeech(
+    agentId: string,
+    facts: SpeechFacts,
+  ): Promise<SpeechJudgment> {
+    const decide = (
+      judgment: SpeechJudgment,
+      source: "model" | "fallback",
+      note?: string,
+    ): SpeechJudgment => {
+      this.api?.logger.info(
+        `Perception ${agentId}: speech -> ${facts.floor ? `${judgment.floor} ` : ""}pace=${judgment.pace.toFixed(2)} (${source})${note ? ` note=${JSON.stringify(note)}` : ""}`,
+      );
+      return judgment;
+    };
+    const ordinary: SpeechJudgment = { floor: "NEXT", pace: 1 };
+    const assemble = this.deps.assembleDecisionContext;
+    const api = this.api;
+    const evaluate =
+      this.deps.evaluateDecision ??
+      (api?.runtime.decisions
+        ? (
+            batch: DecisionBatch,
+            opts: Parameters<DecisionRuntimeV1["evaluate"]>[1],
+          ) => api.runtime.decisions.evaluate(batch, opts)
+        : undefined);
+    if (!assemble || !evaluate)
+      return decide(ordinary, "fallback", "no decision runtime");
+    const signal = AbortSignal.any([
+      this.lifetime.signal,
+      AbortSignal.timeout(this.config.decisionTimeoutMs),
+    ]);
+    try {
+      const [state, task] = await Promise.all([
+        this.store.lookup(agentId),
+        this.taskStore.lookup(agentId),
+      ]);
+      const speech = this.speech?.current(agentId);
+      const batch = await assemble(agentId, {
+        activeTask: task,
+        brainStatus: "busy_thinking",
+        brainContext: state?.brainContext,
+        ...(speech ? { currentSpeech: speech } : {}),
+        incomingBundle: [],
+        pendingQueue: [],
+        speech: facts,
+        signal,
+      });
+      const anchors = PACE_ANCHORS.safeParse(
+        batch.questions.speaking_pace?.criteria,
+      );
+      const outcome = await evaluate(batch, {
+        agentId,
+        purpose: "perception.speech",
+        rubricVersion: RUBRIC_VERSION,
+        timeoutMs: this.config.decisionTimeoutMs,
+        signal,
+      });
+      if (outcome.status !== "ok")
+        return decide(ordinary, "fallback", outcome.reason);
+      const { floor, speaking_pace: pace } = outcome.result.answers;
+      const choice =
+        floor?.type === "choice"
+          ? FLOOR_CHOICES.find((option) => option === floor.choice)
+          : undefined;
+      const judgment: SpeechJudgment = {
+        floor: choice ?? "NEXT",
+        pace:
+          pace?.type === "score" && anchors.success
+            ? paceAt(
+                pace.score,
+                anchors.data.map((level) => level.pace),
+              )
+            : 1,
+      };
+      const usable =
+        (!batch.questions.floor || choice !== undefined) &&
+        (!batch.questions.speaking_pace || pace?.type === "score");
+      return usable
+        ? decide(judgment, "model")
+        : decide(judgment, "fallback", "unusable answer");
+    } catch (error) {
+      this.assertCurrent();
+      return decide(ordinary, "fallback", String(error));
     }
   }
 
@@ -1528,6 +1751,7 @@ export class Perception {
       decision.delayMs > 0 &&
         `delay=${Math.round(decision.delayMs / 1000)}s readyAt=${formatSimTime(record.simTime + decision.delayMs)}`,
       decision.note && `note=${JSON.stringify(decision.note)}`,
+      decision.tunedOut && `tunedOut=${decision.tunedOut}`,
     ].filter(Boolean);
     this.api?.logger.info(
       `Perception ${agentId}: ${record.question} -> ${decision.action} (${decision.source}) for ${bundle.length} stimuli${detail.length ? ` ${detail.join(" ")}` : ""}`,

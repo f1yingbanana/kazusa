@@ -324,6 +324,11 @@
             "minimum": 0,
             "maximum": 20
           },
+          "decisionQuietMinutes": {
+            "default": 10,
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
           "skills": {
             "type": "object",
             "properties": {
@@ -497,6 +502,41 @@
             "maximum": 32,
             "default": 9,
             "description": "Bubbles (said or done) one send_message may carry (default: 9)."
+          },
+          "speechRates": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Face to face, characters said per second at an ordinary pace, per writing system; each speaker's judged pace scales it.",
+            "properties": {
+              "letters": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 12,
+                "description": "Letters and digits of any alphabet (default: 12, about 150 English words a minute)."
+              },
+              "han": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 5,
+                "description": "Chinese characters and Japanese kanji (default: 5)."
+              },
+              "kana": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 8,
+                "description": "Japanese kana, about a mora each (default: 8)."
+              },
+              "hangul": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 7,
+                "description": "Korean syllable blocks (default: 7)."
+              }
+            }
           }
         }
       },
@@ -583,6 +623,8 @@
       "start_task",
       "delay_task",
       "send_message",
+      "create_group",
+      "talk",
       "list_chats",
       "manage_chat",
       "recall",

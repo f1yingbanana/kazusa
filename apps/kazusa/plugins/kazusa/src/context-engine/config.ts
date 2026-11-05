@@ -44,6 +44,11 @@ export const CONTEXT_ENGINE_CONFIG = z.strictObject({
   decisionStimulusMaxTokens: z.number().int().min(32).max(8_000).default(512),
   decisionHistoryItems: z.number().int().min(1).max(200).default(60),
   decisionWikiMaxArticles: z.number().int().min(0).max(20).default(4),
+  /**
+   * Sim minutes someone can say nothing in a conversation in person before the
+   * attention decision asks whether they still follow it.
+   */
+  decisionQuietMinutes: z.number().positive().default(10),
   skills: z
     .object({
       conventions: z.string().default("context-conventions"),

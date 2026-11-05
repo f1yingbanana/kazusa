@@ -36,12 +36,12 @@ describe("skill text", () => {
     // A world or character overrides one line without copying the rest.
     const [world, bundled] = roots({
       "world/kazusa-results/SKILL.md":
-        "---\nname: kazusa-results\n---\n## already-said\nYou said that.\n",
+        "---\nname: kazusa-results\n---\n## out-of-time\nNo time.\n",
       "bundled/kazusa-results/SKILL.md":
-        "## already-said\nYou already said that.\n\n## lookup-limit\nThat's all.\n",
+        "## out-of-time\nYou are out of time.\n\n## lookup-limit\nThat's all.\n",
     });
     const text = createSkillText({ getCandidateRoots: () => [world, bundled] });
-    expect(text("kazusa-results#already-said")).toBe("You said that.");
+    expect(text("kazusa-results#out-of-time")).toBe("No time.");
     expect(text("kazusa-results#lookup-limit")).toBe("That's all.");
     expect(text.maybe("kazusa-results#nothing")).toBeUndefined();
     expect(() => text("kazusa-results#nothing")).toThrow("nothing");
@@ -176,7 +176,6 @@ describe("skill text", () => {
   it("has every section Kazusa's own code asks for", () => {
     const text = bundledSkillText();
     for (const ref of [
-      "kazusa-results#already-said",
       "kazusa-results#lookup-limit",
       "kazusa-results#second-activity",
       "kazusa-results#out-of-time",
@@ -184,8 +183,10 @@ describe("skill text", () => {
       "kazusa-results#aloud-on-the-way",
       "kazusa-results#aloud-not-here",
       "kazusa-results#aloud-not-there",
+      "kazusa-results#aloud-apart",
       "kazusa-deliveries#before-replying",
       "kazusa-deliveries#check-in",
+      "kazusa-deliveries#tuned-out",
       "kazusa-deliveries#idle-check-in",
       ...[
         "start_task",

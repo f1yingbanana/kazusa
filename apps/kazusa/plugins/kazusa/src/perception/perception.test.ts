@@ -311,6 +311,268 @@ describe("Decision fallback", () => {
   });
 });
 
+describe("How they say it", () => {
+  const facts = {
+    sessionKey: "agent:alice:chat:huddle:club",
+    floor: { speaking: ["bob"], turn: "bob", waiting: 0 },
+  };
+  const paces = [0.6, 0.8, 1, 1.25, 1.6].map((pace) => ({
+    pace,
+    description: String(pace),
+  }));
+  /** The real assembler's questions, without its file reads. */
+  const withSpeechQuestions = (floor: boolean) =>
+    vi.fn(async (_id: string, params: DecisionContextRequest) => ({
+      state: { brainStatus: params.brainStatus, incomingBundle: [] },
+      questions: {
+        speaking_pace: {
+          type: "score" as const,
+          instructions: "How fast?",
+          criteria: paces,
+        },
+        ...(floor
+          ? {
+              floor: {
+                type: "choice" as const,
+                instructions: "How badly?",
+                criteria: { CUT_IN: "c", NEXT: "n", WAIT: "w" },
+              },
+            }
+          : {}),
+      },
+    }));
+
+  it("asks how fast they talk and how badly they want in, in one call", async () => {
+    const assembleDecisionContext = withSpeechQuestions(true);
+    const h = setup({ assembleDecisionContext });
+    h.evaluateDecision.mockResolvedValue({
+      status: "ok",
+      result: {
+        answers: {
+          floor: { type: "choice", choice: "CUT_IN" },
+          speaking_pace: { type: "score", score: 3 },
+        },
+      },
+    });
+    expect(await h.router.judgeSpeech("alice", facts)).toEqual({
+      floor: "CUT_IN",
+      pace: 1.25,
+    });
+    expect(h.evaluateDecision).toHaveBeenCalledOnce();
+    expect(h.evaluateDecision.mock.calls[0][1]).toMatchObject({
+      agentId: "alice",
+      purpose: "perception.speech",
+    });
+    expect(assembleDecisionContext.mock.calls[0][1]).toMatchObject({
+      brainStatus: "busy_thinking",
+      incomingBundle: [],
+      speech: facts,
+    });
+    // Their own impulse, not attention: nothing is recorded or queued.
+    expect(h.decisions.size).toBe(0);
+    expect(h.states.size).toBe(0);
+  });
+
+  it("takes the next pause at an ordinary pace when the answer is unusable", async () => {
+    const h = setup({ assembleDecisionContext: withSpeechQuestions(true) });
+    h.evaluateDecision.mockResolvedValueOnce({
+      status: "ok",
+      result: { answers: { floor: { type: "choice", choice: "SHOUT" } } },
+    });
+    expect(await h.router.judgeSpeech("alice", facts)).toEqual({
+      floor: "NEXT",
+      pace: 1,
+    });
+    h.evaluateDecision.mockResolvedValueOnce({
+      status: "unavailable",
+      reason: "overloaded",
+    });
+    expect(await h.router.judgeSpeech("alice", facts)).toEqual({
+      floor: "NEXT",
+      pace: 1,
+    });
+    h.evaluateDecision.mockRejectedValueOnce(new Error("timeout"));
+    expect(await h.router.judgeSpeech("alice", facts)).toEqual({
+      floor: "NEXT",
+      pace: 1,
+    });
+  });
+});
+
+describe("Tuning out", () => {
+  const lunch = "agent:alice:chat:huddle:lunch";
+  const line = (id: string): Stimulus => ({
+    ...stimulus(id),
+    sessionKey: lunch,
+    text: "Anyway, the vending machine ate my coins again.",
+  });
+  /** Asks `still_following` whenever lunch talk is among what they hear. */
+  const asking = vi.fn(async (id: string, params: DecisionContextRequest) => {
+    const quiet = params.incomingBundle.some(
+      (item) => item.sessionKey === lunch,
+    );
+    return {
+      state: {
+        character: { id },
+        incomingBundle: params.incomingBundle.map((item) => item.id),
+        ...(quiet
+          ? { quietIn: { conversation: "chat:huddle:lunch", quietMinutes: 12 } }
+          : {}),
+      },
+      questions: {
+        wake_decision: {
+          type: "choice" as const,
+          instructions: "Judge attention",
+          criteria: {},
+        },
+        ...(quiet
+          ? {
+              still_following: {
+                type: "choice" as const,
+                instructions: "Still following?",
+                criteria: {},
+              },
+            }
+          : {}),
+      },
+    };
+  });
+  const answer = (
+    following: "FOLLOWING" | "TUNED_OUT",
+    wake: "WAKE" | "IGNORE" = "IGNORE",
+  ) => ({
+    status: "ok",
+    result: {
+      answers: {
+        wake_decision: { type: "choice", choice: wake },
+        response_latency: { type: "score", score: 0 },
+        still_following: { type: "choice", choice: following },
+      },
+    },
+  });
+
+  it("leaves a conversation they stopped following, and never hears what was said there", async () => {
+    const h = setup({ assembleDecisionContext: asking });
+    const tuneOut = vi.fn(async () => true);
+    h.router.attachConversations({ tuneOut });
+    h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT"));
+    await h.router.receive("alice", line("lunch-1"));
+    await vi.waitFor(() =>
+      expect(tuneOut).toHaveBeenCalledWith("alice", "chat:huddle:lunch"),
+    );
+    expect(h.deliveries).toEqual([]);
+    const state = h.snapshot();
+    const key = stimulusKey(line("lunch-1"));
+    expect(state.pending).toEqual([]);
+    expect(state.processedIds).toContain(key);
+    expect(state.ignoredIds).toContain(key);
+    expect(state.tunedOut).toEqual([
+      { conversation: "chat:huddle:lunch", at: NOW },
+    ]);
+    expect([...h.decisions.values()]).toEqual([
+      expect.objectContaining({
+        action: "IGNORE",
+        tunedOut: "chat:huddle:lunch",
+      }),
+    ]);
+
+    // A line said there before they left, arriving late, goes unheard too.
+    h.evaluateDecision.mockClear();
+    await h.router.receive("alice", { ...line("lunch-2"), timestamp: NOW - 1 });
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect(h.snapshot().ignoredIds).toContain(stimulusKey(line("lunch-2")));
+
+    // Anything else still reaches them, without the conversation they left.
+    h.evaluateDecision.mockResolvedValue(answer("FOLLOWING", "WAKE"));
+    await h.router.receive("alice", stimulus("text-1"));
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(h.deliveries[0].ids).toEqual(["text-1"]);
+    expect(tuneOut).toHaveBeenCalledOnce();
+  });
+
+  it("drops lines from there still waiting, not only those just judged", async () => {
+    // A line approved earlier, waiting for the next turn, would otherwise wake
+    // them for a conversation they had already left.
+    const h = setup({ assembleDecisionContext: asking });
+    h.router.attachConversations({ tuneOut: vi.fn(async () => true) });
+    h.states.set("alice", {
+      pending: [
+        { ...line("lunch-0"), timestamp: NOW - 60_000, action: "QUEUE_NEXT" },
+        { ...stimulus("text-0"), action: "QUEUE_NEXT" },
+      ],
+    });
+    h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT"));
+    await h.router.receive("alice", line("lunch-1"));
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(h.deliveries[0].ids).toEqual(["text-0"]);
+    expect(h.snapshot().ignoredIds).toEqual(
+      expect.arrayContaining([
+        stimulusKey(line("lunch-0")),
+        stimulusKey(line("lunch-1")),
+      ]),
+    );
+  });
+
+  it("goes on as before while they still follow it", async () => {
+    const h = setup({ assembleDecisionContext: asking });
+    const tuneOut = vi.fn(async () => true);
+    h.router.attachConversations({ tuneOut });
+    h.evaluateDecision.mockResolvedValue(answer("FOLLOWING", "WAKE"));
+    await h.router.receive("alice", line("lunch-1"));
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(h.deliveries[0].ids).toEqual(["lunch-1"]);
+    expect(tuneOut).not.toHaveBeenCalled();
+    expect([...h.decisions.values()][0]).not.toHaveProperty("tunedOut");
+  });
+
+  it("still follows lines it would wake for, whatever the second answer", async () => {
+    // Someone named in the conversation is listening, even if the second
+    // answer says otherwise.
+    const h = setup({ assembleDecisionContext: asking });
+    const tuneOut = vi.fn(async () => true);
+    h.router.attachConversations({ tuneOut });
+    h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT", "WAKE"));
+    await h.router.receive("alice", line("lunch-1"));
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(tuneOut).not.toHaveBeenCalled();
+    expect(h.snapshot().tunedOut).toBeUndefined();
+  });
+
+  it("ignores a tuned-out answer to a question it never asked", async () => {
+    const h = setup();
+    const tuneOut = vi.fn(async () => true);
+    h.router.attachConversations({ tuneOut });
+    h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT", "WAKE"));
+    await h.router.receive("alice", line("lunch-1"));
+    await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
+    expect(tuneOut).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["can't leave", async () => false],
+    [
+      "fails to leave",
+      async () => {
+        throw new Error("messaging unavailable");
+      },
+    ],
+  ])(
+    "hears the conversation as before when they %s, and records no leave",
+    async (_case, tuneOut) => {
+      const h = setup({ assembleDecisionContext: asking });
+      h.router.attachConversations({ tuneOut });
+      h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT"));
+      await h.router.receive("alice", line("lunch-1"));
+      await vi.waitFor(() => expect(h.decisions.size).toBe(1));
+      const state = h.snapshot();
+      expect(state.tunedOut).toBeUndefined();
+      expect([...h.decisions.values()][0]).not.toHaveProperty("tunedOut");
+      // Judged as the main answer says: ignored here, like any line.
+      expect(state.ignoredIds).toContain(stimulusKey(line("lunch-1")));
+    },
+  );
+});
+
 describe("Stale conversation", () => {
   const huddle = "agent:alice:chat:huddle:cafe";
   const line = (id: string, minutesAgo: number, sessionKey = huddle) => ({

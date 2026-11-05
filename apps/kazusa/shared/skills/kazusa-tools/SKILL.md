@@ -72,27 +72,15 @@ current→afterwards state.
 
 ## send_message
 
-Say something in a chat. Use sessionKey for an existing chat, or members and an
-optional title to start one; one other member without a title is your direct
-chat. Bubbles in messages, 1 to {maxBubbles}, are sent one at a time. Delivery
-retries automatically.
-
-## send_message.aloud
-
-Speak aloud to members who are where you are, instead of texting them.
+Say something in a chat, in person or by text: its address alone says which.
+Bubbles in messages, 1 to {maxBubbles}, are said one at a time. Delivery retries
+automatically. Returns `delivered`, or `pending` while delivery retries; if you
+were cut off, how many bubbles were `said` `of` them, and what was `heard` of a
+line cut short.
 
 ## send_message.sessionKey
 
-Your chat address, e.g. chat:direct:bob. Omit members and title.
-
-## send_message.members
-
-Other agent or human IDs to start a chat with; you are included automatically.
-Omit with sessionKey.
-
-## send_message.title
-
-Optional new group title.
+The chat's address, e.g. chat:direct:bob or chat:huddle:k3x9p2m0qa.
 
 ## send_message.messages
 
@@ -113,6 +101,32 @@ in a row unless the feeling is strong. {data}
 A name that starts with an outfit shows you wearing it; the others show your
 usual clothes. {outfits}.
 
+## create_group
+
+Start a text group chat with others and get its address to send_message to. It
+stays quiet until you say something in it. For one person, text their direct
+chat instead (chat:direct:<id>).
+
+## create_group.members
+
+Other agent or human IDs; you are included automatically.
+
+## create_group.title
+
+Optional name for the group.
+
+## talk
+
+Turn to people where you are, to talk with them aloud. Someone in another
+conversation: you walk over to it. Some of your own: you start a side
+conversation with just them. People talking with nobody: they join yours, or one
+starts. Returns its address to send_message to. They must be here, and in no
+more than one conversation.
+
+## talk.members
+
+Who you turn to: agent or human IDs of people here.
+
 ## list_chats
 
 Find your current direct and group chats by optional title, member ID or session
@@ -126,12 +140,13 @@ Title, member ID or session key; omit to list all your chats.
 
 Rename a group chat, add or remove members, or leave it. Use title for rename,
 members for add_members or remove_members, neither for leave. Direct chats have
-fixed membership. Changes affect only later messages; joining grants no earlier
-history.
+fixed membership; a conversation in person can only be left, which steps back
+from it without leaving the place. Changes affect only later messages; joining
+grants no earlier history.
 
 ## manage_chat.sessionKey
 
-Your group chat's address.
+The address of your group chat, or of your conversation in person to leave it.
 
 ## recall
 

@@ -135,8 +135,8 @@ you're just outside. Say places by name, never by id.
 
 Text like a person: a few short bubbles, your words only, no speaker labels. Use
 known ids (`user:` for players); `list_chats` finds an unknown address, and a
-direct address works for first contact. To start a group, use `members` and
-optional `title`. `manage_chat` renames, adds, removes or leaves a group.
-Something urgent can cut you off: the result says what stayed `unsaid`; say it
-later only if it still fits. `delivered` means recorded, not read; never repeat
-a send.
+direct address works for first contact. `create_group` starts a group;
+`manage_chat` renames, adds, removes or leaves one. Something urgent can cut you
+off: the result says how many bubbles were `said`, and the rest stayed unsaid;
+say them later only if they still fit. `delivered` means recorded, not read;
+never repeat a send.

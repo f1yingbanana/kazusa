@@ -1,12 +1,12 @@
 # Messaging — Conversations and Delivery
 
-`src/messaging/` implements `send_message`, `list_chats`, `manage_chat` and
-`set_typing`, registered by the unified plugin. Messaging owns conversation
-routing metadata and direct/group chat persistence; Perception only admits
-stimuli after their ledger writes have committed. Never dispatch a character
-turn in a chat ledger or ask Perception to append the chat again. All character
-inference belongs to `agent:<id>:brain`; private monologue or final brain prose
-never substitutes for `send_message`.
+`src/messaging/` implements `send_message`, `create_group`, `talk`,
+`list_chats`, `manage_chat` and `set_typing`, registered by the unified plugin.
+Messaging owns conversation routing metadata and direct/group chat persistence;
+Perception only admits stimuli after their ledger writes have committed. Never
+dispatch a character turn in a chat ledger or ask Perception to append the chat
+again. All character inference belongs to `agent:<id>:brain`; private monologue
+or final brain prose never substitutes for `send_message`.
 
 ## Authorship and roles
 
@@ -22,18 +22,21 @@ Write one record to each participant's private view of the conversation:
   a send is accepted. Each current member receives a private copy; membership
   never permits reading another agent's memories or backfilling older dialogue.
 - Huddle keys: `agent:<owner>:chat:huddle:<id>`, a face-to-face conversation at
-  one place (`kind: "huddle"`, id `huddle:<id>`, `placeId`). `send_message` with
-  `members` and `aloud: true` speaks to people at the sender's place (checked
-  through the `placeOf` dependency): it speaking aloud brings the people
-  addressed, and anyone they are talking with, into the speaker's huddle (groups
-  merge; a merged huddle keeps `mergedInto` so replies to its old address land
-  in the new one), or joins theirs, or starts one. Speaking into a huddle's
-  address at its place walks over to it and takes the speaker out of their other
-  one. `leavePlace` (called by Location on every move) removes the mover with a
-  `*leaves, heading toward …*` line to those still in it; moving to another
-  huddle posts `*moves to another conversation*`. A huddle with fewer than two
-  left dissolves. Same frozen-audience rule; `manage_chat` refuses huddles. See
-  `apps/kazusa/docs/location.md` §4.6.
+  one place (`kind: "huddle"`, id `huddle:<id>`, `placeId`). `talk({ members })`
+  turns to people at the sender's place (checked through the `placeOf`
+  dependency), one person's move at a time; huddles never merge (live, merging
+  grew one to 17 people). To people in another huddle the speaker walks over to
+  it; to some of the speaker's own, a side conversation splits off and the rest
+  get `*turns to talk with …*`; to people in none, they join the speaker's, or
+  one starts. People in two huddles at once are refused. Older merged huddles
+  keep `mergedInto`, so replies to an old address land in the new one. Speaking
+  into a huddle's address at its place walks over to it and takes the speaker
+  out of their other one. `leavePlace` (called by Location on every move)
+  removes the mover with a `*leaves, heading toward …*` line to those still in
+  it; moving to another huddle posts `*moves to another conversation*`. A huddle
+  with fewer than two left dissolves. Same frozen-audience rule; `manage_chat`
+  only `leave`s a huddle: `*steps back from the conversation*`, still at the
+  place. See `apps/kazusa/docs/location.md` §4.6.
 
 Authorship is the `senderIdentity`, never the role. The same rule applies to
 direct and group chats:
@@ -131,36 +134,35 @@ in the installed SDK is distinct from conformance to the latest rolling docs.
 
 ## Conversation tools and routing metadata
 
-`send_message` has two mutually exclusive targeting forms:
+`send_message` takes a required `sessionKey` and `messages`: it only ever says
+something somewhere. The caller supplies its own full key or the `chat:...`
+shorthand; the registry resolves the current members. Starting a chat is its own
+tool: `create_group({ members, title? })` for a text group (one other member is
+the canonical direct pair, and its title is ignored), `talk({ members })` for a
+conversation in person; each returns the address. A direct chat needs neither:
+`chat:direct:<id>` works on first contact. An optional target was left out on
+41% of follow-up sends, and the either/or rule can't be stated in a tool schema
+(2026-11-05). `messages` holds 1 to `messaging.maxBubbles` (default 9) bubbles,
+each up to 4,000 characters: a string (speech) or
+`{ text, type: "speech" | "action" }`. An action is done, not said, in third
+person without the sender's name; it is kept only in a place conversation (aloud
+or a `chat:huddle:` address) and silently dropped in text chats. The canonical
+message stores the plain text and `type`; agent ledgers, deliveries and
+`said`/`unsaid` read it as `*text*`, and the client gets `type: "action"`. Face
+to face every bubble is split on `*…*` (those segments are actions, the rest
+speech, asterisks stripped), so gestures typed inline or inside an action arrive
+typed; text chats keep speech as typed. System lines (leaving, moving to another
+conversation, `manage_chat` changes) are actions too. Media is future work. The
+human HTTP send keeps a single `text` per request. Absent stored titles are
+`null`, not `undefined`, so retained records satisfy the native JSON state
+contract.
 
-- Existing chat: `sessionKey`, `messages`. The caller supplies only its own full
-  key or `chat:direct:...` / `chat:group:...` shorthand. The registry resolves
-  the current members; do not require them again alongside the key.
-- Start a chat and send its first message: `members` (other configured agent
-  IDs), optional `title`, and `messages`. The sender is included automatically.
-  One other member without a title reuses the canonical direct pair; otherwise
-  create a group. A title allows a two-person group. `messages` holds 1 to
-  `messaging.maxBubbles` (default 9) bubbles, each up to 4,000 characters: a
-  string (speech) or `{ text, type: "speech" | "action" }`. An action is done,
-  not said, in third person without the sender's name; it is kept only in a
-  place conversation (aloud or a `chat:huddle:` address) and silently dropped in
-  text chats. The canonical message stores the plain text and `type`; agent
-  ledgers, deliveries and `said`/`unsaid` read it as `*text*`, and the client
-  gets `type: "action"`. Face to face every bubble is split on `*…*` (those
-  segments are actions, the rest speech, asterisks stripped), so gestures typed
-  inline or inside an action arrive typed; text chats keep speech as typed.
-  System lines (leaving, moving to another conversation, `manage_chat` changes)
-  are actions too. Media is future work. The human HTTP send keeps a single
-  `text` per request. Absent stored titles are `null`, not `undefined`, so
-  retained records satisfy the native JSON state contract.
-
-The result includes the caller's `sessionKey` for later sends. Direct chat
-identity is derived from its sorted pair. Group identity is opaque and derived
-from the sender and an internal delivery ID. The adapter generates a fresh
-server-owned UUID for every tool execution, independent of the provider's
-reusable tool-call IDs. Each execution creates a new group, even with identical
-arguments; recovery of a retained send reuses its original group. Titles are
-labels, not identities; changing a title never changes a key.
+Direct chat identity is derived from its sorted pair. The adapter generates a
+fresh server-owned UUID for every send, independent of the provider's reusable
+tool-call IDs. A new group or huddle gets a random 10-character id
+(`newChatId`), short enough to copy into every reply; each `create_group` makes
+a new group. Titles are labels, not identities; changing a title never changes a
+key.
 
 `list_chats({ query? })` returns only the caller's current memberships with its
 own session keys, titles, and member IDs. It reads routing metadata, not
@@ -378,6 +380,11 @@ audiences, ledger copies and notifications are unchanged per bubble.
   the simulation clock: wall time is the remaining sim time divided by speed,
   re-checked at most every 250ms. A paused clock (speed 0) holds the next bubble
   until it runs again; the shutdown signal lets the rest go at once.
+- **Face to face** (a huddle), every spoken line, the first included, takes its
+  speaking time (per writing system, `messaging.speechRates`, at the speaker's
+  judged pace) and waits for the huddle's floor; actions keep the typing pace. A
+  steer that stops a line mid-way commits what was heard of it, ending in "—".
+  See [floor](floor.md).
 - **Blocking tool.** `send_message` returns only after the last bubble or an
   interruption, so the brain stays busy and new stimuli are judged by
   `attention_allocation` with the current speech in Jev's state.
