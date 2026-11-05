@@ -1,7 +1,12 @@
 "use client";
 
 import { Fragment } from "react";
-import { CircleAlertIcon, SparklesIcon } from "lucide-react";
+import {
+  CheckCheckIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +40,12 @@ import { useFollowBottom } from "@/hooks/use-follow-bottom";
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
 import type { BrainActivity } from "@/lib/source/brain/activity";
-import { actionLine, isOneOnOne } from "@/lib/source/chats/display";
+import {
+  actionLine,
+  isOneOnOne,
+  messageReceipt,
+  receiptLabel,
+} from "@/lib/source/chats/display";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
@@ -251,13 +261,18 @@ export function MessageList({
                           isSelf ? "items-end text-right" : "pl-10",
                         )}
                       >
-                        {run.messages.map((message) => (
+                        {run.messages.map((message, index) => (
                           <ActionLine
                             key={message.id}
                             name={participant.name}
                             message={message}
                             pending={pendingById.get(message.id)}
                             onRetry={onRetry}
+                            nameOf={
+                              isSelf && index === run.messages.length - 1
+                                ? (id) => resolve(id).name
+                                : undefined
+                            }
                           />
                         ))}
                       </div>
@@ -325,6 +340,12 @@ export function MessageList({
                                       message={message}
                                       pending={pendingMessage}
                                       onRetry={onRetry}
+                                      nameOf={
+                                        isSelf
+                                          ? (id) => resolve(id).name
+                                          : undefined
+                                      }
+                                      inPerson={chat.type === "huddle"}
                                     />
                                   </MessageFooter>
                                 ) : null}
@@ -418,13 +439,17 @@ function ActionLine({
   message,
   pending,
   onRetry,
+  nameOf,
 }: {
   name: string;
   message: DisplayMessage;
   pending?: PendingMessage;
   onRetry: (message: PendingMessage) => void;
+  /** The last of the player's own: says who observed it. */
+  nameOf?: (id: string) => string;
 }) {
   const line = actionLine(name, message.text);
+  const observed = nameOf && !pending && messageReceipt(message);
   return (
     <div className="flex max-w-[80%] flex-col gap-0.5">
       <p
@@ -440,12 +465,14 @@ function ActionLine({
         </span>
         {line.rest}
       </p>
-      {pending ? (
+      {pending || observed ? (
         <span className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
           <MessageStatus
             message={message}
             pending={pending}
             onRetry={onRetry}
+            nameOf={nameOf}
+            inPerson
           />
         </span>
       ) : null}
@@ -476,10 +503,16 @@ function MessageStatus({
   message,
   pending,
   onRetry,
+  nameOf,
+  inPerson = false,
 }: {
   message: DisplayMessage;
   pending?: PendingMessage;
   onRetry: (message: PendingMessage) => void;
+  /** The player's own: names who read or observed them. */
+  nameOf?: (id: string) => string;
+  /** Face to face: observed, not read. */
+  inPerson?: boolean;
 }) {
   if (pending?.status === "sending") {
     return <span>Sending…</span>;
@@ -499,13 +532,32 @@ function MessageStatus({
       </>
     );
   }
-  return (
+  const time = (
     <time
       dateTime={new Date(message.timestamp).toISOString()}
       className="font-mono text-[11px] tabular-nums"
     >
       {formatTime(message.timestamp)}
     </time>
+  );
+  const receipt = nameOf ? messageReceipt(message) : undefined;
+  if (!receipt || !nameOf) return time;
+  const label = receiptLabel(receipt, nameOf, formatTime, inPerson);
+  const Icon = receipt.read ? CheckCheckIcon : CheckIcon;
+  return (
+    <span className="flex items-center gap-1">
+      {time}
+      <Icon
+        role="img"
+        aria-label={label}
+        className={cn(
+          "size-3.5",
+          receipt.read ? "text-primary" : "text-muted-foreground",
+        )}
+      >
+        <title>{label}</title>
+      </Icon>
+    </span>
   );
 }
 

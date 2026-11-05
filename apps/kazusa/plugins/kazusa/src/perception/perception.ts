@@ -294,6 +294,9 @@ export class Perception {
   private readonly adoptedListeners = new Set<
     (delivery: PerceptionDelivery) => void | Promise<void>
   >();
+  private readonly readListeners = new Set<
+    (delivery: PerceptionDelivery) => void | Promise<void>
+  >();
   private readonly brainStateListeners = new Set<
     (agentId: string, brain: "idle" | "thinking", queued: number) => void
   >();
@@ -690,6 +693,29 @@ export class Perception {
   }
 
   /**
+   * The brain was shown this delivery: adopted into a turn, or found adopted
+   * when an interrupted handoff is reconciled at startup.
+   */
+  onRead(
+    listener: (delivery: PerceptionDelivery) => void | Promise<void>,
+  ): () => void {
+    this.readListeners.add(listener);
+    return () => {
+      this.readListeners.delete(listener);
+    };
+  }
+
+  private async notifyRead(delivery: PerceptionDelivery): Promise<void> {
+    for (const listener of this.readListeners) {
+      try {
+        await listener(delivery);
+      } catch (err: unknown) {
+        this.warn(err);
+      }
+    }
+  }
+
+  /**
    * A persisted run ID is not a lock. An unconfirmed handoff is reconciled with
    * the brain transcript: adopted input is done (its turn ran, or was cut off
    * mid-way; replaying it could repeat tools), and input the brain never got
@@ -699,6 +725,7 @@ export class Perception {
     const entries = (await this.store.entries()).filter(
       ({ key }) => !isDecisionKey(key),
     );
+    const read: PerceptionDelivery[] = [];
     await Promise.all(
       entries.map(({ key: agentId }) =>
         this.change(
@@ -719,6 +746,7 @@ export class Perception {
                   continue;
                 }
                 if (done) {
+                  read.push(delivery);
                   const keys = new Set(delivery.keys);
                   state.pending = state.pending.filter(
                     (item) => !keys.has(stimulusKey(item)),
@@ -753,6 +781,7 @@ export class Perception {
         ),
       ),
     );
+    for (const delivery of read) await this.notifyRead(delivery);
   }
 
   private async change(
@@ -1642,6 +1671,7 @@ export class Perception {
           if (!held && takenBack()) return;
           adopted = true;
           resolve();
+          await this.notifyRead(delivery);
           for (const listener of this.adoptedListeners) {
             try {
               await listener(delivery);
@@ -1792,6 +1822,7 @@ export class Perception {
   dispose(): void {
     this.lifetime.abort();
     this.adoptedListeners.clear();
+    this.readListeners.clear();
     this.brainStateListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();
     this.debounceTimers.clear();

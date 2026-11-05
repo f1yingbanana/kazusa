@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { actionLine, chatSubject, chatTitle, messagePreview } from "./display";
+import {
+  actionLine,
+  chatSubject,
+  chatTitle,
+  messagePreview,
+  messageReceipt,
+  receiptLabel,
+} from "./display";
 import type { Chat } from "./types";
 
 const names: Record<string, string> = {
@@ -147,5 +154,67 @@ describe("messagePreview", () => {
         nameOf,
       ),
     ).toBe("Sticker");
+  });
+});
+
+describe("messageReceipt", () => {
+  const time = (at: number) => `t${at}`;
+
+  it("has none face to face or for people", () => {
+    expect(messageReceipt({})).toBeUndefined();
+    expect(messageReceipt({ receipts: [] })).toBeUndefined();
+  });
+
+  it("is sent until the character reads it", () => {
+    const sent = messageReceipt({ receipts: [{ id: "kazusa" }] });
+    expect(sent).toEqual({ read: false, readers: [], total: 1 });
+    expect(sent && receiptLabel(sent, nameOf, time)).toBe("Sent");
+    const read = messageReceipt({ receipts: [{ id: "kazusa", readAt: 5 }] });
+    expect(read).toEqual({
+      read: true,
+      readers: ["kazusa"],
+      total: 1,
+      readAt: 5,
+    });
+    expect(read && receiptLabel(read, nameOf, time)).toBe("Read t5");
+  });
+
+  it("face to face, says observed", () => {
+    const heard = messageReceipt({ receipts: [{ id: "kazusa", readAt: 3 }] });
+    expect(heard && receiptLabel(heard, nameOf, time, true)).toBe(
+      "Observed by Kazusa t3",
+    );
+    const some = messageReceipt({
+      receipts: [{ id: "kazusa", readAt: 3 }, { id: "yutori-natsu" }],
+    });
+    expect(some && receiptLabel(some, nameOf, time, true)).toBe(
+      "Observed by Kazusa · 1 of 2",
+    );
+    const none = messageReceipt({ receipts: [{ id: "kazusa" }] });
+    expect(none && receiptLabel(none, nameOf, time, true)).toBe(
+      "Not observed yet",
+    );
+  });
+
+  it("in a group, is read once everyone has, as of the last of them", () => {
+    const some = messageReceipt({
+      receipts: [{ id: "yutori-natsu" }, { id: "kurimura-airi", readAt: 9 }],
+    });
+    expect(some?.read).toBe(false);
+    expect(some && receiptLabel(some, nameOf, time)).toBe(
+      "Read by Kurimura Airi · 1 of 2",
+    );
+    const all = messageReceipt({
+      receipts: [
+        { id: "yutori-natsu", readAt: 12 },
+        { id: "kurimura-airi", readAt: 9 },
+      ],
+    });
+    expect(all).toMatchObject({
+      read: true,
+      readers: ["kurimura-airi", "yutori-natsu"],
+      readAt: 12,
+    });
+    expect(all && receiptLabel(all, nameOf, time)).toBe("Read by everyone t12");
   });
 });

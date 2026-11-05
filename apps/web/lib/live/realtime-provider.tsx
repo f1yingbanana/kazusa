@@ -35,6 +35,7 @@ import { statusStore } from "./state";
 import {
   appendMessageToPages,
   chatsKey,
+  markReadInPages,
   messagesCacheKey,
   updateChatPreview,
 } from "@/hooks/use-chats";
@@ -69,7 +70,13 @@ const OBSERVER_EVENTS = [
   "places",
   "observed",
 ] as const;
-const PLAYER_EVENTS = ["message", "typing", "connected", "chats"] as const;
+const PLAYER_EVENTS = [
+  "message",
+  "typing",
+  "read",
+  "connected",
+  "chats",
+] as const;
 const RETRY_MIN_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
 /** Huddles form and dissolve often, and this list costs a read of all history. */
@@ -231,6 +238,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           break;
         case "typing":
           handleTyping(data);
+          break;
+        case "read":
+          void mutate(
+            messagesCacheKey(config, data.chatId),
+            (pages?: MessagesResponse[]) => markReadInPages(pages, data),
+            { revalidate: false },
+          );
           break;
         case "chats":
           void mutate<ChatsResponse>(chatsKey(config)).then((current) => {

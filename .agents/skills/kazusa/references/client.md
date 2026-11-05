@@ -30,7 +30,11 @@ send group messages through native `chat.send` or read UI history through native
 - A new group is a local draft until its first message creates the conversation.
   Existing chats need only their address and text, never a repeated member list.
 - Local pending, canonical acceptance and completed agent projections are
-  distinct. None means noticed, read or guaranteed reply.
+  distinct. None means noticed, read or guaranteed reply. Read is its own fact:
+  `ChatMessage.receipts` carry each character's `readAt`, the moment Perception
+  showed their brain the message (SSE `read` updates it live). The client shows
+  one check for sent and two for read by every character ("observed" face to
+  face). The player sends no receipts.
 
 ## API and client behavior
 

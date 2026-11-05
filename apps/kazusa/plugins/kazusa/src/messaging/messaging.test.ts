@@ -12,6 +12,7 @@ import {
   clientMessage,
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
+import { stimulusKey } from "../stimulus.ts";
 
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const active: Messaging[] = [];
@@ -1625,6 +1626,90 @@ describe("chats awaiting a reply", () => {
       await h.messaging.chatFacts("bob", ["agent:bob:chat:direct:alice"]),
     ).toMatchObject([
       { lastSpokeAt: NOW + 20 * 60_000, unanswered: 0, waitingSince: null },
+    ]);
+  });
+});
+
+describe("read receipts", () => {
+  const bobsChat = "agent:bob:chat:direct:alice";
+  const receiptsOf = (h: ReturnType<typeof setup>) =>
+    [...h.retained.values()]
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((delivery) => clientMessage(delivery).receipts);
+
+  it("marks a chat read up to the latest message the brain was shown", async () => {
+    const h = setup();
+    const events: unknown[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "read") events.push(event);
+    });
+    await h.send();
+    const second = await h.send({
+      requestId: "second",
+      sessionKey: "chat:direct:bob",
+      text: "Still there?",
+    });
+    await h.send({
+      requestId: "third",
+      sessionKey: "chat:direct:bob",
+      text: "Hello?",
+    });
+    expect(receiptsOf(h)).toEqual([
+      [{ id: "bob" }],
+      [{ id: "bob" }],
+      [{ id: "bob" }],
+    ]);
+
+    const readAt = NOW + 5 * 60_000;
+    h.setNow(readAt);
+    const shown = [stimulusKey({ id: second.messageId, sessionKey: bobsChat })];
+    await h.messaging.markRead("bob", shown, [bobsChat]);
+    // Opening the chat shows everything above the newest message shown.
+    expect(receiptsOf(h)).toEqual([
+      [{ id: "bob", readAt }],
+      [{ id: "bob", readAt }],
+      [{ id: "bob" }],
+    ]);
+    expect(events).toMatchObject([
+      {
+        read: { type: "read", readerId: "bob", readAt },
+        audience: ["alice", "bob"],
+      },
+    ]);
+    expect(events[0]).toHaveProperty("read.messageIds.length", 2);
+
+    // Read once: a later showing keeps the first time and says nothing new.
+    h.setNow(readAt + 60_000);
+    await h.messaging.markRead("bob", shown, [bobsChat]);
+    expect(receiptsOf(h)[0]).toEqual([{ id: "bob", readAt }]);
+    expect(events).toHaveLength(1);
+  });
+
+  it("face to face, counts only the lines taken in as observed", async () => {
+    const h = setup();
+    h.places.set("alice", "park");
+    h.places.set("bob", "park");
+    const first = await h.send({ aloud: true, text: "nice day" });
+    const second = await h.send({
+      requestId: "second",
+      sessionKey: first.sessionKey.replace(/^agent:alice:/, ""),
+      text: "isn't it?",
+    });
+    const bobsHuddle = [...h.retained.values()]
+      .flatMap((delivery) => delivery.copies)
+      .find((copy) => copy.agentId === "bob")?.sessionKey;
+    expect(bobsHuddle).toMatch(/^agent:bob:chat:huddle:/);
+    expect(receiptsOf(h)).toEqual([[{ id: "bob" }], [{ id: "bob" }]]);
+
+    // The first line went by unheard; hearing the next doesn't bring it back.
+    await h.messaging.markRead(
+      "bob",
+      [stimulusKey({ id: second.messageId, sessionKey: bobsHuddle ?? "" })],
+      [bobsHuddle ?? ""],
+    );
+    expect(receiptsOf(h)).toEqual([
+      [{ id: "bob" }],
+      [{ id: "bob", readAt: NOW }],
     ]);
   });
 });
