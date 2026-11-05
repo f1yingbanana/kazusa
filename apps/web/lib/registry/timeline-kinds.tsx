@@ -216,6 +216,7 @@ export const TIMELINE_KINDS: KindMap = {
         choice,
         latencyScore,
         note,
+        tunedOut,
         stimulusIds,
       } = event.payload;
       const outcome =
@@ -241,6 +242,7 @@ export const TIMELINE_KINDS: KindMap = {
       return (
         <>
           <span>{outcome}</span>
+          {tunedOut && <span>{` · stopped following ${tunedOut}`}</span>}
           <span className="font-mono text-xs text-muted-foreground">
             {` · ${stimulusIds.length} ${stimulusIds.length === 1 ? "stimulus" : "stimuli"} · ${why}`}
           </span>

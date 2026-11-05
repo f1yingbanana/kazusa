@@ -6,6 +6,7 @@ import type {
 } from "openclaw/plugin-sdk/decisions";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
 import { z } from "zod";
+import type { SpeechFacts } from "../messaging/floor.ts";
 import type { ChatFacts } from "../messaging/messaging.ts";
 import type { CurrentSpeech } from "../perception/types.ts";
 import type { Stimulus } from "../stimulus.ts";
@@ -28,6 +29,11 @@ export interface DecisionContextRequest {
   readonly queuedReview?: boolean;
   readonly incomingBundle: readonly Stimulus[];
   readonly pendingQueue: readonly Stimulus[];
+  /**
+   * Asks only how they say what they are about to say aloud: how fast, and,
+   * when someone else has the floor, how badly they want in.
+   */
+  readonly speech?: SpeechFacts;
   readonly signal?: AbortSignal;
 }
 
@@ -73,6 +79,8 @@ export function assembleDecisionContext(
     readonly wiki?: readonly string[];
     /** Canonical facts for the chats in the incoming bundle. */
     readonly chats?: readonly ChatFacts[];
+    /** The conversation asked about by `still_following`, if any. */
+    readonly quietIn?: QuietConversation;
     readonly config?: ContextEngineConfig;
   },
 ): DecisionEntry {
@@ -185,6 +193,14 @@ export function assembleDecisionContext(
       waitingMinutes:
         chat.waitingSince === null ? null : minutesAgo(chat.waitingSince),
     })),
+    ...(params.quietIn
+      ? {
+          quietIn: {
+            conversation: formatSessionHeader(params.quietIn.sessionKey),
+            quietMinutes: params.quietIn.quietMinutes,
+          },
+        }
+      : {}),
     recentChannelContext: [...selected].map(
       ([key, records]) =>
         `### ${formatSessionHeader(key)}${records.reverse().join("")}`,
@@ -200,6 +216,18 @@ export function assembleDecisionContext(
     ),
     pendingQueue: formatStimuli(pendingQueue.slice(-16)),
     incomingBundle: formatStimuli(incomingBundle),
+    speech: params.speech
+      ? {
+          conversation: formatSessionHeader(params.speech.sessionKey),
+          floor: params.speech.floor
+            ? {
+                speakingNow: params.speech.floor.speaking,
+                whoseTurn: params.speech.floor.turn ?? null,
+                othersWaitingToSpeak: params.speech.floor.waiting,
+              }
+            : null,
+        }
+      : null,
   };
   // Account for JSON wrappers too. Optional background yields to current input
   // and personality. If even those cannot fit, the caller admits attention.
@@ -238,6 +266,49 @@ export const PerceptionRubricSchema = z.object({
           "attention_allocation criteria cannot be empty",
         ),
     }),
+    /** Absent in a world's older override: nobody is asked, nobody drifts. */
+    still_following: z
+      .object({
+        description: z.string().optional(),
+        criteria: z.object({
+          FOLLOWING: z.string().min(1),
+          TUNED_OUT: z.string().min(1),
+        }),
+      })
+      .optional(),
+    /** Absent in a world's older override: the floor goes by the next pause. */
+    floor: z
+      .object({
+        description: z.string().optional(),
+        criteria: z.object({
+          CUT_IN: z.string().min(1),
+          NEXT: z.string().min(1),
+          WAIT: z.string().min(1),
+        }),
+      })
+      .optional(),
+    /** Absent in a world's older override: everyone talks at an ordinary pace. */
+    speaking_pace: z
+      .object({
+        description: z.string().optional(),
+        criteria: z
+          .array(
+            z.strictObject({
+              pace: z.number().positive(),
+              description: z.string().min(1),
+            }),
+          )
+          .min(2)
+          .refine(
+            (levels) =>
+              levels.every(
+                (level, index) =>
+                  index === 0 || level.pace >= levels[index - 1].pace,
+              ),
+            "speaking_pace criteria must be ordered by pace",
+          ),
+      })
+      .optional(),
     response_latency: z.object({
       description: z.string().optional(),
       criteria: z
@@ -281,7 +352,37 @@ export function buildDecisionQuestions(
   brainStatus: "idle" | "busy_thinking",
   rubric: PerceptionSkillRubric,
   queuedReview = false,
+  speech?: SpeechFacts,
+  quiet = false,
 ): Record<string, DecisionQuestion> {
+  if (speech) {
+    const instructions = (description?: string) =>
+      [rubric.instructions, description].filter(Boolean).join("\n\n");
+    const { floor, speaking_pace: pace } = rubric.questions;
+    const questions: Record<string, DecisionQuestion> = {
+      ...(pace
+        ? {
+            speaking_pace: {
+              type: "score",
+              instructions: instructions(pace.description),
+              criteria: pace.criteria,
+            },
+          }
+        : {}),
+      ...(floor && speech.floor
+        ? {
+            floor: {
+              type: "choice",
+              instructions: instructions(floor.description),
+              criteria: floor.criteria,
+            },
+          }
+        : {}),
+    };
+    if (!Object.keys(questions).length)
+      throw new Error("The perception rubric has no speech questions");
+    return questions;
+  }
   const busy = brainStatus === "busy_thinking";
   const questionKey = busy ? "attention_allocation" : "wake_decision";
   const target = busy
@@ -309,7 +410,62 @@ export function buildDecisionQuestions(
         .join("\n\n"),
       criteria: rubric.questions.response_latency.criteria,
     };
+  const following = rubric.questions.still_following;
+  if (quiet && following)
+    questions.still_following = {
+      type: "choice",
+      instructions: [rubric.instructions, following.description]
+        .filter(Boolean)
+        .join("\n\n"),
+      criteria: following.criteria,
+    };
   return questions;
+}
+
+/** A conversation in person someone has said nothing in for a while. */
+export interface QuietConversation {
+  readonly sessionKey: string;
+  readonly quietMinutes: number;
+}
+
+/** A pair can't drift apart unnoticed: the other is talking to you. */
+const DRIFT_MIN_MEMBERS = 3;
+
+/**
+ * The conversation in person the incoming lines come from, when it has three or
+ * more people and the character has said nothing there for `quietMinutes`:
+ * since their last line, or the first line they heard if they have none. They
+ * are in at most one.
+ */
+export function quietConversation(
+  chats: readonly ChatFacts[],
+  incoming: readonly Stimulus[],
+  simTime: number,
+  quietMinutes: number,
+): QuietConversation | undefined {
+  for (const chat of chats) {
+    if (chat.kind !== "huddle" || chat.memberCount < DRIFT_MIN_MEMBERS)
+      continue;
+    if (!incoming.some((item) => item.sessionKey === chat.sessionKey)) continue;
+    // From their last line, or their joining if later (coming back resets
+    // it); with neither known, the first line they heard.
+    const since =
+      chat.lastSpokeAt === null && !chat.joinedAt
+        ? chat.waitingSince
+        : Math.max(chat.lastSpokeAt ?? 0, chat.joinedAt ?? 0);
+    if (since === null) continue;
+    const quiet = Math.floor((simTime - since) / 60_000);
+    if (quiet >= quietMinutes)
+      return { sessionKey: chat.sessionKey, quietMinutes: quiet };
+  }
+  return undefined;
+}
+
+/** The conversation `still_following` asks about in a batch, as its address. */
+export function quietConversationOf(batch: DecisionBatch): string | undefined {
+  const state = batch.state as { quietIn?: { conversation?: unknown } };
+  const conversation = state.quietIn?.conversation;
+  return typeof conversation === "string" ? conversation : undefined;
 }
 
 export function assembleDecisionBatch(
@@ -317,15 +473,34 @@ export function assembleDecisionBatch(
     readonly rubric: PerceptionSkillRubric | ParsedSkillDocument | string;
   },
 ): DecisionBatch {
-  const state = assembleDecisionContext(params);
   const rubric =
     typeof params.rubric === "object" && "instructions" in params.rubric
       ? params.rubric
       : parsePerceptionSkill(params.rubric);
+  const config = params.config ?? CONTEXT_ENGINE_CONFIG.parse({});
+  // Asked only while they hear it with nothing on their mind: a busy brain may
+  // be answering that very conversation, or waiting for its turn to speak.
+  const quietIn =
+    rubric.questions.still_following &&
+    !params.speech &&
+    params.brainStatus === "idle"
+      ? quietConversation(
+          params.chats ?? [],
+          params.incomingBundle,
+          params.simTime,
+          config.decisionQuietMinutes,
+        )
+      : undefined;
+  const state = assembleDecisionContext({
+    ...params,
+    ...(quietIn ? { quietIn } : {}),
+  });
   const questions = buildDecisionQuestions(
     params.brainStatus,
     rubric,
     params.queuedReview,
+    params.speech,
+    Boolean(quietIn),
   );
   return { state, questions };
 }

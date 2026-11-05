@@ -310,7 +310,7 @@ export function registerMessagingHttp(
       }
       send(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
     };
-    const unsubscribeMessaging = messaging.onEvent((event) => {
+    const unsubscribeMessaging = messaging.onAnyEvent((event) => {
       if (event.type === "message") {
         if (event.delivery.audience.includes(user.id))
           write({

@@ -90,6 +90,7 @@ export function createDecisionContextAssembler(
       ...new Set([
         `agent:${agentId}:tasks`,
         ...stimuli.map((item) => item.sessionKey),
+        ...(request.speech ? [request.speech.sessionKey] : []),
       ]),
     ];
     const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
@@ -159,8 +160,17 @@ export function createDecisionContextAssembler(
           deps.recollections?.(
             {
               agentId,
-              stimulus: stimuli.map((item) => item.text).join("\n"),
-              seeds: stimuli.map((item) => item.sender),
+              stimulus: [
+                ...stimuli.map((item) => item.text),
+                ...(request.currentSpeech?.unsaid ?? []),
+              ].join("\n"),
+              seeds: [
+                ...stimuli.map((item) => item.sender),
+                ...(request.speech?.floor?.speaking ?? []),
+                ...(request.speech?.floor?.turn
+                  ? [request.speech.floor.turn]
+                  : []),
+              ],
               now: deps.clock.time(),
             },
             config.decisionWikiMaxArticles,

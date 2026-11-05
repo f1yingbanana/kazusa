@@ -123,9 +123,9 @@ export const SendPayloadSchema = z
     /** Absent: speech. Actions are kept only in huddles (face to face). */
     type: z.enum(["speech", "action"]).optional(),
     /**
-     * With `members`: say it face to face to people where you are. They join
-     * your huddle there with anyone they were talking with, or you join
-     * theirs.
+     * With `members`: say it face to face to people where you are, as `talk`
+     * turns to them: you walk over to their conversation, split a side one off
+     * your own, or they join yours. Refused when they are in two at once.
      */
     aloud: z.boolean().optional(),
     sessionKey: z.string().optional(),
@@ -1357,6 +1357,11 @@ export const AttentionDecidedEventSchema = z.object({
     latencyScore: z.number().optional(),
     /** Why a fallback was taken. */
     note: z.string().optional(),
+    /**
+     * A conversation in person (its address) they stopped following: its lines
+     * in this batch went unheard, and they left it.
+     */
+    tunedOut: z.string().optional(),
     stimulusIds: z.array(z.string()),
     taskId: z.string().optional(),
   }),

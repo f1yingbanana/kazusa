@@ -12,10 +12,6 @@ Facts only: what to do about them is the other skills' to say. `{placeholders}`
 are filled by code. `{until}` is a sim time; `{notes}` is what Location adds
 (where it happens, the way there), each starting with a space.
 
-## already-said
-
-You already said that, and they have it.
-
 ## lookup-limit
 
 That's all you can find right now.
@@ -44,6 +40,22 @@ You're on your way, so nobody is close enough to hear.
 ## aloud-not-there
 
 You aren't there, so nobody in it can hear you.
+
+## aloud-apart
+
+{who} are in different conversations, so this did not run.
+
+## aloud-self
+
+You are already in your own conversation, so this did not run.
+
+## conversation-over
+
+That conversation is over, so this did not run.
+
+## conversation-leave-only
+
+A conversation in person can only be left, so this did not run.
 
 ## outside-repository
 

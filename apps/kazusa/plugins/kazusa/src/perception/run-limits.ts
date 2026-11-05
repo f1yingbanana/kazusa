@@ -5,14 +5,19 @@ import {
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
 import { pluginSkillText } from "../skill-text.ts";
-import {
-  chooseActivity,
-  LOOKUP_NAMES,
-  MAX_LOOKUPS,
-  repeatsItself,
-  turnOf,
-} from "../turn.ts";
+import { chooseActivity, LOOKUP_NAMES, MAX_LOOKUPS, turnOf } from "../turn.ts";
 import { PERCEPTION_CONFIG } from "./types.ts";
+
+/**
+ * What still runs near a run's end, so it can always report: speaking, and
+ * opening the conversation to speak in (`send_message` needs an address).
+ */
+const SPEECH_TOOLS: ReadonlySet<string> = new Set([
+  "send_message",
+  "talk",
+  "create_group",
+  "continue_work",
+]);
 
 /** Model calls kept back so a run can still say where things stand. */
 const WRAP_UP_MODEL_CALLS = 2;
@@ -170,11 +175,6 @@ export function registerBrainRunLimits(
   api.on("before_tool_call", (event, ctx) => {
     if (ctx.agentId) {
       const turn = turnOf(ctx.agentId);
-      if (
-        event.toolName === "send_message" &&
-        repeatsItself(turn, event.params, ctx.toolCallId ?? event.toolCallId)
-      )
-        return refuse("already-said", ctx.agentId);
       if (LOOKUP_NAMES.has(event.toolName)) {
         if (turn.lookups >= MAX_LOOKUPS)
           return refuse("lookup-limit", ctx.agentId);
@@ -200,8 +200,7 @@ export function registerBrainRunLimits(
     // the chance to report. The model-call limit bounds what follows.
     const { maxModelCalls, maxToolCalls, maxRunSeconds } = state.limits;
     if (
-      event.toolName !== "send_message" &&
-      event.toolName !== "continue_work" &&
+      !SPEECH_TOOLS.has(event.toolName) &&
       (state.tools.size >= maxToolCalls ||
         state.models.size >= maxModelCalls - WRAP_UP_MODEL_CALLS ||
         Date.now() - state.startedAt >=

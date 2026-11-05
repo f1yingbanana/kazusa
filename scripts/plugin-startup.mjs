@@ -81,8 +81,41 @@ export function loadNewPlugins(root) {
   return [`This world now loads new plugins: ${added.join(", ")}.`];
 }
 
+/** Tools that took over starting a chat from `send_message` (2026-11-05). */
+const CHAT_STARTERS = ["create_group", "talk"];
+
+/**
+ * `send_message` only says something in a chat now; `create_group` and `talk`
+ * start one. Characters get tools only from an explicit `alsoAllow`, so a world
+ * made before this lets each one that may send start chats too: the global list
+ * and any character's own. A list without `send_message` is left alone.
+ */
+export function allowChatStarters(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const lists = [
+    config.tools?.alsoAllow,
+    ...Object.values(config.agents?.entries ?? {}).map(
+      (agent) => agent?.tools?.alsoAllow,
+    ),
+  ].filter((list) => Array.isArray(list) && list.includes("send_message"));
+  let added = 0;
+  for (const list of lists) {
+    const missing = CHAT_STARTERS.filter((tool) => !list.includes(tool));
+    list.splice(list.indexOf("send_message") + 1, 0, ...missing);
+    added += missing.length;
+  }
+  if (!added) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [
+    "Characters can now start chats with create_group and talk; send_message only says something.",
+  ];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
+  for (const line of allowChatStarters(root)) console.log(line);
 }

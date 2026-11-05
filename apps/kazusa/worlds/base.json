@@ -372,6 +372,8 @@
         "start_task",
         "delay_task",
         "send_message",
+        "create_group",
+        "talk",
         "list_chats",
         "manage_chat",
         "recall",

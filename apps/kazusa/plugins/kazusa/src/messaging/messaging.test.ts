@@ -30,6 +30,8 @@ function setup(
    * a paused test world says everything at once.
    */
   release: AbortSignal = AbortSignal.abort(),
+  /** More dependencies, such as the floor judgment. */
+  extra: Partial<MessagingDeps> = {},
 ) {
   let now = NOW;
   // Paused unless a test runs the world: then sim time follows the wall clock.
@@ -119,6 +121,7 @@ function setup(
       const placeId = places.get(id);
       return placeId ? { placeId, title: placeId.toUpperCase() } : undefined;
     },
+    ...extra,
   });
   active.push(messaging);
   const send = (overrides: Partial<SendMessageParams> = {}, sender = "alice") =>
@@ -243,7 +246,7 @@ describe("message delivery", () => {
     "replays permanent history after 201 newer sends and membership changes (restart=%s)",
     async (restart) => {
       const h = setup();
-      const params = { title: "club", members: ["bob"] };
+      const params = { title: "club", members: ["bob", "carol"] };
       const first = await h.send(params);
       for (let i = 0; i < 201; i++) {
         await h.send({ requestId: `later-${i}`, sessionKey: first.sessionKey });
@@ -261,7 +264,7 @@ describe("message delivery", () => {
       await h.messaging.manageChat("alice", {
         sessionKey: first.sessionKey,
         action: "add_members",
-        members: ["carol"],
+        members: ["dave"],
       });
       await h.messaging.manageChat("alice", {
         sessionKey: first.sessionKey,
@@ -564,13 +567,15 @@ describe("conversation routing and management", () => {
     expect(await h.messaging.listChats("bob")).toHaveLength(1);
   });
 
-  it("creates a distinct two-person group when a title is supplied", async () => {
+  it("sends to the direct chat when a title names only one other person", async () => {
     const h = setup();
-    await h.send();
-    const group = await h.send({ requestId: "group", title: "Weekend Plans" });
-    expect(group.sessionKey).toContain(":chat:group:");
-    expect(group.recipients).toEqual(["bob"]);
-    expect(await h.messaging.listChats("alice")).toHaveLength(2);
+    const direct = await h.send();
+    const titled = await h.send({ requestId: "group", title: "Weekend Plans" });
+    expect(titled.sessionKey).toBe(direct.sessionKey);
+    expect(titled.recipients).toEqual(["bob"]);
+    expect(await h.messaging.listChats("alice")).toEqual([
+      expect.objectContaining({ kind: "direct", title: "bob" }),
+    ]);
   });
 
   it("lets any member rename, add or remove members, and leave without copying history", async () => {
@@ -735,30 +740,30 @@ describe("conversation routing and management", () => {
     expect(last.recipients).toEqual(["bob"]);
   });
 
-  it("recovers a group creation whose initial delivery acceptance failed without making another group", async () => {
+  it("gives each new group a short id of its own", async () => {
+    // Live: 64-character hashes cost tokens in every reply and were miscopied.
     const h = setup();
-    h.register.mockRejectedValueOnce(new Error("store unavailable"));
-    await expect(
-      h.send({ title: "Tea", members: ["bob", "carol"] }),
-    ).rejects.toThrow("store unavailable");
-    expect(h.chats.size).toBe(1);
-    h.messaging.dispose();
-    const recovered = setup(h.retained, h.committed, h.chats);
-    await expect(
-      recovered.send({ title: "Different", members: ["bob", "carol"] }),
-    ).rejects.toThrow("different chat creation");
-    const sent = await recovered.send({
-      title: "Tea",
+    const tea = await h.send({ title: "Tea", members: ["bob", "carol"] });
+    const lunch = await h.send({
+      requestId: "hello-2",
+      title: "Lunch",
       members: ["bob", "carol"],
     });
-    expect(sent.status).toBe("delivered");
-    expect(h.chats.size).toBe(1);
-    expect((await recovered.messaging.listChats("bob"))[0].title).toBe("Tea");
+    expect(tea.sessionKey).toMatch(/^agent:alice:chat:group:[0-9a-z]{10}$/);
+    expect(lunch.sessionKey).not.toBe(tea.sessionKey);
+    const reply = await h.send(
+      {
+        requestId: "reply",
+        sessionKey: tea.sessionKey.slice("agent:alice:".length),
+      },
+      "alice",
+    );
+    expect(reply.chatId).toBe(tea.chatId);
   });
 
   it("retains failed native title projections and retries without writing dialogue", async () => {
     const h = setup();
-    const group = await h.send({ title: "Tea" });
+    const group = await h.send({ title: "Tea", members: ["bob", "carol"] });
     h.ensureSession.mockRejectedValueOnce(new Error("session store offline"));
     expect(
       await h.messaging.manageChat("bob", {
@@ -774,7 +779,7 @@ describe("conversation routing and management", () => {
     expect([...h.chats.values()][0].needsProjection).toBe(false);
     expect(
       recovered.ensureSession.mock.calls.map(([, title]) => title),
-    ).toEqual(["Lunch", "Lunch"]);
+    ).toEqual(["Lunch", "Lunch", "Lunch"]);
     expect(recovered.append).not.toHaveBeenCalled();
   });
 
@@ -872,15 +877,15 @@ describe("conversation routing and management", () => {
     );
 
     // Adding a user to an existing group chat succeeds
-    const twoAgentsGroup = await h.send({
+    const agentsGroup = await h.send({
       requestId: "grp-2",
       title: "Club Talk",
-      members: ["bob"],
+      members: ["bob", "carol"],
       text: "Starting club chat",
     });
     const updated = await h.messaging.manageChat("alice", {
       action: "add_members",
-      sessionKey: twoAgentsGroup.sessionKey,
+      sessionKey: agentsGroup.sessionKey,
       members: ["user:sensei"],
     });
     expect(updated.members).toContain("user:sensei");
@@ -892,7 +897,7 @@ describe("conversation routing and management", () => {
     const grp = await h.send({
       requestId: "msg-1",
       title: "Secret Strategy",
-      members: ["bob"],
+      members: ["bob", "carol"],
       text: "Secret message 1 before Sensei joined",
     });
     const actualChatId = [...h.chats.values()].find(
@@ -933,7 +938,7 @@ describe("conversation routing and management", () => {
       requestId: "sensei-msg-4",
     });
     expect(senseiSend.status).toBe("delivered");
-    expect(senseiSend.recipients).toEqual(["alice", "bob"]);
+    expect(senseiSend.recipients).toEqual(["alice", "bob", "carol"]);
 
     // Both Alice and Bob receive native copies and Perception stimuli from Sensei's message
     await vi.waitFor(() => {
@@ -1130,13 +1135,7 @@ describe("composition presence", () => {
       title: "Club",
     });
     expect(await h.messaging.getTyping("user:sensei")).toEqual([]);
-    await h.messaging.setTyping(
-      "alice",
-      "Alice",
-      result.sessionKey,
-      true,
-      "run-1",
-    );
+    await h.messaging.setTyping("alice", "Alice", result.sessionKey, true);
     expect(await h.messaging.getTyping("user:sensei")).toMatchObject([
       { chatId: result.chatId, senderId: "alice", isTyping: true },
     ]);
@@ -1147,10 +1146,9 @@ describe("composition presence", () => {
         "Carol",
         result.sessionKey.replace("agent:alice:", "agent:carol:"),
         true,
-        "run-c",
       ),
     ).rejects.toThrow("unavailable");
-    h.messaging.clearTyping("alice", "older-run");
+    h.messaging.clearTyping("alice", "group:elsewhere");
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     await h.send({ requestId: "reply", sessionKey: result.sessionKey });
     expect(await h.messaging.getTyping("bob")).toEqual([]);
@@ -1172,7 +1170,6 @@ describe("composition presence", () => {
       "Bob",
       result.sessionKey.replace("agent:alice:", "agent:bob:"),
       true,
-      "run-b",
     );
     await h.messaging.manageChat("alice", {
       sessionKey: result.sessionKey,
@@ -1183,16 +1180,9 @@ describe("composition presence", () => {
       (await h.messaging.getTyping("alice")).map((x) => x.senderId),
     ).not.toContain("bob");
     await expect(
-      h.messaging.setTyping(
-        "alice",
-        "Alice",
-        result.sessionKey,
-        true,
-        "old",
-        () => {
-          throw new Error("expired");
-        },
-      ),
+      h.messaging.setTyping("alice", "Alice", result.sessionKey, true, () => {
+        throw new Error("expired");
+      }),
     ).rejects.toThrow("expired");
     expect(
       (await h.messaging.getTyping("alice")).map((x) => x.senderId),
@@ -1396,6 +1386,89 @@ describe("paced speech", () => {
     expect(outbox.size).toBe(0);
   });
 
+  it("never lets another instance flush a plan still being said, or taken back", async () => {
+    // Live: another instance's outbox flush sent the bubbles an interrupted
+    // speaker was told "nobody saw", so the character said them twice.
+    const state = createMessagingState();
+    const turn = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      state,
+    );
+    const http = setup(
+      turn.retained,
+      turn.committed,
+      turn.chats,
+      turn.outbox,
+      undefined,
+      state,
+    );
+    turn.setSpeed(0.000_001);
+    const pending = turn.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["Wait...", "I told you not to go!", "What were you thinking?"]),
+    );
+    await vi.waitFor(() => expect(texts(turn.retained)).toEqual(["Wait..."]));
+    await http.messaging.resume();
+    expect(texts(turn.retained)).toEqual(["Wait..."]);
+    // Whichever instance serves the client or steers sees the speech.
+    expect(await http.messaging.getTyping()).toHaveLength(1);
+    expect(http.messaging.currentSpeech("alice")?.said).toEqual(["Wait..."]);
+    expect(http.messaging.interrupt("alice")).toBe(true);
+    expect(await pending).toMatchObject({
+      status: "interrupted",
+      unsaid: ["I told you not to go!", "What were you thinking?"],
+    });
+    await http.messaging.resume();
+    expect(texts(turn.retained)).toEqual(["Wait..."]);
+    expect(turn.outbox.size).toBe(0);
+  });
+
+  it("skips a plan taken back after the outbox was read", async () => {
+    const retained = new Map<string, MessageDelivery>();
+    const committed = new Map<string, { timestamp: number; text: string }>();
+    const chats = new Map<string, ChatConversation>();
+    const outbox = new Map<string, OutboxPlan>();
+    const first = setup(retained, committed, chats, outbox);
+    first.setSpeed(0.000_001);
+    const crashed = first.messaging
+      .speak("alice", "ALICE", speech(["Hi", "Are you free?", "Lunch?"]))
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(retained.size).toBe(1));
+    first.messaging.dispose();
+    await crashed;
+    // Read before the plan was deleted: the entries still list it.
+    const stale = [...outbox].map(([key, value]) => ({
+      key,
+      value,
+      createdAt: NOW,
+    }));
+    outbox.clear();
+    const next = setup(
+      retained,
+      committed,
+      chats,
+      outbox,
+      undefined,
+      undefined,
+      undefined,
+      {
+        outbox: {
+          lookup: async (key) => structuredClone(outbox.get(key)),
+          register: async () => {},
+          delete: async (key) => outbox.delete(key),
+          entries: async () => stale,
+        },
+      },
+    );
+    await next.messaging.resume();
+    expect(texts(retained)).toEqual(["Hi"]);
+  });
+
   it("says sends started together one after another, and stops them all on an interrupt", async () => {
     // Live: Kazusa spoke aloud and texted in one turn; the text cut off her
     // speech before a word of it was said.
@@ -1503,6 +1576,7 @@ describe("chats awaiting a reply", () => {
         title: null,
         memberCount: 2,
         lastSpokeAt: NOW,
+        joinedAt: null,
         unanswered: 2,
         waitingSince: NOW + 10 * 60_000,
       },
@@ -1711,41 +1785,52 @@ describe("huddles", () => {
     ).rejects.toThrow("You're on your way, so nobody is close enough to hear.");
   });
 
-  it("merges groups spoken across, moves on by address, and dissolves when all leave", async () => {
+  it("turns to people one move at a time: joins, splits off, never merges", async () => {
+    // Live, turning to one person merged both groups, and a huddle grew to 17.
     const h = setup();
     for (const who of ["alice", "bob", "carol", "dave", "erin"])
       h.places.set(who, "club");
-    const first = await aloud(
-      h,
-      "alice",
-      { members: ["bob"], aloud: true },
-      "one",
-    );
-    const address = `chat:huddle:${first.chatId.slice("huddle:".length)}`;
-    const other = await aloud(
+    const heard = (who: string, text: string) =>
+      vi.waitFor(() =>
+        expect(h.receive).toHaveBeenCalledWith(
+          who,
+          expect.objectContaining({ text: `[type=action] ${text}` }),
+        ),
+      );
+    const ab = await aloud(h, "alice", { members: ["bob"], aloud: true }, "ab");
+    const cd = await aloud(
       h,
       "carol",
       { members: ["dave"], aloud: true },
-      "two",
+      "cd",
     );
-    const otherAddress = `chat:huddle:${other.chatId.slice("huddle:".length)}`;
-    // Carol turns to Bob: her group and his become one conversation, and
-    // Alice, who was talking with Bob, hears it too.
-    const merged = await aloud(
+    // Carol turns to Bob: she walks over to his conversation, and Dave, left
+    // alone, is talking with nobody. Nothing merges.
+    const over = await aloud(
       h,
       "carol",
       { members: ["bob"], aloud: true },
-      "merge",
+      "over",
     );
-    expect(merged.chatId).toBe(other.chatId);
-    expect([...merged.recipients].sort()).toEqual(["alice", "bob", "dave"]);
-    expect(h.chats.get(first.chatId)).toMatchObject({
-      members: [],
-      mergedInto: other.chatId,
-    });
-    // A reply into the old address lands in the merged conversation.
-    const reply = await aloud(h, "alice", { sessionKey: address }, "reply");
-    expect(reply.chatId).toBe(other.chatId);
+    expect(over.chatId).toBe(ab.chatId);
+    expect([...over.recipients].sort()).toEqual(["alice", "bob"]);
+    expect(h.chats.get(cd.chatId)?.members).toEqual([]);
+    await heard("dave", "moves to another conversation");
+    // Dave, now on his own, calls Erin over: a new conversation.
+    const de = await aloud(h, "dave", { members: ["erin"], aloud: true }, "de");
+    expect(de.chatId).not.toBe(ab.chatId);
+
+    // Alice turns to Bob alone; Carol sees them turn. One left behind is
+    // talking with nobody, so the pair keeps the conversation and its address.
+    const side = await aloud(
+      h,
+      "alice",
+      { members: ["bob"], aloud: true },
+      "side",
+    );
+    expect(side.chatId).toBe(ab.chatId);
+    expect(h.chats.get(side.chatId)?.members).toEqual(["alice", "bob"]);
+    await heard("carol", "turns to talk with bob");
     // Speaking aloud again to people already in it goes on in it.
     const again = await aloud(
       h,
@@ -1753,39 +1838,37 @@ describe("huddles", () => {
       { members: ["alice"], aloud: true },
       "again",
     );
-    expect(again.chatId).toBe(other.chatId);
-    expect(await h.messaging.huddlesAt("club")).toEqual([
-      { address: otherAddress, members: ["alice", "bob", "carol", "dave"] },
-    ]);
+    expect(again.chatId).toBe(side.chatId);
 
-    // Erin, on her own, joins by speaking aloud to Dave.
-    await aloud(h, "erin", { members: ["dave"], aloud: true }, "erin");
-    expect(h.chats.get(other.chatId)?.members).toContain("erin");
+    // Nobody stands in two conversations at once.
+    await expect(
+      aloud(h, "carol", { members: ["alice", "dave"], aloud: true }, "both"),
+    ).rejects.toThrow("different conversations");
+    expect(await h.messaging.huddlesAt("club")).toHaveLength(2);
 
     await h.messaging.leavePlace("bob", "BOB", "club", {
       toward: "Main Gate",
       at: NOW,
     });
-    expect(h.chats.get(other.chatId)?.members).toEqual([
-      "alice",
-      "carol",
-      "dave",
-      "erin",
-    ]);
-    await vi.waitFor(() =>
-      expect(h.receive).toHaveBeenCalledWith(
-        "alice",
-        expect.objectContaining({
-          text: "[type=action] leaves, heading toward Main Gate",
-        }),
-      ),
-    );
+    await heard("alice", "leaves, heading toward Main Gate");
+    expect(h.chats.get(side.chatId)?.members).toEqual([]);
+
+    // Stepping back leaves the conversation without leaving the place.
+    const deAddress = `chat:huddle:${de.chatId.slice("huddle:".length)}`;
+    await aloud(h, "carol", { sessionKey: deAddress }, "join");
+    await h.messaging.manageChat("carol", {
+      action: "leave",
+      sessionKey: deAddress,
+    });
+    expect(h.chats.get(de.chatId)?.members).toEqual(["dave", "erin"]);
+    await heard("erin", "steps back from the conversation");
     await expect(
-      h.messaging.manageChat("alice", {
-        action: "leave",
-        sessionKey: otherAddress,
+      h.messaging.manageChat("dave", {
+        action: "rename",
+        sessionKey: deAddress,
+        title: "Ours",
       }),
-    ).rejects.toThrow("A conversation in person forms and ends on its own");
+    ).rejects.toThrow("can only be left");
   });
 
   it("moves to another conversation by its address, leaving the old one", async () => {
@@ -1819,7 +1902,143 @@ describe("huddles", () => {
         { sessionKey: `chat:huddle:${ab.chatId.slice("huddle:".length)}` },
         "late",
       ),
-    ).rejects.toThrow("That conversation is over.");
+    ).rejects.toThrow("That conversation is over");
+  });
+
+  it("turns to people here with talk, joining their conversation", async () => {
+    const h = setup();
+    h.places.set("alice", "club").set("bob", "club").set("carol", "club");
+    const theirs = await h.messaging.talk("bob", ["carol"]);
+    expect(theirs).toMatchObject({
+      kind: "huddle",
+      members: ["bob", "carol"],
+      sessionKey: expect.stringMatching(/^agent:bob:chat:huddle:[0-9a-z]{10}$/),
+    });
+    // Nothing is said until a send: talking to them only brings you over.
+    expect(h.retained.size).toBe(0);
+    const joined = await h.messaging.talk("alice", ["bob"]);
+    expect(joined.members).toEqual(["alice", "bob", "carol"]);
+    expect(joined.sessionKey).toBe(
+      theirs.sessionKey.replace("agent:bob:", "agent:alice:"),
+    );
+    h.places.set("dave", "street");
+    await expect(h.messaging.talk("alice", ["dave"])).rejects.toThrow();
+    await expect(h.messaging.talk("alice", ["alice"])).rejects.toThrow();
+  });
+
+  it("splits a side conversation off a bigger one, never taking a speaker", async () => {
+    const h = setup();
+    for (const who of ["alice", "bob", "carol", "dave", "erin"])
+      h.places.set(who, "club");
+    const table = await h.messaging.talk("alice", [
+      "bob",
+      "carol",
+      "dave",
+      "erin",
+    ]);
+    const address = table.sessionKey.replace("agent:alice:", "");
+    // Erin is in the middle of saying something to the whole table.
+    h.setSpeed(0.000_001);
+    const erin = h.messaging.speak("erin", "ERIN", {
+      requestId: "erin",
+      sessionKey: address,
+      messages: ["So anyway,", "the funniest part was the end."],
+    });
+    // Face to face her first line takes its speaking time before it is heard.
+    await vi.waitFor(() =>
+      expect(h.messaging.currentSpeech("erin")).toMatchObject({
+        sessionKey: `agent:erin:${address}`,
+        said: [],
+      }),
+    );
+    const side = await h.messaging.talk("alice", ["bob", "erin"]);
+    // Erin can't be turned away mid-sentence; Bob turns with Alice.
+    expect(side.members).toEqual(["alice", "bob"]);
+    expect(side.sessionKey).not.toBe(table.sessionKey);
+    const rest = [...h.chats.values()].find((chat) =>
+      table.sessionKey.endsWith(chat.id.slice("huddle:".length)),
+    );
+    expect(rest?.members).toEqual(["carol", "dave", "erin"]);
+    expect(h.messaging.interrupt("erin")).toBe(true);
+    await erin;
+  });
+
+  it("lets someone tune out of a conversation without a word", async () => {
+    const h = setup();
+    for (const who of ["alice", "bob", "carol"]) h.places.set(who, "club");
+    const lunch = await h.messaging.talk("alice", ["bob", "carol"]);
+    const lines = h.retained.size;
+    const address = lunch.sessionKey.replace("agent:alice:", "");
+    const left = await h.messaging.tuneOut("carol", address);
+    expect(left?.members).toEqual(["alice", "bob", "carol"]);
+    const chat = [...h.chats.values()].find((c) => c.kind === "huddle");
+    expect(chat?.members).toEqual(["alice", "bob"]);
+    // Drifting off isn't announced: nobody else is woken by it.
+    expect(h.retained.size).toBe(lines);
+    // Not in it any more, so nothing to leave.
+    expect(await h.messaging.tuneOut("carol", address)).toBeUndefined();
+    // One of a pair can't drift off unnoticed: the other is talking to them.
+    expect(await h.messaging.tuneOut("bob", address)).toBeUndefined();
+    expect(chat && h.chats.get(chat.id)?.members).toEqual(["alice", "bob"]);
+  });
+
+  it("starts a group with createGroup and nobody hears of it until a send", async () => {
+    const h = setup();
+    const group = await h.messaging.createGroup(
+      "alice",
+      ["bob", "carol"],
+      "Tea",
+    );
+    expect(group).toMatchObject({
+      kind: "group",
+      title: "Tea",
+      members: ["alice", "bob", "carol"],
+    });
+    expect(h.retained.size).toBe(0);
+    expect((await h.messaging.listChats("bob"))[0].title).toBe("Tea");
+    const direct = await h.messaging.createGroup("alice", ["bob"], "Ignored");
+    expect(direct.sessionKey).toBe("agent:alice:chat:direct:bob");
+  });
+
+  it("streams every instance's events to a client, past a reload", async () => {
+    // A client's stream listened on the instance that served it: a reply
+    // accepted on another, or after a reload disposed it, never reached it.
+    const state = createMessagingState();
+    const served = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      state,
+    );
+    const turn = setup(
+      served.retained,
+      undefined,
+      served.chats,
+      undefined,
+      undefined,
+      state,
+    );
+    const stream: string[] = [];
+    const own: string[] = [];
+    const unsubscribe = served.messaging.onAnyEvent((event) => {
+      stream.push(event.type);
+    });
+    served.messaging.onEvent((event) => {
+      own.push(event.type);
+    });
+    await turn.send();
+    expect(stream).toContain("message");
+    expect(own).toEqual([]);
+    served.messaging.dispose();
+    stream.length = 0;
+    await turn.send({ requestId: "after-reload", text: "Still there?" });
+    expect(stream).toContain("message");
+    unsubscribe();
+    stream.length = 0;
+    await turn.send({ requestId: "gone", text: "Bye" });
+    expect(stream).toEqual([]);
   });
 
   it("is one conversation for every instance sharing the process state", async () => {
@@ -1849,6 +2068,7 @@ describe("huddles", () => {
       text: "Hi!",
       requestId: "hi",
     });
+    expect(started.chatId).toMatch(/^huddle:[0-9a-z]{10}$/);
     await turn.messaging.leavePlace("bob", "BOB", "club", { at: NOW });
     expect(await http.messaging.huddlesAt("club")).toEqual([]);
     await expect(
@@ -1857,6 +2077,187 @@ describe("huddles", () => {
         text: "Still here?",
         requestId: "late",
       }),
-    ).rejects.toThrow("That conversation is over.");
+    ).rejects.toThrow("That conversation is over");
+  });
+});
+
+describe("the floor", () => {
+  /** Alice, Bob and Carol talking in the club, on a clock that runs. */
+  async function table(judgeSpeech?: MessagingDeps["judgeSpeech"]) {
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+      judgeSpeech ? { judgeSpeech } : {},
+    );
+    h.places.set("alice", "club").set("bob", "club").set("carol", "club");
+    const started = await h.send({
+      aloud: true,
+      members: ["bob", "carol"],
+      requestId: "start",
+      text: "Hi",
+    });
+    // So slow that only setNow moves time along.
+    h.setSpeed(0.000_001);
+    const sessionKey = `chat:huddle:${started.chatId.slice("huddle:".length)}`;
+    const say = (who: string, messages: string[], requestId = who) =>
+      h.messaging.speak(who, who.toUpperCase(), {
+        requestId,
+        sessionKey,
+        messages,
+      });
+    const lines = () =>
+      [...h.retained.values()]
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((delivery) => `${delivery.sender}: ${delivery.params.text}`);
+    const speaking = async (who: string) =>
+      await vi.waitFor(async () =>
+        expect(
+          (await h.messaging.getTyping()).map((event) => event.senderId),
+        ).toContain(who),
+      );
+    return { h, say, lines, speaking, started };
+  }
+
+  it("says even the first line in its speaking time, heard when it ends", async () => {
+    const { h, say, lines, speaking, started } = await table();
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    expect(lines()).toEqual(["alice: Hi"]);
+    // 19 letters at twelve a second: not yet heard a moment before.
+    h.setNow(NOW + 1_500);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(lines()).toEqual(["alice: Hi"]);
+    h.setNow(NOW + 1_583);
+    expect(await said).toMatchObject({ status: "delivered" });
+    const line = [...h.retained.values()].find(
+      (delivery) => delivery.params.text === "one two three four five",
+    );
+    expect(line!.timestamp - started.message.timestamp).toBe(1_583);
+  });
+
+  it("makes a second speaker wait for the floor, judging how badly they want in", async () => {
+    const judgeSpeech = vi.fn<NonNullable<MessagingDeps["judgeSpeech"]>>(
+      async () => ({ floor: "NEXT", pace: 1 }),
+    );
+    const { h, say, lines, speaking } = await table(judgeSpeech);
+    const alice = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    // Alone with the floor, only her pace was asked.
+    expect(judgeSpeech).toHaveBeenCalledExactlyOnceWith("alice", {
+      sessionKey: expect.stringMatching(/^agent:alice:chat:huddle:/u),
+    });
+    const bob = say("bob", ["Me too"]);
+    await vi.waitFor(() => expect(judgeSpeech).toHaveBeenCalledTimes(2));
+    expect(judgeSpeech).toHaveBeenLastCalledWith("bob", {
+      sessionKey: expect.stringMatching(/^agent:bob:chat:huddle:/u),
+      floor: { speaking: ["alice"], turn: "alice", waiting: 0 },
+    });
+    h.setNow(NOW + 2_000);
+    await alice;
+    await speaking("bob");
+    expect(lines()).toEqual(["alice: Hi", "alice: one two three four five"]);
+    h.setNow(NOW + 2_800);
+    await bob;
+    expect(lines()).toEqual([
+      "alice: Hi",
+      "alice: one two three four five",
+      "bob: Me too",
+    ]);
+  });
+
+  it("goes to the eager between a speaker's lines, and to the patient once they finish", async () => {
+    const judgeSpeech = vi.fn<NonNullable<MessagingDeps["judgeSpeech"]>>(
+      async (who) => ({ floor: who === "bob" ? "NEXT" : "WAIT", pace: 1 }),
+    );
+    const { h, say, lines, speaking } = await table(judgeSpeech);
+    const alice = say("alice", ["a a a a a", "A A A A A"]);
+    await speaking("alice");
+    const others = [say("carol", ["c c c c c"]), say("bob", ["b b b b b"])];
+    await vi.waitFor(() => expect(judgeSpeech).toHaveBeenCalledTimes(3));
+    for (const [at, who] of [
+      [2_000, "bob"],
+      [4_000, "alice"],
+      [6_000, "carol"],
+    ] as const) {
+      h.setNow(NOW + at);
+      await speaking(who);
+    }
+    h.setNow(NOW + 8_000);
+    await Promise.all([alice, ...others]);
+    expect(lines()).toEqual([
+      "alice: Hi",
+      "alice: a a a a a",
+      "bob: b b b b b",
+      "alice: A A A A A",
+      "carol: c c c c c",
+    ]);
+  });
+
+  it("lets a cut-in speak over the speaker, who is heard up to where a steer stops them", async () => {
+    const { h, say, lines, speaking } = await table(async () => ({
+      floor: "CUT_IN",
+      pace: 1,
+    }));
+    const alice = say("alice", [
+      "one two three four five six seven eight nine ten",
+      "And another thing",
+    ]);
+    await speaking("alice");
+    const bob = say("bob", ["No!"]);
+    await speaking("bob");
+    h.setNow(NOW + 400);
+    await bob;
+    expect(lines()).toEqual(["alice: Hi", "bob: No!"]);
+    h.setNow(NOW + 2_000);
+    expect(h.messaging.interrupt("alice")).toBe(true);
+    expect(await alice).toMatchObject({
+      status: "interrupted",
+      said: ["one two three four five six—"],
+      unsaid: [
+        "one two three four five six seven eight nine ten",
+        "And another thing",
+      ],
+    });
+    expect(lines()).toEqual([
+      "alice: Hi",
+      "bob: No!",
+      "alice: one two three four five six—",
+    ]);
+    expect(await h.messaging.getTyping()).toEqual([]);
+  });
+
+  it("says a line at the speaker's judged pace", async () => {
+    const { h, say, speaking, started } = await table(async () => ({
+      floor: "NEXT",
+      pace: 2,
+    }));
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    // Twice as fast: heard in half of 1,583 ms.
+    h.setNow(NOW + 792);
+    await said;
+    const line = [...h.retained.values()].find(
+      (delivery) => delivery.params.text === "one two three four five",
+    );
+    expect(line!.timestamp - started.message.timestamp).toBe(792);
+  });
+
+  it("drops a line stopped before its first word", async () => {
+    const { h, say, lines, speaking } = await table();
+    const alice = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    h.setNow(NOW + 100);
+    h.messaging.interrupt("alice");
+    expect(await alice).toMatchObject({
+      status: "interrupted",
+      said: [],
+      unsaid: ["one two three four five"],
+    });
+    expect(lines()).toEqual(["alice: Hi"]);
   });
 });

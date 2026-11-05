@@ -20,7 +20,8 @@ import {
   ObservedChatsResponseSchema,
 } from "@kazusa/client";
 import type { Messaging, MessageDelivery } from "./messaging.ts";
-import { registerMessaging } from "./register.ts";
+import type { ConversationSource } from "../perception/types.ts";
+import { registerMessaging, speechReply } from "./register.ts";
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
   appendSessionTranscriptMessageByIdentityStrict: vi.fn(),
@@ -33,9 +34,16 @@ const append = vi.mocked(appendSessionTranscriptMessageByIdentityStrict);
 
 async function setup(
   pluginConfig: Record<string, unknown> = {},
-  options: Pick<
-    Parameters<typeof registerMessaging>[1],
-    "release" | "observer" | "broadcaster"
+  options: Partial<
+    Pick<
+      Parameters<typeof registerMessaging>[1],
+      | "release"
+      | "observer"
+      | "broadcaster"
+      | "perception"
+      | "placeOf"
+      | "appendLedger"
+    >
   > = {},
 ) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "kazusa-message-"));
@@ -167,13 +175,30 @@ async function setup(
       .execute(toolCallId, input);
   const execute = (
     input: unknown = {
-      members: ["bob"],
+      sessionKey: "chat:direct:bob",
       messages: ["Hello Bob"],
     },
     overrides: Partial<OpenClawPluginToolContext<2>> = {},
   ) => executeTool("send_message", input, overrides);
+  /** Start a group of Alice, Bob and Carol, then say something in it. */
+  const inGroup = async (
+    title: string,
+    messages: unknown[],
+    overrides: Partial<OpenClawPluginToolContext<2>> = {},
+  ) => {
+    const group = await executeTool(
+      "create_group",
+      { members: ["bob", "carol"], title },
+      overrides,
+    );
+    return execute(
+      { sessionKey: group.details.sessionKey, messages },
+      overrides,
+    );
+  };
   return {
     execute,
+    inGroup,
     executeTool,
     entries,
     chats,
@@ -230,11 +255,7 @@ describe("send_message SDK integration", () => {
         defaults: { systemAgent: { agentId: "alice" } },
       },
     });
-    const sent = await h.execute({
-      members: ["bob"],
-      title: "Console",
-      messages: ["Ready"],
-    });
+    const sent = await h.inGroup("Console", ["Ready"]);
     await h.executeTool("manage_chat", {
       action: "rename",
       sessionKey: sent.details.sessionKey,
@@ -246,7 +267,7 @@ describe("send_message SDK integration", () => {
     });
     const peer = h
       .execute(
-        { members: ["alice"], messages: ["Waiting"] },
+        { sessionKey: "chat:direct:alice", messages: ["Waiting"] },
         {
           agentId: "bob",
           sessionKey: "agent:bob:brain",
@@ -264,7 +285,11 @@ describe("send_message SDK integration", () => {
   });
   it("accepts new sends when the same tool instance receives a reused provider call ID", async () => {
     const h = await setup();
-    const input = { members: ["bob"], title: "Tea", messages: ["Hello"] };
+    const group = await h.executeTool("create_group", {
+      members: ["bob", "carol"],
+      title: "Tea",
+    });
+    const input = { sessionKey: group.details.sessionKey, messages: ["Hello"] };
     const tool = h.registerTool.mock.calls[0][0].create({
       agentId: "alice",
       sessionKey: "agent:alice:brain",
@@ -287,13 +312,95 @@ describe("send_message SDK integration", () => {
         repeated.details.messageIds[0],
       ]).size,
     ).toBe(3);
-    expect(append).toHaveBeenCalledTimes(6);
-    expect(h.chats.size).toBe(3);
+    expect(append).toHaveBeenCalledTimes(9);
+    expect(h.chats.size).toBe(1);
+  });
+
+  it("notes in their own records that they stopped following a conversation", async () => {
+    let source: ConversationSource | undefined;
+    const appendLedger = vi.fn(async () => {});
+    const h = await setup(
+      {},
+      {
+        perception: {
+          receive: vi.fn(async () => {}),
+          attachConversations: (attached) => {
+            source = attached;
+          },
+        },
+        placeOf: async () => ({ placeId: "club", title: "Club" }),
+        appendLedger,
+      },
+    );
+    const lunch = await h.messaging.talk("alice", ["bob", "carol"]);
+    const address = lunch.sessionKey.replace("agent:alice:", "");
+    await source?.tuneOut("carol", address);
+    expect(appendLedger).toHaveBeenCalledOnce();
+    const [[note]] = appendLedger.mock.calls as unknown as [
+      [{ agentId: string; stream: string; text: string; timestamp: number }],
+    ];
+    expect(note).toMatchObject({
+      agentId: "carol",
+      stream: "tasks",
+      timestamp: 123456,
+    });
+    // As the skill words it (wrapped lines and all).
+    expect(note.text.replace(/\s+/g, " ")).toBe(
+      `You stopped following the conversation with Alice Lin and bob (${address}) and no longer hear it.`,
+    );
+    // Out of it already: nothing to leave, nothing to note.
+    await source?.tuneOut("carol", address);
+    expect(appendLedger).toHaveBeenCalledOnce();
+  });
+
+  it("tells a character whether its words went out, never the words again", async () => {
+    const h = await setup();
+    const text = (result: { content: { text: string }[] }) =>
+      JSON.parse(result.content[0].text);
+    const group = await h.executeTool("create_group", {
+      members: ["bob", "carol"],
+      title: "Tea",
+    });
+    expect(text(group)).toEqual({
+      sessionKey: expect.stringMatching(/^chat:group:[0-9a-z]{10}$/),
+      title: "Tea",
+      members: ["alice", "bob", "carol"],
+    });
+    expect(
+      text(
+        await h.execute({
+          sessionKey: text(group).sessionKey,
+          messages: ["Hi"],
+        }),
+      ),
+    ).toEqual({ status: "delivered" });
+    // Live: an interrupted send repeated every word in `said` and `unsaid`.
+    const cut = {
+      status: "interrupted" as const,
+      sessionKey: "agent:alice:chat:huddle:abc",
+      recipients: ["bob"],
+      messageIds: ["1", "2"],
+      said: ["Wait...", "I told you n—"],
+      unsaid: ["I told you not to go!", "Why?"],
+      heard: "I told you n—",
+    };
+    expect(speechReply(cut)).toEqual({
+      status: "interrupted",
+      said: 1,
+      of: 3,
+      heard: "I told you n—",
+    });
+    const { heard: _heard, ...whole } = cut;
+    expect(speechReply({ ...whole, said: ["Wait..."] })).toEqual({
+      status: "interrupted",
+      said: 1,
+      of: 3,
+    });
   });
 
   it("owns send identity without requiring a brain UUID or model-supplied ID", async () => {
     const h = await setup();
-    const input = { members: ["bob"], messages: ["Hello"] };
+    const input = { sessionKey: "chat:direct:bob", messages: ["Hello"] };
     const result = await h.execute(input, { sessionId: undefined });
     expect(result.details.status).toBe("delivered");
     expect(result.details).not.toHaveProperty("requestId");
@@ -335,7 +442,7 @@ describe("send_message SDK integration", () => {
     expect(picker.description).toContain("maid: a maid dress");
 
     const sent = await h.execute({
-      members: ["bob"],
+      sessionKey: "chat:direct:bob",
       messages: [
         "So funny",
         { sticker: "laughing" },
@@ -355,14 +462,17 @@ describe("send_message SDK integration", () => {
       sticker: { name: "maid-happy", v: expect.stringMatching(/^[a-z0-9]+$/) },
     });
     await expect(
-      h.execute({ members: ["bob"], messages: [{ sticker: "crying" }] }),
+      h.execute({
+        sessionKey: "chat:direct:bob",
+        messages: [{ sticker: "crying" }],
+      }),
     ).rejects.toThrow();
 
     // One added while running is offered and sendable on the next turn.
     await writeFile(path.join(dir, "crying.webp"), "RIFF");
     expect(JSON.stringify(tool().parameters)).toContain('"crying"');
     const cried = await h.execute({
-      members: ["bob"],
+      sessionKey: "chat:direct:bob",
       messages: [{ sticker: "crying" }],
     });
     expect(cried.details.said).toEqual(["[type=sticker] Alice Lin, crying"]);
@@ -376,7 +486,7 @@ describe("send_message SDK integration", () => {
     expect(maxItems(await setup({ messaging: { maxBubbles: 3 } }))).toBe(3);
     await expect(
       (await setup({ messaging: { maxBubbles: 3 } })).execute({
-        members: ["bob"],
+        sessionKey: "chat:direct:bob",
         messages: ["a", "b", "c", "d"],
       }),
     ).rejects.toThrow();
@@ -385,13 +495,15 @@ describe("send_message SDK integration", () => {
   it("registers discovery, send and group management as guarded tools", async () => {
     const h = await setup();
     expect(h.registerTool.mock.calls[0][1]).toEqual({
-      names: ["send_message", "list_chats", "manage_chat"],
+      names: [
+        "send_message",
+        "create_group",
+        "talk",
+        "list_chats",
+        "manage_chat",
+      ],
     });
-    const first = await h.execute({
-      title: "Tea",
-      members: ["bob"],
-      messages: ["Hello"],
-    });
+    const first = await h.inGroup("Tea", ["Hello"]);
     const bob = { agentId: "bob", sessionKey: "agent:bob:brain" };
     const found = await h.executeTool("list_chats", { query: "tea" }, bob);
     const sessionKey = found.details.chats[0].sessionKey;
@@ -401,11 +513,6 @@ describe("send_message SDK integration", () => {
     await h.executeTool(
       "manage_chat",
       { action: "rename", sessionKey, title: "Lunch" },
-      bob,
-    );
-    await h.executeTool(
-      "manage_chat",
-      { action: "add_members", sessionKey, members: ["carol"] },
       bob,
     );
     expect([...h.entries.values()]).toHaveLength(3);
@@ -419,8 +526,8 @@ describe("send_message SDK integration", () => {
         ([params]) => params.preserveActivity,
       ),
     ).toBe(true);
-    // "Hello" to two, Bob's rename line to two, his line adding Carol to three.
-    expect(append).toHaveBeenCalledTimes(7);
+    // "Hello" and Bob's rename line, each to all three.
+    expect(append).toHaveBeenCalledTimes(6);
     vi.spyOn(h.api.runtime.agent, "resolveAgentIdentity").mockReturnValue({
       name: "Bob",
     });
@@ -431,18 +538,14 @@ describe("send_message SDK integration", () => {
     expect(reply.details.recipients).toEqual(["alice", "carol"]);
     expect(
       append.mock.calls
-        .slice(7)
+        .slice(6)
         .map(([params]) => params.message.__openclaw?.senderId),
     ).toEqual(["bob", "bob", "bob"]);
   });
 
   it("rejects invalid management arguments, unknown additions and expired membership edits", async () => {
     const h = await setup();
-    const first = await h.execute({
-      title: "Tea",
-      members: ["bob"],
-      messages: ["Hello"],
-    });
+    const first = await h.inGroup("Tea", ["Hello"]);
     const sessionKey = first.details.sessionKey;
     await expect(
       h.executeTool("manage_chat", { action: "rename", sessionKey }),
@@ -473,12 +576,15 @@ describe("send_message SDK integration", () => {
       ),
     ).rejects.toThrow("expired");
     expect((await h.executeTool("list_chats", {})).details.chats).toEqual([
-      expect.objectContaining({ title: "Tea", members: ["alice", "bob"] }),
+      expect.objectContaining({
+        title: "Tea",
+        members: ["alice", "bob", "carol"],
+      }),
     ]);
     await expect(
       h.executeTool("list_chats", {}, { sessionKey: "agent:bob:brain" }),
     ).rejects.toThrow("brain");
-    expect(append).toHaveBeenCalledTimes(2);
+    expect(append).toHaveBeenCalledTimes(3);
   });
 
   it("writes native sender metadata, one text block, stable keys, and real-time session bookkeeping", async () => {
@@ -532,13 +638,13 @@ describe("send_message SDK integration", () => {
     const h = await setup();
     await expect(
       h.execute({
-        members: ["bob"],
+        sessionKey: "chat:direct:bob",
         messages: ["Hi"],
         sender: "carol",
       }),
     ).rejects.toThrow();
     await expect(
-      h.execute({ members: ["missing"], messages: ["Hi"] }),
+      h.execute({ sessionKey: "chat:direct:missing", messages: ["Hi"] }),
     ).rejects.toThrow("Unknown character");
     expect(append).not.toHaveBeenCalled();
   });
@@ -605,8 +711,10 @@ describe("send_message SDK integration", () => {
         data: { phase },
       });
     expect(await h.messaging.getTyping("bob")).toEqual([]);
+    // A delivery's id is a hash of its stimuli, never the run's id: live, the
+    // run's start cleared typing set moments before by its own adoption.
     await h.adopt({
-      id: "run-1",
+      id: "delivery-hash",
       agentId: "alice",
       mode: "followup",
       message: "Hello",
@@ -617,10 +725,30 @@ describe("send_message SDK integration", () => {
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     event("start", "run-1");
     expect(await h.messaging.getTyping("bob")).toHaveLength(1);
-    event("end", "old-run");
-    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
     event("error", "run-1");
     expect(await h.messaging.getTyping("bob")).toEqual([]);
+  });
+
+  it("shows no typing face to face while someone only thinks about replying", async () => {
+    // Face to face, typing shows someone saying a line.
+    const h = await setup(
+      {},
+      { placeOf: async () => ({ placeId: "club", title: "Club" }) },
+    );
+    await h.execute();
+    const club = await h.messaging.talk("alice", ["bob"]);
+    await h.adopt({
+      id: "delivery-both",
+      agentId: "alice",
+      mode: "followup",
+      message: "Hello",
+      ids: ["msg-1"],
+      keys: ["key-1"],
+      sessionKeys: [club.sessionKey, "agent:alice:chat:direct:bob"],
+    });
+    expect(
+      (await h.messaging.getTyping("bob")).map((typing) => typing.chatId),
+    ).toEqual([expect.stringMatching(/^direct:/)]);
   });
 
   it("forwards what happens in others' chats to observers, wrapped as observed", async () => {

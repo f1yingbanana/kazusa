@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
 import { STICKER_NAME } from "../stickers/stickers.ts";
 
@@ -95,7 +95,9 @@ const MAX_BUBBLES = 32;
 /**
  * The `send_message` tool's arguments, with at most `maxBubbles` bubbles. A
  * character with stickers may also pick one of `stickers` by name; `about` is
- * that field's description.
+ * that field's description. It only ever says something somewhere: a chat is
+ * started by `create_group` or `talk`, so the address is always required (an
+ * optional one was left out on 41% of follow-up sends, 2026-11-05).
  */
 export const sendMessageSchema = (
   maxBubbles: number,
@@ -109,9 +111,10 @@ export const sendMessageSchema = (
         z.strictObject({ sticker: z.enum([first, ...rest]).describe(about) }),
       ])
     : BUBBLE;
-  return CHAT_TARGET.extend({
+  return z.strictObject({
+    sessionKey: CHAT_SESSION,
     messages: z.array(bubble).min(1).max(maxBubbles),
-  }).refine(...HAS_TARGET);
+  });
 };
 /** A paced multi-bubble send; the host adapter supplies its identity. */
 export const SPEECH_REQUEST = CHAT_TARGET.extend({
@@ -166,6 +169,14 @@ export const DELIVERY = MESSAGE.extend({
   });
 export type SendMessageParams = z.infer<typeof DELIVERY>;
 
+/** `create_group`: a text chat with others; one other is your direct chat. */
+export const CREATE_GROUP = z.strictObject({
+  members: MEMBERS,
+  title: TITLE.optional(),
+});
+/** `talk`: turn to people where you are and join their conversation. */
+export const TALK = z.strictObject({ members: MEMBERS });
+
 export const LIST_CHATS = z.strictObject({
   query: z.string().trim().min(1).max(256).optional(),
 });
@@ -215,10 +226,11 @@ export interface ChatConversation {
   /** A huddle merged into another (by speaking aloud across groups). */
   readonly mergedInto?: string;
   /**
-   * Detect conflicting retries of a group creation before its first send
-   * commits.
+   * A huddle's members, by when they last joined it (sim time): someone's
+   * silence there counts from joining, not from before they left and came
+   * back.
    */
-  readonly creationFingerprint?: string;
+  readonly joinedAt?: Readonly<Record<string, number>>;
   readonly needsProjection: boolean;
 }
 
@@ -235,6 +247,19 @@ export interface ChatSummary {
 /** Stable identities scope send retries and canonical direct conversations. */
 export function messagingId(parts: readonly string[]): string {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+}
+
+const CHAT_ID_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * A new group's or huddle's id. Characters copy it into every reply, so it is
+ * short: a 64-character hash cost tokens and was miscopied (2026-11-05).
+ */
+export function newChatId(): string {
+  return Array.from(
+    { length: 10 },
+    () => CHAT_ID_CHARS[randomInt(CHAT_ID_CHARS.length)],
+  ).join("");
 }
 
 export interface ParsedChatSession {
@@ -280,6 +305,17 @@ export function conversationId(
   return parsed.kind === "direct"
     ? `direct:${messagingId([participantId, parsed.peerOrGroupId].sort())}`
     : `${parsed.kind}:${parsed.peerOrGroupId}`;
+}
+
+/**
+ * The address a character writes: their ledger key without `agent:<id>:`, which
+ * only costs tokens (the tools accept either).
+ */
+export function chatAddress(sessionKey: string): string {
+  return sessionKey.replace(
+    /^agent:(?:user:)?[a-z0-9][a-z0-9_-]*:(?=chat:)/,
+    "",
+  );
 }
 
 /** The shorthand address of a huddle, the same for everyone. */

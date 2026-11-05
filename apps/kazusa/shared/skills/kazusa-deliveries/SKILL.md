@@ -22,6 +22,11 @@ Say you don't know or don't remember, with no details, no guess, no 'probably'
 or 'I think'. Feelings, tastes, opinions and imagination are free and need no
 source.)
 
+## tuned-out
+
+You stopped following the conversation with {people} ({address}) and no longer
+hear it.
+
 ## check-in
 
 Activity check-in: your {type} activity was planned to end at {time}. {note}

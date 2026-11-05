@@ -55,14 +55,15 @@ per language), so code names the wording and a skill holds it:
 - Guidance goes in the skills the context engine injects (`context-conventions`,
   `task-lifecycle`, `task-interrupt`, `in-person`), said once.
 - Code that must emit text names one section of a skill:
-  `text("kazusa-results#already-said", { who }, { agentId })` (`skill-text.ts`).
-  `kazusa-tools` words every character tool and field (`describeTool` in the
-  tool factory, `## <tool>.<field>`; what code puts in a field's description is
-  `{data}`), `kazusa-results` refusals (facts only; what to do is the other
-  skills' to say), `kazusa-deliveries` check-ins and the closing reminder. Each
-  section resolves on its own along the skill precedence, so an override (a
-  workspace's `skills/`, a world's `shared/skills`) holds only the sections it
-  changes. Reads are synchronous and cached until `refresh_skills`.
+  `text("kazusa-results#aloud-not-here", { who }, { agentId })`
+  (`skill-text.ts`). `kazusa-tools` words every character tool and field
+  (`describeTool` in the tool factory, `## <tool>.<field>`; what code puts in a
+  field's description is `{data}`), `kazusa-results` refusals (facts only; what
+  to do is the other skills' to say), `kazusa-deliveries` check-ins and the
+  closing reminder. Each section resolves on its own along the skill precedence,
+  so an override (a workspace's `skills/`, a world's `shared/skills`) holds only
+  the sections it changes. Reads are synchronous and cached until
+  `refresh_skills`.
 - Formats carry as few words as possible, ideally none: a delivery is the sim
   stamp then `- [sender time] (chat:...): text` lines, `- [time] text` for what
   is seen, check-ins and the reminder from `kazusa-deliveries`. The skills
@@ -171,7 +172,11 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      bubbles and delivers them one by one at simulated typing speed while the
      tool call stays open. A `STEER` aborts the rest; unsent bubbles never reach
      any ledger, and the tool result tells the brain what was and was not said.
-     See `references/messaging.md` (Paced speech).
+     See `references/messaging.md` (Paced speech). Face to face, every spoken
+     line takes its speaking time (per writing system, at a pace Jev judges per
+     send) and waits for the huddle's one floor; Jev's `floor` question decides
+     how badly a speaker wants in (`CUT_IN`, `NEXT`, `WAIT`), and a line stopped
+     mid-way is heard up to where it got. See `references/floor.md`.
    - **No Generative Rewriting & Zero Prompt Injections**: Jev is a
      non-generative classifier with categorical choices. Admitted stimuli pass
      through verbatim to the `:brain` session without hallucination or
@@ -393,22 +398,23 @@ cross-plugin service boundaries or split these into separate packages. Keep
 their internal responsibilities decoupled; callbacks and direct references
 connect these modules in process.
 
-- **One world per process, many registrations**: OpenClaw can call `register()`
-  more than once in one Gateway process. An agent turn without an unambiguous
-  owner gets its own plugin instance beside the one serving HTTP, and tools,
-  hooks and the context engine run on that instance. Anything that must be one
+- **One world per process**: since characters share the Gateway's registry (see
+  OpenClaw Runtime Pitfalls), one Kazusa instance serves HTTP and every turn.
+  OpenClaw can still call `register()` again: a plugin reload starts a new
+  generation beside a retiring one, and a turn whose model's provider plugin did
+  not start with the Gateway loads its own registry. Anything that must be one
   value per world lives in a process-wide cell on `globalThis` under a
   `Symbol.for("kazusa.*")` key: the clock cell (`clock/register.ts`), the
   realtime broadcaster and journal sequence (`realtime.ts`), Taskman's cron
   automation hook (`taskman/register.ts`), the idle supervisor's tick
   (`taskman/supervisor.ts`), Messaging's conversations, active deliveries and
-  queue (`messaging/register.ts`), and Perception's per-character lock
-  (`perception/register.ts`). Each is injected, so tests get their own.
-  Duplicate tool results, a second idle check-in, and huddles that kept a
-  character after they left were all one instance not seeing the other's state.
-  Per-instance state silently diverges: before this, a client pause reached only
-  the HTTP instance, while the turn instance kept time running and persisted
-  over it. Listeners on the shared clock are shared too, so register
+  queue, speech and typing (`messaging/register.ts`), and Perception's
+  per-character lock (`perception/register.ts`). Each is injected, so tests get
+  their own. Duplicate tool results, a second idle check-in, and huddles that
+  kept a character after they left were all one instance not seeing the other's
+  state. Per-instance state silently diverges: before this, a client pause
+  reached only the HTTP instance, while the turn instance kept time running and
+  persisted over it. Listeners on the shared clock are shared too, so register
   process-wide side effects once (`forwardClockOnce`). Durable state still
   belongs in keyed stores.
 - **Timers keep their creator's async context**: a `setTimeout` armed inside a
@@ -422,15 +428,16 @@ connect these modules in process.
   while the clock is stopped (`drainState` returns early; `resume()` runs on the
   clock's restart, from a listener owned by the first registration: a per-turn
   registration has no decision runtime). `start_task`, `delay_task`,
-  `send_message` and `manage_chat` wait in `untilRunning` before acting, and the
-  typing gap between bubbles waits in `sleepSim` instead of sending the rest at
-  once. A turn already generating finishes its model call and then holds at its
-  next tool call. Live, before this, a paused four-person meeting ran a hundred
-  bubbles at one sim instant. **Stopping while paused**: `shutdownSignal()`
-  (`src/shutdown.ts`, one per process) aborts on SIGINT/SIGTERM or a handoff
-  refused with `GatewayDrainingError`; every frozen wait lets go, so the turn
-  finishes at the paused moment (bubbles said at once) and the Gateway drains
-  cleanly instead of timing out a held turn into a tombstone.
+  `send_message`, `create_group`, `talk` and `manage_chat` wait in
+  `untilRunning` before acting, and the typing gap between bubbles waits in
+  `sleepSim` instead of sending the rest at once. A turn already generating
+  finishes its model call and then holds at its next tool call. Live, before
+  this, a paused four-person meeting ran a hundred bubbles at one sim instant.
+  **Stopping while paused**: `shutdownSignal()` (`src/shutdown.ts`, one per
+  process) aborts on SIGINT/SIGTERM or a handoff refused with
+  `GatewayDrainingError`; every frozen wait lets go, so the turn finishes at the
+  paused moment (bubbles said at once) and the Gateway drains cleanly instead of
+  timing out a held turn into a tombstone.
 - **One speaker, one thing at a time.** A character's sends queue one after
   another (parallel tool calls in one turn included); `interrupt()` stops the
   one being said and any waiting. Live, a text started alongside a speech
@@ -702,18 +709,21 @@ connect these modules in process.
 - Messaging owns retained `"chats"` membership and permanent canonical
   `"messaging"` records. Native agent chat sessions are private projections;
   human clients read canonical history filtered by frozen message audience.
-  `send_message` targets an address or starts a chat with its first message;
-  `list_chats` discovers memberships; any current member can `manage_chat`.
-  **Huddles** (`kind: "huddle"`, `chat:huddle:<id>`, with a `placeId`) are
-  face-to-face conversations, many at a place at once. `send_message` with
-  `members` and `aloud: true` speaks to people at the sender's place (Messaging
-  asks Location's `placeOf`): it speaking aloud brings the people addressed, and
-  anyone they are talking with, into the speaker's huddle (groups merge; a
-  merged huddle keeps `mergedInto` so replies to its old address land in the new
-  one), or joins theirs, or starts one. Speaking into a huddle's address at its
-  place walks over to it and leaves the speaker's other one. Walking away
-  (`leavePlace`, called by Location) leaves every huddle there with a line to
-  those still in it (moving to another huddle posts
+  `send_message` says something at an address (`sessionKey` is required);
+  `create_group` starts a text group and `talk` a face-to-face conversation,
+  each returning the address; `list_chats` discovers memberships; any current
+  member can `manage_chat`. **Huddles** (`kind: "huddle"`, `chat:huddle:<id>`,
+  with a `placeId`) are face-to-face conversations, many at a place at once.
+  `talk` turns to people at the sender's place (Messaging asks Location's
+  `placeOf`) one person's move at a time, and huddles never merge: to people in
+  another huddle, the speaker walks over to it; to some of the speaker's own, a
+  side conversation splits off (`*turns to talk with …*` to the rest); to people
+  in none, they join the speaker's, or one starts. People in two huddles at once
+  are refused (`kazusa-results#aloud-apart`). Older merged huddles keep
+  `mergedInto`, so replies to an old address land in the new one. Speaking into
+  a huddle's address at its place walks over to it and leaves the speaker's
+  other one. Walking away (`leavePlace`, called by Location) leaves every huddle
+  there with a line to those still in it (moving to another huddle posts
   `*moves to another conversation*`); with fewer than two left it dissolves.
   Every `manage_chat` change is posted to the group in the actor's voice
   (`*adds Natsu to the chat*`), to those going before they go and those coming
@@ -721,11 +731,12 @@ connect these modules in process.
   person, no name), kept only face to face and dropped silently in text chats;
   stored plain with its `type` for the client, read by characters as `*text*`.
   System lines are actions. `messaging.maxBubbles` (default 9) caps a send.
-  `manage_chat` refuses huddles; speaking to one you are not at fails in-world.
-  Humans have no brain or native agent session. Shared acceptance fans human
-  messages out to agent members before Perception. The `apps/web` prototype and
-  Gateway HTTP adapter still need contract/authentication alignment. Native
-  WebChat group posting is unsupported. Raw session tools remain denied via
+  `manage_chat` only `leave`s a huddle (`*steps back from the conversation*`,
+  still at the place); speaking to one you are not at fails in-world. Humans
+  have no brain or native agent session. Shared acceptance fans human messages
+  out to agent members before Perception. The `apps/web` prototype and Gateway
+  HTTP adapter still need contract/authentication alignment. Native WebChat
+  group posting is unsupported. Raw session tools remain denied via
   `tools.deny: ["group:sessions", "message"]` (see Character Tool Surface in
   §4). See [messaging](references/messaging.md) for canonical storage and
   [the client reference](references/client.md) for UI requirements, current gaps
@@ -1148,21 +1159,22 @@ connect these modules in process.
 
 - **Character Tool Surface (`tools.profile` + `tools.alsoAllow`)**: characters
   inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
-  `send_message`, `list_chats`, `manage_chat`, `recall`, `look_up`, `remember`,
-  `view_image`, `skills_read`. Memory goes through tools, not files; ARONA keeps
-  file access. **Character skills**: `agents.defaults.skills` is every skill in
-  `skills.load.extraDirs` (the world's `shared/skills`, then the defaults) but
-  the engine's own seven, which the context engine injects itself; bundled and
-  repo skills (`kazusa`, `typescript`, …) stay hidden. `src/skills/` keeps that
-  list: on `gateway_start`, and when ARONA runs `refresh_skills` after writing a
-  skill. With `skills.load.watch: false` nothing else reloads skills: OpenClaw
-  rebuilds a session's skill snapshot from disk only when its allowlist changes
-  (bodies are read on use; descriptions wait for a rebuild), and our loaders
-  cache until `clearSkillCaches()`. The repo's `.agents/skills` reach ARONA
-  through her workspace symlink, not `extraDirs`. `tools.deny` keeps
-  `group:sessions`, `message`, and `gateway` (the updater included in
-  `minimal`). `tools.exec.applyPatch.enabled: false` prevents implicit patch
-  access from `write`; ARONA explicitly enables it in her native exec override.
+  `send_message`, `create_group`, `talk`, `list_chats`, `manage_chat`, `recall`,
+  `look_up`, `remember`, `view_image`, `skills_read`. Memory goes through tools,
+  not files; ARONA keeps file access. **Character skills**:
+  `agents.defaults.skills` is every skill in `skills.load.extraDirs` (the
+  world's `shared/skills`, then the defaults) but the engine's own seven, which
+  the context engine injects itself; bundled and repo skills (`kazusa`,
+  `typescript`, …) stay hidden. `src/skills/` keeps that list: on
+  `gateway_start`, and when ARONA runs `refresh_skills` after writing a skill.
+  With `skills.load.watch: false` nothing else reloads skills: OpenClaw rebuilds
+  a session's skill snapshot from disk only when its allowlist changes (bodies
+  are read on use; descriptions wait for a rebuild), and our loaders cache until
+  `clearSkillCaches()`. The repo's `.agents/skills` reach ARONA through her
+  workspace symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`,
+  `message`, and `gateway` (the updater included in `minimal`).
+  `tools.exec.applyPatch.enabled: false` prevents implicit patch access from
+  `write`; ARONA explicitly enables it in her native exec override.
   `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
   tools cost more than they save, and models route calls through its generic
   `tool_call`. `tools.codeMode.enabled: false` for the same reason: models whose
@@ -1192,29 +1204,30 @@ connect these modules in process.
   Characters stay on `minimal` with an explicit `alsoAllow`, so a new tool
   reaches none of them unless it is listed there. Her runs have their own limits
   (`perception.systemAgent`). For every character, near the limits only
-  `send_message` still runs, so a run can report before it ends. Shell
-  execution, code execution and `openclaw` delegation are denied; native `cwd`
-  selects `apps/kazusa` for coding while identity/memory remain in her character
-  workspace. File tools enforce that coding directory. Its `.agents` workspace
-  symlink exposes these architecture guides without adding a workspace-root
-  `AGENTS.md`. Use native `skills_read` for complete installed guides; ordinary
-  file reads through an escaping symlink remain blocked. Perception admits its
-  input immediately, even paused; Messaging uses wall-time pacing, and its
-  message, chat-management and task tools skip the pause wait. Simulation time,
-  task deadlines and ordinary characters remain frozen. Offstage and custody
-  gates still apply. How she works is in her `SOUL.md`; the common jobs
-  (characters, wikis, places) are the `world-building` skill, and whole worlds
-  are `world-project`. Both live in `.agents/skills/`, so coding agents working
-  in this repo get them as well as every world's system agent, who selects them
-  by her per-agent `skills` in `worlds/base.json`. Long jobs survive the run
-  limits through a project file and `continue_work`, which starts a fresh run
-  once this one ends (`perception/continue.ts`), up to
-  `perception.systemAgent.maxContinuations` runs without the user speaking.
-  Retained consumers use the host-injected `api.runtime.config.current()` rather
-  than retaining `api.config` for live agent/identity/workspace lookups.
-  Character and agent roster responses expose `isSystemAgent` from that
-  snapshot; the client renders it as `ADMIN` in World rows and direct-chat rows.
-  Never infer administrator status from a name or biography.
+  `send_message`, `talk`, `create_group` and `continue_work` still run, so a run
+  can report before it ends. Shell execution, code execution and `openclaw`
+  delegation are denied; native `cwd` selects `apps/kazusa` for coding while
+  identity/memory remain in her character workspace. File tools enforce that
+  coding directory. Its `.agents` workspace symlink exposes these architecture
+  guides without adding a workspace-root `AGENTS.md`. Use native `skills_read`
+  for complete installed guides; ordinary file reads through an escaping symlink
+  remain blocked. Perception admits its input immediately, even paused;
+  Messaging uses wall-time pacing, and its message, chat-management and task
+  tools skip the pause wait. Simulation time, task deadlines and ordinary
+  characters remain frozen. Offstage and custody gates still apply. How she
+  works is in her `SOUL.md`; the common jobs (characters, wikis, places) are the
+  `world-building` skill, and whole worlds are `world-project`. Both live in
+  `.agents/skills/`, so coding agents working in this repo get them as well as
+  every world's system agent, who selects them by her per-agent `skills` in
+  `worlds/base.json`. Long jobs survive the run limits through a project file
+  and `continue_work`, which starts a fresh run once this one ends
+  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
+  runs without the user speaking. Retained consumers use the host-injected
+  `api.runtime.config.current()` rather than retaining `api.config` for live
+  agent/identity/workspace lookups. Character and agent roster responses expose
+  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
+  rows and direct-chat rows. Never infer administrator status from a name or
+  biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from
@@ -1333,6 +1346,12 @@ Load these reference files on demand when working on their specific subsystem:
   across Phases 0–5 or designing integration test suites.
 - `references/location.md` — Read when working on the map, positions, travel,
   huddles or encounters.
+- `references/floor.md` — Turn-taking in huddles: speaking time, one floor per
+  conversation, a judged urgency to cut in. Read when working on spoken pacing,
+  interruptions or how many people talk at once.
+- `references/conversations.md` — Conversations in person: how people join,
+  split off and drift out, what covers each behavior, and tuning out. Read when
+  changing `talk`, huddle membership, or how characters leave a conversation.
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.

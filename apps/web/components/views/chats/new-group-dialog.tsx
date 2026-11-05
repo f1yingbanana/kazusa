@@ -74,12 +74,13 @@ function NewGroupForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const nameInvalid = submitted && name.trim().length === 0
-  const membersInvalid = submitted && selected.size === 0
+  // You and one agent is a direct chat; a group needs two.
+  const membersInvalid = submitted && selected.size < 2
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
-    if (!name.trim() || selected.size === 0) return
+    if (!name.trim() || selected.size < 2) return
 
     setIsSubmitting(true)
     try {
@@ -127,7 +128,7 @@ function NewGroupForm({
           <FieldLegend variant="label">Agents</FieldLegend>
           <FieldDescription>
             {selected.size === 0
-              ? 'Pick the agents to include.'
+              ? 'Pick at least two agents to include.'
               : `${selected.size} selected`}
           </FieldDescription>
           {agents.length === 0 ? (
@@ -147,7 +148,7 @@ function NewGroupForm({
               }
             />
           )}
-          {membersInvalid ? <FieldError>Select at least one agent.</FieldError> : null}
+          {membersInvalid ? <FieldError>Select at least two agents.</FieldError> : null}
         </FieldSet>
       </FieldGroup>
 
