@@ -1,14 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import type {
-  MemoryRunsResponse,
-  WikiLintResponse,
-  WikiListItem,
-  WikiListResponse,
-  WikiPage,
-  WikiPageResponse,
+import {
+  WikiKindSchema,
+  WikiSavePayloadSchema,
+  type MemoryRunsResponse,
+  type WikiLintResponse,
+  type WikiListItem,
+  type WikiListResponse,
+  type WikiPage,
+  type WikiPageResponse,
 } from "@kazusa/client";
+import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import { currentConfig } from "../current-config.ts";
@@ -60,6 +63,12 @@ import {
   withPlan,
 } from "./writes.ts";
 import { MEMORY_CONFIG } from "./config.ts";
+import {
+  PAGE_DIRECTORY,
+  readSource,
+  saveSource,
+  SourceConflict,
+} from "./source.ts";
 import {
   createFamiliarity,
   type FamiliarityRecord,
@@ -171,12 +180,6 @@ const SLUG = (name: string): string =>
     .normalize("NFKD")
     .replace(/[^\p{L}\p{N}]+/gu, "_")
     .replace(/^_+|_+$/g, "");
-const DIRECTORY: Readonly<Record<Page["kind"], string>> = {
-  person: path.join("entities", "characters"),
-  place: path.join("entities", "places"),
-  concept: "concepts",
-  day: "days",
-};
 
 export function registerMemory(
   api: OpenClawPluginApi,
@@ -201,9 +204,10 @@ export function registerMemory(
   const config = MEMORY_CONFIG.parse(
     (api.pluginConfig as { memory?: unknown } | undefined)?.memory ?? {},
   );
+  const worldDir = config.wikiDir ?? sharedDir("wiki");
   const index = sharedIndex(
     api,
-    config.wikiDir ?? sharedDir("wiki"),
+    worldDir,
     configuredChoice(config.embedding).vectors,
     config.anchors,
   );
@@ -415,7 +419,7 @@ export function registerMemory(
       const changes = changesSince(agentId, placeId, now);
       const date = new Date(now).toISOString().slice(0, 10);
       applyOperation(
-        path.join(workspace, "wiki", DIRECTORY.place, `${placeId}.md`),
+        path.join(workspace, "wiki", PAGE_DIRECTORY.place, `${placeId}.md`),
         (raw) => {
           let next = withField(
             raw ?? newPage(nameOf(placeId) ?? placeId, "been there"),
@@ -660,7 +664,12 @@ export function registerMemory(
       if (!id) throw new Error("about needs a name.");
       const existing = personal.get(id);
       const kind = existing?.kind ?? world.pages.get(id)?.kind ?? "concept";
-      const file = path.join(workspace, "wiki", DIRECTORY[kind], `${id}.md`);
+      const file = path.join(
+        workspace,
+        "wiki",
+        PAGE_DIRECTORY[kind],
+        `${id}.md`,
+      );
       const name = world.pages.get(id)?.name ?? args.about;
       const certainty: Certainty = args.certainty;
       applyOperation(file, (raw) =>
@@ -841,6 +850,44 @@ export function registerMemory(
         ? { knowledge: index.world().depth(agent, id, Boolean(personal)) }
         : {}),
     } satisfies WikiPageResponse);
+  });
+  /** The world's wiki, or one character's; never a path the request names. */
+  const wikiRoot = (agent: string | null | undefined): string => {
+    if (!agent) return worldDir;
+    if (!listAgentIds(currentConfig(api)).includes(agent))
+      throw new Error(`No character called ${agent}.`);
+    return path.join(workspaceOf(agent), "wiki");
+  };
+  // Editing by hand: the Markdown is the page, so the next turn reads it.
+  route("wiki/source", "GET", async (req, res) => {
+    const query = params(req);
+    const id = WikiSavePayloadSchema.shape.id.parse(query.get("id"));
+    const kind = WikiKindSchema.optional().parse(
+      query.get("kind") ?? undefined,
+    );
+    const agent = query.get("agent");
+    // A new page of theirs goes where the world keeps the same thing.
+    const fallback = kind ?? index.world().pages.get(id)?.kind;
+    sendJson(res, 200, readSource(wikiRoot(agent), id, fallback));
+  });
+  route("wiki/save", "POST", async (req, res) => {
+    const payload = WikiSavePayloadSchema.parse(await readJsonBody(req));
+    const kind = payload.kind ?? index.world().pages.get(payload.id)?.kind;
+    try {
+      sendJson(
+        res,
+        200,
+        saveSource(wikiRoot(payload.agent), {
+          id: payload.id,
+          text: payload.text,
+          ...(kind ? { kind } : {}),
+          ...(payload.base !== undefined ? { base: payload.base } : {}),
+        }),
+      );
+    } catch (error) {
+      if (!(error instanceof SourceConflict)) throw error;
+      sendJson(res, 409, { error: error.message, current: error.current });
+    }
   });
   // Sleep on it now, on request; the same pass a long sleep starts.
   route("memory/consolidate", "POST", async (req, res) => {

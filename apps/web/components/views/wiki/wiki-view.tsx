@@ -1,7 +1,18 @@
 "use client";
 
-import { BookOpenIcon, GlobeIcon, MenuIcon, UserRoundIcon } from "lucide-react";
-import type { Knowledge, WikiPage } from "@kazusa/client";
+import {
+  BookOpenIcon,
+  GlobeIcon,
+  MenuIcon,
+  PencilIcon,
+  UserRoundIcon,
+} from "lucide-react";
+import {
+  WikiKindSchema,
+  type Knowledge,
+  type WikiKind,
+  type WikiPage,
+} from "@kazusa/client";
 import { Unavailable } from "@/components/entities/source-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,29 +23,51 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useCharacter } from "@/hooks/use-characters";
-import { useParam } from "@/hooks/use-url-state";
+import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
 import { useSources } from "@/lib/source/provider";
 import { requestSidebar } from "@/lib/state/sidebar-request";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
+import { PageEditor } from "./page-editor";
+import { describePage, type WikiSide } from "./page-roles";
 
 function Column({
   icon: Icon,
   title,
+  description,
+  onEdit,
   children,
 }: {
   icon: typeof GlobeIcon;
   title: string;
+  /** Which page this is, so nobody edits the wrong one. */
+  description: string;
+  /** Absent while this column is the one being edited. */
+  onEdit?: (() => void) | undefined;
   children: React.ReactNode;
 }) {
   return (
     <section className="min-w-0 flex-1">
-      <h3 className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon aria-hidden className="size-3.5" />
-        {title}
-      </h3>
+      <div className="flex h-6 items-center gap-2">
+        <h3 className="flex flex-1 items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Icon aria-hidden className="size-3.5" />
+          {title}
+        </h3>
+        {onEdit ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onEdit}
+            aria-label={`Edit ${title.toLowerCase()}`}
+          >
+            <PencilIcon />
+            Edit
+          </Button>
+        ) : null}
+      </div>
+      <p className="mt-1 mb-4 text-xs text-muted-foreground">{description}</p>
       <div className="space-y-4">{children}</div>
     </section>
   );
@@ -55,9 +88,12 @@ function Prose({ text, className }: { text: string; className?: string }) {
 function PageBody({
   page,
   subjective,
+  guessHeading = "What they think of me (a guess)",
 }: {
   page: WikiPage;
   subjective: boolean;
+  /** Whose guess about whom, so it isn't read as the other's own view. */
+  guessHeading?: string;
 }) {
   return (
     <>
@@ -76,7 +112,7 @@ function PageBody({
       {page.theyThinkOfMe ? (
         <div>
           <h4 className="mb-1 text-xs font-medium text-muted-foreground">
-            What they think of them (a guess)
+            {guessHeading}
           </h4>
           <p className="text-sm italic">{page.theyThinkOfMe}</p>
         </div>
@@ -169,7 +205,22 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
   const read = useWikiPage(id, agent);
   const { data, isLoading } = read;
   const character = useCharacter(agent);
+  const navigate = useNavigate();
+  const editParam = useParam("wiki.edit");
+  const kindParam = WikiKindSchema.safeParse(useParam("wiki.kind"));
+  const newName = useParam("wiki.name");
   const name = character?.name ?? agent ?? "";
+  // Their own page only exists with a character chosen.
+  const editing: WikiSide | undefined =
+    editParam === "world" || (editParam === "own" && agent)
+      ? editParam
+      : undefined;
+  const edit = (side: WikiSide | null) =>
+    navigate({
+      "wiki.edit": side,
+      ...(side ? {} : { "wiki.kind": null, "wiki.name": null }),
+    });
+
   if (isLoading)
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (read.error)
@@ -179,32 +230,86 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
       </p>
     );
   const title = data?.world?.name ?? data?.personal?.name ?? id;
+  const kind: WikiKind | undefined = kindParam.success
+    ? kindParam.data
+    : (data?.world?.kind ?? data?.personal?.kind);
+  const subject = newName ?? title;
+  const editor = (side: WikiSide) => (
+    <PageEditor
+      id={id}
+      {...(side === "own" && agent ? { agent } : {})}
+      {...(kind ? { kind } : {})}
+      side={side}
+      {...(agent ? { owner: name } : {})}
+      name={subject}
+      onDone={() => edit(null)}
+    />
+  );
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 p-4 lg:p-6">
       <header className="space-y-1">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-lg font-semibold">{subject}</h2>
         {data?.knowledge ? (
           <DepthLine knowledge={data.knowledge} name={name} />
         ) : null}
       </header>
       <div className="flex flex-col gap-8 lg:flex-row">
         {agent ? (
-          <Column icon={UserRoundIcon} title={`What ${name} makes of it`}>
-            {data?.personal ? (
-              <PageBody page={data.personal} subjective />
+          <Column
+            icon={UserRoundIcon}
+            title={`What ${name} makes of it`}
+            description={describePage("own", kind, {
+              owner: name,
+              subject,
+            })}
+            onEdit={
+              editing === "own" || !data?.personal
+                ? undefined
+                : () => edit("own")
+            }
+          >
+            {editing === "own" ? (
+              editor("own")
+            ) : data?.personal ? (
+              <PageBody
+                page={data.personal}
+                subjective
+                guessHeading={`What ${subject} thinks of ${name} (${name}'s guess)`}
+              />
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No page of their own.
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  No page of their own.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => edit("own")}>
+                  <PencilIcon />
+                  Write what they make of it
+                </Button>
+              </div>
             )}
           </Column>
         ) : null}
-        <Column icon={GlobeIcon} title="The world">
-          {data?.world ? (
+        <Column
+          icon={GlobeIcon}
+          title="The world"
+          description={describePage("world", kind, { subject })}
+          onEdit={
+            editing === "world" || (!data?.world && agent)
+              ? undefined
+              : () => edit("world")
+          }
+        >
+          {editing === "world" ? (
+            editor("world")
+          ) : data?.world ? (
             <PageBody page={data.world} subjective={false} />
-          ) : (
+          ) : agent ? (
             <p className="text-sm text-muted-foreground">
               Not in the world wiki: this is theirs alone.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nothing written yet.
             </p>
           )}
         </Column>
