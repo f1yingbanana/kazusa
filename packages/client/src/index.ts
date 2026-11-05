@@ -1469,6 +1469,38 @@ export const WikiPageResponseSchema = z.object({
 });
 export type WikiPageResponse = z.infer<typeof WikiPageResponseSchema>;
 
+/**
+ * GET /kazusa/wiki/source?id=&agent=: one page's Markdown as written. A page
+ * not written yet has `exists: false`, empty `text` and the path it would get.
+ */
+export const WikiSourceResponseSchema = z.object({
+  id: z.string(),
+  /** Relative to the wiki's root, e.g. `entities/places/plaza.md`. */
+  path: z.string(),
+  text: z.string(),
+  exists: z.boolean(),
+  /** What the save checks, so a write made meanwhile isn't lost. */
+  hash: z.string().nullable(),
+});
+export type WikiSourceResponse = z.infer<typeof WikiSourceResponseSchema>;
+
+/**
+ * POST /kazusa/wiki/save. Answers with the new source, or 409 with `{ error,
+ * current }` when the page changed since `base` was read. `base: null` means
+ * the page must not exist yet; omitting it overwrites whatever is there. `kind`
+ * places a new page; an existing one stays where it is.
+ */
+export const WikiSavePayloadSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[\p{L}\p{N}][\p{L}\p{N}_-]*$/u, "Use letters, digits, _ or -."),
+  agent: z.string().min(1).optional(),
+  kind: WikiKindSchema.optional(),
+  text: z.string().max(200_000),
+  base: z.string().nullable().optional(),
+});
+export type WikiSavePayload = z.infer<typeof WikiSavePayloadSchema>;
+
 export const WikiLintResponseSchema = z.object({
   findings: z.array(
     z.object({

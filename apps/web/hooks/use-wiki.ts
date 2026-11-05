@@ -1,8 +1,12 @@
 "use client";
 
-import useSWR from "swr";
+import { useCallback } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import type {
   MemoryRunsResponse,
+  WikiKind,
+  WikiSavePayload,
+  WikiSourceResponse,
   WikiLintResponse,
   WikiListResponse,
   WikiPageResponse,
@@ -12,6 +16,8 @@ import {
   fetchWikiLint,
   fetchWikiList,
   fetchWikiPage,
+  fetchWikiSource,
+  saveWikiSource,
   WIKI_KEY,
 } from "@/lib/source/wiki/http";
 import { useSources } from "@/lib/source/provider";
@@ -53,5 +59,40 @@ export function useMemoryRuns(agent: string | undefined) {
   return useSWR<MemoryRunsResponse>(
     useWikiKey(["runs", agent], Boolean(agent)),
     () => fetchMemoryRuns(baseUrl, token, agent ?? ""),
+  );
+}
+
+/**
+ * A page's Markdown for editing. Read once: refreshing under someone typing
+ * would move the version their save is checked against.
+ */
+export function useWikiSource(
+  id: string | undefined,
+  agent?: string,
+  kind?: WikiKind,
+) {
+  const { baseUrl, token } = useKazusaConfig();
+  return useSWR<WikiSourceResponse>(
+    useWikiKey(["source", id, agent ?? "", kind ?? ""], Boolean(id)),
+    () => fetchWikiSource(baseUrl, token, id ?? "", agent, kind),
+    { revalidateOnFocus: false, revalidateIfStale: false },
+  );
+}
+
+/** Saves a page; every wiki read (pages, lists, problems) reloads after. */
+export function useSaveWikiPage() {
+  const { baseUrl, token } = useKazusaConfig();
+  const { mutate } = useSWRConfig();
+  return useCallback(
+    async (payload: WikiSavePayload): Promise<WikiSourceResponse> => {
+      const saved = await saveWikiSource(baseUrl, token, payload);
+      void mutate(
+        (key) => Array.isArray(key) && key[0] === WIKI_KEY,
+        undefined,
+        { revalidate: true },
+      );
+      return saved;
+    },
+    [baseUrl, token, mutate],
   );
 }

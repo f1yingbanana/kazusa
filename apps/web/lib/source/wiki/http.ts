@@ -3,12 +3,16 @@ import {
   WikiLintResponseSchema,
   WikiListResponseSchema,
   WikiPageResponseSchema,
+  WikiSourceResponseSchema,
   type MemoryRunsResponse,
   type WikiLintResponse,
   type WikiListResponse,
+  type WikiKind,
   type WikiPageResponse,
+  type WikiSavePayload,
+  type WikiSourceResponse,
 } from "@kazusa/client";
-import { buildUrl, request } from "../http";
+import { buildUrl, KazusaApiError, postJson, request } from "../http";
 
 export const WIKI_KEY = "kazusa/wiki";
 
@@ -63,4 +67,41 @@ export async function fetchMemoryRuns(
     token,
   );
   return MemoryRunsResponseSchema.parse(data);
+}
+
+export async function fetchWikiSource(
+  baseUrl: string,
+  token: string | undefined,
+  id: string,
+  agent?: string,
+  kind?: WikiKind,
+): Promise<WikiSourceResponse> {
+  const data = await request<unknown>(
+    buildUrl(baseUrl, "/kazusa/wiki/source", { id, agent, kind }),
+    undefined,
+    token,
+  );
+  return WikiSourceResponseSchema.parse(data);
+}
+
+/** Someone else wrote the page after it was opened (a night's sleep, a note). */
+export class WikiConflictError extends Error {}
+
+export async function saveWikiSource(
+  baseUrl: string,
+  token: string | undefined,
+  payload: WikiSavePayload,
+): Promise<WikiSourceResponse> {
+  try {
+    const data = await postJson<unknown>(
+      buildUrl(baseUrl, "/kazusa/wiki/save"),
+      payload,
+      token,
+    );
+    return WikiSourceResponseSchema.parse(data);
+  } catch (error) {
+    if (error instanceof KazusaApiError && error.status === 409)
+      throw new WikiConflictError(error.message);
+    throw error;
+  }
 }
