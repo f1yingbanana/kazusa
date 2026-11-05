@@ -62,8 +62,8 @@ Look at `## Plans recorded for <date>` in `MEMORY.md`:
 
 ## 5. Transitions
 
-- **Continue:** if the activity needs more time, use
-  `delay_task({ additionalDuration, reason })`.
+- **Continue:** if the activity needs more time, estimate how much longer from
+  now it will take and use `delay_task({ minutesLeft, reason })`.
 - **Switch:** call `start_task({ type, description, duration, summary })` with a
   brief factual `summary` of real progress, including unfinished work. A
   check-in marks time passing, not success.

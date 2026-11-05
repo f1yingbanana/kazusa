@@ -65,7 +65,7 @@ describe("taskman journal events", () => {
       duration: 60,
     });
     await tools.get("delay_task")?.execute("call-2", {
-      additionalDuration: 5,
+      minutesLeft: 65,
     });
 
     const reread = vi.mocked(appendLedgerEntry).mock.calls.map(([, entry]) => {

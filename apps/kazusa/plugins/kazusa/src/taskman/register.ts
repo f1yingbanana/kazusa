@@ -389,12 +389,12 @@ export function registerTaskman(
         parameters: {
           type: "object",
           properties: {
-            additionalDuration: { type: "number" },
+            minutesLeft: { type: "number" },
             reason: { type: "string" },
             monologue: { type: "string" },
             ...delayTaskParameters,
           },
-          required: requiredBy("delayTaskParameters"),
+          required: ["minutesLeft", ...requiredBy("delayTaskParameters")],
           additionalProperties: false,
         },
       },

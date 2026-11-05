@@ -190,9 +190,11 @@ apps/kazusa/ (or repository root)
     Creates an initial lease or replaces the active one in OpenClaw's plugin
     state database (`tasks`), clamps duration to `minDuration`, sets `startedAt`
     and `endAt`, and appends the transition to `agent:<agentId>:tasks`.
-  - `delay_task({ additionalDuration, reason?, monologue? })`: Extends active
-    task lease duration, recalculates `endAt`, updates database record, and
-    dispatches delay notice to `agent:<agentId>:tasks`.
+  - `delay_task({ minutesLeft, reason?, monologue? })`: Sets the active lease's
+    `endAt` to `minutesLeft` from now (the character's estimate, so an overdue
+    activity is never extended into the past, and never earlier than planned),
+    updates its `duration` and the database record, and dispatches the notice to
+    `agent:<agentId>:tasks`.
   - Both tools accept an optional one- or two-sentence in-character monologue.
     Format it below the factual summary as an italic blockquote in the native
     ledger message text, without extending OpenClaw's message schema.
@@ -210,9 +212,10 @@ apps/kazusa/ (or repository root)
   - Call `start_task` with duration below `minDuration`; assert duration is
     clamped to `minDuration`.
 - **Test 3.3 (Delay Task Extension)**:
-  - Call `delay_task` with additional duration; assert `endAt` is extended by N
-    minutes and notice is appended to `agent:<id>:tasks` with the simulated
-    update timestamp, new deadline, and remaining minutes at that update.
+  - Call `delay_task` with `minutesLeft`; assert `endAt` is N minutes from now
+    (also for an overdue lease) and notice is appended to `agent:<id>:tasks`
+    with the simulated update timestamp, new deadline, and remaining minutes at
+    that update.
 - **Test 3.4 (Task Transition)**:
   - Replace a task with `start_task`; assert the new lease replaces the old one
     atomically and one transition notice is logged to `agent:<id>:tasks`.

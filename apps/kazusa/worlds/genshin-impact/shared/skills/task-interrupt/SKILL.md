@@ -18,9 +18,9 @@ or require starting the same task again. Decide as this person would, mid-task:
 - **Reply briefly and carry on.** Call `send_message` with your answer; a quick
   reply keeps the same activity and check-in. Writing the answer in your final
   brain text sends nothing.
-- **Take time out.** If the conversation takes meaningful time, extend the
-  activity with `delay_task({ additionalDuration, reason })`, in simulated
-  minutes.
+- **Take time out.** If the conversation takes meaningful time, estimate how
+  much longer from now your activity will take and extend it with
+  `delay_task({ minutesLeft, reason })`, in simulated minutes.
 - **Change plans.** If priorities change, call
   `start_task({ type, description, duration, summary, where })`. The summary
   states real progress or abandonment; switching is not finishing. If you stop

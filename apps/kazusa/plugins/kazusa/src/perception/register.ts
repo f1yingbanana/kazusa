@@ -68,7 +68,7 @@ export function registerPerception(
   },
 ): Perception {
   const lifetime = new AbortController();
-  const endBrainRun = registerBrainRunLimits(api, () => deps.clock.time());
+  const endBrainRun = registerBrainRunLimits(api, deps.clock);
   // Each decision is persisted by Perception in the "perception" store, which
   // the timeline reads; this only broadcasts it to live observers.
   const onDecision = (

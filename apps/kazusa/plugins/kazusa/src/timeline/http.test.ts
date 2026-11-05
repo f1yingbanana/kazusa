@@ -161,7 +161,6 @@ describe("registerTimelineHttp", () => {
                     kind: "task.delayed",
                     payload: {
                       taskId: "alice:task-1",
-                      additionalMinutes: 10,
                       endAt: 1_001_900,
                       reason: "Taking more notes",
                       monologue: "Need to write this down.",
@@ -219,7 +218,7 @@ describe("registerTimelineHttp", () => {
     expect(parsed.events[1].seq).toBeGreaterThan(parsed.events[2].seq);
 
     // Payloads come from structured metadata, never ledger text
-    expect(parsed.events[1].payload.additionalMinutes).toBe(10);
+    expect(parsed.events[1].payload.endAt).toBe(1_001_900);
     expect(parsed.events[1].payload.reason).toBe("Taking more notes");
     expect(parsed.events[1].payload.monologue).toBe("Need to write this down.");
   });

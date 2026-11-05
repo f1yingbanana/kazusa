@@ -3,6 +3,7 @@ import {
   resolveActiveEmbeddedRunSessionId,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { Clock } from "../clock/clock.ts";
 import { currentConfig } from "../current-config.ts";
 import { pluginSkillText } from "../skill-text.ts";
 import { chooseActivity, LOOKUP_NAMES, MAX_LOOKUPS, turnOf } from "../turn.ts";
@@ -19,6 +20,15 @@ const SPEECH_TOOLS: ReadonlySet<string> = new Set([
   "continue_work",
 ]);
 
+/**
+ * Never refused near the end either: a run that can't choose what comes next
+ * leaves its character on an activity that is already over.
+ */
+const ACTIVITY_TOOLS: ReadonlySet<string> = new Set([
+  "start_task",
+  "delay_task",
+]);
+
 /** Model calls kept back so a run can still say where things stand. */
 const WRAP_UP_MODEL_CALLS = 2;
 /** Share of a run's time after which it is told to wrap up. */
@@ -30,15 +40,17 @@ interface RunLimits {
   readonly maxRunSeconds: number;
 }
 
+function isSystemAgent(api: OpenClawPluginApi, agentId: string): boolean {
+  return currentConfig(api).agents?.defaults?.systemAgent?.agentId === agentId;
+}
+
 /** A character's limits for one brain run; the system agent has its own. */
 export function brainRunLimits(
   api: OpenClawPluginApi,
   agentId: string,
 ): RunLimits {
   const limits = PERCEPTION_CONFIG.parse(api.pluginConfig?.perception ?? {});
-  return currentConfig(api).agents?.defaults?.systemAgent?.agentId === agentId
-    ? limits.systemAgent
-    : limits;
+  return isSystemAgent(api, agentId) ? limits.systemAgent : limits;
 }
 
 interface BrainRun {
@@ -46,6 +58,14 @@ interface BrainRun {
   readonly controller: AbortController;
   readonly limits: RunLimits;
   readonly startedAt: number;
+  /**
+   * A character's run waits out a paused clock at its next tool call
+   * (`untilRunning`), so that time is not spent. The system agent works on.
+   */
+  readonly holdsOnPause: boolean;
+  pausedMs: number;
+  pausedSince?: number;
+  timer?: ReturnType<typeof setTimeout>;
   readonly models: Set<string>;
   readonly tools: Set<string>;
   readonly expire: (reason: string) => void;
@@ -64,6 +84,30 @@ function sessionOwners(): Map<string, string> {
 function activeRuns(): Map<string, BrainRun> {
   const scope = globalThis as { [RUNS]?: Map<string, BrainRun> };
   return (scope[RUNS] ??= new Map<string, BrainRun>());
+}
+
+// Whether the world is paused; every registration's clock shares one cell.
+const PAUSED = Symbol.for("kazusa.brain.run-limit-paused");
+function clockPaused(): boolean {
+  return (globalThis as { [PAUSED]?: () => boolean })[PAUSED]?.() ?? false;
+}
+
+/** Real time a run has spent, less the time its world stood paused. */
+function elapsedMs(run: BrainRun, now = Date.now()): number {
+  const pausing = run.pausedSince === undefined ? 0 : now - run.pausedSince;
+  return now - run.startedAt - run.pausedMs - pausing;
+}
+
+/** Ends the run once its time is spent; nothing counts down while paused. */
+function armExpiry(run: BrainRun): void {
+  clearTimeout(run.timer);
+  if (run.pausedSince !== undefined) return;
+  const { maxRunSeconds } = run.limits;
+  run.timer = setTimeout(
+    () => run.expire(`${maxRunSeconds}s elapsed`),
+    Math.max(0, maxRunSeconds * 1000 - elapsedMs(run)),
+  );
+  run.timer.unref();
 }
 
 /** The native dispatcher owns this signal through the complete run lifetime. */
@@ -90,16 +134,21 @@ export function beginBrainRun(
     )
       abortAgentHarnessRun(state.sessionId);
   };
+  const startedAt = Date.now();
+  const holdsOnPause = !isSystemAgent(api, agentId);
   const state: BrainRun = {
     agentId,
     controller,
     limits,
-    startedAt: Date.now(),
+    startedAt,
+    holdsOnPause,
+    pausedMs: 0,
+    ...(holdsOnPause && clockPaused() ? { pausedSince: startedAt } : {}),
     models: new Set(),
     tools: new Set(),
     expire,
     dispose: () => {
-      clearTimeout(timer);
+      clearTimeout(state.timer);
       if (runs.get(runId) === state) runs.delete(runId);
       if (state.sessionKey && sessionOwners().get(state.sessionKey) === runId)
         sessionOwners().delete(state.sessionKey);
@@ -107,11 +156,7 @@ export function beginBrainRun(
   };
   const runs = activeRuns();
   runs.set(runId, state);
-  const timer = setTimeout(
-    () => expire(`${limits.maxRunSeconds}s elapsed`),
-    limits.maxRunSeconds * 1000,
-  );
-  timer.unref();
+  armExpiry(state);
   return {
     signal: AbortSignal.any([lifetime, controller.signal]),
     dispose: () => {
@@ -148,8 +193,26 @@ function brainRun(
 
 export function registerBrainRunLimits(
   api: OpenClawPluginApi,
-  simTime: () => number,
+  clock: Pick<Clock, "time" | "now" | "onClockChange">,
 ): (runId: string) => void {
+  (globalThis as { [PAUSED]?: () => boolean })[PAUSED] = () =>
+    clock.now().speed <= 0;
+  // Every registration listens; each run notes a pause and its end once.
+  const unsubscribe = clock.onClockChange((now) => {
+    const at = Date.now();
+    for (const run of activeRuns().values()) {
+      if (!run.holdsOnPause) continue;
+      if (now.speed <= 0 && run.pausedSince === undefined) {
+        run.pausedSince = at;
+        clearTimeout(run.timer);
+      } else if (now.speed > 0 && run.pausedSince !== undefined) {
+        run.pausedMs += at - run.pausedSince;
+        delete run.pausedSince;
+        armExpiry(run);
+      }
+    }
+  });
+  api.lifecycle.onDispose?.(unsubscribe);
   // What a refused call says is the `kazusa-results` skill's.
   const text = pluginSkillText(api);
   const refuse = (result: string, agentId?: string) => ({
@@ -181,7 +244,7 @@ export function registerBrainRunLimits(
         turn.lookups++;
       }
       if (event.toolName === "start_task" || event.toolName === "delay_task") {
-        const now = { wall: Date.now(), sim: simTime() };
+        const now = { wall: Date.now(), sim: clock.time() };
         const callId = ctx.toolCallId ?? event.toolCallId;
         if (!chooseActivity(ctx.agentId, now, callId))
           return refuse("second-activity", ctx.agentId);
@@ -196,15 +259,16 @@ export function registerBrainRunLimits(
     const key = callId ? `${state.models.size}:${callId}` : undefined;
     // A host can invoke a hook through multiple registrations; count once.
     if (key && state.tools.has(key)) return;
-    // Near the end only speech still runs, so a run is never cut off without
-    // the chance to report. The model-call limit bounds what follows.
+    // Near the end only speech and choosing what comes next still run, so a
+    // run is never cut off without the chance to report or move on. The
+    // model-call limit bounds what follows.
     const { maxModelCalls, maxToolCalls, maxRunSeconds } = state.limits;
     if (
       !SPEECH_TOOLS.has(event.toolName) &&
+      !ACTIVITY_TOOLS.has(event.toolName) &&
       (state.tools.size >= maxToolCalls ||
         state.models.size >= maxModelCalls - WRAP_UP_MODEL_CALLS ||
-        Date.now() - state.startedAt >=
-          maxRunSeconds * 1000 * WRAP_UP_TIME_SHARE)
+        elapsedMs(state) >= maxRunSeconds * 1000 * WRAP_UP_TIME_SHARE)
     )
       return refuse("out-of-time", ctx.agentId);
     state.tools.add(key ?? `uncorrelated:${state.tools.size}`);

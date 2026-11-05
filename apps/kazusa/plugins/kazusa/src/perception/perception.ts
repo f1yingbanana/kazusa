@@ -512,13 +512,20 @@ export class Perception {
     ) {
       return;
     }
+    // One check-in waits at a time: asking again only retries the one there,
+    // which picks the queue back up after a failed run.
+    const waiting = (await this.store.lookup(agentId))?.pending.find(
+      (item) => item.idle && !item.resume,
+    );
     const stimulus: Stimulus = {
-      id: `task-idle:${agentId}:${simNow}`,
+      id: waiting?.id ?? `task-idle:${agentId}:${simNow}`,
       sessionKey: `agent:${agentId}:tasks`,
       sender: "kazusa:taskman",
-      text: this.text("kazusa-deliveries#idle-check-in", {}, { agentId }),
+      text:
+        waiting?.text ??
+        this.text("kazusa-deliveries#idle-check-in", {}, { agentId }),
       idle: true,
-      timestamp: simNow,
+      timestamp: waiting?.timestamp ?? simNow,
     };
     await this.receive(agentId, stimulus);
   }

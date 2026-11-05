@@ -146,10 +146,10 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      Jev evaluates stimuli against the ongoing activity to avoid unnecessary and
      expensive LLM brain turns (e.g. ignoring casual banter while sleeping).
    - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid-fire messages
-     coalesce within a short window (`coalesceWindowMs = 500ms`). Jev evaluates
-     the combined bundle with recent channel context so two individually minor
-     stimuli can combine into an urgent `STEER` or `WAKE` without context
-     severance.
+     coalesce within a short window (`coalesceWindowMs`, 10 s; 250 ms face to
+     face). Jev evaluates the combined bundle with recent channel context so two
+     individually minor stimuli can combine into an urgent `STEER` or `WAKE`
+     without context severance.
    - **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When a
      busy brain finishes its active turn, all queued stimuli are drained in a
      single consolidated wake turn (not one-by-one ping-pong turns). The agent
@@ -849,10 +849,10 @@ connect these modules in process.
     recorded as ignored, but never a huddle's newest line and never one in
     custody. Phone chats wait however long. Live, two huddles held 2,844 lines.
 - **Multi-Stimulus Coalescing & Emergent Salience**: Rapid arrivals coalesce
-  within a brief window (`coalesceWindowMs = 500ms`). Jev evaluates the incoming
-  bundle against recent channel context and currently pending items so two
-  individually minor stimuli can combine into an urgent `STEER` or `WAKE`
-  without context severance.
+  within a brief window (`coalesceWindowMs`, 10 s; 250 ms face to face). Jev
+  evaluates the incoming bundle against recent channel context and currently
+  pending items so two individually minor stimuli can combine into an urgent
+  `STEER` or `WAKE` without context severance.
 - **Consolidated Queue Draining (Single-Turn Batch Presentation)**: When the
   active brain turn completes, all eligible pending stimuli are drained in a
   single consolidated wake turn (not one-by-one ping-pong turns). All drained
@@ -935,12 +935,15 @@ connect these modules in process.
   can never be dropped into `IGNORE`. When idle, deadlines unconditionally
   trigger `WAKE`. When a character preempts or transitions tasks early
   (`start_task`), Taskman atomically replaces the cron projection; any racing
-  stale deadline stimulus is validated against `task.id` and dropped silently.
-  (Future roadmap: if an LLM concludes a turn without calling
-  `start_task`/`delay_task`, Taskman will project a unified 60-real-second
-  taskless/overdue state scan rather than forcing an OOC synthetic resting
-  lease). This scan is proposed, not implemented; see
-  [the concrete design](../../../apps/kazusa/docs/brain-context.md).
+  stale deadline stimulus is validated against `task.id` and dropped silently. A
+  turn can end without `start_task`/`delay_task` (it failed, or the model chose
+  nothing), leaving the activity overdue: the character is still at it, over
+  time. The idle supervisor (`taskman/supervisor.ts`, every 60 real seconds, two
+  characters a tick) gives an onstage character whose brain is idle and whose
+  activity is over (or missing) an idle check-in, whether or not items are
+  queued: they come along in the same turn. Being a new stimulus, the check-in
+  also clears the `stopped` a failed run left, unless a handoff is still in
+  custody (Restart recovery, below).
 - **Restart recovery**: stopping the Gateway mid-turn can make OpenClaw
   tombstone the interrupted `:brain` session (`mainRestartRecovery.tombstone`),
   after which it refuses every later run there. The brain channel clears that
@@ -950,9 +953,13 @@ connect these modules in process.
   in custody against the brain transcript (`adoptedByBrain`): if the message is
   there the turn ran, so its stimuli are marked processed and never replayed;
   otherwise they go back to pending. Quarantine (`stopped`) is only the fallback
-  when that check is unavailable. It also drops sightings (`foreseen`) still
-  held for an offstage character, and `receive` refuses new ones: nobody is
-  there to see them.
+  when that check is unavailable. `stopped` also follows a run that ended in an
+  error or was aborted (run limit, provider failure, shutdown) and a handoff
+  that failed: nothing drains until a new stimulus arrives with no handoff in
+  custody (the supervisor's check-in is one), or `recover()` settles the custody
+  at the next start. It also drops sightings (`foreseen`) still held for an
+  offstage character, and `receive` refuses new ones: nobody is there to see
+  them.
 - Follow-up batches drain only items whose `timestamp` has come (`<= now`); a
   foreseen sighting is never pulled into an earlier turn.
 - Context assembly only reads and renders admitted context; it never reroutes
@@ -1205,29 +1212,31 @@ connect these modules in process.
   reaches none of them unless it is listed there. Her runs have their own limits
   (`perception.systemAgent`). For every character, near the limits only
   `send_message`, `talk`, `create_group` and `continue_work` still run, so a run
-  can report before it ends. Shell execution, code execution and `openclaw`
-  delegation are denied; native `cwd` selects `apps/kazusa` for coding while
-  identity/memory remain in her character workspace. File tools enforce that
-  coding directory. Its `.agents` workspace symlink exposes these architecture
-  guides without adding a workspace-root `AGENTS.md`. Use native `skills_read`
-  for complete installed guides; ordinary file reads through an escaping symlink
-  remain blocked. Perception admits its input immediately, even paused;
-  Messaging uses wall-time pacing, and its message, chat-management and task
-  tools skip the pause wait. Simulation time, task deadlines and ordinary
-  characters remain frozen. Offstage and custody gates still apply. How she
-  works is in her `SOUL.md`; the common jobs (characters, wikis, places) are the
-  `world-building` skill, and whole worlds are `world-project`. Both live in
-  `.agents/skills/`, so coding agents working in this repo get them as well as
-  every world's system agent, who selects them by her per-agent `skills` in
-  `worlds/base.json`. Long jobs survive the run limits through a project file
-  and `continue_work`, which starts a fresh run once this one ends
-  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
-  runs without the user speaking. Retained consumers use the host-injected
-  `api.runtime.config.current()` rather than retaining `api.config` for live
-  agent/identity/workspace lookups. Character and agent roster responses expose
-  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
-  rows and direct-chat rows. Never infer administrator status from a name or
-  biography.
+  can report before it ends, and `start_task` and `delay_task`, so it can always
+  move on. A character's run time stops while the clock is paused (the run waits
+  at its next tool call); the system agent's keeps running. Shell execution,
+  code execution and `openclaw` delegation are denied; native `cwd` selects
+  `apps/kazusa` for coding while identity/memory remain in her character
+  workspace. File tools enforce that coding directory. Its `.agents` workspace
+  symlink exposes these architecture guides without adding a workspace-root
+  `AGENTS.md`. Use native `skills_read` for complete installed guides; ordinary
+  file reads through an escaping symlink remain blocked. Perception admits its
+  input immediately, even paused; Messaging uses wall-time pacing, and its
+  message, chat-management and task tools skip the pause wait. Simulation time,
+  task deadlines and ordinary characters remain frozen. Offstage and custody
+  gates still apply. How she works is in her `SOUL.md`; the common jobs
+  (characters, wikis, places) are the `world-building` skill, and whole worlds
+  are `world-project`. Both live in `.agents/skills/`, so coding agents working
+  in this repo get them as well as every world's system agent, who selects them
+  by her per-agent `skills` in `worlds/base.json`. Long jobs survive the run
+  limits through a project file and `continue_work`, which starts a fresh run
+  once this one ends (`perception/continue.ts`), up to
+  `perception.systemAgent.maxContinuations` runs without the user speaking.
+  Retained consumers use the host-injected `api.runtime.config.current()` rather
+  than retaining `api.config` for live agent/identity/workspace lookups.
+  Character and agent roster responses expose `isSystemAgent` from that
+  snapshot; the client renders it as `ADMIN` in World rows and direct-chat rows.
+  Never infer administrator status from a name or biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from

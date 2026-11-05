@@ -71,9 +71,9 @@ export function startIdleSupervisor(
             deps.store.lookup(agentId),
             deps.perception.getBrainState(agentId),
           ]);
-          // Skip if brain is busy thinking or has pending stimuli
-          if (brainState.brain === "thinking" || brainState.queued > 0)
-            continue;
+          // Queued items don't skip a check-in: they come along with it. A
+          // failed run leaves its queue waiting, and nothing else would come.
+          if (brainState.brain === "thinking") continue;
           // Skip if task is still in progress
           if (
             task &&

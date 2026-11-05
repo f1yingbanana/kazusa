@@ -304,7 +304,7 @@ describe("registerDesires", () => {
     setNow(minutes(10));
     await executeDelayTask(
       {
-        additionalDuration: 30,
+        minutesLeft: 50,
         afterwards: { satiety: "fine→full", social: "fine→full" },
       },
       context,

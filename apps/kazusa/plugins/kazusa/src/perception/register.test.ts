@@ -299,7 +299,7 @@ describe("Perception host integration", () => {
 
   it("rejects writes from a disposed plugin generation", async () => {
     const h = setup();
-    h.dispose.mock.calls[0][0]();
+    for (const [dispose] of h.dispose.mock.calls) dispose();
     await expect(h.dispatch()).resolves.toEqual({ handled: true });
     expect(h.dispatchBrain).not.toHaveBeenCalled();
   });
@@ -488,7 +488,7 @@ describe("Perception host integration", () => {
     });
     await h.dispatch();
     const { replyOptions } = h.dispatchBrain.mock.calls[0][0];
-    h.dispose.mock.calls[0][0]();
+    for (const [dispose] of h.dispose.mock.calls) dispose();
     expect(replyOptions?.abortSignal?.aborted).toBe(true);
     await expect(
       replyOptions?.turnAdoptionLifecycle?.onAdopted(),
