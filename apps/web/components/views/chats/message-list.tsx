@@ -387,7 +387,7 @@ export function MessageList({
                       <Bubble variant="secondary">
                         <BubbleContent>
                           <span className="shimmer" aria-live="polite">
-                            {chat.type === "huddle"
+                            {typist.mode === "speaking"
                               ? "…"
                               : `${isGroup ? "Typing" : `${participant.name} is typing`}…`}
                           </span>

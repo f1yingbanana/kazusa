@@ -287,7 +287,7 @@ export function registerMessagingHttp(
       user.id,
       user.name,
       params.sessionKey,
-      params.isTyping,
+      params.isTyping && "typing",
     );
     sendJson(res, 200, { success: true });
   });

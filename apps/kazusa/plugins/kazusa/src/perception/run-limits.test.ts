@@ -7,7 +7,6 @@ import {
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
 import type { Clock } from "../clock/clock.ts";
-import type { ClockChangeListener } from "../clock/types.ts";
 
 const native = vi.hoisted(() => ({
   abort: vi.fn(() => true),
@@ -26,7 +25,7 @@ function setup(
   limits: Record<string, unknown> = {
     maxModelCalls: 5,
     maxToolCalls: 2,
-    maxRunSeconds: 5,
+    maxThinkingSeconds: 5,
   },
   runId = "run-1",
 ) {
@@ -45,16 +44,7 @@ function setup(
       },
     },
   } as unknown as OpenClawPluginApi;
-  let speed = 1;
-  const listeners = new Set<ClockChangeListener>();
-  const clock = {
-    time: () => 0,
-    now: () => ({ simTime: 0, speed }),
-    onClockChange: (listener: ClockChangeListener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-  } as unknown as Pick<Clock, "time" | "now" | "onClockChange">;
+  const clock = { time: () => 0 } as Pick<Clock, "time">;
   const finish = registerBrainRunLimits(api, clock);
   const ctx = {
     runId,
@@ -69,17 +59,12 @@ function setup(
   });
   return {
     api,
-    /** Pauses or resumes the world, telling every listener. */
-    setSpeed: (next: number) => {
-      const before = { simTime: 0, speed, formatted: "" };
-      speed = next;
-      for (const listener of listeners)
-        void listener({ simTime: 0, speed, formatted: "" }, before);
-    },
     finish: () => finish(runId),
     ctx,
     call,
     start: (callId: string) => call("model_call_started", { runId, callId }),
+    end: (callId: string, durationMs: number) =>
+      call("model_call_ended", { runId, callId, durationMs }),
     tool: (toolCallId: string, toolName = "read") =>
       call("before_tool_call", {
         toolName,
@@ -152,16 +137,17 @@ describe("brain run hard budgets", () => {
     expect(h.tool("d", "start_task")).toBeUndefined();
     expect(h.tool("e", "delay_task")).toBeUndefined();
   });
-  it("spends none of a character's time while the clock is paused", () => {
+  it("spends none of its time waiting on tools", () => {
     vi.useFakeTimers();
     const h = setup();
     h.start("m1");
     vi.advanceTimersByTime(3000);
-    h.setSpeed(0);
+    h.end("m1", 3000);
+    // Typing, waiting for the floor or a paused world: no model call.
     vi.advanceTimersByTime(60_000);
     expect(native.abort).not.toHaveBeenCalled();
-    h.setSpeed(1);
     expect(h.tool("a")).toBeUndefined();
+    h.start("m2");
     vi.advanceTimersByTime(1000);
     expect(h.tool("b")).toMatchObject({ block: true });
     vi.advanceTimersByTime(999);
@@ -169,14 +155,17 @@ describe("brain run hard budgets", () => {
     vi.advanceTimersByTime(1);
     expect(native.abort).toHaveBeenCalledTimes(1);
   });
-  it("keeps the system agent's time running while the clock is paused", () => {
+  it("counts a model call once however many registrations hear it end", () => {
     vi.useFakeTimers();
-    const h = setup({ systemAgent: { maxRunSeconds: 5 } });
-    h.ctx.sessionKey = "agent:arona:brain";
+    const h = setup();
     h.start("m1");
-    h.setSpeed(0);
-    vi.advanceTimersByTime(5000);
+    h.end("m1", 3000);
+    h.end("m1", 3000);
+    expect(native.abort).not.toHaveBeenCalled();
+    h.start("m2");
+    h.end("m2", 2000);
     expect(native.abort).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
   it("gives the configured system agent its own limits", () => {
     const h = setup({
@@ -247,7 +236,11 @@ describe("a run repeating itself", () => {
   it("is not refused: only delivery knows what was heard", () => {
     // Live: refusing repeats blocked 69 lines nobody received and stopped one
     // real repeat in 130 (2026-11-05).
-    const h = setup({ maxModelCalls: 9, maxToolCalls: 9, maxRunSeconds: 60 });
+    const h = setup({
+      maxModelCalls: 9,
+      maxToolCalls: 9,
+      maxThinkingSeconds: 60,
+    });
     Object.assign(h.ctx, { agentId: "alice" });
     beginTurn("alice");
     h.start("model-1");

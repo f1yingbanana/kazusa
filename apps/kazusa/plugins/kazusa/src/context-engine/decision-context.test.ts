@@ -272,16 +272,21 @@ describe("Bounded decision evidence", () => {
       ["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"],
     );
     // How they say it is asked on its own: pace always, the floor if taken.
-    const speech = { sessionKey: "agent:alice:chat:huddle:club" };
+    const speech = {
+      sessionKey: "agent:alice:chat:huddle:club",
+      medium: "speaking" as const,
+    };
     expect(
       buildDecisionQuestions("busy_thinking", rubric, false, {
         ...speech,
         floor: { speaking: ["bob"], waiting: 0 },
       }),
     ).toEqual({
-      speaking_pace: {
+      pace: {
         type: "score",
-        instructions: expect.stringContaining("How fast do they say it?"),
+        instructions: expect.stringContaining(
+          "How fast do they type or say it?",
+        ),
         criteria: expect.arrayContaining([
           { pace: 1, description: "Ordinary conversational pace." },
         ]),
@@ -300,7 +305,7 @@ describe("Bounded decision evidence", () => {
       Object.keys(
         buildDecisionQuestions("busy_thinking", rubric, false, speech),
       ),
-    ).toEqual(["speaking_pace"]);
+    ).toEqual(["pace"]);
   });
 
   it("keeps every world's own rubric at the shipped version, with every question", async () => {
@@ -414,7 +419,7 @@ describe("Bounded decision evidence", () => {
       // Nothing of it in what they are hearing now.
       batch({ incomingBundle: [message] }),
       // About to speak, not hearing.
-      batch({ speech: { sessionKey: lunch.sessionKey } }),
+      batch({ speech: { sessionKey: lunch.sessionKey, medium: "speaking" } }),
       // Thinking: maybe answering that very conversation, or waiting to speak.
       batch({ brainStatus: "busy_thinking" }),
       // The setting allows longer silences.
@@ -442,6 +447,7 @@ describe("Bounded decision evidence", () => {
         incomingBundle: [],
         speech: {
           sessionKey: "agent:alice:chat:huddle:club",
+          medium: "speaking",
           floor: { speaking: ["bob"], turn: "bob", waiting: 1 },
         },
       }),
@@ -473,6 +479,7 @@ rubric:
     expect(() =>
       buildDecisionQuestions("busy_thinking", older, false, {
         sessionKey: "agent:alice:chat:huddle:club",
+        medium: "speaking",
       }),
     ).toThrow("no speech questions");
   });

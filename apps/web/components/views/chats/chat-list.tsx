@@ -212,7 +212,7 @@ export function ChatRow({
 }) {
   const preview =
     typists.length > 0
-      ? `${typists[0].senderName} is ${chat.type === "huddle" ? "about to speak" : "typing"}…`
+      ? `${typists[0].senderName} is ${typists[0].mode}…`
       : chat.lastMessage
         ? messagePreview(chat.lastMessage, chat, userId, nameOf)
         : "No messages yet";

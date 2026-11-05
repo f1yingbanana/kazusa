@@ -5,7 +5,7 @@ description:
   incoming stimuli."
 user-invocable: false
 metadata:
-  rubricVersion: "10"
+  rubricVersion: "11"
 rubric:
   instructions: |
     Judge attention strictly from this character's identity, values, memories, relationships, and perceived evidence.
@@ -111,15 +111,16 @@ rubric:
           "They let the speaker finish their whole turn and let more eager
           people go first: deference to this speaker, shyness, a serious moment,
           or nothing pressing to add."
-    speaking_pace:
+    pace:
       description:
-        "The character is about to say currentSpeech.unsaid aloud. How fast do
-        they say it? Read it from who they are (a quick talker, a slow and
-        deliberate one), how they feel right now, what they are saying and to
-        whom, and what they are doing. Excitement, anger, nerves that make
-        people babble, and eagerness speed people up; tiredness, sadness,
+        "The character is about to type or say currentSpeech.unsaid: typed into
+        a chat, or said aloud face to face (speech.medium). How fast do they
+        type or say it? Read it from who they are (quick or slow with words, at
+        ease with a phone or not), how they feel right now, what they are saying
+        and to whom, and what they are doing. Excitement, anger, nerves that
+        make people babble, and eagerness speed people up; tiredness, sadness,
         hesitation, care with words, and weight in what they say slow them down.
-        Most people, most of the time, talk at an ordinary pace."
+        Most people, most of the time, go at an ordinary pace."
       criteria:
         - pace: 0.6
           description:
@@ -130,7 +131,7 @@ rubric:
         - pace: 1
           description: "Ordinary conversational pace."
         - pace: 1.25
-          description: "Quick: lively, excited, eager, a fast talker."
+          description: "Quick: lively, excited, eager, a fast talker or typist."
         - pace: 1.6
           description:
             "Rapid-fire: agitated, gushing, panicked, or a motormouth in full
@@ -223,10 +224,10 @@ coverage review does not ask this question.
 
 ## Speech: Pace, and How Badly They Want In
 
-Asked once per `send_message` into a face-to-face conversation. `speaking_pace`
-scales how long each line takes to say (1 is ordinary; fractional scores lie
-between the anchors). `floor` is asked only when someone else has its floor.
-`CUT_IN` says the first line at once, over the speaker; `NEXT` takes the next
-pause, ahead of the speaker's own next line; `WAIT` goes once the speaker's turn
-is over and nobody more eager is waiting. Unusable answers take the next pause,
+Asked once per `send_message`. `pace` scales how long each message takes to type
+or each line to say (1 is ordinary; fractional scores lie between the anchors).
+`floor` is asked only face to face, when someone else has its floor. `CUT_IN`
+says the first line at once, over the speaker; `NEXT` takes the next pause,
+ahead of the speaker's own next line; `WAIT` goes once the speaker's turn is
+over and nobody more eager is waiting. Unusable answers take the next pause,
 never a cut-in.

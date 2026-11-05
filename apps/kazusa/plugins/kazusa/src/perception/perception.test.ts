@@ -314,6 +314,7 @@ describe("Decision fallback", () => {
 describe("How they say it", () => {
   const facts = {
     sessionKey: "agent:alice:chat:huddle:club",
+    medium: "speaking" as const,
     floor: { speaking: ["bob"], turn: "bob", waiting: 0 },
   };
   const paces = [0.6, 0.8, 1, 1.25, 1.6].map((pace) => ({
@@ -325,7 +326,7 @@ describe("How they say it", () => {
     vi.fn(async (_id: string, params: DecisionContextRequest) => ({
       state: { brainStatus: params.brainStatus, incomingBundle: [] },
       questions: {
-        speaking_pace: {
+        pace: {
           type: "score" as const,
           instructions: "How fast?",
           criteria: paces,
@@ -350,7 +351,7 @@ describe("How they say it", () => {
       result: {
         answers: {
           floor: { type: "choice", choice: "CUT_IN" },
-          speaking_pace: { type: "score", score: 3 },
+          pace: { type: "score", score: 3 },
         },
       },
     });
@@ -2274,20 +2275,6 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.deliveries[0].sessionKeys).toEqual([
         "agent:alice:chat:direct:bob",
       ]);
-    });
-
-    it("notifies onAdopted listeners with delivery session keys upon host adoption", async () => {
-      const h = setup();
-      const adopted: string[] = [];
-      h.router.onAdopted((delivery) => {
-        adopted.push(...(delivery.sessionKeys ?? []));
-      });
-      await h.router.receive(
-        "alice",
-        stimulus("chat-msg-2", "alice", "Testing auto typing"),
-      );
-      expect(h.deliver).toHaveBeenCalledTimes(1);
-      expect(adopted).toEqual(["agent:alice:chat:direct:bob"]);
     });
   });
 });

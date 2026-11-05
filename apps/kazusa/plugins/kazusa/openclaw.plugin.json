@@ -98,7 +98,7 @@
             "maximum": 100,
             "default": 24
           },
-          "maxRunSeconds": {
+          "maxThinkingSeconds": {
             "type": "integer",
             "minimum": 1,
             "maximum": 3600,
@@ -120,7 +120,7 @@
                 "maximum": 4000,
                 "default": 1000
               },
-              "maxRunSeconds": {
+              "maxThinkingSeconds": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 14400,
@@ -503,38 +503,80 @@
             "default": 9,
             "description": "Bubbles (said or done) one send_message may carry (default: 9)."
           },
-          "speechRates": {
+          "rates": {
             "type": "object",
             "additionalProperties": false,
-            "description": "Face to face, characters said per second at an ordinary pace, per writing system; each speaker's judged pace scales it.",
+            "description": "Characters per second at an ordinary pace, per writing system, typed into a chat or said face to face; each person's judged pace scales it.",
             "properties": {
-              "letters": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 50,
-                "default": 12,
-                "description": "Letters and digits of any alphabet (default: 12, about 150 English words a minute)."
+              "typing": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Typed on a phone: every key counts, spaces and punctuation too.",
+                "properties": {
+                  "letters": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20,
+                    "default": 3,
+                    "description": "Letters, digits, spaces, punctuation and emoji (default: 3, about 36 English words a minute)."
+                  },
+                  "han": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20,
+                    "default": 0.75,
+                    "description": "Chinese characters and Japanese kanji: a reading, then a pick (default: 0.75)."
+                  },
+                  "kana": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20,
+                    "default": 1.5,
+                    "description": "Japanese kana, flick input (default: 1.5)."
+                  },
+                  "hangul": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20,
+                    "default": 1.2,
+                    "description": "Korean syllable blocks, 2-3 keys each (default: 1.2)."
+                  }
+                }
               },
-              "han": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 50,
-                "default": 5,
-                "description": "Chinese characters and Japanese kanji (default: 5)."
-              },
-              "kana": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 50,
-                "default": 8,
-                "description": "Japanese kana, about a mora each (default: 8)."
-              },
-              "hangul": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 50,
-                "default": 7,
-                "description": "Korean syllable blocks (default: 7)."
+              "speaking": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Said aloud: only what is pronounced takes time.",
+                "properties": {
+                  "letters": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 12,
+                    "description": "Letters and digits of any alphabet (default: 12, about 150 English words a minute)."
+                  },
+                  "han": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 5,
+                    "description": "Chinese characters and Japanese kanji (default: 5)."
+                  },
+                  "kana": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 8,
+                    "description": "Japanese kana, about a mora each (default: 8)."
+                  },
+                  "hangul": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 7,
+                    "description": "Korean syllable blocks (default: 7)."
+                  }
+                }
               }
             }
           }

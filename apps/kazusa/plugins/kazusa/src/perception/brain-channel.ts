@@ -1,4 +1,4 @@
-import { beginBrainRun, brainRunLimits } from "./run-limits.ts";
+import { beginBrainRun } from "./run-limits.ts";
 import { currentConfig } from "../current-config.ts";
 import { noteShutdown } from "../shutdown.ts";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
@@ -270,10 +270,10 @@ export function registerBrainChannel(
         replyOptions: {
           runId: delivery.id,
           abortSignal,
-          // Run limits own how long a brain thinks; the host's default turn
-          // timeout would otherwise end it first.
-          timeoutOverrideSeconds: brainRunLimits(api, delivery.agentId)
-            .maxRunSeconds,
+          // Run limits own how long a brain thinks. The host's turn timeout
+          // is wall time, so it would also count typing, the floor and a
+          // paused world: none (0).
+          timeoutOverrideSeconds: 0,
           turnAdoptionLifecycle: { ...lifecycle, abortSignal },
           sourceReplyDeliveryMode: "message_tool_only",
           suppressTyping: true,

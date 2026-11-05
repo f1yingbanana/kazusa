@@ -169,14 +169,16 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      Task check-ins therefore arrive bundled with the messages a character set
      aside while busy. See `references/perception.md` §12.
    - **Paced, Interruptible Speech**: `send_message` takes an array of chat
-     bubbles and delivers them one by one at simulated typing speed while the
-     tool call stays open. A `STEER` aborts the rest; unsent bubbles never reach
-     any ledger, and the tool result tells the brain what was and was not said.
-     See `references/messaging.md` (Paced speech). Face to face, every spoken
-     line takes its speaking time (per writing system, at a pace Jev judges per
-     send) and waits for the huddle's one floor; Jev's `floor` question decides
-     how badly a speaker wants in (`CUT_IN`, `NEXT`, `WAIT`), and a line stopped
-     mid-way is heard up to where it got. See `references/floor.md`.
+     bubbles and delivers them one by one while the tool call stays open. Every
+     bubble, the first included, takes its time to type or, face to face, to say
+     (`messaging/composing.ts`: per writing system, at a pace Jev judges per
+     send); thinking is not typing, and the typing indicator shows only while a
+     bubble is being composed. A `STEER` aborts the rest; unsent bubbles never
+     reach any ledger, and the tool result tells the brain what was and was not
+     said. See `references/messaging.md` (Paced speech). Face to face, each
+     spoken line also waits for the huddle's one floor; Jev's `floor` question
+     decides how badly a speaker wants in (`CUT_IN`, `NEXT`, `WAIT`), and a line
+     stopped mid-way is heard up to where it got. See `references/floor.md`.
    - **No Generative Rewriting & Zero Prompt Injections**: Jev is a
      non-generative classifier with categorical choices. Admitted stimuli pass
      through verbatim to the `:brain` session without hallucination or
@@ -1213,30 +1215,33 @@ connect these modules in process.
   (`perception.systemAgent`). For every character, near the limits only
   `send_message`, `talk`, `create_group` and `continue_work` still run, so a run
   can report before it ends, and `start_task` and `delay_task`, so it can always
-  move on. A character's run time stops while the clock is paused (the run waits
-  at its next tool call); the system agent's keeps running. Shell execution,
-  code execution and `openclaw` delegation are denied; native `cwd` selects
-  `apps/kazusa` for coding while identity/memory remain in her character
-  workspace. File tools enforce that coding directory. Its `.agents` workspace
-  symlink exposes these architecture guides without adding a workspace-root
-  `AGENTS.md`. Use native `skills_read` for complete installed guides; ordinary
-  file reads through an escaping symlink remain blocked. Perception admits its
-  input immediately, even paused; Messaging uses wall-time pacing, and its
-  message, chat-management and task tools skip the pause wait. Simulation time,
-  task deadlines and ordinary characters remain frozen. Offstage and custody
-  gates still apply. How she works is in her `SOUL.md`; the common jobs
-  (characters, wikis, places) are the `world-building` skill, and whole worlds
-  are `world-project`. Both live in `.agents/skills/`, so coding agents working
-  in this repo get them as well as every world's system agent, who selects them
-  by her per-agent `skills` in `worlds/base.json`. Long jobs survive the run
-  limits through a project file and `continue_work`, which starts a fresh run
-  once this one ends (`perception/continue.ts`), up to
-  `perception.systemAgent.maxContinuations` runs without the user speaking.
-  Retained consumers use the host-injected `api.runtime.config.current()` rather
-  than retaining `api.config` for live agent/identity/workspace lookups.
-  Character and agent roster responses expose `isSystemAgent` from that
-  snapshot; the client renders it as `ADMIN` in World rows and direct-chat rows.
-  Never infer administrator status from a name or biography.
+  move on. A run's time limit (`maxThinkingSeconds`) counts only its model
+  calls, summed from OpenClaw's `model_call_started`/`model_call_ended` hooks;
+  waiting on a tool (typing, the floor, a paused world) spends none of it, so
+  the host's wall-clock turn timeout is off for brain runs
+  (`timeoutOverrideSeconds: 0`). Shell execution, code execution and `openclaw`
+  delegation are denied; native `cwd` selects `apps/kazusa` for coding while
+  identity/memory remain in her character workspace. File tools enforce that
+  coding directory. Its `.agents` workspace symlink exposes these architecture
+  guides without adding a workspace-root `AGENTS.md`. Use native `skills_read`
+  for complete installed guides; ordinary file reads through an escaping symlink
+  remain blocked. Perception admits its input immediately, even paused; her
+  messages go out at once, unpaced, and her message, chat-management and task
+  tools skip the pause wait. Simulation time, task deadlines and ordinary
+  characters remain frozen. Offstage and custody gates still apply. How she
+  works is in her `SOUL.md`; the common jobs (characters, wikis, places) are the
+  `world-building` skill, and whole worlds are `world-project`. Both live in
+  `.agents/skills/`, so coding agents working in this repo get them as well as
+  every world's system agent, who selects them by her per-agent `skills` in
+  `worlds/base.json`. Long jobs survive the run limits through a project file
+  and `continue_work`, which starts a fresh run once this one ends
+  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
+  runs without the user speaking. Retained consumers use the host-injected
+  `api.runtime.config.current()` rather than retaining `api.config` for live
+  agent/identity/workspace lookups. Character and agent roster responses expose
+  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
+  rows and direct-chat rows. Never infer administrator status from a name or
+  biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from

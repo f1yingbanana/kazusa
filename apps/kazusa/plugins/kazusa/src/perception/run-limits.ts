@@ -31,13 +31,13 @@ const ACTIVITY_TOOLS: ReadonlySet<string> = new Set([
 
 /** Model calls kept back so a run can still say where things stand. */
 const WRAP_UP_MODEL_CALLS = 2;
-/** Share of a run's time after which it is told to wrap up. */
+/** Share of a run's thinking time after which it is told to wrap up. */
 const WRAP_UP_TIME_SHARE = 0.8;
 
 interface RunLimits {
   readonly maxModelCalls: number;
   readonly maxToolCalls: number;
-  readonly maxRunSeconds: number;
+  readonly maxThinkingSeconds: number;
 }
 
 function isSystemAgent(api: OpenClawPluginApi, agentId: string): boolean {
@@ -57,14 +57,10 @@ interface BrainRun {
   readonly agentId: string;
   readonly controller: AbortController;
   readonly limits: RunLimits;
-  readonly startedAt: number;
-  /**
-   * A character's run waits out a paused clock at its next tool call
-   * (`untilRunning`), so that time is not spent. The system agent works on.
-   */
-  readonly holdsOnPause: boolean;
-  pausedMs: number;
-  pausedSince?: number;
+  /** Time spent in model calls that have ended, as the host measured them. */
+  thoughtMs: number;
+  /** Model calls under way, by call id: when each started. */
+  readonly thinking: Map<string, number>;
   timer?: ReturnType<typeof setTimeout>;
   readonly models: Set<string>;
   readonly tools: Set<string>;
@@ -86,26 +82,24 @@ function activeRuns(): Map<string, BrainRun> {
   return (scope[RUNS] ??= new Map<string, BrainRun>());
 }
 
-// Whether the world is paused; every registration's clock shares one cell.
-const PAUSED = Symbol.for("kazusa.brain.run-limit-paused");
-function clockPaused(): boolean {
-  return (globalThis as { [PAUSED]?: () => boolean })[PAUSED]?.() ?? false;
+/**
+ * How long a run has spent thinking: its model calls, ended and under way.
+ * Waiting on a tool (typing, the floor, a paused world) is not thinking.
+ */
+function thinkingMs(run: BrainRun, now = Date.now()): number {
+  let ms = run.thoughtMs;
+  for (const startedAt of run.thinking.values()) ms += now - startedAt;
+  return ms;
 }
 
-/** Real time a run has spent, less the time its world stood paused. */
-function elapsedMs(run: BrainRun, now = Date.now()): number {
-  const pausing = run.pausedSince === undefined ? 0 : now - run.pausedSince;
-  return now - run.startedAt - run.pausedMs - pausing;
-}
-
-/** Ends the run once its time is spent; nothing counts down while paused. */
+/** Ends the run once its thinking time is spent; only a model call spends it. */
 function armExpiry(run: BrainRun): void {
   clearTimeout(run.timer);
-  if (run.pausedSince !== undefined) return;
-  const { maxRunSeconds } = run.limits;
+  if (!run.thinking.size) return;
+  const { maxThinkingSeconds } = run.limits;
   run.timer = setTimeout(
-    () => run.expire(`${maxRunSeconds}s elapsed`),
-    Math.max(0, maxRunSeconds * 1000 - elapsedMs(run)),
+    () => run.expire(`${maxThinkingSeconds}s of thinking`),
+    Math.max(0, maxThinkingSeconds * 1000 - thinkingMs(run)),
   );
   run.timer.unref();
 }
@@ -134,16 +128,12 @@ export function beginBrainRun(
     )
       abortAgentHarnessRun(state.sessionId);
   };
-  const startedAt = Date.now();
-  const holdsOnPause = !isSystemAgent(api, agentId);
   const state: BrainRun = {
     agentId,
     controller,
     limits,
-    startedAt,
-    holdsOnPause,
-    pausedMs: 0,
-    ...(holdsOnPause && clockPaused() ? { pausedSince: startedAt } : {}),
+    thoughtMs: 0,
+    thinking: new Map(),
     models: new Set(),
     tools: new Set(),
     expire,
@@ -156,7 +146,6 @@ export function beginBrainRun(
   };
   const runs = activeRuns();
   runs.set(runId, state);
-  armExpiry(state);
   return {
     signal: AbortSignal.any([lifetime, controller.signal]),
     dispose: () => {
@@ -193,26 +182,8 @@ function brainRun(
 
 export function registerBrainRunLimits(
   api: OpenClawPluginApi,
-  clock: Pick<Clock, "time" | "now" | "onClockChange">,
+  clock: Pick<Clock, "time">,
 ): (runId: string) => void {
-  (globalThis as { [PAUSED]?: () => boolean })[PAUSED] = () =>
-    clock.now().speed <= 0;
-  // Every registration listens; each run notes a pause and its end once.
-  const unsubscribe = clock.onClockChange((now) => {
-    const at = Date.now();
-    for (const run of activeRuns().values()) {
-      if (!run.holdsOnPause) continue;
-      if (now.speed <= 0 && run.pausedSince === undefined) {
-        run.pausedSince = at;
-        clearTimeout(run.timer);
-      } else if (now.speed > 0 && run.pausedSince !== undefined) {
-        run.pausedMs += at - run.pausedSince;
-        delete run.pausedSince;
-        armExpiry(run);
-      }
-    }
-  });
-  api.lifecycle.onDispose?.(unsubscribe);
   // What a refused call says is the `kazusa-results` skill's.
   const text = pluginSkillText(api);
   const refuse = (result: string, agentId?: string) => ({
@@ -232,8 +203,18 @@ export function registerBrainRunLimits(
     );
     if (!state || state.models.has(event.callId)) return;
     state.models.add(event.callId);
+    state.thinking.set(event.callId, Date.now());
+    armExpiry(state);
     if (state.models.size >= state.limits.maxModelCalls)
       state.expire(`${state.limits.maxModelCalls} model calls`);
+  });
+  api.on("model_call_ended", (event) => {
+    const state = activeRuns().get(event.runId);
+    if (!state?.thinking.delete(event.callId)) return;
+    state.thoughtMs += event.durationMs;
+    armExpiry(state);
+    if (state.thoughtMs >= state.limits.maxThinkingSeconds * 1000)
+      state.expire(`${state.limits.maxThinkingSeconds}s of thinking`);
   });
   api.on("before_tool_call", (event, ctx) => {
     if (ctx.agentId) {
@@ -262,13 +243,13 @@ export function registerBrainRunLimits(
     // Near the end only speech and choosing what comes next still run, so a
     // run is never cut off without the chance to report or move on. The
     // model-call limit bounds what follows.
-    const { maxModelCalls, maxToolCalls, maxRunSeconds } = state.limits;
+    const { maxModelCalls, maxToolCalls, maxThinkingSeconds } = state.limits;
     if (
       !SPEECH_TOOLS.has(event.toolName) &&
       !ACTIVITY_TOOLS.has(event.toolName) &&
       (state.tools.size >= maxToolCalls ||
         state.models.size >= maxModelCalls - WRAP_UP_MODEL_CALLS ||
-        elapsedMs(state) >= maxRunSeconds * 1000 * WRAP_UP_TIME_SHARE)
+        thinkingMs(state) >= maxThinkingSeconds * 1000 * WRAP_UP_TIME_SHARE)
     )
       return refuse("out-of-time", ctx.agentId);
     state.tools.add(key ?? `uncorrelated:${state.tools.size}`);

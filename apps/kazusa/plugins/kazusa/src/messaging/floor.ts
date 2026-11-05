@@ -5,6 +5,8 @@
  * how badly people want in, not by who waited longest.
  */
 
+import type { Medium } from "./composing.ts";
+
 /** How badly a speaker wants in when someone else has the floor. */
 export const FLOOR_CHOICES = ["CUT_IN", "NEXT", "WAIT"] as const;
 export type FloorChoice = (typeof FLOOR_CHOICES)[number];
@@ -19,122 +21,20 @@ export interface FloorFacts {
   readonly waiting: number;
 }
 
-/** What a speaker is about to say aloud into, as asked once per send. */
+/** What someone is about to type or say into, as asked once per send. */
 export interface SpeechFacts {
   /** The speaker's own address of the conversation. */
   readonly sessionKey: string;
+  readonly medium: Medium;
   /** Present when someone else has the floor. */
   readonly floor?: FloorFacts;
 }
 
-/** How they say it: how badly they want in, and how fast they talk. */
+/** How they say it: how badly they want in, and how fast they type or talk. */
 export interface SpeechJudgment {
   readonly floor: FloorChoice;
-  /** Their speaking rate against an ordinary one: 1.25 is a quarter faster. */
+  /** Their rate against an ordinary one: 1.25 is a quarter faster. */
   readonly pace: number;
-}
-
-/**
- * What one writing system's units take to say, per second at an ordinary pace:
- * spoken languages differ in how much a written character carries. Letters and
- * digits of every alphabet count alike.
- */
-export interface SpeechRates {
-  readonly letters: number;
-  /** Chinese characters, and kanji in Japanese. */
-  readonly han: number;
-  /** Japanese kana: about one mora each. */
-  readonly kana: number;
-  /** Korean syllable blocks. */
-  readonly hangul: number;
-}
-
-/**
- * ~150 English words a minute; Japanese ~8 morae, Mandarin ~5 syllables and
- * Korean ~7 syllables a second (Pellegrino et al. 2011; Korean approximate).
- */
-export const SPEECH_RATES: SpeechRates = {
-  letters: 12,
-  han: 5,
-  kana: 8,
-  hangul: 7,
-};
-
-const HAN = /\p{Script=Han}/u;
-const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
-const HANGUL = /\p{Script=Hangul}/u;
-const SPOKEN = /[\p{L}\p{N}]/u;
-
-/** Seconds one character takes at an ordinary pace; spaces and marks take none. */
-function secondsOf(char: string, rates: SpeechRates): number {
-  if (HAN.test(char)) return 1 / rates.han;
-  if (KANA.test(char)) return 1 / rates.kana;
-  if (HANGUL.test(char)) return 1 / rates.hangul;
-  return SPOKEN.test(char) ? 1 / rates.letters : 0;
-}
-
-/** A letter of a script written with spaces between words. */
-const spaced = (char: string): boolean =>
-  SPOKEN.test(char) && !HAN.test(char) && !KANA.test(char);
-
-/**
- * The pace a judged score stands for: scores index the rubric's ordered pace
- * anchors, and a fraction lies between two, evenly on a log scale (a ratio).
- * Unjudged: ordinary.
- */
-export function paceAt(score: number, anchors: readonly number[]): number {
-  if (!anchors.length || !Number.isFinite(score)) return 1;
-  const position = Math.min(Math.max(score, 0), anchors.length - 1);
-  const lower = Math.floor(position);
-  const upper = Math.ceil(position);
-  const from = Math.log(anchors[lower]);
-  const to = Math.log(anchors[upper]);
-  return Math.exp(from + (to - from) * (position - lower));
-}
-
-/**
- * Speaking time of a spoken line, in sim ms, at the speaker's `pace`. No cap:
- * speech is said live.
- */
-export function speakingMs(
-  text: string,
-  rates: SpeechRates = SPEECH_RATES,
-  pace = 1,
-): number {
-  let seconds = 0;
-  for (const char of text) seconds += secondsOf(char, rates);
-  return Math.round((1_000 * Math.max(seconds, 0.3)) / pace);
-}
-
-/**
- * What a line said `fraction` of the way through sounded like: what its time
- * covers, then a dash. A word written with spaces is heard whole or not at all;
- * a Chinese or Japanese character on its own. Empty when cut before anything
- * was said; the whole line once its time is up.
- */
-export function cutOff(
-  text: string,
-  fraction: number,
-  rates: SpeechRates = SPEECH_RATES,
-): string {
-  if (fraction >= 1) return text;
-  const chars = [...text];
-  const total = chars.reduce((sum, char) => sum + secondsOf(char, rates), 0);
-  const reached = total * Math.max(0, fraction);
-  let spent = 0;
-  let end = 0;
-  for (; end < chars.length; end++) {
-    const seconds = secondsOf(chars[end], rates);
-    if (spent + seconds > reached + 1e-9) break;
-    spent += seconds;
-  }
-  if (end < chars.length && spaced(chars[end]))
-    while (end > 0 && spaced(chars[end - 1])) end--;
-  const kept = chars
-    .slice(0, end)
-    .join("")
-    .replace(/[\s\p{P}]+$/u, "");
-  return [...kept].some((char) => secondsOf(char, rates) > 0) ? `${kept}—` : "";
 }
 
 /** One line wanting the floor. A plan is one `send_message` call. */

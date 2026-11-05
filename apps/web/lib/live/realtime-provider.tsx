@@ -45,6 +45,8 @@ export type ConnectionStatus = "connecting" | "open" | "error";
 export type Typist = {
   senderId: string;
   senderName: string;
+  /** Typed into a chat, or said aloud face to face. */
+  mode: TypingStreamEvent["mode"];
   expiresAt?: number;
 };
 
@@ -222,6 +224,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             {
               senderId: event.senderId,
               senderName: event.senderName,
+              mode: event.mode,
               expiresAt: event.expiresAt,
             },
           ],

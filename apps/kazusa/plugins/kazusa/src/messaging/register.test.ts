@@ -54,7 +54,6 @@ async function setup(
   );
   const registerTool = vi.fn();
   const registerService = vi.fn();
-  const registerAgentEventSubscription = vi.fn();
   type HttpRoute = Parameters<OpenClawPluginApi["registerHttpRoute"]>[0];
   const routes = new Map<string, HttpRoute>();
   const registerHttpRoute = vi.fn((params: HttpRoute) => {
@@ -80,7 +79,6 @@ async function setup(
   const api = {
     config,
     pluginConfig,
-    agent: { events: { registerAgentEventSubscription } },
     registerTool,
     registerService,
     registerHttpRoute,
@@ -129,21 +127,6 @@ async function setup(
     runtime: { ...api.runtime, config: { current: () => api.config } },
   });
   const receive = vi.fn(async () => {});
-  let adoptedListener:
-    | ((delivery: {
-        id: string;
-        agentId: string;
-        mode: "steer" | "followup";
-        message: string;
-        ids: string[];
-        keys: string[];
-        sessionKeys?: string[];
-      }) => void | Promise<void>)
-    | undefined;
-  const onAdopted = vi.fn((listener) => {
-    adoptedListener = listener;
-    return () => {};
-  });
   const messaging = registerMessaging(api, {
     // The test clock is paused; nothing here is about holding still.
     release: AbortSignal.abort(),
@@ -152,7 +135,7 @@ async function setup(
       time: () => 123456,
       now: () => ({ simTime: 123456, speed: 0, formatted: "" }),
     },
-    perception: { receive, onAdopted },
+    perception: { receive },
     ...options,
   });
   instances.push(messaging);
@@ -205,7 +188,6 @@ async function setup(
     api,
     workspace,
     registerService,
-    registerAgentEventSubscription,
     dispose,
     messaging,
     receive,
@@ -213,9 +195,6 @@ async function setup(
     patchSessionEntry,
     registerTool,
     routes,
-    adopt: async (
-      delivery: Parameters<NonNullable<typeof adoptedListener>>[0],
-    ) => adoptedListener?.(delivery),
   };
 }
 
@@ -699,58 +678,6 @@ describe("send_message SDK integration", () => {
     expect(append).not.toHaveBeenCalled();
   });
 
-  it("signals typing automatically on turn adoption and clears it on turn end or send", async () => {
-    const h = await setup();
-    await h.execute();
-    const lifecycle = h.registerAgentEventSubscription.mock.calls[0][0];
-    const event = (phase: string, runId: string) =>
-      lifecycle.handle({
-        stream: "lifecycle",
-        sessionKey: "agent:alice:brain",
-        runId,
-        data: { phase },
-      });
-    expect(await h.messaging.getTyping("bob")).toEqual([]);
-    // A delivery's id is a hash of its stimuli, never the run's id: live, the
-    // run's start cleared typing set moments before by its own adoption.
-    await h.adopt({
-      id: "delivery-hash",
-      agentId: "alice",
-      mode: "followup",
-      message: "Hello",
-      ids: ["msg-1"],
-      keys: ["key-1"],
-      sessionKeys: ["agent:alice:chat:direct:bob"],
-    });
-    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
-    event("start", "run-1");
-    expect(await h.messaging.getTyping("bob")).toHaveLength(1);
-    event("error", "run-1");
-    expect(await h.messaging.getTyping("bob")).toEqual([]);
-  });
-
-  it("shows no typing face to face while someone only thinks about replying", async () => {
-    // Face to face, typing shows someone saying a line.
-    const h = await setup(
-      {},
-      { placeOf: async () => ({ placeId: "club", title: "Club" }) },
-    );
-    await h.execute();
-    const club = await h.messaging.talk("alice", ["bob"]);
-    await h.adopt({
-      id: "delivery-both",
-      agentId: "alice",
-      mode: "followup",
-      message: "Hello",
-      ids: ["msg-1"],
-      keys: ["key-1"],
-      sessionKeys: [club.sessionKey, "agent:alice:chat:direct:bob"],
-    });
-    expect(
-      (await h.messaging.getTyping("bob")).map((typing) => typing.chatId),
-    ).toEqual([expect.stringMatching(/^direct:/)]);
-  });
-
   it("forwards what happens in others' chats to observers, wrapped as observed", async () => {
     const broadcast = vi.fn();
     const h = await setup(
@@ -781,7 +708,7 @@ describe("send_message SDK integration", () => {
         }),
       ]),
     );
-    await h.messaging.setTyping("alice", "Alice", theirs.sessionKey, true);
+    await h.messaging.setTyping("alice", "Alice", theirs.sessionKey, "typing");
     expect(observed()).toContainEqual(
       expect.objectContaining({ type: "typing", isTyping: true }),
     );
@@ -798,7 +725,7 @@ describe("send_message SDK integration", () => {
       "alice",
       "Alice",
       "agent:alice:chat:direct:user:sensei",
-      true,
+      "typing",
     );
     expect(observed().map((event) => event.type)).toEqual(["chats"]);
     expect(mine.chatId).toBeDefined();

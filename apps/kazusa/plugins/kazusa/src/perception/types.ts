@@ -4,13 +4,14 @@ export { STIMULUS, type Stimulus } from "../stimulus.ts";
 export const PERCEPTION_CONFIG = z.object({
   maxModelCalls: z.number().int().min(1).max(100).default(6),
   maxToolCalls: z.number().int().min(1).max(100).default(12),
-  maxRunSeconds: z.number().int().min(1).max(3600).default(180),
+  /** Time in model calls; waiting on a tool (typing, the floor) is not. */
+  maxThinkingSeconds: z.number().int().min(1).max(3600).default(180),
   /** The system agent's jobs are projects, not one character's reaction. */
   systemAgent: z
     .object({
       maxModelCalls: z.number().int().min(1).max(2000).default(500),
       maxToolCalls: z.number().int().min(1).max(4000).default(1000),
-      maxRunSeconds: z.number().int().min(1).max(14_400).default(7200),
+      maxThinkingSeconds: z.number().int().min(1).max(14_400).default(7200),
       /** Fresh runs `continue_work` may ask for before a person must speak. */
       maxContinuations: z.number().int().min(0).max(500).default(40),
     })

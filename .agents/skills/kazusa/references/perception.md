@@ -927,10 +927,11 @@ survive restarts; `recover()` and the next drain re-arm the timer.
 ### 12.4 Paced speech and steering
 
 `send_message({ messages: [...] })` keeps the tool call open while Messaging
-delivers each bubble as its own canonical message, waiting a simulated typing
-interval before every bubble after the first (the brain's thinking time already
-showed the typing indicator for the first). While the call is open the brain is
-busy, so new stimuli go through `attention_allocation`. Jev's state includes
+delivers each bubble as its own canonical message, each one, the first included,
+after its simulated typing or speaking time (thinking is not typing; see
+[messaging](messaging.md), Paced speech). While the call is open the brain is
+busy, so new stimuli go through `attention_allocation`; the wait costs none of
+the run's thinking time. Jev's state includes
 `currentSpeech: { chat, said, unsaid }` so it can tell that a reply contradicts
 what the character is about to say.
 

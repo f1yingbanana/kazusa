@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Floors, cutOff, paceAt, speakingMs } from "./floor.ts";
+import { Floors } from "./floor.ts";
 
 const open = () => new AbortController().signal;
 /** Let granted claims run their continuations. */
@@ -21,46 +21,6 @@ function granted(floors: Floors) {
       });
   return { order, take };
 }
-
-describe("speaking time and cut-off lines", () => {
-  it("takes each writing system's characters at its own rate, with no cap", () => {
-    // Twelve letters a second: spaces and punctuation take no time.
-    expect(speakingMs("Hello, there! How are you?")).toBe(1_583);
-    expect(speakingMs("word ".repeat(150))).toBe(50_000);
-    // A whole sentence with no spaces is not one word.
-    expect(speakingMs("今日は元気ですか")).toBe(1_300);
-    expect(speakingMs("안녕하세요")).toBe(714);
-    expect(speakingMs("…")).toBe(300);
-  });
-
-  it("is said faster or slower at the speaker's pace", () => {
-    expect(speakingMs("Hello, there! How are you?", undefined, 1.25)).toBe(
-      1_267,
-    );
-    expect(speakingMs("Hello, there! How are you?", undefined, 0.5)).toBe(
-      3_167,
-    );
-  });
-
-  it("reads a judged score between the pace anchors, as a ratio", () => {
-    const anchors = [0.6, 0.8, 1, 1.25, 1.6];
-    expect(paceAt(2, anchors)).toBe(1);
-    expect(paceAt(4, anchors)).toBeCloseTo(1.6);
-    expect(paceAt(2.5, anchors)).toBeCloseTo(Math.sqrt(1.25));
-    expect(paceAt(9, anchors)).toBeCloseTo(1.6);
-    expect(paceAt(Number.NaN, anchors)).toBe(1);
-    expect(paceAt(3, [])).toBe(1);
-  });
-
-  it("is heard up to where it got, a spaced word whole or not at all", () => {
-    expect(cutOff("I told you not to go there", 0.5)).toBe("I told you—");
-    expect(cutOff("Wait, no. Listen", 0.67)).toBe("Wait, no—");
-    expect(cutOff("Listen to me", 0.1)).toBe("");
-    expect(cutOff("Listen to me", 1)).toBe("Listen to me");
-    // Chinese and Japanese break between characters.
-    expect(cutOff("今日は元気ですか", 0.5)).toBe("今日は—");
-  });
-});
 
 describe("one floor per huddle", () => {
   it("is free until someone speaks, then contested by everyone else", async () => {
