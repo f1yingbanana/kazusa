@@ -10,6 +10,7 @@ import {
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { parseEnv } from "node:util";
 import { PROVIDERS, type ProviderEntry } from "@kazusa/client";
@@ -70,6 +71,25 @@ export interface KeyStore {
 const ProfileIdsSchema = z.array(z.string());
 
 /**
+ * Arguments that run `body` in a child Node process with OpenClaw's SDK at
+ * `sdk` as `sdk`. It's imported by `file://` URL: Node reads a bare Windows
+ * path's drive (`Z:`) as a URL scheme and refuses it, which stopped setup on
+ * every Windows install.
+ */
+export function sdkScript(
+  sdk: string,
+  body: string,
+  windows = process.platform === "win32",
+): string[] {
+  const url = pathToFileURL(sdk, { windows }).href;
+  return [
+    "--input-type=module",
+    "-e",
+    `const sdk = await import(${JSON.stringify(url)});\n${body}`,
+  ];
+}
+
+/**
  * Through OpenClaw's plugin SDK in a child Node process, with the world's
  * state: setup runs before the Gateway exists. About a second a call.
  */
@@ -87,11 +107,7 @@ export function sdkKeyStore(appDir: string): KeyStore {
       OPENCLAW_STATE_DIR: path.join(liveDir, ".state"),
     },
   };
-  const script = (body: string) => [
-    "--input-type=module",
-    "-e",
-    `const sdk = await import(${JSON.stringify(sdk)});\n${body}`,
-  ];
+  const script = (body: string) => sdkScript(sdk, body);
   return {
     saved: async () => {
       if (!existsSync(options.env.OPENCLAW_STATE_DIR)) return [];
