@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { dropStoreKeyRefs } from "./provider-keys.mjs";
+import { dropStoreKeyRefs, profilesScript } from "./provider-keys.mjs";
 
 const ref = (id) => ({ source: "store", provider: "default", id });
 
@@ -84,5 +84,18 @@ describe("dropStoreKeyRefs", () => {
     };
     expect(dropStoreKeyRefs(root, openclaw)).toEqual([]);
     expect(openclaw.profiles).not.toHaveBeenCalled();
+  });
+});
+
+describe("profilesScript", () => {
+  it("imports the SDK by file URL, which Windows needs for a drive path", () => {
+    expect(
+      profilesScript(
+        "Z:\\Kazusa\\node_modules\\openclaw\\dist\\plugin-sdk\\provider-auth.js",
+        true,
+      ),
+    ).toContain(
+      'import("file:///Z:/Kazusa/node_modules/openclaw/dist/plugin-sdk/provider-auth.js")',
+    );
   });
 });

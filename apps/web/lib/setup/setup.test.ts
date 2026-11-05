@@ -10,7 +10,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SYSTEM_AGENT_INCLUDE as SCRIPT_INCLUDE } from "../../../../scripts/system-agent.mjs";
-import { createSetup, SYSTEM_AGENT_INCLUDE, type KeyStore } from "./setup";
+import { execFileSync } from "node:child_process";
+import {
+  createSetup,
+  sdkScript,
+  SYSTEM_AGENT_INCLUDE,
+  type KeyStore,
+} from "./setup";
 
 function write(file: string, text: string) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -100,6 +106,35 @@ function fixture(): string {
   write(path.join(cards, "concepts/crew.md"), '---\ntitle: "The Crew"\n---\n');
   return app;
 }
+
+describe("sdkScript", () => {
+  it("imports the SDK by file URL, which Windows needs for a drive path", () => {
+    const [, , code] = sdkScript(
+      "Z:\\Kazusa\\node_modules\\openclaw\\dist\\plugin-sdk\\provider-auth.js",
+      "",
+      true,
+    );
+    expect(code).toContain(
+      'import("file:///Z:/Kazusa/node_modules/openclaw/dist/plugin-sdk/provider-auth.js")',
+    );
+  });
+
+  it("loads OpenClaw's SDK in a child Node process", () => {
+    const sdk = path.resolve(
+      __dirname,
+      "../../../../node_modules/openclaw/dist/plugin-sdk/provider-auth.js",
+    );
+    const out = execFileSync(
+      process.execPath,
+      sdkScript(
+        sdk,
+        "process.stdout.write(typeof sdk.ensureAuthProfileStore);",
+      ),
+      { encoding: "utf8" },
+    );
+    expect(out).toBe("function");
+  });
+});
 
 describe("setup", () => {
   let app: string;

@@ -12,7 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Where Kazusa's own config used to keep TypeSafe's key. */
 const TYPESAFE_PATH = ["plugins", "entries", "kazusa", "config", "decisions"];
@@ -91,6 +91,17 @@ export function dropStoreKeyRefs(root, deps = openclawDeps(root)) {
 }
 
 /** Through OpenClaw itself, with the world's state, while no Gateway runs. */
+/**
+ * Lists Kazusa's profiles through OpenClaw's SDK at `sdk`, imported by
+ * `file://` URL: Node reads a bare Windows path's drive (`Z:`) as a URL scheme
+ * and refuses it.
+ */
+export function profilesScript(sdk, windows = process.platform === "win32") {
+  return `const { ensureAuthProfileStore } = await import(${JSON.stringify(pathToFileURL(sdk, { windows }).href)});
+const ids = Object.keys(ensureAuthProfileStore().profiles);
+process.stdout.write(JSON.stringify(ids.filter((id) => id.endsWith(":manual")).map((id) => id.slice(0, -":manual".length))));`;
+}
+
 export function openclawDeps(root) {
   const world = path.join(root, "apps/kazusa/world");
   const env = {
@@ -114,11 +125,10 @@ export function openclawDeps(root) {
         "node_modules/openclaw/dist/plugin-sdk/provider-auth.js",
       );
       // Kazusa names each profile `<provider>:manual` (`providers/keys.ts`).
-      const script = `const { ensureAuthProfileStore } = await import(${JSON.stringify(sdk)});
-const ids = Object.keys(ensureAuthProfileStore().profiles);
-process.stdout.write(JSON.stringify(ids.filter((id) => id.endsWith(":manual")).map((id) => id.slice(0, -":manual".length))));`;
       return new Set(
-        JSON.parse(run(["--input-type=module", "-e", script]) || "[]"),
+        JSON.parse(
+          run(["--input-type=module", "-e", profilesScript(sdk)]) || "[]",
+        ),
       );
     },
     stored: () =>

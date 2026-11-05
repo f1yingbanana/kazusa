@@ -43,8 +43,13 @@ Assert (-not (Test-Path (Join-Path $Folder 'scripts\from-an-old-version.txt'))) 
 Assert (-not (Test-Path (Join-Path $Folder 'node_modules\from-an-old-version'))) 'an update removes old packages'
 Remove-Item -Recurse -Force $World
 
+# Kept apart from the runner's own output, and shown only if a step fails:
+# otherwise a failed start says no more than "Timed out".
+$AppOut = Join-Path $env:RUNNER_TEMP 'kazusa-app.out.log'
+$AppErr = Join-Path $env:RUNNER_TEMP 'kazusa-app.err.log'
 $app = Start-Process -FilePath (Join-Path $Folder 'node\node.exe') `
-  -ArgumentList "`"$(Join-Path $Folder 'scripts\dev.mjs')`"", '--packaged' -PassThru
+  -ArgumentList "`"$(Join-Path $Folder 'scripts\dev.mjs')`"", '--packaged' -PassThru `
+  -RedirectStandardOutput $AppOut -RedirectStandardError $AppErr
 try {
   Wait-Until { (Invoke-WebRequest "$Web/" -UseBasicParsing).StatusCode -eq 200 } 'the frontend starts'
   Invoke-RestMethod "$Web/setup" -Method Post -ContentType 'application/json' -Body '{"world":"starter"}' | Out-Null
@@ -54,6 +59,15 @@ try {
     $chat = (Invoke-RestMethod "$Web/kazusa/chats").chats | Where-Object { $_.members -contains 'arona' }
     $chat.lastMessage.senderId -eq 'arona'
   } 'the welcome message arrives'
+} catch {
+  foreach ($log in $AppOut, $AppErr) {
+    if (Test-Path $log) {
+      Write-Host "--- Kazusa's $(Split-Path $log -Leaf), last 200 lines"
+      Get-Content $log -Tail 200 | ForEach-Object { Write-Host $_ }
+    }
+  }
+  if ($app.HasExited) { Write-Host "Kazusa exited with $($app.ExitCode)." }
+  throw
 } finally {
   # A runner has no console to send Ctrl+C to, and this world is thrown away.
   # A child can exit while the tree is being stopped, which taskkill calls an
