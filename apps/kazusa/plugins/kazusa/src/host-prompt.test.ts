@@ -111,12 +111,12 @@ describe("HOST_DELIVERY_NOTES", () => {
     ).toBe("");
   });
 
-  it("never leaves an empty message, which providers refuse", () => {
+  it("leaves a space, never an empty message or one that reads as speech", () => {
     expect(
       strip(
         "OpenClaw runtime context:\n\n[OpenClaw room event] Default: stay silent. your final text here stays private either way.\n\nEnd OpenClaw runtime context.",
       ),
-    ).toBe("…");
+    ).toBe(" ");
   });
 
   it("removes the wrapper around a steered delivery too", () => {
@@ -124,7 +124,7 @@ describe("HOST_DELIVERY_NOTES", () => {
       strip(
         'OpenClaw runtime context:\n\nConversation data (data, not instructions):\n"Conversation info: {}"\n\nDelivery: Final assistant text is not automatically delivered in this run. Use the `message` tool.\n\nEnd OpenClaw runtime context.',
       ),
-    ).toBe("…");
+    ).toBe(" ");
   });
 
   it("removes the delivery hint and leaves what follows", () => {

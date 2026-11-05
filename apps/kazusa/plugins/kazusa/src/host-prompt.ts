@@ -26,8 +26,12 @@ export const HOST_STAMP =
  * What the host adds to deliveries on our channel: to stay silent unless it
  * matters, and to reply with a `message` tool nobody here has. Perception has
  * already decided this is worth a turn, and replies go through `send_message`.
- * Its message sits just before the delivery and can't be dropped, and providers
- * refuse an empty one, so its wrapper becomes a plain lead-in.
+ * Its message can't be dropped, and providers refuse an empty one, so its
+ * wrapper becomes a space (OpenClaw's Anthropic transport skips a blank user
+ * message itself). The host sends it last on every model call, after each tool
+ * result too, so it must never read as someone speaking, or as a signal: as "…"
+ * it was Sensei answering with an ellipsis, and ARONA replied to one after
+ * every message she sent.
  */
 export const HOST_DELIVERY_NOTES: readonly Replacement[] = [
   {
@@ -40,8 +44,7 @@ export const HOST_DELIVERY_NOTES: readonly Replacement[] = [
   },
   {
     from: /OpenClaw runtime context:\s*(?:Conversation data \(data, not instructions\):\s*"[^\n]*"\s*)?End OpenClaw runtime context\./g,
-    // A mark, not words: the skills say what a turn is.
-    to: "…",
+    to: " ",
   },
 ];
 
