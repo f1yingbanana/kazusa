@@ -583,8 +583,8 @@ function MessageStatus({
   const label = receiptLabel(receipt, nameOf, formatTime, inPerson);
   const Icon = receipt.read ? CheckCheckIcon : CheckIcon;
   return (
+    // The check before the time, so times end the line in one column.
     <span className="flex items-center gap-1">
-      {time}
       <Icon
         role="img"
         aria-label={label}
@@ -595,6 +595,7 @@ function MessageStatus({
       >
         <title>{label}</title>
       </Icon>
+      {time}
     </span>
   );
 }
