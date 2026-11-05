@@ -12,7 +12,6 @@ import {
   appendSessionTranscriptMessageByIdentityStrict,
   publishSessionTranscriptUpdateByIdentity,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
-import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import YAML from "yaml";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
@@ -48,7 +47,7 @@ import {
   type ChatConversation,
   type ChatSummary,
 } from "./conversations.ts";
-import { SPEECH_RATES } from "./floor.ts";
+import { COMPOSING_RATES } from "./composing.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 
 /** `plugins.entries.kazusa.config.messaging`. */
@@ -56,15 +55,52 @@ const MESSAGING_CONFIG = z.strictObject({
   /** Bubbles (said or done) one `send_message` may carry. */
   maxBubbles: z.number().int().min(1).max(32).default(9),
   /**
-   * Face to face, what each writing system's characters take to say per second
-   * at an ordinary pace; a speaker's own pace scales it.
+   * What each writing system's characters take per second at an ordinary pace,
+   * typed into a chat or said face to face; each person's judged pace scales
+   * it.
    */
-  speechRates: z
+  rates: z
     .strictObject({
-      letters: z.number().min(1).max(50).default(SPEECH_RATES.letters),
-      han: z.number().min(1).max(50).default(SPEECH_RATES.han),
-      kana: z.number().min(1).max(50).default(SPEECH_RATES.kana),
-      hangul: z.number().min(1).max(50).default(SPEECH_RATES.hangul),
+      typing: z
+        .strictObject({
+          letters: z
+            .number()
+            .min(0.1)
+            .max(20)
+            .default(COMPOSING_RATES.typing.letters),
+          han: z.number().min(0.1).max(20).default(COMPOSING_RATES.typing.han),
+          kana: z
+            .number()
+            .min(0.1)
+            .max(20)
+            .default(COMPOSING_RATES.typing.kana),
+          hangul: z
+            .number()
+            .min(0.1)
+            .max(20)
+            .default(COMPOSING_RATES.typing.hangul),
+        })
+        .prefault({}),
+      speaking: z
+        .strictObject({
+          letters: z
+            .number()
+            .min(1)
+            .max(50)
+            .default(COMPOSING_RATES.speaking.letters),
+          han: z.number().min(1).max(50).default(COMPOSING_RATES.speaking.han),
+          kana: z
+            .number()
+            .min(1)
+            .max(50)
+            .default(COMPOSING_RATES.speaking.kana),
+          hangul: z
+            .number()
+            .min(1)
+            .max(50)
+            .default(COMPOSING_RATES.speaking.hangul),
+        })
+        .prefault({}),
     })
     .prefault({}),
 });
@@ -164,11 +200,7 @@ export function registerMessaging(
       Partial<
         Pick<
           Perception,
-          | "onAdopted"
-          | "onRead"
-          | "attachSpeech"
-          | "attachConversations"
-          | "judgeSpeech"
+          "onRead" | "attachSpeech" | "attachConversations" | "judgeSpeech"
         >
       >;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
@@ -301,7 +333,7 @@ export function registerMessaging(
           judgeSpeech: deps.perception.judgeSpeech.bind(deps.perception),
         }
       : {}),
-    speechRates: messagingConfig.speechRates,
+    rates: messagingConfig.rates,
     warn: (message) => api.logger.warn(message),
     ...(deps.placeOf ? { placeOf: deps.placeOf } : {}),
   });
@@ -418,40 +450,6 @@ export function registerMessaging(
     } catch (err: unknown) {
       api.logger.warn(`Messaging read receipts error: ${String(err)}`);
     }
-  });
-
-  // Taking up a message shows as typing in its chat until the turn ends or
-  // the character speaks there.
-  deps.perception.onAdopted?.(async (delivery) => {
-    // Face to face, typing shows someone saying a line, never thinking.
-    const chats = delivery.sessionKeys?.filter(
-      (sessionKey) => !sessionKey.includes(":chat:huddle:"),
-    );
-    if (!chats?.length) return;
-    try {
-      const config = getConfig();
-      const name = await characterName(api, config, delivery.agentId);
-      for (const sessionKey of chats) {
-        await messaging.setTyping(delivery.agentId, name, sessionKey, true);
-      }
-    } catch (err: unknown) {
-      api.logger.warn(`Messaging auto-typing error: ${String(err)}`);
-    }
-  });
-
-  // A turn that ends has nothing left to type. Adoption comes before the
-  // run's start event, so start must not clear it.
-  api.agent.events.registerAgentEventSubscription({
-    id: "messaging-typing",
-    streams: ["lifecycle"],
-    handle(event) {
-      const owner = parseAgentSessionKey(event.sessionKey ?? "");
-      const data = z
-        .object({ phase: z.enum(["start", "end", "error"]) })
-        .safeParse(event.data);
-      if (!owner || owner.rest !== "brain" || !data.success) return;
-      if (data.data.phase !== "start") messaging.clearTyping(owner.agentId);
-    },
   });
 
   /** A character's own stickers, read again for each turn's tools. */

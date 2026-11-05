@@ -119,10 +119,12 @@ export function ChatHeader({
           {typing ? (
             <span className="truncate">
               {isDirect
-                ? "typing…"
+                ? `${typists[0].mode}…`
                 : formatTypingLabel(
                     typists.map((t) => t.senderName),
-                    chat.type === "huddle" ? "about to speak" : undefined,
+                    typists.every((t) => t.mode === "speaking")
+                      ? "speaking"
+                      : "typing",
                   )}
             </span>
           ) : chat.type === "huddle" ? (
@@ -150,6 +152,7 @@ export function ChatHeader({
         {!isDirect && others.length > 0 ? (
           <Faces
             ids={others}
+            chat={chat}
             onPick={(id) => show({ kind: "character", id })}
             onMore={() => show(subject)}
           />
@@ -189,10 +192,12 @@ export function ChatHeader({
  */
 function Faces({
   ids,
+  chat,
   onPick,
   onMore,
 }: {
   ids: readonly string[];
+  chat: Pick<Chat, "id" | "type">;
   onPick: (id: string) => void;
   onMore: () => void;
 }) {
@@ -201,7 +206,13 @@ function Faces({
   return (
     <div className="mr-1 hidden items-center sm:flex">
       {shown.map((id, index) => (
-        <Face key={id} id={id} first={index === 0} onPick={onPick} />
+        <Face
+          key={id}
+          id={id}
+          chat={chat}
+          first={index === 0}
+          onPick={onPick}
+        />
       ))}
       {rest > 0 ? (
         <button
@@ -219,10 +230,12 @@ function Faces({
 
 function Face({
   id,
+  chat,
   first,
   onPick,
 }: {
   id: string;
+  chat: Pick<Chat, "id" | "type">;
   first: boolean;
   onPick: (id: string) => void;
 }) {
@@ -232,11 +245,15 @@ function Face({
     character?.kind === "agent" ? id : undefined,
   );
   const name = character?.name ?? id;
-  const doing =
-    status?.brain === "thinking"
-      ? "Thinking"
-      : status?.composingIn.length
-        ? "Typing"
+  // Saying a line here is speaking; anything else composed is typed.
+  const doing = status?.composingIn.includes(chat.id)
+    ? chat.type === "huddle"
+      ? "Speaking"
+      : "Typing"
+    : status?.composingIn.length
+      ? "Typing"
+      : status?.brain === "thinking"
+        ? "Thinking"
         : status?.task?.description;
   return (
     <Tooltip>

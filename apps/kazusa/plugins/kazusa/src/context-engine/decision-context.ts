@@ -30,8 +30,8 @@ export interface DecisionContextRequest {
   readonly incomingBundle: readonly Stimulus[];
   readonly pendingQueue: readonly Stimulus[];
   /**
-   * Asks only how they say what they are about to say aloud: how fast, and,
-   * when someone else has the floor, how badly they want in.
+   * Asks only how they type or say what they are about to: how fast, and, when
+   * someone else has the floor, how badly they want in.
    */
   readonly speech?: SpeechFacts;
   readonly signal?: AbortSignal;
@@ -219,6 +219,7 @@ export function assembleDecisionContext(
     speech: params.speech
       ? {
           conversation: formatSessionHeader(params.speech.sessionKey),
+          medium: params.speech.medium,
           floor: params.speech.floor
             ? {
                 speakingNow: params.speech.floor.speaking,
@@ -287,8 +288,11 @@ export const PerceptionRubricSchema = z.object({
         }),
       })
       .optional(),
-    /** Absent in a world's older override: everyone talks at an ordinary pace. */
-    speaking_pace: z
+    /**
+     * Absent in a world's older override: everyone types and talks at an
+     * ordinary pace.
+     */
+    pace: z
       .object({
         description: z.string().optional(),
         criteria: z
@@ -305,7 +309,7 @@ export const PerceptionRubricSchema = z.object({
                 (level, index) =>
                   index === 0 || level.pace >= levels[index - 1].pace,
               ),
-            "speaking_pace criteria must be ordered by pace",
+            "pace criteria must be ordered by pace",
           ),
       })
       .optional(),
@@ -358,11 +362,11 @@ export function buildDecisionQuestions(
   if (speech) {
     const instructions = (description?: string) =>
       [rubric.instructions, description].filter(Boolean).join("\n\n");
-    const { floor, speaking_pace: pace } = rubric.questions;
+    const { floor, pace } = rubric.questions;
     const questions: Record<string, DecisionQuestion> = {
       ...(pace
         ? {
-            speaking_pace: {
+            pace: {
               type: "score",
               instructions: instructions(pace.description),
               criteria: pace.criteria,

@@ -1,10 +1,10 @@
 # The Floor: Turn-Taking in Face-to-Face Conversation
 
-Status (2026-11-05): built and unit-tested (`messaging/floor.ts`, Messaging's
-`play`, `Perception.judgeSpeech`); not yet run live. Designed in the order set
-by the kazusa skill §0: simulation, then player, then prompt. Builds on huddles
-([location](location.md) §4.6) and paced speech ([messaging](messaging.md),
-[perception](perception.md) §12.4).
+Status (2026-11-05): built and unit-tested (`messaging/floor.ts`,
+`messaging/composing.ts`, Messaging's `play`, `Perception.judgeSpeech`); not yet
+run live. Designed in the order set by the kazusa skill §0: simulation, then
+player, then prompt. Builds on huddles ([location](location.md) §4.6) and paced
+speech ([messaging](messaging.md), [perception](perception.md) §12.4).
 
 Goal: a huddle sounds like people talking. Usually one at a time; in a heated
 moment, over each other, because someone chose to.
@@ -101,9 +101,9 @@ whether something heard makes their own speech moot or worth stopping for
 - **Being cut off.** "And another thing—", then someone else's line.
 - **The player is unpaced.** Sensei types in real time, so their line is said as
   sent, over anyone: they can interrupt, and see who stops.
-- **Client.** The floor holder shows as speaking (the existing typing event, set
-  while a line is said); two at once show two. Waiting speakers show nothing:
-  you can't see someone about to speak.
+- **Client.** The floor holder shows as speaking (the typing event with
+  `mode: "speaking"`, set while a line is said); two at once show two. Waiting
+  speakers show nothing: you can't see someone about to speak.
 - **Never fun:** queues, urgency levels or "waiting to speak" in a character's
   prompt, or a table that is always shouting.
 
@@ -111,9 +111,10 @@ whether something heard makes their own speech moot or worth stopping for
 
 ### 4.1 Speaking time
 
-`speakingMs(text, rates, pace)` sums each character's time at an ordinary pace
-and divides by the speaker's pace; no cap. Spaces and punctuation take none.
-`messaging.speechRates` gives characters per second per writing system:
+`composingMs(text, "speaking", rates, pace)` (`messaging/composing.ts`, the same
+function that times typing) sums each character's time at an ordinary pace and
+divides by the speaker's pace; no cap. Spaces and punctuation take none.
+`messaging.rates.speaking` gives characters per second per writing system:
 `letters` 12 (any alphabet's letters and digits; ~150 English words a minute),
 `han` 5 (Chinese characters and kanji), `kana` 8 (about a mora each), `hangul` 7
 (syllable blocks). Those follow measured syllable rates (Japanese ~8 morae,
@@ -126,8 +127,8 @@ Pace comes from Jev (§4.3), once per send: 1 is ordinary, and the rubric's
 anchors run from 0.6 (halting, grieving) to 1.6 (rapid-fire); a fractional score
 lies between two anchors on a log scale (`paceAt`).
 
-Text chats keep `typingMs` (there the first bubble still sends at once: typing
-shows while thinking). Action bubbles keep that typing pace too and never touch
+Text chats take typing time the same way, with typing rates and no floor
+([messaging](messaging.md), Paced speech). Actions take no time and never touch
 the floor. Stickers are already dropped face to face.
 
 ### 4.2 The floor
@@ -151,11 +152,12 @@ huddle (`Messaging.play`), in order:
    aloud to people or into a huddle's address walks over first, then waits.
 2. **Judge once.** The send asks how it is said (§4.3) once and keeps the
    answer: its pace always, and `floor` when the floor is contested (someone
-   else is speaking, waiting, or holds an open turn); a free floor is `NEXT`.
+   else is speaking, waiting, or holds an open turn); a free floor is `NEXT`. A
+   text send asks only its pace.
 3. **Take the floor.** `CUT_IN` on the first spoken line starts at once, beside
    whoever is speaking, and takes the turn; later lines of that send are `NEXT`.
    Otherwise the line waits its place.
-4. **Say it.** Set typing (the client's "speaking"), wait `speakingMs` on the
+4. **Say it.** Set typing with `mode: "speaking"`, wait its speaking time on the
    sim clock (paused holds it; the shutdown release lets it go, and lets every
    waiter go at once), commit the bubble (heard now), leave `speaking`. The
    send's end closes its turn.
@@ -187,28 +189,28 @@ the floor can't be turned into a side conversation: they are talking to the
 group.
 
 **Who skips the floor:** players (real-time typing, always heard at once), the
-system agent (wall-time pacing) and recovered plans. Text chats have no floor.
+system agent (sends at once, outside the world's time) and recovered plans. Text
+chats have no floor.
 
-**Run time.** A character's brain run has 180 s of wall time
-(`perception.maxRunSeconds`), and a `send_message` waiting for the floor counts
-toward it (OpenClaw has no per-tool timeout). At 1x a 26-word line holds the
-floor ~10 s, so a run waiting behind a long queue can end and drop its line
-unsaid. Watch for that live.
+**Run time.** A brain run's limit (`perception.maxThinkingSeconds`, 180 s)
+counts only its model calls, so a `send_message` waiting for the floor, or
+saying a long line, spends none of it: no line is dropped for waiting.
 
 ### 4.3 The speech judgment
 
 Two questions in the perception rubric (`shared/skills/perception`,
-`rubricVersion` 9), asked together in one call by `Perception.judgeSpeech`
+`rubricVersion` 11), asked together in one call by `Perception.judgeSpeech`
 through the same decision context and direct call as attention,
-`purpose: "perception.speech"`: `speaking_pace`, a score over ordered
-`{ pace, description }` anchors, every time; and `floor: CUT_IN | NEXT | WAIT`
-when someone else has the floor. It is the speaker's own impulse, not a
-stimulus: asked outside the attention lock, not recorded as an attention
-decision (one `Perception <id>: speech -> …` log line). Anything unusable takes
-`NEXT` at pace 1: never the disruptive answer, as `STEER` is never a fallback. A
-world rubric without one question asks the other alone; without both, the same
-fallback. The Elden Ring and Genshin templates override the perception skill, so
-they get neither until their rubric has the questions.
+`purpose: "perception.speech"`: `pace`, a score over ordered
+`{ pace, description }` anchors, every time, for texts too (`speech.medium` says
+which); and `floor: CUT_IN | NEXT | WAIT` when someone else has the floor. It is
+the speaker's own impulse, not a stimulus: asked outside the attention lock, not
+recorded as an attention decision (one `Perception <id>: speech -> …` log line).
+Anything unusable takes `NEXT` at pace 1: never the disruptive answer, as
+`STEER` is never a fallback. A world rubric without one question asks the other
+alone; without both, the same fallback. The Elden Ring and Genshin templates
+override the perception skill and carry both questions, worded for notes instead
+of phones.
 
 Evidence, from the existing decision context:
 
@@ -273,10 +275,23 @@ talk cuts in often, the rubric is wrong, and the table is back to today.
   a choice. If attention decisions are still the main cost after the floor,
   own-huddle lines while busy could queue in code and only be judged for
   `STEER`. Measure first.
-- **Run time** (§4.2): if lines are dropped because runs end while waiting,
-  either the run limit or how long a line may wait needs to change.
 
 ## 6. Decision log
+
+- **Typing and speaking are one composing time, and thinking is neither**
+  (2026-11-05). Texts sent their first bubble the moment the tool was called,
+  showed "typing" for every chat the brain had just read until its turn ended,
+  and typed later bubbles at 20 characters a second whatever the script. Now
+  every bubble, the first included, takes `composingMs` with per-script rates
+  for each medium and the same judged pace, and the indicator shows only while a
+  bubble is being typed or said. Reading and thinking show as the read receipt
+  and the brain's status instead.
+- **A run's time limit counts thinking, not waiting** (2026-11-05). Composing
+  time made sends long enough to end runs. Plugins can't pause OpenClaw's turn
+  timer (its approval pause is driven by a host-owned event stream), but its
+  `model_call_started`/`model_call_ended` hooks time every model call, so the
+  limit sums those and the host's wall-clock timeout is off for brain runs. The
+  pause bookkeeping went with it.
 
 - **Huddles change one person's move at a time, and never merge** (2026-11-05).
   Turning to one person merged both conversations, and the busiest live huddles
@@ -314,5 +329,5 @@ talk cuts in often, the rubric is wrong, and the table is back to today.
   same order as everything else.
 - **No thinking delay.** Model latency already exceeds human turn gaps; delay
   would only make replies staler.
-- **No speaking cap.** `typingMs` caps at 8 s because texts are composed while
-  thinking; speech is said in real time, and its cost is the point.
+- **No speaking cap.** Speech is said in real time, and its cost is the point.
+  Typing is uncapped too, since thinking no longer counts as typing.

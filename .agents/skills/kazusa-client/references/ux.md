@@ -188,9 +188,9 @@ rehoused as a stage view.
   under "In person at <place>", and the text chats under "Messages" (no headings
   when there is no huddle). A huddle's header says "In person at <place>", its
   composer offers **Say / Do**, it has no member management (people join by
-  speaking and leave by walking away), and its typing reads "about to speak".
-  Titles come from members when the server's title is just a member id
-  (`chatTitle`), so a DM shows the partner's name.
+  speaking and leave by walking away), and someone saying a line reads
+  "speaking" (the event's `mode`). Titles come from members when the server's
+  title is just a member id (`chatTitle`), so a DM shows the partner's name.
 - **Actions** (`type: "action"`) are narrated, never bubbled: one line in the
   sender's lane, the name upright and the rest italic ("**Kazusa** leans back.
   She sips her tea."). The text is stored without its subject, the client

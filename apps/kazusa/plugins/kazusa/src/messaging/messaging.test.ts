@@ -154,6 +154,14 @@ function setup(
       anchor = Date.now();
       speed = value;
     },
+    /** Lets the bubble being typed or said finish: its time passes at once. */
+    finishBubble: async () => {
+      await vi.waitFor(async () =>
+        expect(await messaging.getTyping()).not.toEqual([]),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      now += 3_600_000;
+    },
   };
 }
 
@@ -1120,7 +1128,7 @@ describe("observing chats from outside", () => {
   it("reports everyone composing to an observer, and only theirs to a member", async () => {
     const h = setup();
     const result = await h.send();
-    await h.messaging.setTyping("alice", "Alice", result.sessionKey, true);
+    await h.messaging.setTyping("alice", "Alice", result.sessionKey, "typing");
     expect(await h.messaging.getTyping()).toMatchObject([
       { chatId: result.chatId, senderId: "alice" },
     ]);
@@ -1136,7 +1144,7 @@ describe("composition presence", () => {
       title: "Club",
     });
     expect(await h.messaging.getTyping("user:sensei")).toEqual([]);
-    await h.messaging.setTyping("alice", "Alice", result.sessionKey, true);
+    await h.messaging.setTyping("alice", "Alice", result.sessionKey, "typing");
     expect(await h.messaging.getTyping("user:sensei")).toMatchObject([
       { chatId: result.chatId, senderId: "alice", isTyping: true },
     ]);
@@ -1146,7 +1154,7 @@ describe("composition presence", () => {
         "carol",
         "Carol",
         result.sessionKey.replace("agent:alice:", "agent:carol:"),
-        true,
+        "typing",
       ),
     ).rejects.toThrow("unavailable");
     h.messaging.clearTyping("alice", "group:elsewhere");
@@ -1162,7 +1170,7 @@ describe("composition presence", () => {
       title: "Club",
     });
     const humanKey = result.sessionKey.replace("agent:alice:", "");
-    await h.messaging.setTyping("user:sensei", "Sensei", humanKey, true);
+    await h.messaging.setTyping("user:sensei", "Sensei", humanKey, "typing");
     const time = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 8001);
     expect(await h.messaging.getTyping("alice")).toEqual([]);
     time.mockRestore();
@@ -1170,7 +1178,7 @@ describe("composition presence", () => {
       "bob",
       "Bob",
       result.sessionKey.replace("agent:alice:", "agent:bob:"),
-      true,
+      "typing",
     );
     await h.messaging.manageChat("alice", {
       sessionKey: result.sessionKey,
@@ -1181,9 +1189,15 @@ describe("composition presence", () => {
       (await h.messaging.getTyping("alice")).map((x) => x.senderId),
     ).not.toContain("bob");
     await expect(
-      h.messaging.setTyping("alice", "Alice", result.sessionKey, true, () => {
-        throw new Error("expired");
-      }),
+      h.messaging.setTyping(
+        "alice",
+        "Alice",
+        result.sessionKey,
+        "typing",
+        () => {
+          throw new Error("expired");
+        },
+      ),
     ).rejects.toThrow("expired");
     expect(
       (await h.messaging.getTyping("alice")).map((x) => x.senderId),
@@ -1202,12 +1216,13 @@ describe("paced speech", () => {
       .sort((a, b) => a.sequence - b.sequence)
       .map((delivery) => delivery.params.text);
 
-  it("types later bubbles on the simulation clock and sends each as its own message", async () => {
+  it("types every bubble on the simulation clock and sends each as its own message", async () => {
     const h = setup();
     h.setSpeed(1_000_000);
-    const typing: boolean[] = [];
+    const typing: string[] = [];
     h.messaging.onEvent((event) => {
-      if (event.type === "typing") typing.push(event.typing.isTyping);
+      if (event.type === "typing")
+        typing.push(event.typing.isTyping ? event.typing.mode : "sent");
     });
     const result = await h.messaging.speak(
       "alice",
@@ -1223,8 +1238,19 @@ describe("paced speech", () => {
     });
     expect(result.messageIds).toHaveLength(3);
     expect(texts(h.retained)).toEqual(["Wait...", "Are you serious?", "Why?"]);
-    // Typing starts before each later bubble and each send clears it.
-    expect(typing).toEqual([true, false, true, false]);
+    // Thinking is not typing: typing starts before each bubble, the first
+    // included, and each send clears it.
+    expect(typing).toEqual([
+      "typing",
+      "sent",
+      "typing",
+      "sent",
+      "typing",
+      "sent",
+    ]);
+    // Each bubble took its typing time: "Wait..." is seven keys.
+    const [first] = [...h.retained.values()];
+    expect(first.timestamp - NOW).toBeGreaterThanOrEqual(2_333);
     expect(h.outbox.size).toBe(0);
     expect(h.messaging.currentSpeech("alice")).toBeUndefined();
   });
@@ -1237,6 +1263,7 @@ describe("paced speech", () => {
       "ALICE",
       speech(["Wait...", "I told you not to go!", "What were you thinking?"]),
     );
+    await h.finishBubble();
     await vi.waitFor(() =>
       expect(h.messaging.currentSpeech("alice")).toEqual({
         sessionKey: "agent:alice:chat:direct:bob",
@@ -1278,6 +1305,7 @@ describe("paced speech", () => {
       undefined,
       invocation.signal,
     );
+    await h.finishBubble();
     await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
     invocation.abort(new Error("Operator stopped run"));
     expect(await pending).toMatchObject({
@@ -1308,6 +1336,7 @@ describe("paced speech", () => {
       "ALICE",
       speech(["One", "Two", "Three"]),
     );
+    await h.finishBubble();
     await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(texts(h.retained)).toEqual(["One"]);
@@ -1316,7 +1345,7 @@ describe("paced speech", () => {
     expect(texts(h.retained)).toEqual(["One", "Two", "Three"]);
   });
 
-  it("paces every system-agent bubble on wall time while sim time stays frozen", async () => {
+  it("sends every system-agent bubble at once: she is outside the world's time", async () => {
     const stopping = new AbortController();
     const h = setup(
       undefined,
@@ -1335,8 +1364,9 @@ describe("paced speech", () => {
       undefined,
       "alice",
     );
-    await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
+    // No typing, though the world is paused: both go out at once.
     expect((await result).status).toBe("delivered");
+    expect(await h.messaging.getTyping()).toEqual([]);
     expect(texts(h.retained)).toEqual(["One", "Two"]);
     expect([...h.retained.values()].map((d) => d.timestamp)).toEqual([
       NOW,
@@ -1360,6 +1390,7 @@ describe("paced speech", () => {
       "ALICE",
       speech(["One", "Two", "Three"]),
     );
+    await h.finishBubble();
     await vi.waitFor(() => expect(texts(h.retained)).toEqual(["One"]));
     stopping.abort();
     expect((await result).status).toBe("delivered");
@@ -1376,6 +1407,7 @@ describe("paced speech", () => {
     const crashed = first.messaging
       .speak("alice", "ALICE", speech(["Hi", "Are you free?", "Lunch?"]))
       .catch((error: unknown) => error);
+    await first.finishBubble();
     await vi.waitFor(() => expect(retained.size).toBe(1));
     first.messaging.dispose();
     expect(await crashed).toBeInstanceOf(Error);
@@ -1453,6 +1485,7 @@ describe("paced speech", () => {
       "ALICE",
       speech(["Wait...", "I told you not to go!", "What were you thinking?"]),
     );
+    await turn.finishBubble();
     await vi.waitFor(() => expect(texts(turn.retained)).toEqual(["Wait..."]));
     await http.messaging.resume();
     expect(texts(turn.retained)).toEqual(["Wait..."]);
@@ -1479,6 +1512,7 @@ describe("paced speech", () => {
     const crashed = first.messaging
       .speak("alice", "ALICE", speech(["Hi", "Are you free?", "Lunch?"]))
       .catch((error: unknown) => error);
+    await first.finishBubble();
     await vi.waitFor(() => expect(retained.size).toBe(1));
     first.messaging.dispose();
     await crashed;
@@ -1510,6 +1544,111 @@ describe("paced speech", () => {
     expect(texts(retained)).toEqual(["Hi"]);
   });
 
+  it("judges how fast they type, and shows typing only while they do", async () => {
+    const judgeSpeech = vi.fn<NonNullable<MessagingDeps["judgeSpeech"]>>(
+      async () => ({ floor: "NEXT", pace: 2 }),
+    );
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+      { judgeSpeech },
+    );
+    const result = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["ok I'll be right there"]),
+    );
+    await vi.waitFor(async () =>
+      expect(await h.messaging.getTyping("bob")).toMatchObject([
+        { senderId: "alice", isTyping: true, mode: "typing" },
+      ]),
+    );
+    // A text has no floor: only the pace is asked.
+    expect(judgeSpeech).toHaveBeenCalledExactlyOnceWith("alice", {
+      sessionKey: "agent:alice:chat:direct:bob",
+      medium: "typing",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Twice as fast: 22 keys in half of 7,333 ms.
+    h.setNow(NOW + 3_666);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(h.retained.size).toBe(0);
+    h.setNow(NOW + 3_667);
+    expect(await result).toMatchObject({ status: "delivered" });
+    expect([...h.retained.values()][0].timestamp).toBe(NOW + 3_667);
+    expect(await h.messaging.getTyping()).toEqual([]);
+  });
+
+  it("opens one new group to type in, and sends every bubble there", async () => {
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+    );
+    const pending = h.messaging.speak("alice", "ALICE", {
+      requestId: "plan",
+      members: ["bob", "carol"],
+      title: "Plans",
+      messages: ["Lunch?", "Noon?"],
+    });
+    // While the first bubble is typed, attention knows where it goes.
+    await vi.waitFor(() =>
+      expect(h.messaging.currentSpeech("alice")?.sessionKey).toMatch(
+        /^agent:alice:chat:group:/u,
+      ),
+    );
+    await h.finishBubble();
+    await vi.waitFor(() => expect(h.retained.size).toBe(1));
+    await h.finishBubble();
+    const result = await pending;
+    const groups = [...h.chats.values()].filter(
+      (chat) => chat.kind === "group",
+    );
+    expect(groups).toHaveLength(1);
+    expect([...h.retained.values()].map((d) => d.chatId)).toEqual([
+      groups[0].id,
+      groups[0].id,
+    ]);
+    expect(result.sessionKey).toBe(`agent:alice:chat:${groups[0].id}`);
+  });
+
+  it("does an action at once, and shows a line said aloud as speaking", async () => {
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+    );
+    h.places.set("alice", "club").set("bob", "club");
+    const result = h.messaging.speak("alice", "ALICE", {
+      requestId: "wave",
+      members: ["bob"],
+      aloud: true,
+      messages: [{ text: "waves", type: "action" }, "Hi!"],
+    });
+    await vi.waitFor(async () =>
+      expect(await h.messaging.getTyping("bob")).toMatchObject([
+        { senderId: "alice", mode: "speaking" },
+      ]),
+    );
+    expect(texts(h.retained)).toEqual(["waves"]);
+    await h.finishBubble();
+    expect(await result).toMatchObject({ status: "delivered" });
+    expect(texts(h.retained)).toEqual(["waves", "Hi!"]);
+  });
+
   it("says sends started together one after another, and stops them all on an interrupt", async () => {
     // Live: Kazusa spoke aloud and texted in one turn; the text cut off her
     // speech before a word of it was said.
@@ -1521,6 +1660,7 @@ describe("paced speech", () => {
       speech(["A", "B"], "old"),
     );
     const newer = h.messaging.speak("alice", "ALICE", speech(["C"], "new"));
+    await h.finishBubble();
     await vi.waitFor(() => expect(h.retained.size).toBe(1));
     h.setSpeed(1_000_000);
     expect((await older).status).toBe("delivered");
@@ -1534,6 +1674,7 @@ describe("paced speech", () => {
       speech(["D", "E"], "again"),
     );
     const next = h.messaging.speak("alice", "ALICE", speech(["F"], "later"));
+    await h.finishBubble();
     await vi.waitFor(() => expect(h.retained.size).toBe(4));
     expect(h.messaging.interrupt("alice")).toBe(true);
     expect(await speaking).toMatchObject({
@@ -2275,11 +2416,13 @@ describe("the floor", () => {
     // Alone with the floor, only her pace was asked.
     expect(judgeSpeech).toHaveBeenCalledExactlyOnceWith("alice", {
       sessionKey: expect.stringMatching(/^agent:alice:chat:huddle:/u),
+      medium: "speaking",
     });
     const bob = say("bob", ["Me too"]);
     await vi.waitFor(() => expect(judgeSpeech).toHaveBeenCalledTimes(2));
     expect(judgeSpeech).toHaveBeenLastCalledWith("bob", {
       sessionKey: expect.stringMatching(/^agent:bob:chat:huddle:/u),
+      medium: "speaking",
       floor: { speaking: ["alice"], turn: "alice", waiting: 0 },
     });
     h.setNow(NOW + 2_000);

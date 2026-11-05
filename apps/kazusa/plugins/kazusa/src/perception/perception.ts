@@ -20,9 +20,9 @@ import {
   quietConversationOf,
   type DecisionContextAssembler,
 } from "../context-engine/decision-context.ts";
+import { paceAt } from "../messaging/composing.ts";
 import {
   FLOOR_CHOICES,
-  paceAt,
   type SpeechFacts,
   type SpeechJudgment,
 } from "../messaging/floor.ts";
@@ -83,7 +83,7 @@ const isHuddle = (item: Stimulus): boolean =>
   item.sessionKey.includes(":chat:huddle:");
 
 /** `shared/skills/perception/SKILL.md` `metadata.rubricVersion`. */
-const RUBRIC_VERSION = "10";
+const RUBRIC_VERSION = "11";
 
 const PACE_ANCHORS = z.array(z.looseObject({ pace: z.number().positive() }));
 
@@ -291,9 +291,6 @@ export class Perception {
   private readonly readinessTimers = new Map<string, NodeJS.Timeout>();
   private speech?: SpeechSource;
   private conversations?: ConversationSource;
-  private readonly adoptedListeners = new Set<
-    (delivery: PerceptionDelivery) => void | Promise<void>
-  >();
   private readonly readListeners = new Set<
     (delivery: PerceptionDelivery) => void | Promise<void>
   >();
@@ -681,15 +678,6 @@ export class Perception {
   /** Let attention take someone out of a conversation they stopped following. */
   attachConversations(source: ConversationSource): void {
     this.conversations = source;
-  }
-
-  onAdopted(
-    listener: (delivery: PerceptionDelivery) => void | Promise<void>,
-  ): () => void {
-    this.adoptedListeners.add(listener);
-    return () => {
-      this.adoptedListeners.delete(listener);
-    };
   }
 
   /**
@@ -1404,11 +1392,11 @@ export class Perception {
   }
 
   /**
-   * How a character says what they are about to say aloud: how fast they talk,
-   * and, when someone else has the floor, how badly they want in. Their own
-   * impulse, not a stimulus: asked outside the attention lock, and never
-   * recorded as attention. Anything unusable is the next pause at an ordinary
-   * pace, never a cut-in.
+   * How a character types or says what they are about to: how fast, and, when
+   * someone else has the floor, how badly they want in. Their own impulse, not
+   * a stimulus: asked outside the attention lock, and never recorded as
+   * attention. Anything unusable is the next pause at an ordinary pace, never a
+   * cut-in.
    */
   async judgeSpeech(
     agentId: string,
@@ -1457,9 +1445,7 @@ export class Perception {
         speech: facts,
         signal,
       });
-      const anchors = PACE_ANCHORS.safeParse(
-        batch.questions.speaking_pace?.criteria,
-      );
+      const anchors = PACE_ANCHORS.safeParse(batch.questions.pace?.criteria);
       const outcome = await evaluate(batch, {
         agentId,
         purpose: "perception.speech",
@@ -1469,7 +1455,7 @@ export class Perception {
       });
       if (outcome.status !== "ok")
         return decide(ordinary, "fallback", outcome.reason);
-      const { floor, speaking_pace: pace } = outcome.result.answers;
+      const { floor, pace } = outcome.result.answers;
       const choice =
         floor?.type === "choice"
           ? FLOOR_CHOICES.find((option) => option === floor.choice)
@@ -1486,7 +1472,7 @@ export class Perception {
       };
       const usable =
         (!batch.questions.floor || choice !== undefined) &&
-        (!batch.questions.speaking_pace || pace?.type === "score");
+        (!batch.questions.pace || pace?.type === "score");
       return usable
         ? decide(judgment, "model")
         : decide(judgment, "fallback", "unusable answer");
@@ -1672,13 +1658,6 @@ export class Perception {
           adopted = true;
           resolve();
           await this.notifyRead(delivery);
-          for (const listener of this.adoptedListeners) {
-            try {
-              await listener(delivery);
-            } catch (err: unknown) {
-              this.warn(err);
-            }
-          }
           // Inputs can arrive while this reservation waits for adoption. Let
           // Jev assess them now; do not leave urgent arrivals asleep until the
           // newly started brain turn ends. Do not await a second host dispatch
@@ -1821,7 +1800,6 @@ export class Perception {
 
   dispose(): void {
     this.lifetime.abort();
-    this.adoptedListeners.clear();
     this.readListeners.clear();
     this.brainStateListeners.clear();
     for (const cancel of this.debounceTimers.values()) cancel();

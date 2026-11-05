@@ -200,6 +200,9 @@ export const TypingStreamEventSchema = z.object({
   senderId: z.string(),
   senderName: z.string(),
   isTyping: z.boolean(),
+  /** Typed into a chat, or said aloud face to face. */
+  mode: z.enum(["typing", "speaking"]),
+  /** A person's own signal lapses unless renewed; a character's is cleared. */
   expiresAt: z.number().optional(),
 });
 export type TypingStreamEvent = z.infer<typeof TypingStreamEventSchema>;

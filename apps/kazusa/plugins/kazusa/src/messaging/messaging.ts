@@ -14,14 +14,13 @@ import type { CurrentSpeech } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
 import { stimulusKey, type Stimulus } from "../stimulus.ts";
 import {
-  Floors,
-  SPEECH_RATES,
+  COMPOSING_RATES,
+  composingMs,
   cutOff,
-  speakingMs,
-  type SpeechFacts,
-  type SpeechJudgment,
-  type SpeechRates,
-} from "./floor.ts";
+  type ComposingRates,
+  type Medium,
+} from "./composing.ts";
+import { Floors, type SpeechFacts, type SpeechJudgment } from "./floor.ts";
 import {
   DELIVERY,
   LIST_CHATS,
@@ -156,11 +155,6 @@ export interface ChatFacts {
   readonly unanswered: number;
   /** Simulation time of the oldest of those messages. */
   readonly waitingSince: number | null;
-}
-
-/** Simulated texting time before a later bubble: 1s plus 50ms per character. */
-export function typingMs(text: string): number {
-  return Math.min(8_000, 1_000 + 50 * text.length);
 }
 
 interface ConversationTail {
@@ -299,16 +293,16 @@ export interface MessagingDeps {
   /** Shared by every instance in the process; each test gets its own. */
   readonly state?: MessagingState;
   /**
-   * How a speaker says what they are about to say aloud: how badly they want in
-   * when someone else has the floor, and how fast they talk. Absent or failing:
-   * the next pause, at an ordinary pace.
+   * How someone types or says what they are about to: how fast, and face to
+   * face how badly they want in when someone else has the floor. Absent or
+   * failing: the next pause, at an ordinary pace.
    */
   readonly judgeSpeech?: (
     agentId: string,
     facts: SpeechFacts,
   ) => Promise<SpeechJudgment>;
-  /** What each writing system takes to say; default `SPEECH_RATES`. */
-  readonly speechRates?: SpeechRates;
+  /** What each writing system takes to type and say; default `COMPOSING_RATES`. */
+  readonly rates?: ComposingRates;
 }
 
 /** A conversation going on at a place, as others there could see it. */
@@ -488,14 +482,15 @@ export class Messaging {
   }
 
   /**
-   * Explicit composition activity; never inferred from a brain wake or
-   * reasoning.
+   * Someone typing or saying a line, or stopping: only while they really are,
+   * never inferred from a brain wake or reasoning. A person's signal lapses
+   * unless renewed; a character's lasts until cleared.
    */
   async setTyping(
     participantId: string,
     name: string,
     sessionKey: string,
-    isTyping: boolean,
+    composing: Medium | false,
     assertInvocationCurrent?: () => void,
   ): Promise<void> {
     await this.serial.enqueue("messages", async () => {
@@ -508,12 +503,13 @@ export class Messaging {
         chatId: chat.id,
         senderId: participantId,
         senderName: name,
-        isTyping,
-        ...(isTyping
-          ? { expiresAt: Date.now() + (isUser(participantId) ? 8000 : 15000) }
+        isTyping: composing !== false,
+        mode: composing || "typing",
+        ...(composing && isUser(participantId)
+          ? { expiresAt: Date.now() + 8000 }
           : {}),
       };
-      if (isTyping) this.typing.set(key, event);
+      if (composing) this.typing.set(key, event);
       else this.typing.delete(key);
       this.emit({ type: "typing", typing: event, audience: chat.members });
     });
@@ -1595,19 +1591,20 @@ export class Messaging {
       ...(abortSignal ? [abortSignal] : []),
     ]);
     const sent: SendMessageResult[] = [];
-    let paced = live;
-    // Face to face, each spoken line waits for the floor and takes its time to
-    // say. The system agent talks on wall time, outside the world's floors.
-    const floored = live && inPlace && sender !== systemAgentId;
+    // Every bubble takes its time to type, or face to face to say, the first
+    // included: thinking is not typing. The system agent is outside the
+    // world's time and sends at once, as does a recovered plan.
+    let paced = live && sender !== systemAgentId;
     /** How this send is said (how badly they want in, how fast), asked once. */
     let judged: SpeechJudgment | undefined;
     /** Huddles this send has spoken in, whose turn it may hold. */
     const turns = new Set<string>();
-    /** The line being said, until it is heard. */
+    /** The bubble being typed or said, until it is sent. */
     let saying:
       | {
           readonly chatId: string;
           readonly sessionKey: string;
+          readonly medium: Medium;
           readonly text: string;
           readonly index: string;
           readonly startedAt: number;
@@ -1642,34 +1639,64 @@ export class Messaging {
             assertInvocationCurrent?.();
           },
         });
+      /**
+       * Where the next bubble goes: the target, until a bubble opens or reaches
+       * its chat. Resolving a target again could open a second new group.
+       */
+      let address: typeof target = target;
       for (const { index, text, type, sticker } of bubbles) {
         const first = sent[0];
-        const bubble: SendMessageParams = {
-          ...(first ? { sessionKey: first.sessionKey } : target),
+        const to = (where: typeof target): SendMessageParams => ({
+          ...where,
           text,
           ...(type === "speech" ? {} : { type }),
           ...(sticker ? { sticker } : {}),
           requestId: messagingId([requestId, index]),
-        };
+        });
+        let bubble = to(address);
+        // An action is done, not composed; a bubble already sent was composed
+        // before a restart.
         const chat =
-          floored && paced && type === "speech"
-            ? !(await this.accepted(sender, bubble.requestId)) &&
-              (await this.conversationFor(
+          paced &&
+          type !== "action" &&
+          !(await this.accepted(sender, bubble.requestId))
+            ? await this.conversationFor(
                 sender,
                 bubble,
                 first,
                 assertInvocationCurrent,
                 configuredAgents,
-              ))
+              )
             : undefined;
         if (chat) {
           const sessionKey = chatSummary(chat, sender).sessionKey;
+          address = { sessionKey };
+          bubble = to(address);
+          // Attention knows where it goes while it is being composed.
+          speech.sessionKey = sessionKey;
+          // A restart sends the rest there too, as the first was sent.
+          if (!first)
+            await this.deps.outbox.register(
+              plan.id,
+              { ...plan, params: { messages, requestId, sessionKey } },
+              {
+                assertCurrent: () => {
+                  this.assertCurrent();
+                  assertInvocationCurrent?.();
+                },
+              },
+            );
+          const medium = chat.kind === "huddle" ? "speaking" : "typing";
+          const floor =
+            medium === "speaking"
+              ? this.floors.contested(chat.id, sender, plan.id)
+              : undefined;
           if (!judged && speech.hurry.signal.aborted)
             judged = { floor: "CUT_IN", pace: 1 };
           if (!judged) {
-            const floor = this.floors.contested(chat.id, sender, plan.id);
             judged = await this.judgeSpeech(sender, {
               sessionKey,
+              medium,
               ...(floor ? { floor } : {}),
             });
             // Wanting in means nothing when nobody else has the floor.
@@ -1677,25 +1704,33 @@ export class Messaging {
             signal.throwIfAborted();
           }
           const { floor: choice, pace } = judged;
-          if (choice === "CUT_IN" && turns.size === 0)
-            this.floors.cutIn(chat.id, sender, plan.id);
-          else
-            await this.floors.take(
-              chat.id,
-              {
-                agentId: sender,
-                planId: plan.id,
-                // A cut-in is only the first line; after it, the next pause.
-                choice: choice === "CUT_IN" ? "NEXT" : choice,
-              },
-              signal,
-              released,
-            );
-          turns.add(chat.id);
-          const ms = speakingMs(text, this.rates, pace);
+          if (medium === "speaking") {
+            if (choice === "CUT_IN" && turns.size === 0)
+              this.floors.cutIn(chat.id, sender, plan.id);
+            else
+              await this.floors.take(
+                chat.id,
+                {
+                  agentId: sender,
+                  planId: plan.id,
+                  // A cut-in is only the first line; after it, the next pause.
+                  choice: choice === "CUT_IN" ? "NEXT" : choice,
+                },
+                signal,
+                released,
+              );
+            turns.add(chat.id);
+          }
+          const ms = composingMs(
+            sticker ? undefined : text,
+            medium,
+            this.rates,
+            pace,
+          );
           saying = {
             chatId: chat.id,
             sessionKey,
+            medium,
             text,
             index,
             startedAt: this.deps.clock.now().simTime,
@@ -1705,40 +1740,15 @@ export class Messaging {
             sender,
             senderName,
             sessionKey,
-            true,
+            medium,
             assertInvocationCurrent,
           );
+          // A paused world holds the bubble; a stopping Gateway lets the rest
+          // go at once rather than wait on a frozen clock.
           paced = await sleepSim(this.deps.clock, ms, signal, {
             release: released,
             hurry,
           });
-        } else if (
-          first &&
-          paced &&
-          !(await this.accepted(sender, bubble.requestId))
-        ) {
-          await this.setTyping(
-            sender,
-            senderName,
-            first.sessionKey,
-            true,
-            assertInvocationCurrent,
-          );
-          // A paused world holds the next bubble; a stopping Gateway lets the
-          // rest go at once rather than wait on a frozen clock.
-          const speechClock =
-            sender === systemAgentId
-              ? {
-                  now: () => ({ simTime: Date.now(), speed: 1, formatted: "" }),
-                }
-              : this.deps.clock;
-          // A sticker is picked, not typed: only the base pause.
-          paced = await sleepSim(
-            speechClock,
-            typingMs(sticker ? "" : text),
-            signal,
-            { release: released, hurry },
-          );
         }
         signal.throwIfAborted();
         sent.push(
@@ -1752,14 +1762,17 @@ export class Messaging {
         );
         speech.said.push(readAs({ text, type }));
         speech.sessionKey = sent[0].sessionKey;
-        if (saying) this.floors.done(saying.chatId, plan.id);
+        address = { sessionKey: sent[0].sessionKey };
+        if (saying?.medium === "speaking")
+          this.floors.done(saying.chatId, plan.id);
         saying = undefined;
       }
     } catch (error) {
       if (!speech.controller.signal.aborted && !abortSignal?.aborted)
         throw error;
       // Stopped mid-line by what they heard: the words already out were heard.
-      if (saying && speech.controller.signal.aborted) {
+      // A text stopped while typing is never sent.
+      if (saying?.medium === "speaking" && speech.controller.signal.aborted) {
         const heard = cutOff(
           saying.text,
           (this.deps.clock.now().simTime - saying.startedAt) / saying.ms,
@@ -1786,10 +1799,14 @@ export class Messaging {
             this.deps.warn(`Cut-off line of ${sender}: ${String(error)}`);
           }
         }
-        this.clearTyping(sender, saying.chatId);
       }
     } finally {
-      if (saying) this.floors.done(saying.chatId, plan.id);
+      // Whatever stopped it, they are no longer typing or saying it.
+      if (saying) {
+        this.clearTyping(sender, saying.chatId);
+        if (saying.medium === "speaking")
+          this.floors.done(saying.chatId, plan.id);
+      }
       for (const chatId of turns) this.floors.endTurn(chatId, plan.id);
       try {
         // Keep the plan only for a later generation to flush, and never what
@@ -1809,7 +1826,6 @@ export class Messaging {
     // A cut-off line was heard in part: said as heard, and still unsaid whole.
     const whole = sent.length - (cut === undefined ? 0 : 1);
     const unsaid = bubbles.slice(whole).map(readAs);
-    if (unsaid.length && sent[0]) this.clearTyping(sender, sent[0].chatId);
     return {
       status: unsaid.length
         ? "interrupted"
@@ -1829,8 +1845,9 @@ export class Messaging {
   }
 
   /**
-   * The conversation a line said aloud goes to, joined before it is said: you
-   * walk over, then wait for a pause. Sending it later resolves the same one.
+   * The conversation a bubble goes to, opened before it is composed: you open
+   * the chat to type, or walk over to talk and wait for a pause. Sending it
+   * later resolves the same one.
    */
   private async conversationFor(
     sender: string,
@@ -1857,7 +1874,7 @@ export class Messaging {
     });
     this.notify();
     this.scheduleRetry();
-    return chat.kind === "huddle" ? chat : undefined;
+    return chat;
   }
 
   /** A huddle as it is now: merges followed, `undefined` once it is over. */
@@ -1867,8 +1884,8 @@ export class Messaging {
     return chat?.members.length ? chat : undefined;
   }
 
-  private get rates(): SpeechRates {
-    return this.deps.speechRates ?? SPEECH_RATES;
+  private get rates(): ComposingRates {
+    return this.deps.rates ?? COMPOSING_RATES;
   }
 
   /** How they say it; the next pause at an ordinary pace when unjudged. */
@@ -2280,8 +2297,8 @@ export class Messaging {
     this.lifetime.abort();
     if (this.timer) clearTimeout(this.timer);
     // Speech and typing are shared with the other instances: what this
-    // generation was saying stops on the lifetime above and removes itself,
-    // and a stale typing signal expires on its own.
+    // generation was saying stops on the lifetime above and clears its own
+    // typing as it goes.
     this.listeners.clear();
   }
 }

@@ -73,18 +73,15 @@ recover through ordinary history refresh.
 
 ## Typing means composing
 
-An agent calls `set_typing({ sessionKey, isTyping: true })` only after deciding
-to compose a reply, before drafting the text. Perception, model start and
-adoption are not typing signals. Sending, abandoning composition or
-ending/erroring the owning brain run clears the indicator. Matching run IDs
-prevent an old completion from clearing a newer run's indicator. The extra
-explicit tool call is deliberate: we cannot infer commitment to reply from
-private thought. A model that skips the call can still send; do not simulate
-typing retroactively.
+A character shows typing only while `send_message` is composing a bubble: from
+when that bubble's typing (or, face to face, speaking) time starts until it is
+sent or stopped, in that bubble's chat. Perception, model start, adoption and
+thinking are not typing signals; the read receipt and the brain's status show
+those. Events carry `mode: "typing" | "speaking"`, which the client words.
 
 Human typing comes from composer activity, refreshes while input continues and
 expires after eight seconds if the browser disappears. Agent typing lasts until
-send/cancel/run completion, not a short timeout while a model is drafting.
+the bubble is sent or stopped, with no timeout, so a paused world holds it.
 Membership checks and audience filtering apply to both. Reconnect restores the
 active snapshot; membership removal clears the affected indicators.
 

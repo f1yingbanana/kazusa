@@ -386,20 +386,34 @@ becomes its own canonical message with
 `requestId = messagingId([toolRequestId, index])`, so history, ordering, frozen
 audiences, ledger copies and notifications are unchanged per bubble.
 
-- **Pacing.** The first bubble is sent at once: the brain's thinking time
-  already showed typing. Before each later bubble Messaging sets typing, then
-  waits a simulated typing interval (`1s + 50ms/char`, capped at 8s) measured on
-  the simulation clock: wall time is the remaining sim time divided by speed,
-  re-checked at most every 250ms. A paused clock (speed 0) holds the next bubble
-  until it runs again; the shutdown signal lets the rest go at once.
-- **Face to face** (a huddle), every spoken line, the first included, takes its
-  speaking time (per writing system, `messaging.speechRates`, at the speaker's
-  judged pace) and waits for the huddle's floor; actions keep the typing pace. A
-  steer that stops a line mid-way commits what was heard of it, ending in "—".
+- **Pacing.** Every bubble, the first included, takes its time to compose before
+  it is sent: thinking is not typing. `composingMs(text, medium, rates, pace)`
+  (`messaging/composing.ts`) sums each character's time per writing system
+  (`messaging.rates.typing` and `.speaking`), counted as graphemes, so an emoji
+  is one key. Typed on a phone every key counts, spaces and punctuation too:
+  letters 3/s (36 words a minute, Palin et al. 2019), Chinese characters and
+  kanji 0.75/s (a reading, then a pick), kana 1.5/s, Hangul blocks 1.2/s; the
+  last three are estimates from small studies. Said aloud only what is
+  pronounced takes time (letters 12/s, han 5/s, kana 8/s, hangul 7/s). A sticker
+  takes 1.5 s to pick; an action takes no time. No cap: a long message takes
+  long. Jev judges the pace once per send (`pace`, 0.6-1.6) for texts and speech
+  alike. The wait is on the simulation clock: wall time is the remaining sim
+  time divided by speed, re-checked at most every 250ms. A paused clock
+  (speed 0) holds the bubble until it runs again; the shutdown signal lets the
+  rest go at once. The system agent and recovered plans send at once.
+- **Typing indicator.** Set only while a bubble is being typed or said, in that
+  bubble's chat, with `mode: "typing" | "speaking"`; the send, or anything that
+  stops it, clears it. Reading a message or thinking about a reply sets nothing:
+  read receipts and the brain's status show those. A character's indicator has
+  no expiry; a player's lapses after 8 s unless the composer renews it.
+- **Face to face** (a huddle), every spoken line also waits for the huddle's
+  floor; actions never do. A steer that stops a line mid-way commits what was
+  heard of it, ending in "—"; a text stopped while being typed is never sent.
   See [floor](floor.md).
 - **Blocking tool.** `send_message` returns only after the last bubble or an
   interruption, so the brain stays busy and new stimuli are judged by
-  `attention_allocation` with the current speech in Jev's state.
+  `attention_allocation` with the current speech in Jev's state. The time it
+  waits is not thinking, so it costs nothing of the run's time limit.
 - **Interruption.** When Perception reserves a steer for the speaker,
   `Messaging.interrupt(agentId)` aborts the outbox. Unsent bubbles are dropped
   and never reach any ledger. The result reports
