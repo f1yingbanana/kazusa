@@ -3,16 +3,22 @@
 import { useCallback, useState } from "react";
 import useSWR from "swr";
 import {
+  announcedRelease,
   fetchBoot,
   fetchUpdateStatus,
   startUpdate,
   type UpdateChannel,
   type UpdateStatus,
+  type UpdateTarget,
 } from "@/lib/update/update";
 
 const UPDATE_KEY = "update";
 const BOOT_KEY = "update/boot";
 const RESTART_POLL_MS = 2_000;
+/** A check costs up to five of GitHub's 60 unauthenticated calls an hour. */
+const BACKGROUND_CHECK_MS = 60 * 60_000;
+/** A release's downloads take about half an hour to build. */
+const BUILDING_CHECK_MS = 10 * 60_000;
 
 export type UpdatePhase =
   | { readonly step: "downloading"; readonly version: string | null }
@@ -32,8 +38,9 @@ export function useUpdate() {
   const [checking, setChecking] = useState(false);
   // The boot of a frontend another page's update will restart.
   const [othersBoot, setOthersBoot] = useState<string | null>(null);
-  // Each check spends GitHub's hourly allowance, so only on request. While
-  // another page downloads, the route answers from its cache.
+  // Each check spends GitHub's hourly allowance, so beyond the background
+  // check (`useAnnouncedRelease`) only on request. While another page
+  // downloads, the route answers from its cache.
   const resource = useSWR<UpdateStatus, Error>(
     UPDATE_KEY,
     () => fetchUpdateStatus(),
@@ -111,4 +118,27 @@ export function useUpdate() {
     check,
     update,
   };
+}
+
+/**
+ * Checks for a new release in the background: hourly, and more often while the
+ * latest one's downloads build, so it's announced soon after they're up. Shares
+ * its answer with Settings → Updates.
+ */
+export function useAnnouncedRelease(): UpdateTarget | null {
+  const { data } = useSWR<UpdateStatus, Error>(
+    UPDATE_KEY,
+    () => fetchUpdateStatus(),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      // The next background check is soon enough.
+      shouldRetryOnError: false,
+      refreshInterval: (status) =>
+        status?.release?.build === "building"
+          ? BUILDING_CHECK_MS
+          : BACKGROUND_CHECK_MS,
+    },
+  );
+  return data ? announcedRelease(data) : null;
 }

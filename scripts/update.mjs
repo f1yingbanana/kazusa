@@ -184,10 +184,31 @@ async function github(pathname) {
 
 function packagedArchive(release) {
   const target = PACKAGE_TARGETS[`${process.platform}-${process.arch}`];
-  const asset = release.assets?.find((entry) =>
-    entry.name.endsWith(`-${target}.tar.gz`),
+  const asset = release.assets?.find(
+    (entry) =>
+      entry.state === "uploaded" && entry.name.endsWith(`-${target}.tar.gz`),
   );
   return asset?.browser_download_url ?? null;
+}
+
+/**
+ * Whether a release's downloads are up. One made on GitHub's page is out about
+ * half an hour before the release workflow uploads them; `run` is that
+ * workflow's latest run for its tag, if there is one.
+ */
+export function buildOf(uploaded, run) {
+  if (uploaded) return "ready";
+  if (!run) return "missing";
+  if (run.status !== "completed") return "building";
+  return run.conclusion === "success" ? "missing" : "failed";
+}
+
+/** The release workflow's latest run for a tag it was pushed with. */
+async function releaseRun(tag) {
+  const runs = await github(
+    `/actions/workflows/release.yml/runs?event=push&per_page=1&branch=${encodeURIComponent(tag)}`,
+  );
+  return runs?.workflow_runs?.[0];
 }
 
 function sourceArchive(ref) {
@@ -197,15 +218,23 @@ function sourceArchive(ref) {
 async function latestRelease(kind) {
   const release = await github("/releases/latest");
   if (!release) return null;
+  const archive =
+    kind === "packaged"
+      ? packagedArchive(release)
+      : sourceArchive(release.tag_name);
   return {
     version: release.tag_name,
     ref: release.tag_name,
     date: release.published_at,
     url: release.html_url,
-    archive:
+    archive,
+    // A packaged copy needs its own system's archive; any other installs from
+    // source, so it only waits for the build to be announced.
+    uploaded:
       kind === "packaged"
-        ? packagedArchive(release)
-        : sourceArchive(release.tag_name),
+        ? archive !== null
+        : (release.assets?.some((entry) => entry.state === "uploaded") ??
+          false),
   };
 }
 
@@ -236,6 +265,15 @@ async function standing(base, target) {
   };
 }
 
+/** A release's build, for a check: updating doesn't wait on it. */
+async function buildOfTarget(target) {
+  if (target.uploaded === undefined) return null;
+  return buildOf(
+    target.uploaded,
+    target.uploaded ? undefined : await releaseRun(target.ref),
+  );
+}
+
 async function describeTarget(here, target) {
   if (!target) return null;
   return {
@@ -243,6 +281,7 @@ async function describeTarget(here, target) {
     date: target.date,
     url: target.url,
     installable: target.archive !== null,
+    build: await buildOfTarget(target),
     ...(await standing(here.ref, target.ref)),
   };
 }

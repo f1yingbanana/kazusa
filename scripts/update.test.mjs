@@ -8,7 +8,13 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { applyPending, refOf, replaceTree, updatePaths } from "./update.mjs";
+import {
+  applyPending,
+  buildOf,
+  refOf,
+  replaceTree,
+  updatePaths,
+} from "./update.mjs";
 
 /** Writes `{ "a/b.txt": "text" }` under a new folder. */
 function tree(
@@ -31,6 +37,31 @@ describe("refOf", () => {
     expect(refOf("0.1.3-2-gef08f9b")).toBe("ef08f9b");
     expect(refOf("0.1.3")).toBe("0.1.3");
     expect(refOf("v0.2.0-beta")).toBe("v0.2.0-beta");
+  });
+});
+
+describe("buildOf", () => {
+  it("is ready once the downloads are up, whatever the workflow says", () => {
+    expect(buildOf(true, { status: "in_progress" })).toBe("ready");
+  });
+
+  it("is building while the release workflow hasn't finished", () => {
+    expect(buildOf(false, { status: "queued", conclusion: null })).toBe(
+      "building",
+    );
+    expect(buildOf(false, { status: "in_progress", conclusion: null })).toBe(
+      "building",
+    );
+  });
+
+  it("failed when the workflow didn't succeed, else the downloads are missing", () => {
+    expect(buildOf(false, { status: "completed", conclusion: "failure" })).toBe(
+      "failed",
+    );
+    expect(buildOf(false, { status: "completed", conclusion: "success" })).toBe(
+      "missing",
+    );
+    expect(buildOf(false, undefined)).toBe("missing");
   });
 });
 

@@ -90,6 +90,14 @@ function TargetAction({
         Yours is newer
       </span>
     );
+  if (!target.installable && target.build === "building")
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+        <Spinner className="size-3.5" />
+        Building
+      </span>
+    );
+  if (!target.installable && target.build === "failed") return null;
   if (!target.installable)
     return (
       <a href={target.url} target="_blank" rel="noreferrer" className={LINK}>
@@ -108,6 +116,17 @@ function TargetAction({
       Update
     </Button>
   );
+}
+
+/** Why a release this copy can't install yet isn't ready. */
+function releaseNote(release: UpdateTarget | null | undefined) {
+  if (!release || release.installable || release.status !== "newer")
+    return undefined;
+  if (release.build === "building")
+    return "Its downloads are still being built, which takes about half an hour. Kazusa lets you know when it’s ready.";
+  if (release.build === "failed")
+    return "Its downloads failed to build, so it can’t be installed yet.";
+  return undefined;
 }
 
 function Progress({ phase }: { phase: UpdatePhase }) {
@@ -228,6 +247,7 @@ export function UpdateSettings() {
                     </>
                   ) : null
                 }
+                note={releaseNote(release)}
                 action={
                   release ? (
                     <TargetAction

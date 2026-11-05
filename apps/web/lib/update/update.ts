@@ -14,6 +14,16 @@ const UpdateTargetSchema = z.object({
    * updates don't, and as `main` doesn't for an installer's copy.
    */
   installable: z.boolean(),
+  /**
+   * A release's downloads: a release is out about half an hour before the
+   * release workflow uploads them, and a packaged copy can't install it until
+   * then. Null for `main`, and in an answer the route cached from an updater
+   * older than this page.
+   */
+  build: z
+    .enum(["ready", "building", "failed", "missing"])
+    .nullable()
+    .default(null),
   /** Against this copy: whether moving to it goes forward. */
   status: z.enum(["newer", "current", "older", "unknown"]),
   /** Commits it has that this copy doesn't. */
@@ -48,6 +58,18 @@ export const UpdateStatusSchema = z.object({
 export type UpdateTarget = z.infer<typeof UpdateTargetSchema>;
 export type UpdateStatus = z.infer<typeof UpdateStatusSchema>;
 export type UpdateChannel = "release" | "development";
+
+/**
+ * The release worth telling the player about: newer than this copy and
+ * installable here, once its build is done. A copy on `main` hears nothing: its
+ * own branch is ahead of every release.
+ */
+export function announcedRelease(status: UpdateStatus): UpdateTarget | null {
+  const release = status.release;
+  if (!release || release.status !== "newer" || !release.installable)
+    return null;
+  return release.build === "building" ? null : release;
+}
 
 const ErrorSchema = z.object({ error: z.string() });
 const BootSchema = z.object({ boot: z.string() });
