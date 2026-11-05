@@ -1230,8 +1230,11 @@ connect these modules in process.
   agent scope and also run over every message, so each one looks ahead for the
   Runtime line, which only a system prompt has. It also removes the note the
   host adds to room events ("Default: stay silent", "use message(action=send)"),
-  which reached the model on every delivery. An OpenClaw upgrade that renames
-  any of this brings it back: check a captured prompt after upgrading
+  which reached the model on every delivery. Its runtime-context message can't
+  be dropped and comes last on every model call, after each tool result too, so
+  it becomes a single space: as "…" it read as the player answering, and ARONA
+  replied to "another ellipsis" after every send. An OpenClaw upgrade that
+  renames any of this brings it back: check a captured prompt after upgrading
   (`llm_input` shows the system prompt after the edits, but messages only before
   them; a `RegExp` subclass registered last as a transform sees what is actually
   sent).
