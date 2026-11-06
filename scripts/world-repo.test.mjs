@@ -197,6 +197,8 @@ describe("adoptWorldRepo", () => {
     expect(line).toMatch(/starts at its first save/);
     expect(existsSync(path.join(live, ".git"))).toBe(true);
     expect(() => git(live, "rev-parse", "--verify", "--quiet", PLAY)).toThrow();
+    // Said once, not on every start.
+    expect(await adoptWorldRepo(root)).toEqual([]);
   });
 
   it("does nothing before setup has made a world", async () => {

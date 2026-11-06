@@ -351,15 +351,17 @@ export async function adoptWorldRepo(root) {
   const git = findGit(root);
   if (!git)
     return [
-      "This world's history is off: git isn't installed. On a Mac, install the developer tools (xcode-select --install).",
+      process.platform === "darwin"
+        ? "This world's history is off: git isn't installed. Install the developer tools (xcode-select --install) to turn it on."
+        : "This world's history is off: git isn't installed.",
     ];
   const lines = await buildRemotes(root).catch((error) => [
     `Couldn't build the template remotes: ${error.message}`,
   ]);
   const pkg = readJson(manifest);
   const title = pkg.displayName ?? pkg.name;
-  if (!existsSync(path.join(world, ".git")))
-    await gitIn(git, world).raw(["init", `--initial-branch=${PLAY}`]);
+  const fresh = !existsSync(path.join(world, ".git"));
+  if (fresh) await gitIn(git, world).raw(["init", `--initial-branch=${PLAY}`]);
   const repo = gitIn(git, world);
   for (const [key, value] of [
     ["core.autocrlf", "false"],
@@ -401,9 +403,10 @@ export async function adoptWorldRepo(root) {
   if (rooted) return lines;
   const snapshot = snapshotOf(world);
   if (!snapshot) {
-    lines.push(
-      `${title} has no record of the template it was made from, so its history starts at its first save.`,
-    );
+    if (fresh)
+      lines.push(
+        `${title} has no record of the template it was made from, so its history starts at its first save.`,
+      );
     return lines;
   }
   const published = hasRemote
@@ -412,9 +415,12 @@ export async function adoptWorldRepo(root) {
   const base = published ?? (await snapshotCommit(git, world, snapshot, title));
   await repo.raw(["update-ref", `refs/heads/${PLAY}`, base]);
   await repo.raw(["read-tree", base]);
+  const [tag] = (await repo.raw(["tag", "--points-at", base]))
+    .split("\n")
+    .filter(Boolean);
   lines.push(
     published
-      ? `${title}'s history starts at its published ${pkg.version ?? "version"} (${base.slice(0, 7)}).`
+      ? `${title}'s history starts at its published ${tag ? tag.replace(/^v/, "") : "version"} (${base.slice(0, 7)}).`
       : `${title}'s template matches no published version, so its history starts at the template as imported (${base.slice(0, 7)}).`,
   );
   return lines;
