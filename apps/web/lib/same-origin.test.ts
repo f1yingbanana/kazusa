@@ -40,8 +40,43 @@ describe("isSameOrigin", () => {
     expect(isSameOrigin(request({ host: "127.0.0.1:3000" }))).toBe(true);
   });
 
-  it("accepts reverse-proxied requests via KAZUSA_PUBLIC_ORIGIN or x-forwarded-host", () => {
+  it("ignores KAZUSA_PUBLIC_ORIGIN and forwarded host in local and public modes", () => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "local");
     vi.stubEnv("KAZUSA_PUBLIC_ORIGIN", "https://world.openrp.ai");
+    expect(
+      isSameOrigin(
+        request({
+          origin: "https://world.openrp.ai",
+          host: "127.0.0.1:3000",
+        }),
+      ),
+    ).toBe(false);
+
+    expect(
+      isSameOrigin(
+        request({
+          origin: "https://world.openrp.ai",
+          host: "127.0.0.1:3000",
+          "x-forwarded-host": "world.openrp.ai",
+        }),
+      ),
+    ).toBe(false);
+
+    vi.stubEnv("KAZUSA_AUTH_MODE", "public");
+    expect(
+      isSameOrigin(
+        request({
+          origin: "https://world.openrp.ai",
+          host: "demo.example:3000",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts reverse-proxied requests via KAZUSA_PUBLIC_ORIGIN strictly in trusted-proxy mode", () => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
+    vi.stubEnv("KAZUSA_PUBLIC_ORIGIN", "https://world.openrp.ai");
+
     expect(
       isSameOrigin(
         request({
@@ -51,7 +86,7 @@ describe("isSameOrigin", () => {
       ),
     ).toBe(true);
 
-    // Mismatched origin rejected even with KAZUSA_PUBLIC_ORIGIN configured
+    // Mismatched origin rejected even in trusted-proxy mode
     expect(
       isSameOrigin(
         request({
@@ -61,16 +96,15 @@ describe("isSameOrigin", () => {
       ),
     ).toBe(false);
 
-    // Without KAZUSA_PUBLIC_ORIGIN, accepts x-forwarded-host
-    vi.stubEnv("KAZUSA_PUBLIC_ORIGIN", undefined);
+    // Client-sent x-forwarded-host without matching KAZUSA_PUBLIC_ORIGIN is rejected
     expect(
       isSameOrigin(
         request({
-          origin: "https://custom.openrp.ai",
+          origin: "https://attacker.example",
           host: "kazusa-internal:3000",
-          "x-forwarded-host": "custom.openrp.ai",
+          "x-forwarded-host": "attacker.example",
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

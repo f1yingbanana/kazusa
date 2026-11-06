@@ -132,11 +132,17 @@ wrapper (such as OpenRP Cloud). In this mode:
   `KAZUSA_TRUSTED_PROXY_SECRET`. Each world instance must be provisioned with
   its own unique proxy secret.
 - The wrapper must always supply `x-kazusa-role: owner` or
-  `x-kazusa-role: visitor`. Missing roles are rejected with 401.
+  `x-kazusa-role: visitor`. Missing roles are rejected with 401. The wrapper
+  must strip or overwrite any incoming client-sent `x-kazusa-*` headers so
+  clients cannot forge roles or world IDs.
 - Optionally configure `KAZUSA_WORLD_ID` and have the wrapper pass
-  `x-kazusa-world-id` to cryptographically enforce instance binding.
-- Configure `KAZUSA_PUBLIC_ORIGIN` (or pass `x-forwarded-host`) to ensure
-  browser CSRF/same-origin checks pass when proxying to internal addresses.
+  `x-kazusa-world-id` to verify requests are intended for this world instance.
+  The unique per-world proxy secret is what authenticates and cryptographically
+  protects the connection.
+- Configure `KAZUSA_PUBLIC_ORIGIN` to ensure browser CSRF/same-origin checks
+  pass when proxying to internal container addresses. `same-origin.ts` strictly
+  checks `KAZUSA_PUBLIC_ORIGIN` only in `trusted-proxy` mode and does not trust
+  client-sent `x-forwarded-host` headers.
 - Long-lived SSE streams (`/kazusa/events`) remain open until closed by the
   client or terminated by the upstream wrapper upon access revocation.
 - Unknown modes fail closed (503).
@@ -242,9 +248,11 @@ PR 3 branch: `codex/auth-trusted-proxy`.
   - Forwarded to OpenClaw Gateway with authenticated service bearer token and
     normalized `x-kazusa-role`.
 - **Public origin and same-origin CSRF**:
-  - `isSameOrigin` supports `KAZUSA_PUBLIC_ORIGIN` and `x-forwarded-host`,
-    ensuring reverse-proxied browser requests with public `Origin` and internal
-    container `Host` are cleanly verified.
+  - `isSameOrigin` supports `KAZUSA_PUBLIC_ORIGIN` strictly when
+    `KAZUSA_AUTH_MODE=trusted-proxy`, ensuring reverse-proxied browser requests
+    with public `Origin` and internal container `Host` are cleanly verified
+    without weakening origin checks in local desktop mode or relying on
+    untrusted forwarded headers.
 - **Desktop /update loopback keying & host isolation**:
   - `AccessSchema` extended with `local: z.boolean().optional()`.
   - `useAccess()` returns `isLocal: boolean`.

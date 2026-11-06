@@ -78,7 +78,6 @@ class CloudWrapperProxy {
     headers.set("Origin", PUBLIC_ORIGIN);
     // Wrapper communicates with the internal container address
     headers.set("Host", INTERNAL_HOST);
-    headers.set("x-forwarded-host", new URL(PUBLIC_ORIGIN).host);
 
     const req = new Request(`http://${INTERNAL_HOST}/kazusa/${path}`, {
       method,
@@ -277,27 +276,32 @@ describe("trusted-proxy end-to-end wrapper integration", () => {
   });
 });
 
-describe("real HTTP socket reverse proxy", () => {
+describe("real dual-hop HTTP socket reverse proxy", () => {
+  let kazusaServer: Server;
+  let kazusaUrl: string;
   let proxyServer: Server;
   let proxyUrl: string;
 
   beforeEach(async () => {
-    // Spin up an actual Node.js HTTP server acting as the network reverse proxy
-    proxyServer = createServer(async (req, res) => {
-      // Proxy verifies client auth and injects secret & verified role
-      const clientRole = req.headers["authorization"] ? "owner" : "visitor";
+    // 1. Internal Kazusa server listening on its own TCP socket
+    kazusaServer = createServer(async (req, res) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.from(chunk));
+      const body =
+        chunks.length > 0 ? Buffer.concat(chunks).toString("utf8") : undefined;
+
       const headers = new Headers();
-      headers.set("x-kazusa-proxy-secret", PROXY_SECRET);
-      headers.set("x-kazusa-role", clientRole);
-      headers.set("x-kazusa-world-id", WORLD_ID);
-      headers.set("Origin", PUBLIC_ORIGIN);
-      headers.set("Host", INTERNAL_HOST);
+      for (const [key, val] of Object.entries(req.headers)) {
+        if (typeof val === "string") headers.set(key, val);
+        else if (Array.isArray(val)) headers.set(key, val.join(", "));
+      }
 
       const nextReq = new Request(
-        `http://${INTERNAL_HOST}${req.url ?? "/kazusa/access"}`,
+        `http://${req.headers.host}${req.url ?? ""}`,
         {
           method: req.method ?? "GET",
           headers,
+          body: req.method === "POST" ? (body ?? "{}") : undefined,
         },
       );
 
@@ -317,35 +321,96 @@ describe("real HTTP socket reverse proxy", () => {
     });
 
     await new Promise<void>((resolve) => {
+      kazusaServer.listen(0, "127.0.0.1", () => resolve());
+    });
+    const kazusaAddr = kazusaServer.address() as AddressInfo;
+    kazusaUrl = `http://127.0.0.1:${kazusaAddr.port}`;
+
+    // 2. Upstream cloud reverse proxy listening on its own separate TCP socket
+    proxyServer = createServer(async (req, res) => {
+      const clientAuth = req.headers["authorization"];
+      const clientRole =
+        clientAuth === "Bearer user-owner" ? "owner" : "visitor";
+
+      const outgoingHeaders: Record<string, string> = {
+        "x-kazusa-proxy-secret": PROXY_SECRET,
+        "x-kazusa-role": clientRole,
+        "x-kazusa-world-id": WORLD_ID,
+        Origin: PUBLIC_ORIGIN,
+      };
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.from(chunk));
+      const body =
+        chunks.length > 0 ? Buffer.concat(chunks).toString("utf8") : undefined;
+
+      const forwardedRes = await nativeFetch(`${kazusaUrl}${req.url ?? ""}`, {
+        method: req.method ?? "GET",
+        headers: outgoingHeaders,
+        body: req.method === "POST" ? (body ?? "{}") : undefined,
+      });
+
+      res.writeHead(forwardedRes.status, {
+        "Content-Type":
+          forwardedRes.headers.get("content-type") ?? "application/json",
+      });
+      res.end(await forwardedRes.text());
+    });
+
+    await new Promise<void>((resolve) => {
       proxyServer.listen(0, "127.0.0.1", () => resolve());
     });
-    const addr = proxyServer.address() as AddressInfo;
-    proxyUrl = `http://127.0.0.1:${addr.port}`;
+    const proxyAddr = proxyServer.address() as AddressInfo;
+    proxyUrl = `http://127.0.0.1:${proxyAddr.port}`;
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve) => proxyServer.close(() => resolve()));
+    await Promise.all([
+      new Promise<void>((resolve) => proxyServer.close(() => resolve())),
+      new Promise<void>((resolve) => kazusaServer.close(() => resolve())),
+    ]);
   });
 
-  it("handles real HTTP requests across TCP socket for owner and visitor", async () => {
-    // 1. Client connects to proxy with authorization -> recognized as owner
-    const ownerRes = await fetch(`${proxyUrl}/kazusa/access`, {
-      headers: { Authorization: "Bearer user-token-123" },
+  it("handles real HTTP requests across TCP sockets for owner and visitor", async () => {
+    upstream.mockResolvedValue(
+      new Response('{"clock":{"running":true}}', {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    // 1. Client connects to proxy as owner -> gets owner access
+    const ownerAccess = await nativeFetch(`${proxyUrl}/kazusa/access`, {
+      headers: { Authorization: "Bearer user-owner" },
     });
-    expect(ownerRes.status).toBe(200);
-    expect(await ownerRes.json()).toEqual({
+    expect(ownerAccess.status).toBe(200);
+    expect(await ownerAccess.json()).toEqual({
       role: "owner",
       permissions: ["observe", "play", "manage"],
       local: false,
     });
 
-    // 2. Client connects to proxy without authorization -> recognized as visitor
-    const visitorRes = await fetch(`${proxyUrl}/kazusa/access`);
-    expect(visitorRes.status).toBe(200);
-    expect(await visitorRes.json()).toEqual({
-      role: "visitor",
-      permissions: ["observe"],
-      local: false,
+    // 2. Owner mutates clock via proxy across real network socket -> succeeds
+    const ownerClock = await nativeFetch(`${proxyUrl}/kazusa/clock`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer user-owner",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action: "play" }),
     });
+    expect(ownerClock.status).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(1);
+
+    // 3. Visitor mutates clock via proxy across real network socket -> 403 Forbidden
+    const visitorClock = await nativeFetch(`${proxyUrl}/kazusa/clock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "play" }),
+    });
+    expect(visitorClock.status).toBe(403);
+
+    // 4. Direct request to internal Kazusa server without proxy secret -> 401 Unauthorized
+    const directRes = await nativeFetch(`${kazusaUrl}/kazusa/access`);
+    expect(directRes.status).toBe(401);
   });
 });

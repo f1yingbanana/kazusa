@@ -43,7 +43,6 @@ describe("trusted-proxy authentication", () => {
   it("fails closed with 503 when proxy secret is not configured on the server", () => {
     vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
     vi.stubEnv("KAZUSA_TRUSTED_PROXY_SECRET", undefined);
-    vi.stubEnv("KAZUSA_PROXY_SECRET", undefined);
     const req = new Request("https://demo.example/kazusa/access", {
       headers: { "x-kazusa-proxy-secret": SECRET },
     });
