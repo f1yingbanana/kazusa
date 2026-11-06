@@ -68,7 +68,7 @@ async function call(
   return { status, body: JSON.parse(json || "{}") as unknown };
 }
 
-/** A world as `worlds/base.json` makes it, plus one key set by hand. */
+/** A world as `apps/kazusa/base.json` makes it, plus one key set by hand. */
 const WORLD = {
   plugins: { allow: ["kazusa", "openrouter", "venice", "zai"] },
   models: {

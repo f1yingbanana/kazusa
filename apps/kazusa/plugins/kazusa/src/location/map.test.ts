@@ -236,7 +236,7 @@ Body text.
     );
   });
 
-  // Worlds live in their own repositories (`worlds/sources.json`): only those
+  // Worlds live in their own repositories (`apps/kazusa/world-sources.json`): only those
   // downloaded here can be checked.
   const worlds = fileURLToPath(new URL("../../../../worlds/", import.meta.url));
   const downloaded = existsSync(worlds)

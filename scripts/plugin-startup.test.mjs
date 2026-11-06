@@ -15,7 +15,7 @@ function repo(world) {
   const app = path.join(root, "apps/kazusa");
   mkdirSync(path.join(app, "worlds"), { recursive: true });
   writeFileSync(
-    path.join(app, "worlds/base.json"),
+    path.join(app, "base.json"),
     JSON.stringify({
       config: {
         plugins: {
@@ -98,7 +98,7 @@ describe("loadNewPlugins", () => {
   const MISSING = "../../../node_modules/@openclaw/not-installed-provider";
   /** Base lists Kazusa, OpenRP's package (installed) and one not installed. */
   const withLoadPaths = (root) => {
-    const file = path.join(root, "apps/kazusa/worlds/base.json");
+    const file = path.join(root, "apps/kazusa/base.json");
     const base = JSON.parse(readFileSync(file, "utf8"));
     base.config.plugins.load = {
       paths: ["../plugins/kazusa", OPENRP, MISSING],

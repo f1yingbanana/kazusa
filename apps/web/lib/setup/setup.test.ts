@@ -90,7 +90,7 @@ function fixture(): string {
   const app = path.join(root, "apps/kazusa");
   mkdirSync(path.join(root, ".agents"));
   write(
-    path.join(app, "worlds/base.json"),
+    path.join(app, "base.json"),
     JSON.stringify({
       systemAgent: { skills: ["kazusa"] },
       config: {

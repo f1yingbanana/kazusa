@@ -535,8 +535,8 @@ export function applyPending(root) {
         // `node` holds the Node running this, which Windows can only move aside.
         within:
           plan.kind === "packaged"
-            ? ["apps", "apps/kazusa", "apps/kazusa/worlds", "node"]
-            : ["apps", "apps/kazusa", "apps/kazusa/worlds"],
+            ? ["apps", "apps/kazusa", "node"]
+            : ["apps", "apps/kazusa"],
         trash: path.join(paths.dir, `old-${Date.now()}`),
       });
       if (plan.kind === "source")

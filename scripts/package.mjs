@@ -338,9 +338,8 @@ UninstPage instfiles
   RMDir /r "$INSTDIR\\apps\\web"
   RMDir /r "$INSTDIR\\apps\\kazusa\\plugins"
   RMDir /r "$INSTDIR\\apps\\kazusa\\shared"
-  ; Templates are clones the app keeps current: only the files beside them.
-  Delete "$INSTDIR\\apps\\kazusa\\worlds\\base.json"
-  Delete "$INSTDIR\\apps\\kazusa\\worlds\\sources.json"
+  Delete "$INSTDIR\\apps\\kazusa\\base.json"
+  Delete "$INSTDIR\\apps\\kazusa\\world-sources.json"
   Delete "$INSTDIR\\apps\\kazusa\\package.json"
   Delete "$INSTDIR\\package.json"
   Delete "$INSTDIR\\package-lock.json"
@@ -431,7 +430,7 @@ set -e
 cd "$home"
 if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" .bundle-version; then
   echo "Setting up Kazusa. This takes a minute, once per version."
-  rsync -a --delete --exclude /apps/kazusa/world/ --exclude '/apps/kazusa/worlds/*/' --exclude /apps/kazusa/.worlds-before-repositories/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
+  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /apps/kazusa/worlds/ --exclude /apps/kazusa/.worlds-before-repositories/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
   xattr -dr com.apple.quarantine . 2>/dev/null || true
   cp "$bundle/VERSION" .bundle-version
 fi

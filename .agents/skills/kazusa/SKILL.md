@@ -253,21 +253,21 @@ apps/kazusa/
 ### Worlds, Setup and Providers
 
 - **Templates and the live world**: `worlds/<id>/` are templates, each a clone
-  of a world's own repository listed in `worlds/sources.json`: setup lists them
-  by `package.json` alone and clones only the one picked, and every start
-  fast-forwards the clones there are (`package.json`, `shared/wiki`,
-  `workspaces`, optionally `shared/skills`); `worlds/base.json` is the config
-  every world shares. A world's `package.json` is npm's (`name` a lasting slug,
-  `displayName`, semver `version` raised with each template release, `author`,
-  `homepage`, `private: true`) with Kazusa's under `kazusa`: `title` (the setup
-  guide's label, else `displayName`), `systemAgent`, `defaultGroup`, `renames`,
-  and `config` (merged into the plugin's config at setup); the live copy adds
-  `kazusa.template`, the template's folder. Schema: `WorldPackageSchema` in
-  `@kazusa/client`; the plugin reads it in `src/world/package.ts` (the credit on
-  `GET /kazusa/world`). `npm run dev` gives a world from before it one
-  (`scripts/world-package.mjs`: the template its old `world.json` named, else
-  the one whose player id it has). Field rules and migration:
-  [worlds](references/worlds.md). Before the Gateway starts,
+  of a world's own repository listed in `apps/kazusa/world-sources.json`: setup
+  lists them by `package.json` alone and clones only the one picked, and every
+  start fast-forwards the clones there are (`package.json`, `shared/wiki`,
+  `workspaces`, optionally `shared/skills`); `apps/kazusa/base.json` is the
+  config every world shares. A world's `package.json` is npm's (`name` a lasting
+  slug, `displayName`, semver `version` raised with each template release,
+  `author`, `homepage`, `private: true`) with Kazusa's under `kazusa`: `title`
+  (the setup guide's label, else `displayName`), `systemAgent`, `defaultGroup`,
+  `renames`, and `config` (merged into the plugin's config at setup); the live
+  copy adds `kazusa.template`, the template's folder. Schema:
+  `WorldPackageSchema` in `@kazusa/client`; the plugin reads it in
+  `src/world/package.ts` (the credit on `GET /kazusa/world`). `npm run dev`
+  gives a world from before it one (`scripts/world-package.mjs`: the template
+  its old `world.json` named, else the one whose player id it has). Field rules
+  and migration: [worlds](references/worlds.md). Before the Gateway starts,
   `scripts/world-repo.mjs` makes `world/` a git repository rooted at the
   published commit its `.template/` matches, with `upstream` its `repository`
   (git shipped in `git/`), committing nothing. The setup guide
@@ -288,12 +288,12 @@ apps/kazusa/
   100s of MB, one OpenClaw schema) never leaves the machine. Each world is a
   repository: `main` and `v*` tags, and one `checkpoint/<id>` line of versions
   per chapter, story order being a list on `main`, never parents; which worlds
-  exist comes from providers (`worlds/sources.json`: git now, OpenRP later).
-  Publish merges the published tip into the playthrough first, builds fresh
-  commits from the exported parts (`git commit-tree`), appends and pushes only
-  those, then links the playthrough to them (`merge -s ours`); the remote never
-  holds a large file or anything deleted. Playthroughs are local branches of
-  text commits. Saves and loads run only with the Gateway stopped, by whoever
+  exist comes from providers (`apps/kazusa/world-sources.json`: git now, OpenRP
+  later). Publish merges the published tip into the playthrough first, builds
+  fresh commits from the exported parts (`git commit-tree`), appends and pushes
+  only those, then links the playthrough to them (`merge -s ours`); the remote
+  never holds a large file or anything deleted. Playthroughs are local branches
+  of text commits. Saves and loads run only with the Gateway stopped, by whoever
   owns it (`scripts/dev.mjs`, later the cloud host), never on a timer or per
   turn: a save is a commit on its own ref (`refs/saves/*`) holding the text and
   the SQLite, so deleting one frees its databases; loading goes on from the
@@ -362,19 +362,19 @@ apps/kazusa/
   `models.providers.<id>.apiKey`), which reloads every plugin. A key written
   into `openclaw.json` by hand reports as `config` and can't be changed from
   Settings. TypeSafe has no plugin; Jev reads its `typesafe:manual` profile with
-  `resolveApiKeyForProvider`. `worlds/base.json` has no key references. Worlds
-  made by 0.1.3 and 0.2.0 had store references: `providers/migrate.ts` copies
-  each stored key into a profile at `gateway_start` (`secrets.resolve`), and
-  `scripts/provider-keys.mjs` drops a reference whose profile exists (or whose
-  entry is gone) before the next Gateway start, then soft-deletes its store
-  entry. Those two files, the manifest's `decisions.typesafeApiKey` schema and
-  `TYPESAFE_KEY_PATH` are marked deprecated; remove them all together once no
-  such world is left. The setup guide offers the providers in Kazusa's
-  `models.providers` (`worlds/base.json`; labels and key links from the shared
-  catalog, `PROVIDERS` in `@kazusa/client`) and saves the picked one's key as
-  its profile through the SDK in a child Node process before the Gateway exists.
-  It writes no model: the plugin works out the starting model from the keys
-  there are. OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
+  `resolveApiKeyForProvider`. `apps/kazusa/base.json` has no key references.
+  Worlds made by 0.1.3 and 0.2.0 had store references: `providers/migrate.ts`
+  copies each stored key into a profile at `gateway_start` (`secrets.resolve`),
+  and `scripts/provider-keys.mjs` drops a reference whose profile exists (or
+  whose entry is gone) before the next Gateway start, then soft-deletes its
+  store entry. Those two files, the manifest's `decisions.typesafeApiKey` schema
+  and `TYPESAFE_KEY_PATH` are marked deprecated; remove them all together once
+  no such world is left. The setup guide offers the providers in Kazusa's
+  `models.providers` (`apps/kazusa/base.json`; labels and key links from the
+  shared catalog, `PROVIDERS` in `@kazusa/client`) and saves the picked one's
+  key as its profile through the SDK in a child Node process before the Gateway
+  exists. It writes no model: the plugin works out the starting model from the
+  keys there are. OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
   `@openrp-ai/openclaw-provider` (from the openrp repo), a dependency of
   `apps/kazusa` loaded by path from `base.json` like the official
   `@openclaw/*-provider` packages.
@@ -1280,7 +1280,7 @@ connect these modules in process.
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
   Only the system console selects `full`. Her tools and skills belong to the
-  app, not the world: `systemAgent` in `worlds/base.json`, which a world's
+  app, not the world: `systemAgent` in `apps/kazusa/base.json`, which a world's
   config `$include`s from `world/.state/kazusa/system-agent.json`, rewritten by
   `scripts/system-agent.mjs` before every Gateway start (`npm run dev` and
   `npm run gateway`). Her entry in `openclaw.json` keeps only workspace, name
@@ -1311,8 +1311,8 @@ connect these modules in process.
   `world-building` skill, and whole worlds are `world-project`. Both live in
   `.agents/skills/`, so coding agents working in this repo get them as well as
   every world's system agent, who selects them by her per-agent `skills` in
-  `worlds/base.json`. Long jobs survive the run limits through a project file
-  and `continue_work`, which starts a fresh run once this one ends
+  `apps/kazusa/base.json`. Long jobs survive the run limits through a project
+  file and `continue_work`, which starts a fresh run once this one ends
   (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
   runs without the user speaking. Retained consumers use the host-injected
   `api.runtime.config.current()` rather than retaining `api.config` for live
@@ -1365,7 +1365,7 @@ connect these modules in process.
     already holds its model's provider plugin. OpenClaw starts a provider plugin
     with the Gateway only if config names one of its models or its entry has an
     explicit hook policy, and Kazusa's model pick lives in its own store. So
-    `worlds/base.json` gives every provider plugin
+    `apps/kazusa/base.json` gives every provider plugin
     `hooks.allowPromptInjection: true` (the default behaviour; it only changes
     startup), and `scripts/plugin-startup.mjs` adds it to existing worlds before
     the Gateway starts. The same script first loads and allows, by its manifest

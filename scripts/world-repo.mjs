@@ -2,7 +2,7 @@
 /**
  * Worlds are git repositories (the kazusa skill's `references/worlds.md` §4.5).
  *
- * Templates: `apps/kazusa/worlds/sources.json` lists the worlds on offer. The
+ * Templates: `apps/kazusa/world-sources.json` lists the worlds on offer. The
  * setup guide lists them by peeking at each one's `package.json` (`list`) and
  * clones only the one the player picks into `apps/kazusa/worlds/<id>` (`clone
  * <id>`), where setup and `world_update` read templates as before. Every start
@@ -38,7 +38,7 @@ import { simpleGit } from "simple-git";
 
 export const WORLDS = "apps/kazusa/worlds";
 /** Which worlds there are and where each lives; later, providers such as OpenRP. */
-export const SOURCES = `${WORLDS}/sources.json`;
+export const SOURCES = "apps/kazusa/world-sources.json";
 const WORLD = "apps/kazusa/world";
 /** Where a template folder from before repositories is set aside, not lost. */
 const SET_ASIDE = "apps/kazusa/.worlds-before-repositories";
@@ -219,6 +219,8 @@ export async function cloneWorld(root, id) {
       `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
     );
   }
+  // `worlds/` holds only clones, so the first one makes it.
+  mkdirSync(path.join(root, WORLDS), { recursive: true });
   await gitIn(git, path.join(root, WORLDS)).raw([
     "clone",
     "--quiet",

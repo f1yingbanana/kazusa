@@ -56,7 +56,7 @@ npm's own fields say what the world is; everything Kazusa needs sits under one
 | `kazusa.defaultGroup` | The group the setup guide picks to start with: a value of one of the world's anchors.                   |
 | `kazusa.renames`      | Place and concept ids the creator renamed, `{ "old_id": "new_id" }`, so copies follow on update.        |
 | `kazusa.config`       | Merged into the plugin's config (`openclaw.json`) once, at setup. Later edits here don't reach a world. |
-| `kazusa.template`     | Live worlds only: the template (`worlds/<id>`, its id in `sources.json`) the world is a copy of.        |
+| `kazusa.template`     | Live worlds only: the template (`worlds/<id>`, its id in `world-sources.json`) the world is a copy of.  |
 | `repository`          | Npm's: where the world lives and its updates come from (`{ type: "git", url }`).                        |
 
 Rules:
@@ -96,7 +96,7 @@ Rules:
   `package.json` with the template's (keeping `kazusa.template`), so the live
   `version` becomes the release it took. `apply` backs it up with `shared/`,
   `workspaces/` and the base; `undo` restores it.
-- **Templates** (`scripts/world-repo.mjs`): `apps/kazusa/worlds/sources.json`
+- **Templates** (`scripts/world-repo.mjs`): `apps/kazusa/world-sources.json`
   (`[{ id, provider, url }]`; `git` now, OpenRP later) lists the worlds on
   offer. The setup guide lists them without downloading any (`list`: a shallow
   clone with no file contents per source, from which only `package.json` is
@@ -110,11 +110,12 @@ Rules:
   changed or ahead: then it says so and leaves it (a creator edits, commits and
   pushes from there). A folder from before repositories is moved to
   `apps/kazusa/.worlds-before-repositories/`, then cloned. Unreachable (offline,
-  gone): it keeps what it has. Updates keep the clones (`apps/kazusa/worlds` is
-  merged entry by entry in `scripts/update.mjs`; the installer and the Mac
-  launcher leave them), and uninstalling removes them. Tests that check every
-  template (`location/map.test.ts`, `context-engine/decision-context.test.ts`)
-  check the ones downloaded here.
+  gone): it keeps what it has. Updates keep the clones: `worlds/` holds nothing
+  else and is wholly git-ignored (the shared config is `apps/kazusa/base.json`,
+  the list `apps/kazusa/world-sources.json`), no release carries it, and the
+  installer and the Mac launcher leave it, and uninstalling removes them. Tests
+  that check every template (`location/map.test.ts`,
+  `context-engine/decision-context.test.ts`) check the ones downloaded here.
 - **Repository** (`adoptWorldRepo`, before every Gateway start, from
   `scripts/dev.mjs` and `npm run gateway`): makes `world/` a git repository once
   and keeps it set up (§4.5). A new world goes the same way as an old one, since
@@ -308,7 +309,7 @@ playthrough (local):    v1 ─ p1 … p5 ─ M1 ─ p6 … ─ M2      M = link 
 ```
 
 **Sources**: which worlds a copy offers is a list of providers
-(`apps/kazusa/worlds/sources.json`): `git` repositories now, OpenRP's catalog
+(`apps/kazusa/world-sources.json`): `git` repositories now, OpenRP's catalog
 later. The list is only for discovery; a world's own `repository` says where it
 lives and where its updates come from. Kazusa's own worlds live in
 `f1yingbanana/kazusa-<name>` on GitHub; their histories were made from this
@@ -402,8 +403,8 @@ Without git, a world plays as before, untracked, and says so at start.
 
 1. **Set worlds up right while testers are few** (built): git shipped in the
    installers, simple-git, the world-repository module, the worlds moved to
-   their own repositories (synced as clones from `sources.json`), and every
-   world adopted before its Gateway starts (§2, Repository). Nothing is
+   their own repositories (synced as clones from `world-sources.json`), and
+   every world adopted before its Gateway starts (§2, Repository). Nothing is
    committed yet: commits are saves (step 2). Rooting history at the right
    release is what can't be fixed later.
 2. **Saves and loading, locally** (§4.6): the Gateway-only restart on request,

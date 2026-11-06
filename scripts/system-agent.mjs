@@ -3,8 +3,8 @@
  * The system agent's tools and skills belong to the app, not the world: they
  * grow with each release, and a world outlives many. So the world's config
  * keeps only what is its own (workspace, name, cwd) and includes the rest from
- * a file rewritten from `worlds/base.json` before every Gateway start. Keys set
- * beside the include still override it.
+ * a file rewritten from `apps/kazusa/base.json` before every Gateway start.
+ * Keys set beside the include still override it.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -22,7 +22,7 @@ export function syncSystemAgent(root) {
   const configFile = path.join(world, "openclaw.json");
   if (!existsSync(configFile)) return [];
   const { systemAgent } = JSON.parse(
-    readFileSync(path.join(root, "apps/kazusa/worlds/base.json"), "utf8"),
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
   );
   const target = path.join(world, SYSTEM_AGENT_INCLUDE);
   mkdirSync(path.dirname(target), { recursive: true });

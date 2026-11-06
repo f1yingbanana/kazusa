@@ -306,7 +306,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [now] = useState(() => new Date());
   const [date, setDate] = useState(now);
   const [time, setTime] = useState(() => format(now, "HH:mm"));
-  // Offered in `models.providers` order (`worlds/base.json`).
+  // Offered in `models.providers` order (`apps/kazusa/base.json`).
   const [providerId, setProviderId] = useState(status.providers[0]?.id);
   const provider = status.providers.find(({ id }) => id === providerId);
   const [key, setKey] = useState("");

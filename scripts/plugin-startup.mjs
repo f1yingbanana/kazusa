@@ -6,11 +6,11 @@
  * policy, and Kazusa's model pick (its own store) is never in config. Without
  * one, each character's first turn finds the plugin missing and loads every
  * plugin again, a whole Kazusa included: about 3 s and 29 MB per character.
- * `worlds/base.json` gives each provider `hooks.allowPromptInjection: true`,
- * which is already the default behaviour and only changes startup. This brings
- * a world made before that, or before a provider was added, in step. It runs
- * before the Gateway starts, since a config change while it runs reloads every
- * plugin.
+ * `apps/kazusa/base.json` gives each provider `hooks.allowPromptInjection:
+ * true`, which is already the default behaviour and only changes startup. This
+ * brings a world made before that, or before a provider was added, in step. It
+ * runs before the Gateway starts, since a config change while it runs reloads
+ * every plugin.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -25,7 +25,7 @@ export function startProviderPlugins(root) {
   const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
   if (!existsSync(configFile)) return [];
   const base = JSON.parse(
-    readFileSync(path.join(root, "apps/kazusa/worlds/base.json"), "utf8"),
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
   );
   const wanted = Object.entries(base.config?.plugins?.entries ?? {})
     .filter(([, entry]) => entry?.hooks?.allowPromptInjection === true)
@@ -61,7 +61,7 @@ export function loadNewPlugins(root) {
   const configFile = path.join(worldDir, "openclaw.json");
   if (!existsSync(configFile)) return [];
   const base = JSON.parse(
-    readFileSync(path.join(root, "apps/kazusa/worlds/base.json"), "utf8"),
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
   );
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   const plugins = (config.plugins ??= {});

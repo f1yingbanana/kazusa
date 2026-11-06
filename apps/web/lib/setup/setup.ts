@@ -534,7 +534,7 @@ export function createSetup(
 
   async function readBase() {
     return BaseSchema.parse(
-      JSON.parse(await readFile(path.join(worldsDir, "base.json"), "utf8")),
+      JSON.parse(await readFile(path.join(appDir, "base.json"), "utf8")),
     );
   }
 
