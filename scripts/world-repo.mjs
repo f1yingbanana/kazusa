@@ -161,43 +161,49 @@ export function readSources(root) {
 export async function syncWorlds(root) {
   const git = findGit(root);
   if (!git) return [];
+  // All at once: each is mostly waiting on the network.
+  const results = await Promise.all(
+    readSources(root).map((source) => syncWorld(root, git, source)),
+  );
+  return results.flat();
+}
+
+async function syncWorld(root, git, { id, url }) {
+  const dir = path.join(root, WORLDS, id);
   const lines = [];
-  for (const { id, url } of readSources(root)) {
-    const dir = path.join(root, WORLDS, id);
-    try {
-      if (!existsSync(path.join(dir, ".git"))) {
-        if (existsSync(dir)) {
-          const aside = path.join(root, SET_ASIDE, `${id}-${Date.now()}`);
-          mkdirSync(path.dirname(aside), { recursive: true });
-          renameSync(dir, aside);
-          lines.push(
-            `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
-          );
-        }
-        lines.push(`Downloading the ${id} world.`);
-        await gitIn(git, path.join(root, WORLDS)).raw([
-          "clone",
-          "--quiet",
-          url,
-          id,
-        ]);
-        continue;
+  try {
+    if (!existsSync(path.join(dir, ".git"))) {
+      if (existsSync(dir)) {
+        const aside = path.join(root, SET_ASIDE, `${id}-${Date.now()}`);
+        mkdirSync(path.dirname(aside), { recursive: true });
+        renameSync(dir, aside);
+        lines.push(
+          `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
+        );
       }
-      const repo = gitIn(git, dir);
-      await repo.raw(["fetch", "--quiet", "--prune", "--tags", "--force"]);
-      const branch = (await repo.raw(["branch", "--show-current"])).trim();
-      const changed = (await repo.raw(["status", "--porcelain"])).trim();
-      const ahead = (
-        await repo.raw(["rev-list", "--count", "origin/main..HEAD"])
-      ).trim();
-      if (branch !== "main" || changed || ahead !== "0") {
-        lines.push(`Kept your work in worlds/${id}; it isn't updated.`);
-        continue;
-      }
-      await repo.raw(["merge", "--quiet", "--ff-only", "origin/main"]);
-    } catch (error) {
-      lines.push(`Couldn't update the ${id} world: ${error.message.trim()}`);
+      lines.push(`Downloading the ${id} world.`);
+      await gitIn(git, path.join(root, WORLDS)).raw([
+        "clone",
+        "--quiet",
+        url,
+        id,
+      ]);
+      return lines;
     }
+    const repo = gitIn(git, dir);
+    await repo.raw(["fetch", "--quiet", "--prune", "--tags", "--force"]);
+    const branch = (await repo.raw(["branch", "--show-current"])).trim();
+    const changed = (await repo.raw(["status", "--porcelain"])).trim();
+    const ahead = (
+      await repo.raw(["rev-list", "--count", "origin/main..HEAD"])
+    ).trim();
+    if (branch !== "main" || changed || ahead !== "0") {
+      lines.push(`Kept your work in worlds/${id}; it isn't updated.`);
+      return lines;
+    }
+    await repo.raw(["merge", "--quiet", "--ff-only", "origin/main"]);
+  } catch (error) {
+    lines.push(`Couldn't update the ${id} world: ${error.message.trim()}`);
   }
   return lines;
 }
