@@ -9,7 +9,6 @@ import {
   MessageHeader,
 } from "@/components/ui/message";
 import { Marker, MarkerContent } from "@/components/ui/marker";
-import { useCharacters } from "@/hooks/use-characters";
 import { usePlace } from "@/hooks/use-location";
 import { formatDateTime, initials } from "@/lib/format";
 import { useSources } from "@/lib/source/provider";
@@ -24,21 +23,18 @@ import { ActionLine, buildRuns, StickerImage } from "./message-parts";
 export const CARD_WIDTH_PX = 400;
 
 const NO_ACTIVITY = new Map<number, never>();
-const NAMES = new Intl.ListFormat(undefined, {
-  style: "long",
-  type: "conjunction",
-});
 const noRetry = () => {};
 
 /**
  * The picture a screenshot makes: the chosen messages laid out again at a
  * phone's width, whatever the screen they were chosen on. Read the way a chat
- * is: who is talking at the top, where the eye starts; then the conversation;
- * and where it ends, the credit, as a signature: the world, who made it, and
- * its link in the bottom-right corner, where a picture's source is looked for
- * and the eye leaves. Runs and names are worked out for these messages alone,
- * so the first one always says who is speaking. Plain `<img>`s, so every face
- * is loaded before the picture is taken.
+ * is: where it is, by the chat's name alone, where the eye starts; then the
+ * conversation, which says who is talking; and where it ends, the credit, as a
+ * signature: the world, who made it, and its link in the bottom-right corner,
+ * where a picture's source is looked for and the eye leaves. Runs and names are
+ * worked out for these messages alone, so the first one always says who is
+ * speaking. Plain `<img>`s, so every face is loaded before the picture is
+ * taken.
  */
 export const ScreenshotCard = forwardRef<
   HTMLDivElement,
@@ -49,22 +45,13 @@ export const ScreenshotCard = forwardRef<
     resolve: (id: string, fallbackName?: string) => Participant;
   }
 >(function ScreenshotCard({ chat, messages, userId, resolve }, ref) {
-  const { byId } = useCharacters();
   const { world } = useSources();
   const place = usePlace(chat.placeId);
   const isGroup = !isOneOnOne(chat, userId);
   const others = chat.members.filter((id) => id !== userId);
-  // Everyone by name, never "+3": a count says nothing to whoever sees this.
-  const names = NAMES.format(others.map((id) => byId.get(id)?.name ?? id));
   const runs = buildRuns([...messages], formatDateTime, NO_ACTIVITY);
 
   const title = chat.type === "huddle" && place ? place.name : chat.name;
-  const subtitle =
-    chat.type === "huddle"
-      ? `In person with ${names || "nobody else"}`
-      : isGroup
-        ? names
-        : undefined;
   const partner =
     !isGroup && others[0] ? resolve(others[0], chat.name) : undefined;
 
@@ -76,14 +63,9 @@ export const ScreenshotCard = forwardRef<
     >
       <header className="flex items-center gap-3 border-b px-5 py-4">
         {partner ? <Face participant={partner} size={40} /> : null}
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="text-base leading-tight font-semibold">{title}</h1>
-          {subtitle ? (
-            <p className="text-xs leading-snug text-muted-foreground">
-              {subtitle}
-            </p>
-          ) : null}
-        </div>
+        <h1 className="min-w-0 text-base leading-tight font-semibold">
+          {title}
+        </h1>
       </header>
 
       <div className="flex flex-col gap-4 px-4 pt-5 pb-6">

@@ -23,6 +23,7 @@ import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Spinner } from "@/components/ui/spinner";
 import { exportScale } from "@/lib/source/chats/screenshot";
 import type { ChatInfo } from "@/lib/source/chats/types";
+import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@kazusa/client";
 import type { Participant } from "./chat-avatar";
 import { CARD_WIDTH_PX, ScreenshotCard } from "./screenshot-card";
@@ -195,7 +196,15 @@ export function ScreenshotDialog({
         : null}
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-md">
+        <DialogContent
+          className={cn(
+            "flex max-h-[90dvh] flex-col sm:max-w-md",
+            // A phone gets the whole screen: the picture is the point, and a
+            // floating box leaves it a strip to be read in.
+            "max-sm:inset-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:ring-0",
+            "max-sm:pt-[max(1rem,env(safe-area-inset-top))] max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]",
+          )}
+        >
           <DialogHeader>
             <DialogTitle>Screenshot</DialogTitle>
             <DialogDescription>
@@ -208,7 +217,7 @@ export function ScreenshotDialog({
               <img
                 src={ready.url}
                 alt={`Screenshot of ${count} ${count === 1 ? "message" : "messages"}`}
-                className="h-fit w-full max-w-80 rounded-md shadow-sm ring-1 ring-foreground/10"
+                className="h-fit w-full max-w-80 rounded-md shadow-sm ring-1 ring-foreground/10 max-sm:max-w-full"
               />
             ) : picture.state === "failed" ? (
               <Marker className="self-center">
