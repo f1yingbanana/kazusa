@@ -2,9 +2,10 @@
 
 Status (2026-11-05): §1–§3 built (`WorldPackageSchema` in `@kazusa/client`,
 `src/world/package.ts`, `src/world-update/`, `apps/web/lib/setup/`,
-`scripts/world-package.mjs`); §4 is the agreed design, not built. Read this
-before changing a world's `package.json`, how a world is set up or updated, or
-anything about versions, forks, history or saves.
+`scripts/world-package.mjs`, `scripts/world-repo.mjs`); §4 is the agreed design,
+built through step 1 of its roadmap (§4.8). Read this before changing a world's
+`package.json`, how a world is set up or updated, or anything about versions,
+forks, history or saves.
 
 Goal: a world is a thing people make, share, fork and keep playing. It should
 carry who made it and which version it is, take its creator's later releases
@@ -94,6 +95,34 @@ Rules:
   `package.json` with the template's (keeping `kazusa.template`), so the live
   `version` becomes the release it took. `apply` backs it up with `shared/`,
   `workspaces/` and the base; `undo` restores it.
+- **Repository** (`scripts/world-repo.mjs`, before every Gateway start, from
+  `scripts/dev.mjs` and `npm run gateway`): makes `world/` a git repository once
+  and keeps it set up (§4.5). A new world goes the same way as an old one, since
+  setup writes `.template/`: branch `play` is rooted at the newest published
+  commit (`upstream/main`, the mock remote) whose `shared/` and `workspaces/`
+  match `.template/` (every path, every text file's bytes; the manifest,
+  `package.json` or a legacy `world.json`, doesn't count), else at a root commit
+  of `.template/`'s text, else (no snapshot) left unborn for the first save.
+  Only the branch and the index move, never a world file, and a rooted `play` is
+  never moved again. Every start rewrites `.git/info/exclude` (only
+  `package.json`, `openclaw.json`, `shared/`, `workspaces/`) and
+  `.git/info/attributes`, the repo config (`core.autocrlf false`, no signing, a
+  local identity) and the `upstream` URL, then fetches. Nothing is committed.
+  Without git it says so and the world plays untracked.
+- **Mock remotes** (`buildRemotes`): `apps/kazusa/.remotes/<name>.git`, rebuilt
+  on start when this checkout's `HEAD` moved (`kazusa.source` in the bare repo's
+  config), never in a shallow clone or a copy without `.git`. Installers ship
+  them (`scripts/package.mjs` builds them in CI from the full history), so every
+  copy has the same commit ids.
+- **Git** (`findGit`): `git/` beside the app, GitHub Desktop's portable build
+  (`dugite-native`, pinned with its sha256 in `scripts/package.mjs`, Git
+  Credential Manager and Git LFS stripped: they are most of it and nothing uses
+  them), else the system's. On macOS without the developer tools, `/usr/bin/git`
+  only offers to install them, so that counts as none. simple-git guards the
+  environment: our variables (`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`,
+  `GIT_CONFIG_NOSYSTEM`, `GIT_INDEX_FILE`, author dates) are named in
+  `allowEnvironment`, the shipped binary and exec path allowed through `unsafe`,
+  and every inherited `GIT_*`, `EDITOR`, `PAGER` and the like dropped.
 
 ## 3. Bringing existing worlds along
 
@@ -355,13 +384,11 @@ Without git, a world plays as before, untracked, and says so at start.
 
 ### 4.8 Roadmap
 
-1. **Set worlds up right while testers are few** (one PR): git shipped in the
-   installers, simple-git, the world-repository module, the mock remote, and
-   every world adopted before its Gateway starts (history rooted at the
-   published commit whose text matches its `.template/`, else a root commit of
-   `.template/`; a new world goes the same way, since setup writes
-   `.template/`), with its excludes. Nothing is committed yet: commits are saves
-   (step 2). Rooting history at the right release is what can't be fixed later.
+1. **Set worlds up right while testers are few** (built): git shipped in the
+   installers, simple-git, the world-repository module, the mock remotes, and
+   every world adopted before its Gateway starts (§2, Repository). Nothing is
+   committed yet: commits are saves (step 2). Rooting history at the right
+   release is what can't be fixed later.
 2. **Saves and loading, locally** (§4.6): the Gateway-only restart on request,
    saves on their own refs, autosave on stop, Settings → Saves, load.
 3. **Updates over git** (§4.7): retires `.template/`, the backups and
@@ -383,6 +410,9 @@ Without git, a world plays as before, untracked, and says so at start.
   `../../../node_modules/.bin/openclaw` from `world/`.
 - `kazusa.config` applies once, at setup; to change a running world's settings,
   edit `openclaw.json` (or ask the system admin), not `package.json`.
+- Installers carry each template twice, in `worlds/` (setup copies it) and in
+  its mock remote (about 80 MB, mostly Kivotos' stickers), until setup clones
+  from the remote and `worlds/` goes away.
 - An update replaces the live `package.json` with the template's: a fork's own
   `name`, `author` or `version` would be overwritten. Fine while worlds don't
   fork; §4.5 resolves it (a fork merges, it isn't replaced).

@@ -156,6 +156,7 @@ clearTrash(ROOT);
 if (
   existsSync(UPDATE.reinstall) ||
   !existsSync(NEXT) ||
+  !existsSync(path.join(ROOT, "node_modules/simple-git")) ||
   !PLUGINS.every((dir) => existsSync(dir))
 ) {
   console.log("Installing dependencies.");
@@ -302,6 +303,13 @@ if (!stopping) {
     for (const line of adoptWorldPackage(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't give this world a package.json: ${error.message}`);
+  }
+  try {
+    // After the install above: it needs simple-git.
+    const { adoptWorldRepo } = await import("./world-repo.mjs");
+    for (const line of await adoptWorldRepo(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't set up this world's history: ${error.message}`);
   }
   try {
     for (const line of loadNewPlugins(ROOT)) console.log(line);

@@ -3,3 +3,6 @@
 
 # The live world, copied from worlds/ by the setup guide. Playing writes to it.
 /world/
+
+# Each template's mock remote, built from this repo's history by scripts/world-repo.mjs.
+/.remotes/

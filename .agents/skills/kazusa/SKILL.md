@@ -264,10 +264,14 @@ apps/kazusa/
   plugin reads it in `src/world/package.ts` (the credit on `GET /kazusa/world`).
   `npm run dev` gives a world from before it one (`scripts/world-package.mjs`:
   the template its old `world.json` named, else the one whose player id it has).
-  Field rules and migration: [worlds](references/worlds.md). The setup guide
-  (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
-  is the Gateway's cwd, so playing never touches the repo. A new world, or a
-  change to one, goes in its template; templates hold no SQLite.
+  Field rules and migration: [worlds](references/worlds.md). Before the Gateway
+  starts, `scripts/world-repo.mjs` makes `world/` a git repository rooted at the
+  published commit its `.template/` matches (mock remotes in
+  `apps/kazusa/.remotes/`, built from this repo's history; git shipped in
+  `git/`), committing nothing. The setup guide (`apps/web/lib/setup/setup.ts`)
+  copies one to the git-ignored `world/`, which is the Gateway's cwd, so playing
+  never touches the repo. A new world, or a change to one, goes in its template;
+  templates hold no SQLite.
 - **Canon, play, checkpoints and saves** (design agreed 2026-11-05, not built;
   [worlds](references/worlds.md) §4). Creators make worlds, playtest, cut
   checkpoints (chapter starts) and publish; players pick a start, play, save
