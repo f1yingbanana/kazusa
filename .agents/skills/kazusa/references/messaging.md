@@ -376,7 +376,9 @@ every unread copy up to the newest message shown is read, as opening a chat
 shows everything above it. Face to face the wait is short, and only the lines
 taken in count (the client says "observed"): a line let go unheard, stale or
 tuned out, isn't heard later. Ignored, waiting and offstage messages stay
-unread. Humans have no copies, so no receipts. `clientMessage` projects
+unread. A steer carried back by an interrupted send is read when the next model
+call starts on it, so a text in the chat being typed into is read seconds after
+it arrives. Humans have no copies, so no receipts. `clientMessage` projects
 `receipts: [{ id, readAt? }]`, one per recipient copy.
 
 ## Paced speech (outbox)
@@ -414,11 +416,25 @@ audiences, ledger copies and notifications are unchanged per bubble.
   interruption, so the brain stays busy and new stimuli are judged by
   `attention_allocation` with the current speech in Jev's state. The time it
   waits is not thinking, so it costs nothing of the run's time limit.
-- **Interruption.** When Perception reserves a steer for the speaker,
-  `Messaging.interrupt(agentId)` aborts the outbox. Unsent bubbles are dropped
-  and never reach any ledger. The result reports
-  `{ status: "interrupted", said, unsaid }`; the steer injected after it carries
-  the interrupting message.
+- **Interruption.** A steer for a speaker goes to
+  `Messaging.interrupt(agentId, { message, atPause })`, which aborts the outbox
+  and keeps the message on the speech under way. Unsent bubbles are dropped and
+  never reach any ledger; a text being typed is never sent. The result reports
+  `{ status: "interrupted", said, unsaid, meanwhile }`, and the tool's reply is
+  the usual JSON followed by `meanwhile` as its own text, read as a delivery is.
+  Perception marks it read when the next model call starts and adopts it when
+  one completes; a run that ends first (a limit, a failure) leaves it waiting
+  for the next turn. Handing the steer to the host instead, after the abort,
+  lost a race: the abort returned the tool, the next model call started, and the
+  steer landed only after the next send (live, 1-11 minutes of typing blind).
+  With `atPause`, a line being said aloud is finished first (`yielding`), then
+  the send stops.
+- **On screen.** A text arriving in the chat a send is typing into is seen as it
+  arrives: Perception steers it without asking Jev, so the send stops and the
+  turn decides whether to send the rest. Nothing is sent by default.
+- **A send begins** (`speaking` dependency): Perception takes back a steer still
+  waiting for the host, and it rides on this send instead, before a word is
+  typed.
 - **Crash recovery.** The plan is retained in the `outbox` store at the start of
   the call and deleted when it completes or is interrupted. On startup,
   `resume()` sends every bubble of a surviving plan immediately; bubbles that

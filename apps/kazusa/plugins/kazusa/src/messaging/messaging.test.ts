@@ -1284,6 +1284,40 @@ describe("paced speech", () => {
     expect(h.messaging.interrupt("alice")).toBe(false);
   });
 
+  it("hands back what stopped it with the result, and says when a send begins", async () => {
+    const speaking = vi.fn();
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { speaking },
+    );
+    h.setSpeed(0.000_001);
+    const pending = h.messaging.speak(
+      "alice",
+      "ALICE",
+      speech(["Wait...", "I told you not to go!"]),
+    );
+    await vi.waitFor(() => expect(speaking).toHaveBeenCalledWith("alice"));
+    expect(
+      h.messaging.interrupt("alice", {
+        message: "- [Bob] (chat:direct:bob): hi",
+      }),
+    ).toBe(true);
+    expect(await pending).toMatchObject({
+      status: "interrupted",
+      said: [],
+      unsaid: ["Wait...", "I told you not to go!"],
+      meanwhile: "- [Bob] (chat:direct:bob): hi",
+    });
+    // A text being typed when stopped is never sent.
+    expect(texts(h.retained)).toEqual([]);
+  });
+
   it("cancels remaining bubbles immediately when the native run aborts on a paused clock", async () => {
     const gateway = new AbortController();
     const invocation = new AbortController();
@@ -2513,6 +2547,24 @@ describe("the floor", () => {
       (delivery) => delivery.params.text === "one two three four five",
     );
     expect(line!.timestamp - started.message.timestamp).toBe(792);
+  });
+
+  it("finishes the line being said, then stops to take in what was said over it", async () => {
+    const { h, say, lines, speaking } = await table();
+    const alice = say("alice", ["one two three four five", "And another"]);
+    await speaking("alice");
+    h.setNow(NOW + 500);
+    expect(
+      h.messaging.interrupt("alice", { message: "hang on", atPause: true }),
+    ).toBe(true);
+    h.setNow(NOW + 2_000);
+    expect(await alice).toMatchObject({
+      status: "interrupted",
+      said: ["one two three four five"],
+      unsaid: ["And another"],
+      meanwhile: "hang on",
+    });
+    expect(lines()).toEqual(["alice: Hi", "alice: one two three four five"]);
   });
 
   it("drops a line stopped before its first word", async () => {

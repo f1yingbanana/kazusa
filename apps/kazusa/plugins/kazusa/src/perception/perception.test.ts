@@ -2527,17 +2527,29 @@ describe("Human reply timing and task boundaries", () => {
     expect(h.deliveries[0].ids).toEqual(["text"]);
   });
 
-  it("shows Jev the speech in progress and cuts it off on a steer", async () => {
+  /** A send under way in `sessionKey`, which takes whatever stops it. */
+  const speaking = (sessionKey: string) => ({
+    current: vi.fn(() => ({
+      sessionKey,
+      said: ["Wait..."],
+      unsaid: ["I told you not to go!"],
+    })),
+    interrupt: vi.fn(
+      (_agentId: string, _handoff?: { message: string; atPause?: boolean }) =>
+        true,
+    ),
+  });
+  const huddle = (id: string): Stimulus => ({
+    ...stimulus(id),
+    sessionKey: "agent:alice:chat:huddle:k3x9p2m0qa",
+  });
+
+  it("shows Jev the speech in progress and hands a steer back with it", async () => {
     const h = setup({ assembleDecisionContext });
-    const speech = {
-      current: vi.fn(() => ({
-        sessionKey: "agent:alice:chat:direct:bob",
-        said: ["Wait..."],
-        unsaid: ["I told you not to go!"],
-      })),
-      interrupt: vi.fn(() => true),
-    };
+    const speech = speaking("agent:alice:chat:direct:carol");
     h.router.attachSpeech(speech);
+    const read = vi.fn();
+    h.router.onRead(read);
     await h.router.started("alice", "busy");
     h.evaluateDecision.mockResolvedValueOnce(answer("QUEUE_NEXT"));
     await h.router.receive("alice", stimulus("uh huh"));
@@ -2545,11 +2557,112 @@ describe("Human reply timing and task boundaries", () => {
     expect(requests.at(-1)?.currentSpeech).toEqual(speech.current());
     h.evaluateDecision.mockResolvedValueOnce(answer("STEER"));
     await h.router.receive("alice", stimulus("I didn't actually go!"));
-    expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice");
-    expect(h.deliveries[0]).toMatchObject({
-      mode: "steer",
-      ids: ["I didn't actually go!"],
+    // Live, a steer sent to the host after the cut-off missed the next model
+    // call: the brain typed on without knowing what stopped it.
+    expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice", {
+      message: expect.stringContaining("I didn't actually go!"),
+      atPause: false,
     });
+    expect(h.deliver).not.toHaveBeenCalled();
+    // Read once a model call starts on it, taken in once one completes.
+    expect(read).not.toHaveBeenCalled();
+    await h.router.thinking("alice");
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ids: ["I didn't actually go!"] }),
+    );
+    expect(h.snapshot().pending.map((item) => item.id)).toContain(
+      "I didn't actually go!",
+    );
+    await h.router.thought("alice");
+    expect(h.snapshot().pending.map((item) => item.id)).not.toContain(
+      "I didn't actually go!",
+    );
+    expect(h.snapshot().carried).toBeUndefined();
+    expect(read).toHaveBeenCalledOnce();
+  });
+
+  it("puts what a run never finished reading back for its next turn", async () => {
+    const h = setup({ assembleDecisionContext });
+    const speech = speaking("agent:alice:chat:direct:carol");
+    h.router.attachSpeech(speech);
+    await h.router.started("alice", "busy");
+    h.evaluateDecision.mockResolvedValueOnce(answer("STEER"));
+    await h.router.receive("alice", stimulus("are you there?"));
+    expect(speech.interrupt).toHaveBeenCalledOnce();
+    // Live, runs hit their model-call limit with the handed-back lines unread.
+    await h.router.thinking("alice");
+    speech.current.mockReturnValue(undefined as never);
+    await h.router.ended("alice", "busy", false);
+    expect(h.deliveries.at(-1)).toMatchObject({
+      mode: "followup",
+      ids: ["are you there?"],
+    });
+  });
+
+  it("shows a text in the chat being typed into at once, unjudged", async () => {
+    const h = setup({ assembleDecisionContext, coalesceWindowMs: 10_000 });
+    const speech = speaking("agent:alice:chat:direct:bob");
+    h.router.attachSpeech(speech);
+    await h.router.started("alice", "busy");
+    await h.router.receive("alice", stimulus("not at schale!"));
+    await vi.waitFor(() =>
+      expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice", {
+        message: expect.stringContaining("not at schale!"),
+        atPause: false,
+      }),
+    );
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect([...h.decisions.values()]).toEqual([
+      expect.objectContaining({
+        action: "STEER",
+        source: "automatic",
+        stimulusIds: ["not at schale!"],
+      }),
+    ]);
+  });
+
+  it("finishes the line being said before taking in one said over it", async () => {
+    const h = setup({ assembleDecisionContext });
+    const speech = speaking("agent:alice:chat:huddle:k3x9p2m0qa");
+    h.router.attachSpeech(speech);
+    await h.router.started("alice", "busy");
+    h.evaluateDecision.mockResolvedValueOnce(answer("QUEUE_NEXT"));
+    await h.router.receive("alice", huddle("hang on"));
+    expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice", {
+      message: expect.stringContaining("hang on"),
+      atPause: true,
+    });
+    // Cutting in stops them mid-line.
+    h.evaluateDecision.mockResolvedValueOnce(answer("STEER"));
+    await h.router.receive("alice", huddle("STOP"));
+    expect(speech.interrupt).toHaveBeenLastCalledWith("alice", {
+      message: expect.stringContaining("STOP"),
+      atPause: false,
+    });
+  });
+
+  it("hands a steer still waiting for the host to a send that begins", async () => {
+    const h = setup({ assembleDecisionContext });
+    // The host holds the steer until the next tool boundary.
+    h.deliver.mockImplementation(async (delivery, lifecycle) => {
+      h.deliveries.push(structuredClone(delivery));
+      lifecycle.onDeferred?.();
+    });
+    await h.router.started("alice", "busy");
+    h.evaluateDecision.mockResolvedValueOnce(answer("STEER"));
+    await h.router.receive("alice", stimulus("wait"));
+    expect(h.deliveries[0]).toMatchObject({ mode: "steer", ids: ["wait"] });
+
+    const speech = speaking("agent:alice:chat:direct:carol");
+    h.router.attachSpeech(speech);
+    await h.router.speaking("alice");
+    expect(speech.interrupt).toHaveBeenCalledExactlyOnceWith("alice", {
+      message: expect.stringContaining("wait"),
+      atPause: false,
+    });
+    expect(h.snapshot().deliveries ?? []).toEqual([]);
+    await h.router.thought("alice");
+    expect(h.snapshot().pending).toEqual([]);
   });
 });
 

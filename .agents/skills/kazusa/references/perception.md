@@ -261,11 +261,13 @@ Perception submits a choice evaluation query to Jev
   directly to Jev in `currentActivity`. Jev semantically weighs whether the
   stimuli warrant immediate mid-thought steering.
 - **Routing Rules**:
-  1. **STEER**: Joins the steer queue. Whenever the brain is running and no
-     steer is in custody, the whole queue (up to the batch limits) goes into the
-     active brain execution lane as one steer via OpenClaw's `mode: "steer"`
-     session queue (`InboundEventKind: "user_request"`). A steer the turn
-     refused is taken back when the turn ends and joins the next turn's batch.
+  1. **STEER**: Joins the steer queue. While a send is under way, the queue
+     rides back on its result (see Paced speech below). Otherwise, whenever the
+     brain is running and no steer is in custody, the whole queue (up to the
+     batch limits) goes into the active brain execution lane as one steer via
+     OpenClaw's `mode: "steer"` session queue
+     (`InboundEventKind: "user_request"`). A steer the turn refused is taken
+     back when the turn ends and joins the next turn's batch.
   2. **QUEUE_NEXT**: Retained in the pending attention queue to be delivered
      automatically when the current brain run finishes.
   3. **IGNORE**: Dropped from pending attention. The message remains permanently
@@ -935,12 +937,29 @@ the run's thinking time. Jev's state includes
 `currentSpeech: { chat, said, unsaid }` so it can tell that a reply contradicts
 what the character is about to say.
 
-OpenClaw's steer queue injects only at the next tool boundary. Perception
-therefore interrupts Messaging when it **reserves** a steer delivery (not at
-adoption): the tool returns a partial result, and the host injects the steer
-message right after it. Without the interrupt, every bubble would be delivered
-before the character noticed anything.
+OpenClaw's steer queue injects only at the next tool boundary. Mid-speech, that
+boundary is the open `send_message`, so the steer rides back on its result:
+`SpeechSource.interrupt(agentId, { message, atPause })` aborts the send and
+returns whether one was under way; if so the delivery never goes to the host. It
+waits in `state.carried` (its keys in custody): read on `model_call_started`
+(`thinking`), adopted on a completed `model_call_ended` (`thought`), and put
+back for the next turn by `ended` if no call completed. Live, adopting at once
+lost lines: 3 of 4 runs that hit their limit ended with a handed-back result no
+model call read. Interrupting first and handing the steer to the host after lost
+a race live: the aborted tool returned, the next model call started about 0.4 s
+before the steer arrived, and the character resent its unsaid bubbles, seeing
+the steer only after that send (1-11 minutes). A send that begins while a steer
+waits in host custody calls `speaking(agentId)`, which takes the steer back so
+it rides on that send.
+
+Two arrivals skip or soften the judgment while a send is under way:
+
+- A text in the chat being typed into (`currentSpeech.sessionKey`, not a huddle)
+  is on screen: `STEER`, `source: "automatic"`, coalesced like face-to-face
+  lines. The send stops; nothing more is sent unless the turn sends it again.
+- A huddle line judged `QUEUE_NEXT` in the conversation being spoken in becomes
+  a steer `atPause`: the line under way is finished, then the send stops and the
+  turn hears it. `STEER` still stops the line mid-way.
 
 Interrupted bubbles were never committed, so no ledger or human ever saw them.
-The tool result lists what was said and unsaid; the steer message carries the
-interrupting text, so the result does not repeat it.
+The tool result lists what was said and unsaid, then the interrupting text.

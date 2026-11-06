@@ -1,4 +1,5 @@
 import { currentConfig } from "../current-config.ts";
+import { inBackground } from "../background.ts";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -200,7 +201,11 @@ export function registerMessaging(
       Partial<
         Pick<
           Perception,
-          "onRead" | "attachSpeech" | "attachConversations" | "judgeSpeech"
+          | "onRead"
+          | "attachSpeech"
+          | "attachConversations"
+          | "judgeSpeech"
+          | "speaking"
         >
       >;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
@@ -334,15 +339,28 @@ export function registerMessaging(
         }
       : {}),
     rates: messagingConfig.rates,
+    ...(deps.perception.speaking
+      ? {
+          speaking: (agentId: string) =>
+            inBackground(
+              api,
+              async () => {
+                await deps.perception.speaking?.(agentId);
+              },
+              (error) => api.logger.warn(`Perception: ${String(error)}`),
+            ),
+        }
+      : {}),
     warn: (message) => api.logger.warn(message),
     ...(deps.placeOf ? { placeOf: deps.placeOf } : {}),
   });
   api.lifecycle.onDispose?.(() => messaging.dispose());
   // Steering lands at the next tool boundary; an open send_message is that
-  // boundary, so Perception must be able to cut the speaker off.
+  // boundary, so Perception cuts the speaker off and hands what stopped them
+  // back with its result.
   deps.perception.attachSpeech?.({
     current: (agentId) => messaging.currentSpeech(agentId),
-    interrupt: (agentId) => messaging.interrupt(agentId),
+    interrupt: (agentId, handoff) => messaging.interrupt(agentId, handoff),
   });
   // Attention decides someone stopped following a conversation in person: out
   // of it, and a note in their own records so their next turn knows.
@@ -540,6 +558,10 @@ export function registerMessaging(
               return {
                 content: [
                   { type: "text", text: JSON.stringify(speechReply(details)) },
+                  // What stopped them, read as any delivery is.
+                  ...(details.meanwhile === undefined
+                    ? []
+                    : [{ type: "text" as const, text: details.meanwhile }]),
                 ],
                 details,
               };

@@ -34,10 +34,32 @@ function MessageScroller({
   )
 }
 
+/** The primitive's default `scrollEdgeThreshold`. */
+const END_THRESHOLD_PX = 8
+
+const SCROLL_DOWN_KEYS = new Set(["ArrowDown", "End", "PageDown", " "])
+
+function isAtEnd(viewport: HTMLElement) {
+  const { scrollTop, clientHeight, scrollHeight } = viewport
+  return scrollHeight - scrollTop - clientHeight <= END_THRESHOLD_PX
+}
+
 function MessageScrollerViewport({
   className,
+  onWheel,
+  onTouchEnd,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
+  const { scrollToEnd } = useMessageScroller()
+  // The primitive stops following on any wheel, touch or scroll key, and only
+  // a scroll event at the end resumes it. Scrolling down at the end moves
+  // nothing, so no scroll event comes (a trackpad's momentum always ends this
+  // way) and new messages stop scrolling into view. Resume it here.
+  const followIfAtEnd = (viewport: HTMLElement) => {
+    if (isAtEnd(viewport)) scrollToEnd()
+  }
+
   return (
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
@@ -45,6 +67,20 @@ function MessageScrollerViewport({
         "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
         className
       )}
+      onWheel={(event) => {
+        onWheel?.(event)
+        if (event.deltaY > 0) followIfAtEnd(event.currentTarget)
+      }}
+      onTouchEnd={(event) => {
+        onTouchEnd?.(event)
+        followIfAtEnd(event.currentTarget)
+      }}
+      onKeyDown={(event) => {
+        onKeyDown?.(event)
+        if (SCROLL_DOWN_KEYS.has(event.key) && !event.shiftKey) {
+          followIfAtEnd(event.currentTarget)
+        }
+      }}
       {...props}
     />
   )

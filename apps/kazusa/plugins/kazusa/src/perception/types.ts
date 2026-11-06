@@ -86,10 +86,21 @@ export interface CurrentSpeech {
   readonly unsaid: readonly string[];
 }
 
-/** Messaging's view of in-progress speech; Perception can cut it off. */
+/** What stops a speech and comes back with its result. */
+export interface SpeechHandoff {
+  /** What reached them, as a delivery reads. */
+  readonly message: string;
+  /** Face to face, finish the line being said first. */
+  readonly atPause?: boolean;
+}
+
+/**
+ * Messaging's view of in-progress speech; Perception can cut it off. With a
+ * handoff, `interrupt` returns whether a send was under way to carry it back.
+ */
 export interface SpeechSource {
   readonly current: (agentId: string) => CurrentSpeech | undefined;
-  readonly interrupt: (agentId: string) => boolean;
+  readonly interrupt: (agentId: string, handoff?: SpeechHandoff) => boolean;
 }
 
 /** Conversations attention can take someone out of. */

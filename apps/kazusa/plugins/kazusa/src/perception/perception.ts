@@ -59,6 +59,8 @@ import {
  */
 export interface PendingItem extends Stimulus {
   action?: "QUEUE_NEXT" | "STEER";
+  /** A steer that lets the line being said aloud finish first. */
+  atPause?: boolean;
   /** Recheck chat coverage once the ongoing reply has finished. */
   reviewAfterRun?: boolean;
   until?: { taskId?: string; notBefore?: number };
@@ -82,8 +84,12 @@ const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 const isHuddle = (item: Stimulus): boolean =>
   item.sessionKey.includes(":chat:huddle:");
 
+/** Someone's line in a chat, as opposed to a sighting or a check-in. */
+const isChatLine = (item: Stimulus): boolean =>
+  !item.deadline && !item.idle && item.sessionKey.includes(":chat:");
+
 /** `shared/skills/perception/SKILL.md` `metadata.rubricVersion`. */
-const RUBRIC_VERSION = "11";
+const RUBRIC_VERSION = "13";
 
 const PACE_ANCHORS = z.array(z.looseObject({ pace: z.number().positive() }));
 
@@ -116,6 +122,12 @@ export interface PerceptionState {
    * replayed.
    */
   deliveries?: PerceptionDelivery[];
+  /**
+   * Handed back with an interrupted send's result, but taken in only once a
+   * model call reading it completes. Live, runs hit their limit with the result
+   * unread; its lines go back to waiting if the run ends first.
+   */
+  carried?: CarriedDelivery[];
   stopped?: boolean;
   /** Adopted or ignored stimulus keys, for deduplication. */
   processedIds?: string[];
@@ -166,6 +178,20 @@ export interface PerceptionDelivery {
   ids: string[];
   keys: string[];
   sessionKeys?: string[];
+}
+
+export interface CarriedDelivery extends PerceptionDelivery {
+  /** A model call has begun reading it: the sender sees it read. */
+  shown?: boolean;
+}
+
+/** Keys handed to the brain and not yet settled: never judged or sent again. */
+function inCustody(state: PerceptionState): Set<string> {
+  return new Set(
+    [...(state.deliveries ?? []), ...(state.carried ?? [])].flatMap(
+      (delivery) => delivery.keys,
+    ),
+  );
 }
 
 export interface PerceptionDeps {
@@ -389,10 +415,7 @@ export class Perception {
             shouldDrain = true;
             pendingCount = state.pending.filter(
               (item) =>
-                !item.action &&
-                !state.deliveries?.some((delivery) =>
-                  delivery.keys.includes(stimulusKey(item)),
-                ),
+                !item.action && !inCustody(state).has(stimulusKey(item)),
             ).length;
           }
           return;
@@ -406,11 +429,7 @@ export class Perception {
           burst.burstAt = stimulus.timestamp;
         } else state.pending.push(stimulus);
         pendingCount = state.pending.filter(
-          (item) =>
-            !item.action &&
-            !state.deliveries?.some((delivery) =>
-              delivery.keys.includes(stimulusKey(item)),
-            ),
+          (item) => !item.action && !inCustody(state).has(stimulusKey(item)),
         ).length;
         shouldDrain = !state.stopped;
       },
@@ -430,9 +449,13 @@ export class Perception {
       return;
     }
 
-    // In-person exchanges keep only a short burst window. An arriving huddle
-    // can bring an existing remote-message timer forward, never push it back.
-    const inPerson = await this.deps.realtime?.(agentId, stimulus);
+    // In-person exchanges keep only a short burst window, as does a text in the
+    // chat they are typing into, which is on their screen as it arrives. An
+    // arriving one can bring an existing remote-message timer forward, never
+    // push it back.
+    const inPerson =
+      this.onScreen(agentId, [stimulus]).length > 0 ||
+      (await this.deps.realtime?.(agentId, stimulus));
     const windowMs = inPerson
       ? Math.min(this.config.coalesceWindowMs, 250)
       : this.config.coalesceWindowMs;
@@ -644,6 +667,15 @@ export class Perception {
           );
           if (!state.deliveries?.length) delete state.deliveries;
         }
+        // Handed back with a send's result that no model call finished
+        // reading: the run hit a limit, failed or was stopped. Its lines wait
+        // for the next turn, steer queue first.
+        if (state.carried) {
+          const unread = inCustody({ pending: [], carried: state.carried });
+          for (const item of state.pending)
+            if (unread.has(stimulusKey(item))) delete item.atPause;
+          delete state.carried;
+        }
         state.stopped = stopped;
         queued = state.pending.length;
         changed = true;
@@ -673,6 +705,49 @@ export class Perception {
   /** Let attention see, and cut off, what the character is saying. */
   attachSpeech(source: SpeechSource): void {
     this.speech = source;
+  }
+
+  /**
+   * They began a send. A steer still waiting for the host would land only after
+   * it, minutes of typing later, so take it back: draining hands its items to
+   * the send instead, which stops before a word is typed.
+   */
+  async speaking(agentId: string): Promise<void> {
+    await this.change(agentId, (state) => {
+      const waiting = state.deliveries?.filter(
+        (delivery) => delivery.mode === "steer",
+      );
+      if (!waiting?.length) return;
+      for (const delivery of waiting) steerCustody().get(delivery.id)?.abort();
+      state.deliveries = state.deliveries?.filter(
+        (delivery) => delivery.mode !== "steer",
+      );
+      if (!state.deliveries?.length) delete state.deliveries;
+    });
+  }
+
+  /**
+   * Text lines in the chat they are typing into: it is open in front of them,
+   * so each is seen as it arrives.
+   */
+  private onScreen(agentId: string, items: PendingItem[]): PendingItem[] {
+    const typing = this.speech?.current(agentId)?.sessionKey;
+    if (!typing) return [];
+    const chat = formatSessionHeader(typing);
+    if (chat.startsWith("chat:huddle:")) return [];
+    return items.filter(
+      (item) =>
+        isChatLine(item) &&
+        !isHuddle(item) &&
+        formatSessionHeader(item.sessionKey) === chat,
+    );
+  }
+
+  /** The conversation in person they are saying something in, if any. */
+  private speakingIn(agentId: string): string | undefined {
+    const speech = this.speech?.current(agentId)?.sessionKey;
+    const conversation = speech && formatSessionHeader(speech);
+    return conversation?.startsWith("chat:huddle:") ? conversation : undefined;
   }
 
   /** Let attention take someone out of a conversation they stopped following. */
@@ -764,6 +839,8 @@ export class Perception {
             }
             delete state.brainRun;
             delete state.brainContext;
+            // Whatever a send handed back before the restart waits again.
+            delete state.carried;
           },
           true,
         ),
@@ -961,9 +1038,7 @@ export class Perception {
       if (this.deps.onstage && !(await this.deps.onstage(agentId)))
         return undefined;
       const task = await this.taskStore.lookup(agentId);
-      const reserved = new Set(
-        state.deliveries?.flatMap((delivery) => delivery.keys),
-      );
+      const reserved = inCustody(state);
       // Keep reserved entries until their host lifecycle resolves custody.
       state.pending = state.pending.filter(
         (item) => reserved.has(stimulusKey(item)) || this.isCurrent(item, task),
@@ -1032,14 +1107,21 @@ export class Perception {
       const queuedReview = review.length > 0;
       const fresh = queuedReview ? review : happened;
       if (!fresh.length) {
-        // The steer queue goes into the running turn whole, one steer at a
-        // time: what is approved while one is in custody joins the next.
-        const steer =
-          state.brainRun &&
-          !state.deliveries?.some((delivery) => delivery.mode === "steer")
-            ? this.batch(available.filter((item) => item.action === "STEER"))
-            : [];
-        if (steer.length) return this.reserve(agentId, state, steer, "steer");
+        // The steer queue goes into the running turn whole. A send under way
+        // carries it back with its result; otherwise the host takes it, one
+        // steer at a time: what is approved while one is in custody joins the
+        // next.
+        const steer = state.brainRun
+          ? this.batch(available.filter((item) => item.action === "STEER"))
+          : [];
+        if (steer.length) {
+          if (this.carry(agentId, state, steer)) {
+            await this.save(agentId, state);
+            continue;
+          }
+          if (!state.deliveries?.some((delivery) => delivery.mode === "steer"))
+            return this.reserve(agentId, state, steer, "steer");
+        }
         await this.save(agentId, state);
         if (busy || !available.length) {
           // A busy brain drains when it ends; only what has not happened yet
@@ -1070,6 +1152,30 @@ export class Perception {
           return;
         }
         return this.reserve(agentId, state, waiting, "followup");
+      }
+      // A text in the chat they are typing into is seen as it arrives: no
+      // judgment of whether they look. They stop typing to read it, and their
+      // turn decides whether to send the rest.
+      const shown = queuedReview ? [] : this.onScreen(agentId, fresh);
+      if (shown.length) {
+        for (const item of shown) {
+          item.action = "STEER";
+          delete item.reviewAfterRun;
+        }
+        await this.recordDecision(
+          agentId,
+          {
+            action: "STEER",
+            delayMs: 0,
+            source: "automatic",
+            note: "in the chat being typed",
+          },
+          shown,
+          busy,
+          task,
+        );
+        await this.save(agentId, state);
+        continue;
       }
       const decision: AttentionDecision & DecisionTrace =
         systemAgent ||
@@ -1160,7 +1266,21 @@ export class Perception {
         return this.reserve(agentId, state, admitted, "followup");
       }
       const ignored = new Set<string>();
+      // Said in the conversation they are speaking in: heard at once. Queued
+      // means they finish the line they are on, then take it in.
+      const speakingIn = busy ? this.speakingIn(agentId) : undefined;
       for (const item of current) {
+        if (
+          action === "QUEUE_NEXT" &&
+          speakingIn !== undefined &&
+          isHuddle(item) &&
+          formatSessionHeader(item.sessionKey) === speakingIn
+        ) {
+          item.action = "STEER";
+          item.atPause = true;
+          delete item.reviewAfterRun;
+          continue;
+        }
         if (
           busy &&
           item.sessionKey.includes(":chat:") &&
@@ -1217,7 +1337,7 @@ export class Perception {
       ),
       { conversation, at: this.deps.clock.time() },
     ].slice(-8);
-    const handedOver = new Set(state.deliveries?.flatMap((item) => item.keys));
+    const handedOver = inCustody(state);
     const gone = new Set(
       [...bundle, ...state.pending]
         .filter(
@@ -1495,9 +1615,7 @@ export class Perception {
       !last ||
       last.sender !== stimulus.sender ||
       last.reviewAfterRun ||
-      state.deliveries?.some((delivery) =>
-        delivery.keys.includes(stimulusKey(last)),
-      ) ||
+      inCustody(state).has(stimulusKey(last)) ||
       stimulus.timestamp - (last.burstAt ?? last.timestamp) > BURST_WINDOW_MS ||
       last.text.length + stimulus.text.length >= this.config.maxBatchChars
     )
@@ -1532,12 +1650,11 @@ export class Perception {
     return held;
   }
 
-  private async reserve(
+  private deliveryOf(
     agentId: string,
-    state: PerceptionState,
     bundle: PendingItem[],
     mode: PerceptionDelivery["mode"],
-  ): Promise<PerceptionDelivery> {
+  ): PerceptionDelivery {
     const keys = bundle.flatMap(keysOf);
     const sessionKeys = [
       ...new Set(
@@ -1548,11 +1665,7 @@ export class Perception {
           .map((item) => item.sessionKey),
       ),
     ];
-    // Steering lands at the next tool boundary. If the character is mid-speech,
-    // that boundary is the open send_message: stop it so the steer is noticed
-    // before the remaining bubbles are said.
-    if (mode === "steer") this.speech?.interrupt(agentId);
-    const delivery: PerceptionDelivery = {
+    return {
       id: createHash("sha256")
         .update(JSON.stringify([agentId, [...keys].sort()]))
         .digest("hex"),
@@ -1567,6 +1680,99 @@ export class Perception {
         this.text("kazusa-deliveries#before-replying", {}, { agentId }),
       ),
     };
+  }
+
+  /**
+   * Steering lands at the next tool boundary. Mid-speech, that boundary is the
+   * open send_message, so the steer goes back with its result: stopped first
+   * and handed to the host after, the turn's next model call started before the
+   * steer arrived, and the brain typed on blind until its next tool call. False
+   * when no send is under way to carry it. It is taken in once a model call
+   * reading it completes (`thought`).
+   */
+  private carry(
+    agentId: string,
+    state: PerceptionState,
+    bundle: PendingItem[],
+  ): boolean {
+    const delivery = this.deliveryOf(agentId, bundle, "steer");
+    const carried = this.speech?.interrupt(agentId, {
+      message: delivery.message,
+      atPause: bundle.every((item) => item.atPause),
+    });
+    if (!carried) return false;
+    state.carried = [...(state.carried ?? []), delivery];
+    return true;
+  }
+
+  /**
+   * A model call began, reading whatever an interrupted send handed back: the
+   * sender sees it read. Must not block the call.
+   */
+  async thinking(agentId: string): Promise<void> {
+    const shown: PerceptionDelivery[] = [];
+    await this.change(
+      agentId,
+      (state) => {
+        for (const delivery of state.carried ?? []) {
+          if (delivery.shown) continue;
+          delivery.shown = true;
+          shown.push(delivery);
+        }
+      },
+      false,
+    );
+    for (const delivery of shown) await this.notifyRead(delivery);
+  }
+
+  /** A model call completed: what it was handed is taken in. */
+  async thought(agentId: string): Promise<void> {
+    const unread: PerceptionDelivery[] = [];
+    await this.change(
+      agentId,
+      (state) => {
+        if (!state.carried?.length) return;
+        for (const delivery of state.carried) {
+          this.adopt(state, delivery);
+          if (!delivery.shown) unread.push(delivery);
+        }
+        delete state.carried;
+      },
+      false,
+    );
+    for (const delivery of unread) await this.notifyRead(delivery);
+  }
+
+  /** The brain has it: done waiting, and part of what it is thinking about. */
+  private adopt(state: PerceptionState, delivery: PerceptionDelivery): void {
+    state.pending = state.pending.filter(
+      (item) => !delivery.keys.includes(stimulusKey(item)),
+    );
+    state.processedIds = [
+      ...(state.processedIds ?? []),
+      ...delivery.keys,
+    ].slice(-1_000);
+    if (state.deliveries)
+      state.deliveries = state.deliveries.filter(
+        (item) => item.id !== delivery.id,
+      );
+    // Bridges adoption to the native start event; steering preserves the
+    // existing run ID. Never label a turn with its source message ID.
+    state.brainRun ??= "external";
+    state.brainContext = (
+      delivery.mode === "steer"
+        ? `${state.brainContext ?? ""}\n${delivery.message}`
+        : delivery.message
+    ).slice(-this.config.maxBatchChars);
+  }
+
+  private async reserve(
+    agentId: string,
+    state: PerceptionState,
+    bundle: PendingItem[],
+    mode: PerceptionDelivery["mode"],
+  ): Promise<PerceptionDelivery> {
+    const delivery = this.deliveryOf(agentId, bundle, mode);
     if (mode === "followup") this.slots.dispatch(agentId);
     else steerCustody().set(delivery.id, new AbortController());
     state.deliveries = [...(state.deliveries ?? []), delivery];
@@ -1631,24 +1837,7 @@ export class Perception {
               if (!state.deliveries?.some((item) => item.id === delivery.id))
                 return;
               held = true;
-              state.pending = state.pending.filter(
-                (item) => !delivery.keys.includes(stimulusKey(item)),
-              );
-              state.processedIds = [
-                ...(state.processedIds ?? []),
-                ...delivery.keys,
-              ].slice(-1_000);
-              state.deliveries = state.deliveries?.filter(
-                (item) => item.id !== delivery.id,
-              );
-              // Bridges adoption to the native start event; steering preserves the
-              // existing run ID. Never label a turn with its source message ID.
-              state.brainRun ??= "external";
-              state.brainContext = (
-                delivery.mode === "steer"
-                  ? `${state.brainContext ?? ""}\n${delivery.message}`
-                  : delivery.message
-              ).slice(-this.config.maxBatchChars);
+              this.adopt(state, delivery);
             },
             false,
           );

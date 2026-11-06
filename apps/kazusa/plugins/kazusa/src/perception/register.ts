@@ -1,4 +1,5 @@
 import { beginTurn } from "../turn.ts";
+import { inBackground } from "../background.ts";
 import { createHash, randomUUID } from "node:crypto";
 import {
   KeyedAsyncQueue,
@@ -292,6 +293,26 @@ export function registerPerception(
   // DESIGN FIT:
   // Synchronizes physical brain thinking states with attention gating without polling.
   // =========================================================================
+  // What an interrupted send handed back is read once a model call starts on
+  // it, and taken in once one completes; a run that ends first leaves it
+  // waiting. Never block the model call on the attention lock.
+  const brainOf = (sessionKey: string | undefined): string | undefined => {
+    const owner = parseAgentSessionKey(sessionKey ?? "");
+    return owner?.rest === "brain" ? owner.agentId : undefined;
+  };
+  const warnPerception = (err: unknown) =>
+    api.logger.warn(`Perception: ${String(err)}`);
+  api.on("model_call_started", (event, ctx) => {
+    const agentId = brainOf(ctx.sessionKey ?? event.sessionKey);
+    if (agentId)
+      inBackground(api, () => perception.thinking(agentId), warnPerception);
+  });
+  api.on("model_call_ended", (event, ctx) => {
+    const agentId = brainOf(ctx.sessionKey ?? event.sessionKey);
+    if (agentId && event.outcome === "completed")
+      inBackground(api, () => perception.thought(agentId), warnPerception);
+  });
+
   // `finishing` can carry a run's error ahead of its final event.
   const runErrors = new Map<string, string>();
   api.agent.events.registerAgentEventSubscription({

@@ -10,7 +10,7 @@ import { KeyedAsyncQueue, OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { sleepSim, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
 import { stickerUrl } from "../stickers/stickers.ts";
-import type { CurrentSpeech } from "../perception/types.ts";
+import type { CurrentSpeech, SpeechHandoff } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
 import { stimulusKey, type Stimulus } from "../stimulus.ts";
 import {
@@ -121,6 +121,8 @@ export interface SpeechResult {
   readonly unsaid: readonly string[];
   /** A line cut off partway: what was heard of it (also last in `said`). */
   readonly heard?: string;
+  /** What reached them meanwhile and stopped them, as a delivery reads. */
+  readonly meanwhile?: string;
 }
 
 /** A chat whose latest visible message came from someone else. */
@@ -179,6 +181,12 @@ interface Speech {
    * the way out, at once, over whoever is talking.
    */
   readonly hurry: AbortController;
+  /** How the bubble under way is being composed, while it is. */
+  composing?: Medium;
+  /** Finish the line being said, then stop: something was said over it. */
+  yielding?: boolean;
+  /** What stopped it, handed back with its result so the turn sees it at once. */
+  meanwhile?: string;
 }
 
 export type MessagingEvent =
@@ -303,6 +311,11 @@ export interface MessagingDeps {
   ) => Promise<SpeechJudgment>;
   /** What each writing system takes to type and say; default `COMPOSING_RATES`. */
   readonly rates?: ComposingRates;
+  /**
+   * A character began a send, so whatever is waiting to stop them can now ride
+   * on it. Must not block or throw.
+   */
+  readonly speaking?: (agentId: string) => void;
 }
 
 /** A conversation going on at a place, as others there could see it. */
@@ -1639,6 +1652,7 @@ export class Messaging {
         const ahead = queue.map((other) => other.ended);
         queue.push(speech);
         this.speeches.set(sender, queue);
+        if (paced) this.deps.speaking?.(sender);
         await Promise.all(ahead);
         // Interrupted while waiting its turn: nothing to say or retain.
         signal.throwIfAborted();
@@ -1748,6 +1762,7 @@ export class Messaging {
             startedAt: this.deps.clock.now().simTime,
             ms,
           };
+          speech.composing = medium;
           await this.setTyping(
             sender,
             senderName,
@@ -1778,6 +1793,9 @@ export class Messaging {
         if (saying?.medium === "speaking")
           this.floors.done(saying.chatId, plan.id);
         saying = undefined;
+        delete speech.composing;
+        // The line is out; now they take in what was said over it.
+        if (speech.yielding) break;
       }
     } catch (error) {
       if (!speech.controller.signal.aborted && !abortSignal?.aborted)
@@ -1853,6 +1871,10 @@ export class Messaging {
       ],
       unsaid,
       ...(cut === undefined ? {} : { heard: cut }),
+      // Read after leaving the queue: an interrupt from then on finds no speech.
+      ...(speech.meanwhile === undefined
+        ? {}
+        : { meanwhile: speech.meanwhile }),
     };
   }
 
@@ -1922,13 +1944,25 @@ export class Messaging {
 
   /**
    * Stop a character mid-speech, and whatever they were about to say next;
-   * returns whether anything was being said.
+   * returns whether anything was being said. A `handoff` comes back with the
+   * result of the send under way, so the turn sees what stopped it at once
+   * instead of after its next tool call. With `atPause`, a line being said
+   * aloud is finished first.
    */
-  interrupt(agentId: string): boolean {
-    const stopped = this.speeches.get(agentId) ?? [];
-    for (const speech of stopped)
+  interrupt(agentId: string, handoff?: SpeechHandoff): boolean {
+    const [current, ...waiting] = this.speeches.get(agentId) ?? [];
+    if (!current) return false;
+    if (handoff)
+      current.meanwhile =
+        current.meanwhile === undefined
+          ? handoff.message
+          : `${current.meanwhile}\n\n${handoff.message}`;
+    if (handoff?.atPause && current.composing === "speaking")
+      current.yielding = true;
+    else current.controller.abort(new Error("Speech interrupted"));
+    for (const speech of waiting)
       speech.controller.abort(new Error("Speech interrupted"));
-    return stopped.length > 0;
+    return true;
   }
 
   currentSpeech(agentId: string): CurrentSpeech | undefined {
