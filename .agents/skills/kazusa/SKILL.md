@@ -231,7 +231,7 @@ apps/kazusa/
 │       ├── stickers/                   # Per-character sticker sets, GET /kazusa/sticker
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
-├── worlds/                             # Read-only templates: base.json, <id>/{world.json,shared,workspaces}
+├── worlds/                             # Read-only templates: base.json, <id>/{package.json,shared,workspaces}
 └── world/                              # Git-ignored live world copied by the setup guide; the Gateway's cwd
     ├── openclaw.json                   # Written last by the guide; its existence means setup is done
     ├── shared/wiki/                    # WORLD WIKI (objective truth)
@@ -253,8 +253,20 @@ apps/kazusa/
 ### Worlds, Setup and Providers
 
 - **Templates and the live world**: `worlds/<id>/` are read-only templates
-  (`world.json`, `shared/wiki`, `workspaces`, optionally `shared/skills`);
-  `worlds/base.json` is the config every world shares. The setup guide
+  (`package.json`, `shared/wiki`, `workspaces`, optionally `shared/skills`);
+  `worlds/base.json` is the config every world shares. A world's `package.json`
+  is npm's (`name` a lasting slug, `displayName`, semver `version` raised with
+  each template release, `author`, `homepage`, `private: true`) with Kazusa's
+  under `kazusa`: `title` (the setup guide's label, else `displayName`),
+  `systemAgent`, `defaultGroup`, `renames`, and `config` (merged into the
+  plugin's config at setup); the live copy adds `kazusa.template`, the
+  template's folder. Schema: `WorldPackageSchema` in `@kazusa/client`; the
+  plugin reads it in `src/world/package.ts` (the credit on `GET /kazusa/world`).
+  `npm run dev` gives a world from before it one (`scripts/world-package.mjs`:
+  the template its old `world.json` named, else the one whose player id it has).
+  Field rules, migration and the versioning roadmap (update notices, git
+  history, templates as repositories, save and load):
+  [worlds](references/worlds.md). The setup guide
   (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
   is the Gateway's cwd, so playing never touches the repo. A new world, or a
   change to one, goes in its template; templates hold no simulation history.
@@ -274,10 +286,10 @@ apps/kazusa/
   minus play's marks (visit stamps, notes, history, sleep's sections, the
   layout), so untouched pages take the creator's version and a played-on
   character page reports its differences; nothing is removed, and `apply` needs
-  `bestAttempt: true`, the user's consent. `renames` in the template's
-  `world.json` (`{ old_id: new_id }`) carry place and concept ids, with every
+  `bestAttempt: true`, the user's consent. `kazusa.renames` in the template's
+  `package.json` (`{ old_id: new_id }`) carry place and concept ids, with every
   card and position. `apply` needs a paused clock and backs up `shared/`,
-  `workspaces/`, `world.json` and the base to
+  `workspaces/`, `package.json` and the base to
   `.state/kazusa/world-update/backups/<stamp>/` (last 3 kept); `finish` refuses
   a map that doesn't load, re-places characters stranded on a missing place (or
   everyone, with `rehome: all`) through `place()`, and records the new base;
@@ -1404,6 +1416,10 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/conversations.md` — Conversations in person: how people join,
   split off and drift out, what covers each behavior, and tuning out. Read when
   changing `talk`, huddle membership, or how characters leave a conversation.
+- `references/worlds.md` — A world's `package.json`: fields and rules, setup,
+  updates, bringing old worlds along, and the versioning roadmap (git history,
+  templates as repositories, save and load). Read before changing the manifest,
+  setup, `world_update`, or anything about versions, forks or saves.
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.

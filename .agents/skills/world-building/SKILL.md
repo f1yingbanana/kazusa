@@ -154,9 +154,9 @@ takes them offstage. They start at `home`.
 - **Renaming an id** touches the card, the workspace, `openclaw.json` and every
   page that mentions it (`grep` for the id finds them). Tell the user what it
   would involve before starting. When you rename a place or concept in a
-  template that others have copied, also add it to `renames` in the template's
-  `world.json` (`{ "old_id": "new_id" }`), so their copies follow it when they
-  update (see `world-update`).
+  template that others have copied, also add it to `kazusa.renames` in the
+  template's `package.json` (`{ "old_id": "new_id" }`), so their copies follow
+  it when they update (see `world-update`).
 
 ## Stickers
 

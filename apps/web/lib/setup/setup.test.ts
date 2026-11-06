@@ -69,15 +69,19 @@ function fixture(): string {
   );
   const world = (id: string, agents: string[]) => {
     write(
-      path.join(app, "worlds", id, "world.json"),
+      path.join(app, "worlds", id, "package.json"),
       JSON.stringify({
-        title: id,
+        name: id,
+        displayName: id,
+        version: "1.0.0",
         description: id,
-        systemAgent: "admin",
-        defaultGroup: "crew",
         kazusa: {
-          user: { id: "user:me" },
-          memory: { anchors: { guild: "intimate", city: "familiar" } },
+          systemAgent: "admin",
+          defaultGroup: "crew",
+          config: {
+            user: { id: "user:me" },
+            memory: { anchors: { guild: "intimate", city: "familiar" } },
+          },
         },
       }),
     );
@@ -321,13 +325,10 @@ describe("setup", () => {
     const setup = createSetupHere(app);
     store.entries.set("openrouter", "k");
     write(
-      path.join(app, "world/world.json"),
+      path.join(app, "world/package.json"),
       JSON.stringify({
-        id: "starter",
-        title: "s",
-        description: "d",
-        systemAgent: "admin",
-        kazusa: {},
+        name: "s",
+        kazusa: { systemAgent: "admin", template: "starter" },
       }),
     );
     expect(await setup.status()).toMatchObject({

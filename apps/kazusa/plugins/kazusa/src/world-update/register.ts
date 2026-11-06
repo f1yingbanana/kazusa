@@ -111,7 +111,7 @@ export function registerWorldUpdate(
     const id = templateIdOf(live);
     if (!id)
       throw new Error(
-        "This isn't a world made from a template: world.json has no id.",
+        "This isn't a world made from a template: its package.json names no kazusa.template.",
       );
     const template = path.resolve(live, "..", "worlds", id);
     if (!existsSync(template))

@@ -11,7 +11,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import type { WorldPackage } from "@kazusa/client";
 import { renamedText } from "../location/pages.ts";
+import { readWorldPackage, WORLD_PACKAGE } from "../world/package.ts";
 import { parseDoc, renderDoc } from "./parts.ts";
 import {
   mergeMarkdown,
@@ -36,6 +38,11 @@ const KEEP_BACKUPS = 3;
 
 const TEXT = /\.(md|json|txt)$/;
 const PARTS = ["shared", "workspaces"] as const;
+/**
+ * The world's manifest: an update brings the template's, with its new version,
+ * keeping which template the world came from.
+ */
+const PACKAGE = WORLD_PACKAGE;
 const LAYOUT_KEYS = ["fm:map"];
 
 const MANIFEST_SCHEMA = z.object({
@@ -43,14 +50,6 @@ const MANIFEST_SCHEMA = z.object({
   files: z.record(z.string(), z.string()),
 });
 type Manifest = z.infer<typeof MANIFEST_SCHEMA>;
-
-const WORLD_JSON = z
-  .object({
-    id: z.string().optional(),
-    /** Place ids the creator renamed: `{ "old_id": "new_id" }`. */
-    renames: z.record(z.string(), z.string()).optional(),
-  })
-  .loose();
 
 const sha = (data: Buffer | string): string =>
   createHash("sha256").update(data).digest("hex");
@@ -69,7 +68,7 @@ function filesOf(root: string): string[] {
     }
   };
   for (const part of PARTS) if (existsSync(path.join(root, part))) walk(part);
-  if (existsSync(path.join(root, "world.json"))) out.push("world.json");
+  if (existsSync(path.join(root, PACKAGE))) out.push(PACKAGE);
   return out.sort();
 }
 
@@ -102,19 +101,15 @@ function readManifest(live: string): Manifest | undefined {
   return MANIFEST_SCHEMA.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
-/** `world.json` of the live world: which template it came from. */
+/** Which template the live world came from, from its `package.json`. */
 export function templateIdOf(live: string): string | undefined {
-  const file = path.join(live, "world.json");
-  if (!existsSync(file)) return undefined;
-  return WORLD_JSON.parse(JSON.parse(readFileSync(file, "utf8"))).id;
+  return readWorldPackage(live)?.kazusa.template;
 }
 
 // ------------------------------------------------------------------- renames
 
 function renamesOf(template: string): Record<string, string> {
-  const file = path.join(template, "world.json");
-  if (!existsSync(file)) return {};
-  return WORLD_JSON.parse(JSON.parse(readFileSync(file, "utf8"))).renames ?? {};
+  return readWorldPackage(template)?.kazusa.renames ?? {};
 }
 
 function renamedPath(file: string, renames: Record<string, string>): string {
@@ -280,9 +275,11 @@ export function planUpdate(
     const from =
       inL && liveFiles.get(file) !== file ? { from: liveFiles.get(file)! } : {};
     const md = file.endsWith(".md");
-    if (file === "world.json") {
+    if (file === PACKAGE) {
       if (!inT || !inL) continue;
-      const next = { ...WORLD_JSON.parse(JSON.parse(templateText(file))), id };
+      // The template's as written, so its key order and fields survive.
+      const theirs = JSON.parse(templateText(file)) as WorldPackage;
+      const next = { ...theirs, kazusa: { ...theirs.kazusa, template: id } };
       const current: unknown = JSON.parse(read(path.join(live, file)));
       if (JSON.stringify(next) !== JSON.stringify(current))
         changes.push({
@@ -479,7 +476,7 @@ function backup(live: string): string {
       verbatimSymlinks: true,
     });
   };
-  for (const part of [...PARTS, "world.json", BASE_DIR]) copy(part);
+  for (const part of [...PARTS, PACKAGE, BASE_DIR]) copy(part);
   const all = readdirSync(path.join(live, BACKUPS_DIR)).sort();
   for (const old of all.slice(0, Math.max(0, all.length - KEEP_BACKUPS)))
     rmSync(path.join(live, BACKUPS_DIR, old), { recursive: true, force: true });
@@ -572,10 +569,14 @@ export function undoUpdate(live: string): string {
   if (!report) throw new Error("No update to undo.");
   const dir = path.join(live, report.backup);
   if (!existsSync(dir)) throw new Error(`The backup ${report.backup} is gone.`);
-  for (const part of [...PARTS, "world.json", BASE_DIR]) {
+  for (const part of [...PARTS, PACKAGE, BASE_DIR]) {
     const source = path.join(dir, part);
-    if (!existsSync(source)) continue;
     const target = path.join(live, part);
+    if (!existsSync(source)) {
+      // A manifest the update added goes with it.
+      if (part === PACKAGE) rmSync(target, { force: true });
+      continue;
+    }
     rmSync(target, { recursive: true, force: true });
     cpSync(source, target, {
       recursive: true,

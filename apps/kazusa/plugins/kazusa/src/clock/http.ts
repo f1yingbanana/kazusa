@@ -10,6 +10,7 @@ import {
 } from "@kazusa/client";
 import { z } from "zod";
 import type { Clock } from "./clock.ts";
+import { worldCredit } from "../world/package.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
@@ -59,6 +60,8 @@ export function registerClockHttp(
   options?: {
     readonly getCapabilities?: () => Partial<Record<Domain, Capability>>;
     readonly getWorldMeta?: () => Promise<WorldMeta> | WorldMeta;
+    /** Where the world's `package.json` is: the Gateway's working directory. */
+    readonly worldDir?: string;
   },
 ): void {
   const user = USER.parse(api.pluginConfig?.user ?? {});
@@ -78,6 +81,8 @@ export function registerClockHttp(
               ?.summary ?? "Kazusa multi-agent roleplay society",
           accent: (api.pluginConfig?.world as { accent?: string } | undefined)
             ?.accent,
+          // Read on each request, so editing the file needs no restart.
+          package: worldCredit(options?.worldDir ?? process.cwd()),
         };
 
     const capabilities: Partial<Record<Domain, Capability>> =

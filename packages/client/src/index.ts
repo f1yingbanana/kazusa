@@ -292,8 +292,67 @@ export const WorldMetaSchema = z.object({
   summary: z.string().optional(),
   /** Hex color from `shared/wiki/world.md` frontmatter. */
   accent: z.string().optional(),
+  /**
+   * Who made the world and where it lives, from the world's npm-style
+   * `package.json` (`displayName` or `name`, `version`, `author`'s name,
+   * `homepage`). Absent for a world without one. Shared screenshots credit it.
+   */
+  package: z
+    .object({
+      name: z.string(),
+      version: z.string().optional(),
+      author: z.string().optional(),
+      homepage: z.string().optional(),
+    })
+    .optional(),
 });
 export type WorldMeta = z.infer<typeof WorldMetaSchema>;
+
+/**
+ * A world's `package.json`: what it is, who made it and which version, in npm's
+ * own fields, and everything Kazusa needs under `kazusa`, the way tools keep
+ * their config in a package. Templates ship one; setup copies it into the live
+ * world and adds `kazusa.template`. Not wire data, but the plugin and the setup
+ * guide both read it, so it is defined once, here.
+ */
+export const WorldPackageSchema = z.looseObject({
+  /** Npm's name: a lowercase slug, and the world's lasting identity. */
+  name: z.string().trim().min(1),
+  /** The name people read. Not npm's own field; editors use it the same way. */
+  displayName: z.string().trim().min(1).optional(),
+  /**
+   * Semver. A template's goes up with each release, which is how a world can
+   * tell it's behind.
+   */
+  version: z.string().trim().min(1).optional(),
+  description: z.string().optional(),
+  /** Npm's author: "Name <email> (url)", or `{ name, email, url }`. */
+  author: z.union([z.string(), z.looseObject({ name: z.string() })]).optional(),
+  homepage: z.string().trim().min(1).optional(),
+  private: z.boolean().optional(),
+  kazusa: z.looseObject({
+    /** How the setup guide lists a template, when not by its `displayName`. */
+    title: z.string().optional(),
+    systemAgent: z.string(),
+    /** The group picked to start with: a value of one of the world's anchors. */
+    defaultGroup: z.string().optional(),
+    /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
+    renames: z.record(z.string(), z.string()).optional(),
+    /** Only on a live world: the template folder (`worlds/<id>`) it came from. */
+    template: z.string().optional(),
+    /** Merged into the plugin's config when the world is set up. */
+    config: z.record(z.string(), z.unknown()).default({}),
+  }),
+});
+export type WorldPackage = z.infer<typeof WorldPackageSchema>;
+
+/** Npm's author, either form, down to the name. */
+export function authorName(author: WorldPackage["author"]): string | undefined {
+  const name = (typeof author === "string" ? author : author?.name)
+    ?.replace(/<[^>]*>|\([^)]*\)/g, "")
+    .trim();
+  return name || undefined;
+}
 
 /** GET /kazusa/world. Missing capability keys mean "unavailable". */
 export const WorldResponseSchema = z.object({

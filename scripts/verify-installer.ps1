@@ -29,7 +29,7 @@ function Wait-Until([scriptblock]$ready, [string]$what, [int]$seconds = 180) {
 # /D has to come last, and unquoted even with a space in it.
 Run-Silently $Installer @('/S', "/D=$Folder")
 Assert (Test-Path (Join-Path $Folder 'node\node.exe')) 'installed to the chosen folder'
-Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\elden-ring\world.json')) 'bundled Elden Ring'
+Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\elden-ring\package.json')) 'bundled Elden Ring'
 
 New-Item -ItemType Directory -Force -Path $World | Out-Null
 Set-Content (Join-Path $World 'kept.txt') 'mine'
