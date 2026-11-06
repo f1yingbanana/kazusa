@@ -356,13 +356,12 @@ Without git, a world plays as before, untracked, and says so at start.
 ### 4.8 Roadmap
 
 1. **Set worlds up right while testers are few** (one PR): git shipped in the
-   Windows installer, simple-git, the world-repository module, the mock remote,
+   installers, simple-git, the world-repository module, the mock remote, and
    every world adopted before its Gateway starts (history rooted at the
    published commit whose text matches its `.template/`, else a root commit of
    `.template/`; a new world goes the same way, since setup writes
-   `.template/`), the excludes, and a text commit before every start and after
-   every clean stop. Rooting history at the right release is what can't be fixed
-   later.
+   `.template/`), with its excludes. Nothing is committed yet: commits are saves
+   (step 2). Rooting history at the right release is what can't be fixed later.
 2. **Saves and loading, locally** (§4.6): the Gateway-only restart on request,
    saves on their own refs, autosave on stop, Settings → Saves, load.
 3. **Updates over git** (§4.7): retires `.template/`, the backups and
