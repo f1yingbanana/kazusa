@@ -141,4 +141,25 @@ describe("registerProvidersHttp", () => {
     });
     expect(status).toBe(404);
   });
+
+  it("survives Gateway auth refresh timeout or failure when saving or removing a key", async () => {
+    const { routes, deps, profiles } = setup(WORLD);
+    vi.mocked(deps.call).mockRejectedValue(
+      new Error("gateway timeout after 3000ms"),
+    );
+    const saved = await call(routes["/kazusa/providers/key"], "POST", {
+      provider: "venice",
+      key: "vapi_x",
+    });
+    expect(saved.status).toBe(200);
+    expect(ProviderSummarySchema.parse(saved.body).key).toBe("profile");
+    expect(profiles.get("venice")).toBe("vapi_x");
+
+    const removed = await call(routes["/kazusa/providers/remove"], "POST", {
+      provider: "venice",
+    });
+    expect(removed.status).toBe(200);
+    expect(ProviderSummarySchema.parse(removed.body).key).toBe("none");
+    expect(profiles.has("venice")).toBe(false);
+  });
 });
