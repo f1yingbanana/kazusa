@@ -10,17 +10,28 @@ function setup(
   agents: Record<string, ModelSelection> = {},
   config: Record<string, unknown> = {},
   call: (method: string, params: unknown) => Promise<unknown> = vi.fn(),
+  isKeyConfigured: (provider: string) => boolean = () => true,
 ) {
   const hooks: Record<string, Hook> = {};
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const api = {
     config: {},
-    logger: { info: vi.fn(), warn: vi.fn() },
+    logger,
     registerHttpRoute: vi.fn(),
     on: vi.fn((name: string, hook: Hook) => {
       hooks[name] = hook;
     }),
     runtime: {
       config: { current: () => config },
+      modelAuth: {
+        isProviderApiKeyConfigured: vi.fn(
+          ({ provider }: { provider: string }) => isKeyConfigured(provider),
+        ),
+      },
+      agent: {
+        resolveAgentIdentity: vi.fn((_cfg, agentId) => ({ name: agentId })),
+        resolveAgentWorkspaceDir: vi.fn(() => ""),
+      },
       state: {
         openKeyedStore: () => ({
           lookup: async (key: string) =>
@@ -34,7 +45,7 @@ function setup(
     },
   } as unknown as OpenClawPluginApi;
   registerModels(api, { call });
-  return Object.assign(hooks.before_model_resolve, { hooks });
+  return Object.assign(hooks.before_model_resolve, { hooks, logger });
 }
 
 describe("registerModels", () => {
@@ -124,5 +135,48 @@ describe("registerModels", () => {
       providerOverride: "venice",
       modelOverride: "qwen3",
     });
+  });
+
+  it("falls back to world model and logs warning when character model override has no key", async () => {
+    const isKey = (p: string) => p === "openrp";
+    const hook = setup(
+      { model: "openrp/xiaomi/mimo-v2.6-flash" },
+      {
+        "agent:arona": { model: "openrouter/z-ai/glm-5.3-flash" },
+      },
+      {
+        agents: { entries: { arona: {} } },
+      },
+      vi.fn(),
+      isKey,
+    );
+    expect(await hook({}, { sessionKey: "agent:arona:brain" })).toEqual({
+      providerOverride: "openrp",
+      modelOverride: "xiaomi/mimo-v2.6-flash",
+    });
+    expect(hook.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Character "arona" (arona) model override "openrouter/z-ai/glm-5.3-flash" has no configured API key for provider "openrouter". Falling back to world model "openrp/xiaomi/mimo-v2.6-flash".',
+      ),
+    );
+  });
+
+  it("throws hard error when character model has no key and world model is also unreachable", async () => {
+    const isKey = () => false;
+    const hook = setup(
+      { model: "openrp/xiaomi/mimo-v2.6-flash" },
+      {
+        "agent:arona": { model: "openrouter/z-ai/glm-5.3-flash" },
+      },
+      {},
+      vi.fn(),
+      isKey,
+    );
+    await expect(hook({}, { sessionKey: "agent:arona:brain" })).rejects.toThrow(
+      /No API key configured for arona's model/,
+    );
+    expect(hook.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("is also unreachable"),
+    );
   });
 });

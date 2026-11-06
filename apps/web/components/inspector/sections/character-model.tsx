@@ -42,7 +42,7 @@ function FieldHeader({
 export function CharacterModelSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id)
   const navigate = useNavigate()
-  const { data, select, setThinking } = useModels(entity.id)
+  const { data, select, setThinking, error } = useModels(entity.id)
   const world = useModels()
   const name = character?.name ?? entity.id
   const overrides = data?.overrides ?? {}
@@ -59,15 +59,17 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
         <FieldHeader
           htmlFor={modelId}
           label="Chat model"
-          onReset={overrides.model ? () => void select(null) : undefined}
+          onReset={overrides.model || error ? () => void select(null) : undefined}
         />
         <ModelPicker agentId={entity.id} id={modelId} />
         <p className="text-xs leading-relaxed text-muted-foreground">
-          {overrides.model
-            ? `Chosen for ${name}. Changing the world default won’t move them.`
-            : worldModel
-              ? `Follows the world default, ${worldModel}.`
-              : 'Follows the world default.'}
+          {error && !data
+            ? 'Could not load character model settings. Use world default to reset.'
+            : overrides.model
+              ? `Chosen for ${name}. Changing the world default won’t move them.`
+              : worldModel
+                ? `Follows the world default, ${worldModel}.`
+                : 'Follows the world default.'}
         </p>
       </div>
 

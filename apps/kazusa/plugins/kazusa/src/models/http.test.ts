@@ -294,7 +294,7 @@ describe("registerModelsHttp", () => {
   it("validates thinking against the agent's effective model and catalog", async () => {
     const { routes, deps, selection } = setup(CONFIG);
     // The same model can have different availability for another agent.
-    deps.list.mockImplementation(async ({ agentId }: { agentId: string }) => ({
+    deps.list.mockImplementation(async ({ agentId }: { agentId?: string }) => ({
       ...LIST,
       models: LIST.models.map((model) => ({
         ...model,
@@ -419,5 +419,28 @@ describe("registerModelsHttp", () => {
     expect(deps.list).not.toHaveBeenCalled();
     expect(await selection.read()).toEqual({});
     expect(await selection.overrides("missing")).toEqual({});
+  });
+
+  it("falls back to the world catalog listing when agent-scoped listing fails", async () => {
+    const { routes, deps, selection } = setup(CONFIG);
+    await selection.update(
+      { model: "openrouter/anthropic/claude-opus" },
+      "airi",
+    );
+    deps.list.mockImplementation(async ({ agentId }: { agentId?: string }) => {
+      if (agentId === "airi") throw new Error("Agent catalog not published");
+      return LIST;
+    });
+    const { status, body } = await call(
+      routes["/kazusa/models"],
+      "GET",
+      "/?agentId=airi",
+    );
+    expect(status).toBe(200);
+    expect(body.agentId).toBe("airi");
+    expect(body.overrides).toEqual({
+      model: "openrouter/anthropic/claude-opus",
+    });
+    expect(body.models.length).toBeGreaterThan(0);
   });
 });

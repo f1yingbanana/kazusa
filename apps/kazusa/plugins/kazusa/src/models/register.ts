@@ -8,7 +8,9 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
 import { inBackground } from "../background.ts";
 import { currentConfig } from "../current-config.ts";
+import { characterName } from "../identity.ts";
 import { adminCall } from "../providers/http.ts";
+import { providerKeyConfigured } from "../providers/keys.ts";
 import { modelsConfig } from "./config.ts";
 import { catalogModels, registerModelsHttp } from "./http.ts";
 import {
@@ -59,12 +61,54 @@ export function registerModels(
   const selection = createModelSelection(store);
   const config = modelsConfig(api.pluginConfig);
   const starting = createStartingModel(store, config);
+
+  const isConfigured = (modelRef?: string): boolean => {
+    const ref = modelRef ? splitModelRef(modelRef) : undefined;
+    return Boolean(ref && providerKeyConfigured(api, ref.provider));
+  };
+
   const model = async (agentId: string): Promise<string | undefined> => {
-    const picked = (await selection.read(agentId)).model;
-    if (picked) return picked;
-    if (resolveAgentConfig(currentConfig(api), agentId)?.model !== undefined)
-      return undefined;
-    return starting.current();
+    const config = currentConfig(api);
+    const override = (await selection.overrides(agentId)).model;
+    if (override && isConfigured(override)) return override;
+
+    const fallback =
+      (await selection.read()).model ??
+      (resolveAgentConfig(config, agentId)?.model !== undefined
+        ? undefined
+        : await starting.current());
+
+    if (!override) {
+      if (fallback && !isConfigured(fallback)) {
+        const name = await characterName(api, config, agentId).catch(
+          () => agentId,
+        );
+        const ref = splitModelRef(fallback);
+        api.logger?.error?.(
+          `[kazusa] World model "${fallback}" for character "${name}" (${agentId}) has no configured API key for provider "${ref?.provider}".`,
+        );
+        throw new Error(
+          `No API key configured for world model (${fallback}) for ${name}.`,
+        );
+      }
+      return fallback;
+    }
+
+    const name = await characterName(api, config, agentId).catch(() => agentId);
+    const ref = splitModelRef(override);
+    if (fallback && isConfigured(fallback)) {
+      api.logger?.warn?.(
+        `[kazusa] Character "${name}" (${agentId}) model override "${override}" has no configured API key for provider "${ref?.provider}". Falling back to world model "${fallback}".`,
+      );
+      return fallback;
+    }
+
+    api.logger?.error?.(
+      `[kazusa] Character "${name}" (${agentId}) model override "${override}" has no configured API key, and world model "${fallback ?? "none"}" is also unreachable.`,
+    );
+    throw new Error(
+      `No API key configured for ${name}'s model (${override}), and world model (${fallback ?? "none"}) is also unreachable.`,
+    );
   };
 
   api.on("before_model_resolve", async (_event, ctx) => {

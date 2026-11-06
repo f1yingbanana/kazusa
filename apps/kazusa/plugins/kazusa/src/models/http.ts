@@ -62,7 +62,7 @@ const ModelsListResultSchema = z.object({
 export interface ModelsDeps {
   /** Raw `models.list` payload for one agent's view of the catalog. */
   readonly list: (params: {
-    readonly agentId: string;
+    readonly agentId?: string;
     readonly refresh: boolean;
   }) => Promise<unknown>;
   readonly readConfig: () => Config;
@@ -143,7 +143,11 @@ const gatewayDeps: Omit<ModelsDeps, "selection" | "starting"> = {
     const response = await dispatchGatewayMethod(
       "models.list",
       // "default" narrows to the shortlist, and the picker offers every model.
-      { agentId, view: "all", ...(refresh ? { refresh: true } : {}) },
+      {
+        ...(agentId ? { agentId } : {}),
+        view: "all",
+        ...(refresh ? { refresh: true } : {}),
+      },
       { timeoutMs: 60_000 },
     );
     if (!response.ok)
@@ -188,11 +192,16 @@ export function registerModelsHttp(
     targetId?: string,
   ): Promise<ModelsResponse> => {
     const config = deps.readConfig();
-    // Agent-scoped requests must use that agent's credentials and model policy.
-    // World requests retain the first configured agent's catalog view.
-    const agentId = targetId ?? listAgentIds(config)[0];
-    if (!agentId) throw new Error("No characters are configured.");
-    const result = await deps.list({ agentId, refresh });
+    let result: unknown;
+    try {
+      result = await deps.list({ agentId: targetId, refresh });
+    } catch (error) {
+      if (targetId !== undefined) {
+        result = await deps.list({ refresh });
+      } else {
+        throw error;
+      }
+    }
     // Only for aliases: the shortlist isn't shown as its own group.
     const shortlist = {
       ...config.agents?.defaults?.models,

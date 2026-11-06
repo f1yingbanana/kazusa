@@ -112,10 +112,13 @@ export function ModelPicker({
     return groups;
   }, [data?.models]);
 
-  const models = data?.models ?? [];
+  const models = data?.models ?? (agentId ? world.data?.models ?? [] : []);
   const current = models.find((model) => model.ref === data?.current);
   const statusOf = new Map(
-    data?.providers.map((entry) => [entry.provider, entry.status]),
+    (data?.providers ?? world.data?.providers ?? []).map((entry) => [
+      entry.provider,
+      entry.status,
+    ]),
   );
   const own = agentId === undefined || data?.overrides?.model !== undefined;
 
@@ -139,7 +142,9 @@ export function ModelPicker({
     if (ref === null ? own : ref !== data?.current || !own) void select(ref);
   };
 
-  const unavailable = Boolean(error && !data);
+  const unavailable = Boolean(
+    error && !data && (!agentId || !world.data?.models?.length),
+  );
 
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
@@ -163,7 +168,9 @@ export function ModelPicker({
             ? "Models unavailable"
             : current
               ? modelName(current)
-              : (data?.current ?? (isLoading ? "Loading models…" : "No model"))}
+              : data?.current
+                ? `${refName(models, data.current)} (unreachable)`
+                : (isLoading ? "Loading models…" : "No model")}
         </span>
         {current ? (
           <span className="shrink-0 text-xs text-muted-foreground">
