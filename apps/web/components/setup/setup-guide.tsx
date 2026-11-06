@@ -315,7 +315,11 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [submitting, setSubmitting] = useState(false);
   const [starting, setStarting] = useState(false);
 
-  const world = status.worlds.find(({ id }) => id === worldId);
+  // A world is downloaded when picked, which fills in its cast.
+  const [worlds, setWorlds] = useState(status.worlds);
+  const [downloading, setDownloading] = useState(false);
+  const [worldError, setWorldError] = useState<string | null>(null);
+  const world = worlds.find(({ id }) => id === worldId);
   const pickingCast = Boolean(world?.characters.length);
   const [activeItem, setActiveItem] = useState(
     !status.imported ? "world" : pickingCast ? "cast" : "keys",
@@ -328,7 +332,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
             {
               name: "world",
               required: true,
-              choices: status.worlds.map(({ id }) => ({ value: id })),
+              choices: worlds.map(({ id }) => ({ value: id })),
             },
           ]),
       ...(pickingCast ? [{ name: "cast" }, { name: "time" }] : []),
@@ -339,18 +343,36 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
           : { choices: status.providers.map(({ id }) => ({ value: id })) }),
       },
     ],
-    [
-      status.imported,
-      status.worlds,
-      pickingCast,
-      status.savedKey,
-      status.providers,
-    ],
+    [status.imported, worlds, pickingCast, status.savedKey, status.providers],
   );
 
-  const chooseWorld = (option: WorldOption) => {
+  const chooseWorld = async (option: WorldOption) => {
+    if (downloading) return;
     setWorldId(option.id);
     setCast(new Set(option.defaultCast));
+    setWorldError(null);
+    if (option.downloaded) return;
+    setDownloading(true);
+    const response = await fetch("/setup/world", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: option.id }),
+    }).catch(() => null);
+    const body = (await response?.json().catch(() => null)) as
+      (WorldOption & { error?: undefined }) | { error: string } | null;
+    setDownloading(false);
+    if (response?.ok && body && !body.error) {
+      const downloaded = body as WorldOption;
+      setWorlds((current) =>
+        current.map((entry) =>
+          entry.id === downloaded.id ? downloaded : entry,
+        ),
+      );
+      setCast(new Set(downloaded.defaultCast));
+    } else
+      setWorldError(
+        body?.error ?? `Couldn't download ${option.title}. Check the terminal.`,
+      );
   };
 
   // Only the world step has choices the questionnaire knows about, and it won't
@@ -422,16 +444,16 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                     Which world do you want?
                   </QuestionnaireTitle>
                   <QuestionnaireDescription>
-                    This copies a world for you to play in. You can change
+                    This downloads a world for you to play in. You can change
                     anything in it later.
                   </QuestionnaireDescription>
                   <QuestionnaireChoices>
-                    {status.worlds.map((option) => (
+                    {worlds.map((option) => (
                       <QuestionnaireChoice
                         key={option.id}
                         value={option.id}
                         checked={worldId === option.id}
-                        onChange={() => chooseWorld(option)}
+                        onChange={() => void chooseWorld(option)}
                       >
                         <span className="font-medium">{option.title}</span>
                         <QuestionnaireChoiceDescription>
@@ -440,6 +462,12 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                       </QuestionnaireChoice>
                     ))}
                   </QuestionnaireChoices>
+                  {downloading && world ? (
+                    <p className="text-sm text-muted-foreground">
+                      Downloading {world.title}…
+                    </p>
+                  ) : null}
+                  {worldError ? <FieldError>{worldError}</FieldError> : null}
                 </QuestionnaireItem>
               )}
 
@@ -562,7 +590,10 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
 
               <QuestionnaireActions>
                 <QuestionnairePrevious />
-                <QuestionnaireNext disabled={!world} onClick={goNext} />
+                <QuestionnaireNext
+                  disabled={!world?.downloaded || downloading}
+                  onClick={goNext}
+                />
                 <QuestionnaireSubmit
                   disabled={submitting}
                   onClick={(event) => {

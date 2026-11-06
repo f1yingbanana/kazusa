@@ -252,7 +252,8 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => stop(0));
 
-// The setup guide lists the templates, so they're fetched first.
+// Templates downloaded here (the world in play, usually) are brought up to
+// date before setup or a world update reads them.
 try {
   // After the install above: it needs simple-git.
   const { syncWorlds } = await import("./world-repo.mjs");

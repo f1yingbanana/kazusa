@@ -13,6 +13,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   adoptWorldRepo,
+  cloneWorld,
+  listWorlds,
   PLAY,
   SOURCES,
   syncWorlds,
@@ -106,13 +108,56 @@ function world(root, source, commit, { snapshot = true } = {}) {
   return live;
 }
 
-describe("syncWorlds", () => {
-  it("clones each listed world, then moves it to what was published", async () => {
+describe("listWorlds and cloneWorld", () => {
+  it("lists a world by its package.json, then clones only the one picked", async () => {
     const { root, source, clone } = kazusa();
-    expect(await syncWorlds(root)).toEqual(["Downloading the demo world."]);
+    const [peeked] = await listWorlds(root);
+    expect(peeked).toMatchObject({
+      id: "demo",
+      downloaded: false,
+      package: { name: "demo-world", version: "0.2.0" },
+    });
+    expect(existsSync(clone)).toBe(false);
+    expect(await cloneWorld(root, "demo")).toEqual([]);
     expect(git(clone, "rev-parse", "HEAD")).toBe(
       git(source, "rev-parse", "HEAD"),
     );
+    const [listed] = await listWorlds(root);
+    expect(listed).toMatchObject({ id: "demo", downloaded: true });
+    // Once.
+    expect(await cloneWorld(root, "demo")).toEqual([]);
+    await expect(cloneWorld(root, "elsewhere")).rejects.toThrow(
+      "No world elsewhere is listed.",
+    );
+  });
+
+  it("says why a world can't be listed", async () => {
+    const { root } = kazusa(path.join(tmpdir(), "kazusa-nowhere-world"));
+    const [listed] = await listWorlds(root);
+    expect(listed).toMatchObject({ id: "demo", error: expect.any(String) });
+  });
+
+  it("sets a template folder from before repositories aside", async () => {
+    const { root, source, clone } = kazusa();
+    put(path.join(clone, "package.json"), "{}");
+    const [aside] = await cloneWorld(root, "demo");
+    expect(aside).toMatch(/^Set the old demo template aside in /);
+    expect(git(clone, "rev-parse", "HEAD")).toBe(
+      git(source, "rev-parse", "HEAD"),
+    );
+    const [kept] = readdirSync(
+      path.join(root, "apps/kazusa/.worlds-before-repositories"),
+    );
+    expect(kept).toMatch(/^demo-\d+$/);
+  });
+});
+
+describe("syncWorlds", () => {
+  it("moves the worlds cloned here to what was published, and clones none", async () => {
+    const { root, source, clone } = kazusa();
+    expect(await syncWorlds(root)).toEqual([]);
+    expect(existsSync(clone)).toBe(false);
+    await cloneWorld(root, "demo");
     put(path.join(source, "shared/wiki/concepts/more.md"), "More.\n");
     git(source, "add", "-A");
     git(source, "commit", "--quiet", "-m", "More");
@@ -124,7 +169,7 @@ describe("syncWorlds", () => {
 
   it("keeps a creator's work in a clone", async () => {
     const { root, source, clone } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     put(path.join(clone, "shared/wiki/concepts/lore.md"), "Mine.\n");
     git(source, "commit", "--quiet", "--allow-empty", "-m", "Upstream");
     const kept = ["Kept your work in worlds/demo; it isn't updated."];
@@ -136,32 +181,22 @@ describe("syncWorlds", () => {
     expect(await syncWorlds(root)).toEqual(kept);
   });
 
-  it("sets a template folder from before repositories aside", async () => {
+  it("keeps what it has when a world can't be reached", async () => {
     const { root, source, clone } = kazusa();
-    put(path.join(clone, "package.json"), "{}");
-    const [aside, downloading] = await syncWorlds(root);
-    expect(aside).toMatch(/^Set the old demo template aside in /);
-    expect(downloading).toBe("Downloading the demo world.");
+    await cloneWorld(root, "demo");
+    git(clone, "remote", "set-url", "origin", `${source}-gone`);
+    const [line] = await syncWorlds(root);
+    expect(line).toMatch(/^Couldn't update the demo world: /);
     expect(git(clone, "rev-parse", "HEAD")).toBe(
       git(source, "rev-parse", "HEAD"),
     );
-    const [kept] = readdirSync(
-      path.join(root, "apps/kazusa/.worlds-before-repositories"),
-    );
-    expect(kept).toMatch(/^demo-\d+$/);
-  });
-
-  it("keeps what it has when a world can't be reached", async () => {
-    const { root } = kazusa(path.join(tmpdir(), "kazusa-nowhere-world"));
-    const [, line] = await syncWorlds(root);
-    expect(line).toMatch(/^Couldn't update the demo world: /);
   });
 });
 
 describe("adoptWorldRepo", () => {
   it("roots a world at the published commit its snapshot matches, touching no file", async () => {
     const { root, source } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     const live = world(root, source, "v0.1.0");
     const memory = readFileSync(path.join(live, "workspaces/ami/MEMORY.md"));
     const lines = await adoptWorldRepo(root);
@@ -192,7 +227,7 @@ describe("adoptWorldRepo", () => {
 
   it("follows the world's own repository", async () => {
     const { root, source } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     const live = world(root, source, "v0.2.0");
     const pkg = JSON.parse(
       readFileSync(path.join(live, "package.json"), "utf8"),
@@ -215,7 +250,7 @@ describe("adoptWorldRepo", () => {
 
   it("keeps its root on later starts", async () => {
     const { root, source } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     const live = world(root, source, "v0.1.0");
     await adoptWorldRepo(root);
     const rooted = git(live, "rev-parse", PLAY);
@@ -225,7 +260,7 @@ describe("adoptWorldRepo", () => {
 
   it("roots a world whose template was never published at its snapshot", async () => {
     const { root, source } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     const live = world(root, source, "v0.2.0");
     put(path.join(live, ".template/shared/wiki/concepts/lore.md"), "Edited.\n");
     const [line] = await adoptWorldRepo(root);
@@ -250,7 +285,7 @@ describe("adoptWorldRepo", () => {
 
   it("leaves a world from before snapshots unrooted, and says so once", async () => {
     const { root, source } = kazusa();
-    await syncWorlds(root);
+    await cloneWorld(root, "demo");
     const live = world(root, source, "v0.2.0", { snapshot: false });
     const [line] = await adoptWorldRepo(root);
     expect(line).toMatch(/starts at its first save/);

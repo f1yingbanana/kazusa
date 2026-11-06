@@ -2,10 +2,12 @@
 /**
  * Worlds are git repositories (the kazusa skill's `references/worlds.md` §4.5).
  *
- * Templates: `apps/kazusa/worlds/<id>` is a clone of each world listed in
- * `apps/kazusa/worlds/sources.json`, fetched on every start and fast-forwarded
- * when nobody has changed it, so a creator can edit, commit and push from it.
- * Setup and `world_update` read templates there as before.
+ * Templates: `apps/kazusa/worlds/sources.json` lists the worlds on offer. The
+ * setup guide lists them by peeking at each one's `package.json` (`list`) and
+ * clones only the one the player picks into `apps/kazusa/worlds/<id>` (`clone
+ * <id>`), where setup and `world_update` read templates as before. Every start
+ * fetches the clones there are and fast-forwards them when nobody has changed
+ * them, so a creator can edit, commit and push from one.
  *
  * The live world: `world/` is its own repository, whose history starts at the
  * published commit it was made from, so updates and publishing later have the
@@ -13,9 +15,10 @@
  * before the Gateway first starts on a world, new or old. Nothing is committed
  * here: commits are saves, made with the Gateway stopped.
  *
- * Both run from `scripts/dev.mjs` (installed copies too) and from `npm run
- * gateway`. Git is the one shipped beside Kazusa (`git/`, GitHub Desktop's
- * portable build), else the system's.
+ * Starting runs from `scripts/dev.mjs` (installed copies too) and from `npm run
+ * gateway`; the setup guide runs `list` and `clone`, which print JSON. Git is
+ * the one shipped beside Kazusa (`git/`, GitHub Desktop's portable build), else
+ * the system's.
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -152,44 +155,98 @@ export function readSources(root) {
 }
 
 /**
- * Clones each listed world into `worlds/<id>`, or fetches it and moves it to
- * what was published, unless someone has work there: a branch other than
- * `main`, changes, or commits not pushed. A folder from before repositories is
- * set aside first. One that can't be reached (offline, gone) keeps what it
- * had.
+ * What a world says about itself, without downloading it: a shallow clone with
+ * no file contents, from which only `package.json` is read. About a second.
+ */
+async function peek(git, url) {
+  const scratch = mkdtempSync(path.join(tmpdir(), "kazusa-peek-"));
+  try {
+    await gitIn(git, scratch).raw([
+      "clone",
+      "--quiet",
+      "--depth=1",
+      "--filter=blob:none",
+      "--no-checkout",
+      url,
+      "world",
+    ]);
+    return JSON.parse(
+      await gitIn(git, path.join(scratch, "world")).show(["HEAD:package.json"]),
+    );
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Every listed world with its `package.json`: a clone's own, else a peek at its
+ * repository. One that can't be reached says why instead.
+ */
+export async function listWorlds(root) {
+  const git = findGit(root);
+  if (!git) throw new Error("git isn't installed.");
+  return Promise.all(
+    readSources(root).map(async ({ id, url }) => {
+      const manifest = path.join(root, WORLDS, id, "package.json");
+      try {
+        return existsSync(path.join(root, WORLDS, id, ".git"))
+          ? { id, url, downloaded: true, package: readJson(manifest) }
+          : { id, url, downloaded: false, package: await peek(git, url) };
+      } catch (error) {
+        return { id, url, error: error.message.trim() };
+      }
+    }),
+  );
+}
+
+/**
+ * Clones a listed world into `worlds/<id>`, once. A folder from before
+ * repositories is set aside first, never deleted.
+ */
+export async function cloneWorld(root, id) {
+  const source = readSources(root).find((entry) => entry.id === id);
+  if (!source) throw new Error(`No world ${id} is listed.`);
+  const dir = path.join(root, WORLDS, id);
+  if (existsSync(path.join(dir, ".git"))) return [];
+  const git = findGit(root);
+  if (!git) throw new Error("git isn't installed.");
+  const lines = [];
+  if (existsSync(dir)) {
+    const aside = path.join(root, SET_ASIDE, `${id}-${Date.now()}`);
+    mkdirSync(path.dirname(aside), { recursive: true });
+    renameSync(dir, aside);
+    lines.push(
+      `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
+    );
+  }
+  await gitIn(git, path.join(root, WORLDS)).raw([
+    "clone",
+    "--quiet",
+    source.url,
+    id,
+  ]);
+  return lines;
+}
+
+/**
+ * Fetches each world cloned here and moves it to what was published, unless
+ * someone has work there: a branch other than `main`, changes, or commits not
+ * pushed. One that can't be reached (offline, gone) keeps what it had.
  */
 export async function syncWorlds(root) {
   const git = findGit(root);
   if (!git) return [];
   // All at once: each is mostly waiting on the network.
   const results = await Promise.all(
-    readSources(root).map((source) => syncWorld(root, git, source)),
+    readSources(root)
+      .filter(({ id }) => existsSync(path.join(root, WORLDS, id, ".git")))
+      .map(({ id }) => syncWorld(git, path.join(root, WORLDS, id), id)),
   );
   return results.flat();
 }
 
-async function syncWorld(root, git, { id, url }) {
-  const dir = path.join(root, WORLDS, id);
-  const lines = [];
+async function syncWorld(git, dir, id) {
   try {
-    if (!existsSync(path.join(dir, ".git"))) {
-      if (existsSync(dir)) {
-        const aside = path.join(root, SET_ASIDE, `${id}-${Date.now()}`);
-        mkdirSync(path.dirname(aside), { recursive: true });
-        renameSync(dir, aside);
-        lines.push(
-          `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
-        );
-      }
-      lines.push(`Downloading the ${id} world.`);
-      await gitIn(git, path.join(root, WORLDS)).raw([
-        "clone",
-        "--quiet",
-        url,
-        id,
-      ]);
-      return lines;
-    }
     const repo = gitIn(git, dir);
     await repo.raw(["fetch", "--quiet", "--prune", "--tags", "--force"]);
     const branch = (await repo.raw(["branch", "--show-current"])).trim();
@@ -197,15 +254,13 @@ async function syncWorld(root, git, { id, url }) {
     const ahead = (
       await repo.raw(["rev-list", "--count", "origin/main..HEAD"])
     ).trim();
-    if (branch !== "main" || changed || ahead !== "0") {
-      lines.push(`Kept your work in worlds/${id}; it isn't updated.`);
-      return lines;
-    }
+    if (branch !== "main" || changed || ahead !== "0")
+      return [`Kept your work in worlds/${id}; it isn't updated.`];
     await repo.raw(["merge", "--quiet", "--ff-only", "origin/main"]);
+    return [];
   } catch (error) {
-    lines.push(`Couldn't update the ${id} world: ${error.message.trim()}`);
+    return [`Couldn't update the ${id} world: ${error.message.trim()}`];
   }
-  return lines;
 }
 
 /** Content, not manifests: `package.json` (once `world.json`) changes alone. */
@@ -404,14 +459,30 @@ export async function adoptWorldRepo(root) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  // A world without history, or an old template, still plays.
-  for (const [what, step] of [
-    ["the worlds", syncWorlds],
-    ["this world's history", adoptWorldRepo],
-  ])
+  const [command, id] = process.argv.slice(2);
+  if (command === "list" || command === "clone")
+    // One JSON object for the setup guide, `{ error }` when it fails.
     try {
-      for (const line of await step(root)) console.log(line);
+      process.stdout.write(
+        JSON.stringify(
+          command === "list"
+            ? { worlds: await listWorlds(root) }
+            : { lines: await cloneWorld(root, id) },
+        ),
+      );
     } catch (error) {
-      console.warn(`Couldn't set up ${what}: ${error.message}`);
+      process.exitCode = 1;
+      process.stdout.write(JSON.stringify({ error: error.message.trim() }));
     }
+  // A world without history, or an old template, still plays.
+  else
+    for (const [what, step] of [
+      ["the worlds", syncWorlds],
+      ["this world's history", adoptWorldRepo],
+    ])
+      try {
+        for (const line of await step(root)) console.log(line);
+      } catch (error) {
+        console.warn(`Couldn't set up ${what}: ${error.message}`);
+      }
 }

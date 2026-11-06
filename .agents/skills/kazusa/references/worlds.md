@@ -96,18 +96,25 @@ Rules:
   `package.json` with the template's (keeping `kazusa.template`), so the live
   `version` becomes the release it took. `apply` backs it up with `shared/`,
   `workspaces/` and the base; `undo` restores it.
-- **Templates** (`scripts/world-repo.mjs` `syncWorlds`, on every start of
-  `scripts/dev.mjs` before the frontend, and from `npm run gateway`): each world
-  in `apps/kazusa/worlds/sources.json` (`[{ id, provider, url }]`; `git` now,
-  OpenRP later) is a clone at `worlds/<id>`, git-ignored here, so setup and
-  `world_update` read templates where they always did. Each start fetches and
-  fast-forwards it to `origin/main`, unless it's on another branch, changed or
-  ahead: then it says so and leaves it (a creator edits, commits and pushes from
-  there). A folder from before repositories is moved to
+- **Templates** (`scripts/world-repo.mjs`): `apps/kazusa/worlds/sources.json`
+  (`[{ id, provider, url }]`; `git` now, OpenRP later) lists the worlds on
+  offer. The setup guide lists them without downloading any (`list`: a shallow
+  clone with no file contents per source, from which only `package.json` is
+  read, about a second each, all at once; `ListedWorld`, `scriptCatalog` in
+  `apps/web/lib/setup/setup.ts`), and clones only the one the player picks into
+  `worlds/<id>` (`clone <id>`, from `POST /setup/world`, which answers with its
+  cast; `apply` clones too if it wasn't). Setup and `world_update` read
+  templates there as before. Every start (`syncWorlds`, from `scripts/dev.mjs`
+  before the frontend and from `npm run gateway`) fetches the clones there are
+  and fast-forwards each to `origin/main`, unless it's on another branch,
+  changed or ahead: then it says so and leaves it (a creator edits, commits and
+  pushes from there). A folder from before repositories is moved to
   `apps/kazusa/.worlds-before-repositories/`, then cloned. Unreachable (offline,
   gone): it keeps what it has. Updates keep the clones (`apps/kazusa/worlds` is
   merged entry by entry in `scripts/update.mjs`; the installer and the Mac
-  launcher leave them), and uninstalling removes them.
+  launcher leave them), and uninstalling removes them. Tests that check every
+  template (`location/map.test.ts`, `context-engine/decision-context.test.ts`)
+  check the ones downloaded here.
 - **Repository** (`adoptWorldRepo`, before every Gateway start, from
   `scripts/dev.mjs` and `npm run gateway`): makes `world/` a git repository once
   and keeps it set up (§4.5). A new world goes the same way as an old one, since
@@ -420,8 +427,8 @@ Without git, a world plays as before, untracked, and says so at start.
   `../../../node_modules/.bin/openclaw` from `world/`.
 - `kazusa.config` applies once, at setup; to change a running world's settings,
   edit `openclaw.json` (or ask the system admin), not `package.json`.
-- A first start downloads every listed world (Kivotos is about 75 MB, mostly
-  stickers), so setup needs the internet, as it does for provider keys.
+- Setup needs the internet: listing peeks at each world's repository, and the
+  one picked is downloaded (Kivotos is about 75 MB, mostly stickers).
 - An update replaces the live `package.json` with the template's: a fork's own
   `name`, `author` or `version` would be overwritten. Fine while worlds don't
   fork; §4.5 resolves it (a fork merges, it isn't replaced).

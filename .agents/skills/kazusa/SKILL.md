@@ -253,14 +253,15 @@ apps/kazusa/
 ### Worlds, Setup and Providers
 
 - **Templates and the live world**: `worlds/<id>/` are templates, each a clone
-  of a world's own repository listed in `worlds/sources.json` and kept current
-  on start (`package.json`, `shared/wiki`, `workspaces`, optionally
-  `shared/skills`); `worlds/base.json` is the config every world shares. A
-  world's `package.json` is npm's (`name` a lasting slug, `displayName`, semver
-  `version` raised with each template release, `author`, `homepage`,
-  `private: true`) with Kazusa's under `kazusa`: `title` (the setup guide's
-  label, else `displayName`), `systemAgent`, `defaultGroup`, `renames`, and
-  `config` (merged into the plugin's config at setup); the live copy adds
+  of a world's own repository listed in `worlds/sources.json`: setup lists them
+  by `package.json` alone and clones only the one picked, and every start
+  fast-forwards the clones there are (`package.json`, `shared/wiki`,
+  `workspaces`, optionally `shared/skills`); `worlds/base.json` is the config
+  every world shares. A world's `package.json` is npm's (`name` a lasting slug,
+  `displayName`, semver `version` raised with each template release, `author`,
+  `homepage`, `private: true`) with Kazusa's under `kazusa`: `title` (the setup
+  guide's label, else `displayName`), `systemAgent`, `defaultGroup`, `renames`,
+  and `config` (merged into the plugin's config at setup); the live copy adds
   `kazusa.template`, the template's folder. Schema: `WorldPackageSchema` in
   `@kazusa/client`; the plugin reads it in `src/world/package.ts` (the credit on
   `GET /kazusa/world`). `npm run dev` gives a world from before it one
