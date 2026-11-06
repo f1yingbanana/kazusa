@@ -7,6 +7,7 @@ import { ModelPicker } from "@/components/models/model-picker";
 import { ThinkingPicker } from "@/components/models/thinking-picker";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { useAccess } from "@/hooks/use-access";
 import { useModels } from "@/hooks/use-models";
 import { ProviderSettings } from "./provider-settings";
 import { DecisionSettings, MemorySearchSettings } from "./role-settings";
@@ -14,6 +15,7 @@ import { SettingsSection } from "./settings-section";
 
 /** Shows a world file in Finder or Explorer; `/reveal` is local-owner only. */
 function ConfigFiles() {
+  const { isLocal } = useAccess();
   const reveal = async () => {
     const response = await fetch("/reveal", {
       method: "POST",
@@ -30,6 +32,8 @@ function ConfigFiles() {
     }
     toast.success("Opened the folder", { description: result.path });
   };
+
+  if (!isLocal) return null;
 
   return (
     <SettingsSection

@@ -10,6 +10,7 @@ export type Permission = z.infer<typeof PermissionSchema>;
 export const AccessSchema = z.object({
   role: RoleSchema,
   permissions: z.array(PermissionSchema),
+  local: z.boolean().optional(),
 });
 export type Access = z.infer<typeof AccessSchema>;
 
@@ -19,16 +20,23 @@ const PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   visitor: ["observe"],
 };
 
-export function accessForRole(role: Role): Access {
-  return { role, permissions: [...PERMISSIONS[role]] };
+export function accessForRole(
+  role: Role,
+  options?: { readonly local?: boolean },
+): Access {
+  return {
+    role,
+    permissions: [...PERMISSIONS[role]],
+    ...(options?.local !== undefined ? { local: options.local } : {}),
+  };
 }
 
 export function hasPermission(role: Role, permission: Permission): boolean {
   return PERMISSIONS[role].includes(permission);
 }
 
-/** Trusted-proxy mode is a later PR; unknown modes must fail closed. */
-export const AuthModeSchema = z.enum(["local", "public"]);
+/** Deployment authentication modes. Unknown modes must fail closed. */
+export const AuthModeSchema = z.enum(["local", "public", "trusted-proxy"]);
 export type AuthMode = z.infer<typeof AuthModeSchema>;
 
 export function parseAuthMode(value: string | undefined): AuthMode {
@@ -39,8 +47,13 @@ export function deploymentRole(mode: AuthMode): "owner" | "visitor" {
   return mode === "local" ? "owner" : "visitor";
 }
 
-/** Only the authenticated Next-to-Gateway hop may supply this header. */
+/**
+ * Only the authenticated Next-to-Gateway hop or trusted wrapper may supply
+ * these headers.
+ */
 export const VIEWER_ROLE_HEADER = "x-kazusa-role";
+export const PROXY_SECRET_HEADER = "x-kazusa-proxy-secret";
+export const WORLD_ID_HEADER = "x-kazusa-world-id";
 
 export interface RoutePolicy {
   readonly method: "GET" | "POST";

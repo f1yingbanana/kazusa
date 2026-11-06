@@ -86,4 +86,14 @@ describe("registry permissions", () => {
     expect(visitorViews).toContain("wiki");
     expect(visitorViews).toContain("settings");
   });
+
+  it("restricts updates category and status item to local environments", () => {
+    const updateCategory = SETTINGS_CATEGORIES.find(
+      (cat) => cat.id === "updates",
+    );
+    const updateStatus = STATUS_ITEMS.find((item) => item.id === "update");
+
+    expect(updateCategory?.requiresLocal).toBe(true);
+    expect(updateStatus?.requiresLocal).toBe(true);
+  });
 });

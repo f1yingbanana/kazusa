@@ -112,7 +112,20 @@ export function createRouteRegistrar(
           sendJson(res, 405, { error: `Use ${method}.` });
           return true;
         }
-        const parsed = RoleSchema.safeParse(delegated ?? deploymentRole(mode));
+        if (
+          Array.isArray(delegated) ||
+          (typeof delegated === "string" && delegated.includes(","))
+        ) {
+          sendJson(res, 401, {
+            error: "Invalid or unsupported viewer identity.",
+          });
+          return true;
+        }
+        const effective =
+          typeof delegated === "string"
+            ? delegated.trim()
+            : deploymentRole(mode);
+        const parsed = RoleSchema.safeParse(effective);
         // Collaborator play is not enabled until player identities are scoped
         // to the authenticated request, including the admin-agent boundary.
         if (!parsed.success || parsed.data === "collaborator") {

@@ -22,7 +22,9 @@ describe("viewer access", () => {
   it("defaults only an absent deployment mode to local", () => {
     expect(deploymentRole(parseAuthMode(undefined))).toBe("owner");
     expect(deploymentRole(parseAuthMode("public"))).toBe("visitor");
-    for (const value of ["", "PUBLIC", "publci", "trusted-proxy"]) {
+    expect(parseAuthMode("trusted-proxy")).toBe("trusted-proxy");
+    expect(deploymentRole(parseAuthMode("trusted-proxy"))).toBe("visitor");
+    for (const value of ["", "PUBLIC", "publci", "unknown"]) {
       expect(() => parseAuthMode(value)).toThrow();
     }
   });

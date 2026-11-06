@@ -43,12 +43,12 @@ collaborator accounts.
 - `public`: every browser is a visitor. Operators manage the demo through a
   private path. Keep existing chat reads and the observer feed unfiltered for
   this demo; no chat sends, typing, movement, or other mutations are allowed.
-- `trusted-proxy` (later PR): the cloud wrapper authenticates the user, checks
-  membership for the destination world, overwrites identity headers, and passes
-  a normalized identity/role through an authenticated private connection. A
-  dedicated server-to-server secret is sufficient initially. Missing/invalid
-  credentials or mode must never fall back to owner. No Supabase SDK, passcode
-  login, JWT framework, or provider registry is needed in OSS.
+- `trusted-proxy`: the cloud wrapper authenticates the user, checks membership
+  for the destination world, overwrites identity headers, and passes a
+  normalized identity/role through an authenticated private connection using
+  `KAZUSA_TRUSTED_PROXY_SECRET`. Missing/invalid credentials or mode fails
+  closed and never falls back to owner. No Supabase SDK, passcode login, JWT
+  framework, or provider registry is needed in OSS.
 
 Local mode is a deployment choice, not a security boundary against someone
 already holding the private Gateway credential. Do not publish a local-mode

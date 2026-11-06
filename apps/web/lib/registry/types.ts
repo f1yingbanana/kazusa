@@ -71,6 +71,7 @@ export interface SettingsCategory {
   readonly order: number;
   readonly component: ComponentType;
   readonly requiresPermission?: Permission;
+  readonly requiresLocal?: boolean;
 }
 
 export interface StatusItem {
@@ -80,6 +81,7 @@ export interface StatusItem {
   readonly requires: readonly Domain[];
   readonly component: ComponentType;
   readonly requiresPermission?: Permission;
+  readonly requiresLocal?: boolean;
 }
 
 export interface ThoughtLine {
