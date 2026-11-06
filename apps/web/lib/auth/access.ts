@@ -5,6 +5,7 @@ import {
   PROXY_SECRET_HEADER,
   RoleSchema,
   VIEWER_ROLE_HEADER,
+  WORLD_ID_HEADER,
   type Access,
 } from "@kazusa/client";
 import { isSameOrigin } from "../same-origin";
@@ -50,9 +51,7 @@ export function resolveViewer(request?: Request | Headers): Access {
     return accessForRole("visitor", { local: false });
   }
   if (mode === "trusted-proxy") {
-    const expectedSecret = (
-      process.env.KAZUSA_TRUSTED_PROXY_SECRET ?? process.env.KAZUSA_PROXY_SECRET
-    )?.trim();
+    const expectedSecret = process.env.KAZUSA_TRUSTED_PROXY_SECRET?.trim();
     if (!expectedSecret) {
       throw new AuthError(
         503,
@@ -60,20 +59,13 @@ export function resolveViewer(request?: Request | Headers): Access {
       );
     }
     const proxyHeader = getHeader(request, PROXY_SECRET_HEADER);
-    const authHeader = getHeader(request, "authorization");
-    let providedSecret: string | null = null;
-    if (proxyHeader) {
-      providedSecret = proxyHeader.trim();
-    } else if (authHeader) {
-      const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-      if (match) providedSecret = match[1].trim();
-    }
-    if (!providedSecret) {
+    if (!proxyHeader) {
       throw new AuthError(
         401,
         "Unauthorized: Invalid or missing proxy credentials.",
       );
     }
+    const providedSecret = proxyHeader.trim();
     const actualBuf = Buffer.from(providedSecret);
     const expectedBuf = Buffer.from(expectedSecret);
     if (
@@ -85,9 +77,21 @@ export function resolveViewer(request?: Request | Headers): Access {
         "Unauthorized: Invalid or missing proxy credentials.",
       );
     }
+
+    const expectedWorldId = process.env.KAZUSA_WORLD_ID?.trim();
+    if (expectedWorldId) {
+      const providedWorldId = getHeader(request, WORLD_ID_HEADER)?.trim();
+      if (!providedWorldId || providedWorldId !== expectedWorldId) {
+        throw new AuthError(
+          401,
+          "Unauthorized: Request world does not match destination instance.",
+        );
+      }
+    }
+
     const rawRole = getHeader(request, VIEWER_ROLE_HEADER);
-    if (rawRole === null) {
-      return accessForRole("visitor", { local: false });
+    if (!rawRole) {
+      throw new AuthError(401, "Missing viewer role header.");
     }
     if (rawRole.includes(",")) {
       throw new AuthError(401, "Invalid or unsupported viewer identity.");

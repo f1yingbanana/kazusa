@@ -83,47 +83,94 @@ describe("trusted-proxy authentication", () => {
     expect(wrongSecretError?.status).toBe(401);
   });
 
-  it("accepts valid proxy secret via x-kazusa-proxy-secret or Bearer Authorization", () => {
+  it("accepts valid proxy secret via x-kazusa-proxy-secret and enforces role header", () => {
     vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
     vi.stubEnv("KAZUSA_TRUSTED_PROXY_SECRET", SECRET);
 
-    // via custom header
-    const customReq = new Request("https://demo.example/kazusa/access", {
+    const ownerReq = new Request("https://demo.example/kazusa/access", {
       headers: {
         "x-kazusa-proxy-secret": SECRET,
         "x-kazusa-role": "owner",
       },
     });
-    expect(resolveViewer(customReq)).toEqual({
+    expect(resolveViewer(ownerReq)).toEqual({
       role: "owner",
       permissions: ["observe", "play", "manage"],
       local: false,
     });
 
-    // via Bearer header
-    const bearerReq = new Request("https://demo.example/kazusa/access", {
+    const visitorReq = new Request("https://demo.example/kazusa/access", {
       headers: {
-        Authorization: `Bearer ${SECRET}`,
+        "x-kazusa-proxy-secret": SECRET,
         "x-kazusa-role": "visitor",
       },
     });
-    expect(resolveViewer(bearerReq)).toEqual({
+    expect(resolveViewer(visitorReq)).toEqual({
       role: "visitor",
       permissions: ["observe"],
       local: false,
     });
 
-    // missing role header defaults to visitor
+    // Missing role header fails closed with 401 instead of quietly defaulting
     const noRoleReq = new Request("https://demo.example/kazusa/access", {
       headers: {
         "x-kazusa-proxy-secret": SECRET,
       },
     });
-    expect(resolveViewer(noRoleReq)).toEqual({
-      role: "visitor",
-      permissions: ["observe"],
-      local: false,
+    let noRoleError: AuthError | undefined;
+    try {
+      resolveViewer(noRoleReq);
+    } catch (err) {
+      noRoleError = err as AuthError;
+    }
+    expect(noRoleError?.status).toBe(401);
+  });
+
+  it("verifies world ID binding when KAZUSA_WORLD_ID is configured", () => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
+    vi.stubEnv("KAZUSA_TRUSTED_PROXY_SECRET", SECRET);
+    vi.stubEnv("KAZUSA_WORLD_ID", "world-alpha-42");
+
+    // Matching world ID succeeds
+    const validReq = new Request("https://demo.example/kazusa/access", {
+      headers: {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "owner",
+        "x-kazusa-world-id": "world-alpha-42",
+      },
     });
+    expect(resolveViewer(validReq).role).toBe("owner");
+
+    // Mismatched world ID rejected
+    const wrongWorldReq = new Request("https://demo.example/kazusa/access", {
+      headers: {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "owner",
+        "x-kazusa-world-id": "world-beta-99",
+      },
+    });
+    let wrongWorldError: AuthError | undefined;
+    try {
+      resolveViewer(wrongWorldReq);
+    } catch (err) {
+      wrongWorldError = err as AuthError;
+    }
+    expect(wrongWorldError?.status).toBe(401);
+
+    // Missing world ID rejected
+    const missingWorldReq = new Request("https://demo.example/kazusa/access", {
+      headers: {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "owner",
+      },
+    });
+    let missingWorldError: AuthError | undefined;
+    try {
+      resolveViewer(missingWorldReq);
+    } catch (err) {
+      missingWorldError = err as AuthError;
+    }
+    expect(missingWorldError?.status).toBe(401);
   });
 
   it("rejects duplicate, malformed, or unsupported roles", () => {

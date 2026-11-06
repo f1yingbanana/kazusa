@@ -113,16 +113,33 @@ PR 1 branch: `codex/auth-server-access`.
 ### Running the server modes
 
 The desktop launcher still binds Next to loopback. Unset `KAZUSA_AUTH_MODE` or
-set it to `local` for normal owner play. Set `KAZUSA_AUTH_MODE=public` on the
-public frontend; it strips incoming identity, forwards its own visitor role, and
-refuses all mutation/operational routes before forwarding. The upgraded plugin
-also enforces that role after authenticating the private service token. Set the
-Gateway process to `public` as well when all its Kazusa HTTP callers must be
-read-only (even a bearer-token caller asserting owner). A separate private
-local-mode frontend can only manage a Gateway running in local mode. Keep the
-Gateway port private in either case. Restart each process after changing its
-mode. Unknown modes, including the not-yet-implemented `trusted-proxy`, fail
-closed.
+set it to `local` for normal owner play.
+
+Set `KAZUSA_AUTH_MODE=public` on the public frontend for read-only demo mode; it
+strips incoming identity, forwards its own visitor role, and refuses all
+mutation/operational routes before forwarding. The plugin also enforces that
+role after authenticating the private service token. Set the Gateway process to
+`public` as well when all its Kazusa HTTP callers must be read-only (even a
+bearer-token caller asserting owner).
+
+Set `KAZUSA_AUTH_MODE=trusted-proxy` on hosted instances behind an upstream
+wrapper (such as OpenRP Cloud). In this mode:
+
+- Both Next and the Gateway should run with `KAZUSA_AUTH_MODE=trusted-proxy`
+  (never run Gateway in `public` mode if owner operations are needed, as
+  `public` clamps all callers to visitor).
+- The upstream wrapper must supply `x-kazusa-proxy-secret` matching
+  `KAZUSA_TRUSTED_PROXY_SECRET`. Each world instance must be provisioned with
+  its own unique proxy secret.
+- The wrapper must always supply `x-kazusa-role: owner` or
+  `x-kazusa-role: visitor`. Missing roles are rejected with 401.
+- Optionally configure `KAZUSA_WORLD_ID` and have the wrapper pass
+  `x-kazusa-world-id` to cryptographically enforce instance binding.
+- Configure `KAZUSA_PUBLIC_ORIGIN` (or pass `x-forwarded-host`) to ensure
+  browser CSRF/same-origin checks pass when proxying to internal addresses.
+- Long-lived SSE streams (`/kazusa/events`) remain open until closed by the
+  client or terminated by the upstream wrapper upon access revocation.
+- Unknown modes fail closed (503).
 
 Both Next and the Gateway still need the server-only Gateway credential. Do not
 publish a local-mode frontend or distribute that credential to visitors. PR 1
@@ -211,31 +228,40 @@ PR 3 branch: `codex/auth-trusted-proxy`.
 
 - **Wrapper connection authentication & anti-spoofing**:
   - `KAZUSA_AUTH_MODE=trusted-proxy` mode added to `@kazusa/client`.
-  - Timing-safe comparison of `KAZUSA_TRUSTED_PROXY_SECRET` via
-    `x-kazusa-proxy-secret` or `Authorization: Bearer <secret>`.
-  - Rejects unauthenticated direct requests (401), missing server config (503),
-    duplicate/array role headers (401), and unsupported roles (401).
+  - Timing-safe comparison of `KAZUSA_TRUSTED_PROXY_SECRET` strictly via
+    `x-kazusa-proxy-secret`.
+  - Rejects unauthenticated direct requests (401), missing server secret (503),
+    missing or dropped role headers (401), duplicate/array role headers (401),
+    and unsupported roles (401).
+  - Optional `KAZUSA_WORLD_ID` instance binding verifies `x-kazusa-world-id`,
+    rejecting requests routed to the wrong world container (401).
   - Unauthenticated requests cannot bypass the wrapper origin or spoof owner
     authority.
 - **Normalization of viewer identity & access**:
   - Validated role mapped to `accessForRole(role, { local: false })`.
-  - If role header is omitted by wrapper, safe fallback to `visitor`.
   - Forwarded to OpenClaw Gateway with authenticated service bearer token and
     normalized `x-kazusa-role`.
-- **Desktop /update loopback keying**:
+- **Public origin and same-origin CSRF**:
+  - `isSameOrigin` supports `KAZUSA_PUBLIC_ORIGIN` and `x-forwarded-host`,
+    ensuring reverse-proxied browser requests with public `Origin` and internal
+    container `Host` are cleanly verified.
+- **Desktop /update loopback keying & host isolation**:
   - `AccessSchema` extended with `local: z.boolean().optional()`.
   - `useAccess()` returns `isLocal: boolean`.
   - `useUpdate()` and `useAnnouncedRelease()` key polling on
     `isOwner && isLocal ? UPDATE_KEY : null`.
   - Settings `updates` category and status bar item gated with
     `requiresLocal: true`.
+  - Settings `ConfigFiles` button calling `/reveal` gated to local owner only.
   - Desktop-only host routes (`/update`, `/setup`, `/setup/world`, `/reveal`)
     reject non-local requests (403) before processing.
 - **End-to-end integration & verification**:
-  - Dedicated end-to-end wrapper simulation in
-    `apps/web/lib/auth/trusted-proxy.test.ts` (5 tests passing: owner mutation
-    forwarding, visitor read/write boundaries, direct bypass prevention, session
-    revocation reflection, and desktop host route isolation).
+  - End-to-end wrapper integration test suite in
+    `apps/web/lib/auth/trusted-proxy.test.ts` (8 tests passing: owner mutation
+    forwarding with internal host / public origin, visitor read/write
+    boundaries, dropped role failure, world ID mismatch rejection, direct bypass
+    prevention, SSE event streaming with cancellation signal, host route
+    isolation, and a live Node `http.Server` reverse proxy over TCP sockets).
   - Proxy unit tests in `apps/web/lib/auth/proxy.test.ts` (12 tests passing).
   - Gateway registrar tests in
     `apps/kazusa/plugins/kazusa/src/http/access.test.ts` (10 tests passing).

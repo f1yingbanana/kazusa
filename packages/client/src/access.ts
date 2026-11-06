@@ -52,8 +52,8 @@ export function deploymentRole(mode: AuthMode): "owner" | "visitor" {
  * these headers.
  */
 export const VIEWER_ROLE_HEADER = "x-kazusa-role";
-export const VIEWER_USER_HEADER = "x-kazusa-user-id";
 export const PROXY_SECRET_HEADER = "x-kazusa-proxy-secret";
+export const WORLD_ID_HEADER = "x-kazusa-world-id";
 
 export interface RoutePolicy {
   readonly method: "GET" | "POST";
