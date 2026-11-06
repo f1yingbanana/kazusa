@@ -264,12 +264,34 @@ apps/kazusa/
   plugin reads it in `src/world/package.ts` (the credit on `GET /kazusa/world`).
   `npm run dev` gives a world from before it one (`scripts/world-package.mjs`:
   the template its old `world.json` named, else the one whose player id it has).
-  Field rules, migration and the versioning roadmap (update notices, git
-  history, templates as repositories, save and load):
-  [worlds](references/worlds.md). The setup guide
+  Field rules and migration: [worlds](references/worlds.md). The setup guide
   (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
   is the Gateway's cwd, so playing never touches the repo. A new world, or a
-  change to one, goes in its template; templates hold no simulation history.
+  change to one, goes in its template; templates hold no SQLite.
+- **Canon, play, checkpoints and saves** (design agreed 2026-11-05, not built;
+  [worlds](references/worlds.md) §4). Creators make worlds, playtest, cut
+  checkpoints (chapter starts) and publish; players pick a start, play, save
+  privately and take updates. Truth is timeless canon (from the beginning,
+  `main`), story canon (from a checkpoint on) or play (one playthrough), using
+  memory's retcon/event rules (undated vs dated, `always known` vs dated notes).
+  Personal wikis and `MEMORY.md` can be canon: a checkpoint promotes every mind
+  at that moment. Defaults for sorting a change: creator or ARONA undated →
+  timeless, dated → story, characters' writes → play; the creator confirms in a
+  Publish review, which also raises the version. Everything pushed is text:
+  checkpoints consolidate memory first and carry a `scene.json`; SQLite (keys,
+  100s of MB, one OpenClaw schema) never leaves the machine. Each world is a
+  repository: `main` and `v*` tags, and one `checkpoint/<id>` line of versions
+  per chapter, story order being a list on `main`, never parents (the mock
+  remote is built from this repo's history of `worlds/<id>`). Publish merges the
+  published tip into the playthrough first, builds fresh commits from the
+  exported parts (`git commit-tree`), appends and pushes only those, then links
+  the playthrough to them (`merge -s ours`); the remote never holds a large file
+  or anything deleted. Playthroughs are local branches of text commits. Saves
+  and loads run only with the Gateway stopped, by whoever owns it
+  (`scripts/dev.mjs`, later the cloud host), never on a timer or per turn: a
+  save is a commit on its own ref (`refs/saves/*`) holding the text and the
+  SQLite, so deleting one frees its databases; loading goes on from the save's
+  text parent. Git is simple-git over a real `git`.
 - **World updates** (`src/world-update/`, the system agent's `world_update` tool
   and `world-update` skill): bring a live world up to a newer version of its
   template. The base is `world/.template/`, the template as imported or last
@@ -1417,9 +1439,10 @@ Load these reference files on demand when working on their specific subsystem:
   split off and drift out, what covers each behavior, and tuning out. Read when
   changing `talk`, huddle membership, or how characters leave a conversation.
 - `references/worlds.md` — A world's `package.json`: fields and rules, setup,
-  updates, bringing old worlds along, and the versioning roadmap (git history,
-  templates as repositories, save and load). Read before changing the manifest,
-  setup, `world_update`, or anything about versions, forks or saves.
+  updates, bringing old worlds along, and the design for canon vs play,
+  checkpoints, publishing, repositories, saves and the roadmap. Read before
+  changing the manifest, setup, `world_update`, or anything about versions,
+  forks, chapters, publishing or saves.
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.
