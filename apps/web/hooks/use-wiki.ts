@@ -4,6 +4,9 @@ import { useCallback } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import type {
   MemoryRunsResponse,
+  WikiDeletePayload,
+  WikiEditResult,
+  WikiRenamePayload,
   WikiKind,
   WikiSavePayload,
   WikiSourceResponse,
@@ -12,11 +15,13 @@ import type {
   WikiPageResponse,
 } from "@kazusa/client";
 import {
+  deleteWikiPage,
   fetchMemoryRuns,
   fetchWikiLint,
   fetchWikiList,
   fetchWikiPage,
   fetchWikiSource,
+  renameWikiPage,
   saveWikiSource,
   WIKI_KEY,
 } from "@/lib/source/wiki/http";
@@ -79,20 +84,38 @@ export function useWikiSource(
   );
 }
 
-/** Saves a page; every wiki read (pages, lists, problems) reloads after. */
-export function useSaveWikiPage() {
+/** Every wiki read (pages, lists, problems) reloads after a write. */
+function useWikiWrite<Payload, Result>(
+  write: (
+    baseUrl: string,
+    token: string | undefined,
+    payload: Payload,
+  ) => Promise<Result>,
+) {
   const { baseUrl, token } = useKazusaConfig();
   const { mutate } = useSWRConfig();
   return useCallback(
-    async (payload: WikiSavePayload): Promise<WikiSourceResponse> => {
-      const saved = await saveWikiSource(baseUrl, token, payload);
+    async (payload: Payload): Promise<Result> => {
+      const result = await write(baseUrl, token, payload);
       void mutate(
         (key) => Array.isArray(key) && key[0] === WIKI_KEY,
         undefined,
         { revalidate: true },
       );
-      return saved;
+      return result;
     },
-    [baseUrl, token, mutate],
+    [baseUrl, token, mutate, write],
   );
+}
+
+export function useSaveWikiPage() {
+  return useWikiWrite<WikiSavePayload, WikiSourceResponse>(saveWikiSource);
+}
+
+export function useDeleteWikiPage() {
+  return useWikiWrite<WikiDeletePayload, WikiEditResult>(deleteWikiPage);
+}
+
+export function useRenameWikiPage() {
+  return useWikiWrite<WikiRenamePayload, WikiEditResult>(renameWikiPage);
 }

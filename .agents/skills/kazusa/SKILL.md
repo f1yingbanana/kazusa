@@ -1026,8 +1026,33 @@ connect these modules in process.
   the body is the full description. A tree through `parent`; every place is
   somewhere to stand. `sharedWorld` (`world.ts`): one watcher per process keeps
   the map current, so a new place or `home` needs no reload and SSE `places`
-  tells clients to refetch. A broken edit keeps the last good map and warns, and
-  `wiki_lint` names the problem; only a map broken from the start throws. A
+  tells clients to refetch. **Nothing broken stops the map loading** (`buildMap`
+  never throws; `loadWorld` only when no place page parses at all, which keeps
+  the map in use): a page that doesn't parse, a connection to nowhere or
+  declared on both pages, a duplicate id or an unknown home is left out, an
+  unknown parent or a cycle puts the place at top level, a map in separate parts
+  loads (no route between parts: travel there is refused in-world, travel lists
+  skip it), and each is a `problems` entry `wiki_lint` reports per page. Live,
+  keeping the last good map on any problem meant one bad line hid a whole edit
+  with only a log line to say why. **Nobody is left nowhere** (`repair` in
+  `register.ts`, on every change that alters a page the map reads, and once at
+  `gateway_start` for changes made while stopped): a renamed place carries its
+  people, trips and huddles (Messaging's `renamePlace`); someone at or
+  travelling through a place that's gone is `place()`d at the nearest surviving
+  area above it on the previous map, else home, else the first place, while a
+  trip whose way ahead still exists goes on without the places already passed
+  (`relocation`, `landing` in `location.ts`). One page of two with the same
+  `place_id` removes only itself. A rename is an edited `place_id` on the same
+  file (the watcher compares `files`) or one announced with `expectRename`.
+  `PlaceEdits` (`location.pages`, `pages.ts`) does it properly: `rename` moves
+  the page and rewrites `place_id`, `parent`, `home`, `to`, `entity.place.<id>`
+  and `[[id]]` links in every world page and each character's wiki, card file
+  included; `remove` trashes the page (`<state>/kazusa/wiki-trash/<stamp>/`),
+  moves what was in it up a level, drops connections to it, moves homes there
+  up, and unlinks links; characters' cards stay. Exposed as
+  `POST /kazusa/wiki/rename` and `/wiki/delete` (any page; a registered
+  character's world card is refused), saving a world place page with a new
+  `place_id` (a rename), and ARONA's `map_rename_place`/`map_remove_place`. A
   world without places disables Location. `visibleFrom` = parent, children,
   siblings, connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's

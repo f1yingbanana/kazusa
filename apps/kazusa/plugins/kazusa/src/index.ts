@@ -28,7 +28,7 @@ import {
 } from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
-import { registerLocation } from "./location/register.ts";
+import { registerLocation, type PlaceEdits } from "./location/register.ts";
 import { registerLocationHttp } from "./location/http.ts";
 import { registerWorldUpdate } from "./world-update/register.ts";
 import { registerRepoSearch } from "./repo-search/register.ts";
@@ -123,6 +123,7 @@ export default definePluginEntry({
     registerDesiresHttp(api, { desires, broadcaster });
     const contextRef: { current?: ReturnType<typeof registerContextEngine> } =
       {};
+    const placesRef: { current?: PlaceEdits } = {};
     const memory = registerMemory(api, {
       clock,
       broadcaster,
@@ -134,6 +135,7 @@ export default definePluginEntry({
           speakers: [],
           through: now,
         },
+      places: placesRef,
     });
     const location = registerLocation(api, {
       clock,
@@ -146,6 +148,7 @@ export default definePluginEntry({
       familiarity: memory.familiarity,
       use: memory.use,
     });
+    placesRef.current = location.pages;
     registerLocationHttp(api, { location });
     registerWorldUpdate(api, { clock, location });
     registerRepoSearch(api);

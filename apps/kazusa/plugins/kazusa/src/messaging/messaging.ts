@@ -1285,6 +1285,18 @@ export class Messaging {
     });
   }
 
+  /** The place now goes by another id: its huddles go on there, unannounced. */
+  async renamePlace(from: string, to: string): Promise<void> {
+    await this.serial.enqueue("messages", async () => {
+      await this.init();
+      for (const chat of [...this.chats.values()]) {
+        if (chat.kind === "huddle" && chat.placeId === from)
+          await this.saveChat({ ...chat, placeId: to });
+      }
+    });
+    this.notify();
+  }
+
   /**
    * Someone left a place: they leave every huddle there with a line to those
    * still in it ("_leaves, heading toward …_"). The last one out dissolves it;

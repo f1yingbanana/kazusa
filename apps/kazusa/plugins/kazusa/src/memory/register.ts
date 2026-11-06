@@ -1,9 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
+import type { ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
 import {
+  WikiDeletePayloadSchema,
   WikiKindSchema,
+  WikiRenamePayloadSchema,
   WikiSavePayloadSchema,
+  type WikiEditResult,
   type MemoryRunsResponse,
   type WikiLintResponse,
   type WikiListItem,
@@ -44,6 +48,9 @@ import {
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import type { Anchors } from "./knowledge.ts";
 import { lintMap } from "../location/world.ts";
+import { renamedText } from "../location/pages.ts";
+import type { PlaceEdits } from "../location/register.ts";
+import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { auditWorld, workspacesBeside, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
 import type { Certainty, HistoryLine, Page } from "./page.ts";
@@ -65,6 +72,7 @@ import {
 } from "./writes.ts";
 import { MEMORY_CONFIG } from "./config.ts";
 import {
+  deleteSource,
   PAGE_DIRECTORY,
   readSource,
   saveSource,
@@ -200,6 +208,8 @@ export function registerMemory(
       readonly speakers: readonly string[];
       readonly through: number;
     }>;
+    /** Location registers later; it edits place pages so the map holds. */
+    readonly places?: { current?: PlaceEdits };
   },
 ): MemoryService {
   const config = MEMORY_CONFIG.parse(
@@ -872,24 +882,147 @@ export function registerMemory(
     const fallback = kind ?? index.world().pages.get(id)?.kind;
     sendJson(res, 200, readSource(wikiRoot(agent), id, fallback));
   });
+  const PLACE_ID_FIELD = z.object({ place_id: z.string().optional() });
+  /** Where place pages live, as `readSource` reports paths. */
+  const PLACES_PATH = `${PAGE_DIRECTORY.place.split(path.sep).join("/")}/`;
+  const placeIdIn = (text: string): string | undefined => {
+    try {
+      return readFrontmatter(text, PLACE_ID_FIELD).data.place_id;
+    } catch {
+      return undefined;
+    }
+  };
+  /** Kept, never gone for good: a person can put a page back by hand. */
+  const trashDir = (scope: string) =>
+    path.join(
+      resolveStateDir(process.env, homedir()),
+      "kazusa",
+      "wiki-trash",
+      new Date().toISOString().replace(/[:.]/g, "-"),
+      scope,
+    );
+  const conflict = (res: ServerResponse, error: unknown): void => {
+    if (!(error instanceof SourceConflict)) throw error;
+    sendJson(res, 409, { error: error.message, current: error.current });
+  };
   route("wiki/save", "POST", async (req, res) => {
     const payload = WikiSavePayloadSchema.parse(await readJsonBody(req));
     const kind = payload.kind ?? index.world().pages.get(payload.id)?.kind;
+    const root = wikiRoot(payload.agent);
     try {
-      sendJson(
-        res,
-        200,
-        saveSource(wikiRoot(payload.agent), {
-          id: payload.id,
-          text: payload.text,
-          ...(kind ? { kind } : {}),
-          ...(payload.base !== undefined ? { base: payload.base } : {}),
-        }),
-      );
+      // A world place saved under a new `place_id` is renamed, so whatever
+      // names it, and whoever is there, follows instead of losing it.
+      const current = readSource(root, payload.id, kind);
+      const from =
+        current.exists && current.path.startsWith(PLACES_PATH)
+          ? placeIdIn(current.text)
+          : undefined;
+      const to = placeIdIn(payload.text);
+      const places = deps.places?.current;
+      if (
+        !payload.agent &&
+        places &&
+        from !== undefined &&
+        to !== undefined &&
+        from !== to
+      ) {
+        if (payload.base !== undefined && payload.base !== current.hash)
+          throw new SourceConflict(current);
+        await places.rename(from, to);
+        index.invalidateWorld();
+        sendJson(
+          res,
+          200,
+          saveSource(root, {
+            id: to,
+            kind: "place",
+            text: renamedText(payload.text, { [from]: to }),
+          }),
+        );
+        return;
+      }
+      const saved = saveSource(root, {
+        id: payload.id,
+        text: payload.text,
+        ...(kind ? { kind } : {}),
+        ...(payload.base !== undefined ? { base: payload.base } : {}),
+      });
+      index.invalidateWorld();
+      sendJson(res, 200, saved);
     } catch (error) {
-      if (!(error instanceof SourceConflict)) throw error;
-      sendJson(res, 409, { error: error.message, current: error.current });
+      conflict(res, error);
     }
+  });
+  route("wiki/delete", "POST", async (req, res) => {
+    const payload = WikiDeletePayloadSchema.parse(await readJsonBody(req));
+    const root = wikiRoot(payload.agent);
+    const page = payload.agent
+      ? undefined
+      : index.world().pages.get(payload.id);
+    try {
+      const current = readSource(root, payload.id);
+      if (
+        !current.exists ||
+        (payload.base !== undefined && payload.base !== current.hash)
+      )
+        throw new SourceConflict(current);
+      if (
+        page?.kind === "person" &&
+        listAgentIds(currentConfig(api)).includes(payload.id)
+      ) {
+        sendJson(res, 400, {
+          error: `${payload.id} is a character in this world; their card can't be deleted while they are.`,
+        });
+        return;
+      }
+      const places = deps.places?.current;
+      const placeId =
+        payload.agent || !current.path.startsWith(PLACES_PATH)
+          ? undefined
+          : placeIdIn(current.text);
+      if (placeId !== undefined && places) {
+        const { changed, relocated } = await places.remove(
+          placeId,
+          path.join(root, current.path),
+        );
+        index.invalidateWorld();
+        sendJson(res, 200, {
+          id: payload.id,
+          changed: [...changed],
+          relocated: [...relocated],
+        } satisfies WikiEditResult);
+        return;
+      }
+      deleteSource(root, payload, trashDir(payload.agent ?? "world"));
+      index.invalidateWorld();
+      sendJson(res, 200, {
+        id: payload.id,
+        changed: [],
+        relocated: [],
+      } satisfies WikiEditResult);
+    } catch (error) {
+      conflict(res, error);
+    }
+  });
+  route("wiki/rename", "POST", async (req, res) => {
+    const payload = WikiRenamePayloadSchema.parse(await readJsonBody(req));
+    const current = readSource(worldDir, payload.id);
+    const from =
+      current.exists && current.path.startsWith(PLACES_PATH)
+        ? placeIdIn(current.text)
+        : undefined;
+    const places = deps.places?.current;
+    if (from === undefined || !places) {
+      sendJson(res, 400, { error: "Only World Wiki places can be renamed." });
+      return;
+    }
+    const { changed } = await places.rename(from, payload.to);
+    index.invalidateWorld();
+    sendJson(res, 200, {
+      id: payload.to,
+      changed: [...changed],
+      relocated: [],
+    } satisfies WikiEditResult);
   });
   // Sleep on it now, on request; the same pass a long sleep starts.
   route("memory/consolidate", "POST", async (req, res) => {

@@ -247,9 +247,10 @@ Each stage depends on the last, and the project file tracks them.
   know.
 
 - **Your own room has to join the map too.** The whole map must be one connected
-  graph, or none of it loads. The starter's `console_room` begins alone, so add
-  a connection from it to your world's hub once the hub exists, with a way like
-  `{ by: "the console door", minutes: 1 }`. Do this first, not last.
+  graph, or nobody can travel between its parts. The starter's `console_room`
+  begins alone, so add a connection from it to your world's hub once the hub
+  exists, with a way like `{ by: "the console door", minutes: 1 }`. Do this
+  first, not last.
 - **Lint as you go.** Run `wiki_lint` after every batch of places. A map that
   won't load is far easier to fix after 8 pages than after 40.
 
@@ -259,9 +260,10 @@ Each stage depends on the last, and the project file tracks them.
   small group that should have joined the big one, and give it a `parent` or a
   connection. Sub-places need a `parent`. `entry_minutes` does nothing without
   one.
-- `map_route` says a place isn't on the map: the page probably exists, but the
-  new map is invalid, so the old one is still in use. Run `wiki_lint`. Your
-  files almost certainly parse fine, and the fault is in how the places link up.
+- `map_route` says a place isn't on the map: its page doesn't parse, so it is
+  left off. Run `wiki_lint`, which names the page and what's wrong.
+- `map_route` says there's no way between two places: they are in separate parts
+  of the map. Lint lists the parts; connect them.
 - "malformed history": `## History` lines need a real date,
   `- 2026-01-05 — Text`, for things that happen in play. For the ancient past,
   use a section such as `## The Old Wars` with prose or plain bullets, not

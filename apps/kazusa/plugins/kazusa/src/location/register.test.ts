@@ -164,6 +164,7 @@ function setup(
     }),
   );
   let now = T0;
+  const hooks: Record<string, (() => void)[]> = {};
   const api = {
     config: {
       agents: {
@@ -173,7 +174,9 @@ function setup(
     pluginConfig: { location: { wikiDir } },
     logger: { warn: vi.fn(), info: vi.fn() },
     lifecycle: {},
-    on() {},
+    on(event: string, handler: () => void) {
+      (hooks[event] ??= []).push(handler);
+    },
     runtime: {
       agent: {
         resolveAgentWorkspaceDir: (_config: unknown, id: string) =>
@@ -227,6 +230,7 @@ function setup(
     use: async (agentId, ids, at) => {
       uses.push({ agentId, ids, at });
     },
+    trashDir: temporary("kazusa-trash-"),
   });
   const extensions = [desires.taskExtension, location.taskExtension!];
   const ledger: { text: string; metadata: unknown }[] = [];
@@ -257,6 +261,9 @@ function setup(
     path.join(workspaces, agentId, "wiki/entities/places", `${placeId}.md`);
   return {
     api,
+    hooks,
+    wikiDir,
+    workspaces,
     clock,
     stores,
     tasks,
@@ -537,6 +544,171 @@ describe("location registration", () => {
     expect(unprompted).not.toContain("School `school` 11");
   });
 
+  it("moves whoever was in a removed place up to its area, and mends the map", async () => {
+    const { location, wikiDir } = setup();
+    await location.place("kurimura-airi", "club");
+    await location.place("yutori-natsu", "library");
+
+    const result = await location.pages.remove("club");
+    expect(result.relocated).toEqual([
+      { id: "kurimura-airi", from: "club", to: "school" },
+    ]);
+    expect(await location.record("kurimura-airi")).toMatchObject({
+      placeId: "school",
+    });
+    expect(await location.record("yutori-natsu")).toMatchObject({
+      placeId: "library",
+    });
+    expect(existsSync(path.join(wikiDir, "entities/places/club.md"))).toBe(
+      false,
+    );
+    expect(location.world?.map.places.has("club")).toBe(false);
+    expect(location.world?.problems).toEqual([]);
+  });
+
+  it("gives someone at home a new home when theirs is removed", async () => {
+    const { location, wikiDir } = setup();
+    const result = await location.pages.remove("room_kazusa");
+    expect(result.changed).toContain(
+      path
+        .relative(
+          process.cwd(),
+          path.join(wikiDir, "entities/characters/kazusa.md"),
+        )
+        .split(path.sep)
+        .join("/"),
+    );
+    expect(location.world?.homes.get("kazusa")).toBe("dorm");
+    expect(await location.record("kazusa")).toMatchObject({ placeId: "dorm" });
+  });
+
+  it("carries everyone and everything along when a place is renamed", async () => {
+    const { location, wikiDir, card } = setup();
+    const renamed: [string, string][] = [];
+    location.attachConversations({
+      renamePlace: async (from, to) => {
+        renamed.push([from, to]);
+      },
+      huddlesAt: async () => [],
+      leavePlace: async () => {},
+    });
+    await location.place("kurimura-airi", "club");
+    mkdirSync(path.dirname(card("kurimura-airi", "club")), { recursive: true });
+    writeFileSync(
+      card("kurimura-airi", "club"),
+      "---\nplace_id: club\n---\n\nWhere we bake.\n",
+    );
+
+    await location.pages.rename("club", "sweets_club");
+    expect(await location.record("kurimura-airi")).toMatchObject({
+      placeId: "sweets_club",
+    });
+    expect(renamed).toEqual([["club", "sweets_club"]]);
+    expect(location.world?.map.places.get("sweets_club")?.parent).toBe(
+      "school",
+    );
+    expect(existsSync(path.join(wikiDir, "entities/places/club.md"))).toBe(
+      false,
+    );
+    expect(existsSync(card("kurimura-airi", "sweets_club"))).toBe(true);
+    expect(existsSync(card("kurimura-airi", "club"))).toBe(false);
+    await expect(location.pages.rename("library", "dorm")).rejects.toThrow(
+      "already a place",
+    );
+  });
+
+  it("removes and renames a page left off the map", async () => {
+    const { location, wikiDir } = setup();
+    // No summary: it doesn't parse, so it isn't on the map.
+    writeFileSync(
+      path.join(wikiDir, "entities/places/attic.md"),
+      "---\nplace_id: attic\nname: Attic\nparent: dorm\n---\n",
+    );
+    await location.pages.rename("attic", "loft");
+    expect(existsSync(path.join(wikiDir, "entities/places/loft.md"))).toBe(
+      true,
+    );
+    await location.pages.remove("loft");
+    expect(existsSync(path.join(wikiDir, "entities/places/loft.md"))).toBe(
+      false,
+    );
+  });
+
+  it("keeps a trip going when only the place it left is removed", async () => {
+    const { location, context, setNow } = setup();
+    await location.place("kazusa", "club");
+    const started = await executeStartTask(
+      {
+        type: "traveling",
+        description: "Head home.",
+        duration: 30,
+        afterwards: {},
+        where: "dorm",
+      },
+      context(),
+    );
+    expect(started.success).toBe(true);
+    // Past the school, nearer the dorm than anything else.
+    setNow(minutes(20));
+    const result = await location.pages.remove("club");
+    expect(result.relocated).toEqual([]);
+    const record = await location.record("kazusa");
+    expect(record?.trip?.to).toBe("dorm");
+    expect(record?.trip?.legs.map(({ placeId }) => placeId)).toEqual([
+      "school",
+      "dorm",
+    ]);
+  });
+
+  it("settles a trip through a place deleted by hand", async () => {
+    const { location, wikiDir, context, setNow } = setup();
+    await location.place("kazusa", "club");
+    const started = await executeStartTask(
+      {
+        type: "traveling",
+        description: "Head home.",
+        duration: 30,
+        afterwards: {},
+        where: "dorm",
+      },
+      context(),
+    );
+    expect(started.success).toBe(true);
+    setNow(minutes(1));
+    rmSync(path.join(wikiDir, "entities/places/school.md"));
+    // The watcher sees it; school was the way through, so the trip stops. The
+    // OS can drop an event just after a watcher starts: touch a page to retry.
+    await vi.waitFor(
+      async () => {
+        writeFileSync(
+          path.join(wikiDir, "entities/places/dorm.md"),
+          PAGES["places/dorm.md"],
+        );
+        expect(await location.record("kazusa")).toMatchObject({
+          placeId: "club",
+        });
+        expect((await location.record("kazusa"))?.trip).toBeUndefined();
+      },
+      { timeout: 10_000, interval: 500 },
+    );
+    expect(location.world?.problems.length).toBeGreaterThan(0);
+  }, 15_000);
+
+  it("on start, puts whoever stands on a place gone while it was stopped at home", async () => {
+    const { location, stores, hooks } = setup();
+    // Written by an earlier run, on a map that had a beach.
+    await stores.get("location")?.register("kazusa", {
+      placeId: "beach",
+      since: T0,
+    });
+    for (const start of hooks.gateway_start ?? []) start();
+    await vi.waitFor(async () => {
+      expect(await location.record("kazusa")).toMatchObject({
+        placeId: "room_kazusa",
+      });
+    });
+  });
+
   it("places participants through the operator RPC", async () => {
     const { call, location } = setup();
     expect(
@@ -566,6 +738,7 @@ describe("location registration", () => {
     });
     const left: { who: string; placeId: string }[] = [];
     location.attachConversations({
+      renamePlace: async () => {},
       huddlesAt: async () => [],
       leavePlace: async (who, _name, placeId) => {
         left.push({ who, placeId });
@@ -601,6 +774,7 @@ describe("location registration", () => {
     });
     const left: { who: string; placeId: string; toward?: string }[] = [];
     location.attachConversations({
+      renamePlace: async () => {},
       huddlesAt: async (placeId) =>
         placeId === "club"
           ? [
@@ -710,6 +884,7 @@ describe("location registration", () => {
     });
     const left: { who: string; placeId: string }[] = [];
     location.attachConversations({
+      renamePlace: async () => {},
       huddlesAt: async () => [],
       leavePlace: async (who, _name, placeId) => {
         left.push({ who, placeId });

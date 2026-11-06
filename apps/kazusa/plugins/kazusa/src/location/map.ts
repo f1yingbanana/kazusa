@@ -90,13 +90,27 @@ interface Edge {
   readonly ways: readonly Way[];
 }
 
-/** A validated, connected map. */
+/** Something wrong with the map, which it works around until it's fixed. */
+export interface MapProblem {
+  /** The place it's on; absent for the map as a whole. */
+  readonly place?: string;
+  readonly message: string;
+}
+
+/**
+ * The map as it can be used. A problem never stops it loading: what's broken is
+ * left out (a connection to nowhere, a second page with the same id) or made
+ * safe (an unknown parent puts the place at top level), and listed in
+ * `problems` for `wiki_lint`. Live, one bad line kept a whole edit out of the
+ * map, with nothing to say why.
+ */
 export interface WorldMap {
   readonly places: ReadonlyMap<string, Place>;
   /** Depth-first tree order: each area, then its places by name. */
   readonly order: readonly string[];
   readonly children: ReadonlyMap<string, readonly string[]>;
   readonly edges: ReadonlyMap<string, readonly Edge[]>;
+  readonly problems: readonly MapProblem[];
 }
 
 const byName =
@@ -105,35 +119,48 @@ const byName =
     places.get(a)!.name.localeCompare(places.get(b)!.name) ||
     a.localeCompare(b);
 
-/** Builds the graph, throwing one error that lists every problem. */
+const withoutParent = ({ parent: _parent, ...place }: Place): Place => place;
+
+/** Builds the graph from what's usable, listing every problem it worked around. */
 export function buildMap(list: readonly Place[]): WorldMap {
-  const problems: string[] = [];
+  const problems: MapProblem[] = [];
   const places = new Map<string, Place>();
   for (const place of list) {
-    if (places.has(place.id)) problems.push(`duplicate place ${place.id}`);
+    if (places.has(place.id)) {
+      problems.push({
+        place: place.id,
+        message: `two pages say \`place_id: ${place.id}\`; only the first is used`,
+      });
+      continue;
+    }
     places.set(place.id, place);
   }
-  const children = new Map<string, string[]>();
-  const roots: string[] = [];
   for (const place of places.values()) {
-    if (place.parent === undefined) {
-      roots.push(place.id);
-    } else if (!places.has(place.parent)) {
-      problems.push(`${place.id}: unknown parent ${place.parent}`);
-    } else {
-      children.set(place.parent, [
-        ...(children.get(place.parent) ?? []),
-        place.id,
-      ]);
+    if (place.parent !== undefined && !places.has(place.parent)) {
+      problems.push({
+        place: place.id,
+        message: `unknown parent ${place.parent}, so it's at top level for now`,
+      });
+      places.set(place.id, withoutParent(place));
     }
   }
-  for (const place of places.values()) {
-    const seen = new Set([place.id]);
-    for (let up = place.parent; up !== undefined; up = places.get(up)?.parent) {
-      if (seen.has(up)) {
-        problems.push(`${place.id}: parent cycle through ${up}`);
+  for (const id of places.keys()) {
+    const seen = new Set([id]);
+    for (
+      let up = places.get(id)!.parent;
+      up !== undefined;
+      up = places.get(up)?.parent
+    ) {
+      if (up === id) {
+        problems.push({
+          place: id,
+          message: `parent cycle through ${places.get(id)!.parent}, so it's at top level for now`,
+        });
+        places.set(id, withoutParent(places.get(id)!));
         break;
       }
+      // A cycle above this place: its own members break it.
+      if (seen.has(up)) break;
       seen.add(up);
     }
   }
@@ -144,69 +171,68 @@ export function buildMap(list: readonly Place[]): WorldMap {
   };
   const declared = new Set<string>();
   for (const place of places.values()) {
-    if (place.parent !== undefined && places.has(place.parent)) {
+    if (place.parent !== undefined) {
       const ways = [{ by: WALK, minutes: place.entryMinutes }];
       link(place.id, place.parent, ways);
       link(place.parent, place.id, ways);
     }
+    const kept: Connection[] = [];
     for (const connection of place.connections) {
       const pair = [place.id, connection.to].sort().join("~");
-      if (!places.has(connection.to)) {
-        problems.push(`${place.id}: connection to unknown ${connection.to}`);
-      } else if (connection.to === place.id) {
-        problems.push(`${place.id}: connection to itself`);
-      } else if (declared.has(pair)) {
-        problems.push(
-          `${place.id}: connection to ${connection.to} is declared twice`,
-        );
-      } else {
-        declared.add(pair);
-        link(place.id, connection.to, connection.ways);
-        link(connection.to, place.id, connection.ways);
+      const problem = !places.has(connection.to)
+        ? `connection to unknown ${connection.to} is left out`
+        : connection.to === place.id
+          ? "connection to itself is left out"
+          : declared.has(pair)
+            ? `connection to ${connection.to} is declared on both pages; only the first is used`
+            : undefined;
+      if (problem !== undefined) {
+        problems.push({ place: place.id, message: problem });
+        continue;
       }
+      declared.add(pair);
+      kept.push(connection);
+      link(place.id, connection.to, connection.ways);
+      link(connection.to, place.id, connection.ways);
     }
+    if (kept.length !== place.connections.length)
+      places.set(place.id, { ...place, connections: kept });
   }
 
-  const [first] = places.keys();
-  if (first !== undefined) {
-    const reached = new Set([first]);
-    const queue = [first];
-    for (let next = queue.pop(); next !== undefined; next = queue.pop()) {
-      for (const { to } of edges.get(next) ?? []) {
-        if (!reached.has(to)) {
-          reached.add(to);
-          queue.push(to);
-        }
-      }
+  const groups: string[][] = [];
+  const grouped = new Set<string>();
+  for (const start of places.keys()) {
+    if (grouped.has(start)) continue;
+    const group: string[] = [];
+    const stack = [start];
+    while (stack.length) {
+      const next = stack.pop()!;
+      if (grouped.has(next)) continue;
+      grouped.add(next);
+      group.push(next);
+      for (const { to } of edges.get(next) ?? []) stack.push(to);
     }
-    if (reached.size < places.size) {
-      const groups: string[][] = [];
-      const grouped = new Set<string>();
-      for (const start of places.keys()) {
-        if (grouped.has(start)) continue;
-        const group: string[] = [];
-        const stack = [start];
-        while (stack.length) {
-          const next = stack.pop()!;
-          if (grouped.has(next)) continue;
-          grouped.add(next);
-          group.push(next);
-          for (const { to } of edges.get(next) ?? []) stack.push(to);
-        }
-        groups.push(group);
-      }
-      groups.sort((a, b) => b.length - a.length);
-      problems.push(
-        `the map is ${groups.length} separate parts with no way between them, so give the smaller parts a \`parent\` or a connection: ${groups
-          .map((group) => `[${group.join(", ")}]`)
-          .join(" ")}`,
-      );
-    }
+    groups.push(group);
   }
-  if (problems.length > 0) {
-    throw new Error(`Invalid world map:\n- ${problems.join("\n- ")}`);
+  if (groups.length > 1) {
+    groups.sort((a, b) => b.length - a.length);
+    problems.push({
+      message: `the map is ${groups.length} separate parts with no way between them, so nobody can travel from one to another until the smaller parts get a \`parent\` or a connection: ${groups
+        .map((group) => `[${group.join(", ")}]`)
+        .join(" ")}`,
+    });
   }
 
+  const children = new Map<string, string[]>();
+  const roots: string[] = [];
+  for (const place of places.values()) {
+    if (place.parent === undefined) roots.push(place.id);
+    else
+      children.set(place.parent, [
+        ...(children.get(place.parent) ?? []),
+        place.id,
+      ]);
+  }
   const sort = byName(places);
   for (const ids of children.values()) ids.sort(sort);
   const order: string[] = [];
@@ -215,7 +241,7 @@ export function buildMap(list: readonly Place[]): WorldMap {
     for (const child of children.get(id) ?? []) visit(child);
   };
   for (const root of roots.sort(sort)) visit(root);
-  return { places, order, children, edges };
+  return { places, order, children, edges, problems };
 }
 
 /** One step of a route, arriving at `placeId`. */
@@ -275,6 +301,7 @@ export function routesFrom(map: WorldMap, from: string): Map<string, Route> {
   return routes;
 }
 
+/** Throws when there is no way between them: two parts of a broken map. */
 export function routeBetween(map: WorldMap, from: string, to: string): Route {
   const route = routesFrom(map, from).get(to);
   if (!route) throw new Error(`No route from ${from} to ${to}.`);
@@ -380,7 +407,7 @@ export function visibleFrom(map: WorldMap, from: string): string[] {
   ];
 }
 
-/** `Name `id` 13 min on foot, 7 by bike`, nearest first. */
+/** `Name `id` 13 min on foot, 7 by bike`, nearest first; no way, not listed. */
 export function renderTravelTimes(
   map: WorldMap,
   from: string,
@@ -388,7 +415,8 @@ export function renderTravelTimes(
   limit = Infinity,
 ): string {
   const routes = routesFrom(map, from);
-  return [...ids]
+  return ids
+    .filter((id) => routes.has(id))
     .sort(
       (a, b) =>
         routes.get(a)!.minutes - routes.get(b)!.minutes || a.localeCompare(b),

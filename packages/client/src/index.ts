@@ -1714,6 +1714,46 @@ export const WikiSavePayloadSchema = z.object({
 });
 export type WikiSavePayload = z.infer<typeof WikiSavePayloadSchema>;
 
+/**
+ * POST /kazusa/wiki/delete. The page goes to the trash (`.state/kazusa/
+ * wiki-trash`). A World Wiki place takes the map with it: what was in it moves
+ * up to its area, connections to it go, homes and people there go to its area.
+ * With `base`, only the version that was read; 409 as for a save.
+ */
+export const WikiDeletePayloadSchema = WikiSavePayloadSchema.pick({
+  id: true,
+  agent: true,
+  base: true,
+});
+export type WikiDeletePayload = z.infer<typeof WikiDeletePayloadSchema>;
+
+/**
+ * POST /kazusa/wiki/rename. A World Wiki place takes a new id everywhere: its
+ * page, pages and character cards naming it, and positions, trips and
+ * conversations there. Saving a place page with a new `place_id` does the
+ * same.
+ */
+export const WikiRenamePayloadSchema = z.object({
+  id: z.string().min(1),
+  to: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9_-]*$/u, "Use lowercase letters, digits, _ or -."),
+});
+export type WikiRenamePayload = z.infer<typeof WikiRenamePayloadSchema>;
+
+/** What a delete or rename did besides the page itself. */
+export const WikiEditResultSchema = z.object({
+  /** The page's id now: the new one after a rename. */
+  id: z.string(),
+  /** Other pages rewritten, relative to the world folder. */
+  changed: z.array(z.string()),
+  /** People put somewhere else because their place went. */
+  relocated: z.array(
+    z.object({ id: z.string(), from: z.string(), to: z.string() }),
+  ),
+});
+export type WikiEditResult = z.infer<typeof WikiEditResultSchema>;
+
 export const WikiLintResponseSchema = z.object({
   findings: z.array(
     z.object({

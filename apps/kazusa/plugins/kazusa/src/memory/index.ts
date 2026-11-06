@@ -292,6 +292,11 @@ export class MemoryIndex {
     return this.worldModel;
   }
 
+  /** The next `world()` reads the files: they were just written. */
+  invalidateWorld(): void {
+    this.worldCheckedAt = 0;
+  }
+
   /** One character's own pages by id, fresh from disk. */
   personal(agentId: string): ReadonlyMap<string, Page> {
     const scope = personalScope(agentId);

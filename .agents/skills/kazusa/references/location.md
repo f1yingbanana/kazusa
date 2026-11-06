@@ -124,11 +124,17 @@ space), `entry_minutes` (walk to the parent, default 1), `connections` (two-way,
 declared once, `ways` with the usual one first; `walk` reads as on foot). The
 body is the full description: whose a place is, how it is kept, how busy it
 gets. Character cards carry `home`. A file watcher keeps them current, so a new
-place needs no reload. A broken edit (unknown parents, cycles, bad or duplicate
-connections, a disconnected graph, unknown homes) keeps the last good map, and
-only a map broken from the start throws. A world without places disables
-Location. The local working set has 22 places (school, dorm with a room per
-character, Church Street, SCHALE); the wiki lives in `worlds/<id>/`.
+place needs no reload. Nothing broken stops the map loading: an unparseable
+page, a bad or duplicate connection or a duplicate id is left out, an unknown
+parent or a cycle puts the place at top level, an unknown home is dropped, and a
+map in separate parts loads with no route between them; `wiki_lint` lists each.
+After any change, whoever stood or was travelling somewhere now gone is put at
+the nearest area above it, and a renamed place carries its people, trips and
+huddles. Renaming and removing a place through the wiki
+(`POST /kazusa/wiki/rename`, `/wiki/delete`) or ARONA's `map_rename_place` and
+`map_remove_place` also rewrite every page and card naming it. A world without
+places disables Location. The local working set has 22 places (school, dorm with
+a room per character, Church Street, SCHALE); the wiki lives in `worlds/<id>/`.
 
 ### 4.2 Position and travel
 

@@ -30,6 +30,7 @@ import { requestSidebar } from "@/lib/state/sidebar-request";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
+import { DeletePageButton, RenamePlaceButton } from "./page-actions";
 import { PageEditor } from "./page-editor";
 import { describePage, type WikiSide } from "./page-roles";
 
@@ -38,6 +39,7 @@ function Column({
   title,
   description,
   onEdit,
+  actions,
   children,
 }: {
   icon: typeof GlobeIcon;
@@ -46,6 +48,8 @@ function Column({
   description: string;
   /** Absent while this column is the one being edited. */
   onEdit?: (() => void) | undefined;
+  /** Rename, delete: shown beside Edit, and only with it. */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -66,6 +70,7 @@ function Column({
             Edit
           </Button>
         ) : null}
+        {onEdit ? actions : null}
       </div>
       <p className="mt-1 mb-4 text-xs text-muted-foreground">{description}</p>
       <div className="space-y-4">{children}</div>
@@ -215,6 +220,13 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
     editParam === "world" || (editParam === "own" && agent)
       ? editParam
       : undefined;
+  const open = (page: string | null) =>
+    navigate({
+      "wiki.page": page,
+      "wiki.edit": null,
+      "wiki.kind": null,
+      "wiki.name": null,
+    });
   const edit = (side: WikiSide | null) =>
     navigate({
       "wiki.edit": side,
@@ -242,7 +254,10 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
       side={side}
       {...(agent ? { owner: name } : {})}
       name={subject}
-      onDone={() => edit(null)}
+      onDone={(saved) =>
+        // A place saved under a new id was renamed: follow it.
+        saved && saved.id !== id ? open(saved.id) : edit(null)
+      }
     />
   );
   return (
@@ -266,6 +281,17 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
               editing === "own" || !data?.personal
                 ? undefined
                 : () => edit("own")
+            }
+            actions={
+              agent ? (
+                <DeletePageButton
+                  id={id}
+                  name={`${name}'s page on ${subject}`}
+                  agent={agent}
+                  place={false}
+                  onDeleted={() => void read.mutate()}
+                />
+              ) : null
             }
           >
             {editing === "own" ? (
@@ -297,6 +323,23 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
             editing === "world" || (!data?.world && agent)
               ? undefined
               : () => edit("world")
+          }
+          actions={
+            data?.world ? (
+              <>
+                {data.world.kind === "place" ? (
+                  <RenamePlaceButton id={id} name={subject} onRenamed={open} />
+                ) : null}
+                <DeletePageButton
+                  id={id}
+                  name={subject}
+                  place={data.world.kind === "place"}
+                  onDeleted={() =>
+                    data.personal ? void read.mutate() : open(null)
+                  }
+                />
+              </>
+            ) : null
           }
         >
           {editing === "world" ? (
