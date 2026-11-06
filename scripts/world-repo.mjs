@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * Each live world is its own git repository (the kazusa skill's
- * `references/worlds.md` §4.5): its history starts at the published commit it
- * was made from, so updates and publishing later have the right base. Rooting
- * it there is what can't be done afterwards, so it happens before the Gateway
- * first starts on a world, new or old, from `scripts/dev.mjs` (installed copies
- * too) and from `npm run gateway`. Nothing is committed here: commits are
- * saves, made with the Gateway stopped.
+ * Worlds are git repositories (the kazusa skill's `references/worlds.md` §4.5).
  *
- * Until the platform hosts worlds, each template's remote is a bare repository
- * in `apps/kazusa/.remotes/<name>.git`, built from this repository's own
- * history of `apps/kazusa/worlds/<id>`, so every copy gets the same commit ids.
- * Clones build it on start; installers ship it (`scripts/package.mjs`).
+ * Templates: `apps/kazusa/worlds/<id>` is a clone of each world listed in
+ * `apps/kazusa/worlds/sources.json`, fetched on every start and fast-forwarded
+ * when nobody has changed it, so a creator can edit, commit and push from it.
+ * Setup and `world_update` read templates there as before.
  *
- * Git is the one shipped beside Kazusa (`git/`, GitHub Desktop's portable
- * build), else the system's.
+ * The live world: `world/` is its own repository, whose history starts at the
+ * published commit it was made from, so updates and publishing later have the
+ * right base. Rooting it there is what can't be done afterwards, so it happens
+ * before the Gateway first starts on a world, new or old. Nothing is committed
+ * here: commits are saves, made with the Gateway stopped.
+ *
+ * Both run from `scripts/dev.mjs` (installed copies too) and from `npm run
+ * gateway`. Git is the one shipped beside Kazusa (`git/`, GitHub Desktop's
+ * portable build), else the system's.
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -22,8 +23,8 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -32,9 +33,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { simpleGit } from "simple-git";
 
-const WORLDS = "apps/kazusa/worlds";
+export const WORLDS = "apps/kazusa/worlds";
+/** Which worlds there are and where each lives; later, providers such as OpenRP. */
+export const SOURCES = `${WORLDS}/sources.json`;
 const WORLD = "apps/kazusa/world";
-export const REMOTES = "apps/kazusa/.remotes";
+/** Where a template folder from before repositories is set aside, not lost. */
+const SET_ASIDE = "apps/kazusa/.worlds-before-repositories";
 /** The playthrough: the world's local branch, never pushed. */
 export const PLAY = "play";
 const UPSTREAM = "upstream";
@@ -52,8 +56,6 @@ const EXCLUDE = `# Written by scripts/world-repo.mjs on every start.
 `;
 // No delta between SQLite versions exists to find (worlds.md §4.6).
 const ATTRIBUTES = "*.sqlite binary -delta\n";
-// Fixed, so every build of a mock remote gives the same commit ids.
-const PUBLISHER = { name: "Kazusa", email: "worlds@openrp.ai" };
 // What simple-git guards: every `GIT_` variable, and these. An inherited one
 // would point git elsewhere or wait for a person, so none is passed on; ours
 // are named to it (`allowEnvironment`).
@@ -143,98 +145,59 @@ async function treeOf(repo, commit) {
   return files;
 }
 
+/** `[{ id, provider, url }]`: the worlds this copy offers. */
+export function readSources(root) {
+  const file = path.join(root, SOURCES);
+  return existsSync(file) ? (readJson(file).worlds ?? []) : [];
+}
+
 /**
- * Builds or refreshes one bare repository per template from this repository's
- * first-parent history: a commit for each commit that changed the template,
- * holding the template's tree, with the publisher, date and subject fixed by
- * that commit, and `v<version>` on the last commit of each version. Same
- * history, same ids, wherever it's built. A copy without that history (an
- * installed one, a source download, a shallow clone) builds nothing and keeps
- * what it has.
+ * Clones each listed world into `worlds/<id>`, or fetches it and moves it to
+ * what was published, unless someone has work there: a branch other than
+ * `main`, changes, or commits not pushed. A folder from before repositories is
+ * set aside first. One that can't be reached (offline, gone) keeps what it
+ * had.
  */
-export async function buildRemotes(root, out = path.join(root, REMOTES)) {
+export async function syncWorlds(root) {
   const git = findGit(root);
-  if (!git || !existsSync(path.join(root, ".git"))) return [];
-  const source = gitIn(git, root);
-  if (
-    (await source.raw(["rev-parse", "--is-shallow-repository"])).trim() ===
-    "true"
-  )
-    return [];
-  const head = (await source.revparse(["HEAD"])).trim();
+  if (!git) return [];
   const lines = [];
-  for (const id of readdirSync(path.join(root, WORLDS)).sort()) {
-    const manifest = path.join(root, WORLDS, id, "package.json");
-    if (!existsSync(manifest)) continue;
-    const { name } = readJson(manifest);
-    const bare = path.join(out, `${name}.git`);
-    if (!existsSync(bare)) {
-      mkdirSync(bare, { recursive: true });
-      await gitIn(git, bare).raw(["init", "--bare", "--initial-branch=main"]);
-    }
-    const remote = gitIn(git, bare);
-    const built = await remote
-      .raw(["config", "--get", "kazusa.source"])
-      .catch(() => "");
-    if (built.trim() === head) continue;
-    const folder = `${WORLDS}/${id}`;
-    const log = await source.raw([
-      "log",
-      "--first-parent",
-      "--reverse",
-      "--format=%H%x09%ct%x09%s",
-      "HEAD",
-      "--",
-      folder,
-    ]);
-    let tip;
-    let tree;
-    const tags = new Map();
-    for (const line of log.split("\n").filter(Boolean)) {
-      const [sha, time, ...subject] = line.split("\t");
-      const next = await source
-        .revparse([`${sha}:${folder}`])
-        .then((value) => value.trim())
-        .catch(() => undefined);
-      if (!next || next === tree) continue;
-      tree = next;
-      const date = `${time} +0000`;
-      tip = (
-        await gitIn(git, root, {
-          GIT_AUTHOR_NAME: PUBLISHER.name,
-          GIT_AUTHOR_EMAIL: PUBLISHER.email,
-          GIT_AUTHOR_DATE: date,
-          GIT_COMMITTER_NAME: PUBLISHER.name,
-          GIT_COMMITTER_EMAIL: PUBLISHER.email,
-          GIT_COMMITTER_DATE: date,
-        }).raw([
-          "commit-tree",
-          "--no-gpg-sign",
-          tree,
-          ...(tip ? ["-p", tip] : []),
-          "-m",
-          subject.join("\t"),
-          "-m",
-          `Kazusa-Commit: ${sha}`,
-        ])
+  for (const { id, url } of readSources(root)) {
+    const dir = path.join(root, WORLDS, id);
+    try {
+      if (!existsSync(path.join(dir, ".git"))) {
+        if (existsSync(dir)) {
+          const aside = path.join(root, SET_ASIDE, `${id}-${Date.now()}`);
+          mkdirSync(path.dirname(aside), { recursive: true });
+          renameSync(dir, aside);
+          lines.push(
+            `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
+          );
+        }
+        lines.push(`Downloading the ${id} world.`);
+        await gitIn(git, path.join(root, WORLDS)).raw([
+          "clone",
+          "--quiet",
+          url,
+          id,
+        ]);
+        continue;
+      }
+      const repo = gitIn(git, dir);
+      await repo.raw(["fetch", "--quiet", "--prune", "--tags", "--force"]);
+      const branch = (await repo.raw(["branch", "--show-current"])).trim();
+      const changed = (await repo.raw(["status", "--porcelain"])).trim();
+      const ahead = (
+        await repo.raw(["rev-list", "--count", "origin/main..HEAD"])
       ).trim();
-      const version = await source
-        .show([`${sha}:${folder}/package.json`])
-        .then((text) => JSON.parse(text).version)
-        .catch(() => undefined);
-      if (version) tags.set(`v${version}`, tip);
+      if (branch !== "main" || changed || ahead !== "0") {
+        lines.push(`Kept your work in worlds/${id}; it isn't updated.`);
+        continue;
+      }
+      await repo.raw(["merge", "--quiet", "--ff-only", "origin/main"]);
+    } catch (error) {
+      lines.push(`Couldn't update the ${id} world: ${error.message.trim()}`);
     }
-    if (!tip) continue;
-    await source.raw([
-      "push",
-      "--quiet",
-      "--force",
-      bare,
-      `${tip}:refs/heads/main`,
-      ...[...tags].map(([tag, commit]) => `+${commit}:refs/tags/${tag}`),
-    ]);
-    await remote.raw(["config", "kazusa.source", head]);
-    lines.push(`Built the ${name} remote.`);
   }
   return lines;
 }
@@ -355,9 +318,7 @@ export async function adoptWorldRepo(root) {
         ? "This world's history is off: git isn't installed. Install the developer tools (xcode-select --install) to turn it on."
         : "This world's history is off: git isn't installed.",
     ];
-  const lines = await buildRemotes(root).catch((error) => [
-    `Couldn't build the template remotes: ${error.message}`,
-  ]);
+  const lines = [];
   const pkg = readJson(manifest);
   const title = pkg.displayName ?? pkg.name;
   const fresh = !existsSync(path.join(world, ".git"));
@@ -376,25 +337,34 @@ export async function adoptWorldRepo(root) {
   writeFileSync(path.join(world, ".git/info/exclude"), EXCLUDE);
   writeFileSync(path.join(world, ".git/info/attributes"), ATTRIBUTES);
 
-  const remote = path.join(root, REMOTES, `${pkg.name}.git`);
+  // Where the world lives: its own `repository`, else the source it came from.
+  const id = pkg.kazusa?.template;
+  const url =
+    (typeof pkg.repository === "string"
+      ? pkg.repository
+      : pkg.repository?.url) ??
+    readSources(root).find((source) => source.id === id)?.url;
   const remotes = (await repo.raw(["remote"])).split("\n");
-  const hasRemote = existsSync(remote);
-  if (hasRemote) {
-    // Kept current: an installed copy can move.
+  if (url)
     await repo.raw(
       remotes.includes(UPSTREAM)
-        ? ["remote", "set-url", UPSTREAM, remote]
-        : ["remote", "add", UPSTREAM, remote],
+        ? ["remote", "set-url", UPSTREAM, url]
+        : ["remote", "add", UPSTREAM, url],
     );
+  // What was published, from the template's clone: no network, and the same
+  // commits its remote has.
+  const clone = id ? path.join(root, WORLDS, id) : undefined;
+  const hasRemote = Boolean(clone && existsSync(path.join(clone, ".git")));
+  if (hasRemote)
     await repo.raw([
       "fetch",
       "--quiet",
       "--prune",
-      "--tags",
       "--force",
-      UPSTREAM,
+      clone,
+      `+refs/remotes/origin/*:refs/remotes/${UPSTREAM}/*`,
+      "+refs/tags/*:refs/tags/*",
     ]);
-  }
 
   const rooted = await repo
     .raw(["rev-parse", "--verify", "--quiet", `refs/heads/${PLAY}`])
@@ -428,14 +398,14 @@ export async function adoptWorldRepo(root) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  try {
-    const lines =
-      process.argv[2] === "remotes"
-        ? await buildRemotes(root, path.resolve(process.argv[3] ?? REMOTES))
-        : await adoptWorldRepo(root);
-    for (const line of lines) console.log(line);
-  } catch (error) {
-    // A world without history still plays.
-    console.warn(`Couldn't set up this world's history: ${error.message}`);
-  }
+  // A world without history, or an old template, still plays.
+  for (const [what, step] of [
+    ["the worlds", syncWorlds],
+    ["this world's history", adoptWorldRepo],
+  ])
+    try {
+      for (const line of await step(root)) console.log(line);
+    } catch (error) {
+      console.warn(`Couldn't set up ${what}: ${error.message}`);
+    }
 }

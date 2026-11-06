@@ -252,6 +252,15 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => stop(0));
 
+// The setup guide lists the templates, so they're fetched first.
+try {
+  // After the install above: it needs simple-git.
+  const { syncWorlds } = await import("./world-repo.mjs");
+  for (const line of await syncWorlds(ROOT)) console.log(line);
+} catch (error) {
+  console.warn(`Couldn't update the worlds: ${error.message}`);
+}
+
 start(
   "web",
   process.execPath,

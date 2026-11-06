@@ -1,0 +1,24 @@
+{
+  "worlds": [
+    {
+      "id": "blue-archive",
+      "provider": "git",
+      "url": "https://github.com/f1yingbanana/kazusa-cute-and-funny-world-of-kivotos.git"
+    },
+    {
+      "id": "elden-ring",
+      "provider": "git",
+      "url": "https://github.com/f1yingbanana/kazusa-elden-ring.git"
+    },
+    {
+      "id": "genshin-impact",
+      "provider": "git",
+      "url": "https://github.com/f1yingbanana/kazusa-genshin-impact.git"
+    },
+    {
+      "id": "starter",
+      "provider": "git",
+      "url": "https://github.com/f1yingbanana/kazusa-new-world.git"
+    }
+  ]
+}

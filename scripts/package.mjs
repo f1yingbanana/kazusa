@@ -25,7 +25,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist");
@@ -240,19 +240,6 @@ async function stageGit(stage, target) {
         removeTree(path.join(git, dir, entry.name));
 }
 
-/**
- * Each template's mock remote, built from this checkout's history: an installed
- * copy has none to build from. Run from the stage, whose `node_modules` has
- * simple-git.
- */
-async function stageRemotes(stage) {
-  const { buildRemotes, REMOTES } = await import(
-    pathToFileURL(path.join(stage, "scripts/world-repo.mjs")).href
-  );
-  for (const line of await buildRemotes(ROOT, path.join(stage, REMOTES)))
-    console.log(line);
-}
-
 function allFiles(stage) {
   return readdirSync(stage, { recursive: true, withFileTypes: true })
     .filter((entry) => !entry.isDirectory())
@@ -351,8 +338,9 @@ UninstPage instfiles
   RMDir /r "$INSTDIR\\apps\\web"
   RMDir /r "$INSTDIR\\apps\\kazusa\\plugins"
   RMDir /r "$INSTDIR\\apps\\kazusa\\shared"
-  RMDir /r "$INSTDIR\\apps\\kazusa\\worlds"
-  RMDir /r "$INSTDIR\\apps\\kazusa\\.remotes"
+  ; Templates are clones the app keeps current: only the files beside them.
+  Delete "$INSTDIR\\apps\\kazusa\\worlds\\base.json"
+  Delete "$INSTDIR\\apps\\kazusa\\worlds\\sources.json"
   Delete "$INSTDIR\\apps\\kazusa\\package.json"
   Delete "$INSTDIR\\package.json"
   Delete "$INSTDIR\\package-lock.json"
@@ -401,6 +389,8 @@ Section Uninstall
   MessageBox MB_YESNO|MB_ICONQUESTION "Also delete your world and its API keys? This can't be undone." /SD IDNO IDNO keepWorld
   RMDir /r "$INSTDIR\\apps\\kazusa\\world"
   keepWorld:
+  RMDir /r "$INSTDIR\\apps\\kazusa\\worlds"
+  RMDir /r "$INSTDIR\\apps\\kazusa\\.worlds-before-repositories"
   Delete "$SMPROGRAMS\\Kazusa.lnk"
   Delete "$DESKTOP\\Kazusa.lnk"
   DeleteRegKey HKCU "${uninstallKey}"
@@ -441,7 +431,7 @@ set -e
 cd "$home"
 if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" .bundle-version; then
   echo "Setting up Kazusa. This takes a minute, once per version."
-  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
+  rsync -a --delete --exclude /apps/kazusa/world/ --exclude '/apps/kazusa/worlds/*/' --exclude /apps/kazusa/.worlds-before-repositories/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
   xattr -dr com.apple.quarantine . 2>/dev/null || true
   cp "$bundle/VERSION" .bundle-version
 fi
@@ -527,7 +517,6 @@ buildFrontend(stage);
 installForTarget(stage, target);
 await stageNode(stage, target);
 await stageGit(stage, target);
-await stageRemotes(stage);
 writeFileSync(path.join(stage, "VERSION"), `${version}\n`);
 verify(stage, target);
 buildArchive(stage, name, version);

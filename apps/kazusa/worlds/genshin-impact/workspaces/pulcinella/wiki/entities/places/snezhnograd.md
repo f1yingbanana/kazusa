@@ -1,8 +1,0 @@
----
-place_id: snezhnograd
-name: "Snezhnograd"
-aliases: ["the Tsaritsa's capital", "the frozen capital"]
-learned: always known
----
-
-Every street's got a story, and I've got the receipts.

@@ -252,26 +252,27 @@ apps/kazusa/
 
 ### Worlds, Setup and Providers
 
-- **Templates and the live world**: `worlds/<id>/` are read-only templates
-  (`package.json`, `shared/wiki`, `workspaces`, optionally `shared/skills`);
-  `worlds/base.json` is the config every world shares. A world's `package.json`
-  is npm's (`name` a lasting slug, `displayName`, semver `version` raised with
-  each template release, `author`, `homepage`, `private: true`) with Kazusa's
-  under `kazusa`: `title` (the setup guide's label, else `displayName`),
-  `systemAgent`, `defaultGroup`, `renames`, and `config` (merged into the
-  plugin's config at setup); the live copy adds `kazusa.template`, the
-  template's folder. Schema: `WorldPackageSchema` in `@kazusa/client`; the
-  plugin reads it in `src/world/package.ts` (the credit on `GET /kazusa/world`).
-  `npm run dev` gives a world from before it one (`scripts/world-package.mjs`:
-  the template its old `world.json` named, else the one whose player id it has).
-  Field rules and migration: [worlds](references/worlds.md). Before the Gateway
-  starts, `scripts/world-repo.mjs` makes `world/` a git repository rooted at the
-  published commit its `.template/` matches (mock remotes in
-  `apps/kazusa/.remotes/`, built from this repo's history; git shipped in
-  `git/`), committing nothing. The setup guide (`apps/web/lib/setup/setup.ts`)
-  copies one to the git-ignored `world/`, which is the Gateway's cwd, so playing
-  never touches the repo. A new world, or a change to one, goes in its template;
-  templates hold no SQLite.
+- **Templates and the live world**: `worlds/<id>/` are templates, each a clone
+  of a world's own repository listed in `worlds/sources.json` and kept current
+  on start (`package.json`, `shared/wiki`, `workspaces`, optionally
+  `shared/skills`); `worlds/base.json` is the config every world shares. A
+  world's `package.json` is npm's (`name` a lasting slug, `displayName`, semver
+  `version` raised with each template release, `author`, `homepage`,
+  `private: true`) with Kazusa's under `kazusa`: `title` (the setup guide's
+  label, else `displayName`), `systemAgent`, `defaultGroup`, `renames`, and
+  `config` (merged into the plugin's config at setup); the live copy adds
+  `kazusa.template`, the template's folder. Schema: `WorldPackageSchema` in
+  `@kazusa/client`; the plugin reads it in `src/world/package.ts` (the credit on
+  `GET /kazusa/world`). `npm run dev` gives a world from before it one
+  (`scripts/world-package.mjs`: the template its old `world.json` named, else
+  the one whose player id it has). Field rules and migration:
+  [worlds](references/worlds.md). Before the Gateway starts,
+  `scripts/world-repo.mjs` makes `world/` a git repository rooted at the
+  published commit its `.template/` matches, with `upstream` its `repository`
+  (git shipped in `git/`), committing nothing. The setup guide
+  (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
+  is the Gateway's cwd, so playing never touches the repo. A new world, or a
+  change to one, goes in its template; templates hold no SQLite.
 - **Canon, play, checkpoints and saves** (design agreed 2026-11-05, not built;
   [worlds](references/worlds.md) §4). Creators make worlds, playtest, cut
   checkpoints (chapter starts) and publish; players pick a start, play, save
@@ -285,17 +286,17 @@ apps/kazusa/
   checkpoints consolidate memory first and carry a `scene.json`; SQLite (keys,
   100s of MB, one OpenClaw schema) never leaves the machine. Each world is a
   repository: `main` and `v*` tags, and one `checkpoint/<id>` line of versions
-  per chapter, story order being a list on `main`, never parents (the mock
-  remote is built from this repo's history of `worlds/<id>`). Publish merges the
-  published tip into the playthrough first, builds fresh commits from the
-  exported parts (`git commit-tree`), appends and pushes only those, then links
-  the playthrough to them (`merge -s ours`); the remote never holds a large file
-  or anything deleted. Playthroughs are local branches of text commits. Saves
-  and loads run only with the Gateway stopped, by whoever owns it
-  (`scripts/dev.mjs`, later the cloud host), never on a timer or per turn: a
-  save is a commit on its own ref (`refs/saves/*`) holding the text and the
-  SQLite, so deleting one frees its databases; loading goes on from the save's
-  text parent. Git is simple-git over a real `git`.
+  per chapter, story order being a list on `main`, never parents; which worlds
+  exist comes from providers (`worlds/sources.json`: git now, OpenRP later).
+  Publish merges the published tip into the playthrough first, builds fresh
+  commits from the exported parts (`git commit-tree`), appends and pushes only
+  those, then links the playthrough to them (`merge -s ours`); the remote never
+  holds a large file or anything deleted. Playthroughs are local branches of
+  text commits. Saves and loads run only with the Gateway stopped, by whoever
+  owns it (`scripts/dev.mjs`, later the cloud host), never on a timer or per
+  turn: a save is a commit on its own ref (`refs/saves/*`) holding the text and
+  the SQLite, so deleting one frees its databases; loading goes on from the
+  save's text parent. Git is simple-git over a real `git`.
 - **World updates** (`src/world-update/`, the system agent's `world_update` tool
   and `world-update` skill): bring a live world up to a newer version of its
   template. The base is `world/.template/`, the template as imported or last
