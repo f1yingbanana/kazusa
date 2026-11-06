@@ -13,7 +13,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { parseEnv } from "node:util";
-import { PROVIDERS, type ProviderEntry } from "@kazusa/client";
+import {
+  PROVIDERS,
+  WorldPackageSchema,
+  type ProviderEntry,
+} from "@kazusa/client";
 import { z } from "zod";
 import { writeTemplateSnapshot } from "./template-snapshot";
 
@@ -151,18 +155,6 @@ if (!saved) throw new Error("the key store is busy");`),
     },
   };
 }
-
-const WorldSchema = z.object({
-  /** Only on the live copy: which template it came from. */
-  id: z.string().optional(),
-  title: z.string(),
-  description: z.string(),
-  systemAgent: z.string(),
-  /** The group picked to start with: a value of one of the world's anchors. */
-  defaultGroup: z.string().optional(),
-  /** Merged into the plugin's config. */
-  kazusa: z.record(z.string(), z.unknown()),
-});
 
 const BaseSchema = z.object({
   systemAgent: z.record(z.string(), z.unknown()),
@@ -324,11 +316,16 @@ export function createSetup(
   const liveDir = path.join(appDir, "world");
   const configFile = path.join(liveDir, "openclaw.json");
   const envFile = path.join(liveDir, ".state/.env");
-  const markerFile = path.join(liveDir, "world.json");
+  // The world's package.json, written last: a world is imported once it exists.
+  const markerFile = path.join(liveDir, "package.json");
+  // What a world had before package.json; `npm run dev` turns it into one, but
+  // a world that still has it is imported all the same, never copied over.
+  const legacyMarker = path.join(liveDir, "world.json");
+  const imported = () => existsSync(markerFile) || existsSync(legacyMarker);
 
   const readWorld = async (dir: string) =>
-    WorldSchema.parse(
-      JSON.parse(await readFile(path.join(dir, "world.json"), "utf8")),
+    WorldPackageSchema.parse(
+      JSON.parse(await readFile(path.join(dir, "package.json"), "utf8")),
     );
 
   const savedEnv = async (): Promise<string> =>
@@ -339,7 +336,7 @@ export function createSetup(
     const world = await readWorld(dir);
     const workspaces = path.join(dir, "workspaces");
     const ids = (await directories(workspaces)).filter(
-      (agent) => agent !== world.systemAgent,
+      (agent) => agent !== world.kazusa.systemAgent,
     );
     const named = await Promise.all(
       ids.map(async (agent) => ({
@@ -349,7 +346,7 @@ export function createSetup(
     );
     const characters = named.toSorted((a, b) => a.name.localeCompare(b.name));
     const anchors =
-      AnchorsSchema.safeParse(world.kazusa).data?.memory.anchors ??
+      AnchorsSchema.safeParse(world.kazusa.config).data?.memory.anchors ??
       DEFAULT_ANCHORS;
     const fields = ids.length
       ? await characterGroups(path.join(dir, "shared/wiki"), ids, anchors)
@@ -357,12 +354,12 @@ export function createSetup(
     const defaultCast =
       fields
         .flatMap(({ groups }) => groups)
-        .find(({ value }) => value === world.defaultGroup)?.ids ?? [];
+        .find(({ value }) => value === world.kazusa.defaultGroup)?.ids ?? [];
     return {
       id,
-      title: world.title,
-      description: world.description,
-      systemAgent: world.systemAgent,
+      title: world.kazusa.title ?? world.displayName ?? world.name,
+      description: world.description ?? "",
+      systemAgent: world.kazusa.systemAgent,
       characters,
       groups: fields.map(({ field, groups }) => ({
         field,
@@ -377,12 +374,13 @@ export function createSetup(
 
   async function status(): Promise<SetupStatus> {
     const ids = (await directories(worldsDir)).filter((id) =>
-      existsSync(path.join(worldsDir, id, "world.json")),
+      existsSync(path.join(worldsDir, id, "package.json")),
     );
     const worlds = await Promise.all(ids.map(worldOption));
-    const imported = existsSync(markerFile)
-      ? (WorldSchema.parse(JSON.parse(await readFile(markerFile, "utf8"))).id ??
-        null)
+    const importedId = existsSync(markerFile)
+      ? (WorldPackageSchema.safeParse(
+          JSON.parse(await readFile(markerFile, "utf8")),
+        ).data?.kazusa.template ?? null)
       : null;
     return {
       configured: existsSync(configFile),
@@ -390,7 +388,7 @@ export function createSetup(
       worlds: worlds.toSorted(
         (a, b) => Number(a.id === "starter") - Number(b.id === "starter"),
       ),
-      imported,
+      imported: importedId,
       // Once a world exists its Gateway owns the auth store; setup is over.
       ...(existsSync(configFile)
         ? { providers: [], savedKey: null }
@@ -403,7 +401,7 @@ export function createSetup(
    * again.
    */
   async function importWorld(id: string): Promise<void> {
-    if (existsSync(markerFile)) return;
+    if (imported()) return;
     const dir = path.join(worldsDir, id);
     const world = await readWorld(dir);
     await mkdir(liveDir, { recursive: true });
@@ -415,7 +413,12 @@ export function createSetup(
       });
     // The system agent reads Kazusa's own guides through this link. Only Windows
     // reads the type: a junction needs no admin rights or Developer Mode.
-    const link = path.join(liveDir, "workspaces", world.systemAgent, ".agents");
+    const link = path.join(
+      liveDir,
+      "workspaces",
+      world.kazusa.systemAgent,
+      ".agents",
+    );
     if (!existsSync(link))
       await symlink(
         path.relative(path.dirname(link), path.join(appDir, "../../.agents")),
@@ -424,9 +427,10 @@ export function createSetup(
       );
     // What a later world update compares against: the template as imported.
     await writeTemplateSnapshot(liveDir, dir, id);
+    // The template's manifest, saying which template this is a copy of.
     await writeFile(
       markerFile,
-      `${JSON.stringify({ ...world, id }, null, 2)}\n`,
+      `${JSON.stringify({ ...world, kazusa: { ...world.kazusa, template: id } }, null, 2)}\n`,
     );
   }
 
@@ -478,9 +482,7 @@ export function createSetup(
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
-    const world = WorldSchema.parse(
-      JSON.parse(await readFile(markerFile, "utf8")),
-    );
+    const { kazusa: world } = await readWorld(liveDir);
     const base = await readBase();
     const agents = await directories(path.join(liveDir, "workspaces"));
     const name = await characterName(
@@ -503,7 +505,7 @@ export function createSetup(
     const kazusa = base.config.plugins.entries.kazusa.config;
     const memory = {
       ...(kazusa.memory as object),
-      ...(world.kazusa.memory as object | undefined),
+      ...(world.config.memory as object | undefined),
     };
     // A chosen cast starts paused, so nobody spends anything before the player is ready.
     const chosen =
@@ -537,7 +539,7 @@ export function createSetup(
           ...base.config.plugins.entries,
           kazusa: {
             ...base.config.plugins.entries.kazusa,
-            config: { ...kazusa, ...world.kazusa, memory, ...chosen },
+            config: { ...kazusa, ...world.config, memory, ...chosen },
           },
         },
       },

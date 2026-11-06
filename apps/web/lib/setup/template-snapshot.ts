@@ -21,7 +21,7 @@ async function filesOf(root: string): Promise<string[]> {
   };
   for (const part of ["shared", "workspaces"])
     if (existsSync(path.join(root, part))) await walk(part);
-  if (existsSync(path.join(root, "world.json"))) out.push("world.json");
+  if (existsSync(path.join(root, "package.json"))) out.push("package.json");
   return out.sort();
 }
 

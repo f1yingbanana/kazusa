@@ -1,0 +1,28 @@
+{
+  "name": "new-world",
+  "displayName": "New World",
+  "version": "0.3.0",
+  "description": "An empty world and ARONA, your system admin. Describe your world or give her a SillyTavern card, and she builds it with you.",
+  "homepage": "https://openrp.ai/kazusa",
+  "private": true,
+  "kazusa": {
+    "title": "Start from scratch",
+    "systemAgent": "arona",
+    "config": {
+      "welcome": [
+        "Welcome! I'm ARONA, and I look after this world for you. ♪",
+        "It's empty for now, so you get to decide what it becomes.",
+        "Describe the world you have in mind, or give me a SillyTavern card or a wiki link, and we'll build its characters and places together.",
+        "What kind of world are you imagining?"
+      ],
+      "user": {
+        "id": "user:player",
+        "name": "Player"
+      },
+      "world": {
+        "title": "New World",
+        "summary": "A world waiting to be written."
+      }
+    }
+  }
+}

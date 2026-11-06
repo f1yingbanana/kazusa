@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "openclaw": "cd world && OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw",
-    "gateway": "node ../../scripts/system-agent.mjs && node ../../scripts/plugin-startup.mjs && cd world && OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw gateway",
+    "gateway": "node ../../scripts/system-agent.mjs && node ../../scripts/plugin-startup.mjs && node ../../scripts/world-package.mjs && cd world && OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw gateway",
     "status": "cd world && OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw models status",
     "doctor": "cd world && OPENCLAW_CONFIG_PATH=./openclaw.json OPENCLAW_STATE_DIR=./.state openclaw doctor",
     "typecheck": "tsc -p plugins/kazusa",

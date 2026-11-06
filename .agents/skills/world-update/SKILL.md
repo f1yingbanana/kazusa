@@ -69,10 +69,10 @@ frontmatter field, the lead, each `##` section):
 - Changed on both sides differently: this world's version stays, and it's
   reported as a **conflict**.
 
-Place ids the creator renamed (`renames` in the template's `world.json`) follow,
-with every card and position that used them. A card for a place that no longer
-exists is **forgotten** if it holds nothing the character wrote (a bare visit
-stamp), and **orphaned** if it does.
+Place ids the creator renamed (`kazusa.renames` in the template's
+`package.json`) follow, with every card and position that used them. A card for
+a place that no longer exists is **forgotten** if it holds nothing the character
+wrote (a bare visit stamp), and **orphaned** if it does.
 
 **Without a base** (`bestAttempt: true` in the check), the merge guesses what
 play wrote from its marks: visit stamps, notes, history, sleep's sections, the

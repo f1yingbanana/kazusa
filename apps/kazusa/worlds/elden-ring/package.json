@@ -1,0 +1,51 @@
+{
+  "name": "elden-ring",
+  "displayName": "Elden Ring",
+  "version": "0.3.0",
+  "description": "The Lands Between, at the moment the Tarnished return. 114 characters, with The Scribe as your system admin.",
+  "author": "breados17",
+  "homepage": "https://openrp.ai/kazusa",
+  "private": true,
+  "kazusa": {
+    "systemAgent": "scribe",
+    "defaultGroup": "roundtable",
+    "config": {
+      "welcome": [
+        "Tarnished. Welcome to the Lands Between. I am the Scribe, and I keep this world's records.",
+        "Those you called are onstage, yet time stands still, so nothing is spent until you choose a speed at the top of the screen.",
+        "Send word to anyone from Chats, see where they wander in World, and read what has come to pass in Timeline.",
+        "Should you wish anything changed, tell me: a new character, a rewritten history, a place not yet on any map. Where shall we begin?"
+      ],
+      "user": {
+        "id": "user:tarnished",
+        "name": "Tarnished"
+      },
+      "world": {
+        "title": "The Lands Between",
+        "summary": "The Elden Ring is shattered, and grace is calling the Tarnished home.",
+        "accent": "#c9a227"
+      },
+      "taskman": {
+        "categories": [
+          "sleeping",
+          "traveling",
+          "eating",
+          "studying",
+          "working",
+          "socializing",
+          "having fun",
+          "praying",
+          "fighting",
+          "keeping watch",
+          "miscellaneous"
+        ]
+      },
+      "memory": {
+        "anchors": {
+          "faction": "intimate",
+          "realm": "familiar"
+        }
+      }
+    }
+  }
+}

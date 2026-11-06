@@ -62,6 +62,7 @@ const INCLUDED = [
   "scripts/provider-keys.mjs",
   "scripts/system-agent.mjs",
   "scripts/update.mjs",
+  "scripts/world-package.mjs",
   "apps/",
   "packages/",
   ".agents/skills/",

@@ -27,6 +27,7 @@ import {
   startProviderPlugins,
 } from "./plugin-startup.mjs";
 import { dropStoreKeyRefs } from "./provider-keys.mjs";
+import { adoptWorldPackage } from "./world-package.mjs";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
@@ -296,6 +297,11 @@ if (!stopping) {
     for (const line of dropStoreKeyRefs(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't finish moving provider keys: ${error.message}`);
+  }
+  try {
+    for (const line of adoptWorldPackage(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't give this world a package.json: ${error.message}`);
   }
   try {
     for (const line of loadNewPlugins(ROOT)) console.log(line);

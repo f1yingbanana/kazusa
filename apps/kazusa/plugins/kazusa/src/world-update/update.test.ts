@@ -29,13 +29,21 @@ const get = (dir: string, file: string) =>
 const place = (id: string, extra = "") =>
   `---\nplace_id: ${id}\nname: ${id}\nsummary: A place.${extra}\n---\n\n# ${id}\n`;
 
+/** A world's `package.json`. */
+const pkg = (fields: object, kazusa: object = {}) =>
+  JSON.stringify({
+    name: "demo",
+    ...fields,
+    kazusa: { systemAgent: "amy", ...kazusa },
+  });
+
 /** A template at version 1, a live world copied from it, and version 2. */
 function setup() {
   const v1 = path.join(root, "v1");
   const live = path.join(root, "world");
   const v2 = path.join(root, "worlds", "demo");
   for (const dir of [v1, live]) {
-    put(dir, "world.json", JSON.stringify({ title: "Demo" }));
+    put(dir, "package.json", pkg({ version: "1.0.0" }));
     put(dir, "shared/wiki/entities/places/hub.md", place("hub"));
     put(
       dir,
@@ -63,7 +71,7 @@ function setup() {
       "---\nplace_id: gone\nname: gone\n---\n\nFiller.\n",
     );
   }
-  put(live, "world.json", JSON.stringify({ title: "Demo", id: "demo" }));
+  put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
   writeSnapshot(live, v1, "demo");
   // Play: a note on a card, a layout, a new page, a sleep section.
   put(
@@ -89,8 +97,8 @@ function setup() {
   // Version 2: a rename, a removal, a rewrite and a new section.
   put(
     v2,
-    "world.json",
-    JSON.stringify({ title: "Demo 2", renames: { old_market: "market" } }),
+    "package.json",
+    pkg({ version: "2.0.0" }, { renames: { old_market: "market" } }),
   );
   put(
     v2,
@@ -155,9 +163,9 @@ describe("world update", () => {
     const memory = get(live, "workspaces/amy/MEMORY.md");
     expect(memory).toContain("## Lately");
     expect(memory).toContain("## My usual week");
-    expect(JSON.parse(get(live, "world.json"))).toMatchObject({
-      title: "Demo 2",
-      id: "demo",
+    expect(JSON.parse(get(live, "package.json"))).toMatchObject({
+      version: "2.0.0",
+      kazusa: { template: "demo", renames: { old_market: "market" } },
     });
     expect(readReport(live)?.conflicts).toEqual([]);
   });
