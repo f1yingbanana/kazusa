@@ -7,6 +7,7 @@ import { useCharacterStatus } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useOffstage } from "@/hooks/use-stage";
 import { locationStore, placesStore } from "@/lib/live/state";
+import { useAccess } from "@/hooks/use-access";
 import { movePlayer } from "@/lib/source/location/http";
 import { useSources } from "@/lib/source/provider";
 import { useKazusaConfig } from "@/lib/state/config-store";
@@ -94,10 +95,12 @@ export function useOccupancy(ids: readonly string[]): Occupancy {
 export function usePlayer() {
   const config = useKazusaConfig();
   const { resolved } = useSources();
+  const { canPlay } = useAccess();
   const position = usePosition(config.userId);
   const live = resolved.location === "live";
   const moveTo = useCallback(
     async (placeId: string) => {
+      if (!canPlay) return;
       try {
         const { record } = await movePlayer(placeId);
         // SSE brings the same record; don't wait for it.
@@ -108,11 +111,12 @@ export function usePlayer() {
         });
       }
     },
-    [config.userId],
+    [canPlay, config.userId],
   );
   return {
     id: config.userId,
     placeId: position?.kind === "at" ? position.placeId : undefined,
-    moveTo: live ? moveTo : undefined,
+    live,
+    moveTo: live && canPlay ? moveTo : undefined,
   };
 }

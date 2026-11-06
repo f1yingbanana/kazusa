@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { usePlace } from "@/hooks/use-location";
+import { useAccess } from "@/hooks/use-access";
 import { useNavigate, useParam, useSelection } from "@/hooks/use-url-state";
 import { listNames } from "@/lib/source/chats/display";
 import { useKazusaConfig } from "@/lib/state/config-store";
@@ -63,9 +64,10 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
   const Icon = chatIcon(type);
 
   // Only a sent chat the player is in can be changed.
+  const { canPlay } = useAccess();
   const own = chats.find((chat) => chat.id === entity.id);
-  const runsGroup = own?.type === "group";
-  const canLeave = own?.type === "group" || own?.type === "huddle";
+  const runsGroup = canPlay && own?.type === "group";
+  const canLeave = canPlay && (own?.type === "group" || own?.type === "huddle");
   const showOpen = readable && !isOpen;
   const showPlace = () => {
     if (placeId) select({ kind: "place", id: placeId });
@@ -162,7 +164,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
             <h3 className="text-xs font-medium text-muted-foreground">
               {members.length > 0 ? `People · ${members.length}` : "People"}
             </h3>
-            {own && (runsGroup || own.type === "huddle") ? (
+            {own && canPlay && (runsGroup || own.type === "huddle") ? (
               <AddPeople chat={own} placeName={place?.name} />
             ) : null}
           </div>

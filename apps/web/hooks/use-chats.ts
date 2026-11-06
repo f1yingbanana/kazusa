@@ -9,6 +9,7 @@ import {
   manageChat,
   sendMessage,
 } from "@/lib/source/chats/http";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { chatTitle } from "@/lib/source/chats/display";
 import { observedChatsKey } from "@/lib/source/observe/http";
@@ -197,6 +198,7 @@ export function updateChatPreview<
 
 export function useChatActions() {
   const config = useKazusaConfig();
+  const { canPlay } = useAccess();
   const { mutate } = useSWRConfig();
 
   async function send(
@@ -205,6 +207,9 @@ export function useChatActions() {
     requestId: string,
     type?: MessageType,
   ) {
+    if (!canPlay) {
+      throw new Error("You do not have permission to send messages.");
+    }
     return sendMessage(
       chat.draft
         ? {
@@ -259,6 +264,9 @@ export function useChatActions() {
    * chats (it is read-only under Other chats from then on).
    */
   async function manage(payload: ManageChatPayload) {
+    if (!canPlay) {
+      throw new Error("You do not have permission to manage chats.");
+    }
     const response = await manageChat(payload);
     const left = !response.chat.members.includes(config.userId);
     await mutate(
@@ -284,6 +292,9 @@ export function useChatActions() {
    * someone else.
    */
   async function callOver(chat: Chat, members: string[], text: string) {
+    if (!canPlay) {
+      throw new Error("You do not have permission to call people over.");
+    }
     const response = await sendMessage({
       requestId: crypto.randomUUID(),
       text,

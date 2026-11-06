@@ -3,6 +3,7 @@ import { ConnectionStatusItem } from "@/components/status/connection";
 import { DataSourcesItem } from "@/components/status/data-sources";
 import { FailuresItem } from "@/components/status/failures";
 import { PlayerPlaceItem } from "@/components/status/player-place";
+import { ReadOnlyStatusItem } from "@/components/status/read-only";
 import { UpdateAvailableItem } from "@/components/status/update-available";
 import type { StatusItem } from "./types";
 
@@ -16,6 +17,13 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     component: ConnectionStatusItem,
   },
   {
+    id: "read-only",
+    side: "start",
+    order: 5,
+    requires: [],
+    component: ReadOnlyStatusItem,
+  },
+  {
     id: "data-sources",
     side: "start",
     order: 10,
@@ -27,6 +35,7 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     side: "end",
     order: -30,
     requires: [],
+    requiresPermission: "manage",
     component: UpdateAvailableItem,
   },
   {

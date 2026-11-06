@@ -27,6 +27,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAccess } from "@/hooks/use-access";
 import { useSimNow } from "@/hooks/use-clock";
 import { usePlace } from "@/hooks/use-location";
 import { formatListTimestamp } from "@/lib/format";
@@ -60,6 +61,7 @@ export function ChatList({
   quietWhenEmpty?: boolean;
 }) {
   const { typingByChat, unreadByChat } = useRealtime();
+  const { canPlay } = useAccess();
   const simNow = useSimNow();
 
   if (isLoading) return <ListSkeleton />;
@@ -89,7 +91,12 @@ export function ChatList({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
-          <Button size="sm" variant="outline" onClick={onNewGroup}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canPlay}
+            onClick={onNewGroup}
+          >
             New group
           </Button>
         </EmptyContent>

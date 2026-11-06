@@ -13,6 +13,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChatActions, useChats } from "@/hooks/use-chats";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
+import { useAccess } from "@/hooks/use-access";
 import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useRealtime } from "@/lib/live/realtime-provider";
 import { chatSubject } from "@/lib/source/chats/display";
@@ -39,6 +40,7 @@ import { ObservedChatView } from "./observed-chat-view";
  */
 export function ChatsView() {
   const config = useKazusaConfig();
+  const { canPlay, isLoading: isAccessLoading } = useAccess();
   const { chats } = useChats();
   const { byId } = useCharacters();
   const { createChat } = useChatActions();
@@ -91,6 +93,7 @@ export function ChatsView() {
       handledDm.current = null;
       return;
     }
+    if (isAccessLoading) return;
     if (handledDm.current === dmTarget) return;
     handledDm.current = dmTarget;
     const existing = chats.find(
@@ -105,6 +108,10 @@ export function ChatsView() {
       navigate({ "chats.id": existing.id, "chats.dm": null }, "replace");
       return;
     }
+    if (!canPlay) {
+      navigate({ "chats.dm": null }, "replace");
+      return;
+    }
     const next = createChat({
       type: "direct",
       name: byId.get(dmTarget)?.name ?? dmTarget,
@@ -112,7 +119,16 @@ export function ChatsView() {
     });
     setDraftChat(next);
     navigate({ "chats.id": next.id, "chats.dm": null }, "replace");
-  }, [dmTarget, chats, config.userId, byId, createChat, navigate]);
+  }, [
+    dmTarget,
+    chats,
+    config.userId,
+    byId,
+    createChat,
+    navigate,
+    canPlay,
+    isAccessLoading,
+  ]);
 
   // Talking in person: the huddle you are already in with them, or a new one
   // where you stand. Its first message is said aloud, which brings them (and
@@ -123,6 +139,7 @@ export function ChatsView() {
       handledTalk.current = null;
       return;
     }
+    if (isAccessLoading) return;
     if (handledTalk.current === talkTarget) return;
     handledTalk.current = talkTarget;
     const existing = chats.find(
@@ -135,6 +152,10 @@ export function ChatsView() {
       navigate({ "chats.id": existing.id, "chats.talk": null }, "replace");
       return;
     }
+    if (!canPlay) {
+      navigate({ "chats.talk": null }, "replace");
+      return;
+    }
     const next = createChat({
       type: "huddle",
       name:
@@ -145,7 +166,16 @@ export function ChatsView() {
     });
     setDraftChat(next);
     navigate({ "chats.id": next.id, "chats.talk": null }, "replace");
-  }, [talkTarget, chats, player.placeId, places, createChat, navigate]);
+  }, [
+    talkTarget,
+    chats,
+    player.placeId,
+    places,
+    createChat,
+    navigate,
+    canPlay,
+    isAccessLoading,
+  ]);
 
   if (selected) {
     return (

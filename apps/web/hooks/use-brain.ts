@@ -4,6 +4,8 @@ import { useState } from "react";
 import useSWR from "swr";
 import type { BrainTraceResponse, UsageResponse } from "@kazusa/client";
 import { fetchBrainTrace, fetchUsage } from "@/lib/source/brain/http";
+import { useAccess } from "@/hooks/use-access";
+import { useCharacters } from "@/hooks/use-characters";
 import { useSources } from "@/lib/source/provider";
 
 const THINKING_POLL_MS = 1500;
@@ -21,8 +23,13 @@ export function useBrainTrace(
   thinking: boolean,
 ) {
   const { resolved } = useSources();
+  const { byId } = useCharacters();
+  const { canManage } = useAccess();
+  const isSystem = id ? Boolean(byId.get(id)?.isSystemAgent) : false;
+  const allowed = !isSystem || canManage;
+
   return useSWR<BrainTraceResponse, Error>(
-    resolved.brain === "live" && id
+    allowed && resolved.brain === "live" && id
       ? (["kazusa/brain/trace", id, limit] as const)
       : null,
     ([, agent]: readonly [string, string, number]) =>
@@ -41,11 +48,14 @@ export function useBrainTrace(
  */
 export function useUsage(days: number) {
   const { resolved } = useSources();
+  const { canManage } = useAccess();
   const [checks, setChecks] = useState({ days, count: 0 });
   // Reads so far, counting the first load.
   const count = checks.days === days ? checks.count : 0;
   const swr = useSWR<UsageResponse, Error>(
-    resolved.usage === "live" ? (["kazusa/usage", days] as const) : null,
+    canManage && resolved.usage === "live"
+      ? (["kazusa/usage", days] as const)
+      : null,
     () => fetchUsage(days),
     {
       refreshInterval: (data) =>

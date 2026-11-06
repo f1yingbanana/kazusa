@@ -47,6 +47,7 @@ import { useChatActions } from "@/hooks/use-chats";
 import { useOccupancy } from "@/hooks/use-location";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useOffstage } from "@/hooks/use-stage";
+import { useAccess } from "@/hooks/use-access";
 import { useNavigate } from "@/hooks/use-url-state";
 import type { Chat } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
@@ -76,9 +77,10 @@ export function ChatTitle({
   children?: ReactNode;
 }) {
   const { manage } = useChatActions();
+  const { canPlay } = useAccess();
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const renamable = chat?.type === "group" && !chat.draft;
+  const renamable = canPlay && chat?.type === "group" && !chat.draft;
 
   if (!renamable || draft === null) {
     return (

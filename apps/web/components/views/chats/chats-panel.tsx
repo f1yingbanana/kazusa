@@ -10,6 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
@@ -35,6 +36,7 @@ import { ObservedChatList } from "./observed-chat-list";
  */
 export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const config = useKazusaConfig();
+  const { canPlay } = useAccess();
   const { chats: allMine, error, isLoading, reload } = useChats();
   const observed = useObservedChats();
   const { byId } = useCharacters();
@@ -113,6 +115,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                disabled={!canPlay}
                 onClick={() => setNewGroupOpen(true)}
               />
             }

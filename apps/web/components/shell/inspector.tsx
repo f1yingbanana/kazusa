@@ -9,6 +9,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { useAccess } from "@/hooks/use-access";
 import { useSelection } from "@/hooks/use-url-state";
 import { INSPECTOR_SECTIONS } from "@/lib/registry/inspector";
 import type { InspectorSection as InspectorSectionEntry } from "@/lib/registry/types";
@@ -28,6 +29,7 @@ const KIND_LABEL = {
 export function Inspector() {
   const [selection, select] = useSelection();
   const { resolved } = useSources();
+  const { hasPermission } = useAccess();
 
   if (!selection) {
     return (
@@ -48,7 +50,9 @@ export function Inspector() {
   const sections = INSPECTOR_SECTIONS.filter(
     (section) =>
       section.entity === selection.kind &&
-      satisfies(resolved, section.requires),
+      satisfies(resolved, section.requires) &&
+      (!section.requiresPermission ||
+        hasPermission(section.requiresPermission)),
   );
 
   // No title bar: the header section says what this is. The close button sits

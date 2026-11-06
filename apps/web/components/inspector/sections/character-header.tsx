@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCharacter, useCharacterStatus } from "@/hooks/use-characters";
+import { useAccess } from "@/hooks/use-access";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { useChats } from "@/hooks/use-chats";
@@ -45,6 +46,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const watchlist = useWatchlist();
   const navigate = useNavigate();
   const { resolved } = useSources();
+  const { canPlay, canManage } = useAccess();
   const starred = watchlist.includes(entity.id);
   const player = usePlayer();
   const position = usePosition(entity.id);
@@ -90,8 +92,11 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const together = standing !== undefined && standing === player.placeId;
 
   const isAgent = character.kind === "agent";
-  const canGo = isAgent && there && !together && player.moveTo;
-  const showBrain = isAgent && resolved.brain === "live";
+  const canGo = isAgent && there && !together && player.live;
+  const showBrain =
+    isAgent &&
+    resolved.brain === "live" &&
+    (!character.isSystemAgent || canManage);
   const showChats = canMessage && canObserve;
 
   return (
@@ -131,6 +136,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
             <Button
               variant="outline"
               size="sm"
+              disabled={!canPlay}
               onClick={() =>
                 navigate({ view: "chats", "chats.dm": character.id })
               }
@@ -143,6 +149,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
             <Button
               variant="outline"
               size="sm"
+              disabled={!canPlay}
               onClick={() =>
                 navigate({ view: "chats", "chats.talk": character.id })
               }
@@ -154,6 +161,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
             <Button
               variant="outline"
               size="sm"
+              disabled={!player.moveTo}
               title={`Go to ${there.name}`}
               onClick={() => void player.moveTo?.(there.id)}
             >

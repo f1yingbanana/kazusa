@@ -30,7 +30,7 @@ import type { InspectorSection } from "./types";
  * doesn't need folds (`fold`), with its key fact as the folded `summary`.
  * Later: Attention, Relationships.
  */
-export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
+const SECTIONS: readonly InspectorSection[] = [
   {
     id: "character.header",
     entity: "character",
@@ -81,6 +81,7 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     title: "Model",
     order: 50,
     requires: ["characters", "models"],
+    requiresPermission: "manage",
     component: CharacterModelSection,
     useApplies: useRunsOnModel,
     fold: "closed",
@@ -92,6 +93,7 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     title: "Memory and context",
     order: 55,
     requires: ["characters", "context"],
+    requiresPermission: "manage",
     component: CharacterContextSection,
     useApplies: useRunsOnModel,
     fold: "closed",
@@ -129,4 +131,8 @@ export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
     requires: ["places"],
     component: PlaceWaysSection,
   },
-].sort((a, b) => a.order - b.order) as InspectorSection[];
+];
+
+export const INSPECTOR_SECTIONS: readonly InspectorSection[] = [
+  ...SECTIONS,
+].sort((a, b) => a.order - b.order);

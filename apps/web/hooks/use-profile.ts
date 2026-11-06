@@ -9,6 +9,7 @@ import {
   saveProfile,
 } from "@/lib/source/profile/http";
 import { useSources } from "@/lib/source/provider";
+import { useAccess } from "@/hooks/use-access";
 
 /** The inspector shows the same description. */
 function isCharacterKey(key: unknown): boolean {
@@ -19,6 +20,7 @@ function isCharacterKey(key: unknown): boolean {
 export function useProfile() {
   const { resolved } = useSources();
   const { mutate: mutateMatching } = useSWRConfig();
+  const { canPlay } = useAccess();
   const enabled = resolved.profile === "live";
 
   const resource = useSWR<ProfileResponse, Error>(
@@ -31,11 +33,14 @@ export function useProfile() {
   /** Throws if the server refuses, so the form can stay as it is. */
   const save = useCallback(
     async (about: string): Promise<void> => {
+      if (!canPlay) {
+        throw new Error("You do not have permission to edit your profile.");
+      }
       const saved = await saveProfile({ about });
       await mutate(saved, { revalidate: false });
       void mutateMatching(isCharacterKey);
     },
-    [mutate, mutateMatching],
+    [canPlay, mutate, mutateMatching],
   );
 
   return {

@@ -25,6 +25,7 @@ import {
   saveWikiSource,
   WIKI_KEY,
 } from "@/lib/source/wiki/http";
+import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 
 /** Wiki reads. Only live: Markdown on the server is the one truth. */
@@ -82,8 +83,13 @@ function useWikiWrite<Payload, Result>(
   write: (payload: Payload) => Promise<Result>,
 ) {
   const { mutate } = useSWRConfig();
+  const { canManage } = useAccess();
+
   return useCallback(
     async (payload: Payload): Promise<Result> => {
+      if (!canManage) {
+        throw new Error("You do not have permission to edit the wiki.");
+      }
       const result = await write(payload);
       void mutate(
         (key) => Array.isArray(key) && key[0] === WIKI_KEY,
@@ -92,7 +98,7 @@ function useWikiWrite<Payload, Result>(
       );
       return result;
     },
-    [mutate, write],
+    [canManage, mutate, write],
   );
 }
 

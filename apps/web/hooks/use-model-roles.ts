@@ -15,6 +15,7 @@ import {
   selectDecisionModel,
   selectEmbeddingModel,
 } from "@/lib/source/models/http";
+import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 
 function describe(error: unknown) {
@@ -40,7 +41,8 @@ function useRole<T extends { readonly current?: string }>(
   failure: string,
 ) {
   const { resolved } = useSources();
-  const enabled = resolved.models === "live";
+  const { canManage } = useAccess();
+  const enabled = canManage && resolved.models === "live";
   const resource = useSWR<T, Error>(
     enabled ? ([key] as const) : null,
     () => fetcher(),
@@ -50,6 +52,7 @@ function useRole<T extends { readonly current?: string }>(
 
   const select = useCallback(
     async (ref: string | null): Promise<boolean> => {
+      if (!canManage) return false;
       try {
         await mutate(selecter(ref), { revalidate: false });
         return true;

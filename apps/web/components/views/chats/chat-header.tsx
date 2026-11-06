@@ -14,6 +14,7 @@ import {
 import { useCharacterStatus, useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
+import { useAccess } from "@/hooks/use-access";
 import { useNavigate, useSelection } from "@/hooks/use-url-state";
 import { formatTypingLabel } from "@/lib/format";
 import type { Typist } from "@/lib/live/realtime-provider";
@@ -48,6 +49,7 @@ export function ChatHeader({
   typists: readonly Typist[];
   onBack: () => void;
 }) {
+  const { canPlay } = useAccess();
   const { byId } = useCharacters();
   const [selection, select] = useSelection();
   const place = usePlace(chat.placeId);
@@ -121,10 +123,10 @@ export function ChatHeader({
             onMore={() => show(subject)}
           />
         ) : null}
-        {own && (own.type === "group" || own.type === "huddle") ? (
+        {own && canPlay && (own.type === "group" || own.type === "huddle") ? (
           <AddPeople chat={own} placeName={place?.name} compact />
         ) : null}
-        {own && partnerId ? <TalkInPerson id={partnerId} /> : null}
+        {own && partnerId && canPlay ? <TalkInPerson id={partnerId} /> : null}
         {subject ? (
           <Tooltip>
             <TooltipTrigger

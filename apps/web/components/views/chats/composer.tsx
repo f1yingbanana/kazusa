@@ -1,22 +1,22 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import { ArrowUpIcon, HandIcon, MessageCircleIcon } from 'lucide-react'
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpIcon, HandIcon, MessageCircleIcon } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupText,
   InputGroupTextarea,
-} from '@/components/ui/input-group'
-import { Kbd } from '@/components/ui/kbd'
-import type { MessageType } from '@/lib/source/chats/types'
-import { cn } from '@/lib/utils'
+} from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/kbd";
+import type { MessageType } from "@/lib/source/chats/types";
+import { cn } from "@/lib/utils";
 
 const MODES = [
-  { type: 'speech', label: 'Say', icon: MessageCircleIcon },
-  { type: 'action', label: 'Do', icon: HandIcon },
-] as const
+  { type: "speech", label: "Say", icon: MessageCircleIcon },
+  { type: "action", label: "Do", icon: HandIcon },
+] as const;
 
 /**
  * Face to face (`canAct`), the player can also do something instead of saying
@@ -30,48 +30,59 @@ export function Composer({
   disabled,
   canAct,
 }: {
-  placeholder: string
-  onSend: (text: string, type: MessageType) => void
-  onTyping: (isTyping: boolean) => void
-  disabled?: boolean
-  canAct?: boolean
+  placeholder: string;
+  onSend: (text: string, type: MessageType) => void;
+  onTyping: (isTyping: boolean) => void;
+  disabled?: boolean;
+  canAct?: boolean;
 }) {
-  const [text, setText] = useState('')
-  const [type, setType] = useState<MessageType>('speech')
-  const acting = canAct && type === 'action'
-  const lastTyping = useRef(0)
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  useEffect(() => () => { clearTimeout(idleTimer.current); onTyping(false) }, [onTyping])
+  const [text, setText] = useState("");
+  const [type, setType] = useState<MessageType>("speech");
+  const acting = canAct && type === "action";
+  const lastTyping = useRef(0);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(
+    () => () => {
+      clearTimeout(idleTimer.current);
+      onTyping(false);
+    },
+    [onTyping],
+  );
   function stopTyping() {
-    clearTimeout(idleTimer.current)
-    lastTyping.current = 0
-    onTyping(false)
+    clearTimeout(idleTimer.current);
+    lastTyping.current = 0;
+    onTyping(false);
   }
   function typing(value: string) {
-    setText(value)
-    if (!value.trim()) { stopTyping(); return }
-    if (Date.now() - lastTyping.current >= 3000) {
-      lastTyping.current = Date.now()
-      onTyping(true)
+    setText(value);
+    if (!value.trim()) {
+      stopTyping();
+      return;
     }
-    clearTimeout(idleTimer.current)
-    idleTimer.current = setTimeout(stopTyping, 4000)
+    if (Date.now() - lastTyping.current >= 3000) {
+      lastTyping.current = Date.now();
+      onTyping(true);
+    }
+    clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(stopTyping, 4000);
   }
-  const canSend = text.trim().length > 0 && !disabled
+  const canSend = text.trim().length > 0 && !disabled;
 
   function submit() {
-    if (!canSend) return
-    stopTyping()
-    onSend(text.trim(), acting ? 'action' : 'speech')
-    setText('')
+    if (!canSend) return;
+    stopTyping();
+    onSend(text.trim(), acting ? "action" : "speech");
+    setText("");
   }
 
   return (
     <form
       className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4"
       onSubmit={(event) => {
-        event.preventDefault()
-        submit()
+        event.preventDefault();
+        submit();
       }}
     >
       <InputGroup className="rounded-2xl bg-background shadow-xs">
@@ -81,30 +92,40 @@ export function Composer({
           onBlur={stopTyping}
           disabled={disabled}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing || event.keyCode === 229) return
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              submit()
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              submit();
             }
           }}
-          placeholder={acting ? 'What do you do? Write it without your name: “waves”' : placeholder}
-          aria-label={acting ? 'Action' : 'Message'}
+          placeholder={
+            acting
+              ? "What do you do? Write it without your name: “waves”"
+              : placeholder
+          }
+          aria-label={acting ? "Action" : "Message"}
           rows={1}
-          className={cn('max-h-48 min-h-12 px-4 pt-3', acting && 'italic')}
+          className={cn("max-h-48 min-h-12 px-4 pt-3", acting && "italic")}
         />
         <InputGroupAddon align="block-end" className="pb-2.5">
           {canAct ? (
-            <div role="radiogroup" aria-label="Say or do" className="flex rounded-full bg-muted p-0.5">
+            <div
+              role="radiogroup"
+              aria-label="Say or do"
+              className="flex rounded-full bg-muted p-0.5"
+            >
               {MODES.map((mode) => (
                 <button
                   key={mode.type}
                   type="button"
                   role="radio"
                   aria-checked={type === mode.type}
+                  disabled={disabled}
                   onClick={() => setType(mode.type)}
                   className={cn(
-                    'flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring',
-                    type === mode.type && 'bg-background text-foreground shadow-xs',
+                    "flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50 disabled:pointer-events-none",
+                    type === mode.type &&
+                      "bg-background text-foreground shadow-xs",
                   )}
                 >
                   <mode.icon aria-hidden className="size-3.5" />
@@ -135,5 +156,5 @@ export function Composer({
         </InputGroupAddon>
       </InputGroup>
     </form>
-  )
+  );
 }

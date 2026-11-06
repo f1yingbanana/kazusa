@@ -6,6 +6,7 @@ import { clockStore } from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
 import { executeClockAction } from "@/lib/source/clock/http";
 import { useSources } from "@/lib/source/provider";
+import { useAccess } from "@/hooks/use-access";
 import { MINUTE, bucket, simTimeAt } from "@/lib/time/sim";
 
 export function useClockAnchor() {
@@ -71,10 +72,11 @@ export function useSimNow(resolution = MINUTE) {
 
 export function useClockActions() {
   const { resolved } = useSources();
+  const { canManage } = useAccess();
 
   const apply = useCallback(
     async (action: ClockActionPayload) => {
-      if (resolved.clock !== "live") return;
+      if (!canManage || resolved.clock !== "live") return;
       try {
         const result = await executeClockAction(action);
         dispatchLive({ type: "clock", clock: result.clock });
@@ -82,8 +84,8 @@ export function useClockActions() {
         console.error("Failed to execute clock action:", error);
       }
     },
-    [resolved.clock],
+    [canManage, resolved.clock],
   );
 
-  return { apply, enabled: resolved.clock === "live" };
+  return { apply, enabled: canManage && resolved.clock === "live" };
 }
