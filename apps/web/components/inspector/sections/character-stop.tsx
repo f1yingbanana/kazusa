@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LoaderCircleIcon, SquareIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacterStatus } from "@/hooks/use-characters";
 import { abortCharacterBrain } from "@/lib/source/characters/http";
 import { useSources } from "@/lib/source/provider";
@@ -17,11 +18,13 @@ export function CharacterStopButton({
 }) {
   const status = useCharacterStatus(id);
   const { resolved } = useSources();
+  const { canManage } = useAccess();
   const [stopping, setStopping] = useState(false);
 
   if (resolved.characters !== "live" || resolved.status !== "live") return null;
 
   async function stop() {
+    if (!canManage) return;
     setStopping(true);
     try {
       const result = await abortCharacterBrain(id);
@@ -43,7 +46,7 @@ export function CharacterStopButton({
     <Button
       variant="outline"
       size="sm"
-      disabled={stopping}
+      disabled={!canManage || stopping}
       onClick={() => void stop()}
       aria-busy={stopping}
       aria-label={stopping ? `Stopping ${name}` : `Stop ${name} thinking`}

@@ -76,8 +76,12 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
             <MapPinCheckIcon className="size-4 text-primary" aria-hidden />
             {"You're here"}
           </span>
-        ) : player.moveTo ? (
-          <Button size="sm" onClick={() => void player.moveTo?.(place.id)}>
+        ) : player.live ? (
+          <Button
+            size="sm"
+            disabled={!player.moveTo}
+            onClick={() => void player.moveTo?.(place.id)}
+          >
             <MapPinIcon data-icon="inline-start" />
             Go here
           </Button>

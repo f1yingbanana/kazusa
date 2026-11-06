@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import useSWR from "swr";
+import { useAccess } from "@/hooks/use-access";
 import {
   announcedRelease,
   fetchBoot,
@@ -34,6 +35,7 @@ export type UpdatePhase =
  * when the frontend is back.
  */
 export function useUpdate() {
+  const { isOwner } = useAccess();
   const [phase, setPhase] = useState<UpdatePhase | null>(null);
   const [checking, setChecking] = useState(false);
   // The boot of a frontend another page's update will restart.
@@ -42,7 +44,7 @@ export function useUpdate() {
   // check (`useAnnouncedRelease`) only on request. While another page
   // downloads, the route answers from its cache.
   const resource = useSWR<UpdateStatus, Error>(
-    UPDATE_KEY,
+    isOwner ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,
@@ -126,8 +128,9 @@ export function useUpdate() {
  * its answer with Settings → Updates.
  */
 export function useAnnouncedRelease(): UpdateTarget | null {
+  const { isOwner } = useAccess();
   const { data } = useSWR<UpdateStatus, Error>(
-    UPDATE_KEY,
+    isOwner ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,

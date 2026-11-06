@@ -22,6 +22,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacter } from "@/hooks/use-characters";
 import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
@@ -52,6 +53,8 @@ function Column({
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { canManage } = useAccess();
+
   return (
     <section className="min-w-0 flex-1">
       <div className="flex h-6 items-center gap-2">
@@ -63,6 +66,7 @@ function Column({
           <Button
             variant="ghost"
             size="xs"
+            disabled={!canManage}
             onClick={onEdit}
             aria-label={`Edit ${title.toLowerCase()}`}
           >
@@ -70,7 +74,7 @@ function Column({
             Edit
           </Button>
         ) : null}
-        {onEdit ? actions : null}
+        {canManage && onEdit ? actions : null}
       </div>
       <p className="mt-1 mb-4 text-xs text-muted-foreground">{description}</p>
       <div className="space-y-4">{children}</div>
@@ -211,13 +215,14 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
   const { data, isLoading } = read;
   const character = useCharacter(agent);
   const navigate = useNavigate();
+  const { canManage } = useAccess();
   const editParam = useParam("wiki.edit");
   const kindParam = WikiKindSchema.safeParse(useParam("wiki.kind"));
   const newName = useParam("wiki.name");
   const name = character?.name ?? agent ?? "";
   // Their own page only exists with a character chosen.
   const editing: WikiSide | undefined =
-    editParam === "world" || (editParam === "own" && agent)
+    canManage && (editParam === "world" || (editParam === "own" && agent))
       ? editParam
       : undefined;
   const open = (page: string | null) =>
@@ -227,11 +232,13 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
       "wiki.kind": null,
       "wiki.name": null,
     });
-  const edit = (side: WikiSide | null) =>
+  const edit = (side: WikiSide | null) => {
+    if (!canManage && side) return;
     navigate({
       "wiki.edit": side,
       ...(side ? {} : { "wiki.kind": null, "wiki.name": null }),
     });
+  };
 
   if (isLoading)
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
@@ -307,7 +314,12 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
                 <p className="text-sm text-muted-foreground">
                   No page of their own.
                 </p>
-                <Button variant="outline" size="sm" onClick={() => edit("own")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!canManage}
+                  onClick={() => edit("own")}
+                >
                   <PencilIcon />
                   Write what they make of it
                 </Button>

@@ -14,8 +14,7 @@ import { UpdateSettings } from "@/components/views/settings/update-settings";
 import { UsageSettings } from "@/components/views/settings/usage-settings";
 import type { SettingsCategory } from "./types";
 
-/** Settings pages, listed in the Settings sidebar; `settings.tab` picks one. */
-export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
+const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "connection",
     label: "Connection",
@@ -30,6 +29,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     description: "Your description in the World Wiki",
     icon: UserIcon,
     order: 5,
+    requiresPermission: "play",
     component: ProfileSettings,
   },
   {
@@ -38,6 +38,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     description: "Chat, decision and memory search models",
     icon: BoxesIcon,
     order: 10,
+    requiresPermission: "manage",
     component: ModelSettings,
   },
   {
@@ -46,6 +47,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     description: "How much characters remember each turn",
     icon: HistoryIcon,
     order: 15,
+    requiresPermission: "manage",
     component: ContextSettings,
   },
   {
@@ -54,6 +56,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     description: "Tokens used, in total and by character",
     icon: ChartColumnIcon,
     order: 20,
+    requiresPermission: "manage",
     component: UsageSettings,
   },
   {
@@ -62,8 +65,14 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     description: "This version, and updating it",
     icon: CircleArrowUpIcon,
     order: 30,
+    requiresPermission: "manage",
     component: UpdateSettings,
   },
+];
+
+/** Settings pages, listed in the Settings sidebar; `settings.tab` picks one. */
+export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
+  ...CATEGORIES,
 ].sort((a, b) => a.order - b.order);
 
 export const DEFAULT_SETTINGS_CATEGORY = "connection";

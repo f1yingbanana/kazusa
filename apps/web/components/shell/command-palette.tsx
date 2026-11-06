@@ -17,6 +17,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { usePlaces } from "@/hooks/use-location";
+import { useAccess } from "@/hooks/use-access";
 import { useNavigate } from "@/hooks/use-url-state";
 import { placeName } from "@/lib/location/places";
 import { STAGE_VIEWS } from "@/lib/registry/views";
@@ -47,6 +48,7 @@ export function CommandPalette({
   const { chats: observed } = useObservedChats();
   const places = usePlaces();
   const config = useKazusaConfig();
+  const { hasPermission } = useAccess();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -94,7 +96,11 @@ export function CommandPalette({
         <CommandList className="max-h-96">
           <CommandEmpty>Nothing matches.</CommandEmpty>
           <CommandGroup heading="Sections">
-            {STAGE_VIEWS.map((view) => (
+            {STAGE_VIEWS.filter(
+              (view) =>
+                !view.requiresPermission ||
+                hasPermission(view.requiresPermission),
+            ).map((view) => (
               <CommandItem
                 key={view.id}
                 value={`section ${view.label}`}

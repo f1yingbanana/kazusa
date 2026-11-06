@@ -39,21 +39,21 @@ Review follow-ups (folded into PR 1):
       and plugin CORS/preflight. Server Bearer auth and native Gateway auth are
       unchanged.
 
-## PR 2 — Read-only demo UI
+## PR 2 — Read-only demo UI (implemented; ready for review)
 
 Deployable demo milestone, depending on PR 1.
 
-- [ ] Add `useAccess()` with mutations disabled while loading/on failure.
-- [ ] Add read-only indicator and gate controls through existing registries.
-- [ ] Disable chat composers/typing/groups/movement and mutation action hooks.
-- [ ] Disable clock, Stop, stage, wiki/map editing, and configuration controls.
-- [ ] Keep observation, local preferences, search and screenshots working.
-- [ ] Fix direct-link/shortcut paths and avoid unauthorized background fetches.
+- [x] Add `useAccess()` with mutations disabled while loading/on failure.
+- [x] Add read-only indicator and gate controls through existing registries.
+- [x] Disable chat composers/typing/groups/movement and mutation action hooks.
+- [x] Disable clock, Stop, stage, wiki/map editing, and configuration controls.
+- [x] Keep observation, local preferences, search and screenshots working.
+- [x] Fix direct-link/shortcut paths and avoid unauthorized background fetches.
 - [x] Keep hosted browser transport same-origin with no Gateway credential (done
       in PR 1's review follow-ups).
-- [ ] Gate operational reads by permission as well as capability (e.g.
+- [x] Gate operational reads by permission as well as capability (e.g.
       `useModels()` still requests owner-only routes for visitors).
-- [ ] Verify local-owner/public-visitor behavior in browser and direct requests.
+- [x] Verify local-owner/public-visitor behavior in browser and direct requests.
 
 ## PR 3 — Trusted-proxy adapter
 
@@ -64,6 +64,8 @@ PR 4; no accounts, invitations or Supabase implementation in this repo.
 - [ ] Require world-specific membership upstream and a non-bypassable origin.
 - [ ] Reject spoofed/duplicate identity headers and invalid configuration.
 - [ ] Cover both HTTP and SSE, including identity changes and revoked access.
+- [ ] Key desktop `/update` polling to loopback local mode rather than solely
+      owner role so cloud wrapper owners do not hit 403s.
 - [ ] Verify end-to-end through a small test proxy; document deployment.
 
 ## PR 4 — Collaborator player identities
@@ -126,3 +128,79 @@ Both Next and the Gateway still need the server-only Gateway credential. Do not
 publish a local-mode frontend or distribute that credential to visitors. PR 1
 deliberately leaves the existing UI controls visible; they receive 403 in public
 mode until PR 2 adds the read-only presentation.
+
+PR 2 branch: `codex/auth-readonly-ui`.
+
+### PR 2 Evidence
+
+- **useAccess fail-closed contract**:
+  - `apps/web/hooks/use-access.ts` fetches `/kazusa/access` via SWR without
+    caching and validates responses with `AccessSchema.parse()`.
+  - While loading or on error before access is first known, falls back to
+    `accessForRole("visitor")`, ensuring mutations are disabled before the
+    server responds.
+  - When access is already known, retains the last good state on revalidation
+    error so temporary disconnections do not close the owner's active wiki
+    editor or discard unsaved text.
+  - Collaborator role marks `isReadOnly: false` (`!canPlay`), allowing
+    interaction without displaying the "View only" badge.
+  - Comprehensive unit test suite in `apps/web/hooks/use-access.test.ts` (7
+    tests passing: loading fail-closed, error fail-closed before known, retains
+    access across revalidation errors, validates schema, visitor read-only,
+    collaborator play-only, owner full access).
+- **Registry and component gating**:
+  - `StageView`, `InspectorSection`, `SettingsCategory`, and `StatusItem` in
+    `apps/web/lib/registry/types.ts` extended with
+    `requiresPermission?: Permission`.
+  - Sensitive inspector sections (`character.model`, `character.context`) gated
+    with `requiresPermission: "manage"`.
+  - Administrative settings categories (`models`, `context`, `usage`, `updates`)
+    gated with `"manage"`; `profile` category gated with `"play"`.
+  - `StatusItem` update check gated with `"manage"`; `read-only` indicator badge
+    registered at order 5 in `apps/web/lib/registry/status.ts` (hidden while
+    access is loading to prevent flash).
+  - Registries tested in `apps/web/lib/registry/permissions.test.ts` (4 tests
+    passing).
+  - Strongly typed `SETTINGS_CATEGORIES` and `INSPECTOR_SECTIONS` without unsafe
+    type assertions (`as`).
+- **Control presentation**:
+  - Treated as standard production permissions: controls lacking permission are
+    simply disabled cleanly without patronizing "read-only demo" tooltips.
+    - Speed presets & Pause in `TopBar`: disabled when not live/manageable.
+    - Character Stop button: disabled when `!canManage`.
+    - Place map "Arrange" button: disabled when `!canManage`.
+    - Wiki "New page", "Edit", and "Write what they make of it" buttons:
+      disabled when `!canManage`.
+    - Chat composer: disabled textarea, buttons, and radio group for visitors.
+    - Chat header and summary: "New group", "Add people", "Talk in person",
+      "Leave conversation/group", and character row removal disabled/hidden for
+      visitors.
+    - Place header: "Go here" stays hidden when location is not live, and is
+      disabled when live but player lacks movement permission.
+    - Character header: "Go there" button disabled when player lacks movement
+      permission.
+    - Profile settings: form wrapped in `<fieldset disabled={!canPlay}>` to
+      cleanly disable inputs and buttons without per-field boilerplate.
+    - Status bar: displays an unobtrusive "View only" badge for visitors.
+- **Deep links & direct-link protection**:
+  - `?view=wiki&wiki.edit=...`: editing state cleared for visitors; renders
+    read-only page.
+  - `?view=settings&settings.tab=models`: falls back to `connection` when
+    lacking permission.
+  - `?chats.dm=...` and `?chats.talk=...`: waits while access resolves before
+    evaluating, preventing owner deep links from being dropped on initial page
+    load; direct conversation drafts are not created for visitors.
+- **Operational read gating**:
+  - SWR hooks for admin-only data (`useModels`, `useProvidersResource`,
+    `useRole`, `useContextSettings`, `useUsage`, `useUpdate`,
+    `useAnnouncedRelease`) pass `null` as their cache key when `!canManage` or
+    `!isOwner`, avoiding 403 HTTP requests.
+  - System agent brain trace (`useBrainTrace`) gated to require `canManage`,
+    while standard agent traces remain public under `observe`.
+- **Validation**:
+  - `npm run typecheck`, web `tsc --noEmit`, and client package `tsc --noEmit`:
+    all passed with 0 errors.
+  - Web & client tests: 27 test files, 171 tests passed.
+  - Monorepo full test suite: 115 test files, 1,181 tests passed.
+  - Linting (`npx eslint apps/web packages/client`) and formatting
+    (`pretty-quick`) passed.

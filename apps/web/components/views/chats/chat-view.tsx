@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useBrainTrace } from "@/hooks/use-brain";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters, useCharacterStatus } from "@/hooks/use-characters";
 import { readSimNow } from "@/hooks/use-clock";
 import { useChatActions, useMessages } from "@/hooks/use-chats";
@@ -33,6 +34,7 @@ export function ChatView({
   onSent: (chat: Chat) => void;
 }) {
   const { byId } = useCharacters();
+  const { canPlay } = useAccess();
   const { config, send, commitSentMessage, refreshChats } = useChatActions();
   const { typingByChat } = useRealtime();
   const messagesState = useMessages(chat.draft ? null : chat.id);
@@ -60,6 +62,7 @@ export function ChatView({
 
   const deliver = useCallback(
     async (message: PendingMessage) => {
+      if (!canPlay) return;
       try {
         const response = await send(
           chat,
@@ -93,6 +96,7 @@ export function ChatView({
   );
 
   function handleSend(text: string, type: MessageType) {
+    if (!canPlay) return;
     const requestId = crypto.randomUUID();
     const message: PendingMessage = {
       id: requestId,
@@ -109,6 +113,7 @@ export function ChatView({
   }
 
   function handleRetry(message: PendingMessage) {
+    if (!canPlay) return;
     const retried: PendingMessage = { ...message, status: "sending" };
     setPending((current) =>
       current.map((m) => (m.id === message.id ? retried : m)),
@@ -128,13 +133,13 @@ export function ChatView({
 
   const handleTyping = useCallback(
     (isTyping: boolean) => {
-      if (!chat.draft)
-        void setTyping({
-          sessionKey: chat.sessionKey,
-          isTyping,
-        }).catch(() => {});
+      if (!canPlay || chat.draft) return;
+      void setTyping({
+        sessionKey: chat.sessionKey,
+        isTyping,
+      }).catch(() => {});
     },
-    [chat.draft, chat.sessionKey],
+    [canPlay, chat.draft, chat.sessionKey],
   );
 
   return (
@@ -173,10 +178,10 @@ export function ChatView({
         placeholder={
           chat.type === "huddle" ? "Say something" : `Message ${chat.name}`
         }
-        canAct={chat.type === "huddle"}
+        canAct={canPlay && chat.type === "huddle"}
         onSend={handleSend}
         onTyping={handleTyping}
-        disabled={chat.draft && pending.length > 0}
+        disabled={!canPlay || (chat.draft && pending.length > 0)}
       />
     </section>
   );

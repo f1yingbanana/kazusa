@@ -13,19 +13,21 @@ import {
   removeProviderKey,
   saveProviderKey,
 } from "@/lib/source/models/http";
+import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 import { isRoleModelsKey } from "./use-model-roles";
 import { useModels } from "./use-models";
 
 function useProvidersResource() {
   const { resolved } = useSources();
-  const enabled = resolved.models === "live";
+  const { canManage } = useAccess();
+  const enabled = canManage && resolved.models === "live";
   const resource = useSWR<ProvidersResponse, Error>(
     enabled ? ([PROVIDERS_KEY] as const) : null,
     () => fetchProviders(),
     { revalidateOnFocus: false },
   );
-  return { enabled, resource };
+  return { enabled, resource, canManage };
 }
 
 /**
@@ -35,7 +37,7 @@ function useProvidersResource() {
  * are in, and rejects with the Gateway's reason.
  */
 export function useProviders() {
-  const { enabled, resource } = useProvidersResource();
+  const { enabled, resource, canManage } = useProvidersResource();
   const { refresh } = useModels();
   const { mutate: mutateMatching } = useSWRConfig();
   const { mutate } = resource;
@@ -60,13 +62,23 @@ export function useProviders() {
   );
 
   const saveKey = useCallback(
-    (payload: ProviderKeyPayload) => settle(saveProviderKey(payload)),
-    [settle],
+    (payload: ProviderKeyPayload) => {
+      if (!canManage) {
+        throw new Error("You do not have permission to manage provider keys.");
+      }
+      return settle(saveProviderKey(payload));
+    },
+    [canManage, settle],
   );
 
   const removeKey = useCallback(
-    (provider: string) => settle(removeProviderKey(provider)),
-    [settle],
+    (provider: string) => {
+      if (!canManage) {
+        throw new Error("You do not have permission to manage provider keys.");
+      }
+      return settle(removeProviderKey(provider));
+    },
+    [canManage, settle],
   );
 
   return {

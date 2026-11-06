@@ -13,6 +13,7 @@ import { LocateFixedIcon, MinusIcon, MoveIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { Button } from "@/components/ui/button";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import {
   useLocationRecord,
@@ -101,6 +102,7 @@ export function PlaceMap({
   const { mutate } = useSWRConfig();
   const navigate = useNavigate();
   const player = usePlayer();
+  const { canManage } = useAccess();
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
   const now = useSimNow();
@@ -411,18 +413,20 @@ export function PlaceMap({
   );
 
   const startArranging = () => {
+    if (!canManage) return;
     before.current = geometry.coordinates;
     setReplacedAll(false);
     setDraft({ ...geometry.coordinates });
   };
   const autoArrange = () => {
+    if (!canManage) return;
     // Solved as if no page had a position, then held as this draft until saved.
     setDraft({ ...computeMapGeometry(places, {}).coordinates });
     setReplacedAll(true);
     refit.current = true;
   };
   const saveLayout = async () => {
-    if (!draft) return;
+    if (!canManage || !draft) return;
     const positions = positionsToSave({
       geometry,
       before: before.current,
@@ -712,6 +716,7 @@ export function PlaceMap({
               variant="outline"
               size="sm"
               className="hidden bg-background md:inline-flex"
+              disabled={!canManage}
               onClick={startArranging}
             >
               <MoveIcon data-icon="inline-start" />

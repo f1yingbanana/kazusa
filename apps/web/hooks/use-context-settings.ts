@@ -9,6 +9,7 @@ import {
   fetchContextSettings,
   saveContextSettings,
 } from "@/lib/source/context/http";
+import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 
 function describe(error: unknown) {
@@ -27,8 +28,9 @@ function isAgentContextKey(key: unknown): boolean {
  */
 export function useContextSettings(agentId?: string) {
   const { resolved } = useSources();
+  const { canManage } = useAccess();
   const { mutate: mutateMatching } = useSWRConfig();
-  const enabled = resolved.context === "live";
+  const enabled = canManage && resolved.context === "live";
   const resource = useSWR<ContextSettingsResponse, Error>(
     enabled ? ([CONTEXT_SETTINGS_KEY, agentId ?? ""] as const) : null,
     () => fetchContextSettings(agentId),
@@ -38,6 +40,7 @@ export function useContextSettings(agentId?: string) {
 
   const save = useCallback(
     async (overrides: ContextOverrides): Promise<boolean> => {
+      if (!canManage) return false;
       try {
         await mutate(saveContextSettings(overrides, agentId), {
           revalidate: false,

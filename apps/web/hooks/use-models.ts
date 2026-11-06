@@ -11,6 +11,7 @@ import {
   selectThinking,
 } from "@/lib/source/models/http";
 import { useSources } from "@/lib/source/provider";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacter } from "./use-characters";
 
 const EMPTY: ModelsResponse = { models: [], providers: [] };
@@ -31,8 +32,9 @@ function describe(error: unknown) {
  */
 export function useModels(agentId?: string) {
   const { resolved } = useSources();
+  const { canManage } = useAccess();
   const { mutate: mutateMatching } = useSWRConfig();
-  const enabled = resolved.models === "live";
+  const enabled = canManage && resolved.models === "live";
   const [refreshing, setRefreshing] = useState(false);
 
   const resource = useSWR<ModelsResponse, Error>(
@@ -54,6 +56,7 @@ export function useModels(agentId?: string) {
       save: () => Promise<Partial<ModelsResponse>>,
       failure: string,
     ): Promise<boolean> => {
+      if (!canManage) return false;
       try {
         await mutate(
           async (data) => {
@@ -118,6 +121,7 @@ export function useModels(agentId?: string) {
   );
 
   const refresh = useCallback(async () => {
+    if (!canManage) return;
     setRefreshing(true);
     try {
       await mutate(fetchModels({ agentId, refresh: true }), {
@@ -129,7 +133,7 @@ export function useModels(agentId?: string) {
     } finally {
       setRefreshing(false);
     }
-  }, [agentId, mutate, mutateMatching]);
+  }, [agentId, canManage, mutate, mutateMatching]);
 
   return {
     enabled,
@@ -149,8 +153,10 @@ export function useModels(agentId?: string) {
  */
 export function useRunsOnModel(entity: { readonly id: string }): boolean {
   const { resolved } = useSources();
+  const { canManage } = useAccess();
   const character = useCharacter(entity.id);
   return (
+    canManage &&
     resolved.models === "live" &&
     resolved.characters === "live" &&
     character?.kind === "agent"

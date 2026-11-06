@@ -4,6 +4,7 @@ import type {
   Domain,
   JournalEventOf,
   JournalKind,
+  Permission,
   StreamEventOf,
   StreamEventType,
 } from "@kazusa/client";
@@ -35,6 +36,7 @@ export interface StageView {
    * (Settings), apart from the world's sections. Defaults to `start`.
    */
   readonly placement?: "start" | "end";
+  readonly requiresPermission?: Permission;
 }
 
 export interface InspectorSection {
@@ -57,6 +59,7 @@ export interface InspectorSection {
   readonly fold?: "open" | "closed";
   /** One short line beside the title while folded (e.g. the model's name). */
   readonly summary?: ComponentType<{ readonly entity: EntityRef }>;
+  readonly requiresPermission?: Permission;
 }
 
 /** One page of the Settings section, listed in its sidebar. */
@@ -67,6 +70,7 @@ export interface SettingsCategory {
   readonly icon: LucideIcon;
   readonly order: number;
   readonly component: ComponentType;
+  readonly requiresPermission?: Permission;
 }
 
 export interface StatusItem {
@@ -75,6 +79,7 @@ export interface StatusItem {
   readonly order: number;
   readonly requires: readonly Domain[];
   readonly component: ComponentType;
+  readonly requiresPermission?: Permission;
 }
 
 export interface ThoughtLine {

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { statusStore } from "@/lib/live/state";
+import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 import { setStage } from "@/lib/source/stage/http";
 
@@ -47,7 +48,9 @@ export function useOffstage(): ReadonlySet<string> {
  */
 export function useStage() {
   const { resolved } = useSources();
-  const live = resolved.stage === "live" && resolved.status === "live";
+  const { canManage } = useAccess();
+  const live =
+    canManage && resolved.stage === "live" && resolved.status === "live";
 
   const apply = useCallback(
     async (ids: readonly string[], onstage: boolean): Promise<boolean> => {

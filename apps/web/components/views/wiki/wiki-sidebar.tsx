@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useWikiLint, useWikiList } from "@/hooks/use-wiki";
@@ -34,6 +35,7 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const open = useParam("wiki.page");
   const tab = useParam("wiki.tab");
   const navigate = useNavigate();
+  const { canManage } = useAccess();
   const { characters } = useCharacters();
   const { data } = useWikiList(agent);
   const { data: lint } = useWikiLint(agent);
@@ -108,6 +110,7 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                disabled={!canManage}
                 onClick={() => setCreating(true)}
               />
             }
