@@ -676,6 +676,8 @@
       "world_audit",
       "memory_preview",
       "map_route",
+      "map_rename_place",
+      "map_remove_place",
       "continue_work",
       "knowledge_explain",
       "memory_consolidate",

@@ -63,7 +63,7 @@ describe("the world on disk", () => {
     }, SOON);
   });
 
-  it("keeps the map in use when an edit breaks it, until it's fixed", async () => {
+  it("takes in what works of a broken edit, and says what doesn't", async () => {
     const { dir, write } = wiki();
     write("places/office.md", place("office"));
     const warn = vi.fn();
@@ -71,16 +71,28 @@ describe("the world on disk", () => {
     const world = sharedWorld(dir, { warn, onChange });
 
     await vi.waitFor(() => {
-      write("places/tavern.md", place("tavern", "parent: nowhere\n"));
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining("keeping"));
-    }, SOON);
-    expect(world()?.map.places.has("tavern")).toBe(false);
-    expect(onChange).not.toHaveBeenCalled();
-
-    await vi.waitFor(() => {
-      write("places/tavern.md", place("tavern", connected));
+      write(
+        "places/tavern.md",
+        place("tavern", "parent: nowhere\n" + connected),
+      );
       expect(world()?.map.places.has("tavern")).toBe(true);
     }, SOON);
+    expect(world()?.map.places.get("tavern")?.parent).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("unknown parent nowhere"),
+    );
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it("leaves out a page that doesn't parse, and keeps the rest", () => {
+    const { dir, write } = wiki();
+    write("places/office.md", place("office"));
+    write("places/broken.md", "---\nplace_id: broken\n---\n");
+    const world = sharedWorld(dir, { warn: () => {}, onChange: () => {} });
+    expect([...(world()?.map.places.keys() ?? [])]).toEqual(["office"]);
+    expect(lintMap(dir)).toEqual([
+      expect.objectContaining({ page: "world/broken", level: "error" }),
+    ]);
   });
 
   it("names what's broken for the wiki's lint", () => {
@@ -88,15 +100,57 @@ describe("the world on disk", () => {
     write("places/office.md", place("office"));
     expect(lintMap(dir)).toEqual([]);
     write("characters/ann.md", "---\nhome: nowhere\n---\n");
-    expect(lintMap(dir)[0]?.message).toContain("unknown home nowhere");
+    expect(lintMap(dir)[0]?.message).toContain("home nowhere isn't on the map");
   });
 
-  it("throws for a map that was broken from the start", () => {
+  it("loads a map that was broken from the start", () => {
     const { dir, write } = wiki();
     write("places/tavern.md", place("tavern", "parent: nowhere\n"));
-    expect(() =>
-      sharedWorld(dir, { warn: () => {}, onChange: () => {} }),
-    ).toThrow();
+    const onChange = vi.fn();
+    const world = sharedWorld(dir, { warn: () => {}, onChange });
+    expect(world()?.map.places.has("tavern")).toBe(true);
+    // The first load is a change: places may have gone while it was stopped.
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ before: undefined }),
+    );
+  });
+
+  it("takes an edited place_id as a rename", async () => {
+    const { dir, write } = wiki();
+    write("places/office.md", place("office"));
+    const onChange = vi.fn();
+    const world = sharedWorld(dir, { warn: () => {}, onChange });
+    await vi.waitFor(() => {
+      write("places/office.md", place("study"));
+      expect(world()?.map.places.has("study")).toBe(true);
+    }, SOON);
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ renames: new Map([["office", "study"]]) }),
+    );
+  });
+
+  it("carries a rename announced before its files land", () => {
+    const { dir, write } = wiki();
+    write("places/office.md", place("office"));
+    const onChange = vi.fn();
+    const world = sharedWorld(dir, { warn: () => {}, onChange });
+    world.expectRename("office", "study");
+    rmSync(path.join(dir, "entities/places/office.md"));
+    write("places/study.md", place("study"));
+    world.reload();
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ renames: new Map([["office", "study"]]) }),
+    );
+  });
+
+  it("tells nobody when nothing the map reads changed", () => {
+    const { dir, write } = wiki();
+    write("places/office.md", place("office"));
+    const onChange = vi.fn();
+    const world = sharedWorld(dir, { warn: () => {}, onChange });
+    onChange.mockClear();
+    world.reload();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("serves every registration from one source", () => {

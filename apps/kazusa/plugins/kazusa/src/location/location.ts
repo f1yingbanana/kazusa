@@ -201,6 +201,16 @@ export async function planStart(params: {
     };
   }
 
+  // Two parts of a map with no way between them, until its author joins them.
+  if (
+    here &&
+    here.placeId !== target.id &&
+    !routesFrom(map, here.placeId).has(target.id)
+  ) {
+    throw new Error(
+      `There's no way you know of from ${nameOf(map, here.placeId)} to ${target.name}.`,
+    );
+  }
   const endAt = Date.parse(task.endAt);
   if (!travel && here && here.placeId !== target.id) {
     // An activity elsewhere starts with the walk there; it has to fit.
@@ -399,7 +409,7 @@ export function renderWhereabouts(
         id !== place.id &&
         !aroundSet.has(id) &&
         !exclude.has(id) &&
-        map.places.has(id),
+        routes.has(id),
     )
     .slice(0, limit);
   const lines = [`${placeLabel(map, place.id)}. ${place.summary}`];
@@ -438,4 +448,88 @@ export function renderWhereabouts(
     lines.push(`Places you know: ${renderTravelTimes(map, place.id, onMind)}`);
   }
   return lines.join("\n");
+}
+
+/** What a changed map means for one participant's record. */
+export type Relocation =
+  /** The same plans, under the ids the map uses now. */
+  | { readonly kind: "updated"; readonly record: LocationRecord }
+  | { readonly kind: "moved"; readonly placeId: string };
+
+/**
+ * Keeps someone somewhere after the map changed under them. A renamed place
+ * carries them along, trip and all. Standing at a place that's gone, or with
+ * one still ahead on their way, they are put at the nearest place still there:
+ * the area it was in (they were in the room, so now they are in the building),
+ * else their home, else the map's first place. A place already passed doesn't
+ * matter. `undefined` when nothing they need is gone.
+ */
+export function relocation(params: {
+  readonly record: LocationRecord;
+  readonly at: number;
+  readonly before?: WorldMap;
+  readonly after: WorldMap;
+  readonly renames: ReadonlyMap<string, string>;
+  readonly home?: string;
+}): Relocation | undefined {
+  const { record, at, after, renames } = params;
+  const has = (id: string) => after.places.has(id);
+  const carry = (id: string) => (has(id) ? id : (renames.get(id) ?? id));
+  const { trip } = record;
+  // On the way, a place already passed that's gone is dropped from the trip.
+  const legs = (trip?.legs ?? [])
+    .map((leg) => ({ ...leg, placeId: carry(leg.placeId) }))
+    .filter((leg) => leg.at > at || has(leg.placeId));
+  const travelling =
+    trip !== undefined && at >= trip.departAt && at < trip.arriveAt;
+  const origin = carry(record.placeId);
+  const carried: LocationRecord = {
+    ...record,
+    placeId: travelling && !has(origin) ? legs[0].placeId : origin,
+    ...(trip ? { trip: { ...trip, to: carry(trip.to), legs } } : {}),
+  };
+  const position = positionAt(carried, at);
+  const needed =
+    position.kind === "at"
+      ? [position.placeId]
+      : [
+          position.trip.to,
+          position.near,
+          ...position.trip.legs
+            .filter((leg) => leg.at > at)
+            .map((leg) => leg.placeId),
+        ];
+  if (needed.every(has)) {
+    return JSON.stringify(carried) === JSON.stringify(record)
+      ? undefined
+      : { kind: "updated", record: carried };
+  }
+  return {
+    kind: "moved",
+    placeId: landing({
+      ...params,
+      id: position.kind === "at" ? position.placeId : position.near,
+    }),
+  };
+}
+
+/** The nearest place still on the map to one that may be gone. */
+export function landing(params: {
+  readonly id: string;
+  readonly before?: WorldMap;
+  readonly after: WorldMap;
+  readonly renames: ReadonlyMap<string, string>;
+  readonly home?: string;
+}): string {
+  const { before, after, renames, home } = params;
+  const carry = (id: string) => renames.get(id) ?? id;
+  for (
+    let id: string | undefined = params.id;
+    id !== undefined;
+    id = before?.places.get(id)?.parent
+  ) {
+    if (after.places.has(carry(id))) return carry(id);
+  }
+  if (home !== undefined && after.places.has(home)) return home;
+  return after.order[0];
 }

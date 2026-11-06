@@ -1,5 +1,6 @@
 import { currentConfig } from "../current-config.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -9,7 +10,10 @@ import { readCharacterFiles } from "../context-engine/decision-sources.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
-import { createSkillLoader } from "../context-engine/skill-loader.ts";
+import {
+  createSkillLoader,
+  resolveStateDir,
+} from "../context-engine/skill-loader.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
 import { pluginSkillText } from "../skill-text.ts";
@@ -32,8 +36,10 @@ import {
 } from "./knowledge.ts";
 import {
   arrive,
+  landing,
   planTransition,
   positionAt,
+  relocation,
   renderWhereabouts,
   type Companion,
   type LocationRecord,
@@ -44,12 +50,15 @@ import {
   placeLabel,
   resolvePlace,
   routeBetween,
+  routesFrom,
   WALK,
   type Place,
   type WorldMap,
 } from "./map.ts";
 import { writePositions } from "./map-position.ts";
-import { sharedWorld, type World } from "./world.ts";
+import { removePlacePages, renamePlacePages } from "./pages.ts";
+import { sharedWorld, type World, type WorldChange } from "./world.ts";
+import { inBackground } from "../background.ts";
 
 /**
  * The `where` parameter: short and stable, whatever the size of the world. Its
@@ -62,6 +71,38 @@ function whereParameter(config: LocationConfig) {
       .map((type) => `\`${type}\``)
       .join(" or "),
   };
+}
+
+/** Someone put elsewhere because the map changed under them. */
+export interface Relocated {
+  readonly id: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** Editing the map's pages so nobody and nothing is left pointing nowhere. */
+export interface PlaceEdits {
+  /**
+   * Gives a place a new id everywhere: its page, every page and card naming it,
+   * positions, trips and conversations there.
+   */
+  readonly rename: (
+    from: string,
+    to: string,
+  ) => Promise<{ readonly changed: readonly string[] }>;
+  /**
+   * Removes a place's page (kept in `kazusa/wiki-trash` in the state folder).
+   * What was in it moves up to its area, connections to it go, and whoever was
+   * there is put in its area.
+   */
+  readonly remove: (
+    id: string,
+    /** The page, when two say the same `place_id`. */
+    file?: string,
+  ) => Promise<{
+    readonly changed: readonly string[];
+    readonly relocated: readonly Relocated[];
+  }>;
 }
 
 /** Caps a file excerpt for decision evidence. */
@@ -79,6 +120,7 @@ export interface LocationService {
   ) => Promise<number>;
   /** Absent for a world without places. */
   readonly taskExtension?: TaskExtension;
+  readonly pages: PlaceEdits;
   /** The stored record, or the participant's home. */
   readonly record: (id: string) => Promise<LocationRecord | undefined>;
   /**
@@ -155,6 +197,8 @@ export interface LocationService {
 /** The part of Messaging that Location reads and drives. */
 export interface Conversations {
   huddlesAt(placeId: string): Promise<readonly Huddle[]>;
+  /** Huddles at `from` go on at `to`. */
+  renamePlace(from: string, to: string): Promise<void>;
   leavePlace(
     who: string,
     name: string,
@@ -213,6 +257,8 @@ export function registerLocation(
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluate?: JudgeDeps["evaluate"];
+    /** Where removed pages go; absent: `kazusa/wiki-trash` in the state folder. */
+    readonly trashDir?: string;
   },
 ): LocationService {
   const getConfig = () => currentConfig(api);
@@ -238,9 +284,38 @@ export function registerLocation(
     });
   };
   const warn = (message: string): void => api.logger.warn(message);
+  /**
+   * After the map changes, whoever stood or travelled somewhere now gone. One
+   * at a time: a burst of edits must not move anyone twice.
+   */
+  let repairing: Promise<readonly Relocated[]> = Promise.resolve([]);
+  const settle = (change: WorldChange): void => {
+    const run = repairing.then(() => repair(change));
+    repairing = run.catch((error: unknown) => {
+      warn(
+        `Location: couldn't settle positions on the new map: ${String(error)}`,
+      );
+      return [];
+    });
+    inBackground(
+      api,
+      () => repairing,
+      (error) => warn(String(error)),
+    );
+  };
+  /** The first load, checked once the stores are open: never in `register()`. */
+  let atStart: WorldChange | undefined;
   const currentWorld = sharedWorld(config.wikiDir, {
     warn,
-    onChange: () => broadcaster?.broadcast({ type: "places" }),
+    onChange: (change) => {
+      broadcaster?.broadcast({ type: "places" });
+      if (change.before === undefined) atStart = change;
+      else settle(change);
+    },
+  });
+  api.on("gateway_start", () => {
+    if (atStart) settle(atStart);
+    atStart = undefined;
   });
   const skillLoader = createSkillLoader({
     config: getConfig(),
@@ -909,7 +984,164 @@ export function registerLocation(
     return placed;
   };
 
+  /**
+   * Whoever the change left somewhere that's gone: carried along by a rename,
+   * otherwise put at the nearest place still there. Huddles at a renamed place
+   * go on under its new id; at a removed one they end as their people leave.
+   */
+  const repair = async (change: WorldChange): Promise<readonly Relocated[]> => {
+    const { before, after, renames } = change;
+    if (!after) return [];
+    await clock.init();
+    const at = clock.time();
+    for (const [from, to] of renames)
+      await conversations?.renamePlace(from, to).catch((error: unknown) => {
+        warn(
+          `Location: huddles at ${from} didn't follow it to ${to}: ${String(error)}`,
+        );
+      });
+    const relocated: Relocated[] = [];
+    const settleOne = async (id: string): Promise<void> => {
+      const stored = await store.lookup(id);
+      const home = after.homes.get(id);
+      if (!stored) {
+        // No record: they are at their home, unless it just went.
+        const was = before?.homes.get(id);
+        if (was === undefined || home !== undefined) return;
+        const to = landing({
+          id: was,
+          ...(before ? { before: before.map } : {}),
+          after: after.map,
+          renames,
+        });
+        await place(id, to);
+        relocated.push({ id, from: was, to });
+        return;
+      }
+      const next = relocation({
+        record: stored,
+        at,
+        ...(before ? { before: before.map } : {}),
+        after: after.map,
+        renames,
+        ...(home === undefined ? {} : { home }),
+      });
+      if (next?.kind === "updated") await save(id, next.record);
+      if (next?.kind !== "moved") return;
+      const position = positionAt(stored, at);
+      const from = position.kind === "at" ? position.placeId : position.near;
+      await place(id, next.placeId);
+      relocated.push({ id, from, to: next.placeId });
+    };
+    // One who can't be settled doesn't keep the rest where they were.
+    for (const id of everyone())
+      await settleOne(id).catch((error: unknown) => {
+        warn(
+          `Location: couldn't settle ${id} on the new map: ${String(error)}`,
+        );
+      });
+    for (const { id, from, to } of relocated)
+      api.logger.info(
+        `Location: ${id} was at ${from}, which is no longer on the map; now at ${to}.`,
+      );
+    return relocated;
+  };
+
+  const workspaces = (): string[] =>
+    listAgentIds(getConfig())
+      .map(workspaceOf)
+      .filter((dir): dir is string => dir !== undefined);
+  const pages: PlaceEdits = {
+    // A page left off the map (it doesn't parse) can be renamed and removed
+    // too: that is often how it gets fixed.
+    rename: async (from, to) => {
+      const cancel = currentWorld.expectRename(from, to);
+      let changed: string[];
+      try {
+        changed = renamePlacePages({
+          wikiDir: config.wikiDir,
+          workspaces: workspaces(),
+          from,
+          to,
+          cwd: process.cwd(),
+        });
+      } catch (error) {
+        cancel();
+        throw error;
+      }
+      currentWorld.reload();
+      await repairing;
+      return { changed };
+    },
+    remove: async (id, file) => {
+      const { changed } = removePlacePages({
+        wikiDir: config.wikiDir,
+        id,
+        ...(file === undefined ? {} : { file }),
+        trashDir: path.join(
+          deps.trashDir ??
+            path.join(
+              resolveStateDir(process.env, homedir()),
+              "kazusa",
+              "wiki-trash",
+            ),
+          new Date().toISOString().replace(/[:.]/g, "-"),
+          "world",
+        ),
+        cwd: process.cwd(),
+      });
+      currentWorld.reload();
+      return { changed, relocated: await repairing };
+    },
+  };
+
   // Administrative: allowlisted for the system agent only.
+  api.registerTool(() => ({
+    name: "map_rename_place",
+    label: "Rename Place",
+    description:
+      "Give a place a new id everywhere: its page moves to `<to>.md`, and every page, character card, position, trip and conversation naming it follows. Use this rather than editing `place_id` by hand.",
+    parameters: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      required: ["from", "to"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { from, to } = z
+        .object({ from: z.string(), to: z.string() })
+        .parse(input);
+      const result = await pages.rename(from, to);
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 1) },
+        ],
+        details: result,
+      };
+    },
+  }));
+  api.registerTool(() => ({
+    name: "map_remove_place",
+    label: "Remove Place",
+    description:
+      "Remove a place from the map. Places inside it move up to its area, connections to it go, homes there become its area, and whoever is there is put in its area. Characters' own cards stay: they remember it. Deleting the page by hand leaves those for lint to report.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    async execute(_id: string, input: unknown) {
+      const { id } = z.object({ id: z.string() }).parse(input);
+      const result = await pages.remove(id);
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 1) },
+        ],
+        details: result,
+      };
+    },
+  }));
   api.registerTool(() => ({
     name: "map_route",
     label: "Map Route",
@@ -931,14 +1163,16 @@ export function registerLocation(
       const text = !map
         ? "No map is loaded. Run wiki_lint to see why."
         : !start || !end
-          ? `"${!start ? from : to}" isn't on the map in use. If you've written that page, the new map may be invalid, and the last good one stays in use until it's fixed: run wiki_lint.`
-          : (() => {
-              const route = routeBetween(map, start.id, end.id);
-              const passed = route.legs.map(({ placeId: place, ways }) =>
-                ways[0].by === WALK ? place : `${place} (${ways[0].by})`,
-              );
-              return `${describeTravel(route)}: ${[start.id, ...passed].join(" > ")}`;
-            })();
+          ? `"${!start ? from : to}" isn't on the map in use. If you've written that page, run wiki_lint: a page whose front matter doesn't parse is left out.`
+          : !routesFrom(map, start.id).has(end.id)
+            ? `There's no way from ${start.id} to ${end.id}: they're in separate parts of the map. Run wiki_lint for the parts.`
+            : (() => {
+                const route = routeBetween(map, start.id, end.id);
+                const passed = route.legs.map(({ placeId: place, ways }) =>
+                  ways[0].by === WALK ? place : `${place} (${ways[0].by})`,
+                );
+                return `${describeTravel(route)}: ${[start.id, ...passed].join(" > ")}`;
+              })();
       return { content: [{ type: "text" as const, text }], details: text };
     },
   }));
@@ -981,6 +1215,7 @@ export function registerLocation(
     },
     savePositions: (positions) => writePositions(config.wikiDir, positions),
     ...(taskExtension ? { taskExtension } : {}),
+    pages,
     record,
     participants,
     place,

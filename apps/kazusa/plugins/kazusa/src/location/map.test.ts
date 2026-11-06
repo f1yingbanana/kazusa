@@ -120,9 +120,10 @@ Body text.
   });
 
   it.each([
-    [[place("a", { parent: "missing" })], "a: unknown parent missing"],
+    [[place("a", { parent: "missing" })], ["a"], "unknown parent missing"],
     [
       [place("a", { parent: "b" }), place("b", { parent: "a" })],
+      ["a", "b"],
       "parent cycle",
     ],
     [
@@ -131,6 +132,7 @@ Body text.
           connections: [{ to: "zz", ways: [{ by: "walk", minutes: 1 }] }],
         }),
       ],
+      ["a"],
       "connection to unknown zz",
     ],
     [
@@ -142,12 +144,43 @@ Body text.
           connections: [{ to: "a", ways: [{ by: "walk", minutes: 1 }] }],
         }),
       ],
-      "declared twice",
+      ["a", "b"],
+      "declared on both pages",
     ],
-    [[place("a"), place("b")], "the map is 2 separate parts"],
-    [[place("a"), place("a")], "duplicate place a"],
-  ])("rejects a broken map (%#)", (places, problem) => {
-    expect(() => buildMap(places)).toThrow(problem);
+    [[place("a"), place("b")], ["a", "b"], "the map is 2 separate parts"],
+    [[place("a"), place("a")], ["a"], "two pages say"],
+  ])(
+    "loads a broken map and says what it worked around (%#)",
+    (places, ids, problem) => {
+      const map = buildMap(places);
+      expect([...map.places.keys()].sort()).toEqual(ids);
+      expect(map.order).toHaveLength(ids.length);
+      expect(map.problems.map(({ message }) => message).join("\n")).toContain(
+        problem,
+      );
+    },
+  );
+
+  it("keeps what it can of a broken place", () => {
+    const map = buildMap([
+      place("a", {
+        parent: "gone",
+        connections: [
+          { to: "gone", ways: [{ by: "walk", minutes: 1 }] },
+          { to: "b", ways: [{ by: "walk", minutes: 2 }] },
+        ],
+      }),
+      place("b"),
+    ]);
+    expect(map.places.get("a")?.parent).toBeUndefined();
+    expect(map.places.get("a")?.connections.map(({ to }) => to)).toEqual(["b"]);
+    expect(routeBetween(map, "a", "b").minutes).toBe(2);
+  });
+
+  it("lists places it can't reach without travel times", () => {
+    const map = buildMap([place("a"), place("b")]);
+    expect(() => routeBetween(map, "a", "b")).toThrow("No route");
+    expect(renderTravelTimes(map, "a", ["b"])).toBe("");
   });
 
   it("routes through the tree and its connections by the usual way", () => {

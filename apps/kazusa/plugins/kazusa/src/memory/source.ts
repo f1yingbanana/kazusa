@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -102,4 +103,27 @@ export function saveSource(
   writeFileSync(temporary, text, { flag: "wx" });
   renameSync(temporary, file);
   return readSource(root, input.id, input.kind);
+}
+
+/**
+ * Moves a page into `trashDir`, keeping its path under the wiki. With `base`,
+ * only the version that was read.
+ */
+export function deleteSource(
+  root: string,
+  input: { readonly id: string; readonly base?: string | null },
+  trashDir: string,
+): WikiSourceResponse {
+  const current = readSource(root, input.id);
+  if (
+    !current.exists ||
+    (input.base !== undefined && input.base !== current.hash)
+  )
+    throw new SourceConflict(current);
+  const file = path.join(root, current.path);
+  const kept = path.join(trashDir, current.path);
+  mkdirSync(path.dirname(kept), { recursive: true });
+  writeFileSync(kept, current.text);
+  unlinkSync(file);
+  return current;
 }

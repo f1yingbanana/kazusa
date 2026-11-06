@@ -1,5 +1,6 @@
 import {
   MemoryRunsResponseSchema,
+  WikiEditResultSchema,
   WikiLintResponseSchema,
   WikiListResponseSchema,
   WikiPageResponseSchema,
@@ -7,7 +8,10 @@ import {
   type MemoryRunsResponse,
   type WikiLintResponse,
   type WikiListResponse,
+  type WikiDeletePayload,
+  type WikiEditResult,
   type WikiKind,
+  type WikiRenamePayload,
   type WikiPageResponse,
   type WikiSavePayload,
   type WikiSourceResponse,
@@ -104,4 +108,38 @@ export async function saveWikiSource(
       throw new WikiConflictError(error.message);
     throw error;
   }
+}
+
+/** Removes a page; 409 as for a save when it changed since it was read. */
+export async function deleteWikiPage(
+  baseUrl: string,
+  token: string | undefined,
+  payload: WikiDeletePayload,
+): Promise<WikiEditResult> {
+  try {
+    const data = await postJson<unknown>(
+      buildUrl(baseUrl, "/kazusa/wiki/delete"),
+      payload,
+      token,
+    );
+    return WikiEditResultSchema.parse(data);
+  } catch (error) {
+    if (error instanceof KazusaApiError && error.status === 409)
+      throw new WikiConflictError(error.message);
+    throw error;
+  }
+}
+
+/** Gives a World Wiki place a new id everywhere. */
+export async function renameWikiPage(
+  baseUrl: string,
+  token: string | undefined,
+  payload: WikiRenamePayload,
+): Promise<WikiEditResult> {
+  const data = await postJson<unknown>(
+    buildUrl(baseUrl, "/kazusa/wiki/rename"),
+    payload,
+    token,
+  );
+  return WikiEditResultSchema.parse(data);
 }

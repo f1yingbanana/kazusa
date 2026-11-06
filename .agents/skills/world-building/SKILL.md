@@ -66,9 +66,20 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | A character's `stickers/`                     | That character's next turn                  |
 | Anything under `shared/skills/`               | Coming turns, once you run `refresh_skills` |
 
-**A broken map changes nothing.** An unknown `home`, `parent` or connection
-target keeps the whole map as it was until it's fixed. After changing a place or
-a `home`, run `wiki_lint` with no agent: it names what's broken.
+**A broken map still loads, without the broken parts.** A page that doesn't
+parse is left off the map; an unknown `parent` puts the place at top level; a
+connection to an unknown place, or one declared on both pages, is ignored; an
+unknown `home` leaves them homeless; places with no way to the rest can't be
+reached. After changing a place or a `home`, run `wiki_lint` with no agent: it
+names each of these.
+
+**Rename or remove a place with its tools, never by hand.** `map_rename_place`
+moves the page and changes the id everywhere (other pages, characters' cards,
+whoever is there or on the way). `map_remove_place` takes it off the map: places
+inside it move up to its area, connections to it go, homes there and anyone
+there move to its area. Editing `place_id` or deleting the file yourself keeps
+people from being stranded, but leaves every link to the old id for `wiki_lint`
+to report.
 
 **Every id is shared.** Characters, places and concepts share one namespace of
 ids, and of names and aliases too. Two pages with one id hide each other, and a

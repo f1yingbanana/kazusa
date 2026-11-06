@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { renamedText } from "../location/pages.ts";
 import { parseDoc, renderDoc } from "./parts.ts";
 import {
   mergeMarkdown,
@@ -116,32 +117,11 @@ function renamesOf(template: string): Record<string, string> {
   return WORLD_JSON.parse(JSON.parse(readFileSync(file, "utf8"))).renames ?? {};
 }
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 function renamedPath(file: string, renames: Record<string, string>): string {
   const match = /^(.*\/wiki\/entities\/places\/)([^/]+)\.md$/.exec(file);
   if (!match) return file;
   const to = renames[match[2]];
   return to ? `${match[1]}${to}.md` : file;
-}
-
-function renamedText(text: string, renames: Record<string, string>): string {
-  let next = text;
-  for (const [from, to] of Object.entries(renames)) {
-    next = next
-      .replace(
-        new RegExp(
-          `^(\\s*(?:-\\s+)?(?:place_id|parent|home|to):\\s*)"?${escape(from)}"?[ \\t]*$`,
-          "gm",
-        ),
-        `$1${to}`,
-      )
-      .replace(
-        new RegExp(`\\bentity\\.place\\.${escape(from)}\\b`, "g"),
-        `entity.place.${to}`,
-      );
-  }
-  return next;
 }
 
 // ---------------------------------------------------------------------- plan

@@ -43,7 +43,8 @@ interface PageEditorProps {
   readonly owner?: string;
   /** The page's name, for a page not written yet. */
   readonly name: string;
-  readonly onDone: () => void;
+  /** With what was saved; a place saved under a new id comes back renamed. */
+  readonly onDone: (saved?: WikiSourceResponse) => void;
 }
 
 /** A page's Markdown, edited in place of the page; the file is the truth. */
@@ -57,7 +58,7 @@ export function PageEditor(props: PageEditorProps) {
         <p className="text-sm text-muted-foreground">
           Couldn&apos;t open this page.
         </p>
-        <Button variant="outline" size="sm" onClick={props.onDone}>
+        <Button variant="outline" size="sm" onClick={() => props.onDone()}>
           Back to the page
         </Button>
       </div>
@@ -99,15 +100,21 @@ function EditorBody({
     if (saving) return;
     setSaving(true);
     try {
-      await save({
+      const saved = await save({
         id,
         text: draft,
         ...(agent ? { agent } : {}),
         ...(kind ? { kind } : {}),
         ...(overwrite ? {} : { base: source.hash }),
       });
-      toast.success(source.exists ? "Page saved" : "Page created");
-      onDone();
+      toast.success(
+        saved.id !== id
+          ? `Saved, and renamed to ${saved.id}`
+          : source.exists
+            ? "Page saved"
+            : "Page created",
+      );
+      onDone(saved);
     } catch (error) {
       if (error instanceof WikiConflictError) setConflict(true);
       else
@@ -216,7 +223,7 @@ function EditorBody({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDone}>
+            <AlertDialogAction variant="destructive" onClick={() => onDone()}>
               Discard changes
             </AlertDialogAction>
           </AlertDialogFooter>

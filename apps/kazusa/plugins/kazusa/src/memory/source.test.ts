@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -8,7 +9,12 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readSource, saveSource, SourceConflict } from "./source.ts";
+import {
+  deleteSource,
+  readSource,
+  saveSource,
+  SourceConflict,
+} from "./source.ts";
 
 let root: string;
 
@@ -91,6 +97,28 @@ describe("saveSource", () => {
     );
     expect(saveSource(root, { id: "plaza", text: "Mine\n" }).text).toBe(
       "Mine\n",
+    );
+  });
+});
+
+describe("deleteSource", () => {
+  it("moves the page to the trash, keeping where it lived", () => {
+    const trash = path.join(root, "..", `${path.basename(root)}-trash`);
+    const { hash } = readSource(root, "plaza");
+    deleteSource(root, { id: "plaza", base: hash }, trash);
+    expect(existsSync(path.join(root, "entities/places/plaza.md"))).toBe(false);
+    expect(
+      readFileSync(path.join(trash, "entities/places/plaza.md"), "utf8"),
+    ).toContain("# Plaza");
+    rmSync(trash, { recursive: true });
+  });
+
+  it("refuses a page that changed since it was read, or isn't there", () => {
+    expect(() =>
+      deleteSource(root, { id: "plaza", base: "stale" }, root),
+    ).toThrow(SourceConflict);
+    expect(() => deleteSource(root, { id: "nowhere" }, root)).toThrow(
+      SourceConflict,
     );
   });
 });

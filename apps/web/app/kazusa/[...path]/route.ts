@@ -46,6 +46,8 @@ const ROUTES = new Map([
   ["wiki/lint", "GET"],
   ["wiki/source", "GET"],
   ["wiki/save", "POST"],
+  ["wiki/delete", "POST"],
+  ["wiki/rename", "POST"],
   ["knowledge/explain", "GET"],
   ["memory/runs", "GET"],
   ["memory/preview", "GET"],
