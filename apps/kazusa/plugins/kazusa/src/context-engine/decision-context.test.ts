@@ -341,7 +341,8 @@ describe("Bounded decision evidence", () => {
           questions: Object.keys(parsePerceptionSkill(own).questions),
         };
     }
-    expect(Object.keys(rubrics).length).toBeGreaterThan(0);
+    // Worlds live in their own repositories: only those downloaded here are
+    // checked, and none may be.
     // Keyed by world, so a failure names the one left behind.
     expect(rubrics).toEqual(
       Object.fromEntries(

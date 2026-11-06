@@ -3,3 +3,8 @@
 
 # The live world, copied from worlds/ by the setup guide. Playing writes to it.
 /world/
+
+# Templates: clones of the worlds in world-sources.json (scripts/world-repo.mjs),
+# and template folders from before that, set aside.
+/worlds/
+/.worlds-before-repositories/

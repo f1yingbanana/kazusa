@@ -37,6 +37,11 @@ const TARGETS = {
     cpu: "x64",
     archive: `node-${NODE_VERSION}-win-x64.zip`,
     nodeBinary: "node.exe",
+    git: {
+      asset: "windows-x64",
+      sha256:
+        "f1e17876337d7be143e5d51976da36643d65528125cfbc14d57f171de0fd5f14",
+    },
     natives: [
       "@next/swc-win32-x64-msvc",
       "@openclaw/fs-safe-win32-x64-msvc",
@@ -50,9 +55,19 @@ const TARGETS = {
     cpu: "arm64",
     archive: `node-${NODE_VERSION}-darwin-arm64.tar.gz`,
     nodeBinary: "bin/node",
+    git: {
+      asset: "macOS-arm64",
+      sha256:
+        "1110de343de11cc6f469b782b60f36217b9199b5e06875dd65baa26dd60563c7",
+    },
     natives: ["@next/swc-darwin-arm64", "@openclaw/fs-safe-darwin-arm64"],
   },
 };
+
+// GitHub Desktop's portable git (github.com/desktop/dugite-native): built to
+// run from any folder, for both systems. Pinned; each asset's sha256 is above.
+const GIT_RELEASE =
+  "https://github.com/desktop/dugite-native/releases/download/v2.56.0-2/dugite-native-v2.56.0-a44aeca";
 
 const INCLUDED = [
   "package.json",
@@ -63,6 +78,7 @@ const INCLUDED = [
   "scripts/system-agent.mjs",
   "scripts/update.mjs",
   "scripts/world-package.mjs",
+  "scripts/world-repo.mjs",
   "apps/",
   "packages/",
   ".agents/skills/",
@@ -179,6 +195,51 @@ async function stageNode(stage, target) {
   );
 }
 
+/**
+ * Git Credential Manager (a .NET app with its own UI) and Git LFS: most of the
+ * download, and nothing a world's repository uses. git itself links none of
+ * their libraries.
+ */
+function isGitExtra(name, isDirectory) {
+  if (/^git-(credential-manager|lfs)/.test(name)) return true;
+  if (isDirectory) return /^[a-z]{2}(-[A-Za-z]+)?$/.test(name);
+  return (
+    /^([A-Z].*|mscorlib|netstandard)\.dll$/.test(name) ||
+    /\.(dylib|pdb)$/.test(name) ||
+    /^(gcmcore|av_libglesv2|msalruntime|libSkiaSharp|libHarfBuzzSharp)\.dll$/.test(
+      name,
+    ) ||
+    /\.(deps|runtimeconfig)\.json$/.test(name) ||
+    ["NOTICE", "createdump", "uninstall.sh"].includes(name)
+  );
+}
+
+async function stageGit(stage, target) {
+  const work = path.join(DIST, "git-download", target.git.asset);
+  removeTree(work);
+  mkdirSync(work, { recursive: true });
+  const archive = path.join(work, "git.tar.gz");
+  await download(`${GIT_RELEASE}-${target.git.asset}.tar.gz`, archive);
+  const actual = createHash("sha256")
+    .update(readFileSync(archive))
+    .digest("hex");
+  if (actual !== target.git.sha256)
+    throw new Error(`Checksum mismatch for git (${target.git.asset}).`);
+  const git = path.join(stage, "git");
+  mkdirSync(git);
+  run("tar", ["-xzf", archive, "-C", git], work);
+  const extras =
+    target.os === "win32"
+      ? ["ucrt64/bin", "ucrt64/libexec/git-core"]
+      : ["libexec/git-core"];
+  for (const dir of extras)
+    for (const entry of readdirSync(path.join(git, dir), {
+      withFileTypes: true,
+    }))
+      if (isGitExtra(entry.name, entry.isDirectory()))
+        removeTree(path.join(git, dir, entry.name));
+}
+
 function allFiles(stage) {
   return readdirSync(stage, { recursive: true, withFileTypes: true })
     .filter((entry) => !entry.isDirectory())
@@ -198,10 +259,18 @@ function verify(stage, target) {
   );
   if (secrets.length)
     throw new Error(`Would ship local state: ${secrets.join(", ")}`);
+  // A Mac's git links its commands to itself; only Windows can't keep links.
   const links = readdirSync(stage, {
     recursive: true,
     withFileTypes: true,
-  }).filter((entry) => entry.isSymbolicLink());
+  }).filter(
+    (entry) =>
+      entry.isSymbolicLink() &&
+      !(
+        target.os === "darwin" &&
+        path.relative(stage, entry.parentPath).startsWith(`git${path.sep}`)
+      ),
+  );
   if (links.length)
     throw new Error(
       `Symlinks left: ${links.map((link) => path.join(link.parentPath, link.name)).join(", ")}`,
@@ -260,6 +329,7 @@ UninstPage instfiles
 ; Everything but the player's world, in apps\\kazusa\\world.
 !macro RemoveAppFiles
   RMDir /r "$INSTDIR\\node"
+  RMDir /r "$INSTDIR\\git"
   RMDir /r "$INSTDIR\\node_modules"
   RMDir /r "$INSTDIR\\scripts"
   RMDir /r "$INSTDIR\\packages"
@@ -268,7 +338,8 @@ UninstPage instfiles
   RMDir /r "$INSTDIR\\apps\\web"
   RMDir /r "$INSTDIR\\apps\\kazusa\\plugins"
   RMDir /r "$INSTDIR\\apps\\kazusa\\shared"
-  RMDir /r "$INSTDIR\\apps\\kazusa\\worlds"
+  Delete "$INSTDIR\\apps\\kazusa\\base.json"
+  Delete "$INSTDIR\\apps\\kazusa\\world-sources.json"
   Delete "$INSTDIR\\apps\\kazusa\\package.json"
   Delete "$INSTDIR\\package.json"
   Delete "$INSTDIR\\package-lock.json"
@@ -317,6 +388,8 @@ Section Uninstall
   MessageBox MB_YESNO|MB_ICONQUESTION "Also delete your world and its API keys? This can't be undone." /SD IDNO IDNO keepWorld
   RMDir /r "$INSTDIR\\apps\\kazusa\\world"
   keepWorld:
+  RMDir /r "$INSTDIR\\apps\\kazusa\\worlds"
+  RMDir /r "$INSTDIR\\apps\\kazusa\\.worlds-before-repositories"
   Delete "$SMPROGRAMS\\Kazusa.lnk"
   Delete "$DESKTOP\\Kazusa.lnk"
   DeleteRegKey HKCU "${uninstallKey}"
@@ -357,7 +430,7 @@ set -e
 cd "$home"
 if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" .bundle-version; then
   echo "Setting up Kazusa. This takes a minute, once per version."
-  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
+  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /apps/kazusa/worlds/ --exclude /apps/kazusa/.worlds-before-repositories/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
   xattr -dr com.apple.quarantine . 2>/dev/null || true
   cp "$bundle/VERSION" .bundle-version
 fi
@@ -442,6 +515,7 @@ stageTrackedFiles(stage);
 buildFrontend(stage);
 installForTarget(stage, target);
 await stageNode(stage, target);
+await stageGit(stage, target);
 writeFileSync(path.join(stage, "VERSION"), `${version}\n`);
 verify(stage, target);
 buildArchive(stage, name, version);

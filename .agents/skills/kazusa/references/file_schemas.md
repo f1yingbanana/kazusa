@@ -556,8 +556,9 @@ on my quartet exposition.
   strictly contain only persona/identity files (`SOUL.md`, `IDENTITY.md`),
   reflections (`MEMORY.md`), memories (`memory/`), and subjective personal
   beliefs (`wiki/`).
-- A world's roster and overrides live in `worlds/<id>/` and `worlds/base.json`;
-  the setup guide writes them into the git-ignored `world/openclaw.json`.
+- A world's roster and overrides live in `worlds/<id>/` and
+  `apps/kazusa/base.json`; the setup guide writes them into the git-ignored
+  `world/openclaw.json`.
 
 ---
 

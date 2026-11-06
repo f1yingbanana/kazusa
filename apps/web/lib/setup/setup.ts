@@ -19,6 +19,7 @@ import {
   type ProviderEntry,
 } from "@kazusa/client";
 import { z } from "zod";
+import { runScript } from "../run-script";
 import { writeTemplateSnapshot } from "./template-snapshot";
 
 /**
@@ -195,6 +196,8 @@ export interface CharacterGroup {
 
 export interface WorldOption {
   readonly id: string;
+  /** Cloned into `worlds/<id>`; until then only its `package.json` is known. */
+  readonly downloaded: boolean;
   readonly title: string;
   readonly description: string;
   readonly systemAgent: string;
@@ -210,6 +213,51 @@ export interface WorldOption {
   }[];
   readonly defaultCast: readonly string[];
 }
+
+/** A world on offer: `scripts/world-repo.mjs list` gives one per source. */
+export type ListedWorld =
+  | {
+      readonly id: string;
+      readonly downloaded: boolean;
+      readonly package: unknown;
+    }
+  | { readonly id: string; readonly error: string };
+
+/**
+ * Which worlds there are and how to get one. `scripts/world-repo.mjs` peeks at
+ * each source's `package.json` and clones only the one picked, into
+ * `worlds/<id>`.
+ */
+export interface Catalog {
+  readonly list: () => Promise<readonly ListedWorld[]>;
+  readonly clone: (id: string) => Promise<void>;
+}
+
+const ListedSchema = z.object({
+  worlds: z.array(
+    z.union([
+      z.object({
+        id: z.string(),
+        downloaded: z.boolean(),
+        package: z.unknown(),
+      }),
+      z.object({ id: z.string(), error: z.string() }),
+    ]),
+  ),
+});
+
+/** Peeks take about a second each, all at once; a clone, as long as it takes. */
+export const scriptCatalog: Catalog = {
+  list: async () => {
+    const result = await runScript("world-repo.mjs", ["list"], 60_000);
+    if (!result.ok) throw new Error(result.error);
+    return ListedSchema.parse(result.value).worlds;
+  },
+  clone: async (id) => {
+    const result = await runScript("world-repo.mjs", ["clone", id], 0);
+    if (!result.ok) throw new Error(result.error);
+  },
+};
 
 export interface SetupStatus {
   readonly configured: boolean;
@@ -311,6 +359,7 @@ async function characterGroups(
 export function createSetup(
   appDir: string,
   keys: KeyStore = sdkKeyStore(appDir),
+  catalog: Catalog = scriptCatalog,
 ) {
   const worldsDir = path.join(appDir, "worlds");
   const liveDir = path.join(appDir, "world");
@@ -357,6 +406,7 @@ export function createSetup(
         .find(({ value }) => value === world.kazusa.defaultGroup)?.ids ?? [];
     return {
       id,
+      downloaded: true,
       title: world.kazusa.title ?? world.displayName ?? world.name,
       description: world.description ?? "",
       systemAgent: world.kazusa.systemAgent,
@@ -372,11 +422,50 @@ export function createSetup(
     };
   }
 
+  /** Downloaded: the whole option. Not yet: what its `package.json` says. */
+  async function listedOption(
+    listed: ListedWorld,
+  ): Promise<WorldOption | undefined> {
+    if ("error" in listed) {
+      console.warn(`Couldn't list the ${listed.id} world: ${listed.error}`);
+      return undefined;
+    }
+    if (listed.downloaded) return worldOption(listed.id);
+    const world = WorldPackageSchema.safeParse(listed.package).data;
+    if (!world) return undefined;
+    return {
+      id: listed.id,
+      downloaded: false,
+      title: world.kazusa.title ?? world.displayName ?? world.name,
+      description: world.description ?? "",
+      systemAgent: world.kazusa.systemAgent,
+      characters: [],
+      groups: [],
+      defaultCast: [],
+    };
+  }
+
+  // A second request for a world being cloned waits for the same clone.
+  const cloning = new Map<string, Promise<void>>();
+
+  /** Downloads the world the player picked, for its cast. */
+  async function prepare(id: string): Promise<WorldOption> {
+    if (!existsSync(path.join(worldsDir, id, "package.json"))) {
+      const pending = cloning.get(id) ?? catalog.clone(id);
+      cloning.set(id, pending);
+      try {
+        await pending;
+      } finally {
+        cloning.delete(id);
+      }
+    }
+    return worldOption(id);
+  }
+
   async function status(): Promise<SetupStatus> {
-    const ids = (await directories(worldsDir)).filter((id) =>
-      existsSync(path.join(worldsDir, id, "package.json")),
-    );
-    const worlds = await Promise.all(ids.map(worldOption));
+    const worlds = (
+      await Promise.all((await catalog.list()).map(listedOption))
+    ).filter((option) => option !== undefined);
     const importedId = existsSync(markerFile)
       ? (WorldPackageSchema.safeParse(
           JSON.parse(await readFile(markerFile, "utf8")),
@@ -445,7 +534,7 @@ export function createSetup(
 
   async function readBase() {
     return BaseSchema.parse(
-      JSON.parse(await readFile(path.join(worldsDir, "base.json"), "utf8")),
+      JSON.parse(await readFile(path.join(appDir, "base.json"), "utf8")),
     );
   }
 
@@ -553,19 +642,25 @@ export function createSetup(
 
   async function apply(request: SetupRequest): Promise<void> {
     if (existsSync(configFile)) return;
-    if (!(await status()).worlds.some(({ id }) => id === request.world))
+    if (!(await catalog.list()).some(({ id }) => id === request.world))
       throw new Error(`Unknown world: ${request.world}`);
     if (
       request.key &&
       !(await offered()).some(({ id }) => id === request.key?.provider)
     )
       throw new Error(`Unknown provider: ${request.key.provider}`);
+    await prepare(request.world);
     await importWorld(request.world);
     await saveKey(request.key);
     await writeConfig(request);
   }
 
-  return { status, apply, files: { config: configFile, env: envFile } };
+  return {
+    status,
+    prepare,
+    apply,
+    files: { config: configFile, env: envFile },
+  };
 }
 
 // Untraced: Turbopack would otherwise watch everything under the live world,

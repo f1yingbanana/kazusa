@@ -1,8 +1,0 @@
----
-place_id: angels_share
-name: "Angel's Share"
-aliases: ["the Angel's Share tavern"]
-learned: always known
----
-
-Good wine, poor company, and that's why I come.

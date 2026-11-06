@@ -329,6 +329,16 @@ export const WorldPackageSchema = z.looseObject({
   /** Npm's author: "Name <email> (url)", or `{ name, email, url }`. */
   author: z.union([z.string(), z.looseObject({ name: z.string() })]).optional(),
   homepage: z.string().trim().min(1).optional(),
+  /** Npm's repository: where the world lives, and where its updates come from. */
+  repository: z
+    .union([
+      z.string().trim().min(1),
+      z.looseObject({
+        type: z.string().optional(),
+        url: z.string().trim().min(1),
+      }),
+    ])
+    .optional(),
   private: z.boolean().optional(),
   kazusa: z.looseObject({
     /** How the setup guide lists a template, when not by its `displayName`. */

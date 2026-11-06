@@ -1,9 +1,12 @@
 import {
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +18,7 @@ import {
   createSetup,
   sdkScript,
   SYSTEM_AGENT_INCLUDE,
+  type Catalog,
   type KeyStore,
 } from "./setup";
 
@@ -36,13 +40,57 @@ function memoryStore(
   };
 }
 
+const readPackage = (dir: string): unknown =>
+  JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8"));
+
+/**
+ * The fixture's world folders as downloaded worlds, and `remote` (`id` to a
+ * folder elsewhere) as worlds on offer that a clone copies in, without git.
+ */
+function folderCatalog(
+  app: string,
+  remote = new Map<string, string>(),
+): Catalog & { readonly cloned: string[] } {
+  const worlds = path.join(app, "worlds");
+  const cloned: string[] = [];
+  return {
+    cloned,
+    list: async () => [
+      ...readdirSync(worlds, { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            existsSync(path.join(worlds, entry.name, "package.json")),
+        )
+        .map(({ name }) => ({
+          id: name,
+          downloaded: true,
+          package: readPackage(path.join(worlds, name)),
+        })),
+      ...[...remote]
+        .filter(([id]) => !existsSync(path.join(worlds, id)))
+        .map(([id, source]) => ({
+          id,
+          downloaded: false,
+          package: readPackage(source),
+        })),
+    ],
+    clone: async (id) => {
+      const source = remote.get(id);
+      if (!source) throw new Error(`No world ${id} is listed.`);
+      cloned.push(id);
+      cpSync(source, path.join(worlds, id), { recursive: true });
+    },
+  };
+}
+
 /** A repo-shaped folder with a world that has a cast and one that doesn't. */
 function fixture(): string {
   const root = mkdtempSync(path.join(tmpdir(), "kazusa-setup-"));
   const app = path.join(root, "apps/kazusa");
   mkdirSync(path.join(root, ".agents"));
   write(
-    path.join(app, "worlds/base.json"),
+    path.join(app, "base.json"),
     JSON.stringify({
       systemAgent: { skills: ["kazusa"] },
       config: {
@@ -143,7 +191,8 @@ describe("sdkScript", () => {
 describe("setup", () => {
   let app: string;
   let store: ReturnType<typeof memoryStore>;
-  const createSetupHere = (dir: string) => createSetup(dir, store);
+  const createSetupHere = (dir: string, catalog = folderCatalog(dir)) =>
+    createSetup(dir, store, catalog);
   beforeEach(() => {
     app = fixture();
     store = memoryStore();
@@ -181,6 +230,50 @@ describe("setup", () => {
       { id: "cy", name: "CY" },
     ]);
     expect(status.worlds[1]?.characters).toEqual([]);
+  });
+
+  it("lists a world not yet downloaded by its package.json, and downloads it when picked", async () => {
+    const elsewhere = mkdtempSync(path.join(tmpdir(), "kazusa-remote-"));
+    renameSync(
+      path.join(app, "worlds/cast-world"),
+      path.join(elsewhere, "cast-world"),
+    );
+    const catalog = folderCatalog(
+      app,
+      new Map([["cast-world", path.join(elsewhere, "cast-world")]]),
+    );
+    const setup = createSetupHere(app, catalog);
+    const listed = (await setup.status()).worlds.find(
+      ({ id }) => id === "cast-world",
+    );
+    expect(listed).toMatchObject({ downloaded: false, characters: [] });
+    const picked = await setup.prepare("cast-world");
+    expect(picked).toMatchObject({
+      downloaded: true,
+      defaultCast: ["ann", "bo"],
+    });
+    expect(picked.characters.map(({ id }) => id)).toEqual(["ann", "bo", "cy"]);
+    // Picked again (a reload): already there.
+    await setup.prepare("cast-world");
+    expect(catalog.cloned).toEqual(["cast-world"]);
+  });
+
+  it("downloads a world chosen without picking it first", async () => {
+    const elsewhere = mkdtempSync(path.join(tmpdir(), "kazusa-remote-"));
+    renameSync(
+      path.join(app, "worlds/cast-world"),
+      path.join(elsewhere, "cast-world"),
+    );
+    const catalog = folderCatalog(
+      app,
+      new Map([["cast-world", path.join(elsewhere, "cast-world")]]),
+    );
+    await createSetupHere(app, catalog).apply({
+      world: "cast-world",
+      cast: ["ann"],
+    });
+    expect(catalog.cloned).toEqual(["cast-world"]);
+    expect(existsSync(path.join(app, "world/workspaces/ann"))).toBe(true);
   });
 
   it("reads groups from the world's anchors, broadest first, skipping groups of one", async () => {

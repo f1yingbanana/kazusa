@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -234,12 +236,20 @@ Body text.
     );
   });
 
-  it.each(["blue-archive", "elden-ring", "genshin-impact", "starter"])(
+  // Worlds live in their own repositories (`apps/kazusa/world-sources.json`): only those
+  // downloaded here can be checked.
+  const worlds = fileURLToPath(new URL("../../../../worlds/", import.meta.url));
+  const downloaded = existsSync(worlds)
+    ? readdirSync(worlds).filter((id) =>
+        existsSync(path.join(worlds, id, "shared/wiki")),
+      )
+    : [];
+  it
+    .skipIf(downloaded.length === 0)
+    .each(downloaded.length ? downloaded : ["(none downloaded)"])(
     "loads the %s world's wiki",
     (id) => {
-      const wikiDir = fileURLToPath(
-        new URL(`../../../../worlds/${id}/shared/wiki`, import.meta.url),
-      );
+      const wikiDir = path.join(worlds, id, "shared/wiki");
       const world = loadWorld(wikiDir);
       expect(world?.map.places.size).toBeGreaterThan(0);
       for (const home of world?.homes.values() ?? []) {

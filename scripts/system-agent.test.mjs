@@ -14,7 +14,7 @@ function repo(entry) {
   const app = path.join(root, "apps/kazusa");
   mkdirSync(path.join(app, "worlds"), { recursive: true });
   writeFileSync(
-    path.join(app, "worlds/base.json"),
+    path.join(app, "base.json"),
     JSON.stringify({ systemAgent: SYSTEM_AGENT, config: {} }),
   );
   if (entry) {

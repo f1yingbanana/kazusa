@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { PROVIDERS } from "@kazusa/client";
 
 const base = JSON.parse(
-  readFileSync(
-    new URL("../../../../worlds/base.json", import.meta.url),
-    "utf8",
-  ),
+  readFileSync(new URL("../../../../base.json", import.meta.url), "utf8"),
 ) as {
   config: {
     agents: { defaults: { decisionModel?: string } };
@@ -30,7 +27,7 @@ const base = JSON.parse(
  * Keys are auth profiles, outside `openclaw.json`. A store reference in a new
  * world would hide a profile from model discovery.
  */
-describe("worlds/base.json", () => {
+describe("apps/kazusa/base.json", () => {
   it("allows every provider in the catalog and references no keys", () => {
     for (const entry of PROVIDERS)
       expect(base.config.plugins.allow).toContain(entry.plugin);
