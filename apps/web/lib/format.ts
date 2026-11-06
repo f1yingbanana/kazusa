@@ -53,6 +53,14 @@ export function formatDayLabel(timestamp: number, now: number) {
   return longDateFormatter.format(timestamp);
 }
 
+/**
+ * A moment outside the app, where "Today" means nothing: "Tuesday, March 3,
+ * 14:32".
+ */
+export function formatDateTime(timestamp: number) {
+  return `${longDateFormatter.format(timestamp)}, ${timeFormatter.format(timestamp)}`;
+}
+
 export function isSameDay(a: number, b: number) {
   return startOfDay(a) === startOfDay(b);
 }

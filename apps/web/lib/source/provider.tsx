@@ -8,6 +8,7 @@ import type {
   DesiresResponse,
   LocationsResponse,
   PlacesResponse,
+  WorldMeta,
   WorldResponse,
 } from "@kazusa/client";
 import { useChatsResource } from "@/hooks/use-chats";
@@ -44,6 +45,8 @@ interface SourcesValue {
   readonly backendError?: Error;
   readonly retryBackend: () => void;
   readonly player: { readonly id: string; readonly name: string };
+  /** The world's title and accent; absent until `/kazusa/world` answers. */
+  readonly world?: WorldMeta;
   readonly characters: readonly CharacterSummary[];
   readonly charactersById: ReadonlyMap<string, CharacterSummary>;
   readonly charactersLoading: boolean;
@@ -198,6 +201,7 @@ export function SourcesProvider({
       backendError: chats.error,
       retryBackend: () => void chats.mutate(),
       player,
+      world: worldResource.data?.world,
       characters,
       charactersById,
       charactersLoading:
@@ -210,6 +214,7 @@ export function SourcesProvider({
       chats.error,
       chats.mutate,
       player,
+      worldResource.data?.world,
       characters,
       charactersById,
       liveCharacters.isLoading,
