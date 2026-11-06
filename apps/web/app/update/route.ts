@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/same-origin";
-import { runUpdater } from "@/lib/update/run";
+import { requireLocalOwner } from "../../lib/auth/access";
+import { runUpdater } from "../../lib/update/run";
 
 /** Stays the same until the frontend restarts. */
 const BOOT = String(Date.now());
@@ -16,6 +16,8 @@ let staging = false;
  * from. `?boot=1` answers at once, for a page waiting out the restart.
  */
 export async function GET(request: Request): Promise<Response> {
+  const denied = requireLocalOwner(request);
+  if (denied) return denied;
   const params = new URL(request.url).searchParams;
   if (params.has("boot")) return Response.json({ boot: BOOT });
   if (
@@ -33,11 +35,8 @@ export async function GET(request: Request): Promise<Response> {
 
 /** Downloads the update; `scripts/dev.mjs` applies it as it restarts Kazusa. */
 export async function POST(request: Request): Promise<Response> {
-  if (!isSameOrigin(request))
-    return Response.json(
-      { error: "Use the same origin to update." },
-      { status: 403 },
-    );
+  const denied = requireLocalOwner(request);
+  if (denied) return denied;
   const parsed = StageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return Response.json({ error: "Unknown update." }, { status: 400 });

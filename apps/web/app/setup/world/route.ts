@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/same-origin";
-import { setup } from "@/lib/setup/setup";
+import { requireLocalOwner } from "../../../lib/auth/access";
+import { setup } from "../../../lib/setup/setup";
 
 const PrepareSchema = z.object({ id: z.string().trim().min(1) });
 
@@ -9,11 +9,8 @@ const PrepareSchema = z.object({ id: z.string().trim().min(1) });
  * only, like `/setup`.
  */
 export async function POST(request: Request): Promise<Response> {
-  if (!isSameOrigin(request))
-    return Response.json(
-      { error: "Use the same origin for setup requests." },
-      { status: 403 },
-    );
+  const denied = requireLocalOwner(request);
+  if (denied) return denied;
   const parsed = PrepareSchema.safeParse(
     await request.json().catch(() => null),
   );

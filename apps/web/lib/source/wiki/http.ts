@@ -20,70 +20,42 @@ import { buildUrl, KazusaApiError, postJson, request } from "../http";
 
 export const WIKI_KEY = "kazusa/wiki";
 
-export async function fetchWikiList(
-  baseUrl: string,
-  token: string | undefined,
-  agent?: string,
-): Promise<WikiListResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/wiki", { agent }),
-    undefined,
-    token,
-  );
+export async function fetchWikiList(agent?: string): Promise<WikiListResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/wiki", { agent }));
   return WikiListResponseSchema.parse(data);
 }
 
 export async function fetchWikiPage(
-  baseUrl: string,
-  token: string | undefined,
   id: string,
   agent?: string,
 ): Promise<WikiPageResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/wiki/page", { id, agent }),
-    undefined,
-    token,
+    buildUrl("/kazusa/wiki/page", { id, agent }),
   );
   return WikiPageResponseSchema.parse(data);
 }
 
-export async function fetchWikiLint(
-  baseUrl: string,
-  token: string | undefined,
-  agent?: string,
-): Promise<WikiLintResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/wiki/lint", { agent }),
-    undefined,
-    token,
-  );
+export async function fetchWikiLint(agent?: string): Promise<WikiLintResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/wiki/lint", { agent }));
   return WikiLintResponseSchema.parse(data);
 }
 
 export async function fetchMemoryRuns(
-  baseUrl: string,
-  token: string | undefined,
   agent: string,
 ): Promise<MemoryRunsResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/memory/runs", { agent }),
-    undefined,
-    token,
+    buildUrl("/kazusa/memory/runs", { agent }),
   );
   return MemoryRunsResponseSchema.parse(data);
 }
 
 export async function fetchWikiSource(
-  baseUrl: string,
-  token: string | undefined,
   id: string,
   agent?: string,
   kind?: WikiKind,
 ): Promise<WikiSourceResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/wiki/source", { id, agent, kind }),
-    undefined,
-    token,
+    buildUrl("/kazusa/wiki/source", { id, agent, kind }),
   );
   return WikiSourceResponseSchema.parse(data);
 }
@@ -92,15 +64,12 @@ export async function fetchWikiSource(
 export class WikiConflictError extends Error {}
 
 export async function saveWikiSource(
-  baseUrl: string,
-  token: string | undefined,
   payload: WikiSavePayload,
 ): Promise<WikiSourceResponse> {
   try {
     const data = await postJson<unknown>(
-      buildUrl(baseUrl, "/kazusa/wiki/save"),
+      buildUrl("/kazusa/wiki/save"),
       payload,
-      token,
     );
     return WikiSourceResponseSchema.parse(data);
   } catch (error) {
@@ -112,15 +81,12 @@ export async function saveWikiSource(
 
 /** Removes a page; 409 as for a save when it changed since it was read. */
 export async function deleteWikiPage(
-  baseUrl: string,
-  token: string | undefined,
   payload: WikiDeletePayload,
 ): Promise<WikiEditResult> {
   try {
     const data = await postJson<unknown>(
-      buildUrl(baseUrl, "/kazusa/wiki/delete"),
+      buildUrl("/kazusa/wiki/delete"),
       payload,
-      token,
     );
     return WikiEditResultSchema.parse(data);
   } catch (error) {
@@ -132,14 +98,11 @@ export async function deleteWikiPage(
 
 /** Gives a World Wiki place a new id everywhere. */
 export async function renameWikiPage(
-  baseUrl: string,
-  token: string | undefined,
   payload: WikiRenamePayload,
 ): Promise<WikiEditResult> {
   const data = await postJson<unknown>(
-    buildUrl(baseUrl, "/kazusa/wiki/rename"),
+    buildUrl("/kazusa/wiki/rename"),
     payload,
-    token,
   );
   return WikiEditResultSchema.parse(data);
 }

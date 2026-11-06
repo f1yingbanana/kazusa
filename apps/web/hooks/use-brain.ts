@@ -5,7 +5,6 @@ import useSWR from "swr";
 import type { BrainTraceResponse, UsageResponse } from "@kazusa/client";
 import { fetchBrainTrace, fetchUsage } from "@/lib/source/brain/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 const THINKING_POLL_MS = 1500;
 const IDLE_POLL_MS = 5000;
@@ -22,13 +21,12 @@ export function useBrainTrace(
   thinking: boolean,
 ) {
   const { resolved } = useSources();
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<BrainTraceResponse, Error>(
     resolved.brain === "live" && id
-      ? (["kazusa/brain/trace", baseUrl, id, limit] as const)
+      ? (["kazusa/brain/trace", id, limit] as const)
       : null,
-    ([, , agent]: readonly [string, string, string, number]) =>
-      fetchBrainTrace(baseUrl, token, agent, limit),
+    ([, agent]: readonly [string, string, number]) =>
+      fetchBrainTrace(agent, limit),
     {
       refreshInterval: thinking ? THINKING_POLL_MS : IDLE_POLL_MS,
       keepPreviousData: true,
@@ -43,15 +41,12 @@ export function useBrainTrace(
  */
 export function useUsage(days: number) {
   const { resolved } = useSources();
-  const { baseUrl, token } = useKazusaConfig();
   const [checks, setChecks] = useState({ days, count: 0 });
   // Reads so far, counting the first load.
   const count = checks.days === days ? checks.count : 0;
   const swr = useSWR<UsageResponse, Error>(
-    resolved.usage === "live"
-      ? (["kazusa/usage", baseUrl, days] as const)
-      : null,
-    () => fetchUsage(baseUrl, token, days),
+    resolved.usage === "live" ? (["kazusa/usage", days] as const) : null,
+    () => fetchUsage(days),
     {
       refreshInterval: (data) =>
         data?.partial ? (PARTIAL_USAGE_POLLS_MS[count - 1] ?? 0) : 0,

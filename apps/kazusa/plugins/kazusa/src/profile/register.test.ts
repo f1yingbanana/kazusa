@@ -23,6 +23,7 @@ async function setup() {
   );
   const routes: Record<string, Handler> = {};
   registerProfile({
+    config: { gateway: { auth: { token: "test-service-token" } } },
     pluginConfig: {
       user: { id: "user:player", name: "Player" },
       location: { wikiDir },
@@ -38,7 +39,7 @@ async function setup() {
     ) as unknown as IncomingMessage;
     Object.assign(req, {
       method: body === undefined ? "GET" : "POST",
-      headers: {},
+      headers: { authorization: "Bearer test-service-token" },
       url: route,
       socket: new Socket(),
     });

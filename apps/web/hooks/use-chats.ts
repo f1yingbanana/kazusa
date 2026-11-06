@@ -25,15 +25,8 @@ import type {
 import type { Chat, ChatInfo, MessageType } from "@/lib/source/chats/types";
 import type { KazusaConfig } from "@/lib/state/config-store";
 
-export function chatsKey(
-  config: Pick<KazusaConfig, "baseUrl" | "userId" | "token">,
-) {
-  return [
-    "kazusa/chats",
-    config.baseUrl,
-    config.userId,
-    config.token ?? "",
-  ] as const;
+export function chatsKey(config: Pick<KazusaConfig, "userId">) {
+  return ["kazusa/chats", config.userId] as const;
 }
 
 export function messagesCacheKey(config: KazusaConfig, chatId: string) {
@@ -54,7 +47,7 @@ export function useChatsResource() {
   const config = useKazusaConfig();
   const resource = useSWR<ChatsResponse, Error, ReturnType<typeof chatsKey>>(
     chatsKey(config),
-    ([, baseUrl]) => fetchChats(baseUrl, config.token),
+    () => fetchChats(),
   );
   const { data } = resource;
 
@@ -98,7 +91,7 @@ export function useChats() {
 export function useMessages(chatId: string | null) {
   const config = useKazusaConfig();
   return usePagedMessages(messagesKeyGetter(config, chatId), (id, before) =>
-    fetchMessages(config.baseUrl, { chatId: id, before }, config.token),
+    fetchMessages({ chatId: id, before }),
   );
 }
 
@@ -110,7 +103,7 @@ export function usePagedMessages<T extends MessagesResponse>(
   const { data, error, isLoading, size, setSize, isValidating, mutate } =
     useSWRInfinite<T, Error, ReturnType<typeof messagesKeyGetter>>(
       getKey,
-      ([, , , id, before]) => fetchPage(id, before),
+      ([, , id, before]) => fetchPage(id, before),
       { revalidateFirstPage: true, revalidateOnFocus: false },
     );
 
@@ -213,7 +206,6 @@ export function useChatActions() {
     type?: MessageType,
   ) {
     return sendMessage(
-      config.baseUrl,
       chat.draft
         ? {
             requestId,
@@ -231,7 +223,6 @@ export function useChatActions() {
             sessionKey: chat.sessionKey,
             ...(type === "action" ? { type } : {}),
           },
-      config.token,
     );
   }
 
@@ -268,7 +259,7 @@ export function useChatActions() {
    * chats (it is read-only under Other chats from then on).
    */
   async function manage(payload: ManageChatPayload) {
-    const response = await manageChat(config.baseUrl, payload, config.token);
+    const response = await manageChat(payload);
     const left = !response.chat.members.includes(config.userId);
     await mutate(
       chatsKey(config),
@@ -283,7 +274,7 @@ export function useChatActions() {
         },
       { revalidate: true },
     );
-    if (left) await mutate(observedChatsKey(config));
+    if (left) await mutate(observedChatsKey());
     return response.chat;
   }
 
@@ -293,20 +284,16 @@ export function useChatActions() {
    * someone else.
    */
   async function callOver(chat: Chat, members: string[], text: string) {
-    const response = await sendMessage(
-      config.baseUrl,
-      {
-        requestId: crypto.randomUUID(),
-        text,
-        type: "action",
-        aloud: true,
-        members,
-      },
-      config.token,
-    );
+    const response = await sendMessage({
+      requestId: crypto.randomUUID(),
+      text,
+      type: "action",
+      aloud: true,
+      members,
+    });
     commitSentMessage(response.chatId, response.message);
     await mutate(chatsKey(config));
-    if (response.chatId !== chat.id) await mutate(observedChatsKey(config));
+    if (response.chatId !== chat.id) await mutate(observedChatsKey());
     return response;
   }
 

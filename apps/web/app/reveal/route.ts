@@ -1,19 +1,16 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { z } from "zod";
-import { isSameOrigin } from "@/lib/same-origin";
-import { revealCommand } from "@/lib/setup/reveal";
-import { setup } from "@/lib/setup/setup";
+import { requireLocalOwner } from "../../lib/auth/access";
+import { revealCommand } from "../../lib/setup/reveal";
+import { setup } from "../../lib/setup/setup";
 
 const RevealSchema = z.object({ file: z.enum(["config", "env"]) });
 
 /** Local only, like `/setup`. Only these two named files can ever be shown. */
 export async function POST(request: Request): Promise<Response> {
-  if (!isSameOrigin(request))
-    return Response.json(
-      { error: "Use the same origin to open files." },
-      { status: 403 },
-    );
+  const denied = requireLocalOwner(request);
+  if (denied) return denied;
   const parsed = RevealSchema.safeParse(await request.json());
   if (!parsed.success)
     return Response.json({ error: "Unknown file." }, { status: 400 });

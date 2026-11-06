@@ -241,7 +241,7 @@ Body text.
   const worlds = fileURLToPath(new URL("../../../../worlds/", import.meta.url));
   const downloaded = existsSync(worlds)
     ? readdirSync(worlds).filter((id) =>
-        existsSync(path.join(worlds, id, "shared/wiki")),
+        existsSync(path.join(worlds, id, "shared/wiki/entities/places")),
       )
     : [];
   it

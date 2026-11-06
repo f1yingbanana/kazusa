@@ -9,7 +9,6 @@ import {
   saveProfile,
 } from "@/lib/source/profile/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 /** The inspector shows the same description. */
 function isCharacterKey(key: unknown): boolean {
@@ -19,15 +18,12 @@ function isCharacterKey(key: unknown): boolean {
 /** The player's own profile. Only live. */
 export function useProfile() {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const { mutate: mutateMatching } = useSWRConfig();
   const enabled = resolved.profile === "live";
 
   const resource = useSWR<ProfileResponse, Error>(
-    enabled
-      ? ([PROFILE_KEY, config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchProfile(config.baseUrl, config.token),
+    enabled ? ([PROFILE_KEY] as const) : null,
+    () => fetchProfile(),
     { revalidateOnFocus: false },
   );
   const { mutate } = resource;
@@ -35,11 +31,11 @@ export function useProfile() {
   /** Throws if the server refuses, so the form can stay as it is. */
   const save = useCallback(
     async (about: string): Promise<void> => {
-      const saved = await saveProfile(config.baseUrl, { about }, config.token);
+      const saved = await saveProfile({ about });
       await mutate(saved, { revalidate: false });
       void mutateMatching(isCharacterKey);
     },
-    [config.baseUrl, config.token, mutate, mutateMatching],
+    [mutate, mutateMatching],
   );
 
   return {

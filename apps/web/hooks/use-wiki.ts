@@ -26,44 +26,38 @@ import {
   WIKI_KEY,
 } from "@/lib/source/wiki/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 /** Wiki reads. Only live: Markdown on the server is the one truth. */
 function useWikiKey(parts: readonly unknown[], ready = true) {
   const { resolved } = useSources();
-  const { baseUrl } = useKazusaConfig();
   return resolved.wiki === "live" && ready
-    ? ([WIKI_KEY, baseUrl, ...parts] as const)
+    ? ([WIKI_KEY, ...parts] as const)
     : null;
 }
 
 export function useWikiList(agent?: string) {
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<WikiListResponse>(useWikiKey(["list", agent ?? ""]), () =>
-    fetchWikiList(baseUrl, token, agent),
+    fetchWikiList(agent),
   );
 }
 
 export function useWikiPage(id: string | undefined, agent?: string) {
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<WikiPageResponse>(
     useWikiKey(["page", id, agent ?? ""], Boolean(id)),
-    () => fetchWikiPage(baseUrl, token, id ?? "", agent),
+    () => fetchWikiPage(id ?? "", agent),
   );
 }
 
 export function useWikiLint(agent?: string) {
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<WikiLintResponse>(useWikiKey(["lint", agent ?? ""]), () =>
-    fetchWikiLint(baseUrl, token, agent),
+    fetchWikiLint(agent),
   );
 }
 
 export function useMemoryRuns(agent: string | undefined) {
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<MemoryRunsResponse>(
     useWikiKey(["runs", agent], Boolean(agent)),
-    () => fetchMemoryRuns(baseUrl, token, agent ?? ""),
+    () => fetchMemoryRuns(agent ?? ""),
   );
 }
 
@@ -76,27 +70,21 @@ export function useWikiSource(
   agent?: string,
   kind?: WikiKind,
 ) {
-  const { baseUrl, token } = useKazusaConfig();
   return useSWR<WikiSourceResponse>(
     useWikiKey(["source", id, agent ?? "", kind ?? ""], Boolean(id)),
-    () => fetchWikiSource(baseUrl, token, id ?? "", agent, kind),
+    () => fetchWikiSource(id ?? "", agent, kind),
     { revalidateOnFocus: false, revalidateIfStale: false },
   );
 }
 
 /** Every wiki read (pages, lists, problems) reloads after a write. */
 function useWikiWrite<Payload, Result>(
-  write: (
-    baseUrl: string,
-    token: string | undefined,
-    payload: Payload,
-  ) => Promise<Result>,
+  write: (payload: Payload) => Promise<Result>,
 ) {
-  const { baseUrl, token } = useKazusaConfig();
   const { mutate } = useSWRConfig();
   return useCallback(
     async (payload: Payload): Promise<Result> => {
-      const result = await write(baseUrl, token, payload);
+      const result = await write(payload);
       void mutate(
         (key) => Array.isArray(key) && key[0] === WIKI_KEY,
         undefined,
@@ -104,7 +92,7 @@ function useWikiWrite<Payload, Result>(
       );
       return result;
     },
-    [baseUrl, token, mutate, write],
+    [mutate, write],
   );
 }
 

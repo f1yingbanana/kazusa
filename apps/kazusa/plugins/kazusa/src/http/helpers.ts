@@ -1,4 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
+import {
+  deploymentRole,
+  hasPermission,
+  KAZUSA_ROUTES,
+  parseAuthMode,
+  RoleSchema,
+  VIEWER_ROLE_HEADER,
+  type Role,
+} from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readJsonBodyWithLimit } from "openclaw/plugin-sdk/webhook-request-guards";
 
@@ -17,10 +27,7 @@ export function sendJson(
   status: number,
   data: unknown,
 ): void {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-  });
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(data));
 }
 
@@ -40,30 +47,29 @@ export function resolveAuthToken(api: OpenClawPluginApi): string | undefined {
   return process.env.OPENCLAW_GATEWAY_TOKEN?.trim() || undefined;
 }
 
+/** Server-to-server only: the Bearer header, never a URL a browser could leak. */
 export function checkAuth(
   req: IncomingMessage,
   expectedToken?: string,
 ): boolean {
-  if (!expectedToken) return true;
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-    if (match && match[1] === expectedToken) return true;
-  }
-  try {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const queryToken = url.searchParams.get("token");
-    if (queryToken && queryToken === expectedToken) return true;
-  } catch {
-    // Ignore URL parse errors
-  }
-  return false;
+  if (!expectedToken) return false;
+  const match = /^Bearer\s+(.+)$/i.exec(
+    req.headers.authorization?.trim() ?? "",
+  );
+  if (!match) return false;
+  const actual = Buffer.from(match[1]);
+  const expected = Buffer.from(expectedToken);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 export type RouteRegistrar = (
   path: string,
   method: "GET" | "POST",
-  handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>,
+  handler: (
+    req: IncomingMessage,
+    res: ServerResponse,
+    role: Role,
+  ) => Promise<void>,
 ) => void;
 
 /**
@@ -75,41 +81,56 @@ export function createRouteRegistrar(
   options?: { readonly auth?: "gateway" | "plugin" },
 ): RouteRegistrar {
   const auth = options?.auth ?? "plugin";
-  const expectedToken = auth === "plugin" ? resolveAuthToken(api) : undefined;
-  return (
-    path: string,
-    method: "GET" | "POST",
-    handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>,
-  ): void => {
+  const expectedToken = resolveAuthToken(api);
+  const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
+  return (path, method, handler): void => {
+    const policy = KAZUSA_ROUTES.get(path);
+    if (!policy || policy.method !== method) {
+      throw new Error(
+        `Missing Kazusa route policy for ${method} /kazusa/${path}.`,
+      );
+    }
     api.registerHttpRoute({
       path: `/kazusa/${path}`,
       auth,
       match: "exact",
       handler: async (req, res) => {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", `${method}, OPTIONS`);
-        res.setHeader(
-          "Access-Control-Allow-Headers",
-          "Content-Type, Authorization",
-        );
-        if (req.method === "OPTIONS") {
-          res.statusCode = 204;
-          res.end();
-          return true;
-        }
-        if (!checkAuth(req, expectedToken)) {
+        // Gateway-auth routes already passed native authentication. A delegated
+        // role additionally requires the private proxy's service credential.
+        const delegated = req.headers[VIEWER_ROLE_HEADER];
+        if (
+          (auth === "plugin" || delegated !== undefined) &&
+          !checkAuth(req, expectedToken)
+        ) {
           sendJson(res, 401, {
             error: "Unauthorized: Invalid or missing gateway token.",
           });
           return true;
         }
         if (req.method !== method) {
-          res.setHeader("Allow", `${method}, OPTIONS`);
+          res.setHeader("Allow", method);
           sendJson(res, 405, { error: `Use ${method}.` });
           return true;
         }
+        const parsed = RoleSchema.safeParse(delegated ?? deploymentRole(mode));
+        // Collaborator play is not enabled until player identities are scoped
+        // to the authenticated request, including the admin-agent boundary.
+        if (!parsed.success || parsed.data === "collaborator") {
+          sendJson(res, 401, {
+            error: "Invalid or unsupported viewer identity.",
+          });
+          return true;
+        }
+        const role = mode === "public" ? "visitor" : parsed.data;
+        if (!hasPermission(role, policy.permission)) {
+          sendJson(res, 403, {
+            error: "Your access does not allow this action.",
+          });
+          return true;
+        }
         try {
-          await handler(req, res);
+          // Resource-specific checks use this authenticated, mode-clamped role.
+          await handler(req, res, role);
         } catch (error) {
           if (res.headersSent) res.end();
           else

@@ -129,16 +129,12 @@ export function ChatView({
   const handleTyping = useCallback(
     (isTyping: boolean) => {
       if (!chat.draft)
-        void setTyping(
-          config.baseUrl,
-          {
-            sessionKey: chat.sessionKey,
-            isTyping,
-          },
-          config.token,
-        ).catch(() => {});
+        void setTyping({
+          sessionKey: chat.sessionKey,
+          isTyping,
+        }).catch(() => {});
     },
-    [chat.draft, chat.sessionKey, config.baseUrl, config.token],
+    [chat.draft, chat.sessionKey],
   );
 
   return (

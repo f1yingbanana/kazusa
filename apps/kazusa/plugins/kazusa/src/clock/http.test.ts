@@ -20,7 +20,7 @@ describe("registerClockHttp", () => {
       (req: unknown, res: unknown) => Promise<boolean>
     > = {};
     const api = {
-      config: {},
+      config: { gateway: { auth: { token: "test-service-token" } } },
       pluginConfig: {
         user: { id: "user:test", name: "Tester" },
         world: { title: "Test World" },
@@ -59,7 +59,11 @@ describe("registerClockHttp", () => {
       },
     };
     await routes["/kazusa/world"]?.(
-      { method: "GET", url: "/kazusa/world" },
+      {
+        method: "GET",
+        url: "/kazusa/world",
+        headers: { authorization: "Bearer test-service-token" },
+      },
       worldRes,
     );
 

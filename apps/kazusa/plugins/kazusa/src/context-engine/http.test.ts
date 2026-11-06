@@ -15,6 +15,7 @@ function setup(contextEngine: Record<string, unknown> = {}) {
   const config = { agents: { list: [{ id: "alice" }, { id: "bob" }] } };
   registerContextHttp(
     {
+      config: { gateway: { auth: { token: "test-service-token" } } },
       pluginConfig: { contextEngine },
       registerHttpRoute: (route: { path: string; handler: Handler }) => {
         routes[route.path] = route.handler;
@@ -48,7 +49,7 @@ function setup(contextEngine: Record<string, unknown> = {}) {
     ) as unknown as IncomingMessage;
     Object.assign(req, {
       method: body === undefined ? "GET" : "POST",
-      headers: {},
+      headers: { authorization: "Bearer test-service-token" },
       url: route,
       socket: new Socket(),
     });

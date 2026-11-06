@@ -20,12 +20,11 @@ import { useKazusaConfig } from "@/lib/state/config-store";
  * and changes nothing; when the Player lens comes, redaction belongs here.
  */
 function useObservedResource() {
-  const config = useKazusaConfig();
   const { resolved } = useSources();
   const live = resolved.observe === "live";
   const resource = useSWR<ObservedChatsResponse, Error>(
-    live ? observedChatsKey(config) : null,
-    () => fetchObservedChats(config.baseUrl, config.token),
+    live ? observedChatsKey() : null,
+    () => fetchObservedChats(),
     { revalidateOnFocus: false },
   );
   return { ...resource, available: live };
@@ -71,11 +70,6 @@ export function useObservedMessages(chatId: string | null) {
   const config = useKazusaConfig();
   return usePagedMessages<MessagesResponse>(
     messagesKeyGetter(config, chatId, OBSERVED_MESSAGES_KEY),
-    (id, before) =>
-      fetchObservedMessages(
-        config.baseUrl,
-        { chatId: id, before },
-        config.token,
-      ),
+    (id, before) => fetchObservedMessages({ chatId: id, before }),
   );
 }

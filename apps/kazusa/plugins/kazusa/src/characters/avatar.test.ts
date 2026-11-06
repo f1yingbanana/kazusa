@@ -13,7 +13,10 @@ async function setup(withAvatar: boolean) {
   const routes: Record<string, (req: unknown, res: unknown) => Promise<void>> =
     {};
   const api = {
-    config: { agents: { list: [{ id: "kazusa", workspace }] } },
+    config: {
+      gateway: { auth: { token: "test-service-token" } },
+      agents: { list: [{ id: "kazusa", workspace }] },
+    },
     runtime: {
       agent: { resolveAgentWorkspaceDir: vi.fn(() => workspace) },
     },
@@ -46,7 +49,14 @@ async function get(
   });
   const chunks: Buffer[] = [];
   res.on("data", (chunk: Buffer) => chunks.push(chunk));
-  await handler?.({ method: "GET", url, headers: {} }, res);
+  await handler?.(
+    {
+      method: "GET",
+      url,
+      headers: { authorization: "Bearer test-service-token" },
+    },
+    res,
+  );
   return { ...res, body: Buffer.concat(chunks).toString() };
 }
 

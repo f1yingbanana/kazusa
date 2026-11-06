@@ -2,18 +2,15 @@
 
 import { useSyncExternalStore } from "react";
 
+/** The configured player; the server supplies it (`/kazusa/chats` user). */
 export type KazusaConfig = {
-  baseUrl: string;
-  token?: string;
-  /** Supplied by the server (`/kazusa/chats` user); never hardcoded lore. */
   userId: string;
   userName: string;
 };
 
-const STORAGE_KEY = "kazusa:connection";
+/** Older clients stored a Gateway URL and token here; never read it again. */
+const LEGACY_STORAGE_KEY = "kazusa:connection";
 export const DEFAULT_CONFIG: KazusaConfig = {
-  baseUrl: process.env.NEXT_PUBLIC_KAZUSA_API_URL ?? "",
-  token: process.env.NEXT_PUBLIC_KAZUSA_TOKEN ?? "",
   userId: "user:you",
   userName: "You",
 };
@@ -24,25 +21,11 @@ let cached: KazusaConfig | null = null;
 function read(): KazusaConfig {
   if (cached) return cached;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const saved: unknown = raw ? JSON.parse(raw) : null;
-    cached =
-      saved &&
-      typeof saved === "object" &&
-      "baseUrl" in saved &&
-      typeof saved.baseUrl === "string"
-        ? {
-            ...DEFAULT_CONFIG,
-            baseUrl: saved.baseUrl,
-            token:
-              "token" in saved && typeof saved.token === "string"
-                ? saved.token
-                : undefined,
-          }
-        : DEFAULT_CONFIG;
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
-    cached = DEFAULT_CONFIG;
+    // Storage can be unavailable (private mode, sandboxed iframes).
   }
+  cached = DEFAULT_CONFIG;
   return cached;
 }
 
@@ -53,17 +36,6 @@ function subscribe(listener: () => void) {
 
 export function saveConfig(next: KazusaConfig) {
   cached = next;
-  try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        baseUrl: next.baseUrl,
-        token: next.token ?? "",
-      }),
-    );
-  } catch {
-    // Storage can be unavailable (private mode, sandboxed iframes); keep in memory.
-  }
   for (const listener of listeners) listener();
 }
 

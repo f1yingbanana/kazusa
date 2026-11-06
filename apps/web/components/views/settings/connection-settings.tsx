@@ -1,24 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { useRealtime } from "@/lib/live/realtime-provider";
 import { useSources } from "@/lib/source/provider";
-import {
-  DEFAULT_CONFIG,
-  saveConfig,
-  useKazusaConfig,
-  type KazusaConfig,
-} from "@/lib/state/config-store";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -28,35 +12,9 @@ const STREAM_LABELS = {
   error: "Offline",
 } as const;
 
-function isValidUrl(value: string) {
-  if (!value) return true;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function normalize(draft: KazusaConfig, config: KazusaConfig): KazusaConfig {
-  return {
-    baseUrl: draft.baseUrl.trim().replace(/\/+$/, ""),
-    token: draft.token?.trim() || undefined,
-    userId: config.userId,
-    userName: config.userName,
-  };
-}
-
-function sameConnection(a: KazusaConfig, b: KazusaConfig) {
-  return (
-    a.baseUrl === b.baseUrl && (a.token || undefined) === (b.token || undefined)
-  );
-}
-
 function GatewayStatus() {
   const { status } = useRealtime();
   const { reachable, backendError, retryBackend } = useSources();
-  const { baseUrl } = useKazusaConfig();
   const down = !reachable || status === "error";
 
   return (
@@ -77,9 +35,7 @@ function GatewayStatus() {
           {!reachable ? "Can't reach the server" : STREAM_LABELS[status]}
         </span>
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {!reachable && backendError
-            ? backendError.message
-            : baseUrl || "Same origin"}
+          {!reachable && backendError ? backendError.message : "Same origin"}
         </span>
       </div>
       {down ? (
@@ -91,33 +47,11 @@ function GatewayStatus() {
   );
 }
 
-/** Where the client finds the Gateway. */
+/**
+ * The Gateway's health. The browser only ever talks to this app's proxy, which
+ * holds the Gateway credential on the server.
+ */
 export function ConnectionSettings() {
-  const config = useKazusaConfig();
-  const [draft, setDraft] = useState<KazusaConfig>(config);
-  const [submitted, setSubmitted] = useState(false);
-
-  const urlInvalid = submitted && !isValidUrl(draft.baseUrl.trim());
-  const dirty = !sameConnection(normalize(draft, config), config);
-
-  function update<K extends keyof KazusaConfig>(
-    key: K,
-    value: KazusaConfig[K],
-  ) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitted(true);
-    if (!isValidUrl(draft.baseUrl.trim())) return;
-    const next = normalize(draft, config);
-    saveConfig(next);
-    setDraft(next);
-    setSubmitted(false);
-    toast.success("Connection saved");
-  }
-
   return (
     <div className="flex flex-col">
       <SettingsSection
@@ -125,74 +59,6 @@ export function ConnectionSettings() {
         description="The client talks to your Kazusa server through this app's proxy."
       >
         <GatewayStatus />
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-6"
-          noValidate
-        >
-          <FieldGroup>
-            <Field data-invalid={urlInvalid || undefined}>
-              <FieldLabel htmlFor="base-url">Server URL</FieldLabel>
-              <Input
-                id="base-url"
-                type="url"
-                inputMode="url"
-                className="font-mono"
-                value={draft.baseUrl}
-                onChange={(event) => update("baseUrl", event.target.value)}
-                placeholder="Same origin (default)"
-                aria-invalid={urlInvalid || undefined}
-              />
-              {urlInvalid ? (
-                <FieldError>
-                  Enter a full http(s) URL or leave blank.
-                </FieldError>
-              ) : (
-                <FieldDescription>
-                  Leave blank to use this app’s Gateway connection.
-                </FieldDescription>
-              )}
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="gateway-token">Gateway token</FieldLabel>
-              <Input
-                id="gateway-token"
-                type="password"
-                className="font-mono"
-                value={draft.token ?? ""}
-                onChange={(event) => update("token", event.target.value)}
-                placeholder="Bearer token (optional for localhost)"
-                autoComplete="off"
-              />
-              <FieldDescription>
-                Required when connecting to a remote or tunneled OpenClaw
-                Gateway.
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
-          <div className="flex items-center gap-2">
-            <Button type="submit" disabled={!dirty}>
-              Save
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={sameConnection(
-                normalize(draft, config),
-                normalize(DEFAULT_CONFIG, config),
-              )}
-              onClick={() =>
-                setDraft({
-                  ...DEFAULT_CONFIG,
-                  userId: config.userId,
-                  userName: config.userName,
-                })
-              }
-            >
-              Reset to defaults
-            </Button>
-          </div>
-        </form>
       </SettingsSection>
     </div>
   );

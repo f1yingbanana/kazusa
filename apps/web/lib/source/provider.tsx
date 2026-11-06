@@ -67,10 +67,8 @@ export function SourcesProvider({
   const reachable = !chats.error && !chats.isLoading;
 
   const worldResource = useSWR<WorldResponse, Error>(
-    reachable
-      ? (["kazusa/world", config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchWorld(config.baseUrl, config.token),
+    reachable ? (["kazusa/world"] as const) : null,
+    () => fetchWorld(),
     { revalidateOnFocus: false },
   );
 
@@ -84,35 +82,27 @@ export function SourcesProvider({
   );
 
   const liveCharacters = useSWR<CharacterSummary[], Error>(
-    resolved.characters === "live"
-      ? (["kazusa/characters", config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchCharacters(config.baseUrl, config.token),
+    resolved.characters === "live" ? (["kazusa/characters"] as const) : null,
+    () => fetchCharacters(),
     { revalidateOnFocus: true, refreshInterval: 30_000 },
   );
 
   const liveDesires = useSWR<DesiresResponse, Error>(
-    resolved.desires === "live"
-      ? ([DESIRES_KEY, config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchDesires(config.baseUrl, config.token),
+    resolved.desires === "live" ? ([DESIRES_KEY] as const) : null,
+    () => fetchDesires(),
     { revalidateOnFocus: false },
   );
 
   // SSE `places` revalidates this when the map changes; records arrive by SSE.
   const livePlaces = useSWR<PlacesResponse, Error>(
-    resolved.places === "live"
-      ? ([PLACES_KEY, config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchPlaces(config.baseUrl, config.token),
+    resolved.places === "live" ? ([PLACES_KEY] as const) : null,
+    () => fetchPlaces(),
     { revalidateOnFocus: false },
   );
 
   const liveLocations = useSWR<LocationsResponse, Error>(
-    resolved.location === "live"
-      ? ([LOCATIONS_KEY, config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchLocations(config.baseUrl, config.token),
+    resolved.location === "live" ? ([LOCATIONS_KEY] as const) : null,
+    () => fetchLocations(),
     { revalidateOnFocus: false },
   );
 

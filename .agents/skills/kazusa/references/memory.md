@@ -307,7 +307,7 @@ depth read it as what they know; the canon sections stay hidden.
 **Check what someone knows.** The explainer: pick a character and a page to see
 depth and why ("familiar: same school; renown known"), or a character alone for
 their footprint ("38 intimate, 120 familiar, 300 heard of"). Client Wiki panel,
-`GET /kazusa/knowledge/explain`, or ask ARONA.
+or ask ARONA (`knowledge_explain`).
 
 **Rename or remove a page.** The id is the filename. Lint lists dangling links
 and orphaned personal pages. Keep the old id in `aliases` to preserve links, and
@@ -575,10 +575,9 @@ survives.
 ### 7.6 Read models
 
 `GET /kazusa/wiki` (both wikis, per character), `GET /kazusa/wiki/lint`,
-`GET /kazusa/knowledge/explain?agent=&page=`, `GET /kazusa/memory/runs?agent=`;
-SSE `memory` on every write. The client Wiki view shows the world page next to
-each character's page, notes with sources, depth with its reason, per-sleep
-diffs, day pages as a Diary, and lint.
+`GET /kazusa/memory/runs?agent=`; SSE `memory` on every write. The client Wiki
+view shows the world page next to each character's page, notes with sources,
+depth with its reason, per-sleep diffs, day pages as a Diary, and lint.
 
 ### 7.7 How long-term memory reaches a turn
 

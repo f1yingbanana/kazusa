@@ -10,7 +10,6 @@ import {
   saveContextSettings,
 } from "@/lib/source/context/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 function describe(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -18,7 +17,7 @@ function describe(error: unknown) {
 
 /** A character's cached read, which a world change can move. */
 function isAgentContextKey(key: unknown): boolean {
-  return Array.isArray(key) && key[0] === CONTEXT_SETTINGS_KEY && key[3] !== "";
+  return Array.isArray(key) && key[0] === CONTEXT_SETTINGS_KEY && key[1] !== "";
 }
 
 /**
@@ -28,19 +27,11 @@ function isAgentContextKey(key: unknown): boolean {
  */
 export function useContextSettings(agentId?: string) {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const { mutate: mutateMatching } = useSWRConfig();
   const enabled = resolved.context === "live";
   const resource = useSWR<ContextSettingsResponse, Error>(
-    enabled
-      ? ([
-          CONTEXT_SETTINGS_KEY,
-          config.baseUrl,
-          config.token ?? "",
-          agentId ?? "",
-        ] as const)
-      : null,
-    () => fetchContextSettings(config.baseUrl, config.token, agentId),
+    enabled ? ([CONTEXT_SETTINGS_KEY, agentId ?? ""] as const) : null,
+    () => fetchContextSettings(agentId),
     { revalidateOnFocus: false },
   );
   const { mutate } = resource;
@@ -48,12 +39,9 @@ export function useContextSettings(agentId?: string) {
   const save = useCallback(
     async (overrides: ContextOverrides): Promise<boolean> => {
       try {
-        await mutate(
-          saveContextSettings(config.baseUrl, overrides, config.token, agentId),
-          {
-            revalidate: false,
-          },
-        );
+        await mutate(saveContextSettings(overrides, agentId), {
+          revalidate: false,
+        });
         // Characters who follow the world follow it to the new value.
         if (agentId === undefined) void mutateMatching(isAgentContextKey);
         return true;
@@ -64,7 +52,7 @@ export function useContextSettings(agentId?: string) {
         return false;
       }
     },
-    [agentId, config.baseUrl, config.token, mutate, mutateMatching],
+    [agentId, mutate, mutateMatching],
   );
 
   return {

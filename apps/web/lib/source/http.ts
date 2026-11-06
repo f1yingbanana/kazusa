@@ -15,13 +15,13 @@ export function isMissingRoute(error: unknown) {
   return error instanceof KazusaApiError && error.status === 404;
 }
 
+/** Always this app's own `/kazusa/*` proxy, which holds the Gateway credential. */
 export function buildUrl(
-  baseUrl: string,
   path: string,
   params?: Record<string, string | number | undefined | null>,
 ) {
   const url = new URL(
-    `${baseUrl.replace(/\/+$/, "")}${path}`,
+    path,
     typeof window === "undefined" ? undefined : window.location.origin,
   );
   if (params) {
@@ -34,19 +34,10 @@ export function buildUrl(
   return url.toString();
 }
 
-export async function request<T>(
-  url: string,
-  init?: RequestInit,
-  token?: string,
-): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, { ...init, headers });
+    response = await fetch(url, init);
   } catch {
     throw new KazusaApiError(
       `Could not reach the Kazusa server at ${new URL(url).origin}.`,
@@ -75,14 +66,10 @@ export async function request<T>(
   return (await response.json()) as T;
 }
 
-export function postJson<T>(url: string, body: unknown, token?: string) {
-  return request<T>(
-    url,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-    token,
-  );
+export function postJson<T>(url: string, body: unknown) {
+  return request<T>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }

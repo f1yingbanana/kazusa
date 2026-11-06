@@ -12,7 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
@@ -153,7 +152,6 @@ function Progress({ phase }: { phase: UpdatePhase }) {
 /** This copy's version, and updating it to the latest release or to `main`. */
 export function UpdateSettings() {
   const { status, error, checking, phase, check, update } = useUpdate();
-  const { baseUrl } = useKazusaConfig();
   const busy = phase !== null || !!status?.blocked;
 
   async function handleUpdate(to: UpdateChannel) {
@@ -176,14 +174,7 @@ export function UpdateSettings() {
   return (
     <SettingsSection
       title="Version"
-      description={
-        <>
-          Updating restarts Kazusa. Your world stays as it is.
-          {baseUrl
-            ? ` It updates the copy on this computer, not the server at ${baseUrl}.`
-            : null}
-        </>
-      }
+      description="Updating restarts Kazusa. Your world stays as it is."
       action={
         <Button
           variant="ghost"

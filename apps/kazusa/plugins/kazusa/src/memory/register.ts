@@ -59,7 +59,6 @@ import {
   mentionsIn,
   retrieve,
   searchText,
-  type Entity,
   type RetrievalRequest,
 } from "./retrieve.ts";
 import {
@@ -136,7 +135,6 @@ export interface MemoryService {
     request: RetrievalRequest,
     limit: number,
   ) => readonly string[];
-  readonly entities: (request: RetrievalRequest) => readonly Entity[];
   readonly lint: (agentId?: string) => readonly LintFinding[];
   readonly audit: () => WorldAudit;
   readonly explain: (agentId: string, pageId?: string) => unknown;
@@ -466,7 +464,6 @@ export function registerMemory(
         .filter((entity) => entity.signals.some((s) => s !== "salience"))
         .slice(0, limit)
         .map((entity) => renderEntity(entity, nameOf)),
-    entities: (request) => retrieve(index, request),
     audit: () => {
       const config = currentConfig(api);
       const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
@@ -1055,43 +1052,6 @@ export function registerMemory(
     sendJson(res, 200, {
       findings: [...service.lint(agent)],
     } satisfies WikiLintResponse);
-  });
-  route("knowledge/explain", "GET", async (req, res) => {
-    const agent = params(req).get("agent");
-    if (!agent) {
-      sendJson(res, 400, { error: "Missing required agent query parameter." });
-      return;
-    }
-    sendJson(
-      res,
-      200,
-      service.explain(agent, params(req).get("page") ?? undefined),
-    );
-  });
-  // Retrieval with no model call: what a turn would recall for this text.
-  route("memory/preview", "GET", async (req, res) => {
-    const query = params(req);
-    const agent = query.get("agent");
-    if (!agent) {
-      sendJson(res, 400, { error: "Missing required agent query parameter." });
-      return;
-    }
-    const request: RetrievalRequest = {
-      agentId: agent,
-      stimulus: query.get("text") ?? "",
-      seeds: query.getAll("seed"),
-      now: Number(query.get("now") ?? Date.now()),
-    };
-    sendJson(res, 200, {
-      ...(await service.prefetch(request)),
-      entities: service.entities(request).map((entity) => ({
-        id: entity.id,
-        depth: entity.knowledge.depth,
-        why: entity.knowledge.why,
-        signals: entity.signals,
-        score: entity.score,
-      })),
-    });
   });
 
   return service;

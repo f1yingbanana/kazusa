@@ -11,13 +11,12 @@ import {
   selectThinking,
 } from "@/lib/source/models/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import { useCharacter } from "./use-characters";
 
 const EMPTY: ModelsResponse = { models: [], providers: [] };
 
 function isAgentModelsKey(key: unknown): boolean {
-  return Array.isArray(key) && key[0] === MODELS_KEY && key[3] !== "";
+  return Array.isArray(key) && key[0] === MODELS_KEY && key[1] !== "";
 }
 
 function describe(error: unknown) {
@@ -32,21 +31,13 @@ function describe(error: unknown) {
  */
 export function useModels(agentId?: string) {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const { mutate: mutateMatching } = useSWRConfig();
   const enabled = resolved.models === "live";
   const [refreshing, setRefreshing] = useState(false);
 
   const resource = useSWR<ModelsResponse, Error>(
-    enabled
-      ? ([
-          MODELS_KEY,
-          config.baseUrl,
-          config.token ?? "",
-          agentId ?? "",
-        ] as const)
-      : null,
-    () => fetchModels(config.baseUrl, config.token, { agentId }),
+    enabled ? ([MODELS_KEY, agentId ?? ""] as const) : null,
+    () => fetchModels({ agentId }),
     { revalidateOnFocus: false },
   );
   const { mutate } = resource;
@@ -98,17 +89,12 @@ export function useModels(agentId?: string) {
             : {}),
         }),
         async () => {
-          const { current } = await selectModel(
-            config.baseUrl,
-            ref,
-            config.token,
-            { agentId },
-          );
+          const { current } = await selectModel(ref, { agentId });
           return { current };
         },
         "Couldn't switch models",
       ),
-    [agentId, config.baseUrl, config.token, write],
+    [agentId, write],
   );
 
   const setThinking = useCallback(
@@ -123,33 +109,27 @@ export function useModels(agentId?: string) {
             : {}),
         }),
         async () => {
-          const { thinking } = await selectThinking(
-            config.baseUrl,
-            level,
-            config.token,
-            { agentId },
-          );
+          const { thinking } = await selectThinking(level, { agentId });
           return { thinking };
         },
         "Couldn't change reasoning",
       ),
-    [agentId, config.baseUrl, config.token, write],
+    [agentId, write],
   );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await mutate(
-        fetchModels(config.baseUrl, config.token, { agentId, refresh: true }),
-        { revalidate: false },
-      );
+      await mutate(fetchModels({ agentId, refresh: true }), {
+        revalidate: false,
+      });
       if (agentId === undefined) void mutateMatching(isAgentModelsKey);
     } catch (error) {
       toast.error("Couldn't refresh models", { description: describe(error) });
     } finally {
       setRefreshing(false);
     }
-  }, [agentId, config.baseUrl, config.token, mutate, mutateMatching]);
+  }, [agentId, mutate, mutateMatching]);
 
   return {
     enabled,

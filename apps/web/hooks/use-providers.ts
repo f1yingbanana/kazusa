@@ -14,22 +14,18 @@ import {
   saveProviderKey,
 } from "@/lib/source/models/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import { isRoleModelsKey } from "./use-model-roles";
 import { useModels } from "./use-models";
 
 function useProvidersResource() {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const enabled = resolved.models === "live";
   const resource = useSWR<ProvidersResponse, Error>(
-    enabled
-      ? ([PROVIDERS_KEY, config.baseUrl, config.token ?? ""] as const)
-      : null,
-    () => fetchProviders(config.baseUrl, config.token),
+    enabled ? ([PROVIDERS_KEY] as const) : null,
+    () => fetchProviders(),
     { revalidateOnFocus: false },
   );
-  return { enabled, config, resource };
+  return { enabled, resource };
 }
 
 /**
@@ -39,7 +35,7 @@ function useProvidersResource() {
  * are in, and rejects with the Gateway's reason.
  */
 export function useProviders() {
-  const { enabled, config, resource } = useProvidersResource();
+  const { enabled, resource } = useProvidersResource();
   const { refresh } = useModels();
   const { mutate: mutateMatching } = useSWRConfig();
   const { mutate } = resource;
@@ -64,15 +60,13 @@ export function useProviders() {
   );
 
   const saveKey = useCallback(
-    (payload: ProviderKeyPayload) =>
-      settle(saveProviderKey(config.baseUrl, payload, config.token)),
-    [config.baseUrl, config.token, settle],
+    (payload: ProviderKeyPayload) => settle(saveProviderKey(payload)),
+    [settle],
   );
 
   const removeKey = useCallback(
-    (provider: string) =>
-      settle(removeProviderKey(config.baseUrl, provider, config.token)),
-    [config.baseUrl, config.token, settle],
+    (provider: string) => settle(removeProviderKey(provider)),
+    [settle],
   );
 
   return {

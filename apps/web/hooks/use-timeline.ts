@@ -16,7 +16,6 @@ import {
   TIMELINE_PAGE_SIZE,
 } from "@/lib/source/timeline/query";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 export interface TimelineFilters {
   readonly actors?: readonly string[];
@@ -34,9 +33,8 @@ function toQuery(filters: TimelineFilters): TimelineQuery {
 
 function useTimelineFetcher() {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const fetcher = (query: TimelineQuery): Promise<TimelineResponse> =>
-    fetchTimeline(config.baseUrl, query, config.token);
+    fetchTimeline(query);
   return { source: resolved.timeline, fetcher };
 }
 

@@ -7,14 +7,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe("brain stop client and proxy", () => {
-  it("sends the character target and parses the native stop outcome", async () => {
+  it("sends the character target to the same-origin proxy without a credential", async () => {
     const fetcher = vi.fn(async () =>
       Response.json({ aborted: true, drained: false }),
     );
     vi.stubGlobal("fetch", fetcher);
-    expect(
-      await abortCharacterBrain("https://world.test", "alice", "test-token"),
-    ).toEqual({ aborted: true, drained: false });
+    vi.stubGlobal("window", { location: { origin: "https://world.test" } });
+    expect(await abortCharacterBrain("alice")).toEqual({
+      aborted: true,
+      drained: false,
+    });
     const [url, init] = fetcher.mock.calls[0] as unknown as [
       string,
       RequestInit,
@@ -23,9 +25,7 @@ describe("brain stop client and proxy", () => {
     expect(init.method).toBe("POST");
     expect(typeof init.body).toBe("string");
     expect(JSON.parse(init.body as string)).toEqual({ agentId: "alice" });
-    expect(new Headers(init.headers).get("Authorization")).toBe(
-      "Bearer test-token",
-    );
+    expect(new Headers(init.headers).has("Authorization")).toBe(false);
   });
   it("forwards the button request through the server's Gateway credential", async () => {
     vi.stubEnv("KAZUSA_GATEWAY_URL", "http://gateway.test");
@@ -34,10 +34,10 @@ describe("brain stop client and proxy", () => {
       Response.json({ aborted: true, drained: true }),
     );
     vi.stubGlobal("fetch", fetcher);
-    const req = new Request("https://ui.test/kazusa/brain/abort", {
+    const req = new Request("http://localhost:3000/kazusa/brain/abort", {
       method: "POST",
       headers: {
-        origin: "https://ui.test",
+        origin: "http://localhost:3000",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ agentId: "alice" }),
@@ -57,7 +57,7 @@ describe("brain stop client and proxy", () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);
     const response = await POST(
-      new Request("https://ui.test/kazusa/brain/abort", {
+      new Request("http://localhost:3000/kazusa/brain/abort", {
         method: "POST",
         headers: { origin: "https://other.test" },
         body: "{}",
