@@ -72,6 +72,7 @@ describe("registerTimelineHttp", () => {
     const api = {
       id: "kazusa",
       config: {
+        gateway: { auth: { token: "test-service-token" } },
         agents: {
           list: [{ id: "alice" }],
         },
@@ -188,7 +189,11 @@ describe("registerTimelineHttp", () => {
     };
 
     await routes["/kazusa/timeline"]?.(
-      { method: "GET", url: "/kazusa/timeline" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/timeline",
+      },
       res,
     );
 
@@ -232,6 +237,7 @@ describe("registerTimelineHttp", () => {
     const api = {
       id: "kazusa",
       config: {
+        gateway: { auth: { token: "test-service-token" } },
         agents: { list: [{ id: "alice" }] },
         session: { store: "/tmp/sessions" },
       },
@@ -314,6 +320,7 @@ describe("registerTimelineHttp", () => {
     await routes["/kazusa/timeline"]?.(
       {
         method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
         url: "/kazusa/timeline?kinds=task.started&before=250",
       },
       res,
@@ -332,6 +339,7 @@ describe("registerTimelineHttp", () => {
     const api = {
       id: "kazusa",
       config: {
+        gateway: { auth: { token: "test-service-token" } },
         agents: { list: [{ id: "alice" }, { id: "bob" }] },
         session: { store: "/tmp/sessions" },
       },
@@ -380,7 +388,11 @@ describe("registerTimelineHttp", () => {
 
     let resJson: string | undefined;
     await routes["/kazusa/timeline"]?.(
-      { method: "GET", url: "/kazusa/timeline?actors=alice" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/timeline?actors=alice",
+      },
       {
         writeHead: vi.fn(),
         setHeader: vi.fn(),

@@ -7,12 +7,10 @@ import { buildUrl, request } from "../http";
 
 /** `GET /kazusa/timeline`. */
 export async function fetchTimeline(
-  baseUrl: string,
   query: TimelineQuery,
-  token?: string,
 ): Promise<TimelineResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/timeline", {
+    buildUrl("/kazusa/timeline", {
       before: query.before,
       after: query.after,
       limit: query.limit,
@@ -20,8 +18,6 @@ export async function fetchTimeline(
       kinds: query.kinds?.join(","),
       chats: query.chats?.join(","),
     }),
-    undefined,
-    token,
   );
   return TimelineResponseSchema.parse(data);
 }

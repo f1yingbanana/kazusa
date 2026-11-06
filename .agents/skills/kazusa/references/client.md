@@ -18,9 +18,10 @@ send group messages through native `chat.send` or read UI history through native
 - Display `senderId` and `senderName`; mark the configured human as self. Native
   assistant/user roles do not determine UI authorship or alignment.
 - The MVP has one configured human, returned by `/kazusa/chats`. Request bodies
-  cannot choose a sender. End-user authentication and observer mode are
-  deferred; this is a local single-player client, not a multi-user authorization
-  system.
+  cannot choose a sender. Local-owner/public-visitor route permissions are
+  implemented; authenticated collaborator player identities are a later PR. See
+  [auth](auth.md) and `apps/kazusa/docs/auth-implementation.md`. Viewer role is
+  distinct from that configured human, and public viewers cannot send.
 - Joining grants no earlier history; removal stops future sends and receipt.
   Rejoining does not reveal messages sent during the absence. Previously
   received history remains readable, filtered by each message's frozen audience.
@@ -42,9 +43,14 @@ The Next route `app/kazusa/[...path]/route.ts` forwards the fixed API paths to
 the Gateway on the same origin, including SSE. `KAZUSA_GATEWAY_URL` selects the
 upstream; the server-only `OPENCLAW_GATEWAY_TOKEN` is forwarded without exposing
 it in browser configuration, and `scripts/dev.mjs` supplies both. It binds the
-frontend to loopback, since the proxy adds the token. Current plugin routes use
-`auth: "plugin"` with the fixed single-player identity and refuse requests
-without the token. The proxy is not a login system.
+frontend to loopback, since the proxy adds the token. `KAZUSA_AUTH_MODE=local`
+(default) grants owner access; `public` grants visitor. `/kazusa/access` reports
+that role and its permissions with `Cache-Control: no-store`. The proxy replaces
+incoming identity headers with its resolved role. Plugin routes use the shared
+permission registrar and require the service token (or native Gateway auth on
+the routes needing caller authority). Actor identity remains the configured
+player. The trusted-proxy login adapter and collaborator identities are later
+PRs; no browser supplies a trusted identity itself.
 
 | Route                                            | Contract                                                                                                                                                                                       |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

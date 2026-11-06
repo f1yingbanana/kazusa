@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { statusStore } from "@/lib/live/state";
 import { useSources } from "@/lib/source/provider";
 import { setStage } from "@/lib/source/stage/http";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 /** Only an explicit `onstage: false` is offstage; no status means unknown. */
 export function isOffstage(id: string): boolean {
@@ -48,19 +47,13 @@ export function useOffstage(): ReadonlySet<string> {
  */
 export function useStage() {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const live = resolved.stage === "live" && resolved.status === "live";
 
   const apply = useCallback(
     async (ids: readonly string[], onstage: boolean): Promise<boolean> => {
       if (ids.length === 0) return true;
       try {
-        const { statuses } = await setStage(
-          config.baseUrl,
-          ids,
-          onstage,
-          config.token,
-        );
+        const { statuses } = await setStage(ids, onstage);
         // SSE brings the same statuses; don't wait for it.
         for (const [id, status] of Object.entries(statuses))
           statusStore.set(id, status);
@@ -75,7 +68,7 @@ export function useStage() {
         return false;
       }
     },
-    [config.baseUrl, config.token],
+    [],
   );
 
   return { apply: live ? apply : undefined };

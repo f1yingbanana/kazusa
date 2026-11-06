@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { messagesKeyGetter } from "./pagination";
 import type { MessagesResponse } from "@kazusa/client";
 
-const key = messagesKeyGetter(
-  { baseUrl: "", userId: "user:sensei", userName: "Sensei" },
-  "group:club",
-);
+const key = messagesKeyGetter({ userId: "user:sensei" }, "group:club");
 const message = {
   id: "a",
   requestId: "a",
@@ -42,11 +39,6 @@ describe("server-owned pagination", () => {
   });
   it("does not repeat the first page when a cursor is missing", () => {
     expect(key(1, { messages: [message], hasMore: true })).toBeNull();
-    expect(
-      messagesKeyGetter({ baseUrl: "", userId: "u", userName: "U" }, null)(
-        0,
-        null,
-      ),
-    ).toBeNull();
+    expect(messagesKeyGetter({ userId: "u" }, null)(0, null)).toBeNull();
   });
 });

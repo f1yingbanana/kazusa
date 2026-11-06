@@ -8,14 +8,7 @@ export function isDesiresKey(key: unknown) {
   return Array.isArray(key) && key[0] === DESIRES_KEY;
 }
 
-export async function fetchDesires(
-  baseUrl: string,
-  token?: string,
-): Promise<DesiresResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/desires"),
-    undefined,
-    token,
-  );
+export async function fetchDesires(): Promise<DesiresResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/desires"));
   return DesiresResponseSchema.parse(data);
 }

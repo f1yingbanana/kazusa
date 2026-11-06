@@ -7,28 +7,16 @@ import {
 import { buildUrl, request } from "../http";
 
 export async function fetchBrainTrace(
-  baseUrl: string,
-  token: string | undefined,
   id: string,
   limit: number,
 ): Promise<BrainTraceResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/brain/trace", { id, limit }),
-    undefined,
-    token,
+    buildUrl("/kazusa/brain/trace", { id, limit }),
   );
   return BrainTraceResponseSchema.parse(data);
 }
 
-export async function fetchUsage(
-  baseUrl: string,
-  token: string | undefined,
-  days: number,
-): Promise<UsageResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/usage", { days }),
-    undefined,
-    token,
-  );
+export async function fetchUsage(days: number): Promise<UsageResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/usage", { days }));
   return UsageResponseSchema.parse(data);
 }

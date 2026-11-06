@@ -656,6 +656,8 @@ export function createSetup(
   }
 
   return {
+    /** Cheap: no catalog, subprocess or network, unlike `status()`. */
+    configured: () => existsSync(configFile),
     status,
     prepare,
     apply,

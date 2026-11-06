@@ -25,5 +25,16 @@ describe("Gateway token", () => {
     expect(checkAuth(request(), "secret")).toBe(false);
     expect(checkAuth(request("Bearer wrong"), "secret")).toBe(false);
     expect(checkAuth(request("Bearer secret"), "secret")).toBe(true);
+    expect(checkAuth(request("Bearer secret"))).toBe(false);
+    expect(checkAuth(request())).toBe(false);
+  });
+
+  it("is never read from the URL, where browsers and logs keep it", () => {
+    expect(
+      checkAuth(
+        { headers: {}, url: "/kazusa/events?token=secret" } as IncomingMessage,
+        "secret",
+      ),
+    ).toBe(false);
   });
 });

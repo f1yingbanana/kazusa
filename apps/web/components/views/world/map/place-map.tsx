@@ -51,7 +51,6 @@ import {
   type PlaceIndex,
 } from "@/lib/location/places";
 import { PLACES_KEY, savePlacePositions } from "@/lib/source/location/http";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/inspector-request";
 import { useWatchlist } from "@/lib/state/watchlist";
@@ -99,7 +98,6 @@ export function PlaceMap({
   overlay?: React.ReactNode;
 }) {
   const { byId } = useCharacters();
-  const config = useKazusaConfig();
   const { mutate } = useSWRConfig();
   const navigate = useNavigate();
   const player = usePlayer();
@@ -436,10 +434,10 @@ export function PlaceMap({
     }
     setSaving(true);
     try {
-      await savePlacePositions(config.baseUrl, positions, config.token);
+      await savePlacePositions(positions);
       // Show it now; the wiki watcher's `places` event confirms it shortly.
       await mutate(
-        [PLACES_KEY, config.baseUrl, config.token ?? ""],
+        [PLACES_KEY],
         { places: withPositions(world, positions) },
         { revalidate: false },
       );

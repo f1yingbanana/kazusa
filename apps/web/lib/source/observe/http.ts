@@ -10,38 +10,25 @@ import { buildUrl, request } from "../http";
 export const OBSERVED_CHATS_KEY = "kazusa/observe/chats";
 export const OBSERVED_MESSAGES_KEY = "kazusa/observe/messages";
 
-export function observedChatsKey(config: {
-  readonly baseUrl: string;
-  readonly token?: string;
-}) {
-  return [OBSERVED_CHATS_KEY, config.baseUrl, config.token ?? ""] as const;
+export function observedChatsKey() {
+  return [OBSERVED_CHATS_KEY] as const;
 }
 
-export async function fetchObservedChats(
-  baseUrl: string,
-  token?: string,
-): Promise<ObservedChatsResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/observe/chats"),
-    undefined,
-    token,
-  );
+export async function fetchObservedChats(): Promise<ObservedChatsResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/observe/chats"));
   return ObservedChatsResponseSchema.parse(data);
 }
 
-export async function fetchObservedMessages(
-  baseUrl: string,
-  params: { chatId: string; before?: number | null },
-  token?: string,
-): Promise<MessagesResponse> {
+export async function fetchObservedMessages(params: {
+  chatId: string;
+  before?: number | null;
+}): Promise<MessagesResponse> {
   const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/observe/messages", {
+    buildUrl("/kazusa/observe/messages", {
       chatId: params.chatId,
       limit: MESSAGE_PAGE_SIZE,
       before: params.before,
     }),
-    undefined,
-    token,
   );
   return MessagesResponseSchema.parse(data);
 }

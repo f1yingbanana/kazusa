@@ -114,7 +114,10 @@ describe("sticker sets", () => {
       (req: unknown, res: unknown) => Promise<void>
     > = {};
     const api = {
-      config: { agents: { list: [{ id: "aris", workspace }] } },
+      config: {
+        gateway: { auth: { token: "test-service-token" } },
+        agents: { list: [{ id: "aris", workspace }] },
+      },
       runtime: {
         agent: { resolveAgentWorkspaceDir: vi.fn(() => workspace) },
       },
@@ -141,7 +144,11 @@ describe("sticker sets", () => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       await routes["/kazusa/sticker"]?.(
-        { method: "GET", url, headers: {} },
+        {
+          method: "GET",
+          url,
+          headers: { authorization: "Bearer test-service-token" },
+        },
         res,
       );
       return { ...res, body: Buffer.concat(chunks).toString() };

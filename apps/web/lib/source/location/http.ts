@@ -21,54 +21,28 @@ export function isLocationsKey(key: unknown) {
   return Array.isArray(key) && key[0] === LOCATIONS_KEY;
 }
 
-export async function fetchPlaces(
-  baseUrl: string,
-  token?: string,
-): Promise<PlacesResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/places"),
-    undefined,
-    token,
-  );
+export async function fetchPlaces(): Promise<PlacesResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/places"));
   return PlacesResponseSchema.parse(data);
 }
 
 /** Writes where places are drawn to their pages. */
 export async function savePlacePositions(
-  baseUrl: string,
   positions: PlacePositions["positions"],
-  token?: string,
 ): Promise<void> {
-  const data = await postJson<unknown>(
-    buildUrl(baseUrl, "/kazusa/places/positions"),
-    { positions } satisfies PlacePositions,
-    token,
-  );
+  const data = await postJson<unknown>(buildUrl("/kazusa/places/positions"), {
+    positions,
+  } satisfies PlacePositions);
   PlacePositionsResponseSchema.parse(data);
 }
 
-export async function fetchLocations(
-  baseUrl: string,
-  token?: string,
-): Promise<LocationsResponse> {
-  const data = await request<unknown>(
-    buildUrl(baseUrl, "/kazusa/locations"),
-    undefined,
-    token,
-  );
+export async function fetchLocations(): Promise<LocationsResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/locations"));
   return LocationsResponseSchema.parse(data);
 }
 
 /** The player goes straight to a place; the backend knows who the player is. */
-export async function movePlayer(
-  baseUrl: string,
-  placeId: string,
-  token?: string,
-): Promise<MoveResponse> {
-  const data = await postJson<unknown>(
-    buildUrl(baseUrl, "/kazusa/move"),
-    { placeId },
-    token,
-  );
+export async function movePlayer(placeId: string): Promise<MoveResponse> {
+  const data = await postJson<unknown>(buildUrl("/kazusa/move"), { placeId });
   return MoveResponseSchema.parse(data);
 }

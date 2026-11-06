@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useCharacterStatus } from "@/hooks/use-characters";
 import { abortCharacterBrain } from "@/lib/source/characters/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 export function CharacterStopButton({
   id,
@@ -18,7 +17,6 @@ export function CharacterStopButton({
 }) {
   const status = useCharacterStatus(id);
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const [stopping, setStopping] = useState(false);
 
   if (resolved.characters !== "live" || resolved.status !== "live") return null;
@@ -26,11 +24,7 @@ export function CharacterStopButton({
   async function stop() {
     setStopping(true);
     try {
-      const result = await abortCharacterBrain(
-        config.baseUrl,
-        id,
-        config.token,
-      );
+      const result = await abortCharacterBrain(id);
       if (!result.aborted) toast.info(`No brain run was stopped for ${name}.`);
       else if (!result.drained) toast.info(`Stop requested for ${name}.`);
     } catch (error) {

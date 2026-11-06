@@ -1,5 +1,5 @@
-import { isSameOrigin } from "@/lib/same-origin";
-import { setup, SetupRequestSchema } from "@/lib/setup/setup";
+import { requireLocalOwner } from "../../lib/auth/access";
+import { setup, SetupRequestSchema } from "../../lib/setup/setup";
 
 /** Costs nothing. Undefined means OpenRouter couldn't be reached to say. */
 async function keyWorks(key: string): Promise<boolean | undefined> {
@@ -16,11 +16,8 @@ async function keyWorks(key: string): Promise<boolean | undefined> {
 
 /** Local only: `scripts/dev.mjs` binds the frontend to loopback. */
 export async function POST(request: Request): Promise<Response> {
-  if (!isSameOrigin(request))
-    return Response.json(
-      { error: "Use the same origin for setup requests." },
-      { status: 403 },
-    );
+  const denied = requireLocalOwner(request);
+  if (denied) return denied;
   const parsed = SetupRequestSchema.safeParse(await request.json());
   if (!parsed.success)
     return Response.json(

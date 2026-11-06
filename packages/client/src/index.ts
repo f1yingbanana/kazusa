@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./access.ts";
 
 /* ========================================================================== */
 /* Core Entities & Wire Schemas                                               */

@@ -1,9 +1,7 @@
 import { currentConfig } from "../current-config.ts";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
-import { readJsonBodyWithLimit } from "openclaw/plugin-sdk/webhook-request-guards";
 import type {
   Agent,
   AgentsResponse,
@@ -16,7 +14,11 @@ import type {
   SendResponse,
   StreamEvent,
 } from "@kazusa/client";
-import { checkAuth, resolveAuthToken } from "../http/helpers.ts";
+import {
+  createRouteRegistrar,
+  readJsonBody,
+  sendJson,
+} from "../http/helpers.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   TYPING,
@@ -44,25 +46,6 @@ const HISTORY = z.object({
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
-
-/** Read a bounded JSON request; schemas at each route own its contract. */
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const result = await readJsonBodyWithLimit(req, {
-    maxBytes: 256_000,
-    timeoutMs: 10_000,
-    destroyOnLimit: false,
-  });
-  if (!result.ok) throw new Error(result.error);
-  return result.value;
-}
-
-function sendJson(res: ServerResponse, status: number, data: unknown): void {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-  });
-  res.end(JSON.stringify(data));
-}
 
 function clientChat(summary: ChatSummary, viewer: string): Chat {
   return {
@@ -124,52 +107,7 @@ export function registerMessagingHttp(
   const getConfig = () => currentConfig(api);
   const user = USER.parse(api.pluginConfig?.user ?? {});
   const roster = (): ReadonlySet<string> => new Set(listAgentIds(getConfig()));
-  const expectedToken = resolveAuthToken(api);
-  const route = (
-    path: string,
-    method: "GET" | "POST",
-    handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>,
-  ): void => {
-    api.registerHttpRoute({
-      path: `/kazusa/${path}`,
-      auth: "plugin",
-      match: "exact",
-      handler: async (req, res) => {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", `${method}, OPTIONS`);
-        res.setHeader(
-          "Access-Control-Allow-Headers",
-          "Content-Type, Authorization",
-        );
-        if (req.method === "OPTIONS") {
-          res.statusCode = 204;
-          res.end();
-          return true;
-        }
-        if (!checkAuth(req, expectedToken)) {
-          sendJson(res, 401, {
-            error: "Unauthorized: Invalid or missing gateway token.",
-          });
-          return true;
-        }
-        if (req.method !== method) {
-          res.setHeader("Allow", `${method}, OPTIONS`);
-          sendJson(res, 405, { error: `Use ${method}.` });
-          return true;
-        }
-        try {
-          await handler(req, res);
-        } catch (error) {
-          if (res.headersSent) res.end();
-          else
-            sendJson(res, 400, {
-              error: error instanceof Error ? error.message : String(error),
-            });
-        }
-        return true;
-      },
-    });
-  };
+  const route = createRouteRegistrar(api);
   route("chats", "GET", async (req, res) => {
     const query =
       new URL(req.url ?? "/", "http://localhost").searchParams.get("query") ??
@@ -355,7 +293,6 @@ export function registerMessagingHttp(
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
       });
       ready = true;
       write({ type: "connected", typing, statuses });

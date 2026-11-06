@@ -19,7 +19,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "connection",
     label: "Connection",
-    description: "Server and token",
+    description: "Server status",
     icon: PlugIcon,
     order: 0,
     component: ConnectionSettings,

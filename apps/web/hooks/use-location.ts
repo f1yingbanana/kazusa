@@ -99,11 +99,7 @@ export function usePlayer() {
   const moveTo = useCallback(
     async (placeId: string) => {
       try {
-        const { record } = await movePlayer(
-          config.baseUrl,
-          placeId,
-          config.token,
-        );
+        const { record } = await movePlayer(placeId);
         // SSE brings the same record; don't wait for it.
         locationStore.set(config.userId, record);
       } catch (error) {
@@ -112,7 +108,7 @@ export function usePlayer() {
         });
       }
     },
-    [config.baseUrl, config.token, config.userId],
+    [config.userId],
   );
   return {
     id: config.userId,

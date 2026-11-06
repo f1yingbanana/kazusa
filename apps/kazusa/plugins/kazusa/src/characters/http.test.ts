@@ -18,6 +18,7 @@ describe("registerCharactersHttp", () => {
     > = {};
     const api = {
       config: {
+        gateway: { auth: { token: "test-service-token" } },
         agents: {
           defaults: { systemAgent: { agentId: "kazusa" } },
           entries: { kazusa: { workspace: "./workspaces/kazusa" } },
@@ -89,7 +90,11 @@ describe("registerCharactersHttp", () => {
     };
 
     await routes["/kazusa/characters"]?.(
-      { method: "GET", url: "/kazusa/characters" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/characters",
+      },
       charactersRes,
     );
     expect(charactersStatus).toBe(200);
@@ -121,7 +126,11 @@ describe("registerCharactersHttp", () => {
     };
     current = updated;
     await routes["/kazusa/characters"]?.(
-      { method: "GET", url: "/kazusa/characters" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/characters",
+      },
       charactersRes,
     );
     expect(
@@ -130,7 +139,11 @@ describe("registerCharactersHttp", () => {
       ),
     ).toEqual(["arona", "user:sensei"]);
     await routes["/kazusa/character"]?.(
-      { method: "GET", url: "/kazusa/character?id=arona" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/character?id=arona",
+      },
       charactersRes,
     );
     expect(charactersStatus).toBe(200);
@@ -145,7 +158,11 @@ describe("registerCharactersHttp", () => {
     );
     current = { agents: { entries: updated.agents.entries } };
     await routes["/kazusa/characters"]?.(
-      { method: "GET", url: "/kazusa/characters" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/characters",
+      },
       charactersRes,
     );
     expect(
@@ -154,7 +171,11 @@ describe("registerCharactersHttp", () => {
       ).characters.find((c) => c.id === "arona")?.isSystemAgent,
     ).toBe(false);
     await routes["/kazusa/character"]?.(
-      { method: "GET", url: "/kazusa/character?id=kazusa" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/character?id=kazusa",
+      },
       charactersRes,
     );
     expect(charactersStatus).toBe(404);
@@ -166,7 +187,10 @@ describe("registerCharactersHttp", () => {
       (req: IncomingMessage, res: ServerResponse) => Promise<boolean>
     >();
     const api = {
-      config: { agents: { entries: { kazusa: {} } } },
+      config: {
+        gateway: { auth: { token: "test-service-token" } },
+        agents: { entries: { kazusa: {} } },
+      },
       pluginConfig: {},
       registerHttpRoute: vi.fn((opts) => routes.set(opts.path, opts.handler)),
     } as unknown as OpenClawPluginApi;
@@ -208,7 +232,7 @@ describe("registerCharactersHttp", () => {
         {
           method: "POST",
           url: "/kazusa/character/stage",
-          headers: {},
+          headers: { authorization: "Bearer test-service-token" },
           socket: new Socket(),
         },
       );

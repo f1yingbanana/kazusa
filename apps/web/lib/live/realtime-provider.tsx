@@ -112,7 +112,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const { baseUrl, userId, token } = config;
+    const { userId } = config;
     let source: EventSource | null = null;
     let retryTimer: number | undefined;
     let retryDelay = RETRY_MIN_MS;
@@ -173,7 +173,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const refreshObserved = () => {
       observedRefresh ??= window.setTimeout(() => {
         observedRefresh = undefined;
-        void mutate(observedChatsKey(config));
+        void mutate(observedChatsKey());
       }, OBSERVED_REFRESH_MS);
     };
 
@@ -194,7 +194,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       );
       let knownChat = true;
       void mutate(
-        observedChatsKey(config),
+        observedChatsKey(),
         (current?: ObservedChatsResponse) => {
           if (current && !current.chats.some((chat) => chat.id === chatId)) {
             knownChat = false;
@@ -287,9 +287,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(isDesiresKey);
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
-          void mutate(observedChatsKey(config));
+          void mutate(observedChatsKey());
           // Journal events are not replayed, so read what the stream missed.
-          void fetchTimeline(baseUrl, { limit: JOURNAL_CATCH_UP }, token).then(
+          void fetchTimeline({ limit: JOURNAL_CATCH_UP }).then(
             ({ events }) => {
               for (const event of events)
                 dispatchLive({ type: "journal", event });
@@ -323,7 +323,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       retryTimer = undefined;
       let next: EventSource;
       try {
-        next = new EventSource(eventsUrl(baseUrl, token));
+        next = new EventSource(eventsUrl());
       } catch {
         setStatus("error");
         return;
@@ -353,8 +353,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(observedRefresh);
       disconnect();
     };
-    // config fields are listed explicitly so a new object identity does not reconnect.
-  }, [config.baseUrl, config.userId, mutate]);
+    // Only the player changes what the stream means; a new object identity must not reconnect.
+  }, [config.userId, mutate]);
 
   const hasTypists = Object.values(typingByChat).some(
     (list) => list.length > 0,

@@ -11,7 +11,7 @@ type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 function setup() {
   const routes: Record<string, Handler> = {};
   const api = {
-    config: {},
+    config: { gateway: { auth: { token: "test-service-token" } } },
     pluginConfig: { user: { id: "user:player", name: "Player" } },
     registerHttpRoute: vi.fn((opts: { path: string; handler: Handler }) => {
       routes[opts.path] = opts.handler;
@@ -30,7 +30,7 @@ function setup() {
       {
         method: "POST",
         url: "/kazusa/move",
-        headers: {},
+        headers: { authorization: "Bearer test-service-token" },
         socket: new Socket(),
       },
     );
@@ -74,7 +74,7 @@ describe("POST /kazusa/places/positions", () => {
   function route(saved: unknown[]) {
     let handler: Handler | undefined;
     const api = {
-      config: {},
+      config: { gateway: { auth: { token: "test-service-token" } } },
       pluginConfig: { user: { id: "user:player", name: "Player" } },
       registerHttpRoute: vi.fn((opts: { path: string; handler: Handler }) => {
         if (opts.path === "/kazusa/places/positions") handler = opts.handler;
@@ -94,7 +94,7 @@ describe("POST /kazusa/places/positions", () => {
         {
           method: "POST",
           url: "/kazusa/places/positions",
-          headers: {},
+          headers: { authorization: "Bearer test-service-token" },
           socket: new Socket(),
         },
       );

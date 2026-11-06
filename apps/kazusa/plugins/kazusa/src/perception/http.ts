@@ -1,6 +1,7 @@
 import { takeContinuation } from "./continue.ts";
 import {
   BrainAbortPayloadSchema,
+  hasPermission,
   type BrainAbortResponse,
   type BrainTraceResponse,
 } from "@kazusa/client";
@@ -54,11 +55,21 @@ export function registerBrainTraceHttp(
   api: OpenClawPluginApi,
   failureOf: (agentId: string) => Promise<RunFailure | undefined>,
 ): void {
-  createRouteRegistrar(api)("brain/trace", "GET", async (req, res) => {
+  createRouteRegistrar(api)("brain/trace", "GET", async (req, res, role) => {
     const params = new URL(req.url ?? "/", "http://localhost").searchParams;
     const agentId = params.get("id") ?? "";
-    if (!listAgentIds(currentConfig(api)).includes(agentId)) {
+    const config = currentConfig(api);
+    if (!listAgentIds(config).includes(agentId)) {
       sendJson(res, 404, { error: `Unknown character: ${agentId}.` });
+      return;
+    }
+    if (
+      agentId === config.agents?.defaults?.systemAgent?.agentId &&
+      !hasPermission(role, "manage")
+    ) {
+      sendJson(res, 403, {
+        error: "Only the owner can read the system agent's brain trace.",
+      });
       return;
     }
     const limit = Math.min(

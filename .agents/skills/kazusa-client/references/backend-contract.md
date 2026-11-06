@@ -40,10 +40,13 @@ gets the same `Clock` module through HTTP (§3).
 
 ## 2. Transport and conventions
 
-- Requests flow browser → `app/kazusa/[...path]/route.ts` (fixed `ROUTES`
-  allowlist; same-origin check on POST; `OPENCLAW_GATEWAY_TOKEN` forwarded
+- Requests flow browser → `app/kazusa/[...path]/route.ts` (shared
+  `KAZUSA_ROUTES` method/permission policy; same-origin check on POST;
+  `OPENCLAW_GATEWAY_TOKEN` and server-resolved viewer role forwarded
   server-side) → plugin route.
-- **Every new route is added to the proxy allowlist in the same change.**
+- **Every new route needs a policy in `@kazusa/client`, including routes kept
+  private from the browser proxy.** Both boundaries enforce it. See
+  `kazusa/references/auth.md` for local/public modes and later cloud work.
 - Plugin routes use `match: "exact"` with **query parameters, not path
   parameters** (`/kazusa/character?id=alice`). This fits the exact-match
   registration and the proxy's fixed map.
@@ -252,9 +255,10 @@ capability `observe`.
 
 **Observer gating.** `/kazusa/observe/*` and the `observed` event are gated by
 plugin config `observer.enabled`. It defaults to `true`, because this is a local
-single-player client and observation is the product. Real authorization stays
-deferred, as in `client.md`. Observed reads never mutate membership and never
-emit typing.
+single-player client and observation is the product. Local-owner/public-visitor
+route permissions are enforced separately, as in `kazusa/references/auth.md`.
+The demo intentionally retains unfiltered observer reads; per-player privacy is
+a later milestone. Observed reads never mutate membership and never emit typing.
 
 ## 4. Live updates (SSE)
 

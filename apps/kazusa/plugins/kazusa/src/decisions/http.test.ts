@@ -16,6 +16,7 @@ function setup(keys: readonly string[]) {
   const routes: Record<string, Handler> = {};
   const rows = new Map<string, ModelSelection>();
   const api = {
+    config: { gateway: { auth: { token: "test-service-token" } } },
     registerHttpRoute: (opts: { path: string; handler: Handler }) => {
       routes[opts.path] = opts.handler;
     },
@@ -44,7 +45,12 @@ async function call(
     Readable.from(
       body === undefined ? [] : [Buffer.from(JSON.stringify(body))],
     ),
-    { method, url: "/", headers: {}, socket: new Socket() },
+    {
+      method,
+      url: "/",
+      headers: { authorization: "Bearer test-service-token" },
+      socket: new Socket(),
+    },
   );
   let status = 0;
   let json = "";

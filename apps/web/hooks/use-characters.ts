@@ -6,7 +6,6 @@ import type { CharacterDetail, CharacterStatus } from "@kazusa/client";
 import { statusStore } from "@/lib/live/state";
 import { fetchCharacterDetail } from "@/lib/source/characters/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 export function useCharacters() {
   const {
@@ -36,15 +35,11 @@ export function useCharacterDetail(id: string): {
   available: boolean;
 } {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const isLive = resolved.characters === "live";
 
   const { data: liveDetail } = useSWR(
-    isLive
-      ? (["kazusa/character", config.baseUrl, id, config.token ?? ""] as const)
-      : null,
-    ([, baseUrl, charId]) =>
-      fetchCharacterDetail(baseUrl, charId, config.token),
+    isLive ? (["kazusa/character", id] as const) : null,
+    ([, charId]) => fetchCharacterDetail(charId),
     { revalidateOnFocus: true, refreshInterval: 30_000 },
   );
 

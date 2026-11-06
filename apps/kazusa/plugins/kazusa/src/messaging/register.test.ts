@@ -63,7 +63,10 @@ async function setup(
   const retained = new Map<string, MessageDelivery>();
   const chats = new Map<string, unknown>();
   const outbox = new Map<string, unknown>();
-  const config = { agents: { entries: { alice: {}, bob: {}, carol: {} } } };
+  const config = {
+    gateway: { auth: { token: "test-service-token" } },
+    agents: { entries: { alice: {}, bob: {}, carol: {} } },
+  };
   const resolveAgentIdentity = vi.fn(() => undefined);
   const entries = new Map<
     string,
@@ -759,7 +762,7 @@ describe("send_message SDK integration", () => {
         Object.assign(Readable.from([]), {
           method: "GET",
           url,
-          headers: {},
+          headers: { authorization: "Bearer test-service-token" },
           socket: new Socket(),
         }) as unknown as IncomingMessage,
         {
@@ -825,7 +828,7 @@ describe("send_message SDK integration", () => {
     const req = Object.assign(Readable.from([]), {
       method: "GET",
       url: "/kazusa/events",
-      headers: {},
+      headers: { authorization: "Bearer test-service-token" },
       socket: new Socket(),
     });
     await route.handler(
@@ -837,6 +840,40 @@ describe("send_message SDK integration", () => {
     // Unhandled, this event would end the process.
     expect(res.listenerCount("error")).toBeGreaterThan(0);
     res.emit("close");
+  });
+
+  it("refuses visitor messages, typing and membership changes before touching the world", async () => {
+    const h = await setup();
+    for (const path of ["send", "typing", "chats/manage"]) {
+      const route = h.routes.get(`/kazusa/${path}`);
+      if (!route) throw new Error(`Missing route: ${path}`);
+      const req = Object.assign(Readable.from([Buffer.from("not json")]), {
+        method: "POST",
+        url: `/kazusa/${path}`,
+        headers: {
+          authorization: "Bearer test-service-token",
+          "x-kazusa-role": "visitor",
+        },
+        socket: new Socket(),
+      });
+      let status = 0;
+      await route.handler(
+        req as unknown as IncomingMessage,
+        {
+          setHeader: () => {},
+          writeHead: (code: number) => {
+            status = code;
+          },
+          end: () => {},
+        } as unknown as ServerResponse,
+      );
+      expect(status).toBe(403);
+      expect(req.readableDidRead).toBe(false);
+    }
+    expect(h.chats.size).toBe(0);
+    expect(h.retained.size).toBe(0);
+    expect(h.receive).not.toHaveBeenCalled();
+    expect(h.patchSessionEntry).not.toHaveBeenCalled();
   });
 
   it("registers Gateway HTTP routes and handles chats, messages, and send", async () => {
@@ -854,7 +891,7 @@ describe("send_message SDK integration", () => {
         {
           method: body === undefined ? "GET" : "POST",
           url,
-          headers: {},
+          headers: { authorization: "Bearer test-service-token" },
           socket: new Socket(),
         },
       );

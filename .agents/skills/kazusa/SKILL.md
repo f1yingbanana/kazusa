@@ -1244,6 +1244,21 @@ connect these modules in process.
 
 ## 4. Engineering & Zero-Build Conventions
 
+### Browser authentication and permissions
+
+Use [auth](references/auth.md) for role enforcement and the OSS/Cloud boundary.
+The server access foundation adds `KAZUSA_AUTH_MODE=local|public`, a shared
+method/path/permission policy, an uncached `/kazusa/access`, and guards in both
+the Next proxy and plugin registrar. Local defaults to owner; public forces
+visitor. Keep the Gateway credential server-side and fail closed if missing.
+Messaging uses the same registrar as the other routes. Native Gateway-auth
+handlers retain their caller authority. Multi-user identity and trusted-proxy
+integration are later PRs, as is the UI's read-only treatment; see the separate
+[implementation tracker](../../../apps/kazusa/docs/auth-implementation.md).
+Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
+
+### Runtime and code conventions
+
 - **Character Tool Surface (`tools.profile` + `tools.alsoAllow`)**: characters
   inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
   `send_message`, `create_group`, `talk`, `list_chats`, `manage_chat`, `recall`,
@@ -1415,6 +1430,10 @@ connect these modules in process.
 
 Load these reference files on demand when working on their specific subsystem:
 
+- `references/auth.md` — Read before changing browser authentication, roles,
+  permissions, HTTP/SSE route guards, or the OSS/Cloud boundary. Local owner,
+  public visitor, and the planned trusted-proxy adapter share one UI; progress
+  lives in `apps/kazusa/docs/auth-implementation.md`. Scaling is a separate PR.
 - `references/file_schemas.md` — Read when implementing Markdown/YAML parsers or
   creating/modifying `SOUL.md`, `IDENTITY.md`, `MEMORY.md`, World Wiki, or
   Personal Wiki files.

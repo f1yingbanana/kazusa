@@ -16,6 +16,7 @@ function setup() {
   > = {};
   const api = {
     config: {
+      gateway: { auth: { token: "test-service-token" } },
       agents: { list: [{ id: "kazusa" }, { id: "hoshino" }] },
     },
     registerHttpRoute: vi.fn((opts) => {
@@ -55,7 +56,11 @@ describe("registerDesiresHttp", () => {
     let status = 0;
     let body: string | undefined;
     await routes["/kazusa/desires"]?.(
-      { method: "GET", url: "/kazusa/desires" },
+      {
+        method: "GET",
+        headers: { authorization: "Bearer test-service-token" },
+        url: "/kazusa/desires",
+      },
       {
         writeHead: (s: number) => {
           status = s;

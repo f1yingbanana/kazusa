@@ -16,7 +16,6 @@ import {
   selectEmbeddingModel,
 } from "@/lib/source/models/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 function describe(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -36,16 +35,15 @@ export function isRoleModelsKey(key: unknown): boolean {
  */
 function useRole<T extends { readonly current?: string }>(
   key: string,
-  fetcher: (baseUrl: string, token?: string) => Promise<T>,
-  selecter: (baseUrl: string, ref: string | null, token?: string) => Promise<T>,
+  fetcher: () => Promise<T>,
+  selecter: (ref: string | null) => Promise<T>,
   failure: string,
 ) {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
   const enabled = resolved.models === "live";
   const resource = useSWR<T, Error>(
-    enabled ? ([key, config.baseUrl, config.token ?? ""] as const) : null,
-    () => fetcher(config.baseUrl, config.token),
+    enabled ? ([key] as const) : null,
+    () => fetcher(),
     { revalidateOnFocus: false },
   );
   const { mutate } = resource;
@@ -53,16 +51,14 @@ function useRole<T extends { readonly current?: string }>(
   const select = useCallback(
     async (ref: string | null): Promise<boolean> => {
       try {
-        await mutate(selecter(config.baseUrl, ref, config.token), {
-          revalidate: false,
-        });
+        await mutate(selecter(ref), { revalidate: false });
         return true;
       } catch (error) {
         toast.error(failure, { description: describe(error) });
         return false;
       }
     },
-    [config.baseUrl, config.token, failure, mutate, selecter],
+    [failure, mutate, selecter],
   );
 
   return {

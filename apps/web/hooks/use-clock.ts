@@ -6,7 +6,6 @@ import { clockStore } from "@/lib/live/state";
 import { dispatchLive } from "@/lib/registry/live";
 import { executeClockAction } from "@/lib/source/clock/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import { MINUTE, bucket, simTimeAt } from "@/lib/time/sim";
 
 export function useClockAnchor() {
@@ -72,23 +71,18 @@ export function useSimNow(resolution = MINUTE) {
 
 export function useClockActions() {
   const { resolved } = useSources();
-  const config = useKazusaConfig();
 
   const apply = useCallback(
     async (action: ClockActionPayload) => {
       if (resolved.clock !== "live") return;
       try {
-        const result = await executeClockAction(
-          config.baseUrl,
-          action,
-          config.token,
-        );
+        const result = await executeClockAction(action);
         dispatchLive({ type: "clock", clock: result.clock });
       } catch (error) {
         console.error("Failed to execute clock action:", error);
       }
     },
-    [resolved.clock, config.baseUrl, config.token],
+    [resolved.clock],
   );
 
   return { apply, enabled: resolved.clock === "live" };

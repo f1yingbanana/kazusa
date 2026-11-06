@@ -1,79 +1,63 @@
+import {
+  hasPermission,
+  KAZUSA_ROUTES,
+  VIEWER_ROLE_HEADER,
+} from "@kazusa/client";
+import {
+  accessError,
+  hostError,
+  hostOf,
+  isAllowedHost,
+  resolveViewer,
+} from "../../../lib/auth/access";
 import { isSameOrigin } from "../../../lib/same-origin";
-
-/** Local single-player bridge; the Gateway credential never enters browser code. */
-const ROUTES = new Map([
-  ["world", "GET"],
-  ["clock", "POST"],
-  ["characters", "GET"],
-  ["character", "GET"],
-  ["agents", "GET"],
-  ["chats", "GET"],
-  ["messages", "GET"],
-  ["observe/chats", "GET"],
-  ["observe/messages", "GET"],
-  ["events", "GET"],
-  ["send", "POST"],
-  ["chats/manage", "POST"],
-  ["typing", "POST"],
-  ["timeline", "GET"],
-  ["desires", "GET"],
-  ["places", "GET"],
-  ["places/positions", "POST"],
-  ["locations", "GET"],
-  ["move", "POST"],
-  ["character/stage", "POST"],
-  ["avatar", "GET"],
-  ["sticker", "GET"],
-  ["profile", "GET"],
-  ["profile/save", "POST"],
-  ["context/settings", "GET"],
-  ["context/settings/save", "POST"],
-  ["models", "GET"],
-  ["model", "POST"],
-  ["thinking", "POST"],
-  ["models/decision", "GET"],
-  ["models/decision/select", "POST"],
-  ["models/embedding", "GET"],
-  ["models/embedding/select", "POST"],
-  ["providers", "GET"],
-  ["providers/key", "POST"],
-  ["providers/remove", "POST"],
-  ["brain/abort", "POST"],
-  ["brain/trace", "GET"],
-  ["usage", "GET"],
-  ["wiki", "GET"],
-  ["wiki/page", "GET"],
-  ["wiki/lint", "GET"],
-  ["wiki/source", "GET"],
-  ["wiki/save", "POST"],
-  ["wiki/delete", "POST"],
-  ["wiki/rename", "POST"],
-  ["knowledge/explain", "GET"],
-  ["memory/runs", "GET"],
-  ["memory/preview", "GET"],
-]);
 
 type Context = { params: Promise<{ path: string[] }> };
 
 async function forward(request: Request, context: Context): Promise<Response> {
   const route = (await context.params).path.join("/");
-  const method = ROUTES.get(route);
-  if (!method)
+  let viewer;
+  try {
+    viewer = resolveViewer();
+    if (!isAllowedHost(hostOf(request))) return hostError();
+  } catch {
+    return accessError(
+      503,
+      "Kazusa authentication is not configured correctly.",
+    );
+  }
+  // Per-viewer data must never become part of a shared world snapshot cache.
+  if (route === "access") {
+    if (request.method !== "GET")
+      return new Response(null, { status: 405, headers: { Allow: "GET" } });
+    return Response.json(viewer, { headers: { "Cache-Control": "no-store" } });
+  }
+  const policy = KAZUSA_ROUTES.get(route);
+  if (!policy?.proxy)
     return Response.json({ error: "Unknown Kazusa route." }, { status: 404 });
+  const { method, permission } = policy;
   if (request.method !== method)
     return new Response(null, { status: 405, headers: { Allow: method } });
+  if (!hasPermission(viewer.role, permission)) {
+    return accessError(403, "Your access does not allow this action.");
+  }
   if (request.method === "POST" && !isSameOrigin(request)) {
     return Response.json(
-      { error: "Use the same origin for chat requests." },
+      { error: "Use the same origin for this request." },
       { status: 403 },
     );
   }
   const base = process.env.KAZUSA_GATEWAY_URL ?? "http://127.0.0.1:18789";
   const target = new URL(`/kazusa/${route}`, base);
   target.search = new URL(request.url).search;
+  // Credentials and delegated identity come from the server, never the URL.
+  target.searchParams.delete("token");
   const headers = new Headers({ "Content-Type": "application/json" });
-  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
+  if (!token)
+    return accessError(503, "The Kazusa Gateway credential is missing.");
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set(VIEWER_ROLE_HEADER, viewer.role);
   try {
     const response = await fetch(target, {
       method,
