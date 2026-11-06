@@ -1,12 +1,7 @@
 "use client";
 
-import { Fragment } from "react";
-import {
-  CheckCheckIcon,
-  CheckIcon,
-  CircleAlertIcon,
-  SparklesIcon,
-} from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { CircleAlertIcon, SparklesIcon } from "lucide-react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,82 +34,34 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useFollowBottom } from "@/hooks/use-follow-bottom";
 import { useSelection } from "@/hooks/use-url-state";
-import { formatDayLabel, formatTime, isSameDay } from "@/lib/format";
+import { formatDayLabel } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
 import type { BrainActivity } from "@/lib/source/brain/activity";
+import { isOneOnOne } from "@/lib/source/chats/display";
 import {
-  actionLine,
-  isOneOnOne,
-  messageReceipt,
-  receiptLabel,
-} from "@/lib/source/chats/display";
+  includedIn,
+  pickMessage,
+  type ShotRange,
+} from "@/lib/source/chats/screenshot";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { requestInspector } from "@/lib/state/inspector-request";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
+import { MessageActions, useLongPress } from "./message-actions";
+import {
+  ActionLine,
+  buildRuns,
+  MessageStatus,
+  StickerImage,
+} from "./message-parts";
+import { ScreenshotDialog } from "./screenshot-dialog";
+import {
+  ScreenshotBar,
+  ScreenshotFrame,
+  ScreenshotReach,
+} from "./screenshot-frame";
 import { BrainActivityRows, BrainThinking } from "./tool-activity";
 import type { Typist } from "@/lib/live/realtime-provider";
-
-const RUN_GAP_MS = 5 * 60 * 1000;
-
-type DisplayMessage = (ChatMessage & { status?: never }) | PendingMessage;
-
-type Run = {
-  key: string;
-  /** Actions are narrated, never bubbled, so they never share a run with speech. */
-  isAction: boolean;
-  senderId: string;
-  senderName: string;
-  messages: DisplayMessage[];
-  dayLabel: string | null;
-  /** Right after the same sender's action, which already named them. */
-  introduced: boolean;
-};
-
-function buildRuns(
-  messages: DisplayMessage[],
-  simNow: number,
-  /** Messages with something shown just before them start a new run. */
-  startsRun: ReadonlyMap<number, BrainActivity>,
-) {
-  const runs: Run[] = [];
-  let previous: DisplayMessage | null = null;
-
-  for (const message of messages) {
-    const isAction = message.type === "action";
-    const newDay =
-      !previous || !isSameDay(previous.timestamp, message.timestamp);
-    const current = runs[runs.length - 1];
-    const continues =
-      current &&
-      !newDay &&
-      previous &&
-      current.isAction === isAction &&
-      previous.senderId === message.senderId &&
-      message.timestamp - previous.timestamp < RUN_GAP_MS &&
-      !previous.status === !message.status &&
-      !("sequence" in message && startsRun.has(message.sequence));
-
-    if (continues) {
-      current.messages.push(message);
-    } else {
-      runs.push({
-        key: message.id,
-        isAction,
-        senderId: message.senderId,
-        senderName: message.senderName,
-        messages: [message],
-        dayLabel: newDay ? formatDayLabel(message.timestamp, simNow) : null,
-        introduced:
-          !newDay &&
-          Boolean(current?.isAction) &&
-          current?.senderId === message.senderId,
-      });
-    }
-    previous = message;
-  }
-  return runs;
-}
 
 export function MessageList({
   chat,
@@ -167,8 +114,133 @@ export function MessageList({
   const trailing = activity.filter(
     (group) => group.beforeSequence === undefined,
   );
-  const runs = buildRuns([...messages, ...pending], simNow, activityBefore);
+  const runs = buildRuns(
+    [...messages, ...pending],
+    (timestamp) => formatDayLabel(timestamp, simNow),
+    activityBefore,
+  );
   const pendingById = new Map(pending.map((message) => [message.id, message]));
+
+  // Screenshot: a crop over the sent messages, kept by id so it survives
+  // older pages loading above it and belongs to the chat it was made in.
+  const [shot, setShot] = useState<{
+    chatId: string;
+    startId: string;
+    endId: string;
+  } | null>(null);
+  /** Inside the frame but tapped out of the picture. */
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const ids = useMemo(() => messages.map((message) => message.id), [messages]);
+  // Every row asks where it is while choosing; a scan each would be O(n²).
+  const indexById = useMemo(
+    () => new Map(ids.map((id, index) => [id, index])),
+    [ids],
+  );
+  const indexOf = (id: string) => indexById.get(id) ?? -1;
+  const start = shot?.chatId === chat.id ? indexOf(shot.startId) : -1;
+  const end = shot?.chatId === chat.id ? indexOf(shot.endId) : -1;
+  const range: ShotRange | undefined =
+    start !== -1 && end !== -1 ? { start, end } : undefined;
+  const shooting = range !== undefined;
+  const chosen = useMemo(
+    () =>
+      start !== -1 && end !== -1
+        ? includedIn(messages, { start, end }, excluded)
+        : [],
+    [messages, start, end, excluded],
+  );
+  const select = (next: ShotRange) =>
+    setShot({
+      chatId: chat.id,
+      startId: ids[next.start],
+      endId: ids[next.end],
+    });
+  const stopShooting = () => {
+    setShot(null);
+    setExporting(false);
+  };
+  const press = useLongPress(setMenuFor);
+
+  useEffect(() => {
+    if (!shooting || exporting) return;
+    const leave = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShot(null);
+    };
+    window.addEventListener("keydown", leave);
+    return () => window.removeEventListener("keydown", leave);
+  }, [shooting, exporting]);
+
+  /**
+   * While choosing, a click on a message changes the screenshot and nothing
+   * else in the transcript responds: `pickMessage` has the rules (reach one
+   * outside, give up an end, leave one out inside).
+   */
+  const pickClicked = (event: React.MouseEvent) => {
+    if (!range) return;
+    const id = (event.target as Element)
+      .closest("[data-shot-id]")
+      ?.getAttribute("data-shot-id");
+    if (!id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    pick(id);
+  };
+  const pick = (id: string) => {
+    const index = indexOf(id);
+    if (!range || index === -1) return;
+    const next = pickMessage(ids, { range, excluded }, index);
+    select(next.range);
+    setExcluded(next.excluded);
+  };
+
+  /** What a sent message can do; nothing while choosing a screenshot. */
+  const actionsFor = (
+    message: Pick<ChatMessage, "id" | "text">,
+    align: "start" | "end",
+  ) =>
+    shooting ? null : (
+      <MessageActions
+        text={message.text}
+        align={align}
+        open={menuFor === message.id}
+        onClose={() => setMenuFor(null)}
+        onScreenshot={() => {
+          const index = indexOf(message.id);
+          if (index === -1) return;
+          setExcluded(new Set());
+          select({ start: index, end: index });
+        }}
+      />
+    );
+  /**
+   * A sent message's row: pressable on touch, and inside the frame a checkbox
+   * for whether it goes in the picture, so its state is announced and the
+   * keyboard can change it, not only seen as dimmed or not.
+   */
+  const rowProps = (id: string) => {
+    const index = range ? indexOf(id) : -1;
+    const inFrame = range && index >= range.start && index <= range.end;
+    return {
+      "data-shot-id": id,
+      ...(inFrame
+        ? {
+            "data-shot-in": "",
+            role: "checkbox",
+            "aria-checked": !excluded.has(id),
+            tabIndex: 0,
+            onKeyDown: (event: React.KeyboardEvent) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== " " && event.key !== "Enter") return;
+              event.preventDefault();
+              pick(id);
+            },
+          }
+        : {}),
+      ...press(id),
+    };
+  };
 
   return (
     <MessageScrollerProvider autoScroll>
@@ -179,8 +251,21 @@ export function MessageList({
         >
           <MessageScrollerContent
             ref={follow.content}
-            className="mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4"
+            onClickCapture={pickClicked}
+            className={cn(
+              "relative mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4",
+              shooting &&
+                "pb-28 select-none [&_[data-shot-id]]:cursor-pointer [&_[data-shot-in]]:rounded-lg [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ring",
+            )}
           >
+            {range ? (
+              <ScreenshotFrame
+                ids={ids}
+                range={range}
+                excluded={excluded}
+                onChange={select}
+              />
+            ) : null}
             {hasMore ? (
               <MessageScrollerItem
                 messageId="load-older"
@@ -264,20 +349,32 @@ export function MessageList({
                           isSelf ? "items-end text-right" : "pl-10",
                         )}
                       >
-                        {run.messages.map((message, index) => (
-                          <ActionLine
-                            key={message.id}
-                            name={participant.name}
-                            message={message}
-                            pending={pendingById.get(message.id)}
-                            onRetry={onRetry}
-                            nameOf={
-                              isSelf && index === run.messages.length - 1
-                                ? (id) => resolve(id).name
-                                : undefined
-                            }
-                          />
-                        ))}
+                        {run.messages.map((message, index) => {
+                          const pendingMessage = pendingById.get(message.id);
+                          return (
+                            <ActionLine
+                              key={message.id}
+                              name={participant.name}
+                              message={message}
+                              pending={pendingMessage}
+                              onRetry={onRetry}
+                              nameOf={
+                                isSelf && index === run.messages.length - 1
+                                  ? (id) => resolve(id).name
+                                  : undefined
+                              }
+                              className={cn(
+                                "group/message relative",
+                                PRESSABLE,
+                              )}
+                              {...(pendingMessage ? {} : rowProps(message.id))}
+                            >
+                              {pendingMessage
+                                ? null
+                                : actionsFor(message, align)}
+                            </ActionLine>
+                          );
+                        })}
                       </div>
                     </MessageScrollerItem>
                   ) : (
@@ -289,7 +386,12 @@ export function MessageList({
                           const pendingMessage = pendingById.get(message.id);
 
                           return (
-                            <Message key={message.id} align={align}>
+                            <Message
+                              key={message.id}
+                              align={align}
+                              className={PRESSABLE}
+                              {...(pendingMessage ? {} : rowProps(message.id))}
+                            >
                               {!isSelf ? (
                                 isLast ? (
                                   <SenderAvatar participant={participant} />
@@ -308,10 +410,16 @@ export function MessageList({
                                 ) : null}
                                 {message.type === "sticker" &&
                                 message.sticker ? (
-                                  <StickerImage
-                                    url={message.sticker.url}
-                                    alt={message.text}
-                                  />
+                                  <div
+                                    data-slot="sticker"
+                                    className="relative w-fit"
+                                  >
+                                    <StickerImage
+                                      url={message.sticker.url}
+                                      alt={message.text}
+                                    />
+                                    {actionsFor(message, align)}
+                                  </div>
                                 ) : (
                                   <Bubble
                                     align={align}
@@ -331,6 +439,9 @@ export function MessageList({
                                     <BubbleContent className="whitespace-pre-wrap">
                                       {message.text}
                                     </BubbleContent>
+                                    {pendingMessage
+                                      ? null
+                                      : actionsFor(message, align)}
                                   </Bubble>
                                 )}
                                 {isLast ? (
@@ -400,11 +511,35 @@ export function MessageList({
             })}
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <MessageScrollerButton />
+        {range ? (
+          <>
+            <ScreenshotReach ids={ids} range={range} onChange={select} />
+            <ScreenshotBar
+              count={chosen.length}
+              onCancel={stopShooting}
+              onCreate={() => setExporting(true)}
+            />
+          </>
+        ) : (
+          <MessageScrollerButton />
+        )}
       </MessageScroller>
+      <ScreenshotDialog
+        open={shooting && exporting}
+        onOpenChange={setExporting}
+        onDone={stopShooting}
+        chat={chat}
+        messages={chosen}
+        userId={userId}
+        resolve={resolve}
+      />
     </MessageScrollerProvider>
   );
 }
+
+/** On touch, holding a message opens its actions, not the text selection. */
+const PRESSABLE =
+  "pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]";
 
 const EMPTY = {
   direct: {
@@ -425,58 +560,6 @@ const EMPTY_OBSERVED = {
   title: () => "Nothing said yet",
   description: "Messages appear here as they are sent.",
 } as const;
-
-/**
- * Something done rather than said, narrated in third person ("Kazusa leans
- * back. She sips her tea."). The stored text leaves out the subject; the name
- * is set upright so the line still reads as one sentence.
- */
-function ActionLine({
-  name,
-  message,
-  pending,
-  onRetry,
-  nameOf,
-}: {
-  name: string;
-  message: DisplayMessage;
-  pending?: PendingMessage;
-  onRetry: (message: PendingMessage) => void;
-  /** The last of the player's own: says who observed it. */
-  nameOf?: (id: string) => string;
-}) {
-  const line = actionLine(name, message.text);
-  const observed = nameOf && !pending && messageReceipt(message);
-  return (
-    <div className="flex max-w-[80%] flex-col gap-0.5">
-      <p
-        title={formatTime(message.timestamp)}
-        className={cn(
-          "text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground italic",
-          pending?.status === "sending" && "opacity-70",
-          pending?.status === "failed" && "text-destructive",
-        )}
-      >
-        <span className="font-medium text-foreground not-italic">
-          {line.subject}
-        </span>
-        {line.rest}
-      </p>
-      {pending || observed ? (
-        // Inset like a bubble's footer, so receipts line up in one column.
-        <span className="flex h-4 items-center justify-end gap-2 pr-3 text-xs text-muted-foreground">
-          <MessageStatus
-            message={message}
-            pending={pending}
-            onRetry={onRetry}
-            nameOf={nameOf}
-            inPerson
-          />
-        </span>
-      ) : null}
-    </div>
-  );
-}
 
 /*
  * Where the sender's avatar sits: centered on the bubble's last line, which
@@ -515,88 +598,6 @@ function SenderAvatar({ participant }: { participant: Participant }) {
         face
       )}
     </MessageAvatar>
-  );
-}
-
-/**
- * A character's sticker: the picture alone, without a bubble. Its text is what
- * it shows, as everyone in the chat reads it.
- */
-function StickerImage({ url, alt }: { url: string; alt: string }) {
-  return (
-    <img
-      src={url}
-      alt={alt}
-      title={alt}
-      width={128}
-      height={128}
-      loading="lazy"
-      draggable={false}
-      className="size-32 object-contain"
-    />
-  );
-}
-
-function MessageStatus({
-  message,
-  pending,
-  onRetry,
-  nameOf,
-  inPerson = false,
-}: {
-  message: DisplayMessage;
-  pending?: PendingMessage;
-  onRetry: (message: PendingMessage) => void;
-  /** The player's own: names who read or observed them. */
-  nameOf?: (id: string) => string;
-  /** Face to face: observed, not read. */
-  inPerson?: boolean;
-}) {
-  if (pending?.status === "sending") {
-    return <span>Sending…</span>;
-  }
-  if (pending?.status === "failed") {
-    return (
-      <>
-        <span className="text-destructive">Not delivered</span>
-        <Button
-          variant="link"
-          size="xs"
-          className="h-auto px-0"
-          onClick={() => onRetry(pending)}
-        >
-          Retry
-        </Button>
-      </>
-    );
-  }
-  const time = (
-    <time
-      dateTime={new Date(message.timestamp).toISOString()}
-      className="font-mono text-[11px] tabular-nums"
-    >
-      {formatTime(message.timestamp)}
-    </time>
-  );
-  const receipt = nameOf ? messageReceipt(message) : undefined;
-  if (!receipt || !nameOf) return time;
-  const label = receiptLabel(receipt, nameOf, formatTime, inPerson);
-  const Icon = receipt.read ? CheckCheckIcon : CheckIcon;
-  return (
-    // The check before the time, so times end the line in one column.
-    <span className="flex items-center gap-1">
-      <Icon
-        role="img"
-        aria-label={label}
-        className={cn(
-          "size-3.5",
-          receipt.read ? "text-primary" : "text-muted-foreground",
-        )}
-      >
-        <title>{label}</title>
-      </Icon>
-      {time}
-    </span>
   );
 }
 

@@ -108,10 +108,12 @@ function MessageScrollerItem({
     <MessageScrollerPrimitive.Item
       data-slot="message-scroller-item"
       scrollAnchor={scrollAnchor}
-      className={cn(
-        "min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
-        className
-      )}
+      // Not the kit's `content-visibility: auto`: an item not yet drawn holds a
+      // 10rem guess, most messages are shorter, and scrolling up from the end
+      // drew them, shrank the transcript and put the reader back at the end,
+      // where the scroller follows the bottom again. A chat loads a page at a
+      // time, so drawing every item costs little.
+      className={cn("min-w-0 shrink-0", className)}
       {...props}
     />
   )
