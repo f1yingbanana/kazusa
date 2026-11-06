@@ -35,7 +35,7 @@ const DIM =
   "color-mix(in oklch, color-mix(in oklch, var(--background) 55%, black) 82%, transparent)";
 /** Hatching over a message left out inside the frame: out, at a glance. */
 const HATCH =
-  "repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in oklch, var(--foreground) 22%, transparent) 7px 9px)";
+  "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklch, var(--foreground) 26%, transparent) 6px 7px)";
 /** The floating bar and the button above it cover the viewport's foot. */
 const BAR_CLEARANCE_PX = 96;
 /** How close to the viewport's edge a drag starts scrolling it. */
