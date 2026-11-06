@@ -70,7 +70,7 @@ function summary(
   };
 }
 
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 3_000;
 
 /**
  * `models.authRefresh` and `secrets.*` need `operator.admin`, which a
@@ -92,8 +92,19 @@ export const adminCall =
     );
 
 /** Makes the Gateway read a changed profile at once, without a reload. */
-export const refreshAuth = (call: ProvidersDeps["call"]): Promise<unknown> =>
-  call("models.authRefresh", { operation: "login" });
+export const refreshAuth = async (
+  call: ProvidersDeps["call"],
+  log?: (message: string) => void,
+): Promise<unknown> => {
+  try {
+    return await call("models.authRefresh", { operation: "login" });
+  } catch (error) {
+    log?.(
+      `Provider key saved, but Gateway auth refresh did not complete: ${String(error)}`,
+    );
+    return undefined;
+  }
+};
 
 /**
  * Provider keys live in OpenClaw auth profiles (`keys.ts`). Saving or removing
@@ -158,7 +169,10 @@ export function registerProvidersHttp(
       return;
     }
     await deps.keys.save(entry.id, payload.key);
-    await refreshAuth(deps.call);
+    await refreshAuth(
+      deps.call,
+      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
+    );
     respond(res, entry);
   });
 
@@ -172,7 +186,10 @@ export function registerProvidersHttp(
       return;
     }
     await deps.keys.remove(entry.id, deps.readConfig());
-    await refreshAuth(deps.call);
+    await refreshAuth(
+      deps.call,
+      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
+    );
     respond(res, entry);
   });
 }
