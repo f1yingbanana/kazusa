@@ -30,11 +30,12 @@ function Slot({ items }: { items: readonly StatusItem[] }) {
  */
 export function StatusBar() {
   const { resolved } = useSources();
-  const { hasPermission } = useAccess();
+  const { hasPermission, isLocal } = useAccess();
   const items = STATUS_ITEMS.filter(
     (item) =>
       satisfies(resolved, item.requires) &&
-      (!item.requiresPermission || hasPermission(item.requiresPermission)),
+      (!item.requiresPermission || hasPermission(item.requiresPermission)) &&
+      (!item.requiresLocal || isLocal),
   );
   return (
     <footer className="hidden h-7 shrink-0 items-center justify-between gap-4 border-t bg-sidebar px-3 font-mono text-[11px] text-muted-foreground md:flex">

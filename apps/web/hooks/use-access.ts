@@ -37,6 +37,7 @@ export function computeAccessState(
     ? checkPermission(safeAccess.role, "manage")
     : false;
   const isOwner = hasKnownAccess && safeAccess.role === "owner";
+  const isLocal = hasKnownAccess ? Boolean(safeAccess.local) : false;
   // Visitors cannot play, so they are read-only. Collaborators can play, so they are not view-only.
   const isReadOnly = hasKnownAccess ? !canPlay : true;
 
@@ -57,6 +58,7 @@ export function computeAccessState(
     canManage,
     isReadOnly,
     isOwner,
+    isLocal,
     hasPermission: hasPerm,
   };
 }
@@ -71,6 +73,7 @@ export interface UseAccessResult {
   readonly canManage: boolean;
   readonly isReadOnly: boolean;
   readonly isOwner: boolean;
+  readonly isLocal: boolean;
   readonly hasPermission: (permission: Permission) => boolean;
   readonly mutate: () => Promise<Access | undefined>;
 }

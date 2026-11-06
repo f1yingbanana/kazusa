@@ -52,6 +52,7 @@ describe("Kazusa browser proxy", () => {
     expect(await response.json()).toEqual({
       role: "visitor",
       permissions: ["observe"],
+      local: false,
     });
     expect((await call("access", "POST")).status).toBe(405);
     expect(upstream).not.toHaveBeenCalled();
@@ -158,6 +159,117 @@ describe("Kazusa browser proxy", () => {
     expect((await call("world")).status).toBe(503);
     vi.stubEnv("KAZUSA_AUTH_MODE", "typo");
     expect((await call("access")).status).toBe(503);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+});
+
+describe("trusted-proxy browser proxy", () => {
+  const SECRET = "proxy-shared-secret";
+  const ORIGIN = "https://cloud.example";
+
+  beforeEach(() => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
+    vi.stubEnv("KAZUSA_TRUSTED_PROXY_SECRET", SECRET);
+    vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", "test-service-token");
+    vi.stubEnv("KAZUSA_GATEWAY_URL", "http://127.0.0.1:18789");
+    upstream.mockReset();
+  });
+
+  it("rejects calls without proxy credentials", async () => {
+    const response = await call("access", "GET", {}, ORIGIN);
+    expect(response.status).toBe(401);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("serves access metadata for authenticated owner and visitor", async () => {
+    // Owner
+    const ownerRes = await call(
+      "access",
+      "GET",
+      {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "owner",
+      },
+      ORIGIN,
+    );
+    expect(ownerRes.status).toBe(200);
+    expect(await ownerRes.json()).toEqual({
+      role: "owner",
+      permissions: ["observe", "play", "manage"],
+      local: false,
+    });
+
+    // Visitor
+    const visitorRes = await call(
+      "access",
+      "GET",
+      {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "visitor",
+      },
+      ORIGIN,
+    );
+    expect(visitorRes.status).toBe(200);
+    expect(await visitorRes.json()).toEqual({
+      role: "visitor",
+      permissions: ["observe"],
+      local: false,
+    });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("forwards owner mutations to Gateway with service token and owner role", async () => {
+    upstream.mockResolvedValue(
+      new Response('{"success":true}', {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const response = await call(
+      "clock",
+      "POST",
+      {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "owner",
+        Origin: ORIGIN,
+      },
+      ORIGIN,
+    );
+    expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(1);
+    const [, init] = upstream.mock.calls[0];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("authorization")).toBe("Bearer test-service-token");
+    expect(headers.get("x-kazusa-role")).toBe("owner");
+  });
+
+  it("blocks visitor mutations before calling upstream Gateway", async () => {
+    const response = await call(
+      "clock",
+      "POST",
+      {
+        "x-kazusa-proxy-secret": SECRET,
+        "x-kazusa-role": "visitor",
+        Origin: ORIGIN,
+      },
+      ORIGIN,
+    );
+    expect(response.status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate or unsupported roles with 401 without contacting Gateway", async () => {
+    for (const role of ["collaborator", "owner, visitor", "admin"]) {
+      const response = await call(
+        "chats",
+        "GET",
+        {
+          "x-kazusa-proxy-secret": SECRET,
+          "x-kazusa-role": role,
+        },
+        ORIGIN,
+      );
+      expect(response.status).toBe(401);
+    }
     expect(upstream).not.toHaveBeenCalled();
   });
 });

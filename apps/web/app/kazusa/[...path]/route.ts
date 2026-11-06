@@ -5,6 +5,7 @@ import {
 } from "@kazusa/client";
 import {
   accessError,
+  AuthError,
   hostError,
   hostOf,
   isAllowedHost,
@@ -18,9 +19,12 @@ async function forward(request: Request, context: Context): Promise<Response> {
   const route = (await context.params).path.join("/");
   let viewer;
   try {
-    viewer = resolveViewer();
+    viewer = resolveViewer(request);
     if (!isAllowedHost(hostOf(request))) return hostError();
-  } catch {
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return accessError(err.status, err.message);
+    }
     return accessError(
       503,
       "Kazusa authentication is not configured correctly.",

@@ -94,4 +94,19 @@ describe("computeAccessState", () => {
       }),
     ).not.toThrow();
   });
+
+  it("distinguishes local owner from remote/cloud owner", () => {
+    const localOwner = accessForRole("owner", { local: true });
+    expect(computeAccessState(localOwner, false, undefined).isLocal).toBe(true);
+
+    const cloudOwner = accessForRole("owner", { local: false });
+    expect(computeAccessState(cloudOwner, false, undefined).isLocal).toBe(
+      false,
+    );
+
+    const cloudVisitor = accessForRole("visitor", { local: false });
+    expect(computeAccessState(cloudVisitor, false, undefined).isLocal).toBe(
+      false,
+    );
+  });
 });

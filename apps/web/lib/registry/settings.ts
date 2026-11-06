@@ -66,6 +66,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
     icon: CircleArrowUpIcon,
     order: 30,
     requiresPermission: "manage",
+    requiresLocal: true,
     component: UpdateSettings,
   },
 ];

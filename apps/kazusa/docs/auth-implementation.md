@@ -55,18 +55,18 @@ Deployable demo milestone, depending on PR 1.
       `useModels()` still requests owner-only routes for visitors).
 - [x] Verify local-owner/public-visitor behavior in browser and direct requests.
 
-## PR 3 — Trusted-proxy adapter
+## PR 3 — Trusted-proxy adapter (implemented; ready for review)
 
 One UI behind the private wrapper. Collaborator interaction stays disabled until
 PR 4; no accounts, invitations or Supabase implementation in this repo.
 
-- [ ] Authenticate the wrapper connection; normalize viewer identity and role.
-- [ ] Require world-specific membership upstream and a non-bypassable origin.
-- [ ] Reject spoofed/duplicate identity headers and invalid configuration.
-- [ ] Cover both HTTP and SSE, including identity changes and revoked access.
-- [ ] Key desktop `/update` polling to loopback local mode rather than solely
+- [x] Authenticate the wrapper connection; normalize viewer identity and role.
+- [x] Require world-specific membership upstream and a non-bypassable origin.
+- [x] Reject spoofed/duplicate identity headers and invalid configuration.
+- [x] Cover both HTTP and SSE, including identity changes and revoked access.
+- [x] Key desktop `/update` polling to loopback local mode rather than solely
       owner role so cloud wrapper owners do not hit 403s.
-- [ ] Verify end-to-end through a small test proxy; document deployment.
+- [x] Verify end-to-end through a small test proxy; document deployment.
 
 ## PR 4 — Collaborator player identities
 
@@ -204,3 +204,39 @@ PR 2 branch: `codex/auth-readonly-ui`.
   - Monorepo full test suite: 115 test files, 1,181 tests passed.
   - Linting (`npx eslint apps/web packages/client`) and formatting
     (`pretty-quick`) passed.
+
+PR 3 branch: `codex/auth-trusted-proxy`.
+
+### PR 3 Evidence
+
+- **Wrapper connection authentication & anti-spoofing**:
+  - `KAZUSA_AUTH_MODE=trusted-proxy` mode added to `@kazusa/client`.
+  - Timing-safe comparison of `KAZUSA_TRUSTED_PROXY_SECRET` via
+    `x-kazusa-proxy-secret` or `Authorization: Bearer <secret>`.
+  - Rejects unauthenticated direct requests (401), missing server config (503),
+    duplicate/array role headers (401), and unsupported roles (401).
+  - Unauthenticated requests cannot bypass the wrapper origin or spoof owner
+    authority.
+- **Normalization of viewer identity & access**:
+  - Validated role mapped to `accessForRole(role, { local: false })`.
+  - If role header is omitted by wrapper, safe fallback to `visitor`.
+  - Forwarded to OpenClaw Gateway with authenticated service bearer token and
+    normalized `x-kazusa-role`.
+- **Desktop /update loopback keying**:
+  - `AccessSchema` extended with `local: z.boolean().optional()`.
+  - `useAccess()` returns `isLocal: boolean`.
+  - `useUpdate()` and `useAnnouncedRelease()` key polling on
+    `isOwner && isLocal ? UPDATE_KEY : null`.
+  - Settings `updates` category and status bar item gated with
+    `requiresLocal: true`.
+  - Desktop-only host routes (`/update`, `/setup`, `/setup/world`, `/reveal`)
+    reject non-local requests (403) before processing.
+- **End-to-end integration & verification**:
+  - Dedicated end-to-end wrapper simulation in
+    `apps/web/lib/auth/trusted-proxy.test.ts` (5 tests passing: owner mutation
+    forwarding, visitor read/write boundaries, direct bypass prevention, session
+    revocation reflection, and desktop host route isolation).
+  - Proxy unit tests in `apps/web/lib/auth/proxy.test.ts` (12 tests passing).
+  - Gateway registrar tests in
+    `apps/kazusa/plugins/kazusa/src/http/access.test.ts` (10 tests passing).
+  - Full suite: all 116 test files pass.

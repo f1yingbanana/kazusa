@@ -1,15 +1,106 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   accessForRole,
-  deploymentRole,
   parseAuthMode,
+  PROXY_SECRET_HEADER,
+  RoleSchema,
+  VIEWER_ROLE_HEADER,
   type Access,
 } from "@kazusa/client";
 import { isSameOrigin } from "../same-origin";
 
-/** Server-only deployment choice. Browser-supplied identity is never trusted. */
-export function resolveViewer(): Access {
-  return accessForRole(
-    deploymentRole(parseAuthMode(process.env.KAZUSA_AUTH_MODE)),
+export class AuthError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+function getHeader(
+  source: Request | Headers | undefined,
+  name: string,
+): string | null {
+  if (!source) return null;
+  if ("headers" in source && source.headers instanceof Headers) {
+    return source.headers.get(name);
+  }
+  if (source instanceof Headers) {
+    return source.get(name);
+  }
+  return null;
+}
+
+/**
+ * Server-only deployment choice.
+ *
+ * - In local mode, zero-login owner with local: true.
+ * - In public mode, every browser is a visitor with local: false.
+ * - In trusted-proxy mode, requires private wrapper authentication with
+ *   timing-safe secret check, rejecting forged or duplicate identity headers.
+ */
+export function resolveViewer(request?: Request | Headers): Access {
+  const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
+  if (mode === "local") {
+    return accessForRole("owner", { local: true });
+  }
+  if (mode === "public") {
+    return accessForRole("visitor", { local: false });
+  }
+  if (mode === "trusted-proxy") {
+    const expectedSecret = (
+      process.env.KAZUSA_TRUSTED_PROXY_SECRET ?? process.env.KAZUSA_PROXY_SECRET
+    )?.trim();
+    if (!expectedSecret) {
+      throw new AuthError(
+        503,
+        "Kazusa authentication is not configured correctly.",
+      );
+    }
+    const proxyHeader = getHeader(request, PROXY_SECRET_HEADER);
+    const authHeader = getHeader(request, "authorization");
+    let providedSecret: string | null = null;
+    if (proxyHeader) {
+      providedSecret = proxyHeader.trim();
+    } else if (authHeader) {
+      const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+      if (match) providedSecret = match[1].trim();
+    }
+    if (!providedSecret) {
+      throw new AuthError(
+        401,
+        "Unauthorized: Invalid or missing proxy credentials.",
+      );
+    }
+    const actualBuf = Buffer.from(providedSecret);
+    const expectedBuf = Buffer.from(expectedSecret);
+    if (
+      actualBuf.length !== expectedBuf.length ||
+      !timingSafeEqual(actualBuf, expectedBuf)
+    ) {
+      throw new AuthError(
+        401,
+        "Unauthorized: Invalid or missing proxy credentials.",
+      );
+    }
+    const rawRole = getHeader(request, VIEWER_ROLE_HEADER);
+    if (rawRole === null) {
+      return accessForRole("visitor", { local: false });
+    }
+    if (rawRole.includes(",")) {
+      throw new AuthError(401, "Invalid or unsupported viewer identity.");
+    }
+    const parsed = RoleSchema.safeParse(rawRole.trim());
+    if (!parsed.success || parsed.data === "collaborator") {
+      throw new AuthError(401, "Invalid or unsupported viewer identity.");
+    }
+    return accessForRole(parsed.data, { local: false });
+  }
+  throw new AuthError(
+    503,
+    "Kazusa authentication is not configured correctly.",
   );
 }
 
@@ -20,7 +111,7 @@ const LOOPBACK_HOST =
 /**
  * Local mode answers only to loopback names, so a page whose DNS name was
  * rebound to 127.0.0.1 can't use the owner's proxy. Ownership still comes from
- * the mode, never from the Host; public frontends serve any domain.
+ * the mode, never from the Host; public and proxy frontends serve any domain.
  */
 export function isAllowedHost(host: string | null): boolean {
   if (parseAuthMode(process.env.KAZUSA_AUTH_MODE) !== "local") return true;
@@ -43,17 +134,28 @@ export function hostError(): Response {
   return accessError(403, "Open Kazusa at localhost.");
 }
 
-/** Desktop host operations are unavailable on a public deployment. */
+/** Desktop host operations are unavailable on a public or cloud deployment. */
 export function requireLocalOwner(request: Request): Response | undefined {
   try {
-    if (resolveViewer().role !== "owner") {
+    const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
+    if (mode !== "local") {
+      return accessError(
+        403,
+        "This action is only available to the local owner.",
+      );
+    }
+    const viewer = resolveViewer(request);
+    if (viewer.role !== "owner") {
       return accessError(
         403,
         "This action is only available to the local owner.",
       );
     }
     if (!isAllowedHost(hostOf(request))) return hostError();
-  } catch {
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return accessError(err.status, err.message);
+    }
     return accessError(
       503,
       "Kazusa authentication is not configured correctly.",

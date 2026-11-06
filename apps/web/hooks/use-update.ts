@@ -35,16 +35,16 @@ export type UpdatePhase =
  * when the frontend is back.
  */
 export function useUpdate() {
-  const { isOwner } = useAccess();
+  const { isOwner, isLocal } = useAccess();
   const [phase, setPhase] = useState<UpdatePhase | null>(null);
   const [checking, setChecking] = useState(false);
   // The boot of a frontend another page's update will restart.
   const [othersBoot, setOthersBoot] = useState<string | null>(null);
   // Each check spends GitHub's hourly allowance, so beyond the background
   // check (`useAnnouncedRelease`) only on request. While another page
-  // downloads, the route answers from its cache.
+  // downloads, the route answers from its cache. Desktop local owner only.
   const resource = useSWR<UpdateStatus, Error>(
-    isOwner ? UPDATE_KEY : null,
+    isOwner && isLocal ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,
@@ -128,9 +128,9 @@ export function useUpdate() {
  * its answer with Settings → Updates.
  */
 export function useAnnouncedRelease(): UpdateTarget | null {
-  const { isOwner } = useAccess();
+  const { isOwner, isLocal } = useAccess();
   const { data } = useSWR<UpdateStatus, Error>(
-    isOwner ? UPDATE_KEY : null,
+    isOwner && isLocal ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,

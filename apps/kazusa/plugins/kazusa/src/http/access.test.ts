@@ -101,6 +101,24 @@ describe("deployment policy", () => {
     expect(h.handler).not.toHaveBeenCalled();
   });
 
+  it("handles trusted-proxy mode respecting delegated roles from Next proxy", async () => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "trusted-proxy");
+    const h = setup();
+    // Delegated owner gets 200
+    expect(await call(h.routes.get("/kazusa/clock"), "owner")).toBe(200);
+    // Delegated visitor gets 403 on manage route
+    expect(await call(h.routes.get("/kazusa/clock"), "visitor")).toBe(403);
+    // Delegated visitor gets 200 on observe route
+    expect(await call(h.routes.get("/kazusa/events"), "visitor")).toBe(200);
+    // Missing delegated role falls back to visitor (403 on clock)
+    expect(await call(h.routes.get("/kazusa/clock"))).toBe(403);
+    // Malformed/unsupported role gets 401
+    expect(await call(h.routes.get("/kazusa/clock"), "collaborator")).toBe(401);
+    expect(await call(h.routes.get("/kazusa/clock"), "owner, visitor")).toBe(
+      401,
+    );
+  });
+
   it("does not register unclassified endpoints or mismatched methods", () => {
     const h = setup();
     expect(() => h.register("unclassified", "POST", h.handler)).toThrow(
