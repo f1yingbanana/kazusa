@@ -369,6 +369,10 @@ describe("send_message SDK integration", () => {
       of: 3,
       heard: "I told you n—",
     });
+    // What stopped them follows as its own text, read as a delivery is.
+    expect(speechReply({ ...cut, meanwhile: "- [Bob] …" })).not.toHaveProperty(
+      "meanwhile",
+    );
     const { heard: _heard, ...whole } = cut;
     expect(speechReply({ ...whole, said: ["Wait..."] })).toEqual({
       status: "interrupted",

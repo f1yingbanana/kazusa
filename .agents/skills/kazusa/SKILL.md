@@ -173,9 +173,10 @@ hallucinations. Kazusa addresses these through six architectural pillars:
      bubble, the first included, takes its time to type or, face to face, to say
      (`messaging/composing.ts`: per writing system, at a pace Jev judges per
      send); thinking is not typing, and the typing indicator shows only while a
-     bubble is being composed. A `STEER` aborts the rest; unsent bubbles never
-     reach any ledger, and the tool result tells the brain what was and was not
-     said. See `references/messaging.md` (Paced speech). Face to face, each
+     bubble is being composed. A `STEER` aborts the rest and comes back in the
+     tool result, after what was and was not said; unsent bubbles never reach
+     any ledger. A text in the chat being typed into stops it unjudged: it is on
+     screen. See `references/messaging.md` (Paced speech). Face to face, each
      spoken line also waits for the huddle's one floor; Jev's `floor` question
      decides how badly a speaker wants in (`CUT_IN`, `NEXT`, `WAIT`), and a line
      stopped mid-way is heard up to where it got. See `references/floor.md`.
@@ -832,17 +833,29 @@ connect these modules in process.
     situational urgency to steer, while routine stimuli are queued for the next
     turn (`QUEUE_NEXT`), set aside until the activity ends (`DEFER`), or
     ignored. `STEER` also interrupts an in-progress `send_message`.
+  - **On screen, said over**: a text arriving in the chat whose send is under
+    way (`currentSpeech.sessionKey`, not a huddle) is `STEER`ed without Jev
+    (`source: "automatic"`, a 250 ms window): typing in a chat, you see what
+    comes in. Face to face, a `QUEUE_NEXT` line in the huddle being spoken in
+    becomes a steer `atPause`: the line being said is finished, then it stops.
   - **The steer queue**: a busy `STEER` only marks its items `action: "STEER"`.
-    While the brain runs and no steer is in custody, everything in that queue
-    (up to the batch limits) goes in one steer, its text built at send time;
-    what is steered meanwhile waits and merges into the next, sent when the one
-    in custody is adopted. The brain combines the signals itself. A steer still
-    in custody when its run ends was refused (OpenClaw parked it as a turn of
-    its own): `ended` aborts it through the lifecycle `abortSignal`
-    (`steerCustody`, process-wide) and its items join the next turn's batch,
-    steer queue first. No watchdog: a custody that never resolves is a paused
-    world. Live before this, 98% of steers were refused and each ran later as
-    its own turn, oldest first.
+    While a send is under way, the queue rides back on its result
+    (`SpeechSource.interrupt(agentId, handoff)`, kept in `state.carried`: read
+    when the next model call starts, taken in when one completes, back in the
+    queue if the run ends first; live, 3 of 4 run-limit hits ended unread):
+    handed to the host after the cut-off, the steer missed the model call the
+    cut-off started, and live the brain typed on blind for 1-11 minutes. A send
+    that begins while a steer waits for the host takes it back
+    (`Perception.speaking`). Otherwise, while the brain runs and no steer is in
+    custody, everything in that queue (up to the batch limits) goes in one steer
+    to the host, its text built at send time; what is steered meanwhile waits
+    and merges into the next, sent when the one in custody is adopted. The brain
+    combines the signals itself. A steer still in custody when its run ends was
+    refused (OpenClaw parked it as a turn of its own): `ended` aborts it through
+    the lifecycle `abortSignal` (`steerCustody`, process-wide) and its items
+    join the next turn's batch, steer queue first. No watchdog: a custody that
+    never resolves is a paused world. Live before this, 98% of steers were
+    refused and each ran later as its own turn, oldest first.
   - **Unavailable judgment** falls back to `DEFER` for a group chat and
     `QUEUE_NEXT` otherwise, never `STEER`: idle, it is delivered at once; busy,
     it waits for the turn to end. Live, a `STEER` fallback ran 1,278 turns.

@@ -75,8 +75,8 @@ current→afterwards state.
 Say something in a chat, in person or by text: its address alone says which.
 Bubbles in messages, 1 to {maxBubbles}, are said one at a time. Delivery retries
 automatically. Returns `delivered`, or `pending` while delivery retries; if you
-were cut off, how many bubbles were `said` `of` them, and what was `heard` of a
-line cut short.
+were cut off, how many bubbles were `said` `of` them, what was `heard` of a line
+cut short, and then what stopped you.
 
 ## send_message.sessionKey
 
