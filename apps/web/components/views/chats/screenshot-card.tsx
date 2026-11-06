@@ -17,24 +17,26 @@ import type { ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, WorldMeta } from "@kazusa/client";
 import type { Participant } from "./chat-avatar";
+import { ChatSubtitle } from "./chat-header";
 import { ActionLine, buildRuns, StickerImage } from "./message-parts";
 
 /** A phone's width: what a shared chat screenshot is expected to look like. */
 export const CARD_WIDTH_PX = 400;
 
 const NO_ACTIVITY = new Map<number, never>();
+const NO_TYPISTS: never[] = [];
 const noRetry = () => {};
 
 /**
  * The picture a screenshot makes: the chosen messages laid out again at a
  * phone's width, whatever the screen they were chosen on. Read the way a chat
- * is: where it is, by the chat's name alone, where the eye starts; then the
- * conversation, which says who is talking; and where it ends, the credit, as a
- * signature: the world, who made it, and its link in the bottom-right corner,
- * where a picture's source is looked for and the eye leaves. Runs and names are
- * worked out for these messages alone, so the first one always says who is
- * speaking. Plain `<img>`s, so every face is loaded before the picture is
- * taken.
+ * is: the chat's own title bar (its name, and the line under it the app shows)
+ * where the eye starts; then the conversation; and where it ends, the credit,
+ * as a signature: the world, who made it, and its link in the bottom-right
+ * corner, where a picture's source is looked for and the eye leaves. Runs and
+ * names are worked out for these messages alone, so the first one always says
+ * who is speaking. Plain `<img>`s, so every face is loaded before the picture
+ * is taken.
  */
 export const ScreenshotCard = forwardRef<
   HTMLDivElement,
@@ -63,9 +65,12 @@ export const ScreenshotCard = forwardRef<
     >
       <header className="flex items-center gap-3 border-b px-5 py-4">
         {partner ? <Face participant={partner} size={40} /> : null}
-        <h1 className="min-w-0 text-base leading-tight font-semibold">
-          {title}
-        </h1>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="truncate text-base leading-tight font-semibold">
+            {title}
+          </h1>
+          <ChatSubtitle chat={chat} userId={userId} typists={NO_TYPISTS} />
+        </div>
       </header>
 
       <div className="flex flex-col gap-4 px-4 pt-5 pb-6">

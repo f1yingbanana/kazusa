@@ -451,12 +451,8 @@ export function ScreenshotBar({
           {count === 1 ? " message" : " messages"}
         </span>
         <span className="text-xs leading-tight text-muted-foreground">
-          <span className="pointer-coarse:hidden">
-            Click a message to add it or leave it out
-          </span>
-          <span className="pointer-fine:hidden">
-            Tap a message to add it or leave it out
-          </span>
+          <span className="pointer-coarse:hidden">Click to add or remove</span>
+          <span className="pointer-fine:hidden">Tap to add or remove</span>
         </span>
       </div>
       <Button variant="ghost" onClick={onCancel}>

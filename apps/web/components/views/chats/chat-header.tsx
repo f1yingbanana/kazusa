@@ -55,7 +55,6 @@ export function ChatHeader({
   const others = chat.members.filter((id) => id !== userId);
   const partnerId = isDirect ? others[0] : undefined;
   const partner = partnerId ? byId.get(partnerId) : undefined;
-  const typing = typists.length > 0;
 
   const subject = chatSubject(chat, userId);
   const showing = subject !== null && sameEntity(subject, selection);
@@ -110,42 +109,7 @@ export function ChatHeader({
             chat.name
           )}
         </h2>
-        <p
-          className={cn(
-            "flex min-w-0 items-center gap-1 text-xs leading-tight text-muted-foreground",
-            typing && "shimmer text-primary",
-          )}
-        >
-          {typing ? (
-            <span className="truncate">
-              {isDirect
-                ? `${typists[0].mode}…`
-                : formatTypingLabel(
-                    typists.map((t) => t.senderName),
-                    typists.every((t) => t.mode === "speaking")
-                      ? "speaking"
-                      : "typing",
-                  )}
-            </span>
-          ) : chat.type === "huddle" ? (
-            <>
-              <SpeechIcon aria-hidden className="size-3 shrink-0" />
-              <span className="truncate">
-                {`${chat.ended ? "Was in person" : "In person"} · ${
-                  listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
-                  "just you"
-                }`}
-              </span>
-            </>
-          ) : isDirect ? (
-            <Activity character={partner} />
-          ) : (
-            <span className="truncate">
-              {listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
-                "Just you"}
-            </span>
-          )}
-        </p>
+        <ChatSubtitle chat={chat} userId={userId} typists={typists} />
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -182,6 +146,65 @@ export function ChatHeader({
         ) : null}
       </div>
     </header>
+  );
+}
+
+/**
+ * The line under a chat's name: who is typing or speaking right now, else who
+ * is there (in person, a group) or what a DM's partner is doing and for how
+ * long. Shared with the screenshot's header, which passes no typists.
+ */
+export function ChatSubtitle({
+  chat,
+  userId,
+  typists,
+}: {
+  chat: ChatInfo;
+  userId: string;
+  typists: readonly Typist[];
+}) {
+  const { byId } = useCharacters();
+  const isDirect = isOneOnOne(chat, userId);
+  const others = chat.members.filter((id) => id !== userId);
+  const partner = isDirect && others[0] ? byId.get(others[0]) : undefined;
+  const typing = typists.length > 0;
+  return (
+    <p
+      className={cn(
+        "flex min-w-0 items-center gap-1 text-xs leading-tight text-muted-foreground",
+        typing && "shimmer text-primary",
+      )}
+    >
+      {typing ? (
+        <span className="truncate">
+          {isDirect
+            ? `${typists[0].mode}…`
+            : formatTypingLabel(
+                typists.map((t) => t.senderName),
+                typists.every((t) => t.mode === "speaking")
+                  ? "speaking"
+                  : "typing",
+              )}
+        </span>
+      ) : chat.type === "huddle" ? (
+        <>
+          <SpeechIcon aria-hidden className="size-3 shrink-0" />
+          <span className="truncate">
+            {`${chat.ended ? "Was in person" : "In person"} · ${
+              listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
+              "just you"
+            }`}
+          </span>
+        </>
+      ) : isDirect ? (
+        <Activity character={partner} />
+      ) : (
+        <span className="truncate">
+          {listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
+            "Just you"}
+        </span>
+      )}
+    </p>
   );
 }
 

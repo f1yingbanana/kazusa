@@ -208,7 +208,7 @@ export function ScreenshotDialog({
           <DialogHeader>
             <DialogTitle>Screenshot</DialogTitle>
             <DialogDescription>
-              {`${count} ${count === 1 ? "message" : "messages"}, sized for a phone.`}
+              {`${count} ${count === 1 ? "message" : "messages"}`}
             </DialogDescription>
           </DialogHeader>
 
