@@ -342,10 +342,7 @@ export function MessageList({
                     </MessageScrollerItem>
                   ) : null}
                   {run.isAction ? (
-                    <MessageScrollerItem
-                      messageId={run.key}
-                      className={HOLDS_MENU}
-                    >
+                    <MessageScrollerItem messageId={run.key}>
                       <div
                         className={cn(
                           "flex flex-col gap-1",
@@ -381,10 +378,7 @@ export function MessageList({
                       </div>
                     </MessageScrollerItem>
                   ) : (
-                    <MessageScrollerItem
-                      messageId={run.key}
-                      className={HOLDS_MENU}
-                    >
+                    <MessageScrollerItem messageId={run.key}>
                       <MessageGroup className="gap-1">
                         {run.messages.map((message, index) => {
                           const isFirst = index === 0;
@@ -542,13 +536,6 @@ export function MessageList({
     </MessageScrollerProvider>
   );
 }
-
-/**
- * Off-screen items skip painting and clip to their box; a touch menu rises
- * above its bubble, out of that box, so its item paints in full while open.
- */
-const HOLDS_MENU =
-  "has-[[role=toolbar][data-open]]:[content-visibility:visible]";
 
 /** On touch, holding a message opens its actions, not the text selection. */
 const PRESSABLE =
