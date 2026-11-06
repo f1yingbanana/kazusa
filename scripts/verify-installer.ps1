@@ -29,7 +29,8 @@ function Wait-Until([scriptblock]$ready, [string]$what, [int]$seconds = 180) {
 # /D has to come last, and unquoted even with a space in it.
 Run-Silently $Installer @('/S', "/D=$Folder")
 Assert (Test-Path (Join-Path $Folder 'node\node.exe')) 'installed to the chosen folder'
-Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\elden-ring\package.json')) 'bundled Elden Ring'
+Assert (Test-Path (Join-Path $Folder 'git\cmd\git.exe')) 'bundled Git'
+Assert (Test-Path (Join-Path $Folder 'apps\kazusa\world-sources.json')) 'bundled world sources'
 
 New-Item -ItemType Directory -Force -Path $World | Out-Null
 Set-Content (Join-Path $World 'kept.txt') 'mine'
@@ -54,6 +55,7 @@ try {
   Wait-Until { (Invoke-WebRequest "$Web/" -UseBasicParsing).StatusCode -eq 200 } 'the frontend starts'
   Invoke-RestMethod "$Web/setup" -Method Post -ContentType 'application/json' -Body '{"world":"starter"}' | Out-Null
   Assert ((Get-Item (Join-Path $World 'workspaces\arona\.agents')).LinkType -eq 'Junction') 'setup links the guides'
+  Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\starter\package.json')) 'setup cloned the starter world'
   Wait-Until { (Invoke-WebRequest "$Web/kazusa/world" -UseBasicParsing).StatusCode -eq 200 } 'the Gateway starts'
   Wait-Until {
     $chat = (Invoke-RestMethod "$Web/kazusa/chats").chats | Where-Object { $_.members -contains 'arona' }
