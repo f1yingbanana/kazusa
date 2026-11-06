@@ -38,7 +38,11 @@ import { formatDayLabel } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
 import type { BrainActivity } from "@/lib/source/brain/activity";
 import { isOneOnOne } from "@/lib/source/chats/display";
-import { includedIn, type ShotRange } from "@/lib/source/chats/screenshot";
+import {
+  includedIn,
+  pickMessage,
+  type ShotRange,
+} from "@/lib/source/chats/screenshot";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
 import { requestInspector } from "@/lib/state/inspector-request";
 import { cn } from "@/lib/utils";
@@ -169,8 +173,9 @@ export function MessageList({
   }, [shooting, exporting]);
 
   /**
-   * While choosing, a click on a message inside the frame leaves it out of the
-   * picture or puts it back; nothing else in the transcript responds.
+   * While choosing, a click on a message changes the screenshot and nothing
+   * else in the transcript responds: `pickMessage` has the rules (reach one
+   * outside, give up an end, leave one out inside).
    */
   const pickClicked = (event: React.MouseEvent) => {
     if (!range) return;
@@ -180,15 +185,15 @@ export function MessageList({
     if (!id) return;
     event.preventDefault();
     event.stopPropagation();
-    const index = indexOf(id);
-    if (index >= range.start && index <= range.end) toggle(id);
+    pick(id);
   };
-  const toggle = (id: string) =>
-    setExcluded((current) => {
-      const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  const pick = (id: string) => {
+    const index = indexOf(id);
+    if (!range || index === -1) return;
+    const next = pickMessage(ids, { range, excluded }, index);
+    select(next.range);
+    setExcluded(next.excluded);
+  };
 
   /** What a sent message can do; nothing while choosing a screenshot. */
   const actionsFor = (
@@ -229,7 +234,7 @@ export function MessageList({
               if (event.target !== event.currentTarget) return;
               if (event.key !== " " && event.key !== "Enter") return;
               event.preventDefault();
-              toggle(id);
+              pick(id);
             },
           }
         : {}),
@@ -250,7 +255,7 @@ export function MessageList({
             className={cn(
               "relative mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4",
               shooting &&
-                "pb-28 select-none [&_[data-shot-in]]:cursor-pointer [&_[data-shot-in]]:rounded-lg [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ring",
+                "pb-28 select-none [&_[data-shot-id]]:cursor-pointer [&_[data-shot-in]]:rounded-lg [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ring",
             )}
           >
             {range ? (

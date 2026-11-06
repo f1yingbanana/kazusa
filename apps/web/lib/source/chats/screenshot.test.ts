@@ -4,6 +4,7 @@ import {
   exportScale,
   includedIn,
   nudgeEdge,
+  pickMessage,
   visibleEnds,
 } from "./screenshot";
 
@@ -19,6 +20,69 @@ describe("visibleEnds", () => {
   it("is undefined when no message's middle is on screen", () => {
     expect(visibleEnds(bounds, 75, 115)).toBeUndefined();
     expect(visibleEnds(bounds, 200, 300)).toBeUndefined();
+  });
+});
+
+describe("pickMessage", () => {
+  const ids = ["a", "b", "c", "d", "e", "f"];
+  const shot = (start: number, end: number, ...out: string[]) => ({
+    range: { start, end },
+    excluded: new Set(out),
+  });
+  const pick = (from: ReturnType<typeof shot>, index: number) => {
+    const next = pickMessage(ids, from, index);
+    return { range: next.range, out: [...next.excluded].sort() };
+  };
+
+  it("reaches a message outside and leaves out the ones between", () => {
+    expect(pick(shot(2, 3), 5)).toEqual({
+      range: { start: 2, end: 5 },
+      out: ["e"],
+    });
+    expect(pick(shot(3, 3), 0)).toEqual({
+      range: { start: 0, end: 3 },
+      out: ["b", "c"],
+    });
+  });
+
+  it("takes in a neighbour without leaving anything out", () => {
+    expect(pick(shot(2, 3), 4)).toEqual({
+      range: { start: 2, end: 4 },
+      out: [],
+    });
+  });
+
+  it("gives up an end, and left-out messages that would become the edge", () => {
+    expect(pick(shot(1, 4), 4)).toEqual({
+      range: { start: 1, end: 3 },
+      out: [],
+    });
+    expect(pick(shot(1, 5, "c", "d"), 1)).toEqual({
+      range: { start: 4, end: 5 },
+      out: [],
+    });
+    expect(pick(shot(0, 5, "e"), 5)).toEqual({
+      range: { start: 0, end: 3 },
+      out: [],
+    });
+  });
+
+  it("keeps a range of one", () => {
+    expect(pick(shot(2, 2), 2)).toEqual({
+      range: { start: 2, end: 2 },
+      out: [],
+    });
+  });
+
+  it("leaves out a message inside, or puts it back", () => {
+    expect(pick(shot(0, 4), 2)).toEqual({
+      range: { start: 0, end: 4 },
+      out: ["c"],
+    });
+    expect(pick(shot(0, 4, "c"), 2)).toEqual({
+      range: { start: 0, end: 4 },
+      out: [],
+    });
   });
 });
 

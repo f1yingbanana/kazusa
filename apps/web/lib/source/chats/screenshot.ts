@@ -32,6 +32,57 @@ export function visibleEnds(
   return { start, end };
 }
 
+/** What a screenshot holds: its range, and the messages inside left out. */
+export interface Shot {
+  readonly range: ShotRange;
+  readonly excluded: ReadonlySet<string>;
+}
+
+/**
+ * A click on the message at `index` (into `ids`):
+ *
+ * - Outside the range, the range reaches it, and every message passed over on the
+ *   way is left out: you picked that one, not the ones between;
+ * - On the first or last message, the range gives it up, and any left-out
+ *   messages that would then be the edge go with it, so an edge is always in;
+ * - Inside, the message is left out, or put back.
+ *
+ * A range of one stays: there is nothing to shrink to.
+ */
+export function pickMessage(
+  ids: readonly string[],
+  { range, excluded }: Shot,
+  index: number,
+): Shot {
+  const { start, end } = range;
+  const out = new Set(excluded);
+  if (index < start || index > end) {
+    const [from, to] = index < start ? [index + 1, start] : [end + 1, index];
+    for (let between = from; between < to; between++) out.add(ids[between]);
+    out.delete(ids[index]);
+    return {
+      range: index < start ? { start: index, end } : { start, end: index },
+      excluded: out,
+    };
+  }
+  if (start === end) return { range, excluded };
+  if (index === start || index === end) {
+    const step = index === start ? 1 : -1;
+    let edge = index + step;
+    while (edge !== (index === start ? end : start) && out.has(ids[edge])) {
+      out.delete(ids[edge]);
+      edge += step;
+    }
+    out.delete(ids[index]);
+    return {
+      range: index === start ? { start: edge, end } : { start, end: edge },
+      excluded: out,
+    };
+  }
+  if (!out.delete(ids[index])) out.add(ids[index]);
+  return { range, excluded: out };
+}
+
 /**
  * The messages that go in the picture: the range, less any left out by a tap
  * inside it.

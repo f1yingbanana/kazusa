@@ -452,10 +452,10 @@ export function ScreenshotBar({
         </span>
         <span className="text-xs leading-tight text-muted-foreground">
           <span className="pointer-coarse:hidden">
-            Click a message to leave it out
+            Click a message to add it or leave it out
           </span>
           <span className="pointer-fine:hidden">
-            Tap a message to leave it out
+            Tap a message to add it or leave it out
           </span>
         </span>
       </div>
