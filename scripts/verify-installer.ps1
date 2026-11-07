@@ -29,6 +29,8 @@ function Wait-Until([scriptblock]$ready, [string]$what, [int]$seconds = 180) {
 # /D has to come last, and unquoted even with a space in it.
 Run-Silently $Installer @('/S', "/D=$Folder")
 Assert (Test-Path (Join-Path $Folder 'node\node.exe')) 'installed to the chosen folder'
+Assert (Test-Path (Join-Path $Folder 'Kazusa.cmd')) 'bundled Windows launcher'
+Assert (Test-Path (Join-Path $Folder 'Kazusa.ico')) 'bundled app icon'
 Assert (Test-Path (Join-Path $Folder 'git\cmd\git.exe')) 'bundled Git'
 Assert (Test-Path (Join-Path $Folder 'apps\kazusa\world-sources.json')) 'bundled world sources'
 
@@ -44,12 +46,32 @@ Assert (-not (Test-Path (Join-Path $Folder 'scripts\from-an-old-version.txt'))) 
 Assert (-not (Test-Path (Join-Path $Folder 'node_modules\from-an-old-version'))) 'an update removes old packages'
 Remove-Item -Recurse -Force $World
 
+# Read both real shortcuts, so packaging and quoting are part of this test.
+$shell = New-Object -ComObject WScript.Shell
+foreach ($location in 'DesktopDirectory', 'Programs') {
+  $shortcutPath = Join-Path ([Environment]::GetFolderPath($location)) 'Kazusa.lnk'
+  Assert (Test-Path $shortcutPath) "$location shortcut exists"
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  Assert ((Split-Path $shortcut.TargetPath -Leaf) -eq 'cmd.exe') "$location shortcut opens a terminal"
+  Assert ($shortcut.Arguments.Contains((Join-Path $Folder 'Kazusa.cmd'))) "$location shortcut runs the installed launcher"
+  Assert ($shortcut.Arguments -match '(?i)(^|\s)/d(\s|$)') "$location shortcut skips shell AutoRun"
+  Assert ($shortcut.Arguments -match '(?i)(^|\s)/v:off(\s|$)') "$location shortcut disables delayed expansion"
+  Assert ($shortcut.WorkingDirectory -eq $Folder) "$location shortcut starts in the install folder"
+  Assert (($shortcut.IconLocation -replace ',\s*0$', '').Trim('"') -eq (Join-Path $Folder 'Kazusa.ico')) "$location shortcut uses the app icon"
+}
+$displayIcon = Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Kazusa' -Name DisplayIcon
+Assert (($displayIcon -replace ',\s*0$', '').Trim('"') -eq (Join-Path $Folder 'Kazusa.ico')) 'Installed Apps uses the app icon'
+
 # Kept apart from the runner's own output, and shown only if a step fails:
 # otherwise a failed start says no more than "Timed out".
 $AppOut = Join-Path $env:RUNNER_TEMP 'kazusa-app.out.log'
 $AppErr = Join-Path $env:RUNNER_TEMP 'kazusa-app.err.log'
-$app = Start-Process -FilePath (Join-Path $Folder 'node\node.exe') `
-  -ArgumentList "`"$(Join-Path $Folder 'scripts\dev.mjs')`"", '--packaged' -PassThru `
+# Execute the shortcut's exact command with redirected output. Shell-opening
+# the .lnk cannot redirect its console. Deliberately start elsewhere: on CI,
+# Windows is on C: and the installation is on D:, exercising cd /d as well.
+Write-Host "Launching from $env:SystemRoot; installed in $Folder; TEMP=$env:TEMP"
+$app = Start-Process -FilePath $shortcut.TargetPath `
+  -ArgumentList $shortcut.Arguments -WorkingDirectory $env:SystemRoot -PassThru `
   -RedirectStandardOutput $AppOut -RedirectStandardError $AppErr
 try {
   Wait-Until { (Invoke-WebRequest "$Web/" -UseBasicParsing).StatusCode -eq 200 } 'the frontend starts'
@@ -61,6 +83,16 @@ try {
     $chat = (Invoke-RestMethod "$Web/kazusa/chats").chats | Where-Object { $_.members -contains 'arona' }
     $chat.lastMessage.senderId -eq 'arona'
   } 'the welcome message arrives'
+  Wait-Until {
+    $models = Invoke-RestMethod "$Web/kazusa/models"
+    $models.PSObject.Properties.Name -contains 'models'
+  } 'Models returns JSON'
+  Wait-Until {
+    $providers = Invoke-RestMethod "$Web/kazusa/providers"
+    $providers.PSObject.Properties.Name -contains 'providers'
+  } 'Providers returns JSON'
+  $loadErrors = Select-String -Path $AppOut, $AppErr -Pattern 'failed during (load|register) from|FsSafeError'
+  Assert (-not $loadErrors) 'no plugin load or filesystem safety errors'
 } catch {
   foreach ($log in $AppOut, $AppErr) {
     if (Test-Path $log) {
@@ -88,4 +120,6 @@ Wait-Until {
 Set-Content (Join-Path $World 'kept.txt') 'mine'
 Run-Silently (Join-Path $Folder 'Uninstall.exe') @('/S')
 Wait-Until { -not (Test-Path (Join-Path $Folder 'node')) } 'uninstalling removes the app'
+Assert (-not (Test-Path (Join-Path $Folder 'Kazusa.cmd'))) 'uninstalling removes the launcher'
+Assert (-not (Test-Path (Join-Path $Folder 'Kazusa.ico'))) 'uninstalling removes the icon'
 Assert (Test-Path (Join-Path $World 'kept.txt')) 'uninstalling keeps the world unless asked'
