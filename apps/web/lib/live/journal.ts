@@ -2,25 +2,24 @@ import type { JournalEvent } from "@kazusa/client";
 
 export const TAIL_LIMIT = 500;
 
-/**
- * Appends a live journal event to the ascending tail. Duplicates are ignored.
- * `gapAfter` is set when `seq` skips ahead of the last seen seq, so the caller
- * can catch up with `GET /kazusa/timeline?after=<gapAfter>`.
- */
-export function appendToTail(
+/** Merge the recent live window. Journal sequences are ordered, not contiguous. */
+export function mergeTail(
   tail: readonly JournalEvent[],
-  event: JournalEvent,
-  lastSeq: number | undefined,
+  events: readonly JournalEvent[],
   limit = TAIL_LIMIT,
-): { tail: readonly JournalEvent[]; gapAfter?: number } {
-  if (tail.some((existing) => existing.seq === event.seq)) return { tail };
-  const next = [...tail, event].sort((a, b) => a.seq - b.seq).slice(-limit);
-  const gapAfter =
-    lastSeq !== undefined && event.seq > lastSeq + 1 ? lastSeq : undefined;
-  return { tail: next, gapAfter };
+): readonly JournalEvent[] {
+  const unique = new Map(tail.map((event) => [event.seq, event]));
+  for (const event of events) {
+    if (!unique.has(event.seq)) unique.set(event.seq, event);
+  }
+  if (unique.size === tail.length) return tail;
+  return [...unique.values()].sort((a, b) => a.seq - b.seq).slice(-limit);
 }
 
-/** Merges tail (ascending) and history pages (newest-first) into newest-first, unique by seq. */
+/**
+ * Merges tail (ascending) and history pages (newest-first) into newest-first,
+ * unique by seq.
+ */
 export function mergeNewestFirst(
   tail: readonly JournalEvent[],
   history: readonly JournalEvent[],

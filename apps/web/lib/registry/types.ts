@@ -9,7 +9,6 @@ import type {
   StreamEventType,
 } from "@kazusa/client";
 import type { EntityKind, EntityRef } from "@/lib/state/entity-ref";
-import type { LiveContext } from "@/lib/registry/live";
 
 export interface SectionSidebarProps {
   /** Called after the sidebar navigated or selected, so a sheet can close. */
@@ -123,5 +122,4 @@ export interface TimelineKind<K extends JournalKind = JournalKind> {
 /** Applies one SSE event type to client state. */
 export type LiveHandler<T extends StreamEventType> = (
   event: StreamEventOf<T>,
-  ctx: LiveContext,
 ) => void;

@@ -44,7 +44,7 @@ import {
   type ShotRange,
 } from "@/lib/source/chats/screenshot";
 import type { ChatInfo, PendingMessage } from "@/lib/source/chats/types";
-import { requestInspector } from "@/lib/state/inspector-request";
+import { requestInspector } from "@/lib/state/ui-store";
 import { cn } from "@/lib/utils";
 import { ParticipantAvatar, type Participant } from "./chat-avatar";
 import { MessageActions, useLongPress } from "./message-actions";
@@ -61,7 +61,7 @@ import {
   ScreenshotReach,
 } from "./screenshot-frame";
 import { BrainActivityRows, BrainThinking } from "./tool-activity";
-import type { Typist } from "@/lib/live/realtime-provider";
+import type { Typist } from "@/lib/live/realtime-state";
 
 export function MessageList({
   chat,
@@ -85,7 +85,7 @@ export function MessageList({
   observed?: boolean;
   messages: ChatMessage[];
   pending: PendingMessage[];
-  typists: Typist[];
+  typists: readonly Typist[];
   isLoading: boolean;
   error?: Error;
   hasMore: boolean;

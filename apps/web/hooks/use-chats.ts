@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import useSWRInfinite, { unstable_serialize } from "swr/infinite";
+import useSWRInfinite from "swr/infinite";
 import {
   fetchChats,
   fetchMessages,
@@ -14,25 +14,20 @@ import { useCharacters } from "@/hooks/use-characters";
 import { chatTitle } from "@/lib/source/chats/display";
 import { observedChatsKey } from "@/lib/source/observe/http";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
-import { saveConfig, useKazusaConfig } from "@/lib/state/config-store";
+import { useSources } from "@/lib/source/provider";
+import {
+  appendCachedMessage,
+  chatsKey,
+  updateChatPreview,
+} from "@/lib/source/chats/cache";
 import type {
   ChatMessage,
   ChatType,
   ChatsResponse,
   ManageChatPayload,
   MessagesResponse,
-  ReadStreamEvent,
 } from "@kazusa/client";
 import type { Chat, ChatInfo, MessageType } from "@/lib/source/chats/types";
-import type { KazusaConfig } from "@/lib/state/config-store";
-
-export function chatsKey(config: Pick<KazusaConfig, "userId">) {
-  return ["kazusa/chats", config.userId] as const;
-}
-
-export function messagesCacheKey(config: KazusaConfig, chatId: string) {
-  return unstable_serialize(messagesKeyGetter(config, chatId));
-}
 
 export function sortChats<T extends ChatInfo>(chats: T[]) {
   return [...chats].sort(
@@ -40,46 +35,30 @@ export function sortChats<T extends ChatInfo>(chats: T[]) {
   );
 }
 
-/**
- * The raw chats resource. The sources provider reads it as the reachability
- * probe, so it must not depend on anything the provider supplies.
- */
+/** The player's raw chat list, shared with setup polling and SSE updates. */
 export function useChatsResource() {
-  const config = useKazusaConfig();
-  const resource = useSWR<ChatsResponse, Error, ReturnType<typeof chatsKey>>(
-    chatsKey(config),
-    () => fetchChats(),
+  return useSWR<ChatsResponse, Error, ReturnType<typeof chatsKey>>(
+    chatsKey(),
+    fetchChats,
   );
-  const { data } = resource;
-
-  useEffect(() => {
-    if (
-      data &&
-      (config.userId !== data.user.id || config.userName !== data.user.name)
-    ) {
-      saveConfig({ ...config, userId: data.user.id, userName: data.user.name });
-    }
-  }, [data, config]);
-
-  return resource;
 }
 
 /** The player's chats, newest first, titled for display. */
 export function useChats() {
-  const config = useKazusaConfig();
+  const { player } = useSources();
   const { data, error, isLoading, mutate } = useChatsResource();
   const { byId } = useCharacters();
   const chats = useMemo(() => {
-    const userId = data?.user.id ?? config.userId;
+    const userId = player.id;
     const nameOf = (id: string) =>
-      byId.get(id)?.name ?? (id === userId ? data?.user.name : undefined) ?? id;
+      byId.get(id)?.name ?? (id === userId ? player.name : undefined) ?? id;
     return sortChats(
       (data?.chats ?? []).map((chat) => ({
         ...chat,
         name: chatTitle(chat, userId, nameOf),
       })),
     );
-  }, [data, byId, config.userId]);
+  }, [data, byId, player.id, player.name]);
 
   return {
     chats,
@@ -90,8 +69,7 @@ export function useChats() {
 }
 
 export function useMessages(chatId: string | null) {
-  const config = useKazusaConfig();
-  return usePagedMessages(messagesKeyGetter(config, chatId), (id, before) =>
+  return usePagedMessages(messagesKeyGetter(chatId), (id, before) =>
     fetchMessages({ chatId: id, before }),
   );
 }
@@ -104,7 +82,7 @@ export function usePagedMessages<T extends MessagesResponse>(
   const { data, error, isLoading, size, setSize, isValidating, mutate } =
     useSWRInfinite<T, Error, ReturnType<typeof messagesKeyGetter>>(
       getKey,
-      ([, , id, before]) => fetchPage(id, before),
+      ([, id, before]) => fetchPage(id, before),
       { revalidateFirstPage: true, revalidateOnFocus: false },
     );
 
@@ -117,7 +95,9 @@ export function usePagedMessages<T extends MessagesResponse>(
   }, [data]);
 
   const lastPage = data?.[data.length - 1];
-  const hasMore = Boolean(lastPage?.hasMore);
+  const hasMore = Boolean(
+    lastPage?.hasMore && lastPage.nextCursor !== undefined,
+  );
   const isLoadingOlder =
     size > 0 && data !== undefined && typeof data[size - 1] === "undefined";
 
@@ -133,71 +113,8 @@ export function usePagedMessages<T extends MessagesResponse>(
   };
 }
 
-export function appendMessageToPages(
-  pages: MessagesResponse[] | undefined,
-  message: ChatMessage,
-) {
-  if (!pages || pages.length === 0) return pages;
-  if (pages.some((page) => page.messages.some((m) => m.id === message.id))) {
-    return pages;
-  }
-  const [first, ...rest] = pages;
-  // History gets this from the stored record; a live message arrives as it's sent.
-  const timed = { ...message, createdAt: message.createdAt ?? Date.now() };
-  return [{ ...first, messages: [...first.messages, timed] }, ...rest];
-}
-
-/** A character read these messages: their receipts gain the time. */
-export function markReadInPages(
-  pages: MessagesResponse[] | undefined,
-  { readerId, readAt, messageIds }: ReadStreamEvent,
-) {
-  if (!pages) return pages;
-  const ids = new Set(messageIds);
-  return pages.map((page) => ({
-    ...page,
-    messages: page.messages.map((message) =>
-      ids.has(message.id) && message.receipts
-        ? {
-            ...message,
-            receipts: message.receipts.map((receipt) =>
-              receipt.id === readerId && receipt.readAt === undefined
-                ? { ...receipt, readAt }
-                : receipt,
-            ),
-          }
-        : message,
-    ),
-  }));
-}
-
-export function updateChatPreview<
-  T extends { readonly chats: readonly ChatInfo[] },
->(current: T | undefined, chatId: string, message: ChatMessage): T | undefined {
-  if (!current) return current;
-  return {
-    ...current,
-    chats: current.chats.map((chat) =>
-      chat.id === chatId &&
-      (chat.lastMessage?.sequence ?? 0) <= message.sequence
-        ? {
-            ...chat,
-            lastMessage: {
-              text: message.text,
-              timestamp: message.timestamp,
-              sequence: message.sequence,
-              senderId: message.senderId,
-              senderName: message.senderName,
-              type: message.type,
-            },
-          }
-        : chat,
-    ),
-  };
-}
-
 export function useChatActions() {
-  const config = useKazusaConfig();
+  const { player } = useSources();
   const { canPlay } = useAccess();
   const { mutate } = useSWRConfig();
 
@@ -215,7 +132,7 @@ export function useChatActions() {
         ? {
             requestId,
             text,
-            members: chat.members.filter((id) => id !== config.userId),
+            members: chat.members.filter((id) => id !== player.id),
             ...(chat.type === "group" ? { title: chat.name } : {}),
             // Face to face: it joins or starts a huddle where you stand.
             ...(chat.type === "huddle"
@@ -232,13 +149,9 @@ export function useChatActions() {
   }
 
   function commitSentMessage(chatId: string, message: ChatMessage) {
+    void appendCachedMessage(mutate, chatId, message);
     void mutate(
-      messagesCacheKey(config, chatId),
-      (pages?: MessagesResponse[]) => appendMessageToPages(pages, message),
-      { revalidate: false },
-    );
-    void mutate(
-      chatsKey(config),
+      chatsKey(),
       (current?: ChatsResponse) => updateChatPreview(current, chatId, message),
       { revalidate: false },
     );
@@ -254,7 +167,7 @@ export function useChatActions() {
       ...input,
       id: `draft:${crypto.randomUUID()}`,
       sessionKey: "",
-      members: [...new Set([config.userId, ...input.members])],
+      members: [...new Set([player.id, ...input.members])],
       draft: true,
     };
   }
@@ -268,9 +181,9 @@ export function useChatActions() {
       throw new Error("You do not have permission to manage chats.");
     }
     const response = await manageChat(payload);
-    const left = !response.chat.members.includes(config.userId);
+    const left = !response.chat.members.includes(player.id);
     await mutate(
-      chatsKey(config),
+      chatsKey(),
       (current?: ChatsResponse) =>
         current && {
           ...current,
@@ -303,16 +216,16 @@ export function useChatActions() {
       members,
     });
     commitSentMessage(response.chatId, response.message);
-    await mutate(chatsKey(config));
+    await mutate(chatsKey());
     if (response.chatId !== chat.id) await mutate(observedChatsKey());
     return response;
   }
 
   async function refreshChats() {
-    await mutate(chatsKey(config));
+    await mutate(chatsKey());
   }
   return {
-    config,
+    player,
     send,
     commitSentMessage,
     createChat,

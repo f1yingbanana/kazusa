@@ -10,11 +10,6 @@ export class KazusaApiError extends Error {
   }
 }
 
-/** True when the backend answered but doesn't have the route (an older plugin). */
-export function isMissingRoute(error: unknown) {
-  return error instanceof KazusaApiError && error.status === 404;
-}
-
 /** Always this app's own `/kazusa/*` proxy, which holds the Gateway credential. */
 export function buildUrl(
   path: string,

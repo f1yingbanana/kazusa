@@ -1,32 +1,37 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
-import type { CharacterDetail, CharacterStatus } from "@kazusa/client";
-import { statusStore } from "@/lib/live/state";
+import type {
+  CharacterDetail,
+  CharacterStatus,
+  CharacterSummary,
+} from "@kazusa/client";
+import { useLiveStore } from "@/lib/live/state";
 import { fetchCharacterDetail } from "@/lib/source/characters/http";
-import { useSources } from "@/lib/source/provider";
+import { useSources, useCharactersResource } from "@/lib/source/provider";
 
+const EMPTY_CHARACTERS: readonly CharacterSummary[] = [];
 export function useCharacters() {
-  const {
-    characters,
-    charactersById,
-    charactersLoading,
-    charactersError,
-    resolved,
-  } = useSources();
+  const { resolved } = useSources();
+  const resource = useCharactersResource();
+  const characters = resource.data ?? EMPTY_CHARACTERS;
+  const byId = useMemo(
+    () => new Map(characters.map((character) => [character.id, character])),
+    [characters],
+  );
   return {
     characters,
-    byId: charactersById,
-    isLoading: charactersLoading,
-    error: charactersError,
+    byId,
+    isLoading: resource.isLoading,
+    error: resource.error,
     source: resolved.characters,
   };
 }
 
 export function useCharacter(id: string | undefined) {
-  const { charactersById } = useSources();
-  return id ? charactersById.get(id) : undefined;
+  const { data } = useCharactersResource();
+  return id ? data?.find((character) => character.id === id) : undefined;
 }
 
 /** Full profile, from GET /kazusa/character. */
@@ -52,18 +57,5 @@ export function useCharacterDetail(id: string): {
 export function useCharacterStatus(
   id: string | undefined,
 ): CharacterStatus | undefined {
-  return useSyncExternalStore(
-    (listener) => (id ? statusStore.subscribeKey(id, listener) : () => {}),
-    () => (id ? statusStore.get(id) : undefined),
-    () => undefined,
-  );
-}
-
-/** Aggregate subscription for summaries and status-based grouping. */
-export function useStatusVersion() {
-  return useSyncExternalStore(
-    (listener) => statusStore.subscribe(listener),
-    () => statusStore.version(),
-    () => 0,
-  );
+  return useLiveStore((state) => (id ? state.statuses.get(id) : undefined));
 }

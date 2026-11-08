@@ -1,45 +1,25 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { statusStore } from "@/lib/live/state";
+import { updateStatuses, useLiveStore } from "@/lib/live/state";
 import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 import { setStage } from "@/lib/source/stage/http";
 
-/** Only an explicit `onstage: false` is offstage; no status means unknown. */
-export function isOffstage(id: string): boolean {
-  return statusStore.get(id)?.onstage === false;
-}
-
-let cachedVersion = -1;
-let cachedKey = "";
-
-/** Offstage ids joined, recomputed once per status write. */
-function offstageKey(): string {
-  const version = statusStore.version();
-  if (version !== cachedVersion) {
-    cachedVersion = version;
-    const ids: string[] = [];
-    for (const [id, status] of statusStore.entries()) {
-      if (status.onstage === false) ids.push(id);
-    }
-    cachedKey = ids.sort().join("\n");
-  }
-  return cachedKey;
-}
-
-/**
- * Who is offstage. Changes only when someone goes off or comes back, so a brain
- * flip for one of 300 characters re-renders nothing here.
- */
+/** Only an explicit onstage:false is offstage. Ignore unrelated brain updates. */
 export function useOffstage(): ReadonlySet<string> {
-  const key = useSyncExternalStore(
-    (listener) => statusStore.subscribe(listener),
-    offstageKey,
-    () => "",
+  return useLiveStore(
+    useShallow(
+      (state) =>
+        new Set(
+          [...state.statuses]
+            .filter(([, status]) => status.onstage === false)
+            .map(([id]) => id),
+        ),
+    ),
   );
-  return useMemo(() => new Set(key ? key.split("\n") : []), [key]);
 }
 
 /**
@@ -58,8 +38,7 @@ export function useStage() {
       try {
         const { statuses } = await setStage(ids, onstage);
         // SSE brings the same statuses; don't wait for it.
-        for (const [id, status] of Object.entries(statuses))
-          statusStore.set(id, status);
+        updateStatuses(Object.entries(statuses));
         return true;
       } catch (error) {
         toast.error(

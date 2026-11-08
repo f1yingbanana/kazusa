@@ -21,8 +21,8 @@ import type { SectionSidebarProps } from "@/lib/registry/types";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { setDraftChat } from "@/lib/state/chat-draft";
-import { markQuietSelection } from "@/lib/state/inspector-request";
-import { useKazusaConfig } from "@/lib/state/config-store";
+import { markQuietSelection } from "@/lib/state/ui-store";
+import { useSources } from "@/lib/source/provider";
 import {
   setObservedCollapsed,
   useObservedCollapsed,
@@ -37,7 +37,7 @@ import { ObservedChatList } from "./observed-chat-list";
  * narrows both to one character's chats.
  */
 export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
-  const config = useKazusaConfig();
+  const { player } = useSources();
   const { canPlay } = useAccess();
   const { chats: allMine, error, isLoading, reload } = useChats();
   const observed = useObservedChats();
@@ -94,7 +94,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   // Opening a chat also points the inspector at it, in the same URL change,
   // including the one already open (after looking at someone else).
   function openChat(chat: ChatInfo) {
-    const patch = openChatPatch(chat, config.userId);
+    const patch = openChatPatch(chat, player.id);
     if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     void setParams(patch);
     onOpened?.();
@@ -163,7 +163,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
           <ChatList
             chats={chats}
             agentsById={byId}
-            userId={config.userId}
+            userId={player.id}
             isLoading={isLoading}
             query={query}
             selectedChatId={chatId}
@@ -176,7 +176,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               chats={others}
               total={others.length}
               agentsById={byId}
-              userId={config.userId}
+              userId={player.id}
               selectedChatId={chatId}
               open={othersOpen}
               onToggle={() => setObservedCollapsed(othersOpen)}

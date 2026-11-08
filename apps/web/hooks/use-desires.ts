@@ -1,24 +1,15 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import type { DesireRecord, DesiresConfig } from "@kazusa/client";
-import { desireConfigStore, desireStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
+import { useDesiresResource } from "@/lib/source/provider";
 
 export function useDesireConfig(): DesiresConfig | null {
-  return useSyncExternalStore(
-    (listener) => desireConfigStore.subscribe(listener),
-    () => desireConfigStore.get(),
-    () => null,
-  );
+  return useDesiresResource().data?.config ?? null;
 }
 
-/** Per-id subscription; levels are derived from the record and `useSimNow()`. */
 export function useDesireRecord(
   id: string | undefined,
 ): DesireRecord | undefined {
-  return useSyncExternalStore(
-    (listener) => (id ? desireStore.subscribeKey(id, listener) : () => {}),
-    () => (id ? desireStore.get(id) : undefined),
-    () => undefined,
-  );
+  return useLiveStore((state) => (id ? state.desires.get(id) : undefined));
 }

@@ -1,10 +1,8 @@
 import type { MessagesResponse } from "@kazusa/client";
-import type { KazusaConfig } from "@/lib/state/config-store";
 
-type MessagesPageKey = readonly [string, string, string, number | null];
+type MessagesPageKey = readonly [string, string, number | null];
 
 export function messagesKeyGetter(
-  config: Pick<KazusaConfig, "userId">,
   chatId: string | null,
   route = "kazusa/messages",
 ) {
@@ -14,10 +12,10 @@ export function messagesKeyGetter(
   ): MessagesPageKey | null => {
     if (!chatId) return null;
     if (index === 0) {
-      return [route, config.userId, chatId, null];
+      return [route, chatId, null];
     }
     if (!previous?.hasMore || previous.nextCursor === undefined) return null;
     const before = previous.nextCursor;
-    return [route, config.userId, chatId, before];
+    return [route, chatId, before];
   };
 }

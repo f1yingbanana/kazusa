@@ -1,4 +1,6 @@
 "use client";
+import { useLiveStore } from "@/lib/live/state";
+import { useShallow } from "zustand/react/shallow";
 
 import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { useQueryStates, parseAsString } from "nuqs";
@@ -41,7 +43,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useStage } from "@/hooks/use-stage";
 import { useSelection } from "@/hooks/use-selection";
 import { filterCharacters, type KindFilter } from "@/lib/state/grouping";
-import { markQuietSelection } from "@/lib/state/inspector-request";
+import { markQuietSelection } from "@/lib/state/ui-store";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { useWatchlist } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
@@ -285,6 +287,19 @@ export function WorldSidebar({
     [characters, query],
   );
   const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
+  const busyHints = useLiveStore(
+    useShallow(
+      (state) =>
+        new Map([
+          [WATCH_FOLDER, busySummary(watched, state.statuses)],
+          [ALL_FOLDER, busySummary(everyone, state.statuses)],
+          ...groups.map(
+            (group) =>
+              [group.key, busySummary(group.members, state.statuses)] as const,
+          ),
+        ]),
+    ),
+  );
   const selectedId = selection?.kind === "character" ? selection.id : null;
   const customized = kind !== "characters" || by !== defaultBy;
 
@@ -433,7 +448,7 @@ export function WorldSidebar({
             icon={StarIcon}
             label="Watchlist"
             count={watched.length}
-            hint={busySummary(watched)}
+            hint={busyHints.get(WATCH_FOLDER)}
             active={folder === WATCH_FOLDER}
             onOpen={() => open(WATCH_FOLDER)}
           />
@@ -441,7 +456,7 @@ export function WorldSidebar({
             icon={UsersIcon}
             label="Everyone"
             count={everyone.length}
-            hint={busySummary(everyone)}
+            hint={busyHints.get(ALL_FOLDER)}
             active={folder === ALL_FOLDER}
             onOpen={() => open(ALL_FOLDER)}
             {...stageProps(ALL_FOLDER, "Everyone")}
@@ -457,7 +472,7 @@ export function WorldSidebar({
               icon={groupIcon(by, group)}
               label={group.label}
               count={group.members.length}
-              hint={busySummary(group.members)}
+              hint={busyHints.get(group.key)}
               active={folder === group.key}
               onOpen={() => open(group.key, group.placeId)}
               depth={group.depth}

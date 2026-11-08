@@ -3,9 +3,9 @@
 import { EyeIcon } from "lucide-react";
 import { useObservedMessages } from "@/hooks/use-observed-chats";
 import { useParticipantResolver } from "@/hooks/use-participants";
-import { useRealtime } from "@/lib/live/realtime-provider";
+import { useTyping } from "@/lib/live/realtime-state";
 import type { ChatInfo } from "@/lib/source/chats/types";
-import { useKazusaConfig } from "@/lib/state/config-store";
+import { useSources } from "@/lib/source/provider";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 
@@ -23,11 +23,10 @@ export function ObservedChatView({
   chat: ChatInfo;
   onBack: () => void;
 }) {
-  const { userId } = useKazusaConfig();
-  const { typingByChat } = useRealtime();
+  const { player } = useSources();
   const messages = useObservedMessages(chat.id);
   const resolve = useParticipantResolver();
-  const typists = typingByChat[chat.id] ?? [];
+  const typists = useTyping(chat.id);
 
   return (
     <section
@@ -36,7 +35,7 @@ export function ObservedChatView({
     >
       <ChatHeader
         chat={chat}
-        userId={userId}
+        userId={player.id}
         typists={typists}
         onBack={onBack}
       />
@@ -54,7 +53,7 @@ export function ObservedChatView({
         onLoadOlder={messages.loadOlder}
         onRetry={noRetry}
         resolve={resolve}
-        userId={userId}
+        userId={player.id}
       />
 
       <footer className="flex shrink-0 items-center justify-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">

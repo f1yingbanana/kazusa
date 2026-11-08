@@ -77,7 +77,7 @@ export function useModels(agentId?: string) {
         return false;
       }
     },
-    [agentId, mutate, mutateMatching],
+    [agentId, canManage, mutate, mutateMatching],
   );
 
   /** `null` clears this scope's choice (a character follows the world again). */

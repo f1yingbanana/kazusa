@@ -24,7 +24,7 @@ import {
 } from "@/hooks/use-location";
 import { useSimNow } from "@/hooks/use-clock";
 import { useSelection } from "@/hooks/use-selection";
-import { locationStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
 import {
   MAP_SCALE,
   boundsOf,
@@ -55,7 +55,7 @@ import {
 } from "@/lib/location/places";
 import { PLACES_KEY, savePlacePositions } from "@/lib/source/location/http";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
-import { markQuietSelection } from "@/lib/state/inspector-request";
+import { markQuietSelection } from "@/lib/state/ui-store";
 import { useWatchlist } from "@/lib/state/preferences-store";
 import { MapHighlight, MapRegions, MapRoads } from "./map-roads";
 import {
@@ -110,6 +110,7 @@ export function PlaceMap({
   const { canManage } = useAccess();
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
+  const locations = useLiveStore((state) => state.locations);
   const now = useSimNow();
 
   const [draft, setDraft] = useState<Record<string, Point> | null>(null);
@@ -523,7 +524,7 @@ export function PlaceMap({
   const travelers = occupied.traveling
     .flatMap((id) => {
       const person = byId.get(id);
-      const record = locationStore.get(id);
+      const record = locations.get(id);
       if (!person || !record) return [];
       const point = travelerPoint(record, now, geometry);
       return point ? [{ person, point }] : [];

@@ -1,71 +1,66 @@
-'use client'
+"use client";
 
-import { useMemo } from 'react'
-import type { CharacterSummary } from '@kazusa/client'
-import { CharacterRow } from '@/components/entities/character-row'
-import { PlaceChip } from '@/components/entities/chips'
-import { useCharacters } from '@/hooks/use-characters'
-import { useSimNow } from '@/hooks/use-clock'
-import {
-  useLocationVersion,
-  useOccupancy,
-  usePlaces,
-} from '@/hooks/use-location'
-import { useOffstage } from '@/hooks/use-stage'
-import { useSelection } from '@/hooks/use-selection'
-import { locationStore } from '@/lib/live/state'
-import { headingTo, peopleWithin } from '@/lib/location/places'
-import type { EntityRef } from '@/lib/state/entity-ref'
-import { useWatchlist } from '@/lib/state/preferences-store'
-import { formatSimDuration } from '@/lib/time/sim'
+import { useMemo } from "react";
+import type { CharacterSummary } from "@kazusa/client";
+import { CharacterRow } from "@/components/entities/character-row";
+import { PlaceChip } from "@/components/entities/chips";
+import { useCharacters } from "@/hooks/use-characters";
+import { useSimNow } from "@/hooks/use-clock";
+import { useOccupancy, usePlaces } from "@/hooks/use-location";
+import { useOffstage } from "@/hooks/use-stage";
+import { useSelection } from "@/hooks/use-selection";
+import { useLiveStore } from "@/lib/live/state";
+import { headingTo, peopleWithin } from "@/lib/location/places";
+import type { EntityRef } from "@/lib/state/entity-ref";
+import { useWatchlist } from "@/lib/state/preferences-store";
+import { formatSimDuration } from "@/lib/time/sim";
 
-const MAX_ROWS = 12
+const MAX_ROWS = 12;
 
 function Subheading({ children }: { children: React.ReactNode }) {
   return (
     <h4 className="flex items-center justify-between font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
       {children}
     </h4>
-  )
+  );
 }
 
 /** Who is here (omniscient Observer lens), who is inside, and who is on the way. */
 export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
-  const places = usePlaces()
-  const { characters, byId } = useCharacters()
-  const [, select] = useSelection()
-  const watchlist = useWatchlist()
-  const watchSet = useMemo(() => new Set(watchlist), [watchlist])
-  const ids = useMemo(() => characters.map((c) => c.id), [characters])
-  const occupied = useOccupancy(ids)
-  const version = useLocationVersion()
-  const offstage = useOffstage()
-  const now = useSimNow()
+  const places = usePlaces();
+  const { characters, byId } = useCharacters();
+  const [, select] = useSelection();
+  const watchlist = useWatchlist();
+  const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
+  const ids = useMemo(() => characters.map((c) => c.id), [characters]);
+  const occupied = useOccupancy(ids);
+  const locations = useLiveStore((state) => state.locations);
+  const offstage = useOffstage();
+  const now = useSimNow();
 
   const arriving = useMemo(
     () =>
       headingTo(
         ids.filter((id) => !offstage.has(id)),
-        (id) => locationStore.get(id),
+        (id) => locations.get(id),
         entity.id,
         now,
       ),
-    // `version` stands in for every record in the store.
-    [ids, offstage, entity.id, now, version],
-  )
+    [ids, offstage, entity.id, now, locations],
+  );
 
-  if (!places?.byId.has(entity.id)) return null
+  if (!places?.byId.has(entity.id)) return null;
 
   const people = (list: readonly string[]) =>
     list
       .map((id) => byId.get(id))
       .filter((c): c is CharacterSummary => Boolean(c))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  const here = people(occupied.at.get(entity.id) ?? [])
+      .sort((a, b) => a.name.localeCompare(b.name));
+  const here = people(occupied.at.get(entity.id) ?? []);
   const inside = (places.children.get(entity.id) ?? [])
     .map((id) => ({ id, count: peopleWithin(places, occupied, id).length }))
-    .filter(({ count }) => count > 0)
-  const onSelect = (id: string) => void select({ kind: 'character', id })
+    .filter(({ count }) => count > 0);
+  const onSelect = (id: string) => void select({ kind: "character", id });
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,7 +115,7 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
           </Subheading>
           <div className="-mx-2 flex flex-col">
             {arriving.slice(0, MAX_ROWS).map(({ id, arriveAt }) => {
-              const character = byId.get(id)
+              const character = byId.get(id);
               return character ? (
                 <CharacterRow
                   key={id}
@@ -130,11 +125,11 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
                   onSelect={onSelect}
                   trailing={`in ${formatSimDuration(Math.max(0, arriveAt - now))}`}
                 />
-              ) : null
+              ) : null;
             })}
           </div>
         </div>
       ) : null}
     </div>
-  )
+  );
 }

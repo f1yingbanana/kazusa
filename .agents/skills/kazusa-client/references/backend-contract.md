@@ -21,12 +21,12 @@ OpenClaw's Gateway exposes a typed WebSocket control plane: `sessions.list`,
 would technically be possible to build the UI on it. We don't, for these
 reasons:
 
-| Concern      | Native Gateway WS                                                                                                                                                     | Plugin read model (`/kazusa/*`)                                                                                                          |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth         | Device identity, signed `connect.challenge`, pairing. An authenticated client is trusted at **full Gateway scope** (agents, config, exec). Can't go to a browser.     | `registerHttpRoute({ auth: "plugin" })`, with the token held server-side by the Next proxy. Narrow, read-mostly surface.                 |
-| Data meaning | Native transcripts are agents' **private prose projections** (OpenClaw roles, catalog clipping, prose monologues). `client.md` already forbids `chat.history` for UI. | Canonical stores: `messaging`, `chats`, `tasks`, `clock`, and the new `journal`, with sim time, sender attribution and frozen audiences. |
-| Events       | Not replayed. `agent` streams are raw model deltas. That's noisy at 300 agents and leaks model internals.                                                             | Curated, sequenced events with gap recovery through history endpoints.                                                                   |
-| Coupling     | Tied to OpenClaw protocol and schema versions.                                                                                                                        | Our Zod contracts in `@kazusa/client`.                                                                                                   |
+| Concern      | Native Gateway WS                                                                                                                                                     | Plugin read model (`/kazusa/*`)                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Auth         | Device identity, signed `connect.challenge`, pairing. An authenticated client is trusted at **full Gateway scope** (agents, config, exec). Can't go to a browser.     | `registerHttpRoute({ auth: "plugin" })`, with the token held server-side by the Next proxy. Narrow, read-mostly surface. |
+| Data meaning | Native transcripts are agents' **private prose projections** (OpenClaw roles, catalog clipping, prose monologues). `client.md` already forbids `chat.history` for UI. | Canonical stores and structured ledgers, with sim time, sender attribution and frozen audiences.                         |
+| Events       | Not replayed. `agent` streams are raw model deltas. That's noisy at 300 agents and leaks model internals.                                                             | Curated events; reconnect refreshes snapshots and history endpoints.                                                     |
+| Coupling     | Tied to OpenClaw protocol and schema versions.                                                                                                                        | Our Zod contracts in `@kazusa/client`.                                                                                   |
 
 The plugin runs **inside** the Gateway process and has in-process SDK access:
 keyed stores, `readSessionTranscriptCatalogPage`, cron, agent lifecycle event
@@ -63,9 +63,13 @@ gets the same `Clock` module through HTTP (§3).
   with plain `text`. Render it as narration ("Kazusa sets the textbook on the
   desk"), not a bubble. System lines (joining, leaving, renaming) arrive the
   same way.
-- **Ordering and paging:** server sequences (`sequence` for messages, `seq` for
-  journal) with `nextCursor` + `hasMore`. Never page by timestamp or page
-  length.
+- **Ordering and paging:** use each endpoint's `nextCursor` + `hasMore`, never
+  infer continuation from page length. Message cursors use `sequence`. Timeline
+  `seq` orders and deduplicates events but is noncontiguous; `before`, `after`
+  and `nextCursor` currently use simulation timestamps. Both timeline query
+  directions return newest-first. Strict timestamp bounds can skip events
+  sharing a page boundary timestamp; fixing that requires a backend cursor
+  change, not a client sequence-gap recovery loop.
 - **Errors:** `{ error: string }` with an appropriate status, matching the
   existing `sendJson` behavior.
 - **Greenfield rule:** when a contract changes (for example `/kazusa/agents` →
@@ -82,20 +86,20 @@ gets the same `Clock` module through HTTP (§3).
 | `GET /kazusa/chats`                                                     | Player's chats ("Mine")                           |
 | `GET /kazusa/messages`                                                  | Player-audience history                           |
 | `POST /kazusa/send`, `POST /kazusa/chats/manage`, `POST /kazusa/typing` | Unchanged                                         |
-| `GET /kazusa/events`                                                    | Gains `?scope=`; `player` is the current behavior |
+| `GET /kazusa/events`                                                    | Shared player/observer stream; no scope parameter |
 
-### Proposed: Phase 1 (unblocks the first draft)
+### Read-model routes (built unless marked proposed)
 
-| Route                            | Response (schemas in `@kazusa/client`)                                                                                                                                                                  | Backed by                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `GET /kazusa/world`              | `{ user, serverNow, clock: { simTime, speed, updatedAt }, capabilities: Record<Domain, "live" \| "unavailable">, world: { title, accent?, summary? } }`                                                 | `clock` store; plugin config; `shared/wiki/world.md` frontmatter                                   |
-| `POST /kazusa/clock`             | Body: `{ action: "set_speed", speed }` \| `{ action: "advance", minutes }`. Returns the new `clock`                                                                                                     | Same `Clock` module as the `clock.*` RPCs                                                          |
-| `GET /kazusa/characters`         | `{ characters: CharacterSummary[] }`. All characters in one response at ≤ ~1000; add paging only once measured                                                                                          | Roster config + World Wiki character frontmatter + `tasks` store + Perception brain state + typing |
-| `GET /kazusa/character?id=`      | `CharacterDetail` = summary + profile frontmatter fields + `bodyMarkdown`                                                                                                                               | IDENTITY.md + World Wiki card (frontmatter + body)                                                 |
-| `GET /kazusa/timeline`           | Params: `before?` \| `after?`, `limit`, `actors?`, `kinds?`, `chats?`. Returns `{ events: JournalEvent[], nextCursor?, hasMore }` (`before` pages newest-first; `after` returns ascending for catch-up) | `journal` store                                                                                    |
-| `GET /kazusa/timeline/histogram` | Params: `from`, `to`, `bucketMinutes`, same filters. Returns `{ buckets: { start, counts: Record<JournalKind, number> }[] }`                                                                            | `journal` store                                                                                    |
-| `GET /kazusa/observe/chats`      | Params: `query?`, `member?`. Returns all canonical chats with members and latest preview                                                                                                                | `chats` + `messaging` stores, audience-agnostic                                                    |
-| `GET /kazusa/observe/messages`   | Same shape as `/kazusa/messages`, any chat                                                                                                                                                              | `messaging` store                                                                                  |
+| Route                            | Response (schemas in `@kazusa/client`)                                                                                                                                          | Backed by                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `GET /kazusa/world`              | `{ user, serverNow, clock: { simTime, speed, updatedAt }, capabilities: Record<Domain, "live" \| "unavailable">, world: { title, accent?, summary? } }`                         | `clock` store; plugin config; `shared/wiki/world.md` frontmatter                                   |
+| `POST /kazusa/clock`             | Body: `{ action: "set_speed", speed }` \| `{ action: "advance", minutes }`. Returns the new `clock`                                                                             | Same `Clock` module as the `clock.*` RPCs                                                          |
+| `GET /kazusa/characters`         | `{ characters: CharacterSummary[] }`. All characters in one response at ≤ ~1000; add paging only once measured                                                                  | Roster config + World Wiki character frontmatter + `tasks` store + Perception brain state + typing |
+| `GET /kazusa/character?id=`      | `CharacterDetail` = summary + profile frontmatter fields + `bodyMarkdown`                                                                                                       | IDENTITY.md + World Wiki card (frontmatter + body)                                                 |
+| `GET /kazusa/timeline`           | Params: `before?` \| `after?`, `limit`, `actors?`, `kinds?`, `chats?`. Returns `{ events: JournalEvent[], nextCursor?, hasMore }` (simulation-time bounds; always newest-first) | Structured ledgers + canonical messages + perception decisions                                     |
+| `GET /kazusa/timeline/histogram` | **Proposed.** Params: `from`, `to`, `bucketMinutes`, same filters. Returns `{ buckets: { start, counts: Record<JournalKind, number> }[] }`                                      | `journal` store                                                                                    |
+| `GET /kazusa/observe/chats`      | Params: `query?`, `member?`. Returns all canonical chats with members and latest preview                                                                                        | `chats` + `messaging` stores, audience-agnostic                                                    |
+| `GET /kazusa/observe/messages`   | Same shape as `/kazusa/messages`, any chat                                                                                                                                      | `messaging` store                                                                                  |
 
 ### Built: brain trace and usage
 
@@ -262,23 +266,27 @@ a later milestone. Observed reads never mutate membership and never emit typing.
 
 ## 4. Live updates (SSE)
 
-`GET /kazusa/events?scope=player|observer`:
+`GET /kazusa/events` is one shared connection. Player chat events remain
+audience-filtered; observer chat events use an `observed` envelope. There is no
+scope query parameter.
 
-| Event                        | Scope                                    | Payload                                                    | Client handling                                                                                          |
-| ---------------------------- | ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `connected`                  | both                                     | `{ typing[], journalSeq?, statuses? }`                     | Seed live store. If `journalSeq` > last seen, catch up with `timeline?after=`                            |
-| `message`, `typing`, `chats` | player: audience-filtered; observer: all | Existing shapes                                            | Existing handlers                                                                                        |
-| `desires`                    | observer                                 | `{ characterId, record: DesireRecord }` (full replacement) | `desireStore.set` unless the held record has a later `anchorAt`; `connected` refetches `/kazusa/desires` |
-| `journal`                    | observer                                 | `JournalEvent` (with `seq`)                                | Append to the timeline tail; detect gaps → catch up                                                      |
-| `status`                     | observer                                 | `{ characterId, status }` (full replacement for that id)   | Live store per-id update                                                                                 |
-| `clock`                      | both                                     | `{ simTime, speed, updatedAt }`                            | Re-anchor interpolation                                                                                  |
+| Event                                | Payload                                                    | Client handling                                                                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `connected`                          | `{ typing[], statuses? }`                                  | Seed typing/status, refresh snapshots and the latest 200 journal events, invalidate SWR history pages and revalidate mounted timelines. No journal high-water mark is sent. |
+| `message`, `typing`, `read`, `chats` | Existing player-audience shapes                            | Update message caches, typing and chat resources.                                                                                                                           |
+| `observed`                           | `{ event: message \| typing \| chats }`                    | Update observer message caches, typing and chat resources.                                                                                                                  |
+| `desires`                            | `{ characterId, record: DesireRecord }` (full replacement) | Update the per-id live projection unless its record has a later `anchorAt`; `connected` refetches `/kazusa/desires`.                                                        |
+| `journal`                            | `{ event: JournalEvent }` (with noncontiguous `seq`)       | Merge into the bounded live tail, retaining at most 500 events. Numeric sequence jumps do not identify gaps.                                                                |
+| `status`                             | `{ characterId, status }` (full replacement for that id)   | Update the per-id Zustand live projection.                                                                                                                                  |
+| `clock`                              | `{ clock: { simTime, speed, updatedAt } }`                 | Re-anchor interpolation in the isolated clock store.                                                                                                                        |
 
 Rules (the same as messaging):
 
 - Subscribe before taking the snapshot, and buffer until the snapshot is sent.
 - Heartbeats keep the connection open. Slow consumers are closed and recover
   through history.
-- SSE is notification only. The journal and stores are the durable record.
+- SSE is notification only. Canonical stores and structured ledgers supply
+  history; the client's bounded live tail is not the durable record.
 - Transient states (thinking, composing, queued) are `status` deltas and are
   **never** journaled.
 
@@ -323,16 +331,17 @@ body-only data into frontmatter. When a proposal is implemented, update
 
 ## 6. The world journal
 
-A new plugin module, `src/journal/`. It is an append-only, retained keyed store
-that serves as the single sequenced, structured, cross-agent log of what
-happened.
+The current implementation is `src/timeline/http.ts`, which projects history
+from structured ledgers and canonical stores and shares event ordering with SSE
+through `src/realtime.ts`. A separate retained `src/journal/` module remains a
+proposal; there is no contiguous sequence or replay cursor to consume today.
 
-**Why it's needed.** Ledgers (`:tasks`, `:chat:*`) are per-agent private prose
-projections, built for context assembly. The Timeline needs one structured,
-sequenced, filterable log across every character. This is the same split as
-messaging: a canonical record for clients, with projections for agents.
+**Why the read model exists.** Ledgers (`:tasks`, `:chat:*`) are per-agent
+projections built for context assembly. Timeline reads their structured metadata
+and canonical records to expose one ordered, filterable history across
+characters; it never parses their prose.
 
-**Record (draft):**
+**Current record shape:**
 
 ```ts
 {
@@ -363,11 +372,13 @@ messaging: a canonical record for clients, with projections for agents.
 **Where history comes from:** `GET /kazusa/timeline` reads `:tasks` rows'
 structured `__openclaw.kazusa = { kind, payload }` with
 `readVisibleSessionTranscriptMessageEntries` (the catalog reader drops
-`__openclaw`), chat rows from the catalog, and attention decisions from the
+`__openclaw`), canonical message deliveries, and attention decisions from the
 `"perception"` store. Ledger text is never parsed (D4). Rows without metadata
 are skipped.
 
-**Invariants:**
+**Retained-journal proposal (not implemented):** An append-only retained store
+would need the following guarantees. Do not assume the current timeline
+projection provides them, or implement a second client storage layer for them.
 
 - The journal is observation-only. No simulation code reads it. The current task
   still comes from `tasks`, and messages from `messaging`. This keeps it from
@@ -381,16 +392,16 @@ are skipped.
   Measure before adding more indexes, as with messaging history.
 - Retention is permanent, like canonical messages.
 
-## 7. Capability matrix (today → first draft)
+## 7. Capability matrix
 
 | Domain                       | Today                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Needed for live                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `clock`                      | Store + RPCs built; no HTTP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `/kazusa/world`, `POST /kazusa/clock`, SSE `clock`                                                               |
-| `characters`                 | `/kazusa/agents` (id, name, avatar)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `/kazusa/characters`, `/kazusa/character`                                                                        |
-| `status`                     | `tasks` store built; typing built; brain busy/idle tracked inside Perception (drafted)                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Perception exposes read-only brain state + change callback; SSE `status`                                         |
+| `clock`                      | Built: `/kazusa/world`, `POST /kazusa/clock`, SSE `clock`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                |
+| `characters`                 | Built: `/kazusa/characters`, `/kazusa/character`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                |
+| `status`                     | Built: character snapshots and per-id SSE `status`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                |
 | `chats`                      | Built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | —                                                                                                                |
-| `observe`                    | Audience-filtered only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `/kazusa/observe/*`, `scope=observer`                                                                            |
-| `timeline`                   | None                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `src/journal/` + routes + SSE `journal`                                                                          |
+| `observe`                    | Built: `/kazusa/observe/*` and `observed` events on the shared SSE connection                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | —                                                                                                                |
+| `timeline`                   | Built: `src/timeline/http.ts` and SSE `journal`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Stable pagination cursor; retained-journal extension remains proposed (§6)                                       |
 | `places`                     | Built: `GET /kazusa/places` (tree order, `PlacesResponse`); wired to the World tree and map, place inspector and palette. `Place.map` carries where a place is drawn from its frontmatter; `POST /kazusa/places/positions` edits only that line on each page. The simulation never reads it                                                                                                                                                                                                                                                       | —                                                                                                                |
 | `location`                   | Built: `GET /kazusa/locations` (closed-form `LocationRecord`s, homes included); SSE `location` (`{ characterId, record }`, one per record write); `location.noticed` journal events (observer's `:tasks` ledger, plus SSE `journal`); trips in `task.started` payloads (`where`, `from`, `arriveAt`, `usualMinutes`); in-person conversations are chats of type `huddle` (`chat:huddle:<id>`), many per place; `POST /kazusa/move` (`MovePayload` → `MoveResponse`) moves the player straight to a place; `SendPayload.aloud` speaks face to face | Client wiring (in-person thread style) SSE `places` means the map changed on disk: refetch `GET /kazusa/places`. |
 | `desires`                    | Built: `/kazusa/desires`, SSE `desires`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | —                                                                                                                |
@@ -399,15 +410,15 @@ are skipped.
 
 Until a domain is live, its panels show an honest unavailable state (D10).
 
-## 8. Backend work, in priority order
+## 8. Initial backend implementation sequence (historical)
 
 1. `/kazusa/world` + `POST /kazusa/clock` + SSE `clock`. Smallest change,
    unblocks the top bar.
 2. Shared `readFrontmatter` + `/kazusa/characters` + `/kazusa/character`,
    replacing `/kazusa/agents` atomically.
 3. Perception brain-state exposure + SSE `status`.
-4. `src/journal/` with Taskman, Messaging and Clock producers, plus the
-   `/kazusa/timeline` routes.
-5. `/kazusa/observe/*` + `scope=observer`.
+4. `src/timeline/http.ts` with structured history and SSE `journal` producers.
+   The retained-journal extension and histogram route remain proposed (§6).
+5. `/kazusa/observe/*` + `observed` envelopes on the shared SSE connection.
 6. `shared/wiki/world.md` and the place `parent` frontmatter, then
    `/kazusa/places` for the World tree.

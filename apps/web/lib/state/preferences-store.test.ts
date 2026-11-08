@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { StrictMode, useEffect } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_PREFERENCES,
   dismissUpdate,
@@ -7,10 +9,11 @@ import {
   sanitizePreferences,
   setObservedCollapsed,
   setSectionOpen,
+  syncPreferences,
   toggleWatch,
   usePreferencesStore,
+  useSectionOpen,
 } from "./preferences-store";
-import { DEFAULT_CONFIG, saveConfig, useConfigStore } from "./config-store";
 import { setDraftChat, useChatDraftStore } from "./chat-draft";
 
 describe("preferences-store actions", () => {
@@ -120,80 +123,181 @@ describe("sanitizePreferences", () => {
   });
 });
 
-describe("preferences-store legacy migration and persistence", () => {
+describe("preferences-store persistence", () => {
   beforeEach(() => {
     window.localStorage.clear();
     resetPreferences();
   });
 
-  it("migrates legacy keys when unified key is missing and deletes legacy keys upon save", async () => {
-    window.localStorage.removeItem("kazusa:preferences");
-    window.localStorage.setItem(
-      "kazusa:watchlist",
-      JSON.stringify(["airi-kurimura", "hifumi-ajitani"]),
-    );
-    window.localStorage.setItem(
-      "kazusa:inspector-folds",
-      JSON.stringify({ "character.desires": false }),
-    );
-    window.localStorage.setItem("kazusa:observed-collapsed", "1");
-    window.localStorage.setItem("kazusa:update-dismissed", "1.0.0");
-
-    // Rehydrate from storage adapter
-    await usePreferencesStore.persist.rehydrate();
-
-    const state = usePreferencesStore.getState();
-    expect(state.watchlist).toEqual(["airi-kurimura", "hifumi-ajitani"]);
-    expect(state.inspectorFolds).toEqual({ "character.desires": false });
-    expect(state.observedCollapsed).toBe(true);
-    expect(state.dismissedUpdateVersion).toBe("1.0.0");
-
-    // Trigger a write
-    toggleWatch("kazusa-kyouyama");
-
-    // Unified key should be written
-    const unifiedRaw = window.localStorage.getItem("kazusa:preferences");
-    expect(unifiedRaw).not.toBeNull();
-    const unified = JSON.parse(unifiedRaw!);
-    expect(unified.state.watchlist).toContain("kazusa-kyouyama");
-
-    // Legacy keys should be cleanly removed
-    expect(window.localStorage.getItem("kazusa:watchlist")).toBeNull();
-    expect(window.localStorage.getItem("kazusa:inspector-folds")).toBeNull();
-    expect(window.localStorage.getItem("kazusa:observed-collapsed")).toBeNull();
-    expect(window.localStorage.getItem("kazusa:update-dismissed")).toBeNull();
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
   });
 
-  it("tolerates localStorage setItem quota exceeded errors gracefully", () => {
-    const originalSetItem = window.localStorage.setItem;
-    window.localStorage.setItem = () => {
-      throw new Error("QuotaExceededError");
-    };
+  it("restores the current persisted preferences", async () => {
+    window.localStorage.setItem(
+      "kazusa:preferences",
+      JSON.stringify({
+        version: 1,
+        state: {
+          watchlist: ["alice"],
+          inspectorFolds: { "character.desires": false },
+          observedCollapsed: true,
+          dismissedUpdateVersion: "1.2.3",
+        },
+      }),
+    );
+    await usePreferencesStore.persist.rehydrate();
+    expect(usePreferencesStore.getState()).toEqual({
+      watchlist: ["alice"],
+      inspectorFolds: { "character.desires": false },
+      observedCollapsed: true,
+      dismissedUpdateVersion: "1.2.3",
+    });
 
-    try {
-      expect(() => toggleWatch("airi-kurimura")).not.toThrow();
-      expect(usePreferencesStore.getState().watchlist).toEqual([
-        "airi-kurimura",
-      ]);
-    } finally {
-      window.localStorage.setItem = originalSetItem;
-    }
+    toggleWatch("bob");
+    expect(
+      JSON.parse(window.localStorage.getItem("kazusa:preferences") ?? "null")
+        .state.watchlist,
+    ).toEqual(["alice", "bob"]);
+  });
+
+  it("keeps defaults when stored JSON is corrupt", async () => {
+    window.localStorage.setItem("kazusa:preferences", "{");
+    await usePreferencesStore.persist.rehydrate();
+    expect(usePreferencesStore.getState()).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it("keeps preferences usable when storage is full or blocked", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage is full", "QuotaExceededError");
+    });
+    expect(() => toggleWatch("alice")).not.toThrow();
+    expect(usePreferencesStore.getState().watchlist).toEqual(["alice"]);
+
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Storage is blocked", "SecurityError");
+    });
+    await usePreferencesStore.persist.rehydrate();
+    expect(usePreferencesStore.getState().watchlist).toEqual(["alice"]);
+  });
+
+  it("does not rerender an inspector section when another preference changes", () => {
+    const renders = vi.fn();
+    const section = renderHook(() => {
+      renders();
+      return useSectionOpen("character.desires", true);
+    });
+    act(() => toggleWatch("alice"));
+    act(() => setSectionOpen("character.about", false));
+    expect(renders).toHaveBeenCalledOnce();
+    act(() => setSectionOpen("character.desires", false));
+    expect(section.result.current).toBe(false);
+    expect(renders).toHaveBeenCalledTimes(2);
   });
 });
 
-describe("config-store", () => {
+describe("preferences across tabs", () => {
+  const storageKey = "kazusa:preferences";
+
+  function remoteWrite(state: typeof DEFAULT_PREFERENCES): void {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ state, version: 1 }),
+    );
+  }
+
+  function storageEvent(
+    key: string | null = storageKey,
+    storageArea: Storage = window.localStorage,
+  ): void {
+    window.dispatchEvent(new StorageEvent("storage", { key, storageArea }));
+  }
+
+  function useSyncPreferences(): void {
+    useEffect(syncPreferences, []);
+  }
+
   beforeEach(() => {
-    useConfigStore.setState({ config: DEFAULT_CONFIG });
+    window.localStorage.clear();
+    resetPreferences();
   });
 
-  it("updates and retrieves player configuration", () => {
-    expect(useConfigStore.getState().config.userId).toBe("user:you");
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
-    saveConfig({ userId: "user:sensei", userName: "Sensei" });
-    expect(useConfigStore.getState().config).toEqual({
-      userId: "user:sensei",
-      userName: "Sensei",
+  it("retains another tab's watchlist when this tab folds an inspector section", () => {
+    renderHook(useSyncPreferences, { wrapper: StrictMode });
+    remoteWrite({ ...DEFAULT_PREFERENCES, watchlist: ["airi-kurimura"] });
+    act(() => storageEvent());
+
+    setSectionOpen("character.desires", false);
+    expect(
+      JSON.parse(window.localStorage.getItem(storageKey) ?? "null"),
+    ).toEqual({
+      version: 1,
+      state: {
+        ...DEFAULT_PREFERENCES,
+        watchlist: ["airi-kurimura"],
+        inspectorFolds: { "character.desires": false },
+      },
     });
+  });
+
+  it("hydrates changes made before mounting without writing them back", () => {
+    remoteWrite({ ...DEFAULT_PREFERENCES, watchlist: ["alice"] });
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    renderHook(useSyncPreferences, { wrapper: StrictMode });
+
+    expect(usePreferencesStore.getState().watchlist).toEqual(["alice"]);
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it.each([storageKey, null])(
+    "resets deleted preferences without echoing a write for storage key %s",
+    (key) => {
+      renderHook(useSyncPreferences);
+      toggleWatch("alice");
+      if (key === null) window.localStorage.clear();
+      else window.localStorage.removeItem(storageKey);
+      const writes = vi.spyOn(Storage.prototype, "setItem");
+
+      act(() => storageEvent(key));
+      expect(usePreferencesStore.getState()).toEqual(DEFAULT_PREFERENCES);
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+      expect(writes).not.toHaveBeenCalled();
+    },
+  );
+
+  it("only listens to relevant local-storage events and releases its listener", () => {
+    const view = renderHook(useSyncPreferences, { wrapper: StrictMode });
+    const rehydrate = vi.spyOn(usePreferencesStore.persist, "rehydrate");
+    storageEvent("unrelated");
+    storageEvent(storageKey, window.sessionStorage);
+    expect(rehydrate).not.toHaveBeenCalled();
+
+    remoteWrite({ ...DEFAULT_PREFERENCES, watchlist: ["alice"] });
+    act(() => storageEvent());
+    expect(rehydrate).toHaveBeenCalledOnce();
+    expect(usePreferencesStore.getState().watchlist).toEqual(["alice"]);
+
+    view.unmount();
+    storageEvent();
+    expect(rehydrate).toHaveBeenCalledOnce();
+  });
+
+  it("keeps in-memory preferences when localStorage access is blocked", () => {
+    toggleWatch("alice");
+    vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("Storage is blocked", "SecurityError");
+    });
+    expect(() => {
+      const stop = syncPreferences();
+      stop();
+    }).not.toThrow();
+    expect(usePreferencesStore.getState().watchlist).toEqual(["alice"]);
   });
 });
 

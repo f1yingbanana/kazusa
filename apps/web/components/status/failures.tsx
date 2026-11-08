@@ -2,7 +2,7 @@
 
 import { useQueryState } from "nuqs";
 import { entityRefParser } from "@/lib/state/entity-ref";
-import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { CircleAlertIcon } from "lucide-react";
 import {
   DropdownMenu,
@@ -12,8 +12,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCharacters, useStatusVersion } from "@/hooks/use-characters";
-import { statusStore } from "@/lib/live/state";
+import { useCharacters } from "@/hooks/use-characters";
+import { useLiveStore } from "@/lib/live/state";
 
 const LISTED = 20;
 
@@ -22,19 +22,21 @@ const LISTED = 20;
  * once.
  */
 export function FailuresItem() {
-  const version = useStatusVersion();
   const { byId } = useCharacters();
   const [, setSelection] = useQueryState("sel", entityRefParser);
-  const failing = useMemo(
-    () =>
-      [...statusStore.entries()].flatMap(([id, status]) =>
-        status.failure && status.brain !== "thinking"
-          ? [{ id, ...status.failure }]
-          : [],
-      ),
-    // `version` changes on every live status write.
-    [version],
+  const failures = useLiveStore(
+    useShallow(
+      (state) =>
+        new Map(
+          [...state.statuses].flatMap(([id, status]) =>
+            status.failure && status.brain !== "thinking"
+              ? [[id, status.failure.error] as const]
+              : [],
+          ),
+        ),
+    ),
   );
+  const failing = [...failures];
   if (failing.length === 0) return null;
 
   return (
@@ -46,7 +48,7 @@ export function FailuresItem() {
       <DropdownMenuContent side="top" className="w-96">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Latest turn failed</DropdownMenuLabel>
-          {failing.slice(0, LISTED).map(({ id, error }) => (
+          {failing.slice(0, LISTED).map(([id, error]) => (
             <DropdownMenuItem
               key={id}
               className="flex-col items-start gap-0.5"

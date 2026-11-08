@@ -25,8 +25,8 @@ import { placeName } from "@/lib/location/places";
 import { STAGE_VIEWS } from "@/lib/registry/views";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
-import { useKazusaConfig } from "@/lib/state/config-store";
-import { markQuietSelection } from "@/lib/state/inspector-request";
+import { useSources } from "@/lib/source/provider";
+import { markQuietSelection } from "@/lib/state/ui-store";
 
 /** The palette isn't virtualized; only the latest of others' chats are listed. */
 const MAX_OBSERVED = 100;
@@ -52,7 +52,7 @@ export function CommandPalette({
   const { chats } = useChats();
   const { chats: observed } = useObservedChats();
   const places = usePlaces();
-  const config = useKazusaConfig();
+  const { player } = useSources();
   const { hasPermission } = useAccess();
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export function CommandPalette({
 
   // As from the chat list: the inspector follows without covering the chat.
   function openChat(chat: ChatInfo) {
-    const patch = openChatPatch(chat, config.userId);
+    const patch = openChatPatch(chat, player.id);
     if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     go(patch);
   }
