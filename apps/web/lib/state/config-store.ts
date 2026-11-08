@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { create } from "zustand";
 
 /** The configured player; the server supplies it (`/kazusa/chats` user). */
 export type KazusaConfig = {
@@ -15,30 +15,26 @@ export const DEFAULT_CONFIG: KazusaConfig = {
   userName: "You",
 };
 
-const listeners = new Set<() => void>();
-let cached: KazusaConfig | null = null;
-
-function read(): KazusaConfig {
-  if (cached) return cached;
+if (typeof window !== "undefined") {
   try {
     window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
     // Storage can be unavailable (private mode, sandboxed iframes).
   }
-  cached = DEFAULT_CONFIG;
-  return cached;
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export interface ConfigState {
+  readonly config: KazusaConfig;
 }
 
-export function saveConfig(next: KazusaConfig) {
-  cached = next;
-  for (const listener of listeners) listener();
+export const useConfigStore = create<ConfigState>()(() => ({
+  config: DEFAULT_CONFIG,
+}));
+
+export function saveConfig(next: KazusaConfig): void {
+  useConfigStore.setState({ config: next });
 }
 
-export function useKazusaConfig() {
-  return useSyncExternalStore(subscribe, read, () => DEFAULT_CONFIG);
+export function useKazusaConfig(): KazusaConfig {
+  return useConfigStore((state) => state.config);
 }

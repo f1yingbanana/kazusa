@@ -38,7 +38,7 @@ import { useChats } from "@/hooks/use-chats";
 import { useDraftChat } from "@/lib/state/chat-draft";
 import { useSources } from "@/lib/source/provider";
 import type { EntityRef } from "@/lib/state/entity-ref";
-import { toggleWatch, useWatchlist } from "@/lib/state/watchlist";
+import { toggleWatch, useWatchlist } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
 
 const KIND_NOTE = { agent: undefined, npc: "NPC", player: "Player" } as const;

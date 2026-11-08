@@ -16,7 +16,7 @@ import { useSelection } from '@/hooks/use-selection'
 import { locationStore } from '@/lib/live/state'
 import { headingTo, peopleWithin } from '@/lib/location/places'
 import type { EntityRef } from '@/lib/state/entity-ref'
-import { useWatchlist } from '@/lib/state/watchlist'
+import { useWatchlist } from '@/lib/state/preferences-store'
 import { formatSimDuration } from '@/lib/time/sim'
 
 const MAX_ROWS = 12

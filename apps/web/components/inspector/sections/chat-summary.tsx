@@ -19,7 +19,7 @@ import { useAccess } from "@/hooks/use-access";
 import { useSelection } from "@/hooks/use-selection";
 import { listNames } from "@/lib/source/chats/display";
 import { useKazusaConfig } from "@/lib/state/config-store";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import {
   AddPeople,

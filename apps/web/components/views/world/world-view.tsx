@@ -28,7 +28,7 @@ import { useSimNow } from "@/hooks/use-clock";
 import { useSelection } from "@/hooks/use-selection";
 import { locationStore } from "@/lib/live/state";
 import { areaPath } from "@/lib/location/places";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 import {

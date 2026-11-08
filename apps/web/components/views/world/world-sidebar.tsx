@@ -43,7 +43,7 @@ import { useSelection } from "@/hooks/use-selection";
 import { filterCharacters, type KindFilter } from "@/lib/state/grouping";
 import { markQuietSelection } from "@/lib/state/inspector-request";
 import type { SectionSidebarProps } from "@/lib/registry/types";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
 import {
   ALL_FOLDER,

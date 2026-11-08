@@ -56,7 +56,7 @@ import {
 import { PLACES_KEY, savePlacePositions } from "@/lib/source/location/http";
 import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/inspector-request";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 import { MapHighlight, MapRegions, MapRoads } from "./map-roads";
 import {
   HALO,

@@ -23,7 +23,7 @@ import {
   TIMELINE_KIND_LIST,
 } from '@/lib/registry/timeline-kinds'
 import { requestSidebar } from '@/lib/state/sidebar-request'
-import { useWatchlist } from '@/lib/state/watchlist'
+import { useWatchlist } from '@/lib/state/preferences-store'
 import { formatSimDateLong, simDayStart } from '@/lib/time/sim'
 import { TimelineRow } from './timeline-row'
 
