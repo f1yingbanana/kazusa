@@ -288,15 +288,109 @@ function verify(stage, target) {
     throw new Error(`Path too long for Windows: ${longest}`);
 }
 
+/** Convert the shared logo with macOS's image tools; both installers build here. */
+function stageAppIcon(stage, target) {
+  const logo = path.join(ROOT, ".github/assets/logo.webp");
+  const work = path.join(DIST, `icons-${target.os}`);
+  removeTree(work);
+  mkdirSync(work, { recursive: true });
+  try {
+    if (target.os === "win32") {
+      // sips writes one image per ICO. Keep its bitmap/PNG encoding, collecting
+      // the sizes into one directory so Explorer can choose the right one.
+      const frames = [16, 24, 32, 48, 64, 128, 256].map((size) => {
+        const file = path.join(work, `${size}.ico`);
+        run(
+          "sips",
+          [
+            "-s",
+            "format",
+            "ico",
+            "-z",
+            String(size),
+            String(size),
+            logo,
+            "--out",
+            file,
+          ],
+          work,
+        );
+        const frame = readFileSync(file);
+        if (frame.readUInt16LE(4) !== 1)
+          throw new Error(`Expected one icon image in ${file}.`);
+        return frame;
+      });
+      const directory = Buffer.alloc(6 + frames.length * 16);
+      directory.writeUInt16LE(1, 2);
+      directory.writeUInt16LE(frames.length, 4);
+      let offset = directory.length;
+      const images = frames.map((frame, index) => {
+        const entry = 6 + index * 16;
+        frame.copy(directory, entry, 6, 22);
+        directory.writeUInt32LE(offset, entry + 12);
+        const start = frame.readUInt32LE(18);
+        const image = frame.subarray(start, start + frame.readUInt32LE(14));
+        offset += image.length;
+        return image;
+      });
+      writeFileSync(
+        path.join(stage, "Kazusa.ico"),
+        Buffer.concat([directory, ...images]),
+      );
+    } else {
+      const iconset = path.join(work, "Kazusa.iconset");
+      mkdirSync(iconset);
+      for (const size of [16, 32, 128, 256, 512]) {
+        for (const scale of [1, 2]) {
+          const pixels = String(size * scale);
+          const file = path.join(
+            iconset,
+            `icon_${size}x${size}${scale === 2 ? "@2x" : ""}.png`,
+          );
+          run(
+            "sips",
+            ["-s", "format", "png", "-z", pixels, pixels, logo, "--out", file],
+            work,
+          );
+        }
+      }
+      run(
+        "iconutil",
+        ["-c", "icns", iconset, "-o", path.join(stage, "Kazusa.icns")],
+        work,
+      );
+    }
+  } finally {
+    removeTree(work);
+  }
+}
+
+/** Keep launch paths relative to this file, including when changing drives. */
+function stageWindowsLauncher(stage) {
+  writeFileSync(
+    path.join(stage, "Kazusa.cmd"),
+    [
+      "@echo off",
+      "setlocal EnableExtensions DisableDelayedExpansion",
+      'cd /d "%~dp0"',
+      "if errorlevel 1 exit /b 1",
+      '".\\node\\node.exe" ".\\scripts\\dev.mjs" --packaged',
+      "exit /b %errorlevel%",
+      "",
+    ].join("\r\n"),
+  );
+}
+
 function buildInstaller(stage, version) {
   const script = path.join(DIST, "kazusa.nsi");
   const output = path.join(DIST, `Kazusa-Setup-${version}.exe`);
-  const launch = `/k ""$INSTDIR\\node\\node.exe" "$INSTDIR\\scripts\\dev.mjs" --packaged"`;
+  const launch = `/d /v:off /s /k ""$INSTDIR\\Kazusa.cmd""`;
   const uninstallKey =
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Kazusa";
   // Per-user, so no admin prompt. An update defaults to the folder already in
   // use. A chosen folder may hold other things, so only what's installed is ever
-  // removed. `cmd /k` keeps the window open to show any error.
+  // removed. `cmd /k` keeps the window open to show any error; /d skips the
+  // user's shell AutoRun, and /v:off preserves exclamation marks in the path.
   writeFileSync(
     script,
     `Unicode true
@@ -307,10 +401,26 @@ InstallDir "$LOCALAPPDATA\\Programs\\Kazusa"
 InstallDirRegKey HKCU "${uninstallKey}" "InstallLocation"
 SetCompressor /SOLID lzma
 ShowInstDetails nevershow
-DirText "Kazusa and your world will be kept in this folder. To update, keep the folder you installed to: your world stays as it is."
-Page directory "" "" CheckFolder
-Page instfiles
-UninstPage instfiles
+
+!include "MUI2.nsh"
+
+!define MUI_ICON "${path.join(stage, "Kazusa.ico")}"
+!define MUI_UNICON "${path.join(stage, "Kazusa.ico")}"
+
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Kazusa and your world will be kept in this folder. To update, keep the folder you installed to: your world stays as it is."
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE CheckFolder
+!insertmacro MUI_PAGE_DIRECTORY
+
+!insertmacro MUI_PAGE_INSTFILES
+
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Launch Kazusa"
+!define MUI_FINISHPAGE_RUN_FUNCTION LaunchKazusa
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_INSTFILES
+
+!insertmacro MUI_LANGUAGE "English"
 
 ; Nothing can be replaced or removed while it's running.
 !macro WaitUntilStopped
@@ -344,6 +454,8 @@ UninstPage instfiles
   Delete "$INSTDIR\\package.json"
   Delete "$INSTDIR\\package-lock.json"
   Delete "$INSTDIR\\VERSION"
+  Delete "$INSTDIR\\Kazusa.cmd"
+  Delete "$INSTDIR\\Kazusa.ico"
 !macroend
 
 Function CheckFolder
@@ -368,15 +480,21 @@ Function CheckFolder
   Delete "$INSTDIR\\.kazusa-write-test"
 FunctionEnd
 
+Function LaunchKazusa
+  SetOutPath "$INSTDIR"
+  Exec '"$SYSDIR\\cmd.exe" ${launch}'
+FunctionEnd
+
 Section
   !insertmacro WaitUntilStopped
   !insertmacro RemoveAppFiles
   SetOutPath "$INSTDIR"
   File /r "${stage}/*.*"
   WriteUninstaller "$INSTDIR\\Uninstall.exe"
-  CreateShortcut "$SMPROGRAMS\\Kazusa.lnk" "$SYSDIR\\cmd.exe" '${launch}'
-  CreateShortcut "$DESKTOP\\Kazusa.lnk" "$SYSDIR\\cmd.exe" '${launch}'
+  CreateShortcut "$SMPROGRAMS\\Kazusa.lnk" "$SYSDIR\\cmd.exe" '${launch}' "$INSTDIR\\Kazusa.ico" 0
+  CreateShortcut "$DESKTOP\\Kazusa.lnk" "$SYSDIR\\cmd.exe" '${launch}' "$INSTDIR\\Kazusa.ico" 0
   WriteRegStr HKCU "${uninstallKey}" "DisplayName" "Kazusa"
+  WriteRegStr HKCU "${uninstallKey}" "DisplayIcon" '"$INSTDIR\\Kazusa.ico",0'
   WriteRegStr HKCU "${uninstallKey}" "DisplayVersion" "${version}"
   WriteRegStr HKCU "${uninstallKey}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${uninstallKey}" "UninstallString" '"$INSTDIR\\Uninstall.exe"'
@@ -459,6 +577,10 @@ function buildDiskImage(stage, version) {
   removeTree(root);
   mkdirSync(path.join(contents, "MacOS"), { recursive: true });
   mkdirSync(path.join(contents, "Resources"));
+  renameSync(
+    path.join(stage, "Kazusa.icns"),
+    path.join(contents, "Resources/Kazusa.icns"),
+  );
   renameSync(stage, path.join(contents, "Resources/kazusa"));
   writeFileSync(
     path.join(contents, "Info.plist"),
@@ -469,6 +591,7 @@ function buildDiskImage(stage, version) {
   <key>CFBundleExecutable</key><string>Kazusa</string>
   <key>CFBundleIdentifier</key><string>ai.openrp.kazusa</string>
   <key>CFBundleName</key><string>Kazusa</string>
+  <key>CFBundleIconFile</key><string>Kazusa.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${version}</string>
 </dict>
@@ -516,6 +639,8 @@ buildFrontend(stage);
 installForTarget(stage, target);
 await stageNode(stage, target);
 await stageGit(stage, target);
+stageAppIcon(stage, target);
+if (target.os === "win32") stageWindowsLauncher(stage);
 writeFileSync(path.join(stage, "VERSION"), `${version}\n`);
 verify(stage, target);
 buildArchive(stage, name, version);
