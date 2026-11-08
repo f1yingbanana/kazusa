@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "@/components/views/settings/search-params";
 import { PlugZapIcon, UnplugIcon } from "lucide-react";
 import type { Domain } from "@kazusa/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { useNavigate } from "@/hooks/use-url-state";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,10 @@ export function Unavailable({
   className?: string;
 }) {
   const { resolved, reachable, backendError, retryBackend } = useSources();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
   const missing = requires.filter(
     (domain) => resolved[domain] === "unavailable",
   );
@@ -54,7 +58,7 @@ export function Unavailable({
             size="sm"
             variant="ghost"
             onClick={() =>
-              navigate({ view: "settings", "settings.tab": "connection" })
+              void setParams({ view: "settings", "settings.tab": "connection" })
             }
           >
             Connection settings

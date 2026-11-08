@@ -1,11 +1,12 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "@/components/views/settings/search-params";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useNavigate } from "@/hooks/use-url-state";
 import { useRealtime } from "@/lib/live/realtime-provider";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,10 @@ const LABELS = {
 /** Gateway SSE health. SSE errors surface only here (UX §11). */
 export function ConnectionStatusItem() {
   const { status } = useRealtime();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
 
   return (
     <Tooltip>
@@ -27,7 +31,7 @@ export function ConnectionStatusItem() {
           <button
             type="button"
             onClick={() =>
-              navigate({ view: "settings", "settings.tab": "connection" })
+              void setParams({ view: "settings", "settings.tab": "connection" })
             }
           />
         }

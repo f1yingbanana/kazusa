@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { chatsParsers } from "@/components/views/chats/search-params";
+import { timelineParsers } from "@/components/views/timeline/search-params";
 import { useState } from "react";
 import {
   BrainIcon,
@@ -32,7 +35,6 @@ import { useAccess } from "@/hooks/use-access";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { useChats } from "@/hooks/use-chats";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useDraftChat } from "@/lib/state/chat-draft";
 import { useSources } from "@/lib/source/provider";
 import type { EntityRef } from "@/lib/state/entity-ref";
@@ -44,7 +46,15 @@ const KIND_NOTE = { agent: undefined, npc: "NPC", player: "Player" } as const;
 export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id);
   const watchlist = useWatchlist();
-  const navigate = useNavigate();
+  const [queryState, setParams] = useQueryStates({
+    view: parseAsString,
+    "chats.id": chatsParsers["chats.id"],
+    "chats.dm": chatsParsers["chats.dm"],
+    "chats.talk": chatsParsers["chats.talk"],
+    "chats.member": chatsParsers["chats.member"],
+    "tl.actors": timelineParsers["tl.actors"],
+    "tl.watch": timelineParsers["tl.watch"],
+  });
   const { resolved } = useSources();
   const { canPlay, canManage } = useAccess();
   const starred = watchlist.includes(entity.id);
@@ -59,8 +69,8 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const [brainOpen, setBrainOpen] = useState(false);
   // Message is redundant while their direct chat is the one open, and Talk in
   // person while you are already talking with them there.
-  const view = useParam("view");
-  const openChatId = useParam("chats.id");
+  const view = queryState["view"];
+  const openChatId = queryState["chats.id"];
   const { chats } = useChats();
   const draft = useDraftChat();
   const open =
@@ -138,7 +148,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
               size="sm"
               disabled={!canPlay}
               onClick={() =>
-                navigate({ view: "chats", "chats.dm": character.id })
+                void setParams({ view: "chats", "chats.dm": character.id })
               }
             >
               <MessageCircleIcon data-icon="inline-start" />
@@ -151,7 +161,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
               size="sm"
               disabled={!canPlay}
               onClick={() =>
-                navigate({ view: "chats", "chats.talk": character.id })
+                void setParams({ view: "chats", "chats.talk": character.id })
               }
             >
               <SpeechIcon data-icon="inline-start" />
@@ -212,7 +222,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
               {showChats ? (
                 <DropdownMenuItem
                   onClick={() =>
-                    navigate({
+                    void setParams({
                       view: "chats",
                       "chats.member": character.id,
                       "chats.id": null,
@@ -225,9 +235,9 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
               ) : null}
               <DropdownMenuItem
                 onClick={() =>
-                  navigate({
+                  void setParams({
                     view: "timeline",
-                    "tl.actors": character.id,
+                    "tl.actors": [character.id],
                     "tl.watch": null,
                   })
                 }

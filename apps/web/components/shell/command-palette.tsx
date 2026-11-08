@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
+import { chatsParsers } from "@/components/views/chats/search-params";
 import { useEffect, useMemo } from "react";
 import { MapPinIcon } from "lucide-react";
 import { chatIcon } from "@/components/entities/chips";
@@ -18,14 +21,12 @@ import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { usePlaces } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
-import { useNavigate } from "@/hooks/use-url-state";
 import { placeName } from "@/lib/location/places";
 import { STAGE_VIEWS } from "@/lib/registry/views";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { markQuietSelection } from "@/lib/state/inspector-request";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
 
 /** The palette isn't virtualized; only the latest of others' chats are listed. */
 const MAX_OBSERVED = 100;
@@ -42,7 +43,11 @@ export function CommandPalette({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    sel: entityRefParser,
+    "chats.id": chatsParsers["chats.id"],
+  });
   const { characters } = useCharacters();
   const { chats } = useChats();
   const { chats: observed } = useObservedChats();
@@ -64,15 +69,15 @@ export function CommandPalette({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onOpenChange]);
 
-  function go(patch: Record<string, string | null>) {
-    navigate(patch);
+  function go(patch: Parameters<typeof setParams>[0]) {
+    void setParams(patch);
     onOpenChange(false);
   }
 
   // As from the chat list: the inspector follows without covering the chat.
   function openChat(chat: ChatInfo) {
     const patch = openChatPatch(chat, config.userId);
-    if (patch.sel) markQuietSelection(patch.sel);
+    if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     go(patch);
   }
 
@@ -153,7 +158,7 @@ export function CommandPalette({
                   value={`place ${place.name} ${place.aliases.join(" ")} ${place.id}`}
                   onSelect={() =>
                     go({
-                      sel: serializeEntityRef({ kind: "place", id: place.id }),
+                      sel: { kind: "place", id: place.id },
                     })
                   }
                 >
@@ -176,10 +181,10 @@ export function CommandPalette({
                   value={`character ${character.name} ${character.aliases.join(" ")} ${character.affiliation ?? ""}`}
                   onSelect={() =>
                     go({
-                      sel: serializeEntityRef({
+                      sel: {
                         kind: "character",
                         id: character.id,
-                      }),
+                      },
                     })
                   }
                 >

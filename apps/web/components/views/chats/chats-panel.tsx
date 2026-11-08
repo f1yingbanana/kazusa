@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { chatsParsers } from "./search-params";
+import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { useMemo, useRef, useState } from "react";
 import { SquarePenIcon, UnplugIcon, XIcon } from "lucide-react";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
@@ -14,7 +17,6 @@ import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
@@ -40,9 +42,14 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const { chats: allMine, error, isLoading, reload } = useChats();
   const observed = useObservedChats();
   const { byId } = useCharacters();
-  const navigate = useNavigate();
-  const chatId = useParam("chats.id");
-  const member = useParam("chats.member");
+  const [queryState, setParams] = useQueryStates({
+    "chats.id": chatsParsers["chats.id"],
+    "chats.member": chatsParsers["chats.member"],
+    view: parseAsString,
+    sel: entityRefParser,
+  });
+  const chatId = queryState["chats.id"];
+  const member = queryState["chats.member"];
   const collapsed = useObservedCollapsed();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -88,8 +95,8 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   // including the one already open (after looking at someone else).
   function openChat(chat: ChatInfo) {
     const patch = openChatPatch(chat, config.userId);
-    if (patch.sel) markQuietSelection(patch.sel);
-    navigate(patch);
+    if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
+    void setParams(patch);
     onOpened?.();
   }
 
@@ -98,7 +105,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
       allMine.find((candidate) => candidate.id === id) ??
       observed.chats.find((candidate) => candidate.id === id);
     if (chat) openChat(chat);
-    else navigate({ view: "chats", "chats.id": id });
+    else void setParams({ view: "chats", "chats.id": id });
   }
 
   return (
@@ -134,7 +141,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
             size="icon-xs"
             variant="ghost"
             aria-label="Show everyone's chats"
-            onClick={() => navigate({ "chats.member": null })}
+            onClick={() => void setParams({ "chats.member": null })}
           >
             <XIcon />
           </Button>

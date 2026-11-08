@@ -1,8 +1,9 @@
 "use client";
 
+import { useQueryState, useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "./search-params";
 import { useAccess } from "@/hooks/use-access";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import {
   DEFAULT_SETTINGS_CATEGORY,
@@ -25,7 +26,7 @@ function useAllowedCategories() {
  * one is open; on narrow screens this list is the first screen instead.
  */
 export function useSettingsTab() {
-  const tab = useParam("settings.tab");
+  const [tab] = useQueryState("settings.tab", settingsParsers["settings.tab"]);
   const docked = useMediaQuery("(min-width: 1024px)");
   const allowed = useAllowedCategories();
   return (
@@ -39,7 +40,10 @@ export function useSettingsTab() {
 }
 
 export function SettingsSidebar({ onNavigated }: SectionSidebarProps) {
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
   const active = useSettingsTab();
   const allowed = useAllowedCategories();
 
@@ -60,7 +64,10 @@ export function SettingsSidebar({ onNavigated }: SectionSidebarProps) {
               type="button"
               aria-current={current ? "page" : undefined}
               onClick={() => {
-                navigate({ view: "settings", "settings.tab": category.id });
+                void setParams({
+                  view: "settings",
+                  "settings.tab": category.id,
+                });
                 onNavigated?.();
               }}
               className={cn(

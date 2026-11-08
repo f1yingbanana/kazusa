@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryState } from "nuqs";
+import { worldParsers } from "../search-params";
 import {
   useCallback,
   useEffect,
@@ -21,7 +23,7 @@ import {
   usePlayer,
 } from "@/hooks/use-location";
 import { useSimNow } from "@/hooks/use-clock";
-import { useNavigate, useParam, useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { locationStore } from "@/lib/live/state";
 import {
   MAP_SCALE,
@@ -100,7 +102,10 @@ export function PlaceMap({
 }) {
   const { byId } = useCharacters();
   const { mutate } = useSWRConfig();
-  const navigate = useNavigate();
+  const [planeParam, setPlane] = useQueryState(
+    "world.plane",
+    worldParsers["world.plane"],
+  );
   const player = usePlayer();
   const { canManage } = useAccess();
   const [selection, select] = useSelection();
@@ -139,7 +144,6 @@ export function PlaceMap({
       .sort((a, b) => b[1] - a[1])
       .map(([plane]) => plane);
   }, [planes]);
-  const planeParam = useParam("world.plane");
   const focusPlane = focusPlaceId ? planes.get(focusPlaceId) : undefined;
   const playerPlane = player.placeId ? planes.get(player.placeId) : undefined;
   const plane =
@@ -323,9 +327,9 @@ export function PlaceMap({
       flyTo(focusPlaceId);
     } else {
       // The plane effect flies there once this plane's map is drawn.
-      navigate({ "world.plane": planes.get(focusPlaceId) ?? null }, "replace");
+      void setPlane(planes.get(focusPlaceId) ?? null, { history: "replace" });
     }
-  }, [focusPlaceId, flyTo, fitAll, planes, plane, navigate]);
+  }, [focusPlaceId, flyTo, fitAll, planes, plane, setPlane]);
 
   // A closed area opens first; details come with the click after that, or
   // quietly here, without a sheet covering the map on narrow screens.
@@ -336,12 +340,12 @@ export function PlaceMap({
         markQuietSelection(serializeEntityRef(ref));
         flyTo(id);
       }
-      select(ref);
+      void select(ref);
     },
     [select, reveal, zoom, flyTo],
   );
   const onSelectCharacter = useCallback(
-    (id: string) => select({ kind: "character", id }),
+    (id: string) => void select({ kind: "character", id }),
     [select],
   );
 
@@ -697,7 +701,7 @@ export function PlaceMap({
                       aria-pressed={option === plane}
                       className="rounded-none capitalize"
                       onClick={() =>
-                        navigate({ "world.plane": option }, "replace")
+                        void setPlane(option, { history: "replace" })
                       }
                     >
                       {option || "Elsewhere"}

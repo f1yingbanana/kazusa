@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { chatsParsers } from "./search-params";
 import { ChevronLeftIcon, InfoIcon, SpeechIcon } from "lucide-react";
 import type { CharacterSummary } from "@kazusa/client";
 import { AddPeople } from "@/components/inspector/sections/chat-controls";
@@ -15,7 +17,7 @@ import { useCharacterStatus, useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
-import { useNavigate, useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { formatTypingLabel } from "@/lib/format";
 import type { Typist } from "@/lib/live/realtime-provider";
 import { chatSubject, isOneOnOne, listNames } from "@/lib/source/chats/display";
@@ -61,7 +63,7 @@ export function ChatHeader({
   const subject = chatSubject(chat, userId);
   const showing = subject !== null && sameEntity(subject, selection);
   const show = (ref: EntityRef | null) => {
-    if (ref) select(ref);
+    if (ref) void select(ref);
     requestInspector();
   };
 
@@ -316,7 +318,10 @@ function Face({
 
 /** In a DM with someone standing where you are: talk face to face instead. */
 function TalkInPerson({ id }: { id: string }) {
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "chats.talk": chatsParsers["chats.talk"],
+  });
   const player = usePlayer();
   const position = usePosition(id);
   const together =
@@ -331,7 +336,7 @@ function TalkInPerson({ id }: { id: string }) {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => navigate({ view: "chats", "chats.talk": id })}
+            onClick={() => void setParams({ view: "chats", "chats.talk": id })}
           />
         }
       >

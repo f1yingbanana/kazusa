@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useUsage } from "@/hooks/use-brain";
 import { useCharacters } from "@/hooks/use-characters";
-import { useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { formatCost, formatTokens } from "@/lib/format";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
@@ -137,7 +137,7 @@ function ByCharacter({ report }: { report: UsageResponse }) {
               <button
                 type="button"
                 aria-current={selected ? "true" : undefined}
-                onClick={() => select({ kind: "character", id: agentId })}
+                onClick={() => void select({ kind: "character", id: agentId })}
                 className={cn(
                   "flex h-full w-full items-center gap-3 px-3 text-left outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
                   selected && "bg-muted",

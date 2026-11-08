@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryState } from "nuqs";
+import { entityRefParser } from "@/lib/state/entity-ref";
 import {
   MapPinIcon,
   MessageCircleIcon,
@@ -12,10 +14,8 @@ import { useChats } from "@/hooks/use-chats";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { useCharacter } from "@/hooks/use-characters";
 import { usePlace } from "@/hooks/use-location";
-import { useNavigate } from "@/hooks/use-url-state";
 import type { Chat } from "@/lib/source/chats/types";
 import { useDraftChat } from "@/lib/state/chat-draft";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { cn } from "@/lib/utils";
 import { PresenceAvatar } from "./presence-avatar";
 
@@ -30,15 +30,13 @@ export function CharacterChip({
   className?: string;
 }) {
   const character = useCharacter(id);
-  const navigate = useNavigate();
+  const [, setSelection] = useQueryState("sel", entityRefParser);
   const name = character?.name ?? id;
   return (
     <button
       type="button"
       className={cn(chipClass, className)}
-      onClick={() =>
-        navigate({ sel: serializeEntityRef({ kind: "character", id }) })
-      }
+      onClick={() => void setSelection({ kind: "character", id })}
     >
       <PresenceAvatar
         id={id}
@@ -135,15 +133,13 @@ export function ChatChip({
   className?: string;
 }) {
   const { title, type } = useChatTitle(id);
-  const navigate = useNavigate();
+  const [, setSelection] = useQueryState("sel", entityRefParser);
   const Icon = chatIcon(type);
   return (
     <button
       type="button"
       className={cn(chipClass, className)}
-      onClick={() =>
-        navigate({ sel: serializeEntityRef({ kind: "chat", id }) })
-      }
+      onClick={() => void setSelection({ kind: "chat", id })}
     >
       <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">{label ?? title}</span>
@@ -162,15 +158,13 @@ export function PlaceChip({
   className?: string;
 }) {
   const place = usePlace(id);
-  const navigate = useNavigate();
+  const [, setSelection] = useQueryState("sel", entityRefParser);
   return (
     <button
       type="button"
       title={place?.summary}
       className={cn(chipClass, className)}
-      onClick={() =>
-        navigate({ sel: serializeEntityRef({ kind: "place", id }) })
-      }
+      onClick={() => void setSelection({ kind: "place", id })}
     >
       {bare ? null : (
         <MapPinIcon

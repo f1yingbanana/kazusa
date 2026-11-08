@@ -1,5 +1,5 @@
 import type { ChatMessage } from "@kazusa/client";
-import { serializeEntityRef, type EntityRef } from "../../state/entity-ref";
+import { type EntityRef } from "../../state/entity-ref";
 import type { ChatInfo } from "./types";
 
 type NameOf = (id: string) => string;
@@ -59,12 +59,12 @@ export function chatSubject(chat: ChatInfo, userId: string): EntityRef | null {
 export function openChatPatch(
   chat: ChatInfo,
   userId: string,
-): Record<string, string> {
+): { view: string; "chats.id": string; sel?: EntityRef } {
   const subject = chatSubject(chat, userId);
   return {
     view: "chats",
     "chats.id": chat.id,
-    ...(subject ? { sel: serializeEntityRef(subject) } : {}),
+    ...(subject ? { sel: subject } : {}),
   };
 }
 

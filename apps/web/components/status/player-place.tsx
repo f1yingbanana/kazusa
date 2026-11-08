@@ -2,7 +2,7 @@
 
 import { MapPinIcon } from 'lucide-react'
 import { usePlace, usePlayer } from '@/hooks/use-location'
-import { useSelection } from '@/hooks/use-url-state'
+import { useSelection } from '@/hooks/use-selection'
 
 /** Where the player stands; opens that place, where "Go here" lives too. */
 export function PlayerPlaceItem() {
@@ -14,7 +14,7 @@ export function PlayerPlaceItem() {
     <button
       type="button"
       className="flex items-center gap-1 hover:text-foreground"
-      onClick={() => select({ kind: 'place', id: place.id })}
+      onClick={() => void select({ kind: 'place', id: place.id })}
     >
       <MapPinIcon className="size-3" aria-hidden />
       {`You're at ${place.name}`}

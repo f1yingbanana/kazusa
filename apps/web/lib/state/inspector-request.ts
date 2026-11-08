@@ -1,3 +1,5 @@
+import { createLoader, parseAsString } from "nuqs/server";
+
 /**
  * "Show me the inspector" from places that select on purpose (e.g. tapping a
  * chat header). On narrow screens the shell reopens the inspector sheet even
@@ -49,6 +51,8 @@ export function keepsLinkedSelection(param: string): boolean {
   if (linkHonored || loadedSearch === null) return false;
   linkHonored = true;
   if (window.location.search !== loadedSearch) return false;
-  const params = new URLSearchParams(loadedSearch);
-  return params.has(param) && params.has("sel");
+  const params = createLoader({ [param]: parseAsString, sel: parseAsString })(
+    loadedSearch,
+  );
+  return params[param] !== null && params.sel !== null;
 }

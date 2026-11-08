@@ -1,17 +1,21 @@
 'use client'
 
+import { useQueryState } from 'nuqs'
+import { settingsParsers } from './search-params'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useNavigate } from '@/hooks/use-url-state'
 import { SettingsSidebar, useSettingsTab } from './settings-sidebar'
 
 /**
- * The open settings page (`settings.tab`). The category list is this
- * section's sidebar; on narrow screens it is this screen until one is opened.
+ * The open settings page (`settings.tab`). The category list is this section's
+ * sidebar; on narrow screens it is this screen until one is opened.
  */
 export function SettingsView() {
   const category = useSettingsTab()
-  const navigate = useNavigate()
+  const [, setTab] = useQueryState(
+    'settings.tab',
+    settingsParsers['settings.tab'],
+  )
 
   if (!category) {
     return (
@@ -29,7 +33,7 @@ export function SettingsView() {
           variant="ghost"
           size="icon-sm"
           className="-ml-2 lg:hidden"
-          onClick={() => navigate({ 'settings.tab': null })}
+          onClick={() => void setTab(null)}
         >
           <ChevronLeftIcon />
           <span className="sr-only">Back to settings</span>

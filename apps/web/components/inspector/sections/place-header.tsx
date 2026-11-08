@@ -1,17 +1,22 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { worldParsers } from "@/components/views/world/search-params";
 import { MapPinCheckIcon, MapPinIcon, UsersIcon } from "lucide-react";
 import { PlaceChip } from "@/components/entities/chips";
 import { Button } from "@/components/ui/button";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
-import { useNavigate } from "@/hooks/use-url-state";
 import { ancestors } from "@/lib/location/places";
 import type { EntityRef } from "@/lib/state/entity-ref";
 
 /** Frontmatter as facts, the description verbatim and never mined (D4). */
 export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
   const places = usePlaces();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "world.by": worldParsers["world.by"],
+    "world.in": worldParsers["world.in"],
+  });
   const player = usePlayer();
   const place = places?.byId.get(entity.id);
   if (!places)
@@ -90,7 +95,7 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
           size="sm"
           variant="outline"
           onClick={() =>
-            navigate({
+            void setParams({
               view: "world",
               "world.by": null,
               "world.in": `place:${place.id}`,

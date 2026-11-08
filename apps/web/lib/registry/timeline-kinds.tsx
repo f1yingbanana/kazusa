@@ -362,7 +362,7 @@ export function timelineKindsParam(kinds: readonly JournalKind[]) {
   const isDefault =
     kinds.length === DEFAULT_TIMELINE_KINDS.length &&
     DEFAULT_TIMELINE_KINDS.every((kind) => kinds.includes(kind));
-  return isDefault ? null : kinds.join(",");
+  return isDefault ? null : [...kinds];
 }
 
 /**

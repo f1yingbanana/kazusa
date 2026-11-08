@@ -10,7 +10,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useAccess } from "@/hooks/use-access";
-import { useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { INSPECTOR_SECTIONS } from "@/lib/registry/inspector";
 import type { InspectorSection as InspectorSectionEntry } from "@/lib/registry/types";
 import { satisfies } from "@/lib/source/capabilities";
@@ -65,7 +65,7 @@ export function Inspector() {
           variant="ghost"
           size="icon-sm"
           className="absolute top-3 right-3 z-10 text-muted-foreground"
-          onClick={() => select(null)}
+          onClick={() => void select(null)}
         >
           <XIcon />
           <span className="sr-only">Close details</span>

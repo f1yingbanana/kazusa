@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { chatsParsers } from "@/components/views/chats/search-params";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   CheckIcon,
@@ -48,7 +50,6 @@ import { useOccupancy } from "@/hooks/use-location";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useOffstage } from "@/hooks/use-stage";
 import { useAccess } from "@/hooks/use-access";
-import { useNavigate } from "@/hooks/use-url-state";
 import type { Chat } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 
@@ -269,7 +270,10 @@ export function AddPeople({
   compact?: boolean;
 }) {
   const { manage, callOver } = useChatActions();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "chats.id": chatsParsers["chats.id"],
+  });
   const candidates = useCandidates(chat);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -302,7 +306,7 @@ export function AddPeople({
         // over to their conversation instead: say so and follow it.
         if (response.chatId !== chat.id) {
           toast.info(`You joined ${andList(names)}'s conversation`);
-          navigate({ view: "chats", "chats.id": response.chatId });
+          void setParams({ view: "chats", "chats.id": response.chatId });
         } else toast.success(`Called ${andList(names)} over`);
       } else {
         await manage({

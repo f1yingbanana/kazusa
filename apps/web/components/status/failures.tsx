@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryState } from "nuqs";
+import { entityRefParser } from "@/lib/state/entity-ref";
 import { useMemo } from "react";
 import { CircleAlertIcon } from "lucide-react";
 import {
@@ -11,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCharacters, useStatusVersion } from "@/hooks/use-characters";
-import { useNavigate } from "@/hooks/use-url-state";
 import { statusStore } from "@/lib/live/state";
 
 const LISTED = 20;
@@ -23,7 +24,7 @@ const LISTED = 20;
 export function FailuresItem() {
   const version = useStatusVersion();
   const { byId } = useCharacters();
-  const navigate = useNavigate();
+  const [, setSelection] = useQueryState("sel", entityRefParser);
   const failing = useMemo(
     () =>
       [...statusStore.entries()].flatMap(([id, status]) =>
@@ -49,7 +50,7 @@ export function FailuresItem() {
             <DropdownMenuItem
               key={id}
               className="flex-col items-start gap-0.5"
-              onClick={() => navigate({ sel: `character:${id}` })}
+              onClick={() => void setSelection({ kind: "character", id })}
             >
               <span className="font-medium">{byId.get(id)?.name ?? id}</span>
               <span className="line-clamp-2 text-xs text-muted-foreground">

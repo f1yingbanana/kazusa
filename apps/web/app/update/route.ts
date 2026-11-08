@@ -1,6 +1,13 @@
+import { createLoader, parseAsString } from "nuqs/server";
 import { z } from "zod";
 import { requireLocalOwner } from "../../lib/auth/access";
 import { runUpdater } from "../../lib/update/run";
+
+// These flags are presence-based: ?boot and ?boot=0 both count.
+const loadUpdateParams = createLoader({
+  boot: parseAsString,
+  fresh: parseAsString,
+});
 
 /** Stays the same until the frontend restarts. */
 const BOOT = String(Date.now());
@@ -18,11 +25,11 @@ let staging = false;
 export async function GET(request: Request): Promise<Response> {
   const denied = requireLocalOwner(request);
   if (denied) return denied;
-  const params = new URL(request.url).searchParams;
-  if (params.has("boot")) return Response.json({ boot: BOOT });
+  const params = loadUpdateParams(request);
+  if (params.boot !== null) return Response.json({ boot: BOOT });
   if (
     !checked ||
-    params.has("fresh") ||
+    params.fresh !== null ||
     Date.now() - checked.at > CHECK_TTL_MS
   ) {
     const result = await runUpdater(["check"]);
