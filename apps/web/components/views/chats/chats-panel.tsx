@@ -26,7 +26,7 @@ import { useKazusaConfig } from "@/lib/state/config-store";
 import {
   setObservedCollapsed,
   useObservedCollapsed,
-} from "@/lib/state/observed-section";
+} from "@/lib/state/preferences-store";
 import { ChatList } from "./chat-list";
 import { NewGroupDialog } from "./new-group-dialog";
 import { ObservedChatList } from "./observed-chat-list";

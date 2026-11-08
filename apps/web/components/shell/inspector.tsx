@@ -16,7 +16,7 @@ import type { InspectorSection as InspectorSectionEntry } from "@/lib/registry/t
 import { satisfies } from "@/lib/source/capabilities";
 import { useSources } from "@/lib/source/provider";
 import { serializeEntityRef, type EntityRef } from "@/lib/state/entity-ref";
-import { setSectionOpen, useSectionOpen } from "@/lib/state/inspector-folds";
+import { setSectionOpen, useSectionOpen } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
 
 const KIND_LABEL = {

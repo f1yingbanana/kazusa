@@ -17,7 +17,7 @@ import {
   type GroupBy,
   type KindFilter,
 } from "@/lib/state/grouping";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 
 /*
  * URL params:

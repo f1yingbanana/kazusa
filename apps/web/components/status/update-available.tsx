@@ -6,25 +6,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { CircleArrowUpIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAnnouncedRelease } from "@/hooks/use-update";
-
-/** The last release whose notice was dismissed, so each is announced once. */
-const DISMISSED_KEY = "kazusa:update-dismissed";
-
-function dismissedVersion(): string | null {
-  try {
-    return window.localStorage.getItem(DISMISSED_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function dismiss(version: string) {
-  try {
-    window.localStorage.setItem(DISMISSED_KEY, version);
-  } catch {
-    // Without storage it's announced again on the next load.
-  }
-}
+import {
+  dismissUpdate,
+  useDismissedUpdateVersion,
+} from "@/lib/state/preferences-store";
 
 /**
  * A newer release, once its downloads are up: a notice that stays until it's
@@ -33,6 +18,7 @@ function dismiss(version: string) {
  */
 export function UpdateAvailableItem() {
   const release = useAnnouncedRelease();
+  const dismissed = useDismissedUpdateVersion();
   const [, setParams] = useQueryStates({
     view: parseAsString,
     "settings.tab": settingsParsers["settings.tab"],
@@ -52,7 +38,7 @@ export function UpdateAvailableItem() {
       toast.dismiss(shown.current);
       shown.current = null;
     }
-    if (!version || !id || dismissedVersion() === version) return;
+    if (!version || !id || dismissed === version) return;
     shown.current = id;
     toast(`Kazusa ${version} is available`, {
       id,
@@ -63,13 +49,13 @@ export function UpdateAvailableItem() {
       action: {
         label: "View update",
         onClick: () => {
-          dismiss(version);
+          dismissUpdate(version);
           openUpdates();
         },
       },
-      onDismiss: () => dismiss(version),
+      onDismiss: () => dismissUpdate(version),
     });
-  }, [version, openUpdates]);
+  }, [version, dismissed, openUpdates]);
 
   if (!version) return null;
   return (

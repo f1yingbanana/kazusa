@@ -17,7 +17,7 @@ import {
   TIMELINE_KIND_LIST,
   timelineKindsParam,
 } from "@/lib/registry/timeline-kinds";
-import { useWatchlist } from "@/lib/state/watchlist";
+import { useWatchlist } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
 
 const ALL_KINDS = TIMELINE_KIND_LIST.map((kind) => kind.kind);
