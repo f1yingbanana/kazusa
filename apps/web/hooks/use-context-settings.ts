@@ -55,7 +55,7 @@ export function useContextSettings(agentId?: string) {
         return false;
       }
     },
-    [agentId, mutate, mutateMatching],
+    [agentId, canManage, mutate, mutateMatching],
   );
 
   return {

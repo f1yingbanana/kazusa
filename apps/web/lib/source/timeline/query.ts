@@ -8,10 +8,8 @@ export function matchesTimelineQuery(
   query: TimelineQuery,
 ) {
   if (query.kinds?.length && !query.kinds.includes(event.kind)) return false;
-  if (
-    query.actors?.length &&
-    !event.actors.some((a) => query.actors!.includes(a))
-  )
+  const actors = query.actors;
+  if (actors?.length && !event.actors.some((actor) => actors.includes(actor)))
     return false;
   if (
     query.chats?.length &&

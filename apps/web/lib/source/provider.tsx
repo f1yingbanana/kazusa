@@ -1,33 +1,30 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo } from "react";
-import useSWR from "swr";
+import { useEffect, useMemo } from "react";
+import useSWR, {
+  unstable_serialize,
+  useSWRConfig,
+  type Cache,
+  type SWRResponse,
+} from "swr";
 import type {
-  CharacterStatus,
   CharacterSummary,
   DesiresResponse,
+  Domain,
   LocationsResponse,
   PlacesResponse,
-  WorldMeta,
   WorldResponse,
+  WorldMeta,
 } from "@kazusa/client";
-import { useChatsResource } from "@/hooks/use-chats";
 import {
-  clockStore,
-  desireConfigStore,
-  desireStore,
-  journalTailStore,
-  locationStore,
-  placesStore,
-  statusStore,
+  clearJournal,
+  setDesires,
+  setLocations,
+  setStatuses,
+  useLiveStore,
 } from "@/lib/live/state";
-import { buildPlaceIndex } from "@/lib/location/places";
-import { useKazusaConfig } from "@/lib/state/config-store";
-import {
-  LEGACY_CAPABILITIES,
-  resolveSources,
-  type ResolvedSources,
-} from "./capabilities";
+import { sampleClock, setClock, useClockStore } from "@/lib/live/clock-state";
+import { resolveSources, type ResolvedSources } from "./capabilities";
 import { fetchCharacters } from "./characters/http";
 import { DESIRES_KEY, fetchDesires } from "./desires/http";
 import {
@@ -40,21 +37,146 @@ import { fetchWorld } from "./clock/http";
 
 interface SourcesValue {
   readonly resolved: ResolvedSources;
-  /** False when the Gateway proxy can't be reached (distinct from "not served"). */
   readonly reachable: boolean;
   readonly backendError?: Error;
   readonly retryBackend: () => void;
   readonly player: { readonly id: string; readonly name: string };
-  /** The world's title and accent; absent until `/kazusa/world` answers. */
   readonly world?: WorldMeta;
-  readonly characters: readonly CharacterSummary[];
-  readonly charactersById: ReadonlyMap<string, CharacterSummary>;
-  readonly charactersLoading: boolean;
-  readonly charactersError?: Error;
+  readonly worldResource: SWRResponse<WorldResponse, Error>;
+  readonly probing: boolean;
 }
 
-const SourcesContext = createContext<SourcesValue | null>(null);
+const NO_PLAYER = { id: "", name: "You" };
+const WORLD_KEY = ["kazusa/world"] as const;
+const WORLD_CACHE_KEY = unstable_serialize(WORLD_KEY);
 
+function isLive(cache: Cache<unknown>, domain: Domain): boolean {
+  const world = cache.get(WORLD_CACHE_KEY)?.data as WorldResponse | undefined;
+  return world?.capabilities[domain] === "live";
+}
+
+// Capture the live projection before each request. An SSE update that arrives
+// while HTTP is in flight wins over that request's older snapshot.
+async function loadWorld(cache: Cache<unknown>): Promise<WorldResponse> {
+  const baselineWorld = cache.get(WORLD_CACHE_KEY)?.data;
+  const baseline = useClockStore.getState().clock;
+  const world = await fetchWorld();
+  if (
+    useClockStore.getState().clock === baseline &&
+    cache.get(WORLD_CACHE_KEY)?.data === baselineWorld
+  ) {
+    setClock(
+      world.capabilities.clock === "live"
+        ? {
+            clock: world.clock,
+            offset: world.serverNow - Date.now(),
+          }
+        : null,
+    );
+  }
+  return world;
+}
+
+async function loadCharacters(
+  cache: Cache<unknown>,
+): Promise<CharacterSummary[]> {
+  const baseline = useLiveStore.getState().statuses;
+  const characters = await fetchCharacters();
+  if (isLive(cache, "characters") && isLive(cache, "status")) {
+    setStatuses(
+      characters.flatMap((c) => (c.status ? [[c.id, c.status] as const] : [])),
+      baseline,
+    );
+  }
+  return characters;
+}
+
+async function loadDesires(cache: Cache<unknown>): Promise<DesiresResponse> {
+  const baseline = useLiveStore.getState().desires;
+  const data = await fetchDesires();
+  if (isLive(cache, "desires"))
+    setDesires(Object.entries(data.records), baseline);
+  return data;
+}
+
+async function loadLocations(
+  cache: Cache<unknown>,
+): Promise<LocationsResponse> {
+  const baseline = useLiveStore.getState().locations;
+  const data = await fetchLocations();
+  if (isLive(cache, "location"))
+    setLocations(Object.entries(data.records), baseline);
+  return data;
+}
+
+/** Shared resource hooks read SWR directly; no second response cache. */
+export function useSources(): SourcesValue {
+  const { cache } = useSWRConfig();
+  const worldResource = useSWR<WorldResponse, Error>(
+    WORLD_KEY,
+    () => loadWorld(cache),
+    { revalidateOnFocus: false, revalidateIfStale: false },
+  );
+  const reachable = Boolean(worldResource.data) && !worldResource.error;
+
+  const resolved = useMemo(
+    () =>
+      resolveSources({
+        capabilities: worldResource.data?.capabilities ?? {},
+        // Keep cached resources usable during a transient revalidation error.
+        reachable: Boolean(worldResource.data),
+      }),
+    [worldResource.data?.capabilities],
+  );
+
+  return {
+    resolved,
+    reachable,
+    backendError: worldResource.error,
+    retryBackend: () => void worldResource.mutate(),
+    player: worldResource.data?.user ?? NO_PLAYER,
+    world: worldResource.data?.world,
+    worldResource,
+    probing: worldResource.isLoading && !worldResource.error,
+  };
+}
+
+export function useCharactersResource(
+  poll = false,
+): SWRResponse<CharacterSummary[], Error> {
+  const { cache } = useSWRConfig();
+  const { resolved } = useSources();
+  return useSWR<CharacterSummary[], Error>(
+    resolved.characters === "live" ? (["kazusa/characters"] as const) : null,
+    () => loadCharacters(cache),
+    {
+      revalidateOnFocus: true,
+      refreshInterval: poll ? 30_000 : 0,
+      revalidateIfStale: false,
+    },
+  );
+}
+
+export function useDesiresResource(): SWRResponse<DesiresResponse, Error> {
+  const { cache } = useSWRConfig();
+  const { resolved } = useSources();
+  return useSWR<DesiresResponse, Error>(
+    resolved.desires === "live" ? ([DESIRES_KEY] as const) : null,
+    () => loadDesires(cache),
+    { revalidateOnFocus: false, revalidateIfStale: false },
+  );
+}
+
+export function usePlacesResource(): SWRResponse<PlacesResponse, Error> {
+  const { resolved } = useSources();
+  return useSWR<PlacesResponse, Error>(
+    resolved.places === "live" ? ([PLACES_KEY] as const) : null,
+    () => fetchPlaces(),
+    { revalidateOnFocus: false, revalidateIfStale: false },
+  );
+}
+
+/** Seeds live projections from SWR and owns the one simulation ticker. */
 export function SourcesProvider({
   children,
   fallback,
@@ -62,169 +184,41 @@ export function SourcesProvider({
   children: React.ReactNode;
   fallback: React.ReactNode;
 }) {
-  const config = useKazusaConfig();
-  const chats = useChatsResource();
-  const reachable = !chats.error && !chats.isLoading;
-
-  const worldResource = useSWR<WorldResponse, Error>(
-    reachable ? (["kazusa/world"] as const) : null,
-    () => fetchWorld(),
-    { revalidateOnFocus: false },
-  );
-
-  const resolved = useMemo(
-    () =>
-      resolveSources({
-        capabilities: worldResource.data?.capabilities ?? LEGACY_CAPABILITIES,
-        reachable,
-      }),
-    [reachable, worldResource.data?.capabilities],
-  );
-
-  const liveCharacters = useSWR<CharacterSummary[], Error>(
-    resolved.characters === "live" ? (["kazusa/characters"] as const) : null,
-    () => fetchCharacters(),
-    { revalidateOnFocus: true, refreshInterval: 30_000 },
-  );
-
-  const liveDesires = useSWR<DesiresResponse, Error>(
-    resolved.desires === "live" ? ([DESIRES_KEY] as const) : null,
-    () => fetchDesires(),
-    { revalidateOnFocus: false },
-  );
-
-  // SSE `places` revalidates this when the map changes; records arrive by SSE.
-  const livePlaces = useSWR<PlacesResponse, Error>(
-    resolved.places === "live" ? ([PLACES_KEY] as const) : null,
-    () => fetchPlaces(),
-    { revalidateOnFocus: false },
-  );
-
-  const liveLocations = useSWR<LocationsResponse, Error>(
+  const { cache } = useSWRConfig();
+  const { resolved, probing } = useSources();
+  useCharactersResource(true);
+  useDesiresResource();
+  // Keep the resource mounted so map edits revalidate even on other views.
+  usePlacesResource();
+  useSWR<LocationsResponse, Error>(
     resolved.location === "live" ? ([LOCATIONS_KEY] as const) : null,
-    () => fetchLocations(),
-    { revalidateOnFocus: false },
+    () => loadLocations(cache),
+    { revalidateOnFocus: false, revalidateIfStale: false },
   );
-
-  const player = useMemo(
-    () => ({
-      id: worldResource.data?.user.id ?? config.userId,
-      name: worldResource.data?.user.name ?? config.userName,
-    }),
-    [worldResource.data?.user, config.userId, config.userName],
-  );
-
-  const characters = useMemo<readonly CharacterSummary[]>(() => {
-    if (resolved.characters === "unavailable") return [];
-    const list = liveCharacters.data ?? [];
-    if (list.some((c) => c.kind === "player" || c.id === player.id)) {
-      return list;
-    }
-    return [
-      ...list,
-      { id: player.id, name: player.name, kind: "player", aliases: [] },
-    ];
-  }, [resolved.characters, liveCharacters.data, player]);
-
-  const charactersById = useMemo(
-    () => new Map(characters.map((c) => [c.id, c])),
-    [characters],
-  );
+  useEffect(() => {
+    const timer = window.setInterval(sampleClock, 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    if (resolved.status === "live" && liveCharacters.data) {
-      const entries: Array<readonly [string, CharacterStatus]> = [];
-      for (const c of liveCharacters.data) {
-        if (c.status) entries.push([c.id, c.status]);
-      }
-      statusStore.reset(entries);
-    } else if (resolved.status === "unavailable") {
-      statusStore.reset([]);
-    }
-  }, [resolved.status, liveCharacters.data]);
+    if (resolved.status === "unavailable") setStatuses([]);
+  }, [resolved.status]);
 
   useEffect(() => {
-    if (resolved.desires === "live" && liveDesires.data) {
-      desireConfigStore.set(liveDesires.data.config);
-      desireStore.reset(Object.entries(liveDesires.data.records));
-    } else if (resolved.desires === "unavailable") {
-      desireConfigStore.set(null);
-      desireStore.reset([]);
-    }
-  }, [resolved.desires, liveDesires.data]);
+    if (resolved.desires === "unavailable") setDesires([]);
+  }, [resolved.desires]);
 
   useEffect(() => {
-    if (resolved.places === "live" && livePlaces.data) {
-      placesStore.set(buildPlaceIndex(livePlaces.data.places));
-    } else if (resolved.places === "unavailable") {
-      placesStore.set(null);
-    }
-  }, [resolved.places, livePlaces.data]);
+    if (resolved.location === "unavailable") setLocations([]);
+  }, [resolved.location]);
 
   useEffect(() => {
-    if (resolved.location === "live" && liveLocations.data) {
-      locationStore.reset(Object.entries(liveLocations.data.records));
-    } else if (resolved.location === "unavailable") {
-      locationStore.reset([]);
-    }
-  }, [resolved.location, liveLocations.data]);
-
-  useEffect(() => {
-    journalTailStore.set([]);
+    clearJournal();
   }, [resolved.timeline]);
 
   useEffect(() => {
-    if (resolved.clock === "live" && worldResource.data) {
-      clockStore.set({
-        clock: worldResource.data.clock,
-        offset: worldResource.data.serverNow - Date.now(),
-      });
-    } else if (resolved.clock === "unavailable") {
-      clockStore.set(null);
-    }
-  }, [resolved.clock, worldResource.data]);
+    if (resolved.clock === "unavailable") setClock(null);
+  }, [resolved.clock]);
 
-  const value = useMemo<SourcesValue>(
-    () => ({
-      resolved,
-      reachable,
-      backendError: chats.error,
-      retryBackend: () => void chats.mutate(),
-      player,
-      world: worldResource.data?.world,
-      characters,
-      charactersById,
-      charactersLoading:
-        resolved.characters === "live" && liveCharacters.isLoading,
-      charactersError: liveCharacters.error,
-    }),
-    [
-      resolved,
-      reachable,
-      chats.error,
-      chats.mutate,
-      player,
-      worldResource.data?.world,
-      characters,
-      charactersById,
-      liveCharacters.isLoading,
-      liveCharacters.error,
-    ],
-  );
-
-  // Hold until capabilities arrive, so no panel flashes as unavailable.
-  const probing =
-    (chats.isLoading && !chats.error) || (reachable && worldResource.isLoading);
-  if (probing) return <>{fallback}</>;
-
-  return (
-    <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>
-  );
-}
-
-export function useSources() {
-  const context = useContext(SourcesContext);
-  if (!context)
-    throw new Error("useSources must be used within SourcesProvider");
-  return context;
+  return <>{probing ? fallback : children}</>;
 }

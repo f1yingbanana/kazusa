@@ -1,73 +1,31 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback } from "react";
 import type { ClockActionPayload } from "@kazusa/client";
-import { clockStore } from "@/lib/live/state";
-import { dispatchLive } from "@/lib/registry/live";
+import {
+  setClock,
+  useClockStore,
+  type ClockAnchor,
+} from "@/lib/live/clock-state";
 import { executeClockAction } from "@/lib/source/clock/http";
 import { useSources } from "@/lib/source/provider";
 import { useAccess } from "@/hooks/use-access";
 import { MINUTE, bucket, simTimeAt } from "@/lib/time/sim";
 
-export function useClockAnchor() {
-  return useSyncExternalStore(
-    (listener) => clockStore.subscribe(listener),
-    () => clockStore.get(),
-    () => null,
-  );
+export function useClockAnchor(): ClockAnchor | null {
+  return useClockStore((state) => state.clock);
 }
 
-/*
- * One shared ticker for every `useSimNow` subscriber (D6). It samples once per
- * real second; each subscriber reads a bucketed value, so rows only re-render
- * when their resolution boundary is crossed.
- */
-let currentSimNow = 0;
-const tickListeners = new Set<() => void>();
-let timer: number | undefined;
-
-function sample() {
-  const anchor = clockStore.get();
-  currentSimNow = anchor
-    ? simTimeAt(anchor.clock, Date.now(), anchor.offset)
-    : 0;
-  for (const listener of tickListeners) listener();
-}
-
-/**
- * Sim time right now, for stamping an event (not for rendering: use
- * `useSimNow`).
- */
+/** Exact simulation time for event stamps; rendering uses bucketed selectors. */
 export function readSimNow(): number {
-  const anchor = clockStore.get();
+  const anchor = useClockStore.getState().clock;
   return anchor
     ? simTimeAt(anchor.clock, Date.now(), anchor.offset)
     : Date.now();
 }
 
-function subscribeTicker(listener: () => void) {
-  tickListeners.add(listener);
-  const unsubscribeClock = clockStore.subscribe(sample);
-  if (timer === undefined) {
-    sample();
-    timer = window.setInterval(sample, 1_000);
-  }
-  return () => {
-    tickListeners.delete(listener);
-    unsubscribeClock();
-    if (tickListeners.size === 0 && timer !== undefined) {
-      window.clearInterval(timer);
-      timer = undefined;
-    }
-  };
-}
-
-export function useSimNow(resolution = MINUTE) {
-  return useSyncExternalStore(
-    subscribeTicker,
-    () => bucket(currentSimNow, resolution),
-    () => 0,
-  );
+export function useSimNow(resolution = MINUTE): number {
+  return useClockStore((state) => bucket(state.simNow, resolution));
 }
 
 export function useClockActions() {
@@ -79,7 +37,10 @@ export function useClockActions() {
       if (!canManage || resolved.clock !== "live") return;
       try {
         const result = await executeClockAction(action);
-        dispatchLive({ type: "clock", clock: result.clock });
+        setClock({
+          clock: result.clock,
+          offset: useClockStore.getState().clock?.offset ?? 0,
+        });
       } catch (error) {
         console.error("Failed to execute clock action:", error);
       }

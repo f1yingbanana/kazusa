@@ -1,15 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import { useSources } from "../source/provider";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useSWRConfig } from "swr";
+  applyTyping,
+  clearTyping,
+  clearTypist,
+  clearUnread,
+  expireTyping,
+  receiveMessage,
+  retainMembers,
+  setStatus,
+  useRealtimeStore,
+} from "./realtime-state";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
 import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
@@ -17,47 +21,24 @@ import {
   OBSERVED_MESSAGES_KEY,
   observedChatsKey,
 } from "@/lib/source/observe/http";
-import { messagesKeyGetter } from "@/lib/source/chats/pagination";
-import { useKazusaConfig } from "@/lib/state/config-store";
 import {
   parseStreamEvent,
   type ObservedChatsResponse,
   type ChatsResponse,
   type MessageStreamEvent,
-  type MessagesResponse,
   type TypingStreamEvent,
-  type StreamEvent,
 } from "@kazusa/client";
 import { unstable_serialize } from "swr/infinite";
 import { dispatchLive } from "@/lib/registry/live";
 import { fetchTimeline } from "@/lib/source/timeline/http";
-import { statusStore } from "./state";
+import { mergeJournal, setStatuses } from "./state";
 import {
-  appendMessageToPages,
+  appendCachedMessage,
   chatsKey,
-  markReadInPages,
+  markCachedMessagesRead,
   messagesCacheKey,
   updateChatPreview,
-} from "@/hooks/use-chats";
-
-export type ConnectionStatus = "connecting" | "open" | "error";
-
-export type Typist = {
-  senderId: string;
-  senderName: string;
-  /** Typed into a chat, or said aloud face to face. */
-  mode: TypingStreamEvent["mode"];
-  expiresAt?: number;
-};
-
-type RealtimeContextValue = {
-  status: ConnectionStatus;
-  typingByChat: Record<string, Typist[]>;
-  unreadByChat: Record<string, number>;
-  setActiveChat: (chatId: string | null) => void;
-};
-
-const RealtimeContext = createContext<RealtimeContextValue | null>(null);
+} from "../source/chats/cache";
 
 /**
  * One SSE connection per scope; observer event types fan out through the live
@@ -83,91 +64,69 @@ const RETRY_MIN_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
 /** Huddles form and dissolve often, and this list costs a read of all history. */
 const OBSERVED_REFRESH_MS = 2_000;
-const JOURNAL_CATCH_UP = 200;
-
-function parseEvent(raw: string): StreamEvent | null {
-  return parseStreamEvent(raw);
-}
+const JOURNAL_RECENT_LIMIT = 200;
+const TIMELINE_PAGES_PREFIX = unstable_serialize(() => ["kazusa/timeline"]);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-  const config = useKazusaConfig();
-  const { mutate } = useSWRConfig();
-  const [status, setStatus] = useState<ConnectionStatus>("connecting");
-  const [typingByChat, setTypingByChat] = useState<Record<string, Typist[]>>(
-    {},
+  const { cache, mutate } = useSWRConfig();
+  const { resolved, player } = useSources();
+  const userId = player.id;
+  const { mutate: refreshJournal } = useSWR(
+    resolved.timeline === "live" ? (["kazusa/timeline/live"] as const) : null,
+    () => fetchTimeline({ limit: JOURNAL_RECENT_LIMIT }),
+    {
+      revalidateOnFocus: false,
+      onSuccess: ({ events }) => {
+        mergeJournal(events);
+      },
+    },
   );
-  const [unreadByChat, setUnreadByChat] = useState<Record<string, number>>({});
-  const activeChatRef = useRef<string | null>(null);
-
-  const setActiveChat = useCallback((chatId: string | null) => {
-    activeChatRef.current = chatId;
-    if (chatId) {
-      setUnreadByChat((current) => {
-        if (!current[chatId]) return current;
-        const next = { ...current };
-        delete next[chatId];
-        return next;
-      });
-    }
-  }, []);
+  const hasTypists = useRealtimeStore((state) =>
+    Object.values(state.typingByChat).some((list) => list.length > 0),
+  );
 
   useEffect(() => {
-    const { userId } = config;
+    let disposed = false;
     let source: EventSource | null = null;
     let retryTimer: number | undefined;
     let retryDelay = RETRY_MIN_MS;
     let observedRefresh: number | undefined;
     setStatus("connecting");
+    clearUnread();
     const seenMessages = new Set<string>();
-    setTypingByChat({});
+    clearTyping();
 
-    const clearTypist = (chatId: string, senderId: string) => {
-      setTypingByChat((current) => {
-        const list = current[chatId];
-        if (!list?.some((t) => t.senderId === senderId)) return current;
-        return {
-          ...current,
-          [chatId]: list.filter((t) => t.senderId !== senderId),
-        };
-      });
-    };
-
-    const handleMessage = (event: MessageStreamEvent) => {
-      const { chatId, message } = event;
-      if (seenMessages.has(message.id)) return;
-      seenMessages.add(message.id);
+    const rememberMessage = (id: string): boolean => {
+      if (seenMessages.has(id)) return false;
+      seenMessages.add(id);
       if (seenMessages.size > 1000) {
         const oldest = seenMessages.values().next().value;
         if (oldest !== undefined) seenMessages.delete(oldest);
       }
+      return true;
+    };
+
+    const handleMessage = (event: MessageStreamEvent) => {
+      const { chatId, message } = event;
+      if (!rememberMessage(message.id)) return;
       clearTypist(chatId, message.senderId);
 
-      void mutate(
-        messagesCacheKey(config, chatId),
-        (pages?: MessagesResponse[]) => appendMessageToPages(pages, message),
-        { revalidate: false },
-      );
+      void appendCachedMessage(mutate, chatId, message);
 
       let knownChat = true;
       void mutate(
-        chatsKey(config),
+        chatsKey(),
         (current?: ChatsResponse) => {
-          if (current && !current.chats.some((chat) => chat.id === chatId)) {
-            knownChat = false;
-          }
+          knownChat =
+            current?.chats.some((chat) => chat.id === chatId) ?? false;
           return updateChatPreview(current, chatId, message);
         },
         { revalidate: false },
       ).then(() => {
-        if (!knownChat) void mutate(chatsKey(config));
+        if (!disposed && !knownChat) void mutate(chatsKey());
       });
 
-      if (message.senderId !== userId && activeChatRef.current !== chatId) {
-        setUnreadByChat((current) => ({
-          ...current,
-          [chatId]: (current[chatId] ?? 0) + 1,
-        }));
-      }
+      receiveMessage(chatId, message.senderId !== userId);
     };
 
     const refreshObserved = () => {
@@ -177,63 +136,32 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }, OBSERVED_REFRESH_MS);
     };
 
-    const observedMessagesKey = (chatId: string) =>
-      unstable_serialize(
-        messagesKeyGetter(config, chatId, OBSERVED_MESSAGES_KEY),
-      );
-
     /** Someone else's chat: no unread, nothing of the player's changes. */
     const handleObservedMessage = ({ chatId, message }: MessageStreamEvent) => {
-      if (seenMessages.has(message.id)) return;
-      seenMessages.add(message.id);
+      if (!rememberMessage(message.id)) return;
       clearTypist(chatId, message.senderId);
-      void mutate(
-        observedMessagesKey(chatId),
-        (pages?: MessagesResponse[]) => appendMessageToPages(pages, message),
-        { revalidate: false },
-      );
+      void appendCachedMessage(mutate, chatId, message, OBSERVED_MESSAGES_KEY);
       let knownChat = true;
       void mutate(
         observedChatsKey(),
         (current?: ObservedChatsResponse) => {
-          if (current && !current.chats.some((chat) => chat.id === chatId)) {
-            knownChat = false;
-          }
+          knownChat =
+            current?.chats.some((chat) => chat.id === chatId) ?? false;
           return updateChatPreview(current, chatId, message);
         },
         { revalidate: false },
       ).then(() => {
-        if (!knownChat) refreshObserved();
+        if (!disposed && !knownChat) refreshObserved();
       });
     };
 
     const handleTyping = (event: TypingStreamEvent) => {
       if (event.senderId === userId) return;
-      if (!event.isTyping) {
-        clearTypist(event.chatId, event.senderId);
-        return;
-      }
-      setTypingByChat((current) => {
-        const list = (current[event.chatId] ?? []).filter(
-          (t) => t.senderId !== event.senderId,
-        );
-        return {
-          ...current,
-          [event.chatId]: [
-            ...list,
-            {
-              senderId: event.senderId,
-              senderName: event.senderName,
-              mode: event.mode,
-              expiresAt: event.expiresAt,
-            },
-          ],
-        };
-      });
+      applyTyping(event);
     };
 
     const onEvent = (raw: MessageEvent<string>) => {
-      const data = parseEvent(raw.data);
+      const data = parseStreamEvent(raw.data);
       if (!data) return;
       switch (data.type) {
         case "message":
@@ -243,27 +171,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           handleTyping(data);
           break;
         case "read":
-          void mutate(
-            messagesCacheKey(config, data.chatId),
-            (pages?: MessagesResponse[]) => markReadInPages(pages, data),
-            { revalidate: false },
-          );
+          void markCachedMessagesRead(mutate, data);
           break;
         case "chats":
-          void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
-            if (!current) return;
+          void mutate<ChatsResponse>(chatsKey()).then((current) => {
+            if (disposed || !current) return;
             // Only the player's chats are checked; others' typists stay.
-            setTypingByChat((typing) => ({
-              ...typing,
-              ...Object.fromEntries(
-                current.chats.map((chat) => [
-                  chat.id,
-                  (typing[chat.id] ?? []).filter((person) =>
-                    chat.members.includes(person.senderId),
-                  ),
-                ]),
-              ),
-            }));
+            retainMembers(current.chats);
           });
           break;
         case "places":
@@ -276,11 +190,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           else if (data.event.type === "typing") handleTyping(data.event);
           else refreshObserved();
           break;
-        case "connected":
-          setTypingByChat({});
+        case "connected": {
+          clearTyping();
           for (const typing of data.typing) handleTyping(typing);
-          if ("statuses" in data && data.statuses) {
-            statusStore.reset(Object.entries(data.statuses));
+          if (data.statuses) {
+            setStatuses(Object.entries(data.statuses));
           }
           // Desire records and the map changed while disconnected are only in the
           // snapshot.
@@ -288,22 +202,35 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());
-          // Journal events are not replayed, so read what the stream missed.
-          void fetchTimeline({ limit: JOURNAL_CATCH_UP }).then(
-            ({ events }) => {
-              for (const event of events)
-                dispatchLive({ type: "journal", event });
-            },
-            () => {},
+          // Refresh the recent window; durable history remains in SWR.
+          void refreshJournal();
+          void mutate(
+            (key) => Array.isArray(key) && key[0] === "kazusa/timeline/recent",
           );
-          if (activeChatRef.current)
-            void mutate(observedMessagesKey(activeChatRef.current));
+          // Invalidate individual history pages before revalidating their
+          // aggregates, which otherwise reuse those pages without fetching.
+          // The aggregate keeps the rendered history visible during the read.
+          void mutate(
+            (key) => Array.isArray(key) && key[0] === "kazusa/timeline",
+            undefined,
+            { revalidate: false },
+          ).then(() => {
+            if (disposed) return;
+            for (const key of cache.keys()) {
+              if (key.startsWith(TIMELINE_PAGES_PREFIX)) void mutate(key);
+            }
+          });
+          const activeChat = useRealtimeStore.getState().activeChat;
+          if (activeChat)
+            void mutate(messagesCacheKey(activeChat, OBSERVED_MESSAGES_KEY));
           // Always refresh: messages can arrive between the initial GET and SSE.
-          void mutate<ChatsResponse>(chatsKey(config)).then((current) => {
+          void mutate<ChatsResponse>(chatsKey()).then((current) => {
+            if (disposed) return;
             for (const chat of current?.chats ?? [])
-              void mutate(messagesCacheKey(config, chat.id));
+              void mutate(messagesCacheKey(chat.id));
           });
           break;
+        }
         default:
           dispatchLive(data);
       }
@@ -313,6 +240,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const disconnect = () => {
       if (!source) return;
       for (const name of eventNames) source.removeEventListener(name, onEvent);
+      source.onopen = null;
+      source.onerror = null;
       source.close();
       source = null;
     };
@@ -320,7 +249,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // (e.g. the proxy's 502 while the Gateway restarts) closes it for good, so
     // reopen it ourselves with backoff.
     const connect = () => {
+      if (disposed || source) return;
+      window.clearTimeout(retryTimer);
       retryTimer = undefined;
+      if (!navigator.onLine) {
+        setStatus("error");
+        return;
+      }
+      setStatus("connecting");
       let next: EventSource;
       try {
         next = new EventSource(eventsUrl());
@@ -334,67 +270,53 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setStatus("open");
       };
       next.onerror = () => {
-        setTypingByChat({});
-        if (next.readyState !== EventSource.CLOSED) {
+        clearTyping();
+        if (next.readyState !== EventSource.CLOSED && navigator.onLine) {
           setStatus("connecting");
           return;
         }
         setStatus("error");
         disconnect();
-        retryTimer = window.setTimeout(connect, retryDelay);
-        retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+        if (navigator.onLine) {
+          retryTimer = window.setTimeout(connect, retryDelay);
+          retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+        }
       };
       for (const name of eventNames) next.addEventListener(name, onEvent);
     };
+    const onOffline = () => {
+      window.clearTimeout(retryTimer);
+      retryTimer = undefined;
+      disconnect();
+      clearTyping();
+      setStatus("error");
+    };
+    const onOnline = () => {
+      retryDelay = RETRY_MIN_MS;
+      connect();
+    };
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
     connect();
 
     return () => {
+      disposed = true;
+      clearTyping();
+      setStatus("connecting");
       window.clearTimeout(retryTimer);
       window.clearTimeout(observedRefresh);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
       disconnect();
     };
     // Only the player changes what the stream means; a new object identity must not reconnect.
-  }, [config.userId, mutate]);
-
-  const hasTypists = Object.values(typingByChat).some(
-    (list) => list.length > 0,
-  );
+  }, [userId, cache, mutate, refreshJournal]);
 
   useEffect(() => {
     if (!hasTypists) return;
-    const interval = window.setInterval(() => {
-      const now = Date.now();
-      setTypingByChat((current) => {
-        let changed = false;
-        const next: Record<string, Typist[]> = {};
-        for (const [chatId, list] of Object.entries(current)) {
-          const alive = list.filter(
-            (t) => t.expiresAt === undefined || t.expiresAt > now,
-          );
-          if (alive.length !== list.length) changed = true;
-          if (alive.length) next[chatId] = alive;
-        }
-        return changed ? next : current;
-      });
-    }, 1000);
+    const interval = window.setInterval(() => expireTyping(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, [hasTypists]);
 
-  const value = useMemo(
-    () => ({ status, typingByChat, unreadByChat, setActiveChat }),
-    [status, typingByChat, unreadByChat, setActiveChat],
-  );
-
-  return (
-    <RealtimeContext.Provider value={value}>
-      {children}
-    </RealtimeContext.Provider>
-  );
-}
-
-export function useRealtime() {
-  const context = useContext(RealtimeContext);
-  if (!context)
-    throw new Error("useRealtime must be used within RealtimeProvider");
-  return context;
+  return <>{children}</>;
 }

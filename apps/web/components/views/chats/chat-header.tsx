@@ -19,11 +19,11 @@ import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
 import { useSelection } from "@/hooks/use-selection";
 import { formatTypingLabel } from "@/lib/format";
-import type { Typist } from "@/lib/live/realtime-provider";
+import type { Typist } from "@/lib/live/realtime-state";
 import { chatSubject, isOneOnOne, listNames } from "@/lib/source/chats/display";
 import type { Chat, ChatInfo } from "@/lib/source/chats/types";
 import { sameEntity, type EntityRef } from "@/lib/state/entity-ref";
-import { requestInspector } from "@/lib/state/inspector-request";
+import { requestInspector } from "@/lib/state/ui-store";
 import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 

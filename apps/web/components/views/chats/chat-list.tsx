@@ -36,7 +36,7 @@ import { messagePreview } from "@/lib/source/chats/display";
 import type { Chat, ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ChatAvatar } from "./chat-avatar";
-import { useRealtime, type Typist } from "@/lib/live/realtime-provider";
+import { useRealtimeStore, useTyping } from "@/lib/live/realtime-state";
 
 export function ChatList({
   chats,
@@ -60,7 +60,6 @@ export function ChatList({
   /** Something follows this list, so an empty one needn't fill the panel. */
   quietWhenEmpty?: boolean;
 }) {
-  const { typingByChat, unreadByChat } = useRealtime();
   const { canPlay } = useAccess();
   const simNow = useSimNow();
 
@@ -131,8 +130,6 @@ export function ChatList({
       userId={userId}
       nameOf={nameOf}
       isActive={chat.id === selectedChatId}
-      typists={typingByChat[chat.id] ?? []}
-      unread={unreadByChat[chat.id] ?? 0}
       simNow={simNow}
       onSelect={onSelect}
     />
@@ -202,8 +199,7 @@ export function ChatRow({
   userId,
   nameOf,
   isActive,
-  typists,
-  unread,
+  observed = false,
   simNow,
   onSelect,
 }: {
@@ -212,11 +208,14 @@ export function ChatRow({
   userId: string;
   nameOf: (id: string) => string;
   isActive: boolean;
-  typists: readonly Typist[];
-  unread: number;
+  observed?: boolean;
   simNow: number;
   onSelect: (chatId: string) => void;
 }) {
+  const typists = useTyping(chat.id);
+  const unread = useRealtimeStore((state) =>
+    observed ? 0 : (state.unreadByChat[chat.id] ?? 0),
+  );
   const preview =
     typists.length > 0
       ? `${typists[0].senderName} is ${typists[0].mode}…`

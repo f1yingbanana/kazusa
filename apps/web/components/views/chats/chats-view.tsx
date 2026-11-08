@@ -17,14 +17,12 @@ import { useChatActions, useChats } from "@/hooks/use-chats";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
-import { useRealtime } from "@/lib/live/realtime-provider";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { setActiveChat } from "@/lib/live/realtime-state";
 import { chatSubject } from "@/lib/source/chats/display";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
-import {
-  keepsLinkedSelection,
-  markQuietSelection,
-} from "@/lib/state/inspector-request";
-import { useKazusaConfig } from "@/lib/state/config-store";
+import { keepsLinkedSelection, markQuietSelection } from "@/lib/state/ui-store";
+import { useSources } from "@/lib/source/provider";
 import { ChatView } from "./chat-view";
 import { ChatsPanel } from "./chats-panel";
 import { ObservedChatView } from "./observed-chat-view";
@@ -40,12 +38,12 @@ import { ObservedChatView } from "./observed-chat-view";
  * read-only. `chats.msg` deep-link highlighting is on the roadmap.
  */
 export function ChatsView() {
-  const config = useKazusaConfig();
+  const docked = useMediaQuery("(min-width: 1024px)");
+  const { player } = useSources();
   const { canPlay, isLoading: isAccessLoading } = useAccess();
   const { chats } = useChats();
   const { byId } = useCharacters();
   const { createChat } = useChatActions();
-  const { setActiveChat } = useRealtime();
   const [queryState, setParams] = useQueryStates({
     "chats.id": chatsParsers["chats.id"],
     "chats.dm": chatsParsers["chats.dm"],
@@ -55,7 +53,7 @@ export function ChatsView() {
   const chatId = queryState["chats.id"];
   const dmTarget = queryState["chats.dm"];
   const talkTarget = queryState["chats.talk"];
-  const player = usePlayer();
+  const position = usePlayer();
   const places = usePlaces();
   const draft = useDraftChat();
 
@@ -67,13 +65,14 @@ export function ChatsView() {
 
   useEffect(() => {
     setActiveChat(open?.id ?? null);
-  }, [open?.id, setActiveChat]);
+    return () => setActiveChat(null);
+  }, [open?.id]);
 
   // Opening a chat, or coming back to Chats with one open, points the inspector
   // at it (the partner of a DM), whatever was selected before; picking
   // something else afterwards sticks. A page loaded from a link that names a
   // selection too keeps it.
-  const subject = open ? chatSubject(open, config.userId) : null;
+  const subject = open ? chatSubject(open, player.id) : null;
   const subjectKey = subject ? serializeEntityRef(subject) : null;
   const selParam = queryState["sel"];
   const followed = useRef<string | null>(null);
@@ -107,7 +106,7 @@ export function ChatsView() {
         chat.type === "direct" &&
         chat.members.includes(dmTarget) &&
         chat.members.every(
-          (member) => member === dmTarget || member === config.userId,
+          (member) => member === dmTarget || member === player.id,
         ),
     );
     if (existing) {
@@ -134,7 +133,7 @@ export function ChatsView() {
   }, [
     dmTarget,
     chats,
-    config.userId,
+    player.id,
     byId,
     createChat,
     setParams,
@@ -157,7 +156,7 @@ export function ChatsView() {
     const existing = chats.find(
       (chat) =>
         chat.type === "huddle" &&
-        chat.placeId === player.placeId &&
+        chat.placeId === position.placeId &&
         chat.members.includes(talkTarget),
     );
     if (existing) {
@@ -174,10 +173,10 @@ export function ChatsView() {
     const next = createChat({
       type: "huddle",
       name:
-        (player.placeId && places?.byId.get(player.placeId)?.name) ??
+        (position.placeId && places?.byId.get(position.placeId)?.name) ??
         "In person",
       members: [talkTarget],
-      ...(player.placeId ? { placeId: player.placeId } : {}),
+      ...(position.placeId ? { placeId: position.placeId } : {}),
     });
     setDraftChat(next);
     void setParams(
@@ -187,7 +186,7 @@ export function ChatsView() {
   }, [
     talkTarget,
     chats,
-    player.placeId,
+    position.placeId,
     places,
     createChat,
     setParams,
@@ -223,24 +222,20 @@ export function ChatsView() {
     );
   }
 
+  if (!docked) return <ChatsPanel />;
+
   return (
-    <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 flex-1 flex-col lg:hidden">
-        <ChatsPanel />
-      </div>
-      <Empty className="hidden border-none lg:flex">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <MessagesSquareIcon />
-          </EmptyMedia>
-          <EmptyTitle>Pick a conversation</EmptyTitle>
-          <EmptyDescription>
-            Choose one from the list, or open a character and choose Message.
-            Chats you aren&apos;t in open read-only, and nobody in them can
-            tell.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    </div>
+    <Empty className="border-none">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <MessagesSquareIcon />
+        </EmptyMedia>
+        <EmptyTitle>Pick a conversation</EmptyTitle>
+        <EmptyDescription>
+          Choose one from the list, or open a character and choose Message.
+          Chats you aren&apos;t in open read-only, and nobody in them can tell.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

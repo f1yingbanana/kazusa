@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import type {
@@ -9,7 +9,7 @@ import type {
   TimelineResponse,
 } from "@kazusa/client";
 import { mergeNewestFirst } from "@/lib/live/journal";
-import { journalTailStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
 import { fetchTimeline } from "@/lib/source/timeline/http";
 import {
   matchesTimelineQuery,
@@ -31,19 +31,8 @@ function toQuery(filters: TimelineFilters): TimelineQuery {
   };
 }
 
-function useTimelineFetcher() {
-  const { resolved } = useSources();
-  const fetcher = (query: TimelineQuery): Promise<TimelineResponse> =>
-    fetchTimeline(query);
-  return { source: resolved.timeline, fetcher };
-}
-
 function useTail(query: TimelineQuery) {
-  const tail = useSyncExternalStore(
-    (listener) => journalTailStore.subscribe(listener),
-    () => journalTailStore.get(),
-    () => [],
-  );
+  const tail = useLiveStore((state) => state.journalTail);
   return useMemo(
     () => tail.filter((event) => matchesTimelineQuery(event, query)),
     [tail, query],
@@ -52,28 +41,26 @@ function useTail(query: TimelineQuery) {
 
 /** History pages (`before`, newest-first) merged with the live tail. */
 export function useTimeline(filters: TimelineFilters) {
-  const { source, fetcher } = useTimelineFetcher();
+  const { resolved } = useSources();
+  const source = resolved.timeline;
   const query = useMemo(() => toQuery(filters), [filters]);
-  const filterKey = JSON.stringify(query);
 
   const { data, error, isLoading, size, setSize, isValidating } =
     useSWRInfinite<TimelineResponse, Error>(
       (index: number, previous: TimelineResponse | null) => {
         if (source === "unavailable") return null;
-        if (index === 0)
-          return ["kazusa/timeline", source, filterKey, null] as const;
+        if (index === 0) return ["kazusa/timeline", query, null] as const;
         if (!previous?.hasMore || previous.nextCursor === undefined)
           return null;
-        return [
-          "kazusa/timeline",
-          source,
-          filterKey,
-          previous.nextCursor,
-        ] as const;
+        return ["kazusa/timeline", query, previous.nextCursor] as const;
       },
-      ([, , , before]: readonly [string, string, string, number | null]) =>
-        fetcher({
-          ...query,
+      ([, pageQuery, before]: readonly [
+        string,
+        TimelineQuery,
+        number | null,
+      ]) =>
+        fetchTimeline({
+          ...pageQuery,
           before: typeof before === "number" ? before : undefined,
           limit: TIMELINE_PAGE_SIZE,
         }),
@@ -89,12 +76,15 @@ export function useTimeline(filters: TimelineFilters) {
     () => mergeNewestFirst(tail, history),
     [tail, history],
   );
-  const hasMore = Boolean(data?.[data.length - 1]?.hasMore);
+  const lastPage = data?.[data.length - 1];
+  const hasMore = Boolean(
+    lastPage?.hasMore && lastPage.nextCursor !== undefined,
+  );
   const isLoadingMore = isValidating && size > (data?.length ?? 0);
 
   return {
     events,
-    error: error,
+    error,
     isLoading,
     hasMore,
     isLoadingMore,
@@ -109,21 +99,21 @@ export function useRecentEvents(
   limit: number,
   kinds: readonly JournalKind[],
 ) {
-  const { source, fetcher } = useTimelineFetcher();
-  const kindsKey = kinds.join(",");
+  const { resolved } = useSources();
+  const source = resolved.timeline;
   const query = useMemo(
     () =>
       toQuery({
         actors: [actorId],
-        kinds: kindsKey.split(",") as JournalKind[],
+        kinds,
       }),
-    [actorId, kindsKey],
+    [actorId, kinds],
   );
   const { data, isLoading } = useSWR(
     source === "unavailable"
       ? null
-      : (["kazusa/timeline/recent", source, actorId, limit, kindsKey] as const),
-    () => fetcher({ ...query, limit }),
+      : (["kazusa/timeline/recent", query, limit] as const),
+    () => fetchTimeline({ ...query, limit }),
     { revalidateOnFocus: false },
   );
   const tail = useTail(query);

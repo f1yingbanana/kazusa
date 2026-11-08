@@ -1,42 +1,44 @@
-'use client'
+"use client";
 
-import { useQueryState, parseAsString } from 'nuqs'
-import { useEffect, useState } from 'react'
+import { useQueryState, parseAsString } from "nuqs";
+import { useEffect, useState } from "react";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet'
-import { Skeleton } from '@/components/ui/skeleton'
-import { useActiveView } from '@/hooks/use-active-view'
-import { useMediaQuery } from '@/hooks/use-media-query'
-import { useSelection } from '@/hooks/use-selection'
-import { RealtimeProvider } from '@/lib/live/realtime-provider'
-import { SourcesProvider } from '@/lib/source/provider'
-import { serializeEntityRef } from '@/lib/state/entity-ref'
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveView } from "@/hooks/use-active-view";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useSelection } from "@/hooks/use-selection";
+import { RealtimeProvider } from "@/lib/live/realtime-provider";
+import { SourcesProvider } from "@/lib/source/provider";
+import { serializeEntityRef } from "@/lib/state/entity-ref";
 import {
-  isQuietSelection,
-  onInspectorRequest,
+  useUiStore,
+  setSidebarOpen,
+  clearInspectorRequest,
   settleQuietSelection,
-} from '@/lib/state/inspector-request'
-import { onSidebarRequest } from '@/lib/state/sidebar-request'
-import { CommandPalette } from './command-palette'
-import { Inspector } from './inspector'
-import { SectionRail, SectionTabs } from './section-nav'
-import { Stage } from './stage'
-import { StatusBar } from './status-bar'
-import { TopBar } from './top-bar'
+} from "@/lib/state/ui-store";
+import { syncPreferences } from "@/lib/state/preferences-store";
+import { CommandPalette } from "./command-palette";
+import { Inspector } from "./inspector";
+import { SectionRail, SectionTabs } from "./section-nav";
+import { Stage } from "./stage";
+import { StatusBar } from "./status-bar";
+import { TopBar } from "./top-bar";
 
 export function Shell() {
+  useEffect(syncPreferences, []);
   return (
     <SourcesProvider fallback={<ShellSkeleton />}>
       <RealtimeProvider>
         <Layout />
       </RealtimeProvider>
     </SourcesProvider>
-  )
+  );
 }
 
 /**
@@ -46,41 +48,45 @@ export function Shell() {
  * bar.
  */
 function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const [selection, select] = useSelection()
-  const active = useActiveView()
-  const [view] = useQueryState('view', parseAsString)
-  const wide = useMediaQuery('(min-width: 1280px)')
-  const Sidebar = active.sidebar
+  const sidebarOpen = useUiStore((state) => state.sidebarOpen);
+  const inspectorRequested = useUiStore((state) => state.inspectorRequested);
+  const quietKey = useUiStore((state) => state.quietKey);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [selection, select] = useSelection();
+  const active = useActiveView();
+  const [view] = useQueryState("view", parseAsString);
+  const docked = useMediaQuery("(min-width: 1024px)");
+  const wide = useMediaQuery("(min-width: 1280px)");
+  const Sidebar = active.sidebar;
 
   // Narrow screens: the inspector sheet opens on a new selection (unless it was
   // made quietly), closes when a link changes the view (keeping the
   // selection), and dismissing it clears it.
-  const selKey = selection ? serializeEntityRef(selection) : null
-  const [sheetOpen, setSheetOpen] = useState(Boolean(selKey))
-  const [seen, setSeen] = useState({ selKey, view })
+  const selKey = selection ? serializeEntityRef(selection) : null;
+  const [sheetOpen, setSheetOpen] = useState(Boolean(selKey));
+  const [seen, setSeen] = useState({ selKey, view });
   if (seen.selKey !== selKey || seen.view !== view) {
-    setSeen({ selKey, view })
+    setSeen({ selKey, view });
     setSheetOpen(
-      seen.selKey !== selKey
-        ? Boolean(selKey) && !isQuietSelection(selKey)
-        : false,
-    )
+      seen.selKey !== selKey ? Boolean(selKey) && selKey !== quietKey : false,
+    );
   }
-  useEffect(() => settleQuietSelection(selKey), [selKey])
-  useEffect(() => onInspectorRequest(() => setSheetOpen(true)), [])
-  useEffect(() => onSidebarRequest(() => setSidebarOpen(true)), [])
+  useEffect(() => settleQuietSelection(selKey), [selKey]);
+  useEffect(() => {
+    if (!inspectorRequested) return;
+    setSheetOpen(true);
+    clearInspectorRequest();
+  }, [inspectorRequested]);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <TopBar onOpenPalette={() => setPaletteOpen(true)} />
       <div className="flex min-h-0 flex-1">
         <SectionRail onOpenPalette={() => setPaletteOpen(true)} />
-        {Sidebar ? (
+        {Sidebar && docked ? (
           <aside
             aria-label={`${active.label} sidebar`}
-            className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex"
+            className="flex w-72 shrink-0 flex-col border-r bg-sidebar"
           >
             <Sidebar key={active.id} />
           </aside>
@@ -88,17 +94,19 @@ function Layout() {
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage />
         </main>
-        <aside
-          aria-label="Inspector"
-          className="hidden w-80 shrink-0 flex-col border-l xl:flex"
-        >
-          <Inspector />
-        </aside>
+        {wide ? (
+          <aside
+            aria-label="Inspector"
+            className="flex w-80 shrink-0 flex-col border-l"
+          >
+            <Inspector />
+          </aside>
+        ) : null}
       </div>
       <SectionTabs />
       <StatusBar />
 
-      {Sidebar ? (
+      {Sidebar && !docked ? (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent
             side="left"
@@ -120,7 +128,7 @@ function Layout() {
       <Sheet
         open={!wide && selection !== null && sheetOpen}
         onOpenChange={(open) => {
-          if (!open) void select(null)
+          if (!open) void select(null);
         }}
       >
         <SheetContent
@@ -140,7 +148,7 @@ function Layout() {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
-  )
+  );
 }
 
 function ShellSkeleton() {
@@ -168,5 +176,5 @@ function ShellSkeleton() {
         <div className="flex-1" />
       </div>
     </div>
-  )
+  );
 }

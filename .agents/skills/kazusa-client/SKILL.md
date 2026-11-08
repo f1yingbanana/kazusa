@@ -55,17 +55,17 @@ built yet.
 
 **Foundations (built)**
 
-| Piece                       | Where                                                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| --------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Read-model schemas          | `packages/client/src/index.ts`                                       | `WorldResponse`, `ClockState`, `ClockActionPayload`, `CharacterSummary`/`Detail`, `CharacterStatus`, `TaskSummary`, `DesiresConfig`/`DesireRecord`/`DesiresResponse`, `JournalEvent` (9 kinds, incl. `attention.decided`, `location.noticed`), `Place`/`PlacesResponse`, `LocationRecord`/`Trip`/`LocationsResponse`, `TimelineQuery`/`Response`/`Histogram`, observer SSE events, `parseStreamEvent`. All marked PROPOSED until the plugin serves them.                                                                                                                          |
-| Setup guide                 | `components/setup/`, `lib/setup/`, `app/setup/route.ts`              | First-run questions that only ask what is missing. The provider key can be skipped (with a warning); a keyless start lands on Settings → Models instead of the admin's chat. Lists the worlds in `apps/kazusa/world-sources.json` by their `package.json` alone, downloads the one picked into `worlds/<id>` (`app/setup/world/route.ts`, which answers with its cast), copies it to `world/`, then lands in the system agent's chat once the plugin's `welcome` has opened it. `app/reveal/route.ts` shows the world's two config files in the file manager (Settings → Models). |
-| Directory layout (§6)       | `apps/web`                                                           | The atomic move is done. `components/kazusa/*`, `lib/kazusa/*` and `hooks/use-kazusa.ts` no longer exist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Capability resolution (D10) | `lib/source/capabilities.ts`                                         | Resolves each domain on its own to live or unavailable. Capabilities come from `LEGACY_CAPABILITIES` (`characters`, `chats` = live) because `/kazusa/world` doesn't exist yet.                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Live store                  | `lib/live/{store,state,journal}.ts`                                  | Keyed external store (`useSyncExternalStore`). Status/clock/journal-tail singletons. Journal seq gap detection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Registries                  | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}` | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock`/`desires`/`location` through `registry/live.ts`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| URL state                   | `hooks/use-url-state.ts`, `lib/state/entity-ref.ts`                  | `useNavigate` uses the native History API (`pushState`/`replaceState`), which Next syncs into `useSearchParams` with no server round trip; a router navigation took ~0.5 s and showed the old state meanwhile. `view`, `sel` (incl. `place:<id>`), `world.by` (`place` is the default when places resolve), `world.in` (`place:<id>`, `__transit`, `__unplaced`), `world.kind`, `world.as` (`map`, `list`), `world.plane`, `tl.actors`, `tl.kinds`, `tl.watch`, `chats.id`, `chats.dm`, `chats.talk`.                                                                             |
-| Sim time                    | `lib/time/sim.ts`, `hooks/use-clock.ts`                              | Anchor interpolation, formatting, speed labels.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Tests                       | `lib/**/*.test.ts`                                                   | Sim time, EntityRef, capabilities, live store, journal gaps, grouping, pagination.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Piece                       | Where                                                                           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read-model schemas          | `packages/client/src/index.ts`                                                  | `WorldResponse`, `ClockState`, `ClockActionPayload`, `CharacterSummary`/`Detail`, `CharacterStatus`, `TaskSummary`, `DesiresConfig`/`DesireRecord`/`DesiresResponse`, `JournalEvent` (incl. `attention.decided`, `location.noticed`), `Place`/`PlacesResponse`, `LocationRecord`/`Trip`/`LocationsResponse`, `TimelineQuery`/`Response`/`Histogram`, observer SSE events, `parseStreamEvent`. Live resources are validated at the fetch boundary; deferred endpoints are tracked below.                                                                                           |
+| Setup guide                 | `components/setup/`, `lib/setup/`, `app/setup/route.ts`                         | First-run questions that only ask what is missing. The provider key can be skipped (with a warning); a keyless start lands on Settings → Models instead of the admin's chat. Lists the worlds in `apps/kazusa/world-sources.json` by their `package.json` alone, downloads the one picked into `worlds/<id>` (`app/setup/world/route.ts`, which answers with its cast), copies it to `world/`, then lands in the system agent's chat once the plugin's `welcome` has opened it. `app/reveal/route.ts` shows the world's two config files in the file manager (Settings → Models). |
+| Directory layout (§6)       | `apps/web`                                                                      | The atomic move is done. `components/kazusa/*`, `lib/kazusa/*` and `hooks/use-kazusa.ts` no longer exist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Capability resolution (D10) | `lib/source/capabilities.ts`                                                    | Resolves each domain to live or unavailable from `GET /kazusa/world`. Missing capabilities are unavailable; no legacy capability defaults.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Live store                  | `lib/live/{state,clock-state,realtime-state,journal}.ts`                        | Zustand stores with per-id selectors for status, desires, locations, typing and unread counts. Isolated clock projection and a bounded recent journal tail. SWR owns resource caches and reconnect revalidation.                                                                                                                                                                                                                                                                                                                                                                  |
+| Registries                  | `lib/registry/{views,inspector,status,timeline-kinds,live,entities}`            | Every shell surface iterates a registry. The SSE provider sends `status`/`journal`/`clock`/`desires`/`location` through `registry/live.ts`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| URL state                   | `hooks/use-selection.ts`, feature `search-params.ts`, `lib/state/entity-ref.ts` | nuqs owns typed query state through the root `NuqsAdapter` (`history: "push"`, `shallow: true`, `scroll: false`). Features declare their own parsers and batch related navigation with `useQueryStates`; `useSelection` shares the inspector selection. Use `history: "replace"` for changes that should not add a back-stack entry.                                                                                                                                                                                                                                              |
+| Sim time                    | `lib/time/sim.ts`, `hooks/use-clock.ts`                                         | Anchor interpolation, formatting, speed labels.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Tests                       | `lib/**/*.test.ts`                                                              | Sim time, EntityRef, capabilities, Zustand render isolation, snapshot races, SSE reconnect, grouping, pagination and live browser flows.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 **Surfaces**
 
@@ -84,7 +84,7 @@ built yet.
 | Chats view: my chats, composer, groups. A group's people are run from the chat inspector (the header's member count opens it); there is no separate members sheet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Built (existing UI rehoused)                                                                                                                                                                                                                                                                         | `chats`: **Live**. Shows "Can't reach the Kazusa server" + Retry when the Gateway is down                                                                                                                                                                                                                                |
 | Chats view: header (`chat-header.tsx`): plain title and subtitle (DM: partner avatar opens them, task + time left; group: member names; huddle: the place as the title link over "In person · names"); member faces with presence rings, each opening that person; one action (Add people, Call people over, or Talk in person); Details (ⓘ) shows the chat's subject, pressed while shown. Opening a chat, coming back to Chats with one open, or picking the open chat again quietly selects its subject in the inspector (character for a DM or a talk not started yet, else the chat, a draft group included). The chat list and ⌘K set `chats.id` and `sel` in one change (`openChatPatch`); the view follows any other way in. Only a page loaded from a link naming both keeps its selection (`keepsLinkedSelection`, once per load)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Built                                                                                                                                                                                                                                                                                                | `status`: **Live**                                                                                                                                                                                                                                                                                                       |
 | Chats view: huddles listed first under "In person at <place>"; actions narrated as lines, not bubbles (`lib/source/chats/display.ts`, tested); Say/Do composer in huddles                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Built                                                                                                                                                                                                                                                                                                | `chats`: **Live** (`Chat.placeId`, `lastMessage.type`/`senderId`/`senderName`, `SendPayload.type`)                                                                                                                                                                                                                       |
-| Chats view: read receipts on the player's messages: one check once sent, two (accent) once every character it reached has taken it in; the icon's label says "Read 14:32", "Read by Airi · 1 of 3" or "Sent", and in huddles (bubbles and actions) "Observed by Airi 14:32" or "Not observed yet". None from people. `messageReceipt`/`receiptLabel` in `lib/source/chats/display.ts` (tested); `markReadInPages` applies SSE `read`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Built                                                                                                                                                                                                                                                                                                | `chats`: **Live** (`ChatMessage.receipts`, SSE `read`; `readAt` is when Perception showed the character's brain the message)                                                                                                                                                                                             |
+| Chats view: read receipts on the player's messages: one check once sent, two (accent) once every character it reached has taken it in; the icon's label says "Read 14:32", "Read by Airi · 1 of 3" or "Sent", and in huddles (bubbles and actions) "Observed by Airi 14:32" or "Not observed yet". None from people. `messageReceipt`/`receiptLabel` in `lib/source/chats/display.ts` (tested); `markCachedMessagesRead` applies SSE `read` to SWR pages and their aggregate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Built                                                                                                                                                                                                                                                                                                | `chats`: **Live** (`ChatMessage.receipts`, SSE `read`; `readAt` is when Perception showed the character's brain the message)                                                                                                                                                                                             |
 | Chats view: stickers, shown as the picture alone (no bubble, 128 px, `StickerImage` in `message-parts.tsx`) with their text as alt; the chat list previews "Sticker". Characters only: the player can't send one yet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Built                                                                                                                                                                                                                                                                                                | `chats`: **Live** (`ChatMessage.type: "sticker"`, `ChatMessage.sticker.url` → `GET /kazusa/sticker`)                                                                                                                                                                                                                     |
 | Chats view: message actions and screenshots, in your chats and observed ones. Hovering a sent message's row shows Copy text and Screenshot beside its bubble; on touch a long press shows them labeled above it. Screenshot opens a crop frame over the transcript (`screenshot-frame.tsx`; one dim built from `--background`, since the dark theme follows the system and `dark:` never applies): everything outside is dimmed, a handle on each edge drags it a message at a time (arrow keys too, autoscrolling at the viewport's edges), "Select up to here" at the top and foot of the screen takes it to the first or last message showing (each hides once the selection reaches there), a click on a message inside it leaves that message out (dimmed like the outside and hatched; again puts it back; rows in the frame are `role="checkbox"`, Space or Enter toggles), and Escape or Cancel leaves. Create image lays the chosen messages out again as a 400 px phone-width card (`screenshot-card.tsx`: the chat's own title bar (its name, a DM's partner's face, and the line under it, `ChatSubtitle` in `chat-header.tsx`, without typing); an absolute date; at the foot the world's credit, its name and author left and homepage right, from `WorldMeta.package`, which the plugin reads from the world's npm-style `package.json` on each `GET /kazusa/world`, else the world's title), whatever the screen they were chosen on, and draws it with `modern-screenshot` at up to 3× (`exportScale` keeps it under the canvas limit); the dialog shows the PNG itself with Save image and Copy image, or Share where the system has a share sheet. Range math in `lib/source/chats/screenshot.ts` (tested); runs, actions and stickers shared with the live list via `message-parts.tsx` | Built                                                                                                                                                                                                                                                                                                | `chats` + `observe`: **Live** (sent messages only; pending ones can't be picked)                                                                                                                                                                                                                                         |
 | Player presence: status bar "You're at <place>" (opens it); place inspector "Go here" / "You're here"; character header "Go to <place>" and "Talk in person" (same place) → `chats.talk=<id>` opens your huddle with them or a draft huddle whose first message is sent `aloud`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Built. `usePlayer()` in `hooks/use-location.ts`; moving needs `location` live                                                                                                                                                                                                                        | `location`: **Live** (`POST /kazusa/move`; the record also arrives by SSE `location`)                                                                                                                                                                                                                                    |
@@ -124,10 +124,10 @@ providers/key, providers/remove, profile, profile/save, context/settings,
 context/settings/save, wiki, wiki/page, wiki/lint, wiki/source, wiki/save,
 wiki/delete, wiki/rename), and add an http adapter under `lib/source/<domain>/`.
 
-1. `GET /kazusa/world`: **Done.** Replaced `LEGACY_CAPABILITIES` with live
-   capabilities; seeds `clockStore` from `clock`.
+1. `GET /kazusa/world`: **Done.** Supplies capabilities and player identity; its
+   SWR fetcher seeds the Zustand clock projection.
 2. `POST /kazusa/clock` + SSE `clock`: **Done.** Top-bar actions execute
-   `POST /kazusa/clock`, and SSE updates `clockStore`.
+   `POST /kazusa/clock`, and SSE updates the Zustand clock projection.
 3. `GET /kazusa/characters`, `GET /kazusa/character`: **Done.** Roster and
    Profile read real frontmatter and bodies.
 4. SSE `status` (Perception brain state + taskman + typing): **Done.** Realtime
@@ -207,8 +207,9 @@ character.
   `sequence`/`seq`, never timestamps, because the clock can be frozen.
 - The client interpolates "now" from `{ simTime, speed, updatedAt, serverNow }`,
   so it doesn't poll the clock.
-- Components subscribe through a shared `useSimNow(resolution)` ticker at minute
-  (or coarser) resolution. 300 rows must not re-render every second.
+- Components select bucketed Zustand time through `useSimNow(resolution)` at
+  minute (or coarser) resolution; `SourcesProvider` owns one sampling timer. 300
+  rows must not re-render every second.
 - Every timestamp on screen is sim time, shown in UTC like the plugin's
   `ClockSnapshot.formatted`, regardless of the viewer's timezone. That includes
   chat bubbles and list times (`lib/format.ts`). "Today"/"Yesterday" compare UTC
@@ -292,7 +293,10 @@ role.
 - **StatusBar** is a slot registry for small, global, glanceable signals.
   Anything bigger than a chip belongs elsewhere.
 - **Mobile:** the stage is full-screen, the sidebar and inspector become sheets,
-  and status items fold into a top-bar menu.
+  and status items fold into a top-bar menu. Responsive feature panels mount
+  only in their visible layout: the shell mounts the docked sidebar at `lg`, and
+  the docked inspector at `xl`; narrower layouts mount their sheets when opened.
+  Do not keep a second hidden inspector or sidebar subscribed behind CSS.
 
 UX details for each surface are in `references/ux.md`.
 
@@ -379,7 +383,6 @@ interface TimelineKind<K extends JournalKind = JournalKind> {
 /** Applies one SSE event type to client state. */
 type LiveHandler<T extends StreamEvent["type"]> = (
   event: StreamEventOf<T>,
-  ctx: LiveContext,
 ) => void;
 ```
 
@@ -393,8 +396,8 @@ To add a feature:
    SSE event if the feature has live data.
 2. Add a source domain in `lib/source/` with an `http` implementation. Declare
    it in `Domain`.
-3. Add hooks in `hooks/` (SWR for resources, the live store for high-frequency
-   state).
+3. Add hooks in `hooks/` (SWR for resources, Zustand selectors for
+   high-frequency state).
 4. Register views, sections, status items, timeline kinds and live handlers.
    Never edit shell components to mount a feature.
 5. Route private or subjective reads through `lib/lens/` selectors.
@@ -409,31 +412,73 @@ To add a feature:
 lib/source/<domain>/http.ts ── resolved per domain by capabilities (D10)
    │
    ├─ request/response resources → SWR hooks (useCharacters, useTimeline, useCharacter…)
-   └─ high-frequency live state  → lib/live/ keyed external store
-                                    (useSyncExternalStore; per-id subscriptions:
-                                     useCharacterStatus(id), useTyping(chatId))
+   └─ high-frequency live state  → lib/live/ Zustand stores
+                                    (per-id selectors: useCharacterStatus(id),
+                                     useTyping(chatId))
    │
 lib/lens/ selectors (Observer today, Player later)
    │
 registered components
 ```
 
-- **One SSE connection per scope.** `GET /kazusa/events?scope=observer` carries
-  player events plus `journal` and `status` events. A registry of `LiveHandler`s
-  dispatches each event type. No component opens its own `EventSource`.
-- **Gap-safe journal.** Journal events carry `seq`, and the `connected` event
-  reports the server's high-water `journalSeq`. On reconnect, or when the client
-  sees a gap, it catches up with `GET /kazusa/timeline?after=<lastSeq>`. SSE is
-  a notification channel; history is the durable log. This matches the messaging
-  rule.
+- **One SSE connection per tab.** `GET /kazusa/events` carries player events,
+  observer projections such as `journal` and `status`, and other chats' events
+  in an `observed` wrapper. There is no `scope` query parameter. A registry of
+  `LiveHandler`s dispatches projection events; `RealtimeProvider` handles
+  messaging and connection events. No component opens its own `EventSource`.
+- **Bounded live journal, durable history in SWR.** Journal `seq` values are
+  ordered but noncontiguous; a numeric jump does not imply a missing event. The
+  live projection retains at most 500 events and reads the latest 200 on
+  connect. Reconnect also invalidates history pages and revalidates mounted
+  infinite timelines and recent-event resources. Do not implement catch-up by
+  passing `seq` to `after`: the current backend uses simulation-time cursors.
+  Its same-timestamp pagination limitation requires a backend cursor change.
 - **Live status doesn't go through SWR arrays.** A status delta for one of 300
-  characters must not re-render the roster. The live store is seeded from the
-  `/kazusa/characters` snapshot and updated per id.
+  characters must not re-render the roster. The Zustand live projection is
+  seeded from `/kazusa/characters` and updated per id. Equal snapshot records
+  preserve their references so roster polling does not rerender every row.
 - **URL is the navigation state.** It holds `view`, `sel` (EntityRef), and each
   view's namespaced params, so deep links and back/forward work and the Timeline
   → Chats → Inspector hops stay shareable. Ephemeral UI state (hover, open
   popovers) stays in components.
-- **No fetching in `useEffect`.** Use SWR or the live store.
+- **SWR owns fetching and resource caching.** Resource hooks read their scoped
+  SWR cache directly; do not mirror responses in React contexts or Zustand.
+  `/kazusa/world` supplies capabilities and the player identity. Places and
+  desire configuration are also derived from SWR. The SWR fetchers in
+  `lib/source/provider.tsx` seed live projections after each successful read,
+  preserving per-id changes since the request began and checking that the
+  current scoped cache still enables the domain. The clock seed also checks that
+  its request baseline is current. `SourcesProvider` keeps snapshot resources
+  mounted for SSE invalidation and owns roster polling and the clock timer.
+  `RealtimeProvider` owns SSE and browser online/offline handling, and uses SWR
+  `mutate` for resource invalidation, journal refresh and synchronized writes to
+  both message pages and their infinite aggregate.
+- **Zustand owns shared client state.** `lib/live/state.ts` holds entity
+  projections and the journal tail; `lib/live/clock-state.ts` isolates the clock
+  anchor and sampled time so each tick does not evaluate entity selectors.
+  `lib/live/realtime-state.ts` holds connection, typing, active-chat and unread
+  state. `lib/state/` holds preferences (`persist`), chat drafts, and UI state
+  (sheet requests, quiet selections, session error dismissals). Stores contain
+  data; actions are named module exports calling `setState`/`getState`. Keep
+  only current store APIs and storage keys; do not add compatibility stores or
+  legacy-key fallbacks. Subscribe with scalar/per-id selectors; use `useShallow`
+  for derived collections or aggregates. Update maps and sets immutably. SSE
+  handlers call actions directly; there is no unused context parameter. Never
+  use imperative reads plus version counters in rendering, generic store
+  wrappers, listener sets, or mirrored contexts.
+- **Preferences stay synchronized across tabs.** `Shell` owns one native
+  `storage` listener and cleans it up on unmount. Writes from another tab
+  rehydrate the Zustand persist store; key removal or `clear()` restores
+  defaults, while a blocked read retains in-memory preferences. The listener
+  does not echo writes. Zustand persist's storage adapter is the boundary for
+  changing where preferences are saved. One-time deep-link bookkeeping stays in
+  module variables because no UI subscribes to it.
+- **No fetching in `useEffect`.** Use SWR. Effects own external lifecycles,
+  timers and clearing projections when capabilities become unavailable. Seed
+  snapshots in the SWR fetcher, where the request baseline is available.
+  Component-local state remains in React; URL state remains in nuqs.
+  `useSyncExternalStore` is only needed for native external sources such as
+  `matchMedia`, not application data.
 
 ## 6. Target directory layout (`apps/web`)
 
@@ -453,7 +498,7 @@ components/
 lib/
   registry/                        # views.ts, inspector.ts, status.ts, timeline-kinds.ts, live.ts, entities.ts
   source/<domain>/http.ts   # plus capabilities.ts (resolution)
-  live/                            # keyed external store + SSE client
+  live/                            # Zustand live/realtime stores + SSE lifecycle
   lens/                            # selectors
   time/                            # sim-clock interpolation, buckets, formatting (+ *.test.ts)
   state/                           # url-state helpers, EntityRef (de)serialization (+ tests)
@@ -464,8 +509,8 @@ The old `components/kazusa/*` and `lib/kazusa/*` paths have been moved into this
 layout and deleted. Don't bring back parallel old paths. `lib/lens/` hasn't been
 created yet (§1.1).
 
-Pure modules under `lib/` (anything with a colocated test) use **relative
-imports**, not `@/`. The root vitest config has no path alias.
+Pure modules under `lib/` use **relative imports**. The root Vitest config also
+resolves `@/` to `apps/web` for hook and component integration tests.
 
 ## 7. Visual language (summary)
 
@@ -484,16 +529,22 @@ imports**, not `@/`. The root vitest config has no path alias.
 
 - `npm test` (vitest): pure logic is colocated in `lib/**/*.test.ts`. That
   covers sim-clock interpolation, time bucketing, EntityRef serialization,
-  journal gap detection, collapse rules and capability resolution. If root dev
-  dependencies aren't installed (as in the v0 sandbox), run vitest from an
-  isolated temp install with
+  journal merging, collapse rules and capability resolution. React tests also
+  verify render isolation, zero entity-selector work on clock ticks, delayed
+  snapshot races, cross-tab preferences, synchronized SWR message caches and SSE
+  reconnect behavior in StrictMode. If root dev dependencies aren't installed
+  (as in the v0 sandbox), run vitest from an isolated temp install with
   `--root <repo> --config <temp config including apps/web/lib/**/*.test.ts>`.
 - `npm run typecheck` and
   `npx tsc --noEmit --incremental false -p apps/web/tsconfig.json`. A build that
   ignores TypeScript errors doesn't count.
 - Run targeted `prettier --check` / `eslint` on touched files.
-- Browser check: open the preview against a live Gateway. Then scroll the roster
-  and timeline, switch views, select entities, and confirm the URL updates.
+- Run the real-stack Playwright suite with
+  `npm run --workspace=@kazusa/web test:e2e`. It starts or reuses `npm run dev`
+  and checks desktop/mobile navigation, persisted preferences across tabs, real
+  chat history and offline/reconnect behavior. See `apps/web/e2e/README.md` for
+  world and browser prerequisites. Manual browser checks should also scroll the
+  roster and timeline, select entities, and confirm the URL updates.
 - Run plugin route changes through the plugin test suite (`http.ts` handler
   tests) as the `kazusa` skill describes.
 

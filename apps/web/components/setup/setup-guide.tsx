@@ -3,6 +3,9 @@
 import { format } from "date-fns";
 import { ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
+import { fetchChats } from "@/lib/source/chats/http";
+import { chatsKey } from "@/lib/source/chats/cache";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -247,40 +250,41 @@ function Starting({
   keyless: boolean;
 }) {
   const [slow, setSlow] = useState(false);
+  const { data } = useSWR(chatsKey(), fetchChats, {
+    refreshInterval: START_POLL_MS,
+    errorRetryInterval: START_POLL_MS,
+    dedupingInterval: START_POLL_MS,
+    revalidateOnFocus: false,
+  });
+  const answered = Boolean(data);
+  const chatId = data?.chats.find(
+    ({ type, members }) => type === "direct" && members.includes(systemAgent),
+  )?.id;
+
   useEffect(() => {
-    const started = Date.now();
-    let answeredAt: number | undefined;
-    const timer = setInterval(async () => {
-      if (Date.now() - started > SLOW_START_MS) setSlow(true);
-      const response = await fetch("/kazusa/chats").catch(() => null);
-      if (!response?.ok) return;
-      if (keyless) {
-        window.location.assign("/?view=settings&settings.tab=models");
-        return;
-      }
-      answeredAt ??= Date.now();
-      const { chats } = (await response.json()) as {
-        chats: readonly {
-          id: string;
-          type: string;
-          members: readonly string[];
-        }[];
-      };
-      const chat = chats.find(
-        ({ type, members }) =>
-          type === "direct" && members.includes(systemAgent),
+    const timer = window.setTimeout(() => setSlow(true), SLOW_START_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!answered) return;
+    if (keyless) {
+      window.location.assign("/?view=settings&settings.tab=models");
+      return;
+    }
+    if (chatId) {
+      window.location.assign(
+        `/?view=chats&chats.id=${encodeURIComponent(chatId)}`,
       );
-      if (chat)
-        window.location.assign(
-          `/?view=chats&chats.id=${encodeURIComponent(chat.id)}`,
-        );
-      else if (Date.now() - answeredAt > WELCOME_WAIT_MS)
-        window.location.assign(
-          `/?view=chats&chats.dm=${encodeURIComponent(systemAgent)}`,
-        );
-    }, START_POLL_MS);
-    return () => clearInterval(timer);
-  }, [keyless, systemAgent]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      window.location.assign(
+        `/?view=chats&chats.dm=${encodeURIComponent(systemAgent)}`,
+      );
+    }, WELCOME_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [answered, chatId, keyless, systemAgent]);
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <Spinner className="size-6" />

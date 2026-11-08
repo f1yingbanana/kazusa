@@ -354,10 +354,11 @@ wakes, token/cost meter (Observer debug), notifications and mentions.
 - Virtualize every list longer than about 50 items: roster, timeline, observed
   chats, tree occupants and the palette.
 - Filter and aggregate on the server. The client renders windows.
-- Keep high-frequency live state in the keyed live store with per-id
-  subscriptions. A delta re-renders one row.
-- Use a shared minute-resolution `useSimNow`. Rows compute "time left" from it
-  without their own intervals.
+- Keep high-frequency live state in Zustand with per-id selectors. A delta
+  re-renders one row. The clock anchor and sampled time live in a separate store
+  so timer ticks do not evaluate entity selectors.
+- Use the shared `useSimNow` (minute resolution by default). Rows compute "time
+  left" from it without their own intervals.
 - Focus sets (watchlist, compare pins, selection) are the only path to
   per-character detail in aggregate views.
 - Collapse low-salience runs. Surface high-salience events first in summaries.

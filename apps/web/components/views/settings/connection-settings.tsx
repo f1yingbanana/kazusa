@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useRealtime } from "@/lib/live/realtime-provider";
+import { useRealtimeStore } from "@/lib/live/realtime-state";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
@@ -13,7 +13,7 @@ const STREAM_LABELS = {
 } as const;
 
 function GatewayStatus() {
-  const { status } = useRealtime();
+  const status = useRealtimeStore((state) => state.status);
   const { reachable, backendError, retryBackend } = useSources();
   const down = !reachable || status === "error";
 

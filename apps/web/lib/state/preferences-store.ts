@@ -1,5 +1,3 @@
-"use client";
-
 import { create } from "zustand";
 import {
   createJSONStorage,
@@ -22,12 +20,6 @@ export const DEFAULT_PREFERENCES: PreferencesState = {
 };
 
 const STORAGE_KEY = "kazusa:preferences";
-const LEGACY_KEYS = [
-  "kazusa:watchlist",
-  "kazusa:inspector-folds",
-  "kazusa:observed-collapsed",
-  "kazusa:update-dismissed",
-] as const;
 
 /**
  * Validates and sanitizes raw data read from storage, discarding corrupted or
@@ -74,119 +66,23 @@ export function sanitizePreferences(raw: unknown): PreferencesState {
   };
 }
 
-/**
- * Migrates legacy localStorage keys if the unified preferences key does not yet exist.
- */
-function readLegacyPreferences(): PreferencesState | null {
-  if (typeof window === "undefined") return null;
-
-  let hasLegacy = false;
-  let watchlist: unknown;
-  let inspectorFolds: unknown;
-  let observedCollapsed: unknown;
-  let dismissedUpdateVersion: unknown;
-
-  try {
-    const rawWatch = window.localStorage.getItem("kazusa:watchlist");
-    if (rawWatch !== null) {
-      hasLegacy = true;
-      try {
-        watchlist = JSON.parse(rawWatch);
-      } catch {
-        // Corrupt JSON.
-      }
-    }
-
-    const rawFolds = window.localStorage.getItem("kazusa:inspector-folds");
-    if (rawFolds !== null) {
-      hasLegacy = true;
-      try {
-        inspectorFolds = JSON.parse(rawFolds);
-      } catch {
-        // Corrupt JSON.
-      }
-    }
-
-    const rawObserved = window.localStorage.getItem("kazusa:observed-collapsed");
-    if (rawObserved !== null) {
-      hasLegacy = true;
-      observedCollapsed = rawObserved === "1";
-    }
-
-    const rawDismissed = window.localStorage.getItem("kazusa:update-dismissed");
-    if (rawDismissed !== null) {
-      hasLegacy = true;
-      dismissedUpdateVersion = rawDismissed;
-    }
-  } catch {
-    // Storage blocked.
-  }
-
-  if (!hasLegacy) return null;
-
-  return sanitizePreferences({
-    watchlist,
-    inspectorFolds,
-    observedCollapsed,
-    dismissedUpdateVersion,
-  });
-}
-
-let hasLegacyToClean = false;
-
-function cleanLegacyKeys(): void {
-  if (typeof window === "undefined") return;
-  for (const key of LEGACY_KEYS) {
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      // Storage access blocked.
-    }
-  }
-}
-
-/**
- * Custom StateStorage adapter that:
- * 1. Checks and migrates legacy keys on initial getItem when kazusa:preferences is missing.
- * 2. Catches and suppresses setItem errors (e.g. QuotaExceededError or private browsing).
- * 3. Removes legacy keys once on the first write to kazusa:preferences after migration.
- */
-const preferencesStorageAdapter: StateStorage = {
-  getItem: (name: string): string | null => {
-    if (typeof window === "undefined") return null;
-    try {
-      const stored = window.localStorage.getItem(name);
-      if (stored !== null) return stored;
-
-      // Unified entry is missing; check for legacy entries to migrate.
-      const legacy = readLegacyPreferences();
-      if (legacy) {
-        hasLegacyToClean = true;
-        return JSON.stringify({ state: legacy, version: 1 });
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-  setItem: (name: string, value: string): void => {
-    if (typeof window === "undefined") return;
+/** Keep preferences usable in memory when browser storage is unavailable. */
+const preferencesStorage: StateStorage = {
+  // Persist catches read failures and retains the in-memory state. A missing
+  // value, unlike a failed read, means another tab may have cleared preferences.
+  getItem: (name) => window.localStorage.getItem(name),
+  setItem: (name, value) => {
     try {
       window.localStorage.setItem(name, value);
-      if (hasLegacyToClean) {
-        hasLegacyToClean = false;
-        cleanLegacyKeys();
-      }
     } catch {
-      // Storage quota exceeded or disabled; fail gracefully without crashing.
+      // Storage may be blocked or full.
     }
   },
-  removeItem: (name: string): void => {
-    if (typeof window === "undefined") return;
+  removeItem: (name) => {
     try {
       window.localStorage.removeItem(name);
     } catch {
-      // Storage access blocked.
+      // Storage may be blocked.
     }
   },
 };
@@ -195,17 +91,32 @@ export const usePreferencesStore = create<PreferencesState>()(
   persist(() => DEFAULT_PREFERENCES, {
     name: STORAGE_KEY,
     version: 1,
-    storage: createJSONStorage(() => preferencesStorageAdapter),
-    merge: (persistedState, currentState) => ({
-      ...currentState,
-      ...sanitizePreferences(persistedState),
-    }),
+    storage: createJSONStorage(() => preferencesStorage),
+    merge: (persistedState) => sanitizePreferences(persistedState),
   }),
 );
 
-/* -------------------------------------------------------------------------- */
-/* Standalone Action Functions (Zustand idiomatic "no store actions" pattern)   */
-/* -------------------------------------------------------------------------- */
+/** Keep mounted tabs current before their next preference edit. */
+export function syncPreferences(): () => void {
+  let storage: Storage;
+  try {
+    storage = window.localStorage;
+  } catch {
+    return () => undefined;
+  }
+  const onStorage = (event: StorageEvent): void => {
+    if (
+      event.storageArea === storage &&
+      (event.key === STORAGE_KEY || event.key === null)
+    ) {
+      void usePreferencesStore.persist.rehydrate();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  // A different tab may have written since the module's initial hydration.
+  void usePreferencesStore.persist.rehydrate();
+  return () => window.removeEventListener("storage", onStorage);
+}
 
 export function toggleWatch(id: string): void {
   usePreferencesStore.setState((state) => ({
@@ -230,13 +141,8 @@ export function dismissUpdate(version: string): void {
 }
 
 export function resetPreferences(): void {
-  hasLegacyToClean = false;
   usePreferencesStore.setState(DEFAULT_PREFERENCES, true);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Selector Hooks                                                             */
-/* -------------------------------------------------------------------------- */
 
 export function useWatchlist(): readonly string[] {
   return usePreferencesStore((state) => state.watchlist);

@@ -1,67 +1,27 @@
 import type { StreamEvent, StreamEventType } from "@kazusa/client";
-import { appendToTail } from "@/lib/live/journal";
 import {
-  clockStore,
-  desireStore,
-  journalTailStore,
-  locationStore,
-  statusStore,
-} from "@/lib/live/state";
+  mergeJournal,
+  updateDesire,
+  updateLocation,
+  updateStatuses,
+} from "../live/state";
+import { setClock, useClockStore } from "../live/clock-state";
 import type { LiveHandler } from "./types";
 
-export interface LiveContext {
-  readonly statuses: typeof statusStore;
-  readonly clock: typeof clockStore;
-  readonly journalTail: typeof journalTailStore;
-  readonly desires: typeof desireStore;
-  readonly locations: typeof locationStore;
-  /** Called when a journal seq gap is detected; catch up with `timeline?after=`. */
-  readonly onJournalGap?: (after: number) => void;
-}
-
-export const defaultLiveContext: LiveContext = {
-  statuses: statusStore,
-  clock: clockStore,
-  journalTail: journalTailStore,
-  desires: desireStore,
-  locations: locationStore,
-};
-
-/*
- * Observer-scope handlers. Player-scope chat events (`message`, `typing`,
- * `chats`, `connected`) are still applied inside `RealtimeProvider`; moving
- * them here is on the roadmap.
- */
 export const LIVE_HANDLERS: { [T in StreamEventType]?: LiveHandler<T> } = {
-  status: (event, ctx) => ctx.statuses.set(event.characterId, event.status),
-  journal: (event, ctx) => {
-    const current = ctx.journalTail.get();
-    const { tail, gapAfter } = appendToTail(
-      current,
-      event.event,
-      current.at(-1)?.seq,
-    );
-    ctx.journalTail.set(tail);
-    if (gapAfter !== undefined) ctx.onJournalGap?.(gapAfter);
-  },
-  clock: (event, ctx) => ctx.clock.set({ clock: event.clock, offset: 0 }),
-  desires: (event, ctx) => {
-    // Anchors only move forward, so an older record (a late snapshot) loses.
-    const current = ctx.desires.get(event.characterId);
-    if (current && current.anchorAt > event.record.anchorAt) return;
-    ctx.desires.set(event.characterId, event.record);
-  },
-  // Every write is a full record; positions follow from it and sim time.
-  location: (event, ctx) =>
-    ctx.locations.set(event.characterId, event.record),
+  status: (event) => updateStatuses([[event.characterId, event.status]]),
+  journal: (event) => mergeJournal([event.event]),
+  clock: (event) =>
+    setClock({
+      clock: event.clock,
+      offset: useClockStore.getState().clock?.offset ?? 0,
+    }),
+  desires: (event) => updateDesire(event.characterId, event.record),
+  location: (event) => updateLocation(event.characterId, event.record),
 };
 
-export function dispatchLive(
-  event: StreamEvent,
-  ctx: LiveContext = defaultLiveContext,
-) {
+export function dispatchLive(event: StreamEvent): void {
   const handler = LIVE_HANDLERS[event.type] as
-    | ((event: StreamEvent, ctx: LiveContext) => void)
-    | undefined;
-  handler?.(event, ctx);
+    ((event: StreamEvent) => void) | undefined;
+  handler?.(event);
 }

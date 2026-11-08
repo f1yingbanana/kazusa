@@ -4,7 +4,6 @@ import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRightIcon, EyeIcon } from "lucide-react";
 import { useSimNow } from "@/hooks/use-clock";
-import { useRealtime } from "@/lib/live/realtime-provider";
 import type { Agent } from "@kazusa/client";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,6 @@ export function ObservedChatList({
   onSelect: (chatId: string) => void;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
-  const { typingByChat } = useRealtime();
   const simNow = useSimNow();
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -111,8 +109,7 @@ export function ObservedChatList({
                 userId={userId}
                 nameOf={nameOf}
                 isActive={chat.id === selectedChatId}
-                typists={typingByChat[chat.id] ?? []}
-                unread={0}
+                observed
                 simNow={simNow}
                 onSelect={onSelect}
               />

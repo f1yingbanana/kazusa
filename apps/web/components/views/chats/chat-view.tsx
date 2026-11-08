@@ -19,7 +19,7 @@ import { ChatFailure } from "./chat-failure";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
-import { useRealtime } from "@/lib/live/realtime-provider";
+import { useTyping } from "@/lib/live/realtime-state";
 
 /** The system admin's work is the player's to watch; a character's is theirs. */
 const ADMIN_TURNS = 20;
@@ -35,12 +35,11 @@ export function ChatView({
 }) {
   const { byId } = useCharacters();
   const { canPlay } = useAccess();
-  const { config, send, commitSentMessage, refreshChats } = useChatActions();
-  const { typingByChat } = useRealtime();
+  const { player, send, commitSentMessage, refreshChats } = useChatActions();
   const messagesState = useMessages(chat.draft ? null : chat.id);
   const [pending, setPending] = useState<PendingMessage[]>([]);
 
-  const typists = typingByChat[chat.id] ?? [];
+  const typists = useTyping(chat.id);
 
   const admin =
     chat.type === "direct" && !chat.draft
@@ -54,8 +53,8 @@ export function ChatView({
     [adminTrace, messagesState.messages],
   );
   const others = useMemo(
-    () => chat.members.filter((id) => id !== config.userId),
-    [chat.members, config.userId],
+    () => chat.members.filter((id) => id !== player.id),
+    [chat.members, player.id],
   );
 
   const resolve = useParticipantResolver();
@@ -101,8 +100,8 @@ export function ChatView({
     const message: PendingMessage = {
       id: requestId,
       requestId,
-      senderId: config.userId,
-      senderName: config.userName,
+      senderId: player.id,
+      senderName: player.name,
       text,
       ...(type === "action" ? { type } : {}),
       timestamp: readSimNow(),
@@ -150,7 +149,7 @@ export function ChatView({
       <ChatHeader
         chat={chat}
         own={chat.draft ? undefined : chat}
-        userId={config.userId}
+        userId={player.id}
         typists={typists}
         onBack={onBack}
       />
@@ -167,7 +166,7 @@ export function ChatView({
         onLoadOlder={messagesState.loadOlder}
         onRetry={handleRetry}
         resolve={resolve}
-        userId={config.userId}
+        userId={player.id}
         activity={activity}
         activityRunning={adminThinking}
       />

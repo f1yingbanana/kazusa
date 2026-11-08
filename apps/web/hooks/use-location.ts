@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo } from "react";
 import type { LocationRecord } from "@kazusa/client";
 import { toast } from "sonner";
 import { useCharacterStatus } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useOffstage } from "@/hooks/use-stage";
-import { locationStore, placesStore } from "@/lib/live/state";
+import { updateLocation, useLiveStore } from "@/lib/live/state";
 import { useAccess } from "@/hooks/use-access";
 import { movePlayer } from "@/lib/source/location/http";
-import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
+import { useSources, usePlacesResource } from "@/lib/source/provider";
 import {
+  buildPlaceIndex,
   occupancy,
   positionAt,
   type Occupancy,
@@ -20,11 +20,8 @@ import {
 } from "@/lib/location/places";
 
 export function usePlaces(): PlaceIndex | null {
-  return useSyncExternalStore(
-    (listener) => placesStore.subscribe(listener),
-    () => placesStore.get(),
-    () => null,
-  );
+  const { data } = usePlacesResource();
+  return useMemo(() => (data ? buildPlaceIndex(data.places) : null), [data]);
 }
 
 export function usePlace(id: string | undefined) {
@@ -36,11 +33,7 @@ export function usePlace(id: string | undefined) {
 export function useLocationRecord(
   id: string | undefined,
 ): LocationRecord | undefined {
-  return useSyncExternalStore(
-    (listener) => (id ? locationStore.subscribeKey(id, listener) : () => {}),
-    () => (id ? locationStore.get(id) : undefined),
-    () => undefined,
-  );
+  return useLiveStore((state) => (id ? state.locations.get(id) : undefined));
 }
 
 /**
@@ -58,32 +51,22 @@ export function usePosition(id: string | undefined): Position | undefined {
   );
 }
 
-/** Aggregate subscription for occupancy and place grouping. */
-export function useLocationVersion() {
-  return useSyncExternalStore(
-    (listener) => locationStore.subscribe(listener),
-    () => locationStore.version(),
-    () => 0,
-  );
-}
-
 /**
  * Who is where right now among `ids`; regroups on moves and each sim minute.
  * Offstage characters are left out: they aren't anywhere.
  */
 export function useOccupancy(ids: readonly string[]): Occupancy {
-  const version = useLocationVersion();
+  const locations = useLiveStore((state) => state.locations);
   const offstage = useOffstage();
   const now = useSimNow();
   return useMemo(
     () =>
       occupancy(
         ids.filter((id) => !offstage.has(id)),
-        (id) => locationStore.get(id),
+        (id) => locations.get(id),
         now,
       ),
-    // `version` stands in for every record in the store.
-    [ids, offstage, version, now],
+    [ids, offstage, locations, now],
   );
 }
 
@@ -93,10 +76,9 @@ export function useOccupancy(ids: readonly string[]): Occupancy {
  * come in; leaving takes the player out of their huddles.
  */
 export function usePlayer() {
-  const config = useKazusaConfig();
-  const { resolved } = useSources();
+  const { resolved, player } = useSources();
   const { canPlay } = useAccess();
-  const position = usePosition(config.userId);
+  const position = usePosition(player.id);
   const live = resolved.location === "live";
   const moveTo = useCallback(
     async (placeId: string) => {
@@ -104,17 +86,17 @@ export function usePlayer() {
       try {
         const { record } = await movePlayer(placeId);
         // SSE brings the same record; don't wait for it.
-        locationStore.set(config.userId, record);
+        updateLocation(player.id, record);
       } catch (error) {
         toast.error("Couldn't go there", {
           description: error instanceof Error ? error.message : undefined,
         });
       }
     },
-    [canPlay, config.userId],
+    [canPlay, player.id],
   );
   return {
-    id: config.userId,
+    id: player.id,
     placeId: position?.kind === "at" ? position.placeId : undefined,
     live,
     moveTo: live && canPlay ? moveTo : undefined,

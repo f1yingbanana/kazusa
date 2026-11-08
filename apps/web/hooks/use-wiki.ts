@@ -74,7 +74,11 @@ export function useWikiSource(
   return useSWR<WikiSourceResponse>(
     useWikiKey(["source", id, agent ?? "", kind ?? ""], Boolean(id)),
     () => fetchWikiSource(id ?? "", agent, kind),
-    { revalidateOnFocus: false, revalidateIfStale: false },
+    {
+      revalidateOnMount: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    },
   );
 }
 
@@ -92,7 +96,8 @@ function useWikiWrite<Payload, Result>(
       }
       const result = await write(payload);
       void mutate(
-        (key) => Array.isArray(key) && key[0] === WIKI_KEY,
+        (key) =>
+          Array.isArray(key) && key[0] === WIKI_KEY && key[1] !== "source",
         undefined,
         { revalidate: true },
       );

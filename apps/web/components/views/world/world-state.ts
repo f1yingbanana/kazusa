@@ -3,11 +3,15 @@
 import { useQueryState } from "nuqs";
 import { worldParsers } from "./search-params";
 import { useMemo } from "react";
-import type { CharacterSummary } from "@kazusa/client";
-import { useCharacters, useStatusVersion } from "@/hooks/use-characters";
+import type {
+  CharacterSummary,
+  CharacterStatus,
+  LocationRecord,
+} from "@kazusa/client";
+import { useCharacters } from "@/hooks/use-characters";
 import { useOccupancy, usePlaces } from "@/hooks/use-location";
 import { useOffstage } from "@/hooks/use-stage";
-import { locationStore, statusStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
 import type { Occupancy, PlaceIndex } from "@/lib/location/places";
 import { useSources } from "@/lib/source/provider";
 import {
@@ -123,6 +127,7 @@ function placeFolders(
   occupied: Occupancy,
   byId: ReadonlyMap<string, CharacterSummary>,
   offstage: readonly CharacterSummary[],
+  locations: ReadonlyMap<string, LocationRecord>,
 ): Folder[] {
   const people = (ids: readonly string[]) =>
     ids
@@ -162,7 +167,7 @@ function placeFolders(
   // Travelers grouped by where they are headed.
   const heading = new Map<string, CharacterSummary[]>();
   for (const character of people(occupied.traveling)) {
-    const to = locationStore.get(character.id)?.trip?.to ?? "";
+    const to = locations.get(character.id)?.trip?.to ?? "";
     heading.set(to, [...(heading.get(to) ?? []), character]);
   }
   const transit = [...heading.entries()]
@@ -200,8 +205,13 @@ function placeFolders(
 export function useWorldFolders(by: Dimension, kind: KindFilter) {
   const { characters, byId, isLoading, error } = useCharacters();
   const watchlist = useWatchlist();
-  const statusVersion = useStatusVersion();
   const statusGrouped = by === "activity" || by === "brain";
+  const statuses = useLiveStore((state) =>
+    statusGrouped ? state.statuses : null,
+  );
+  const locations = useLiveStore((state) =>
+    by === "place" ? state.locations : null,
+  );
   const places = usePlaces();
   const offstage = useOffstage();
 
@@ -220,28 +230,21 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
 
   const groups: Folder[] = useMemo(() => {
     if (by === "place")
-      return places
+      return places && locations
         ? placeFolders(
             places,
             occupied,
             byId,
             pool.filter((c) => offstage.has(c.id)),
+            locations,
           )
         : [];
     const statusGroups: Group[] = groupCharacters(pool, by, (id) =>
-      statusStore.get(id),
+      statuses?.get(id),
     );
     return statusGroups;
     // Activity and brain folders regroup on live status deltas.
-  }, [
-    pool,
-    by,
-    places,
-    occupied,
-    byId,
-    offstage,
-    statusGrouped ? statusVersion : 0,
-  ]);
+  }, [pool, by, places, occupied, byId, offstage, statuses, locations]);
 
   /*
    * Who a folder's onstage controls act on: every character in it, whatever
@@ -304,11 +307,12 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
 /** "2 thinking · 1 composing", or null when nobody is busy. */
 export function busySummary(
   members: readonly CharacterSummary[],
+  statuses: ReadonlyMap<string, CharacterStatus>,
 ): string | null {
   let thinking = 0;
   let composing = 0;
   for (const member of members) {
-    const status = statusStore.get(member.id);
+    const status = statuses.get(member.id);
     if (status?.brain === "thinking") thinking += 1;
     if (status?.composingIn.length) composing += 1;
   }

@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useRealtime } from "@/lib/live/realtime-provider";
+import { useRealtimeStore } from "@/lib/live/realtime-state";
 import { cn } from "@/lib/utils";
 
 const LABELS = {
@@ -18,7 +18,7 @@ const LABELS = {
 
 /** Gateway SSE health. SSE errors surface only here (UX §11). */
 export function ConnectionStatusItem() {
-  const { status } = useRealtime();
+  const status = useRealtimeStore((state) => state.status);
   const [, setParams] = useQueryStates({
     view: parseAsString,
     "settings.tab": settingsParsers["settings.tab"],

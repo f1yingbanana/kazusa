@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { CharacterSummary } from "@kazusa/client";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
@@ -18,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useClockAnchor } from "@/hooks/use-clock";
 import { useOffstage, useStage } from "@/hooks/use-stage";
-import { statusStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
 import { cn } from "@/lib/utils";
 
 /** What the dialog opens with: everyone on, everyone off, or as things are. */
@@ -93,9 +94,11 @@ function CastForm({
   const goingOff = cast.filter(
     (c) => !selected.has(c.id) && !offstage.has(c.id),
   );
-  const waiting = comingBack.reduce(
-    (sum, c) => sum + (statusStore.get(c.id)?.queued ?? 0),
-    0,
+  const waiting = useLiveStore((state) =>
+    comingBack.reduce(
+      (sum, c) => sum + (state.statuses.get(c.id)?.queued ?? 0),
+      0,
+    ),
   );
   const changes = comingBack.length + goingOff.length;
 
@@ -252,6 +255,17 @@ function CastList({
   offstage: ReadonlySet<string>;
   onToggle: (id: string, on: boolean) => void;
 }) {
+  const queued = useLiveStore(
+    useShallow(
+      (state) =>
+        new Map(
+          cast.map((character) => [
+            character.id,
+            state.statuses.get(character.id)?.queued ?? 0,
+          ]),
+        ),
+    ),
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: cast.length,
@@ -281,7 +295,7 @@ function CastList({
           const character = cast[virtual.index];
           const on = selected.has(character.id);
           const wasOff = offstage.has(character.id);
-          const waiting = statusStore.get(character.id)?.queued ?? 0;
+          const waiting = queued.get(character.id) ?? 0;
           const note =
             on && wasOff
               ? "comes back"

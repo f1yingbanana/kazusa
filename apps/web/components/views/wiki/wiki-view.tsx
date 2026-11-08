@@ -23,7 +23,7 @@ import { useAccess } from "@/hooks/use-access";
 import { useCharacter } from "@/hooks/use-characters";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
 import { useSources } from "@/lib/source/provider";
-import { requestSidebar } from "@/lib/state/sidebar-request";
+import { requestSidebar } from "@/lib/state/ui-store";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
@@ -255,6 +255,7 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
   const subject = newName ?? title;
   const editor = (side: WikiSide) => (
     <PageEditor
+      key={`${id}:${side}:${agent ?? ""}`}
       id={id}
       {...(side === "own" && agent ? { agent } : {})}
       {...(kind ? { kind } : {})}

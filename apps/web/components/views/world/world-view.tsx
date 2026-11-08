@@ -24,12 +24,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { useSimNow } from "@/hooks/use-clock";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSelection } from "@/hooks/use-selection";
-import { locationStore } from "@/lib/live/state";
+import { useLiveStore } from "@/lib/live/state";
+import { useClockStore } from "@/lib/live/clock-state";
 import { areaPath } from "@/lib/location/places";
 import { useWatchlist } from "@/lib/state/preferences-store";
-import { formatSimDuration } from "@/lib/time/sim";
+import { bucket, formatSimDuration, MINUTE } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 import {
   KIND_LABELS,
@@ -53,22 +54,14 @@ import { WorldSidebar } from "./world-sidebar";
  */
 export function WorldView() {
   const { folderParam } = useWorldParams();
+  const docked = useMediaQuery("(min-width: 1024px)");
   return (
     <section aria-label="World" className="flex min-h-0 flex-1 flex-col">
-      {folderParam === null ? (
-        <div className="flex min-h-0 flex-1 flex-col lg:hidden">
-          <WorldSidebar asFirstScreen />
-        </div>
-      ) : null}
-      <div
-        className={
-          folderParam === null
-            ? "hidden min-h-0 flex-1 flex-col lg:flex"
-            : "flex min-h-0 flex-1 flex-col"
-        }
-      >
+      {!docked && folderParam === null ? (
+        <WorldSidebar asFirstScreen />
+      ) : (
         <FolderStage />
-      </div>
+      )}
     </section>
   );
 }
@@ -144,8 +137,10 @@ function FolderStage() {
   const members = open.members;
   const items = useMemo(() => itemsOf(open), [open]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const now = useSimNow();
   const inTransit = open.key === TRANSIT_FOLDER;
+  const now = useClockStore((state) =>
+    inTransit ? bucket(state.simNow, MINUTE) : 0,
+  );
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -165,13 +160,16 @@ function FolderStage() {
   );
   const selectedId = selection?.kind === "character" ? selection.id : null;
   const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
-  const busy = busySummary(members);
+  const locations = useLiveStore((state) =>
+    inTransit ? state.locations : null,
+  );
+  const busy = useLiveStore((state) => busySummary(members, state.statuses));
   const scope =
     open.key === WATCH_FOLDER ? null : KIND_LABELS[kind].toLowerCase();
   const area = open.placeId && places ? areaPath(places, open.placeId) : "";
 
   const arrival = (id: string) => {
-    const arriveAt = locationStore.get(id)?.trip?.arriveAt;
+    const arriveAt = locations?.get(id)?.trip?.arriveAt;
     if (!arriveAt || now === 0) return undefined;
     return arriveAt > now
       ? `in ${formatSimDuration(arriveAt - now)}`

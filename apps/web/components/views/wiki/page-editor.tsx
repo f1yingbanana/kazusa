@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileTextIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { WikiKind, WikiSourceResponse } from "@kazusa/client";
@@ -50,9 +50,18 @@ interface PageEditorProps {
 /** A page's Markdown, edited in place of the page; the file is the truth. */
 export function PageEditor(props: PageEditorProps) {
   const source = useWikiSource(props.id, props.agent, props.kind);
-  if (source.isLoading)
+  // Freeze the base revision after opening; a cache refresh must not discard edits.
+  const [snapshot, setSnapshot] = useState<WikiSourceResponse | null>(null);
+  useEffect(() => {
+    if (!snapshot && source.data && !source.isValidating && !source.error)
+      setSnapshot(source.data);
+  }, [snapshot, source.data, source.isValidating, source.error]);
+  if (
+    !snapshot &&
+    (source.isLoading || source.isValidating || (source.data && !source.error))
+  )
     return <p className="text-sm text-muted-foreground">Opening…</p>;
-  if (!source.data)
+  if (!snapshot)
     return (
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
@@ -65,11 +74,9 @@ export function PageEditor(props: PageEditorProps) {
     );
   return (
     <EditorBody
-      // A newer version starts the draft over from what it says.
-      key={source.data.hash ?? "new"}
       {...props}
-      source={source.data}
-      reload={() => void source.mutate()}
+      initialSource={snapshot}
+      reload={() => source.mutate()}
     />
   );
 }
@@ -82,12 +89,13 @@ function EditorBody({
   owner,
   name,
   onDone,
-  source,
+  initialSource,
   reload,
 }: PageEditorProps & {
-  readonly source: WikiSourceResponse;
-  readonly reload: () => void;
+  readonly initialSource: WikiSourceResponse;
+  readonly reload: () => Promise<WikiSourceResponse | undefined>;
 }) {
+  const [source, setSource] = useState(initialSource);
   const initial = source.exists ? source.text : pageTemplate(name);
   const [draft, setDraft] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -126,6 +134,23 @@ function EditorBody({
     }
   };
 
+  const loadLatest = async () => {
+    setSaving(true);
+    try {
+      const latest = await reload();
+      if (!latest) throw new Error("The page could not be loaded.");
+      setSource(latest);
+      setDraft(latest.exists ? latest.text : pageTemplate(name));
+      setConflict(false);
+    } catch (error) {
+      toast.error("Couldn't load the page", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const cancel = () => {
     if (dirty && source.exists) setDiscarding(true);
     else onDone();
@@ -151,12 +176,18 @@ function EditorBody({
       ) : null}
       {conflict ? (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={reload}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={saving}
+            onClick={() => void loadLatest()}
+          >
             Load their version
           </Button>
           <Button
             size="sm"
             variant="destructive"
+            disabled={saving}
             onClick={() => void submit(true)}
           >
             Save mine anyway

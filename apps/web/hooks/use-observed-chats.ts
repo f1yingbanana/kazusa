@@ -1,4 +1,5 @@
 "use client";
+import { useCharacters } from "./use-characters";
 
 import { useMemo } from "react";
 import useSWR from "swr";
@@ -13,7 +14,6 @@ import {
   observedChatsKey,
 } from "@/lib/source/observe/http";
 import { useSources } from "@/lib/source/provider";
-import { useKazusaConfig } from "@/lib/state/config-store";
 
 /**
  * The one read path for chats the player isn't in. Reads nothing in the world
@@ -27,13 +27,15 @@ function useObservedResource() {
     () => fetchObservedChats(),
     { revalidateOnFocus: false },
   );
-  return { ...resource, available: live };
+  return { resource, available: live };
 }
 
 /** Chats the player isn't in, newest first, titled for display. */
 export function useObservedChats() {
-  const { data, error, isLoading, mutate, available } = useObservedResource();
-  const { charactersById, player } = useSources();
+  const { resource, available } = useObservedResource();
+  const { data, error, isLoading, mutate } = resource;
+  const { player } = useSources();
+  const { byId: charactersById } = useCharacters();
   const chats = useMemo(() => {
     const nameOf = (id: string) => charactersById.get(id)?.name ?? id;
     return sortChats(
@@ -48,8 +50,10 @@ export function useObservedChats() {
 
 /** One observed chat by id: chips can ask without sorting the whole list. */
 export function useObservedChat(id: string | null | undefined) {
-  const { data, available } = useObservedResource();
-  const { charactersById, player } = useSources();
+  const { resource, available } = useObservedResource();
+  const { data } = resource;
+  const { player } = useSources();
+  const { byId: charactersById } = useCharacters();
   const chat = id ? data?.chats.find((candidate) => candidate.id === id) : null;
   return {
     available,
@@ -67,9 +71,8 @@ export function useObservedChat(id: string | null | undefined) {
 }
 
 export function useObservedMessages(chatId: string | null) {
-  const config = useKazusaConfig();
   return usePagedMessages<MessagesResponse>(
-    messagesKeyGetter(config, chatId, OBSERVED_MESSAGES_KEY),
+    messagesKeyGetter(chatId, OBSERVED_MESSAGES_KEY),
     (id, before) => fetchObservedMessages({ chatId: id, before }),
   );
 }

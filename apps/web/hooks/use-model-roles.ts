@@ -61,7 +61,7 @@ function useRole<T extends { readonly current?: string }>(
         return false;
       }
     },
-    [failure, mutate, selecter],
+    [canManage, failure, mutate, selecter],
   );
 
   return {
