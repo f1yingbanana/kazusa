@@ -1,11 +1,12 @@
 "use client";
 
+import { useQueryState } from "nuqs";
+import { worldParsers } from "./search-params";
 import { useMemo } from "react";
 import type { CharacterSummary } from "@kazusa/client";
 import { useCharacters, useStatusVersion } from "@/hooks/use-characters";
 import { useOccupancy, usePlaces } from "@/hooks/use-location";
 import { useOffstage } from "@/hooks/use-stage";
-import { useParam } from "@/hooks/use-url-state";
 import { locationStore, statusStore } from "@/lib/live/state";
 import type { Occupancy, PlaceIndex } from "@/lib/location/places";
 import { useSources } from "@/lib/source/provider";
@@ -72,25 +73,18 @@ export function useDimensions() {
 }
 
 export function useWorldParams() {
-  const rawBy = useParam("world.by");
-  const rawKind = useParam("world.kind");
-  const folderParam = useParam("world.in");
+  const [rawBy] = useQueryState("world.by", worldParsers["world.by"]);
+  const [rawKind] = useQueryState("world.kind", worldParsers["world.kind"]);
+  const [folderParam] = useQueryState("world.in", worldParsers["world.in"]);
   const dimensions = useDimensions();
-  const rawAs = useParam("world.as");
+  const [rawAs] = useQueryState("world.as", worldParsers["world.as"]);
   const defaultBy: Dimension = dimensions.some((d) => d.id === "place")
     ? "place"
     : "affiliation";
-  const by: Dimension = dimensions.some((d) => d.id === rawBy)
-    ? (rawBy as Dimension)
-    : defaultBy;
-  const kind: KindFilter =
-    rawKind && rawKind in KIND_LABELS ? (rawKind as KindFilter) : "characters";
-  const as: "map" | "list" =
-    rawAs === "map" || rawAs === "list"
-      ? rawAs
-      : by === "place"
-        ? "map"
-        : "list";
+  const by: Dimension =
+    rawBy && dimensions.some((d) => d.id === rawBy) ? rawBy : defaultBy;
+  const kind: KindFilter = rawKind ?? "characters";
+  const as: "map" | "list" = rawAs ?? (by === "place" ? "map" : "list");
   return {
     by,
     defaultBy,

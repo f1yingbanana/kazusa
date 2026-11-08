@@ -62,14 +62,17 @@ describe("chatTitle", () => {
     expect(openChatPatch(dm, "user:me")).toEqual({
       view: "chats",
       "chats.id": "d",
-      sel: "character:kazusa",
+      sel: { kind: "character", id: "kazusa" },
     });
     const group = chat({
       id: "group:g",
       type: "group",
       members: ["user:me", "kazusa", "yutori-natsu"],
     });
-    expect(openChatPatch(group, "user:me").sel).toBe("chat:group:g");
+    expect(openChatPatch(group, "user:me").sel).toEqual({
+      kind: "chat",
+      id: "group:g",
+    });
   });
 
   it("names a direct chat between two others after both of them", () => {

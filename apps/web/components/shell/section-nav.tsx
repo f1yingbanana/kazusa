@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryState, parseAsString } from "nuqs";
 import { SearchIcon } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -9,7 +10,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useAccess } from "@/hooks/use-access";
 import { useActiveView } from "@/hooks/use-active-view";
-import { useNavigate } from "@/hooks/use-url-state";
 import type { StageView } from "@/lib/registry/types";
 import { STAGE_VIEWS } from "@/lib/registry/views";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,7 @@ function RailItem({
  */
 export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
   const active = useActiveView();
-  const navigate = useNavigate();
+  const [, setView] = useQueryState("view", parseAsString);
   const { hasPermission } = useAccess();
   const allowed = (view: StageView) =>
     !view.requiresPermission || hasPermission(view.requiresPermission);
@@ -83,7 +83,7 @@ export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
           key={view.id}
           view={view}
           current={view.id === active.id}
-          onSelect={() => navigate({ view: view.id })}
+          onSelect={() => void setView(view.id)}
         />
       ))}
 
@@ -108,7 +108,7 @@ export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
           key={view.id}
           view={view}
           current={view.id === active.id}
-          onSelect={() => navigate({ view: view.id })}
+          onSelect={() => void setView(view.id)}
         />
       ))}
     </nav>
@@ -118,7 +118,7 @@ export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
 /** Bottom tab bar below md, replacing the rail. */
 export function SectionTabs() {
   const active = useActiveView();
-  const navigate = useNavigate();
+  const [, setView] = useQueryState("view", parseAsString);
   const { hasPermission } = useAccess();
   const allowed = (view: StageView) =>
     !view.requiresPermission || hasPermission(view.requiresPermission);
@@ -135,7 +135,7 @@ export function SectionTabs() {
             key={view.id}
             type="button"
             aria-current={current ? "page" : undefined}
-            onClick={() => navigate({ view: view.id })}
+            onClick={() => void setView(view.id)}
             className={cn(
               "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground",
               current && "text-foreground",

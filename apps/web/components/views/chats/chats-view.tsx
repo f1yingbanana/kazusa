@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryStates } from "nuqs";
+import { chatsParsers } from "./search-params";
+import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { useEffect, useRef } from "react";
 import { MessagesSquareIcon } from "lucide-react";
 import {
@@ -14,11 +17,9 @@ import { useChatActions, useChats } from "@/hooks/use-chats";
 import { useObservedChat } from "@/hooks/use-observed-chats";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useRealtime } from "@/lib/live/realtime-provider";
 import { chatSubject } from "@/lib/source/chats/display";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
 import {
   keepsLinkedSelection,
   markQuietSelection,
@@ -45,10 +46,15 @@ export function ChatsView() {
   const { byId } = useCharacters();
   const { createChat } = useChatActions();
   const { setActiveChat } = useRealtime();
-  const navigate = useNavigate();
-  const chatId = useParam("chats.id");
-  const dmTarget = useParam("chats.dm");
-  const talkTarget = useParam("chats.talk");
+  const [queryState, setParams] = useQueryStates({
+    "chats.id": chatsParsers["chats.id"],
+    "chats.dm": chatsParsers["chats.dm"],
+    "chats.talk": chatsParsers["chats.talk"],
+    sel: entityRefParser,
+  });
+  const chatId = queryState["chats.id"];
+  const dmTarget = queryState["chats.dm"];
+  const talkTarget = queryState["chats.talk"];
   const player = usePlayer();
   const places = usePlaces();
   const draft = useDraftChat();
@@ -69,18 +75,18 @@ export function ChatsView() {
   // selection too keeps it.
   const subject = open ? chatSubject(open, config.userId) : null;
   const subjectKey = subject ? serializeEntityRef(subject) : null;
-  const selParam = useParam("sel");
+  const selParam = queryState["sel"];
   const followed = useRef<string | null>(null);
   useEffect(() => {
     if (!subjectKey || followed.current === subjectKey) return;
     followed.current = subjectKey;
     // Most ways in (the chat list, ⌘K) already selected it with the chat.
-    if (selParam === subjectKey) return;
+    if (selParam && serializeEntityRef(selParam) === subjectKey) return;
     if (keepsLinkedSelection("chats.id")) return;
     markQuietSelection(subjectKey);
-    navigate({ sel: subjectKey }, "replace");
+    void setParams({ sel: subject }, { history: "replace" });
     // `selParam` is read, not followed: picking someone else afterwards sticks.
-  }, [subjectKey, navigate]);
+  }, [subjectKey, setParams]);
 
   useEffect(() => {
     if (draft && !draft.draft && chats.some((chat) => chat.id === draft.id))
@@ -105,11 +111,14 @@ export function ChatsView() {
         ),
     );
     if (existing) {
-      navigate({ "chats.id": existing.id, "chats.dm": null }, "replace");
+      void setParams(
+        { "chats.id": existing.id, "chats.dm": null },
+        { history: "replace" },
+      );
       return;
     }
     if (!canPlay) {
-      navigate({ "chats.dm": null }, "replace");
+      void setParams({ "chats.dm": null }, { history: "replace" });
       return;
     }
     const next = createChat({
@@ -118,14 +127,17 @@ export function ChatsView() {
       members: [dmTarget],
     });
     setDraftChat(next);
-    navigate({ "chats.id": next.id, "chats.dm": null }, "replace");
+    void setParams(
+      { "chats.id": next.id, "chats.dm": null },
+      { history: "replace" },
+    );
   }, [
     dmTarget,
     chats,
     config.userId,
     byId,
     createChat,
-    navigate,
+    setParams,
     canPlay,
     isAccessLoading,
   ]);
@@ -149,11 +161,14 @@ export function ChatsView() {
         chat.members.includes(talkTarget),
     );
     if (existing) {
-      navigate({ "chats.id": existing.id, "chats.talk": null }, "replace");
+      void setParams(
+        { "chats.id": existing.id, "chats.talk": null },
+        { history: "replace" },
+      );
       return;
     }
     if (!canPlay) {
-      navigate({ "chats.talk": null }, "replace");
+      void setParams({ "chats.talk": null }, { history: "replace" });
       return;
     }
     const next = createChat({
@@ -165,14 +180,17 @@ export function ChatsView() {
       ...(player.placeId ? { placeId: player.placeId } : {}),
     });
     setDraftChat(next);
-    navigate({ "chats.id": next.id, "chats.talk": null }, "replace");
+    void setParams(
+      { "chats.id": next.id, "chats.talk": null },
+      { history: "replace" },
+    );
   }, [
     talkTarget,
     chats,
     player.placeId,
     places,
     createChat,
-    navigate,
+    setParams,
     canPlay,
     isAccessLoading,
   ]);
@@ -183,10 +201,10 @@ export function ChatsView() {
         <ChatView
           key={selected.id}
           chat={selected}
-          onBack={() => navigate({ "chats.id": null })}
+          onBack={() => void setParams({ "chats.id": null })}
           onSent={(chat) => {
             setDraftChat(chat);
-            navigate({ "chats.id": chat.id });
+            void setParams({ "chats.id": chat.id });
           }}
         />
       </div>
@@ -199,7 +217,7 @@ export function ChatsView() {
         <ObservedChatView
           key={observed.id}
           chat={observed}
-          onBack={() => navigate({ "chats.id": null })}
+          onBack={() => void setParams({ "chats.id": null })}
         />
       </div>
     );

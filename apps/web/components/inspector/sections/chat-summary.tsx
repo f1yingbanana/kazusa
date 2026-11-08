@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { chatsParsers } from "@/components/views/chats/search-params";
 import { useState } from "react";
 import { EyeIcon, MessagesSquareIcon } from "lucide-react";
 import { CharacterRow } from "@/components/entities/character-row";
@@ -14,7 +16,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { usePlace } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
-import { useNavigate, useParam, useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { listNames } from "@/lib/source/chats/display";
 import { useKazusaConfig } from "@/lib/state/config-store";
 import { useWatchlist } from "@/lib/state/watchlist";
@@ -39,10 +41,13 @@ const TYPE_LABEL = {
  * add or remove people, or leave.
  */
 export function ChatSummarySection({ entity }: { entity: EntityRef }) {
-  const navigate = useNavigate();
+  const [queryState, setParams] = useQueryStates({
+    view: parseAsString,
+    "chats.id": chatsParsers["chats.id"],
+  });
   const [, select] = useSelection();
-  const view = useParam("view");
-  const chatParam = useParam("chats.id");
+  const view = queryState["view"];
+  const chatParam = queryState["chats.id"];
   const isOpen = view === "chats" && chatParam === entity.id;
   const { byId } = useCharacters();
   const { chats } = useChats();
@@ -70,7 +75,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
   const canLeave = canPlay && (own?.type === "group" || own?.type === "huddle");
   const showOpen = readable && !isOpen;
   const showPlace = () => {
-    if (placeId) select({ kind: "place", id: placeId });
+    if (placeId) void select({ kind: "place", id: placeId });
   };
 
   // One plain line: what kind of chat, then who or what state it is in.
@@ -139,7 +144,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    navigate({ view: "chats", "chats.id": entity.id })
+                    void setParams({ view: "chats", "chats.id": entity.id })
                   }
                 >
                   {mine ? (
@@ -190,7 +195,9 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
                 character={character}
                 selected={false}
                 starred={watchSet.has(id)}
-                onSelect={(next) => select({ kind: "character", id: next })}
+                onSelect={(next) =>
+                  void select({ kind: "character", id: next })
+                }
                 action={
                   runsGroup ? (
                     <RemoveButton name={name} onClick={() => setRemoving(id)} />

@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "@/components/views/settings/search-params";
 import { useMemo, useSyncExternalStore } from "react";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import {
@@ -10,7 +12,6 @@ import {
 } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useCharacters, useStatusVersion } from "@/hooks/use-characters";
-import { useNavigate } from "@/hooks/use-url-state";
 import { statusStore } from "@/lib/live/state";
 
 /*
@@ -48,7 +49,10 @@ export function ChatFailure({ members }: { members: readonly string[] }) {
   const version = useStatusVersion();
   const closed = useDismissed();
   const { byId } = useCharacters();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
   const failing = useMemo(
     () =>
       members.flatMap((id) => {
@@ -82,7 +86,7 @@ export function ChatFailure({ members }: { members: readonly string[] }) {
             size="xs"
             className="h-auto px-0"
             onClick={() =>
-              navigate({ view: "settings", "settings.tab": "models" })
+              void setParams({ view: "settings", "settings.tab": "models" })
             }
           >
             Check model settings

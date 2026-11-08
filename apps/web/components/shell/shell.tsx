@@ -1,15 +1,26 @@
 'use client'
 
+import { useQueryState, parseAsString } from 'nuqs'
 import { useEffect, useState } from 'react'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useActiveView } from '@/hooks/use-active-view'
 import { useMediaQuery } from '@/hooks/use-media-query'
-import { useParam, useSelection } from '@/hooks/use-url-state'
+import { useSelection } from '@/hooks/use-selection'
 import { RealtimeProvider } from '@/lib/live/realtime-provider'
 import { SourcesProvider } from '@/lib/source/provider'
 import { serializeEntityRef } from '@/lib/state/entity-ref'
-import { isQuietSelection, onInspectorRequest, settleQuietSelection } from '@/lib/state/inspector-request'
+import {
+  isQuietSelection,
+  onInspectorRequest,
+  settleQuietSelection,
+} from '@/lib/state/inspector-request'
 import { onSidebarRequest } from '@/lib/state/sidebar-request'
 import { CommandPalette } from './command-palette'
 import { Inspector } from './inspector'
@@ -29,16 +40,17 @@ export function Shell() {
 }
 
 /**
- * rail (where) → section sidebar (which) → stage (what) → inspector (details).
+ * Rail (where) → section sidebar (which) → stage (what) → inspector (details).
  * Below `lg` the sidebar isn't docked: sections show it as their first screen,
- * or open it as a sheet on request. Below `md` the rail becomes a bottom tab bar.
+ * or open it as a sheet on request. Below `md` the rail becomes a bottom tab
+ * bar.
  */
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [selection, select] = useSelection()
   const active = useActiveView()
-  const view = useParam('view')
+  const [view] = useQueryState('view', parseAsString)
   const wide = useMediaQuery('(min-width: 1280px)')
   const Sidebar = active.sidebar
 
@@ -50,7 +62,11 @@ function Layout() {
   const [seen, setSeen] = useState({ selKey, view })
   if (seen.selKey !== selKey || seen.view !== view) {
     setSeen({ selKey, view })
-    setSheetOpen(seen.selKey !== selKey ? Boolean(selKey) && !isQuietSelection(selKey) : false)
+    setSheetOpen(
+      seen.selKey !== selKey
+        ? Boolean(selKey) && !isQuietSelection(selKey)
+        : false,
+    )
   }
   useEffect(() => settleQuietSelection(selKey), [selKey])
   useEffect(() => onInspectorRequest(() => setSheetOpen(true)), [])
@@ -62,14 +78,20 @@ function Layout() {
       <div className="flex min-h-0 flex-1">
         <SectionRail onOpenPalette={() => setPaletteOpen(true)} />
         {Sidebar ? (
-          <aside aria-label={`${active.label} sidebar`} className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
+          <aside
+            aria-label={`${active.label} sidebar`}
+            className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex"
+          >
             <Sidebar key={active.id} />
           </aside>
         ) : null}
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage />
         </main>
-        <aside aria-label="Inspector" className="hidden w-80 shrink-0 flex-col border-l xl:flex">
+        <aside
+          aria-label="Inspector"
+          className="hidden w-80 shrink-0 flex-col border-l xl:flex"
+        >
           <Inspector />
         </aside>
       </div>
@@ -78,12 +100,19 @@ function Layout() {
 
       {Sidebar ? (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="w-80 gap-0 bg-sidebar p-0 lg:hidden" showCloseButton={false}>
+          <SheetContent
+            side="left"
+            className="w-80 gap-0 bg-sidebar p-0 lg:hidden"
+            showCloseButton={false}
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>{`${active.label} sidebar`}</SheetTitle>
               <SheetDescription>{`Narrow what the ${active.label} section shows.`}</SheetDescription>
             </SheetHeader>
-            <Sidebar key={active.id} onNavigated={() => setSidebarOpen(false)} />
+            <Sidebar
+              key={active.id}
+              onNavigated={() => setSidebarOpen(false)}
+            />
           </SheetContent>
         </Sheet>
       ) : null}
@@ -91,13 +120,19 @@ function Layout() {
       <Sheet
         open={!wide && selection !== null && sheetOpen}
         onOpenChange={(open) => {
-          if (!open) select(null)
+          if (!open) void select(null)
         }}
       >
-        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-sm" showCloseButton={false}>
+        <SheetContent
+          side="right"
+          className="w-full gap-0 p-0 sm:max-w-sm"
+          showCloseButton={false}
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>Inspector</SheetTitle>
-            <SheetDescription>Details for the selected entity.</SheetDescription>
+            <SheetDescription>
+              Details for the selected entity.
+            </SheetDescription>
           </SheetHeader>
           <Inspector />
         </SheetContent>
@@ -110,7 +145,11 @@ function Layout() {
 
 function ShellSkeleton() {
   return (
-    <div className="flex h-dvh flex-col" aria-busy="true" aria-label="Connecting to Kazusa">
+    <div
+      className="flex h-dvh flex-col"
+      aria-busy="true"
+      aria-label="Connecting to Kazusa"
+    >
       <div className="flex h-12 items-center gap-3 border-b bg-sidebar px-3">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="mx-auto h-4 w-40" />

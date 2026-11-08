@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, type inferParserType } from "nuqs";
+import { wikiParsers } from "./search-params";
 import { useMemo, useState } from "react";
 import { AlertTriangleIcon, FilePlusIcon, MoonIcon } from "lucide-react";
 import type { WikiListItem } from "@kazusa/client";
@@ -20,7 +22,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useWikiLint, useWikiList } from "@/hooks/use-wiki";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { NewPageDialog } from "./new-page-dialog";
@@ -31,10 +32,10 @@ const CLOSED = { "wiki.edit": null, "wiki.kind": null, "wiki.name": null };
 
 /** Pick a wiki (the world's, or one character's mind), then a page in it. */
 export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
-  const agent = useParam("wiki.agent") ?? undefined;
-  const open = useParam("wiki.page");
-  const tab = useParam("wiki.tab");
-  const navigate = useNavigate();
+  const [queryState, setParams] = useQueryStates(wikiParsers);
+  const agent = queryState["wiki.agent"] ?? undefined;
+  const open = queryState["wiki.page"];
+  const tab = queryState["wiki.tab"];
   const { canManage } = useAccess();
   const { characters } = useCharacters();
   const { data } = useWikiList(agent);
@@ -70,8 +71,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
     [data, needle],
   );
 
-  const go = (patch: Readonly<Record<string, string | null>>) => {
-    navigate({ ...CLOSED, ...patch });
+  const go = (patch: Partial<inferParserType<typeof wikiParsers>>) => {
+    void setParams({ ...CLOSED, ...patch });
     onNavigated?.();
   };
   const problems = lint?.findings.length ?? 0;

@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates } from "nuqs";
+import { timelineParsers } from "./search-params";
 import {
   CheckIcon,
   StarIcon,
@@ -10,7 +12,6 @@ import {
 import type { JournalKind } from "@kazusa/client";
 import { CharacterChip } from "@/components/entities/chips";
 import { Button } from "@/components/ui/button";
-import { useListParam, useNavigate, useParam } from "@/hooks/use-url-state";
 import {
   effectiveTimelineKinds,
   TIMELINE_KIND_LIST,
@@ -94,24 +95,22 @@ function SectionLabel({
  * any other selection is stored explicitly.
  */
 export function TimelineSidebar() {
-  const navigate = useNavigate();
-  const actorParam = useListParam("tl.actors");
-  const kindParam = useListParam("tl.kinds") as JournalKind[];
-  const watchOnly = useParam("tl.watch") === "1";
+  const [queryState, setFilters] = useQueryStates(timelineParsers, {
+    history: "replace",
+  });
+  const actorParam = queryState["tl.actors"];
+  const kindParam = queryState["tl.kinds"];
+  const watchOnly = queryState["tl.watch"];
   const watchlist = useWatchlist();
   const effectiveKinds = effectiveTimelineKinds(kindParam);
   const hasFilters = actorParam.length > 0 || kindParam.length > 0 || watchOnly;
-
-  function patch(next: Record<string, string | null>) {
-    navigate({ view: "timeline", ...next }, "replace");
-  }
 
   function toggleKind(kind: JournalKind) {
     const next = effectiveKinds.includes(kind)
       ? effectiveKinds.filter((k) => k !== kind)
       : [...effectiveKinds, kind];
     // Keep registry order so the param is stable.
-    patch({
+    void setFilters({
       "tl.kinds": timelineKindsParam(ALL_KINDS.filter((k) => next.includes(k))),
     });
   }
@@ -126,7 +125,11 @@ export function TimelineSidebar() {
               variant="ghost"
               size="xs"
               onClick={() =>
-                patch({ "tl.actors": null, "tl.kinds": null, "tl.watch": null })
+                void setFilters({
+                  "tl.actors": null,
+                  "tl.kinds": null,
+                  "tl.watch": null,
+                })
               }
             >
               Clear
@@ -147,7 +150,9 @@ export function TimelineSidebar() {
             checked={!watchOnly && actorParam.length === 0}
             icon={UsersIcon}
             label="Everyone"
-            onToggle={() => patch({ "tl.watch": null, "tl.actors": null })}
+            onToggle={() =>
+              void setFilters({ "tl.watch": null, "tl.actors": null })
+            }
           />
           <OptionRow
             role="radio"
@@ -155,7 +160,9 @@ export function TimelineSidebar() {
             icon={StarIcon}
             label="Watchlist"
             hint={String(watchlist.length)}
-            onToggle={() => patch({ "tl.watch": "1", "tl.actors": null })}
+            onToggle={() =>
+              void setFilters({ "tl.watch": true, "tl.actors": null })
+            }
           />
         </div>
         {!watchOnly && actorParam.length > 0 ? (
@@ -173,9 +180,8 @@ export function TimelineSidebar() {
                   variant="ghost"
                   size="icon-xs"
                   onClick={() =>
-                    patch({
-                      "tl.actors":
-                        actorParam.filter((a) => a !== id).join(",") || null,
+                    void setFilters({
+                      "tl.actors": actorParam.filter((a) => a !== id),
                     })
                   }
                 >

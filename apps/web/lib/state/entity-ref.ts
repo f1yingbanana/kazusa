@@ -1,3 +1,5 @@
+import { createParser } from "nuqs/server";
+
 export const ENTITY_KINDS = ["character", "chat", "place"] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
@@ -10,8 +12,13 @@ export function serializeEntityRef(ref: EntityRef) {
   return `${ref.kind}:${ref.id}`;
 }
 
-/** Splits on the FIRST colon: ids such as `user:you` or `group:club` contain colons. */
-export function parseEntityRef(value: string | null | undefined): EntityRef | null {
+/**
+ * Splits on the FIRST colon: ids such as `user:you` or `group:club` contain
+ * colons.
+ */
+export function parseEntityRef(
+  value: string | null | undefined,
+): EntityRef | null {
   if (!value) return null;
   const index = value.indexOf(":");
   if (index <= 0 || index === value.length - 1) return null;
@@ -23,3 +30,13 @@ export function parseEntityRef(value: string | null | undefined): EntityRef | nu
 export function sameEntity(a: EntityRef | null, b: EntityRef | null) {
   return a?.kind === b?.kind && a?.id === b?.id;
 }
+
+/**
+ * The same typed selection is shared by inspector readers and navigation
+ * writers.
+ */
+export const entityRefParser = createParser({
+  parse: parseEntityRef,
+  serialize: serializeEntityRef,
+  eq: sameEntity,
+});

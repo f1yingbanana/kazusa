@@ -1,10 +1,11 @@
 'use client'
 
+import { useQueryStates, parseAsString } from 'nuqs'
+import { timelineParsers } from '@/components/views/timeline/search-params'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TimelineRow } from '@/components/views/timeline/timeline-row'
 import { useRecentEvents } from '@/hooks/use-timeline'
-import { useNavigate } from '@/hooks/use-url-state'
 import { RECENT_KINDS, TIMELINE_KINDS } from '@/lib/registry/timeline-kinds'
 import type { EntityRef } from '@/lib/state/entity-ref'
 import { formatSimTime } from '@/lib/time/sim'
@@ -15,7 +16,11 @@ import { formatSimTime } from '@/lib/time/sim'
  */
 export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
   const { events, isLoading } = useRecentEvents(entity.id, 3, RECENT_KINDS)
-  const navigate = useNavigate()
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    'tl.actors': timelineParsers['tl.actors'],
+    'tl.watch': timelineParsers['tl.watch'],
+  })
 
   if (isLoading) {
     return (
@@ -34,7 +39,13 @@ export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
       ) : (
         <div className="-mx-3 flex flex-col">
           {events.map((event) => (
-            <TimelineRow key={event.seq} event={event} compact omitActor={entity.id} className="py-1.5" />
+            <TimelineRow
+              key={event.seq}
+              event={event}
+              compact
+              omitActor={entity.id}
+              className="py-1.5"
+            />
           ))}
         </div>
       )}
@@ -42,7 +53,13 @@ export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
         variant="link"
         size="sm"
         className="self-start px-0"
-        onClick={() => navigate({ view: 'timeline', 'tl.actors': entity.id, 'tl.watch': null })}
+        onClick={() =>
+          void setParams({
+            view: 'timeline',
+            'tl.actors': [entity.id],
+            'tl.watch': null,
+          })
+        }
       >
         Open in Timeline
       </Button>
@@ -55,5 +72,7 @@ export function CharacterRecentSummary({ entity }: { entity: EntityRef }) {
   const { events } = useRecentEvents(entity.id, 3, RECENT_KINDS)
   const latest = events[0]
   if (!latest) return null
-  return <>{`${TIMELINE_KINDS[latest.kind].label} at ${formatSimTime(latest.simTime)}`}</>
+  return (
+    <>{`${TIMELINE_KINDS[latest.kind].label} at ${formatSimTime(latest.simTime)}`}</>
+  )
 }

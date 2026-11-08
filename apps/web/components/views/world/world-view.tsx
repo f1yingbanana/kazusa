@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryState, useQueryStates } from "nuqs";
+import { worldParsers } from "./search-params";
+import { entityRefParser } from "@/lib/state/entity-ref";
 import { useCallback, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { CharacterSummary } from "@kazusa/client";
@@ -22,10 +25,9 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useSimNow } from "@/hooks/use-clock";
-import { useNavigate, useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { locationStore } from "@/lib/live/state";
 import { areaPath } from "@/lib/location/places";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { useWatchlist } from "@/lib/state/watchlist";
 import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
@@ -118,7 +120,10 @@ function itemsOf(folder: Folder): Item[] {
 }
 
 function FolderStage() {
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    "world.in": worldParsers["world.in"],
+    "world.as": worldParsers["world.as"],
+  });
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
   const { by, kind, as, folder } = useWorldParams();
@@ -151,11 +156,11 @@ function FolderStage() {
   });
 
   const onSelect = useCallback(
-    (id: string) => select({ kind: "character", id }),
+    (id: string) => void select({ kind: "character", id }),
     [select],
   );
   const selectPlace = useCallback(
-    (id: string) => select({ kind: "place", id }),
+    (id: string) => void select({ kind: "place", id }),
     [select],
   );
   const selectedId = selection?.kind === "character" ? selection.id : null;
@@ -180,7 +185,7 @@ function FolderStage() {
           variant="ghost"
           size="icon-sm"
           className="lg:hidden"
-          onClick={() => navigate({ "world.in": null })}
+          onClick={() => void setParams({ "world.in": null })}
         >
           <ChevronLeftIcon />
           <span className="sr-only">All folders</span>
@@ -210,7 +215,9 @@ function FolderStage() {
               size="icon-sm"
               aria-pressed={showMap}
               className="rounded-r-none"
-              onClick={() => navigate({ "world.as": "map" }, "replace")}
+              onClick={() =>
+                void setParams({ "world.as": "map" }, { history: "replace" })
+              }
             >
               <MapIcon />
               <span className="sr-only">Map</span>
@@ -220,7 +227,9 @@ function FolderStage() {
               size="icon-sm"
               aria-pressed={!showMap}
               className="rounded-l-none"
-              onClick={() => navigate({ "world.as": "list" }, "replace")}
+              onClick={() =>
+                void setParams({ "world.as": "list" }, { history: "replace" })
+              }
             >
               <ListIcon />
               <span className="sr-only">List</span>
@@ -296,7 +305,7 @@ function FolderStage() {
 
 /** Who isn't anywhere on the map, and the way to them. */
 function OffMap({ by, groups }: { by: string; groups: readonly Folder[] }) {
-  const navigate = useNavigate();
+  const [, setFolder] = useQueryState("world.in", worldParsers["world.in"]);
   if (by !== "place") return null;
   const off = groups.filter(
     (group) =>
@@ -311,7 +320,7 @@ function OffMap({ by, groups }: { by: string; groups: readonly Folder[] }) {
           variant="outline"
           size="xs"
           className="bg-background"
-          onClick={() => navigate({ "world.in": group.key })}
+          onClick={() => void setFolder(group.key)}
         >
           {group.label}
           <span className="font-mono tabular-nums">{group.members.length}</span>
@@ -354,7 +363,7 @@ function SectionHeading({
 }
 
 function EmptyFolder({ folder }: { folder: Folder }) {
-  const navigate = useNavigate();
+  const [, setSelection] = useQueryState("sel", entityRefParser);
   const watch = folder.key === WATCH_FOLDER;
   const placed = folder.placeId !== undefined;
   const title = watch
@@ -385,9 +394,7 @@ function EmptyFolder({ folder }: { folder: Folder }) {
           variant="outline"
           size="sm"
           onClick={() =>
-            navigate({
-              sel: serializeEntityRef({ kind: "place", id: folder.placeId! }),
-            })
+            void setSelection({ kind: "place", id: folder.placeId! })
           }
         >
           Place details

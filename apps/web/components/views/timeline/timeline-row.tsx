@@ -1,5 +1,8 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { entityRefParser } from "@/lib/state/entity-ref";
+import { chatsParsers } from "@/components/views/chats/search-params";
 import { memo } from "react";
 import { ArrowUpRightIcon } from "lucide-react";
 import type { JournalEvent } from "@kazusa/client";
@@ -7,10 +10,8 @@ import { CharacterChip, useChatTitle } from "@/components/entities/chips";
 import { Thought } from "@/components/entities/fact";
 import { Button } from "@/components/ui/button";
 import { useCharacter } from "@/hooks/use-characters";
-import { useNavigate } from "@/hooks/use-url-state";
 import { kindOf } from "@/lib/registry/timeline-kinds";
 import type { StageLink } from "@/lib/registry/types";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { formatSimTime } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,12 @@ function ThoughtAttribution({ by, text }: { by: string; text: string }) {
  */
 function ChatLink({ link, chatId }: { link: StageLink; chatId: string }) {
   const { mine, readable } = useChatTitle(chatId);
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    sel: entityRefParser,
+    "chats.id": chatsParsers["chats.id"],
+    "chats.msg": chatsParsers["chats.msg"],
+  });
   if (!readable) return null;
   return (
     <Button
@@ -35,10 +41,10 @@ function ChatLink({ link, chatId }: { link: StageLink; chatId: string }) {
       size="xs"
       className="shrink-0 self-start text-muted-foreground"
       onClick={() =>
-        navigate({
+        void setParams({
           view: link.view,
           ...link.params,
-          sel: serializeEntityRef({ kind: "chat", id: chatId }),
+          sel: { kind: "chat", id: chatId },
         })
       }
     >

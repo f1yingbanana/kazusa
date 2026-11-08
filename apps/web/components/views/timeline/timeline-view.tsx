@@ -1,9 +1,11 @@
 'use client'
 
+import { useQueryStates } from 'nuqs'
+import { timelineParsers } from './search-params'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowUpIcon, ListFilterIcon } from 'lucide-react'
-import type { JournalEvent, JournalKind } from '@kazusa/client'
+import type { JournalEvent } from '@kazusa/client'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -16,8 +18,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { useCharacters } from '@/hooks/use-characters'
 import { useTimeline } from '@/hooks/use-timeline'
-import { useListParam, useNavigate, useParam } from '@/hooks/use-url-state'
-import { effectiveTimelineKinds, TIMELINE_KIND_LIST } from '@/lib/registry/timeline-kinds'
+import {
+  effectiveTimelineKinds,
+  TIMELINE_KIND_LIST,
+} from '@/lib/registry/timeline-kinds'
 import { requestSidebar } from '@/lib/state/sidebar-request'
 import { useWatchlist } from '@/lib/state/watchlist'
 import { formatSimDateLong, simDayStart } from '@/lib/time/sim'
@@ -25,7 +29,11 @@ import { TimelineRow } from './timeline-row'
 
 type Row =
   | { readonly type: 'day'; readonly key: string; readonly start: number }
-  | { readonly type: 'event'; readonly key: string; readonly event: JournalEvent }
+  | {
+      readonly type: 'event'
+      readonly key: string
+      readonly event: JournalEvent
+    }
 
 function buildRows(events: readonly JournalEvent[]): Row[] {
   const rows: Row[] = []
@@ -42,10 +50,10 @@ function buildRows(events: readonly JournalEvent[]): Row[] {
 }
 
 export function TimelineView() {
-  const navigate = useNavigate()
-  const actorParam = useListParam('tl.actors')
-  const kindParam = useListParam('tl.kinds') as JournalKind[]
-  const watchOnly = useParam('tl.watch') === '1'
+  const [queryState, setParams] = useQueryStates(timelineParsers)
+  const actorParam = queryState['tl.actors']
+  const kindParam = queryState['tl.kinds']
+  const watchOnly = queryState['tl.watch']
   const watchlist = useWatchlist()
   const { byId } = useCharacters()
 
@@ -62,7 +70,8 @@ export function TimelineView() {
 
   // While scrolled away, newer events are held back so the viewport doesn't jump.
   const visible = useMemo(
-    () => (atTop ? timeline.events : timeline.events.filter((e) => e.seq <= seenSeq)),
+    () =>
+      atTop ? timeline.events : timeline.events.filter((e) => e.seq <= seenSeq),
     [atTop, timeline.events, seenSeq],
   )
   const pending = atTop ? 0 : timeline.events.length - visible.length
@@ -79,7 +88,11 @@ export function TimelineView() {
   const lastIndex = items.at(-1)?.index ?? 0
 
   useEffect(() => {
-    if (lastIndex >= rows.length - 12 && timeline.hasMore && !timeline.isLoadingMore) {
+    if (
+      lastIndex >= rows.length - 12 &&
+      timeline.hasMore &&
+      !timeline.isLoadingMore
+    ) {
       void timeline.loadMore()
     }
   }, [lastIndex, rows.length, timeline])
@@ -99,7 +112,9 @@ export function TimelineView() {
         ? `${actorParam.length} characters`
         : 'Everyone'
   const kindsLabel =
-    kinds.length === TIMELINE_KIND_LIST.length ? 'all kinds' : `${kinds.length} of ${TIMELINE_KIND_LIST.length} kinds`
+    kinds.length === TIMELINE_KIND_LIST.length
+      ? 'all kinds'
+      : `${kinds.length} of ${TIMELINE_KIND_LIST.length} kinds`
 
   return (
     <section aria-label="Timeline" className="flex min-h-0 flex-1 flex-col">
@@ -108,10 +123,17 @@ export function TimelineView() {
           <h2 className="text-sm font-semibold">Timeline</h2>
           <p className="truncate font-mono text-[11px] text-muted-foreground">{`${following} · ${kindsLabel}`}</p>
         </div>
-        <Button variant="outline" size="sm" className="relative lg:hidden" onClick={requestSidebar}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="relative lg:hidden"
+          onClick={requestSidebar}
+        >
           <ListFilterIcon data-icon="inline-start" />
           Filters
-          {hasFilters ? <span aria-hidden className="size-1.5 rounded-full bg-primary" /> : null}
+          {hasFilters ? (
+            <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+          ) : null}
           {hasFilters ? <span className="sr-only">(changed)</span> : null}
         </Button>
       </header>
@@ -141,7 +163,12 @@ export function TimelineView() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => navigate({ 'tl.actors': null, 'tl.kinds': null, 'tl.watch': null }, 'replace')}
+                  onClick={() =>
+                    void setParams(
+                      { 'tl.actors': null, 'tl.kinds': null, 'tl.watch': null },
+                      { history: 'replace' },
+                    )
+                  }
                 >
                   Reset filters
                 </Button>
@@ -149,8 +176,15 @@ export function TimelineView() {
             ) : null}
           </Empty>
         ) : (
-          <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
-            <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="h-full overflow-y-auto"
+          >
+            <div
+              className="relative w-full"
+              style={{ height: virtualizer.getTotalSize() }}
+            >
               {items.map((item) => {
                 const row = rows[item.index]
                 return (
@@ -166,7 +200,10 @@ export function TimelineView() {
                         {formatSimDateLong(row.start)}
                       </h3>
                     ) : (
-                      <TimelineRow event={row.event} className="animate-in fade-in-0 slide-in-from-top-1 duration-300 motion-reduce:animate-none" />
+                      <TimelineRow
+                        event={row.event}
+                        className="animate-in fade-in-0 slide-in-from-top-1 duration-300 motion-reduce:animate-none"
+                      />
                     )}
                   </div>
                 )
@@ -184,7 +221,9 @@ export function TimelineView() {
           <Button
             size="sm"
             className="absolute top-3 left-1/2 -translate-x-1/2 shadow-md"
-            onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() =>
+              scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+            }
           >
             <ArrowUpIcon data-icon="inline-start" />
             {pending === 1 ? '1 new event' : `${pending} new events`}

@@ -1,10 +1,11 @@
 "use client";
 
+import { useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "@/components/views/settings/search-params";
 import { useCallback, useEffect, useRef } from "react";
 import { CircleArrowUpIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAnnouncedRelease } from "@/hooks/use-update";
-import { useNavigate } from "@/hooks/use-url-state";
 
 /** The last release whose notice was dismissed, so each is announced once. */
 const DISMISSED_KEY = "kazusa:update-dismissed";
@@ -32,12 +33,15 @@ function dismiss(version: string) {
  */
 export function UpdateAvailableItem() {
   const release = useAnnouncedRelease();
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
   const version = release?.version;
   const shown = useRef<string | null>(null);
   const openUpdates = useCallback(
-    () => navigate({ view: "settings", "settings.tab": "updates" }),
-    [navigate],
+    () => void setParams({ view: "settings", "settings.tab": "updates" }),
+    [setParams],
   );
 
   useEffect(() => {

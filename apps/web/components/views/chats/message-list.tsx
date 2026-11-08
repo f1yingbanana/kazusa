@@ -33,7 +33,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSimNow } from "@/hooks/use-clock";
 import { useFollowBottom } from "@/hooks/use-follow-bottom";
-import { useSelection } from "@/hooks/use-url-state";
+import { useSelection } from "@/hooks/use-selection";
 import { formatDayLabel } from "@/lib/format";
 import type { ChatMessage } from "@kazusa/client";
 import type { BrainActivity } from "@/lib/source/brain/activity";
@@ -191,7 +191,7 @@ export function MessageList({
     const index = indexOf(id);
     if (!range || index === -1) return;
     const next = pickMessage(ids, { range, excluded }, index);
-    select(next.range);
+    void select(next.range);
     setExcluded(next.excluded);
   };
 
@@ -210,7 +210,7 @@ export function MessageList({
           const index = indexOf(message.id);
           if (index === -1) return;
           setExcluded(new Set());
-          select({ start: index, end: index });
+          void select({ start: index, end: index });
         }}
       />
     );
@@ -585,7 +585,7 @@ function SenderAvatar({ participant }: { participant: Participant }) {
         <button
           type="button"
           onClick={() => {
-            select({ kind: "character", id: character.id });
+            void select({ kind: "character", id: character.id });
             requestInspector();
           }}
           // Inset: the avatar's frame clips anything outside the circle.

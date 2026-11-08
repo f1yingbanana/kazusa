@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryStates, useQueryState } from "nuqs";
+import { wikiParsers } from "./search-params";
 import {
   BookOpenIcon,
   GlobeIcon,
@@ -7,12 +9,7 @@ import {
   PencilIcon,
   UserRoundIcon,
 } from "lucide-react";
-import {
-  WikiKindSchema,
-  type Knowledge,
-  type WikiKind,
-  type WikiPage,
-} from "@kazusa/client";
+import { type Knowledge, type WikiKind, type WikiPage } from "@kazusa/client";
 import { Unavailable } from "@/components/entities/source-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +21,6 @@ import {
 } from "@/components/ui/empty";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacter } from "@/hooks/use-characters";
-import { useNavigate, useParam } from "@/hooks/use-url-state";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
 import { useSources } from "@/lib/source/provider";
 import { requestSidebar } from "@/lib/state/sidebar-request";
@@ -214,11 +210,16 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
   const read = useWikiPage(id, agent);
   const { data, isLoading } = read;
   const character = useCharacter(agent);
-  const navigate = useNavigate();
+  const [queryState, setParams] = useQueryStates({
+    "wiki.edit": wikiParsers["wiki.edit"],
+    "wiki.kind": wikiParsers["wiki.kind"],
+    "wiki.name": wikiParsers["wiki.name"],
+    "wiki.page": wikiParsers["wiki.page"],
+  });
   const { canManage } = useAccess();
-  const editParam = useParam("wiki.edit");
-  const kindParam = WikiKindSchema.safeParse(useParam("wiki.kind"));
-  const newName = useParam("wiki.name");
+  const editParam = queryState["wiki.edit"];
+  const kindParam = queryState["wiki.kind"];
+  const newName = queryState["wiki.name"];
   const name = character?.name ?? agent ?? "";
   // Their own page only exists with a character chosen.
   const editing: WikiSide | undefined =
@@ -226,7 +227,7 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
       ? editParam
       : undefined;
   const open = (page: string | null) =>
-    navigate({
+    void setParams({
       "wiki.page": page,
       "wiki.edit": null,
       "wiki.kind": null,
@@ -234,7 +235,7 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
     });
   const edit = (side: WikiSide | null) => {
     if (!canManage && side) return;
-    navigate({
+    void setParams({
       "wiki.edit": side,
       ...(side ? {} : { "wiki.kind": null, "wiki.name": null }),
     });
@@ -249,9 +250,8 @@ function PagePane({ id, agent }: { id: string; agent?: string }) {
       </p>
     );
   const title = data?.world?.name ?? data?.personal?.name ?? id;
-  const kind: WikiKind | undefined = kindParam.success
-    ? kindParam.data
-    : (data?.world?.kind ?? data?.personal?.kind);
+  const kind: WikiKind | undefined =
+    kindParam ?? data?.world?.kind ?? data?.personal?.kind;
   const subject = newName ?? title;
   const editor = (side: WikiSide) => (
     <PageEditor
@@ -458,9 +458,11 @@ function LintPane({ agent }: { agent?: string }) {
 /** Canon next to each character's mind, what sleep changed, and what is broken. */
 export function WikiView() {
   const { resolved } = useSources();
-  const agent = useParam("wiki.agent") ?? undefined;
-  const page = useParam("wiki.page") ?? undefined;
-  const tab = useParam("wiki.tab");
+  const agent =
+    useQueryState("wiki.agent", wikiParsers["wiki.agent"])[0] ?? undefined;
+  const page =
+    useQueryState("wiki.page", wikiParsers["wiki.page"])[0] ?? undefined;
+  const [tab] = useQueryState("wiki.tab", wikiParsers["wiki.tab"]);
 
   if (resolved.wiki !== "live")
     return <Unavailable requires={["wiki"]} className="m-auto" />;

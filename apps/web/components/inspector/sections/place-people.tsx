@@ -6,9 +6,13 @@ import { CharacterRow } from '@/components/entities/character-row'
 import { PlaceChip } from '@/components/entities/chips'
 import { useCharacters } from '@/hooks/use-characters'
 import { useSimNow } from '@/hooks/use-clock'
-import { useLocationVersion, useOccupancy, usePlaces } from '@/hooks/use-location'
+import {
+  useLocationVersion,
+  useOccupancy,
+  usePlaces,
+} from '@/hooks/use-location'
 import { useOffstage } from '@/hooks/use-stage'
-import { useSelection } from '@/hooks/use-url-state'
+import { useSelection } from '@/hooks/use-selection'
 import { locationStore } from '@/lib/live/state'
 import { headingTo, peopleWithin } from '@/lib/location/places'
 import type { EntityRef } from '@/lib/state/entity-ref'
@@ -61,7 +65,7 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
   const inside = (places.children.get(entity.id) ?? [])
     .map((id) => ({ id, count: peopleWithin(places, occupied, id).length }))
     .filter(({ count }) => count > 0)
-  const onSelect = (id: string) => select({ kind: 'character', id })
+  const onSelect = (id: string) => void select({ kind: 'character', id })
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,7 +90,9 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Nobody is standing here.</p>
+          <p className="text-sm text-muted-foreground">
+            Nobody is standing here.
+          </p>
         )}
       </div>
 
@@ -97,7 +103,9 @@ export function PlacePeopleSection({ entity }: { entity: EntityRef }) {
             {inside.map(({ id, count }) => (
               <li key={id} className="flex items-center justify-between gap-2">
                 <PlaceChip id={id} bare />
-                <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                  {count}
+                </span>
               </li>
             ))}
           </ul>

@@ -1,5 +1,8 @@
 "use client";
 
+import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
+import { useQueryStates, parseAsString } from "nuqs";
+import { worldParsers } from "./search-params";
 import { useCallback, useMemo, useState } from "react";
 import type { CharacterSummary } from "@kazusa/client";
 import {
@@ -36,8 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStage } from "@/hooks/use-stage";
-import { useNavigate, useSelection } from "@/hooks/use-url-state";
-import { serializeEntityRef } from "@/lib/state/entity-ref";
+import { useSelection } from "@/hooks/use-selection";
 import { filterCharacters, type KindFilter } from "@/lib/state/grouping";
 import { markQuietSelection } from "@/lib/state/inspector-request";
 import type { SectionSidebarProps } from "@/lib/registry/types";
@@ -222,7 +224,13 @@ export function WorldSidebar({
   /** Rendered as the narrow-screen first screen, where nothing is open yet. */
   asFirstScreen?: boolean;
 }) {
-  const navigate = useNavigate();
+  const [, setParams] = useQueryStates({
+    sel: entityRefParser,
+    view: parseAsString,
+    "world.in": worldParsers["world.in"],
+    "world.by": worldParsers["world.by"],
+    "world.kind": worldParsers["world.kind"],
+  });
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
   const {
@@ -285,17 +293,15 @@ export function WorldSidebar({
    * screens.
    */
   function open(key: string, placeId?: string) {
-    const sel = placeId
-      ? serializeEntityRef({ kind: "place", id: placeId })
-      : undefined;
-    if (sel) markQuietSelection(sel);
-    navigate({ view: "world", "world.in": key, ...(sel ? { sel } : {}) });
+    const sel = placeId ? ({ kind: "place", id: placeId } as const) : undefined;
+    if (sel) markQuietSelection(serializeEntityRef(sel));
+    void setParams({ view: "world", "world.in": key, ...(sel ? { sel } : {}) });
     onNavigated?.();
   }
 
   const onSelect = useCallback(
     (id: string) => {
-      select({ kind: "character", id });
+      void select({ kind: "character", id });
       onNavigated?.();
     },
     [select, onNavigated],
@@ -307,16 +313,19 @@ export function WorldSidebar({
     folderParam !== ALL_FOLDER &&
     folderParam !== WATCH_FOLDER;
   function setBy(next: Dimension) {
-    navigate(
+    void setParams(
       {
         "world.by": next === defaultBy ? null : next,
         ...(groupOpen ? { "world.in": null } : {}),
       },
-      "replace",
+      { history: "replace" },
     );
   }
   function setKind(next: KindFilter) {
-    navigate({ "world.kind": next === "characters" ? null : next }, "replace");
+    void setParams(
+      { "world.kind": next === "characters" ? null : next },
+      { history: "replace" },
+    );
   }
 
   return (
