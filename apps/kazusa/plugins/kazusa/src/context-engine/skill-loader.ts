@@ -248,6 +248,32 @@ export function createSkillLoader(
 ): SkillLoader {
   const contentCache = new Map<string, string>();
   const pathCache = new Map<string, string | null>();
+  // Roots depend on the context, the environment and plugin manifests on disk.
+  // Manifests change only with a plugin reload, which builds new loaders, and
+  // `refresh_skills` clears this with the rest. Recomputing them read every
+  // plugin's manifest on each lookup: 9,861 reads per tool-history render.
+  const rootsCache = new Map<string, readonly string[]>();
+
+  function candidateRoots(context?: SkillResolutionContext): readonly string[] {
+    const env = options.env ?? process.env;
+    const key = JSON.stringify([
+      context?.cwd ?? options.cwd ?? process.cwd(),
+      process.cwd(),
+      context?.agentId ?? options.agentId,
+      context?.workspaceDir ?? options.workspaceDir,
+      context?.executionWorkspaceDir ?? options.executionWorkspaceDir,
+      env.HOME,
+      env.USERPROFILE,
+      env.OPENCLAW_STATE_DIR,
+      env.OPENCLAW_BUNDLED_SKILLS_DIR,
+    ]);
+    let roots = rootsCache.get(key);
+    if (!roots) {
+      roots = Object.freeze([...collectCandidateRoots(context)]);
+      rootsCache.set(key, roots);
+    }
+    return roots;
+  }
 
   function collectCandidateRoots(
     context?: SkillResolutionContext,
@@ -391,7 +417,7 @@ export function createSkillLoader(
     name: string,
     context?: SkillResolutionContext,
   ): Promise<string | null> {
-    const roots = collectCandidateRoots(context);
+    const roots = candidateRoots(context);
     const cacheKey = `${name}::${roots.join(";")}`;
     if (pathCache.has(cacheKey)) {
       return pathCache.get(cacheKey) ?? null;
@@ -509,7 +535,7 @@ export function createSkillLoader(
   ): Promise<string> {
     const resolvedPath = await resolveSkillPath(name, context);
     if (!resolvedPath) {
-      const roots = collectCandidateRoots(context);
+      const roots = candidateRoots(context);
       throw new Error(
         `Kazusa skill "${name}" could not be resolved from candidate roots:\n  ${roots.join("\n  ")}`,
       );
@@ -531,7 +557,7 @@ export function createSkillLoader(
   ): Promise<ParsedSkillDocument> {
     const resolvedPath = await resolveSkillPath(name, context);
     if (!resolvedPath) {
-      const roots = collectCandidateRoots(context);
+      const roots = candidateRoots(context);
       throw new Error(
         `Kazusa skill "${name}" could not be resolved from candidate roots:\n  ${roots.join("\n  ")}`,
       );
@@ -543,6 +569,7 @@ export function createSkillLoader(
   function clearCache(): void {
     contentCache.clear();
     pathCache.clear();
+    rootsCache.clear();
   }
   loaderCaches().add(new WeakRef(clearCache));
 
@@ -550,7 +577,7 @@ export function createSkillLoader(
     loadSkill,
     loadSkillDocument,
     resolveSkillPath,
-    getCandidateRoots: (ctx) => collectCandidateRoots(ctx),
+    getCandidateRoots: candidateRoots,
     clearCache,
   };
 }

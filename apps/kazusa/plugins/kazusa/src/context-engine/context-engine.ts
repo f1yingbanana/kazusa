@@ -6,7 +6,7 @@ import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
-import { createSkillText } from "../skill-text.ts";
+import { skillTextFor } from "../skill-text.ts";
 import { renderToolHistory } from "./tool-history.ts";
 
 import type { AssembledContext, BrainTurn } from "@kazusa/client";
@@ -131,13 +131,12 @@ export async function assembleContext(params: {
   const inPerson = params.inCompany
     ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
     : undefined;
+  const text = skillTextFor(skillLoader);
   const deliveries = (
     section: string,
     values?: Readonly<Record<string, string | number>>,
   ): string =>
-    createSkillText(skillLoader)(`kazusa-deliveries#${section}`, values, {
-      agentId: params.agentId,
-    });
+    text(`kazusa-deliveries#${section}`, values, { agentId: params.agentId });
 
   // Only what is the same every turn, so the provider reuses the whole system
   // prompt and the records after it. The clock lives in the situation message,

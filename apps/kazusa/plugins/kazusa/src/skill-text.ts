@@ -108,6 +108,23 @@ export function createSkillText(
   );
 }
 
+const SHARED = new WeakMap<Pick<SkillLoader, "getCandidateRoots">, SkillText>();
+
+/**
+ * The one reader for `loader`. Its file cache lives as long as the loader, so
+ * code that has only a loader at hand doesn't re-read `SKILL.md` per section.
+ */
+export function skillTextFor(
+  loader: Pick<SkillLoader, "getCandidateRoots">,
+): SkillText {
+  let text = SHARED.get(loader);
+  if (!text) {
+    text = createSkillText(loader);
+    SHARED.set(loader, text);
+  }
+  return text;
+}
+
 /** Along this Gateway's skill precedence: workspace, world, then bundled. */
 export function pluginSkillText(api: OpenClawPluginApi): SkillText {
   return createSkillText(
