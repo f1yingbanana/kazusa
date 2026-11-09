@@ -11,8 +11,12 @@ export interface SkillRoot {
 export const ALL = /^/;
 /** `skills/…` under a world's `shared`. */
 export const SHARED_SKILLS = /^skills(?:[\\/]|$)/;
-/** `<character>/skills/…` under the workspaces folder. */
-export const CHARACTER_SKILLS = /^[^\\/]+[\\/]skills(?:[\\/]|$)/;
+/**
+ * `<character>/skills/…` or `<character>/.agents/skills/…` under the workspaces
+ * folder.
+ */
+export const CHARACTER_SKILLS =
+  /^[^\\/]+[\\/](?:\.agents[\\/])?skills(?:[\\/]|$)/;
 
 /** Edits arrive as bursts of events: one change per burst. */
 const SETTLE_MS = 300;

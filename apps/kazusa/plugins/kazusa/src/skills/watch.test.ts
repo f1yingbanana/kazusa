@@ -14,6 +14,10 @@ describe("skill paths", () => {
     expect(CHARACTER_SKILLS.test("airi/skills")).toBe(true);
     expect(CHARACTER_SKILLS.test("airi/skills/violin/SKILL.md")).toBe(true);
     expect(CHARACTER_SKILLS.test("airi\\skills\\violin")).toBe(true);
+    expect(CHARACTER_SKILLS.test("airi/.agents/skills/violin/SKILL.md")).toBe(
+      true,
+    );
+    expect(CHARACTER_SKILLS.test("airi/.agents/notes.md")).toBe(false);
     expect(CHARACTER_SKILLS.test("airi/wiki/skills/x.md")).toBe(false);
     expect(CHARACTER_SKILLS.test("airi/memory/2026-11-10.md")).toBe(false);
     expect(CHARACTER_SKILLS.test("airi/skillset/SKILL.md")).toBe(false);

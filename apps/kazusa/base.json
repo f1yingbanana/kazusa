@@ -27,15 +27,7 @@
       "elevated": {
         "enabled": false
       }
-    },
-    "skills": [
-      "world-building",
-      "world-project",
-      "world-update",
-      "kazusa",
-      "openclaw",
-      "typescript"
-    ]
+    }
   },
   "config": {
     "agents": {
@@ -58,7 +50,6 @@
           "every": "0m"
         },
         "skipBootstrap": true,
-        "skills": [],
         "modelPolicy": {}
       },
       "ownership": "explicit",
@@ -397,6 +388,7 @@
       }
     },
     "skills": {
+      "allowBundled": ["kazusa:no-bundled-skills"],
       "load": {
         "extraDirs": ["./shared/skills", "../shared/skills"],
         "watch": false
