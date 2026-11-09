@@ -64,7 +64,7 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Any place, or a `home` on a character card    | Within a second, once the map loads         |
 | Concept pages                                 | Coming turns                                |
 | A character's `stickers/`                     | That character's next turn                  |
-| Anything under `shared/skills/`               | Coming turns, once you run `refresh_skills` |
+| Anything under `shared/skills/`               | Within a second; coming turns               |
 
 **A broken map still loads, without the broken parts.** A page that doesn't
 parse is left off the map; an unknown `parent` puts the place at top level; a
@@ -392,8 +392,11 @@ The steps or rules, written for someone in this world.
   `perception`, `location-judgment` and `sleep-consolidation` are how the world
   runs, and the engine gives them to characters itself. Read the original in
   `../shared/skills/<name>/SKILL.md` before replacing one with a copy here.
-- Then run `refresh_skills`. Nothing reloads on its own. It reports which skills
-  characters can read.
+- Skills reload on their own within a second. Run `refresh_skills` to see which
+  skills characters can read, or if a new one doesn't show up. A changed
+  `description` only shows after the Gateway restarts.
+- To change one of the engine's skills for one character only, put the copy in
+  their workspace instead: `workspaces/<id>/skills/<skill-name>/SKILL.md`.
 
 ## Your own skills and tools
 

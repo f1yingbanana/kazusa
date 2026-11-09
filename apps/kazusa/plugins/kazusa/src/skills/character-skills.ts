@@ -3,11 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import type { ContextEngineConfig } from "../context-engine/config.ts";
-import {
-  MAX_GROUPED_SKILL_SCAN_DEPTH,
-  parseSkillMarkdown,
-  resolveUserPath,
-} from "../context-engine/skill-loader.ts";
+import { parseSkillMarkdown } from "../context-engine/skill-loader.ts";
+import { resolveUserPath } from "../state-dir.ts";
+
+/** How deep OpenClaw looks for a grouped skill under a root. */
+const MAX_GROUPED_SKILL_SCAN_DEPTH = 6;
 
 /**
  * Skills the plugin reads and injects itself. They are how the world works,
@@ -21,6 +21,9 @@ export function engineSkills(
     "perception",
     "location-judgment",
     "sleep-consolidation",
+    "kazusa-tools",
+    "kazusa-results",
+    "kazusa-deliveries",
   ]);
 }
 

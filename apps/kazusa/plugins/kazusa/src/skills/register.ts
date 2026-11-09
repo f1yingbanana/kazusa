@@ -1,27 +1,39 @@
+import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { CONTEXT_ENGINE_CONFIG } from "../context-engine/config.ts";
-import { clearSkillCaches } from "../context-engine/skill-loader.ts";
+import {
+  clearSkillCaches,
+  kazusaSkillsDir,
+} from "../context-engine/skill-loader.ts";
 import { currentConfig } from "../current-config.ts";
+import { resolveUserPath } from "../state-dir.ts";
 import { characterSkills, engineSkills } from "./character-skills.ts";
+import { ALL, CHARACTER_SKILLS, SHARED_SKILLS, watchSkills } from "./watch.ts";
 
 export interface SkillSync {
-  /** What characters can read now. */
+  /** What every character can read now. */
   readonly skills: readonly string[];
   readonly added: readonly string[];
   readonly removed: readonly string[];
 }
 
 /**
- * Skills reach characters two ways, and neither watches the disk
- * (`skills.load.watch` is off with a large cast). The engine's own are read and
- * cached by our loaders. The rest are OpenClaw's: each session keeps a snapshot
- * of the list, which it rebuilds from disk when its agent's skill allowlist
- * changes. So `agents.defaults.skills`, which every character inherits, is kept
- * to exactly the world's shared skills, and writing it is the refresh. Bodies
- * are read when used, so an edit needs no rebuild; only a new description waits
- * for the next one.
+ * Skills reach characters two ways. Kazusa's own (the engine's instructions,
+ * rubrics and wording) are read by our loaders and cached until a skill
+ * changes. The rest are OpenClaw's: each session keeps a snapshot of its
+ * skills, rebuilt from disk when its agent's skill list changes. So
+ * `agents.defaults.skills`, which every character inherits, is kept to exactly
+ * the world's shared skills; it is hot config, so writing it reloads nothing.
+ *
+ * One watcher for the process notices skills added, edited or removed (the
+ * world's, each character's and Kazusa's) and does what `refresh_skills` does.
+ * Bodies are read when used, so an edit applies from the next turn. A changed
+ * description changes no list and waits for a Gateway restart.
  */
-export function registerSkills(api: OpenClawPluginApi): void {
+export function registerSkills(
+  api: OpenClawPluginApi,
+  { watch = true }: { readonly watch?: boolean } = {},
+): void {
   const engine = engineSkills(
     CONTEXT_ENGINE_CONFIG.parse(api.pluginConfig?.contextEngine ?? {}),
   );
@@ -46,20 +58,30 @@ export function registerSkills(api: OpenClawPluginApi): void {
     return { skills, added, removed };
   }
 
+  // One refresh at a time: a burst of edits must not race its own writes.
+  let refreshing: Promise<unknown> = Promise.resolve();
+  const refresh = (): Promise<SkillSync> => {
+    const run = refreshing.then(() => {
+      clearSkillCaches();
+      return sync();
+    });
+    refreshing = run.catch(() => undefined);
+    return run;
+  };
+
   // Administrative: allowlisted for the system agent only (`openclaw.json`).
   api.registerTool({
     name: "refresh_skills",
     label: "Refresh Skills",
     description:
-      "Reload skills after you add, edit or remove one under shared/skills, so every character's next turn uses them. Characters can read each skill there except the engine's own.",
+      "Reload skills now and report what characters can read. Skills under shared/skills reload on their own within a second; use this to check, or if they didn't. Characters can read each skill there except the engine's own.",
     parameters: {
       type: "object",
       properties: {},
       additionalProperties: false,
     },
     async execute() {
-      clearSkillCaches();
-      const result = await sync();
+      const result = await refresh();
       return {
         content: [{ type: "text" as const, text: describeSync(result) }],
         details: result,
@@ -70,13 +92,39 @@ export function registerSkills(api: OpenClawPluginApi): void {
   // A world may arrive with skills its config doesn't list yet.
   api.on("gateway_start", async () => {
     try {
-      await sync();
+      await refresh();
     } catch (error) {
       api.logger.warn(
         `Kazusa skills: could not list character skills: ${String(error)}`,
       );
     }
   });
+
+  if (!watch) return;
+  const config = currentConfig(api);
+  const workspaces = config.agents?.defaults?.workspace;
+  watchSkills(
+    [
+      { dir: path.resolve("shared"), skills: SHARED_SKILLS },
+      { dir: kazusaSkillsDir(api.rootDir), skills: ALL },
+      ...(workspaces
+        ? [{ dir: resolveUserPath(workspaces), skills: CHARACTER_SKILLS }]
+        : []),
+    ],
+    () => {
+      refresh().then(
+        (result) => {
+          api.logger.info(`Kazusa skills changed. ${describeSync(result)}`);
+        },
+        (error: unknown) => {
+          api.logger.warn(`Kazusa skills: reload failed: ${String(error)}`);
+        },
+      );
+    },
+    (message) => {
+      api.logger.warn(message);
+    },
+  );
 }
 
 export function describeSync({ skills, added, removed }: SkillSync): string {
@@ -91,6 +139,6 @@ export function describeSync({ skills, added, removed }: SkillSync): string {
     changes.length > 0
       ? `Since the last refresh: ${changes.join("; ")}.`
       : "None added or removed.",
-    "Edits, the engine's own skills included, apply from each character's next turn. A changed description shows in their skill list once a skill is next added or removed, or after a Gateway restart.",
+    "Edits, the engine's own skills included, apply from each character's next turn. A changed description applies after a Gateway restart.",
   ].join(" ");
 }

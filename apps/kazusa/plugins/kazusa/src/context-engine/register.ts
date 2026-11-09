@@ -21,7 +21,7 @@ import {
 } from "./context-engine.ts";
 import { readBrainTurns } from "../perception/brain-trace.ts";
 import { currentBrainRun } from "../perception/run-limits.ts";
-import { createSkillLoader } from "./skill-loader.ts";
+import { pluginSkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
 import { pluginSkillText } from "../skill-text.ts";
@@ -218,10 +218,7 @@ function createContextEngine(
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
   );
-  const skillLoader = createSkillLoader({
-    config: getConfig(),
-    pluginRootDir: api.rootDir,
-  });
+  const skillLoader = pluginSkillLoader(api);
   const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
     namespace: "tasks",
     retention: "retained",

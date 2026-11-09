@@ -10,10 +10,8 @@ import { readCharacterFiles } from "../context-engine/decision-sources.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
-import {
-  createSkillLoader,
-  resolveStateDir,
-} from "../context-engine/skill-loader.ts";
+import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
+import { resolveStateDir } from "../state-dir.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
 import { pluginSkillText } from "../skill-text.ts";
@@ -317,10 +315,7 @@ export function registerLocation(
     if (atStart) settle(atStart);
     atStart = undefined;
   });
-  const skillLoader = createSkillLoader({
-    config: getConfig(),
-    pluginRootDir: api.rootDir,
-  });
+  const skillLoader = pluginSkillLoader(api);
   /** Configured characters and the player, onstage or not. */
   const everyone = (): string[] => [
     ...new Set([

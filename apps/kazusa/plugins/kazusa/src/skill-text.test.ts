@@ -8,7 +8,6 @@ import {
   createSkillText,
   describeTool,
   skillSections,
-  skillTextFor,
 } from "./skill-text.ts";
 
 function roots(files: Record<string, string>): string[] {
@@ -24,16 +23,6 @@ function roots(files: Record<string, string>): string[] {
 }
 
 describe("skill text", () => {
-  it("shares one reader per loader", () => {
-    const dirs = roots({ "a/x/SKILL.md": "## one\nFirst." });
-    const loader = { getCandidateRoots: () => dirs };
-    expect(skillTextFor(loader)).toBe(skillTextFor(loader));
-    expect(skillTextFor(loader)("x#one")).toBe("First.");
-    expect(skillTextFor({ getCandidateRoots: () => dirs })).not.toBe(
-      skillTextFor(loader),
-    );
-  });
-
   it("reads `## name` sections, ignoring what comes before the first", () => {
     expect([
       ...skillSections("Intro.\n\n## one\n\nFirst.\n\n## two\nSecond\nline.\n"),

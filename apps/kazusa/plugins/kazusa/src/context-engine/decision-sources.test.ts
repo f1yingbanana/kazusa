@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -52,7 +53,7 @@ describe("Decision context sources", () => {
     );
     const api = {
       id: "kazusa",
-      rootDir: "/wrong/plugin/root",
+      rootDir: fileURLToPath(new URL("../..", import.meta.url)),
       config: {},
       pluginConfig: {},
       runtime: {

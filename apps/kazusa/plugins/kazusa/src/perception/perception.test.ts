@@ -175,6 +175,7 @@ function setup(options: SetupOptions = {}) {
     api: {
       lifecycle: { runInBackgroundContext: backgroundWork },
       runtime: {
+        agent: { resolveAgentWorkspaceDir: () => undefined },
         config: {
           current: () => ({
             agents: {
@@ -2103,7 +2104,10 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
               run: () => Promise<T>,
             ): Promise<T> => run(),
           },
-          runtime: { config: { current: () => ({}) } },
+          runtime: {
+            agent: { resolveAgentWorkspaceDir: () => undefined },
+            config: { current: () => ({}) },
+          },
           logger: { info: vi.fn(), warn: vi.fn() },
         } as unknown as OpenClawPluginApi,
         stateStore: {

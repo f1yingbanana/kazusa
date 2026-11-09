@@ -6,7 +6,7 @@ import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
-import { skillTextFor } from "../skill-text.ts";
+import { createSkillText } from "../skill-text.ts";
 import { renderToolHistory } from "./tool-history.ts";
 
 import type { AssembledContext, BrainTurn } from "@kazusa/client";
@@ -131,7 +131,7 @@ export async function assembleContext(params: {
   const inPerson = params.inCompany
     ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
     : undefined;
-  const text = skillTextFor(skillLoader);
+  const text = createSkillText(skillLoader);
   const deliveries = (
     section: string,
     values?: Readonly<Record<string, string | number>>,

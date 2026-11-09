@@ -26,9 +26,9 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import { inBackground } from "../background.ts";
-import { resolveStateDir } from "../context-engine/skill-loader.ts";
 import type { Clock } from "../clock/clock.ts";
-import { createSkillLoader } from "../context-engine/skill-loader.ts";
+import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
+import { resolveStateDir } from "../state-dir.ts";
 import { createSkillText, describeTool } from "../skill-text.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
@@ -303,10 +303,7 @@ export function registerMemory(
 
   const workspaceOf = (agentId: string): string =>
     api.runtime.agent.resolveAgentWorkspaceDir(currentConfig(api), agentId);
-  const skills = createSkillLoader({
-    config: currentConfig(api),
-    pluginRootDir: api.rootDir,
-  });
+  const skills = pluginSkillLoader(api);
   const text = createSkillText(skills);
   const holder = globalThis as unknown as Record<
     symbol,

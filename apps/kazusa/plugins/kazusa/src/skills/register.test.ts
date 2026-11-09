@@ -19,7 +19,11 @@ interface Tool {
 
 function setup(root: string, listed?: string[]) {
   let config = {
-    agents: { defaults: listed ? { skills: listed } : {} },
+    agents: {
+      defaults: {
+        ...(listed ? { skills: listed } : {}),
+      },
+    },
     skills: { load: { extraDirs: [root] } },
   } as OpenClawConfig;
   const tools: Tool[] = [];
@@ -38,9 +42,11 @@ function setup(root: string, listed?: string[]) {
     on: (name: string, hook: () => Promise<void>) => {
       hooks[name] = hook;
     },
-    runtime: { config: { current: () => config, mutateConfigFile } },
+    runtime: {
+      config: { current: () => config, mutateConfigFile },
+    },
   } as unknown as OpenClawPluginApi;
-  registerSkills(api);
+  registerSkills(api, { watch: false });
   const tool = tools.find((t) => t.name === "refresh_skills");
   if (!tool) throw new Error("refresh_skills was not registered");
   return { tool, hooks, mutateConfigFile, config: () => config };
@@ -107,9 +113,7 @@ describe("refresh_skills", () => {
 
   it("makes every loader read an edited skill again", async () => {
     await skill(root, "kazusa-test-cached");
-    const loader = createSkillLoader({
-      config: { skills: { load: { extraDirs: [root] } } },
-    });
+    const loader = createSkillLoader({ worldDir: root, defaultsDir: root });
     expect(await loader.loadSkill("kazusa-test-cached")).toBe("Body.");
     await skill(root, "kazusa-test-cached", "Edited.");
     expect(await loader.loadSkill("kazusa-test-cached")).toBe("Body.");
@@ -121,7 +125,11 @@ describe("refresh_skills", () => {
 describe("describeSync", () => {
   it("says what characters can read and what changed", () => {
     expect(
-      describeSync({ skills: ["fishing"], added: ["fishing"], removed: [] }),
+      describeSync({
+        skills: ["fishing"],
+        added: ["fishing"],
+        removed: [],
+      }),
     ).toMatch(
       /^Characters can read: fishing\. Since the last refresh: added fishing\./,
     );

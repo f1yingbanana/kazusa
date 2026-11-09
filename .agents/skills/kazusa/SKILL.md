@@ -60,10 +60,11 @@ per language), so code names the wording and a skill holds it:
   (`describeTool` in the tool factory, `## <tool>.<field>`; what code puts in a
   field's description is `{data}`), `kazusa-results` refusals (facts only; what
   to do is the other skills' to say), `kazusa-deliveries` check-ins and the
-  closing reminder. Each section resolves on its own along the skill precedence,
-  so an override (a workspace's `skills/`, a world's `shared/skills`) holds only
-  the sections it changes. Reads are synchronous and cached until
-  `refresh_skills`.
+  closing reminder. Each section resolves on its own across the three places a
+  Kazusa skill can be (a character's `<workspace>/skills`, the world's
+  `shared/skills`, Kazusa's `apps/kazusa/shared/skills`; `createSkillLoader`),
+  so an override holds only the sections it changes. Reads are synchronous and
+  cached until a skill changes on disk (the skills watcher) or `refresh_skills`.
 - Formats carry as few words as possible, ideally none: a delivery is the sim
   stamp then `- [sender time] (chat:...): text` lines, `- [time] text` for what
   is seen, check-ins and the reminder from `kazusa-deliveries`. The skills
@@ -719,10 +720,10 @@ connect these modules in process.
   (so a change costs no cached prefix) `task-lifecycle` when the current task is
   absent or overdue, otherwise `task-interrupt`, plus `in-person` while someone
   else is where the character is (Location's `inCompany`); it offers speaking
-  aloud and texting alike and leaves the choice to the character. Use the
-  existing SkillLoader precedence and strip YAML frontmatter. Incoming text or
-  `[kazusa:skill=...]` markers must never select system instructions. Perception
-  no longer emits those markers.
+  aloud and texting alike and leaves the choice to the character. Load them
+  through `pluginSkillLoader` (a character's own, the world's, then Kazusa's)
+  and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]` markers must
+  never select system instructions. Perception no longer emits those markers.
 - **How you feel**: The situation message carries Desires' one-line state
   summary (§3.5), supplied through a `feelings` provider like `awaitingReplies`.
   The context engine renders it verbatim.
@@ -1265,16 +1266,25 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   `look_up`, `remember`, `view_image`, `skills_read`. Memory goes through tools,
   not files; ARONA keeps file access. **Character skills**:
   `agents.defaults.skills` is every skill in `skills.load.extraDirs` (the
-  world's `shared/skills`, then the defaults) but the engine's own seven, which
-  the context engine injects itself; bundled and repo skills (`kazusa`,
-  `typescript`, …) stay hidden. `src/skills/` keeps that list: on
-  `gateway_start`, and when ARONA runs `refresh_skills` after writing a skill.
-  With `skills.load.watch: false` nothing else reloads skills: OpenClaw rebuilds
-  a session's skill snapshot from disk only when its allowlist changes (bodies
-  are read on use; descriptions wait for a rebuild), and our loaders cache until
-  `clearSkillCaches()`. The repo's `.agents/skills` reach ARONA through her
-  workspace symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`,
-  `message`, and `gateway` (the updater included in `minimal`).
+  world's `shared/skills`, then the defaults) but the engine's own ten (which
+  Kazusa reads itself); bundled and repo skills (`kazusa`, `typescript`, …) stay
+  hidden. `src/skills/` keeps the list: on `gateway_start`, through
+  `refresh_skills`, and on its own: one recursive watcher per process
+  (`skills/watch.ts`) over the world's `shared/skills`, every workspace's
+  `skills/` and Kazusa's defaults reloads within a second of an edit.
+  `agents.defaults` is hot config, so nothing restarts. OpenClaw's own
+  `skills.load.watch` stays `false` (one watcher per workspace ran out with a
+  large cast); it rebuilds a session's skill snapshot from disk only when its
+  list changes. So bodies apply from the next use and a new or removed skill
+  from the next turn, while a changed description waits for a Gateway restart. A
+  character's own copy of one of Kazusa's skills (`<workspace>/skills`) applies
+  from their next turn too. A skill only one character can read would need
+  `agents.entries.<id>.skills`, and OpenClaw refuses any write under
+  `agents.entries` while the system agent's entry has keys beside its
+  `$include`. Our loaders cache files until `clearSkillCaches()`, which the
+  watcher calls. The repo's `.agents/skills` reach ARONA through her workspace
+  symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`, `message`, and
+  `gateway` (the updater included in `minimal`).
   `tools.exec.applyPatch.enabled: false` prevents implicit patch access from
   `write`; ARONA explicitly enables it in her native exec override.
   `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
