@@ -23,7 +23,7 @@ import { runScript } from "../run-script";
 import { writeTemplateSnapshot } from "./template-snapshot";
 
 /**
- * Where a world's config includes its system agent's tools and skills from;
+ * Where a world's config includes its system agent's tools from;
  * `scripts/system-agent.mjs` rewrites that file before every Gateway start.
  */
 export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
@@ -581,7 +581,7 @@ export function createSetup(
     const entries: Record<string, unknown> = Object.fromEntries(
       agents.map((id) => [id, { workspace: `./workspaces/${id}` }]),
     );
-    // Its tools and skills come with Kazusa, so they update with it.
+    // Its tools come with Kazusa, so they update with it.
     const included = path.join(liveDir, SYSTEM_AGENT_INCLUDE);
     await mkdir(path.dirname(included), { recursive: true });
     await writeFile(included, `${JSON.stringify(base.systemAgent, null, 2)}\n`);

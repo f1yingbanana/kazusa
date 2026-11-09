@@ -14,7 +14,7 @@ import {
   type CharacterFiles,
   type DecisionContextAssembler,
 } from "./decision-context.ts";
-import { createSkillLoader, type SkillLoader } from "./skill-loader.ts";
+import { pluginSkillLoader, type SkillLoader } from "./skill-loader.ts";
 
 /** Bound disk I/O before token selection; never follow a file symlink. */
 async function readText(
@@ -77,12 +77,7 @@ export function createDecisionContextAssembler(
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
   );
-  const skillLoader =
-    deps.skillLoader ??
-    createSkillLoader({
-      config: getConfig(),
-      pluginRootDir: api.rootDir,
-    });
+  const skillLoader = deps.skillLoader ?? pluginSkillLoader(api);
   return async (agentId, request) => {
     const simTime = deps.clock.time();
     const stimuli = [...request.incomingBundle, ...request.pendingQueue];

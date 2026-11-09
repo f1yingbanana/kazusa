@@ -1,5 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { materialize, WORLDS } from "./fixtures/worlds.ts";
 import { registerMemory } from "./register.ts";
@@ -39,7 +40,7 @@ beforeEach(() => {
   factories = new Map();
   const api = {
     id: "kazusa",
-    rootDir: root,
+    rootDir: fileURLToPath(new URL("../..", import.meta.url)),
     pluginConfig: {
       memory: {
         wikiDir: path.join(root, "world"),

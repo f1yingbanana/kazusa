@@ -1,15 +1,12 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
-  createSkillLoader,
-  parseSkillMarkdown,
-  trackSkillCache,
+  kazusaSkillsDir,
+  pluginSkillLoader,
+  readSkillFile,
   type SkillLoader,
   type SkillResolutionContext,
 } from "./context-engine/skill-loader.ts";
-import { currentConfig } from "./current-config.ts";
-import { sharedDir } from "./shared-dir.ts";
 
 /**
  * Wording a character reads, kept in skills rather than code, so a world, a
@@ -17,10 +14,11 @@ import { sharedDir } from "./shared-dir.ts";
  * of a skill, `kazusa-results#aloud-not-here`; code says only which, and fills
  * its `{placeholders}`.
  *
- * Each section resolves on its own along the skill precedence, so an override
- * (`<workspace>/skills/kazusa-results/SKILL.md`, or a world's `shared/skills`)
+ * Each section resolves on its own across the three places a Kazusa skill can
+ * be (`createSkillLoader`), so an override (a character's
+ * `<workspace>/skills/kazusa-results/SKILL.md`, or a world's `shared/skills`)
  * holds only the sections it changes. Synchronous, for tool factories; files
- * are read once until `refresh_skills`.
+ * are read once until a skill changes (`clearSkillCaches`).
  */
 export interface SkillText {
   (
@@ -58,26 +56,16 @@ export function skillSections(body: string): Map<string, string> {
   return sections;
 }
 
+/** A skill file's `## name` sections, worked out once per read. */
+function sectionsAt(file: string): ReadonlyMap<string, string> | null {
+  const read = readSkillFile(file);
+  if (!read) return null;
+  return (read.sections ??= skillSections(read.document.body));
+}
+
 export function createSkillText(
   loader: Pick<SkillLoader, "getCandidateRoots">,
 ): SkillText {
-  // Path → its sections, or null when there is no such file.
-  const files = new Map<string, Map<string, string> | null>();
-  trackSkillCache(() => files.clear());
-  const sectionsAt = (file: string): Map<string, string> | null => {
-    if (!files.has(file)) {
-      let sections: Map<string, string> | null = null;
-      try {
-        sections = skillSections(
-          parseSkillMarkdown(readFileSync(file, "utf8")).body,
-        );
-      } catch {
-        // Not here: the next root may have it.
-      }
-      files.set(file, sections);
-    }
-    return files.get(file) ?? null;
-  };
   const maybe: SkillText["maybe"] = (ref, values = {}, context) => {
     const [skill, section] = ref.split("#");
     if (!skill || !section)
@@ -108,38 +96,16 @@ export function createSkillText(
   );
 }
 
-const SHARED = new WeakMap<Pick<SkillLoader, "getCandidateRoots">, SkillText>();
-
-/**
- * The one reader for `loader`. Its file cache lives as long as the loader, so
- * code that has only a loader at hand doesn't re-read `SKILL.md` per section.
- */
-export function skillTextFor(
-  loader: Pick<SkillLoader, "getCandidateRoots">,
-): SkillText {
-  let text = SHARED.get(loader);
-  if (!text) {
-    text = createSkillText(loader);
-    SHARED.set(loader, text);
-  }
-  return text;
-}
-
-/** Along this Gateway's skill precedence: workspace, world, then bundled. */
+/** For this Gateway: the character's own, the world's, then Kazusa's. */
 export function pluginSkillText(api: OpenClawPluginApi): SkillText {
-  return createSkillText(
-    createSkillLoader({
-      config: currentConfig(api),
-      pluginRootDir: api.rootDir,
-    }),
-  );
+  return createSkillText(pluginSkillLoader(api));
 }
 
 let bundled: SkillText | undefined;
 /** Kazusa's own skills alone, for code running without a Gateway. */
 export function bundledSkillText(): SkillText {
   return (bundled ??= createSkillText({
-    getCandidateRoots: () => [sharedDir("skills")],
+    getCandidateRoots: () => [kazusaSkillsDir()],
   }));
 }
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * The system agent's tools and skills belong to the app, not the world: they
- * grow with each release, and a world outlives many. So the world's config
- * keeps only what is its own (workspace, name, cwd) and includes the rest from
- * a file rewritten from `apps/kazusa/base.json` before every Gateway start.
- * Keys set beside the include still override it.
+ * The system agent's tools belong to the app, not the world: they grow with
+ * each release, and a world outlives many. So the world's config keeps only
+ * what is its own (workspace, name, cwd) and includes the rest from a file
+ * rewritten from `apps/kazusa/base.json` before every Gateway start. Keys set
+ * beside the include still override it.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -35,7 +35,7 @@ export function syncSystemAgent(root) {
   const { tools: _tools, skills: _skills, ...own } = entry;
   config.agents.entries[id] = { $include: SYSTEM_AGENT_INCLUDE, ...own };
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
-  return [`${id}'s tools and skills now come with Kazusa and update with it.`];
+  return [`${id}'s tools now come with Kazusa and update with it.`];
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

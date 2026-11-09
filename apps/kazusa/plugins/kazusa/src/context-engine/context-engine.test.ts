@@ -62,10 +62,8 @@ const testSkillLoader: SkillLoader = {
     frontmatter: null,
     body: "Stay in character.",
   })),
-  resolveSkillPath: vi.fn(async () => "/fake/SKILL.md"),
   // The shared skills hold what code reads by section (`kazusa-deliveries`).
   getCandidateRoots: vi.fn(() => [sharedDir("skills")]),
-  clearCache: vi.fn(),
 };
 
 function assemble(
@@ -776,9 +774,7 @@ describe("Context assembly", () => {
     const loader = {
       loadSkill: vi.fn(async (name: string) => `Skill content for ${name}`),
       loadSkillDocument: vi.fn(),
-      resolveSkillPath: vi.fn(),
       getCandidateRoots: vi.fn(() => []),
-      clearCache: vi.fn(),
     };
     const config = CONTEXT_ENGINE_CONFIG.parse({
       skills: {

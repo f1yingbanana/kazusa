@@ -56,15 +56,15 @@ below for anything new, and don't rewrite old pages unless the user asks.
 
 ## When a change takes effect
 
-| Change                                        | Takes effect                                |
-| :-------------------------------------------- | :------------------------------------------ |
-| Personal wiki, `MEMORY.md`, `SOUL.md`         | That character's coming turns               |
-| `IDENTITY.md`                                 | Coming turns, and the client's next refresh |
-| Adding to `agents.entries` in `openclaw.json` | By itself, but it can interrupt your turn   |
-| Any place, or a `home` on a character card    | Within a second, once the map loads         |
-| Concept pages                                 | Coming turns                                |
-| A character's `stickers/`                     | That character's next turn                  |
-| Anything under `shared/skills/`               | Coming turns, once you run `refresh_skills` |
+| Change                                                      | Takes effect                                |
+| :---------------------------------------------------------- | :------------------------------------------ |
+| Personal wiki, `MEMORY.md`, `SOUL.md`                       | That character's coming turns               |
+| `IDENTITY.md`                                               | Coming turns, and the client's next refresh |
+| Adding to `agents.entries` in `openclaw.json`               | By itself, but it can interrupt your turn   |
+| Any place, or a `home` on a character card                  | Within a second, once the map loads         |
+| Concept pages                                               | Coming turns                                |
+| A character's `stickers/`                                   | That character's next turn                  |
+| Anything under `shared/skills/`, or a character's `skills/` | Within a second; their next turn            |
 
 **A broken map still loads, without the broken parts.** A page that doesn't
 parse is left off the map; an unknown `parent` puts the place at top level; a
@@ -392,8 +392,12 @@ The steps or rules, written for someone in this world.
   `perception`, `location-judgment` and `sleep-consolidation` are how the world
   runs, and the engine gives them to characters itself. Read the original in
   `../shared/skills/<name>/SKILL.md` before replacing one with a copy here.
-- Then run `refresh_skills`. Nothing reloads on its own. It reports which skills
-  characters can read.
+- Skills reload on their own within a second and apply from each character's
+  next turn. Run `refresh_skills` to see who can read what, or if a new one
+  doesn't show up.
+- A skill only one character should know goes in their workspace instead:
+  `workspaces/<id>/skills/<skill-name>/SKILL.md`. It reaches only them. A copy
+  there of a world skill, or of one of the engine's, replaces it for them alone.
 
 ## Your own skills and tools
 

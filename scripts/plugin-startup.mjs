@@ -113,9 +113,43 @@ export function allowChatStarters(root) {
   ];
 }
 
+/**
+ * A skill name no bundled skill has. OpenClaw reads an empty `allowBundled` as
+ * "every bundled skill", so the only way to allow none is a list that matches
+ * none: this is that list's one entry, not a skill.
+ */
+export const NO_BUNDLED_SKILLS = "kazusa:no-bundled-skills";
+
+/**
+ * Characters' skills come from OpenClaw, which shows each one the world's
+ * `shared/skills` and their own workspace's `skills/`. A world made before this
+ * listed the world's skills in `agents.defaults.skills`, which hid a
+ * character's own; that list goes, and OpenClaw's bundled skills (GitHub,
+ * weather, …) stay hidden through `skills.allowBundled` instead. Kazusa's own
+ * skills are hidden at runtime (`skills.entries.<name>.enabled: false`), since
+ * a world can rename them. An `allowBundled` the world set itself is kept.
+ */
+export function scopeCharacterSkills(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const defaults = config.agents?.defaults;
+  const listed = defaults && "skills" in defaults;
+  if (listed) delete defaults.skills;
+  const skills = (config.skills ??= {});
+  const hiding = skills.allowBundled === undefined;
+  if (hiding) skills.allowBundled = [NO_BUNDLED_SKILLS];
+  if (!listed && !hiding) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [
+    "Characters can now have skills of their own, in their workspace's skills/ folder.",
+  ];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of allowChatStarters(root)) console.log(line);
+  for (const line of scopeCharacterSkills(root)) console.log(line);
 }

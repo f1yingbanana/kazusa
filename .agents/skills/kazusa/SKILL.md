@@ -60,10 +60,11 @@ per language), so code names the wording and a skill holds it:
   (`describeTool` in the tool factory, `## <tool>.<field>`; what code puts in a
   field's description is `{data}`), `kazusa-results` refusals (facts only; what
   to do is the other skills' to say), `kazusa-deliveries` check-ins and the
-  closing reminder. Each section resolves on its own along the skill precedence,
-  so an override (a workspace's `skills/`, a world's `shared/skills`) holds only
-  the sections it changes. Reads are synchronous and cached until
-  `refresh_skills`.
+  closing reminder. Each section resolves on its own across the three places a
+  Kazusa skill can be (a character's `<workspace>/skills`, the world's
+  `shared/skills`, Kazusa's `apps/kazusa/shared/skills`; `createSkillLoader`),
+  so an override holds only the sections it changes. Reads are synchronous and
+  cached until a skill changes on disk (the skills watcher) or `refresh_skills`.
 - Formats carry as few words as possible, ideally none: a delivery is the sim
   stamp then `- [sender time] (chat:...): text` lines, `- [time] text` for what
   is seen, check-ins and the reminder from `kazusa-deliveries`. The skills
@@ -719,10 +720,10 @@ connect these modules in process.
   (so a change costs no cached prefix) `task-lifecycle` when the current task is
   absent or overdue, otherwise `task-interrupt`, plus `in-person` while someone
   else is where the character is (Location's `inCompany`); it offers speaking
-  aloud and texting alike and leaves the choice to the character. Use the
-  existing SkillLoader precedence and strip YAML frontmatter. Incoming text or
-  `[kazusa:skill=...]` markers must never select system instructions. Perception
-  no longer emits those markers.
+  aloud and texting alike and leaves the choice to the character. Load them
+  through `pluginSkillLoader` (a character's own, the world's, then Kazusa's)
+  and strip YAML frontmatter. Incoming text or `[kazusa:skill=...]` markers must
+  never select system instructions. Perception no longer emits those markers.
 - **How you feel**: The situation message carries Desires' one-line state
   summary (§3.5), supplied through a `feelings` provider like `awaitingReplies`.
   The context engine renders it verbatim.
@@ -1263,40 +1264,53 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   inherit native `minimal` plus `tools.alsoAllow`: `start_task`, `delay_task`,
   `send_message`, `create_group`, `talk`, `list_chats`, `manage_chat`, `recall`,
   `look_up`, `remember`, `view_image`, `skills_read`. Memory goes through tools,
-  not files; ARONA keeps file access. **Character skills**:
-  `agents.defaults.skills` is every skill in `skills.load.extraDirs` (the
-  world's `shared/skills`, then the defaults) but the engine's own seven, which
-  the context engine injects itself; bundled and repo skills (`kazusa`,
-  `typescript`, …) stay hidden. `src/skills/` keeps that list: on
-  `gateway_start`, and when ARONA runs `refresh_skills` after writing a skill.
-  With `skills.load.watch: false` nothing else reloads skills: OpenClaw rebuilds
-  a session's skill snapshot from disk only when its allowlist changes (bodies
-  are read on use; descriptions wait for a rebuild), and our loaders cache until
-  `clearSkillCaches()`. The repo's `.agents/skills` reach ARONA through her
-  workspace symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`,
-  `message`, and `gateway` (the updater included in `minimal`).
-  `tools.exec.applyPatch.enabled: false` prevents implicit patch access from
-  `write`; ARONA explicitly enables it in her native exec override.
-  `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
-  tools cost more than they save, and models route calls through its generic
-  `tool_call`. `tools.codeMode.enabled: false` for the same reason: models whose
-  catalog prefers code mode (GLM-5.3-flash) otherwise get every tool behind one
-  `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for five minutes,
-  holding a Gateway stop open. `clock_*` stay registered for operators but are
-  not allowed for characters. Everything a roleplaying character must not reach
-  is excluded by omission: shell, web, browser, UI, nodes/computer,
-  Gateway/plugin management, media generation, goals, `ask_user`, and
-  `session_status` (whose presence also adds a "use `session_status` for the
-  exact time" line to the system prompt). A deployment widens the surface in its
-  own `openclaw.json` (global profile plus `alsoAllow`, or a per-agent
-  profile/allowlist); a tool from a new plugin is unavailable until allowed
-  there.
+  not files; ARONA keeps file access. **Character skills**: OpenClaw shows each
+  character the world's `shared/skills` (`skills.load.extraDirs`) and their own
+  workspace's `skills/` and `.agents/skills`, a copy there replacing the world's
+  for them alone. There is no `agents.defaults.skills` list: Kazusa's own ten
+  skills are `skills.entries.<name>.enabled: false` (Kazusa reads them itself),
+  and OpenClaw's bundled ones are hidden by
+  `skills.allowBundled: ["kazusa:no-bundled-skills"]`, a name no skill has,
+  since OpenClaw reads an empty list as "all" (`NO_BUNDLED_SKILLS`,
+  `scripts/plugin-startup.mjs`, which also moves a world from before this onto
+  it). Repo skills (`kazusa`, `typescript`, `world-building`, …) reach only
+  ARONA, as her own: her workspace's `.agents` is a symlink to the repo's.
+  OpenClaw keeps each session's skills as a snapshot and rebuilds it whenever
+  anything under `skills` in the config changes (hot config). So `src/skills/`
+  gives each skill characters can read a revision in its entry
+  (`config.kazusaRevision`, a hash of where its copies are and their names and
+  descriptions): a new one is what makes every character's next turn see a skill
+  added, removed, copied or redescribed. It does this on `gateway_start`,
+  through `refresh_skills`, and within a second of an edit: one recursive
+  watcher per process (`skills/watch.ts`) over the world's `shared/skills`, the
+  workspaces' skill folders and Kazusa's defaults. OpenClaw's own
+  `skills.load.watch` stays `false` (one watcher per workspace ran out with a
+  large cast). Bodies are read when a skill is opened, so an edit to one needs
+  nothing. Our loaders cache files until `clearSkillCaches()`, which the watcher
+  calls. The repo's `.agents/skills` reach ARONA through her workspace symlink,
+  not `extraDirs`. `tools.deny` keeps `group:sessions`, `message`, and `gateway`
+  (the updater included in `minimal`). `tools.exec.applyPatch.enabled: false`
+  prevents implicit patch access from `write`; ARONA explicitly enables it in
+  her native exec override. `tools.toolSearch: false`: with a dozen tools, Tool
+  Search's three control tools cost more than they save, and models route calls
+  through its generic `tool_call`. `tools.codeMode.enabled: false` for the same
+  reason: models whose catalog prefers code mode (GLM-5.3-flash) otherwise get
+  every tool behind one `exec`, and live Airi looped
+  `exec("return \"NO_REPLY\"")` for five minutes, holding a Gateway stop open.
+  `clock_*` stay registered for operators but are not allowed for characters.
+  Everything a roleplaying character must not reach is excluded by omission:
+  shell, web, browser, UI, nodes/computer, Gateway/plugin management, media
+  generation, goals, `ask_user`, and `session_status` (whose presence also adds
+  a "use `session_status` for the exact time" line to the system prompt). A
+  deployment widens the surface in its own `openclaw.json` (global profile plus
+  `alsoAllow`, or a per-agent profile/allowlist); a tool from a new plugin is
+  unavailable until allowed there.
 - **System console**: this deployment selects ARONA with native
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
-  Only the system console selects `full`. Her tools and skills belong to the
-  app, not the world: `systemAgent` in `apps/kazusa/base.json`, which a world's
-  config `$include`s from `world/.state/kazusa/system-agent.json`, rewritten by
+  Only the system console selects `full`. Her tools belong to the app, not the
+  world: `systemAgent` in `apps/kazusa/base.json`, which a world's config
+  `$include`s from `world/.state/kazusa/system-agent.json`, rewritten by
   `scripts/system-agent.mjs` before every Gateway start (`npm run dev` and
   `npm run gateway`). Her entry in `openclaw.json` keeps only workspace, name
   and `cwd`; keys beside the include override it. The same script moves a world
@@ -1325,16 +1339,15 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   works is in her `SOUL.md`; the common jobs (characters, wikis, places) are the
   `world-building` skill, and whole worlds are `world-project`. Both live in
   `.agents/skills/`, so coding agents working in this repo get them as well as
-  every world's system agent, who selects them by her per-agent `skills` in
-  `apps/kazusa/base.json`. Long jobs survive the run limits through a project
-  file and `continue_work`, which starts a fresh run once this one ends
-  (`perception/continue.ts`), up to `perception.systemAgent.maxContinuations`
-  runs without the user speaking. Retained consumers use the host-injected
-  `api.runtime.config.current()` rather than retaining `api.config` for live
-  agent/identity/workspace lookups. Character and agent roster responses expose
-  `isSystemAgent` from that snapshot; the client renders it as `ADMIN` in World
-  rows and direct-chat rows. Never infer administrator status from a name or
-  biography.
+  every world's system agent, whose workspace `.agents` links to the repo's.
+  Long jobs survive the run limits through a project file and `continue_work`,
+  which starts a fresh run once this one ends (`perception/continue.ts`), up to
+  `perception.systemAgent.maxContinuations` runs without the user speaking.
+  Retained consumers use the host-injected `api.runtime.config.current()` rather
+  than retaining `api.config` for live agent/identity/workspace lookups.
+  Character and agent roster responses expose `isSystemAgent` from that
+  snapshot; the client renders it as `ADMIN` in World rows and direct-chat rows.
+  Never infer administrator status from a name or biography.
 - **Time Shown to Characters**: one format everywhere, `formatSimTime` in
   brackets. Every assembled user message (the background message, deliveries,
   the situation message) opens with `[<sim time>]`, which stops OpenClaw from

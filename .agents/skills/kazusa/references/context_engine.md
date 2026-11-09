@@ -310,21 +310,20 @@ ongoing means `task-interrupt`. Selection does not depend on whether the host
 supplies `run.prompt`, and incoming chat content never chooses system
 instructions. Skills are full injected bodies, not a hint to read a file.
 
+- **Only Kazusa's own skills**: the loader serves the engine's skills, rubrics
+  and wording, nothing else; OpenClaw loads every skill characters can read.
+  Each is `<place>/<name>/SKILL.md` in one of three places, the first found
+  winning: the character's `<workspace>/skills`, the world's `shared/skills`
+  (under the Gateway's cwd), Kazusa's `apps/kazusa/shared/skills` (beside the
+  plugin's `rootDir`). No other OpenClaw tier, grouped layout or name
+  normalization.
 - **Frontmatter Parsing & Stripping**: Skills use standard YAML frontmatter
   delimited by `--- ... ---`. The loader parses frontmatter using the `yaml`
   library and strips it from the injected body so that the LLM receives only
   clean Markdown instructions.
-- **Name Normalization**: Hyphens and underscores are treated interchangeably
-  (`task-lifecycle` matches folder `task_lifecycle` or frontmatter
-  `name: task_lifecycle`).
-- **OpenClaw 1:1 Precedence Hierarchy**: Skills are loaded exactly like OpenClaw
-  does.
-- **Grouped Layout Discovery**: Discovers skills up to 6 levels deep
-  (`MAX_GROUPED_SKILL_SCAN_DEPTH = 6`). When a directory contains `SKILL.md`,
-  traversal stops below that directory per OpenClaw specification. Resolves
-  based on `frontmatter.name` with fallback to directory basename.
-- **Resolution Caching**: Resolves and caches skill paths and parsed Markdown
-  bodies in memory; `clearCache()` invalidates for tests.
+- **Caching**: one process-wide cache of parsed files, shared by every
+  registration, cleared by `clearSkillCaches()` when the skills watcher sees a
+  change or ARONA runs `refresh_skills`.
 
 ## Chats awaiting a reply (the "phone glance")
 
@@ -492,8 +491,8 @@ memory views back into the source ledgers.
 
 ## Skill expansion and future scope
 
-Use the existing `SkillLoader` for names, not ad-hoc paths in routing code.
-Behavioral prose belongs in shared skills. Native tool schemas remain tools, not
+Use `pluginSkillLoader` for names, not ad-hoc paths in routing code. Behavioral
+prose belongs in shared skills. Native tool schemas remain tools, not
 `kazusa:tool` prose substitutions. Never expand historical conversation markers.
 Perception sends trusted task markers; classifier-generated summary text escapes
 marker syntax before joining a trusted wake.

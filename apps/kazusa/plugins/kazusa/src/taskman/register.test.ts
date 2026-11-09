@@ -32,6 +32,7 @@ describe("taskman journal events", () => {
         tools.set(tool.name, tool);
       },
       runtime: {
+        agent: { resolveAgentWorkspaceDir: () => undefined },
         state: {
           openKeyedStore: () => ({
             lookup: async (key: string) => tasks.get(key),
@@ -118,6 +119,7 @@ describe("taskman cron projection", () => {
         handlers.set(name, handler),
       registerTool: () => {},
       runtime: {
+        agent: { resolveAgentWorkspaceDir: () => undefined },
         state: {
           openKeyedStore: () => ({
             lookup: async (key: string) => tasks.get(key),
