@@ -1,3 +1,4 @@
+import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import { describe, expect, it } from "vitest";
 import { brainTurns } from "../perception/brain-trace.ts";
 import { sharedDir } from "../shared-dir.ts";
@@ -109,5 +110,106 @@ describe("renderToolHistory", () => {
     expect(tight).not.toContain("start_task");
     expect(renderToolHistory(turns, 0, text)).toBe("");
     expect(renderToolHistory([], 1000, text)).toBe("");
+  });
+
+  // A long history: turns of one to four calls, some failing, some unanswered.
+  const long = brainTurns(
+    Array.from({ length: 40 }, (_, turn) => {
+      const hour = String(turn % 24).padStart(2, "0");
+      const rows: object[] = [
+        prompt(`p${turn}`, `[Mon 2026-11-02 ${hour}:15] Turn ${turn}.`),
+      ];
+      for (let index = 0; index <= turn % 4; index += 1) {
+        const id = `c${turn}-${index}`;
+        rows.push(
+          call(
+            id,
+            index % 2 ? "send_message" : "start_task",
+            index % 2
+              ? { sessionKey: `chat:direct:p${turn}`, messages: [{}, {}] }
+              : { type: "working", description: `task number ${turn}` },
+            `r${turn}`,
+          ),
+        );
+        if (index !== 3)
+          rows.push(
+            result(id, index === 2 ? "Unknown chat." : "ok", index === 2),
+          );
+      }
+      return rows as Parameters<typeof brainTurns>[0];
+    }).flat(),
+  );
+
+  /** The digest as it was first written: every line formatted, then trimmed. */
+  function formatAllThenTrim(maxTokens: number): string {
+    const tokens = (line: string) =>
+      line ? estimateTokens({ role: "user", content: line, timestamp: 0 }) : 0;
+    const calls = long.flatMap((turn) => {
+      const stamp =
+        turn.prompts[0]?.match(
+          /^\[[^\]\n]*\d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]\n]*\]/,
+        )?.[0] ?? "";
+      return turn.calls
+        .flatMap((step) => step.steps)
+        .flatMap((step) => {
+          if (step.type !== "tool") return [];
+          const outcome =
+            step.result === undefined
+              ? text("tool-no-result")
+              : step.isError
+                ? text("tool-error", { error: errorLine(step.result) })
+                : text("tool-ok");
+          const line = text("tool-call", {
+            name: step.name,
+            args: callShape(step.name, JSON.parse(step.input)),
+            outcome,
+          });
+          return [{ turn, stamp, line }];
+        });
+    });
+    const heading = text("tool-history");
+    let used = tokens(heading);
+    let from = calls.length;
+    while (from > 0) {
+      const { turn, stamp, line } = calls[from - 1];
+      const cost =
+        tokens(line) + (calls[from]?.turn === turn ? 0 : tokens(stamp));
+      if (used + cost > maxTokens) break;
+      used += cost;
+      from -= 1;
+    }
+    if (from === calls.length) return "";
+    return [
+      heading,
+      ...calls
+        .slice(from)
+        .flatMap(({ turn, stamp, line }, index, kept) =>
+          kept[index - 1]?.turn === turn
+            ? [line]
+            : ["", ...(stamp ? [stamp] : []), line],
+        ),
+    ].join("\n");
+  }
+
+  it("matches formatting everything then trimming, at every budget", () => {
+    for (const budget of [0, 20, 40, 60, 90, 150, 300, 600, 1200, 4000, 1e6])
+      expect(renderToolHistory(long, budget, text)).toBe(
+        formatAllThenTrim(budget),
+      );
+  });
+
+  it("words only the lines it keeps", () => {
+    let lookups = 0;
+    const counted = (section: string, values?: Record<string, string>) => {
+      lookups += 1;
+      return text(section, values);
+    };
+    const digest = renderToolHistory(long, 600, counted);
+    const kept = digest.split("\n").filter((line) => line.startsWith("- "));
+    // The heading, two per kept line, and two for the one that didn't fit.
+    expect(lookups).toBe(1 + 2 * kept.length + 2);
+    expect(kept.length).toBeLessThan(
+      long.flatMap((turn) => turn.calls.flatMap((c) => c.steps)).length / 2,
+    );
   });
 });

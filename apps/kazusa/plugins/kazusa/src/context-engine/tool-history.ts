@@ -1,4 +1,4 @@
-import type { BrainTurn } from "@kazusa/client";
+import type { BrainStep, BrainTurn } from "@kazusa/client";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 
 /**
@@ -79,70 +79,88 @@ export function errorLine(text: string): string {
 /** The sim time a turn's prompt starts with, as perception stamps it. */
 const STAMP = /^\[[^\]\n]*\d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]\n]*\]/;
 
+type ToolStep = Extract<BrainStep, { type: "tool" }>;
+
+/** Past tool calls, newest first, each with its turn. */
+function* newestFirst(
+  turns: readonly BrainTurn[],
+): Generator<{ readonly turn: BrainTurn; readonly step: ToolStep }> {
+  for (let t = turns.length - 1; t >= 0; t -= 1) {
+    const turn = turns[t];
+    for (let c = turn.calls.length - 1; c >= 0; c -= 1) {
+      const steps = turn.calls[c].steps;
+      for (let s = steps.length - 1; s >= 0; s -= 1) {
+        const step = steps[s];
+        if (step.type === "tool") yield { turn, step };
+      }
+    }
+  }
+}
+
 /**
  * The digest: one line per past tool call, oldest first, the newest that fit
  * `maxTokens`, each turn's under the sim time its prompt starts with. Its words
  * are `kazusa-deliveries` sections, read through `text`. Empty when there are
  * no calls.
+ *
+ * Lines are formatted newest first and only until the budget is spent: a
+ * character's history has no end, and the budget keeps a few dozen lines.
  */
 export function renderToolHistory(
   turns: readonly BrainTurn[],
   maxTokens: number,
   text: (section: string, values?: Record<string, string>) => string,
 ): string {
-  const calls = turns.flatMap((turn) => {
-    const stamp = turn.prompts[0]?.match(STAMP)?.[0] ?? "";
-    return turn.calls
-      .flatMap((call) => call.steps)
-      .flatMap((step) => {
-        if (step.type !== "tool") return [];
-        let args: unknown;
-        try {
-          args = JSON.parse(step.input);
-        } catch {
-          // Cut short by the trace: show it as it is.
-          args = undefined;
-        }
-        const shape =
-          args === undefined
-            ? cut(step.input.replace(/\s+/g, " "), MAX_ARGS)
-            : callShape(step.name, args);
-        const outcome =
-          step.result === undefined
-            ? text("tool-no-result")
-            : step.isError
-              ? text("tool-error", { error: errorLine(step.result) })
-              : text("tool-ok");
-        const line = text("tool-call", {
-          name: step.name,
-          args: shape,
-          outcome,
-        });
-        return [{ turn, stamp, line }];
-      });
-  });
-  if (!calls.length) return "";
+  const calls = newestFirst(turns);
+  const first = calls.next();
+  if (first.done) return "";
+  const line = (step: ToolStep): string => {
+    let args: unknown;
+    try {
+      args = JSON.parse(step.input);
+    } catch {
+      // Cut short by the trace: show it as it is.
+      args = undefined;
+    }
+    const shape =
+      args === undefined
+        ? cut(step.input.replace(/\s+/g, " "), MAX_ARGS)
+        : callShape(step.name, args);
+    const outcome =
+      step.result === undefined
+        ? text("tool-no-result")
+        : step.isError
+          ? text("tool-error", { error: errorLine(step.result) })
+          : text("tool-ok");
+    return text("tool-call", { name: step.name, args: shape, outcome });
+  };
   const heading = text("tool-history");
-  const tokens = (line: string) =>
-    line ? estimateTokens({ role: "user", content: line, timestamp: 0 }) : 0;
+  const tokens = (value: string) =>
+    value ? estimateTokens({ role: "user", content: value, timestamp: 0 }) : 0;
   let used = tokens(heading);
-  let from = calls.length;
-  while (from > 0) {
-    const { turn, stamp, line } = calls[from - 1];
+  const kept: { turn: BrainTurn; stamp: string; line: string }[] = [];
+  for (
+    let next: IteratorResult<{ turn: BrainTurn; step: ToolStep }> = first;
+    !next.done;
+    next = calls.next()
+  ) {
+    const { turn, step } = next.value;
+    const stamp = turn.prompts[0]?.match(STAMP)?.[0] ?? "";
+    const rendered = line(step);
     // A turn's stamp is paid for with the first of its calls that fits.
     const cost =
-      tokens(line) + (calls[from]?.turn === turn ? 0 : tokens(stamp));
+      tokens(rendered) + (kept.at(-1)?.turn === turn ? 0 : tokens(stamp));
     if (used + cost > maxTokens) break;
     used += cost;
-    from -= 1;
+    kept.push({ turn, stamp, line: rendered });
   }
-  if (from === calls.length) return "";
+  if (!kept.length) return "";
   return [
     heading,
-    ...calls
-      .slice(from)
-      .flatMap(({ turn, stamp, line }, index, kept) =>
-        kept[index - 1]?.turn === turn
+    ...kept
+      .reverse()
+      .flatMap(({ turn, stamp, line }, index, oldestFirst) =>
+        oldestFirst[index - 1]?.turn === turn
           ? [line]
           : ["", ...(stamp ? [stamp] : []), line],
       ),

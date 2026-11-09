@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  clearSkillCaches,
   createSkillLoader,
   expandUserPath,
   isDefaultStateDir,
@@ -199,6 +200,38 @@ name: "unterminated string
     const pluginIndex = roots.indexOf(path.join(pluginDir, "skills"));
     expect(extraIndex).toBeGreaterThan(5);
     expect(pluginIndex).toBeGreaterThan(5);
+  });
+
+  it("works out candidate roots once per context, until skill caches clear", async () => {
+    const pluginDir = path.join(tempDir, "plugin");
+    const manifest = path.join(pluginDir, "openclaw.plugin.json");
+    await fs.mkdir(pluginDir, { recursive: true });
+    await fs.writeFile(manifest, JSON.stringify({ skills: ["./one"] }));
+    const loader = createSkillLoader({
+      pluginRootDir: pluginDir,
+      env: { HOME: path.join(tempDir, "home") },
+    });
+    const alpha = {
+      agentId: "alpha",
+      workspaceDir: path.join(tempDir, "alpha"),
+    };
+
+    const first = loader.getCandidateRoots(alpha);
+    expect(first).toContain(path.join(pluginDir, "one"));
+    // The manifest isn't read again: a reload or `refresh_skills` re-reads it.
+    await fs.writeFile(manifest, JSON.stringify({ skills: ["./two"] }));
+    expect(loader.getCandidateRoots(alpha)).toBe(first);
+    expect(
+      loader.getCandidateRoots({
+        agentId: "beta",
+        workspaceDir: path.join(tempDir, "beta"),
+      }),
+    ).toContain(path.join(pluginDir, "two"));
+
+    clearSkillCaches();
+    expect(loader.getCandidateRoots(alpha)).toContain(
+      path.join(pluginDir, "two"),
+    );
   });
 
   it("excludes personal ~/.agents/skills when OPENCLAW_STATE_DIR is non-default", () => {
