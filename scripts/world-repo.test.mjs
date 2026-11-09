@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -199,6 +200,14 @@ describe("adoptWorldRepo", () => {
     await cloneWorld(root, "demo");
     const live = world(root, source, "v0.1.0");
     const memory = readFileSync(path.join(live, "workspaces/ami/MEMORY.md"));
+    // The system agent's link to the app's skills is the machine's, not the world's.
+    mkdirSync(path.join(root, ".agents/skills/kazusa"), { recursive: true });
+    put(path.join(root, ".agents/skills/kazusa/SKILL.md"), "Guide.");
+    symlinkSync(
+      path.join(root, ".agents"),
+      path.join(live, "workspaces/ami/.agents"),
+      "junction",
+    );
     const lines = await adoptWorldRepo(root);
     expect(git(live, "rev-parse", PLAY)).toBe(
       git(source, "rev-parse", "v0.1.0^{commit}"),

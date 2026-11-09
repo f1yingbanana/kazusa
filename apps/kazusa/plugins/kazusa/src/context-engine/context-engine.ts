@@ -135,8 +135,7 @@ export async function assembleContext(params: {
   const deliveries = (
     section: string,
     values?: Readonly<Record<string, string | number>>,
-  ): string =>
-    text(`kazusa-deliveries#${section}`, values, { agentId: params.agentId });
+  ): string => text(`kazusa-deliveries#${section}`, values, resolutionContext);
 
   // Only what is the same every turn, so the provider reuses the whole system
   // prompt and the records after it. The clock lives in the situation message,

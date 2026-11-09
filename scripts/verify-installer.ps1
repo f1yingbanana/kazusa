@@ -79,6 +79,15 @@ try {
   Assert ((Get-Item (Join-Path $World 'workspaces\arona\.agents')).LinkType -eq 'Junction') 'setup links the guides'
   Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\starter\package.json')) 'setup cloned the starter world'
   Wait-Until { (Invoke-WebRequest "$Web/kazusa/world" -UseBasicParsing).StatusCode -eq 200 } 'the Gateway starts'
+  # The junction is only half of it: OpenClaw has to follow it when it scans
+  # her workspace, and offer what it finds to her.
+  $env:OPENCLAW_CONFIG_PATH = Join-Path $World 'openclaw.json'
+  $env:OPENCLAW_STATE_DIR = Join-Path $World '.state'
+  Wait-Until {
+    $status = & (Join-Path $Folder 'node\node.exe') (Join-Path $Folder 'node_modules\openclaw\openclaw.mjs') `
+      gateway call skills.status --params '{"agentId":"arona"}' --json 2>$null | ConvertFrom-Json
+    $status.skills | Where-Object { $_.name -eq 'world-building' -and $_.eligible -and $_.modelVisible }
+  } 'ARONA is offered the guides' 60
   Wait-Until {
     $chat = (Invoke-RestMethod "$Web/kazusa/chats").chats | Where-Object { $_.members -contains 'arona' }
     $chat.lastMessage.senderId -eq 'arona'

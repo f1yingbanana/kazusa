@@ -12,7 +12,7 @@ import {
   engineSkills,
   skillRevision,
 } from "./character-skills.ts";
-import { ALL, CHARACTER_SKILLS, SHARED_SKILLS, watchSkills } from "./watch.ts";
+import { CHARACTER_SKILLS, skillsFolder, watchSkills } from "./watch.ts";
 
 export interface SkillSync {
   /** What every character can read: the world's skills. */
@@ -50,7 +50,8 @@ const revisionOf = (entries: SkillEntries, name: string): unknown =>
  * redescribed. Bodies are read when used, so an edit to one needs nothing.
  *
  * One watcher for the process (the world's, each character's and Kazusa's
- * skills) does this within a second of a change, as `refresh_skills` does.
+ * skills) does this within a second of a change, as `refresh_skills` does. A
+ * character added later is covered if their workspace is beside the others.
  */
 export function registerSkills(
   api: OpenClawPluginApi,
@@ -153,15 +154,28 @@ export function registerSkills(
   });
 
   if (!watch) return;
+  // The folders `sync` reads: the world's, Kazusa's, and the folder the
+  // characters' workspaces are in (one for a Kazusa world).
   const config = currentConfig(api);
-  const workspaces = config.agents?.defaults?.workspace;
+  const workspaceFolders = new Set(
+    Object.keys(config.agents?.entries ?? {}).map((agentId) =>
+      path.dirname(
+        path.resolve(
+          api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
+        ),
+      ),
+    ),
+  );
   watchSkills(
     [
-      { dir: path.resolve("shared"), skills: SHARED_SKILLS },
-      { dir: kazusaSkillsDir(api.rootDir), skills: ALL },
-      ...(workspaces
-        ? [{ dir: resolveUserPath(workspaces), skills: CHARACTER_SKILLS }]
-        : []),
+      ...(config.skills?.load?.extraDirs ?? []).map((dir) =>
+        skillsFolder(resolveUserPath(dir)),
+      ),
+      skillsFolder(kazusaSkillsDir(api.rootDir)),
+      ...[...workspaceFolders].map((dir) => ({
+        dir,
+        skills: CHARACTER_SKILLS,
+      })),
     ],
     () => {
       refresh().then(

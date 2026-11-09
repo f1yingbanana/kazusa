@@ -54,6 +54,8 @@ const EXCLUDE = `# Written by scripts/world-repo.mjs on every start.
 !/openclaw.json
 !/shared/
 !/workspaces/
+# The system agent's link to the app's own skills (a junction on Windows).
+/workspaces/*/.agents
 .DS_Store
 *.tmp
 `;

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CHARACTER_SKILLS,
-  SHARED_SKILLS,
+  skillsFolder,
   stopWatchingSkills,
   watchSkills,
 } from "./watch.ts";
@@ -23,9 +23,17 @@ describe("skill paths", () => {
     expect(CHARACTER_SKILLS.test("airi/skillset/SKILL.md")).toBe(false);
   });
 
-  it("knows a world's skills from the rest of shared", () => {
-    expect(SHARED_SKILLS.test("skills/fishing/SKILL.md")).toBe(true);
-    expect(SHARED_SKILLS.test("wiki/entities/places/home.md")).toBe(false);
+  it("watches a skills folder from the folder it is in", () => {
+    const { dir, skills } = skillsFolder(
+      path.join("world", "shared", "skills"),
+    );
+    expect(dir).toBe(path.join("world", "shared"));
+    expect(skills.test("skills")).toBe(true);
+    expect(skills.test("skills/fishing/SKILL.md")).toBe(true);
+    expect(skills.test("skills\\fishing")).toBe(true);
+    expect(skills.test("skillset/x.md")).toBe(false);
+    expect(skills.test("wiki/entities/places/home.md")).toBe(false);
+    expect(skillsFolder("a/my.skills").skills.test("myxskills/x")).toBe(false);
   });
 });
 

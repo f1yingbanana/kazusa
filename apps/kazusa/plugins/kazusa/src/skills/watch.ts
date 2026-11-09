@@ -1,4 +1,5 @@
 import { existsSync, watch, type FSWatcher } from "node:fs";
+import path from "node:path";
 
 /** A folder to watch and which paths under it are skills. */
 export interface SkillRoot {
@@ -7,10 +8,18 @@ export interface SkillRoot {
   readonly skills: RegExp;
 }
 
-/** Every path under Kazusa's own skills folder. */
-export const ALL = /^/;
-/** `skills/…` under a world's `shared`. */
-export const SHARED_SKILLS = /^skills(?:[\\/]|$)/;
+/**
+ * A skills folder, watched from the folder it is in, so it may be created or
+ * removed while the Gateway runs.
+ */
+export function skillsFolder(dir: string): SkillRoot {
+  const name = path.basename(dir).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return {
+    dir: path.dirname(dir),
+    skills: new RegExp(`^${name}(?:[\\\\/]|$)`, "u"),
+  };
+}
+
 /**
  * `<character>/skills/…` or `<character>/.agents/skills/…` under the workspaces
  * folder.
@@ -32,10 +41,11 @@ const CELL = Symbol.for("kazusa.skillsWatch");
 
 /**
  * Calls `onChange` once a burst of skill edits settles. One recursive watcher
- * per folder for the whole process, however many characters there are (a single
- * native stream on macOS and Windows), where OpenClaw's own `skills.load.watch`
- * watches each workspace and runs out with a large cast. The plugin registers
- * many times; the newest `onChange` is the one called.
+ * per folder for the whole process, however many characters there are: a single
+ * native stream on macOS and Windows, which Kazusa ships for (Linux, for
+ * development, watches each folder under it). OpenClaw's own
+ * `skills.load.watch` watches each workspace and runs out with a large cast.
+ * The plugin registers many times; the newest `onChange` is the one called.
  */
 export function watchSkills(
   roots: readonly SkillRoot[],
@@ -44,9 +54,10 @@ export function watchSkills(
   settleMs: number = SETTLE_MS,
 ): void {
   const holder = globalThis as { [CELL]?: WatchCell };
-  const key = JSON.stringify(
-    roots.map(({ dir, skills }) => [dir, skills.source]),
+  const unique = new Map(
+    roots.map((root) => [`${root.dir}\0${root.skills.source}`, root]),
   );
+  const key = JSON.stringify([...unique.keys()]);
   const existing = holder[CELL];
   if (existing?.key === key) {
     existing.onChange = onChange;
@@ -55,7 +66,7 @@ export function watchSkills(
   if (existing) stopWatchingSkills();
   const cell: WatchCell = { key, watchers: [], onChange };
   holder[CELL] = cell;
-  for (const { dir, skills } of roots) {
+  for (const { dir, skills } of unique.values()) {
     if (!existsSync(dir)) continue;
     try {
       cell.watchers.push(

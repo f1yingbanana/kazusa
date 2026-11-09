@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 /** Expand a leading `~` or `~/` to the user's home directory. */
-export function expandUserPath(
+function expandUserPath(
   rawPath: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
