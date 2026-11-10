@@ -217,14 +217,10 @@ export default definePluginEntry({
       onAwoken: memory.sleep.wake,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
-      realtime: async (agentId, item) => {
-        if (!item.sessionKey.includes(":chat:")) return false;
-        return (
-          (
-            await messagingRef.current?.chatFacts(agentId, [item.sessionKey])
-          )?.some((chat) => chat.kind === "huddle") ?? false
-        );
-      },
+      realtime: async (agentId, item) =>
+        item.sessionKey.includes(":chat:") &&
+        ((await messagingRef.current?.isHuddle(agentId, item.sessionKey)) ??
+          false),
       thinking: async (agentId) => (await models.read(agentId)).thinking,
       model: models.model,
     });
