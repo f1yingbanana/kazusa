@@ -786,12 +786,11 @@ connect these modules in process.
   §4). See [messaging](references/messaging.md) for canonical storage and
   [the client reference](references/client.md) for UI requirements, current gaps
   and live acceptance tests.
-- **What the model saw**: transcripts hold turns but not the assembled situation
-  message. After each `assemble()` the context engine keeps the last 20 per
-  character (`{ simTime, situation, inPerson, estimatedTokens }`, retained store
-  `"context"`), served at `GET /kazusa/context?id=<agentId>`
-  (`context-engine/http.ts`, `ContextResponseSchema`). Read it before guessing
-  why a character did something.
+- **What the model saw**: transcripts hold turns but not the situation message
+  `assemble()` builds, and nothing keeps it. A per-character record of the last
+  20 cost every first build about 250 ms of shared database writes, for
+  debugging alone, and was removed (2026-11). Work from the stores it is built
+  from (task, location, feelings, read receipts) and the transcript.
 - Behavioral instructions belong in skills, not TypeScript prompt constants.
 - See [context-engine conventions](references/context_engine.md) for budgets,
   timestamps, SDK lifecycle requirements, and the messaging contract.
@@ -1425,9 +1424,9 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
 - **Live runs**: keep the sim clock at 1x or paused and `clock.advance` to just
   past the next lease end once every brain is idle; at x60 a model turn costs
   half a sim hour and check-ins land far too late. Read turns from
-  `.state/agents/<id>/agent/openclaw-agent.sqlite` (`transcript_events`) and
-  prompts from `GET /kazusa/context`; `openclaw proxy run` breaks model calls
-  and the cache trace redacts. Operating notes and findings:
+  `.state/agents/<id>/agent/openclaw-agent.sqlite` (`transcript_events`). The
+  situation message is not kept, `openclaw proxy run` breaks model calls and the
+  cache trace redacts. Operating notes and findings:
   [location live run](../../../apps/kazusa/docs/location-live-run.md).
 - **Atomic Markdown Writes**: When mutating Markdown files, always write to a
   temporary file in the same directory and atomically `rename(tmp, target)` so

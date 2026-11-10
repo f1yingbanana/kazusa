@@ -6,13 +6,8 @@ import {
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
-import type {
-  AssembledContext,
-  BrainTurn,
-  ContextSettings,
-} from "@kazusa/client";
+import type { BrainTurn, ContextSettings } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
-import type { StateStore } from "../state.ts";
 import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
 import { contextSettings, contextSettingsBase } from "./settings.ts";
 import {
@@ -90,8 +85,6 @@ interface TurnInputs {
     Pick<MemoryPrefetch, "onYourMind" | "roster" | "ids"> | undefined;
   /** Past turns for the past-tool-call note; the current one is left out. */
   readonly brainTurns: readonly BrainTurn[];
-  /** The last build's situation, so an unchanged one isn't recorded twice. */
-  readonly situation: string;
 }
 
 /**
@@ -110,12 +103,7 @@ interface TurnCaches {
  * Wire host lifecycle and session I/O; selection and skill expansion stay in
  * the engine.
  */
-/** How many brain turns' contexts are kept per character, for observers. */
-const RECENT_CONTEXTS = 20;
-
 export interface ContextEngineService {
-  /** A character's last brain turns' contexts, newest first. */
-  readonly recentContexts: (agentId: string) => Promise<AssembledContext[]>;
   /** The oldest of their ledgers since `since` that fit, for sleep. */
   readonly experiences: (
     agentId: string,
@@ -134,17 +122,21 @@ export function registerContextEngine(
   deps: ContextEngineDeps,
 ): ContextEngineService {
   const getConfig = () => currentConfig(api);
-  // What each brain turn was given, which no transcript keeps.
-  const recent = api.runtime.state.openKeyedStore<AssembledContext[]>({
-    namespace: "context",
-    retention: "retained",
-  });
+  // Earlier versions kept each character's last 20 situations here, for
+  // debugging only, and rewrote them on every first build. Drop what is left.
+  void api.runtime.state
+    .openKeyedStore({ namespace: "context", retention: "retained" })
+    .clear()
+    .catch((error: unknown) =>
+      api.logger.warn(
+        `Context engine: could not drop old situations: ${String(error)}`,
+      ),
+    );
   const caches: TurnCaches = { turns: new Map(), windows: new Map() };
   api.registerContextEngine("kazusa", () =>
-    createContextEngine(api, deps, recent, getConfig, caches),
+    createContextEngine(api, deps, getConfig, caches),
   );
   return {
-    recentContexts: async (agentId) => (await recent.lookup(agentId)) ?? [],
     experiences: (agentId, since, now) =>
       readExperiences(api, getConfig, agentId, since, now),
   };
@@ -252,7 +244,6 @@ function createContextEngine(
     memory,
     runOf = currentBrainRun,
   }: ContextEngineDeps,
-  recent: StateStore<AssembledContext[]>,
   getConfig: () => OpenClawConfig,
   { turns, windows }: TurnCaches,
 ): ContextEngine {
@@ -487,7 +478,6 @@ function createContextEngine(
           prompt,
           recollection,
           brainTurns,
-          situation: assembled.situationText,
         });
       try {
         if (
@@ -502,29 +492,6 @@ function createContextEngine(
           `Context engine: could not keep where records start: ${String(error)}`,
         );
       }
-      // Observers see each situation a turn was given, once: a later build
-      // that changed nothing adds nothing.
-      if (turn?.situation !== assembled.situationText)
-        try {
-          const previous = (await recent.lookup(brainAgentId)) ?? [];
-          await recent.register(
-            brainAgentId,
-            [
-              {
-                simTime: now,
-                situation: assembled.situationText,
-                inPerson: company,
-                estimatedTokens: assembled.estimatedTokens,
-                breakdown: assembled.breakdown,
-              },
-              ...previous,
-            ].slice(0, RECENT_CONTEXTS),
-          );
-        } catch (error: unknown) {
-          api.logger.warn(
-            `Context engine: could not record context: ${String(error)}`,
-          );
-        }
       return assembled;
     },
   };

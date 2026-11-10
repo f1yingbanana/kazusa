@@ -276,7 +276,7 @@ describe("Context assembly", () => {
     // 64k less the 10k the host keeps for itself.
     expect(result.estimatedTokens).toBeLessThanOrEqual(54_000);
     // Unlimited records take most of what is left, cut back to leave room.
-    expect(result.breakdown.records).toBeGreaterThan(30_000);
+    expect(result.estimatedTokens).toBeGreaterThan(30_000);
     expect(JSON.stringify(result.messages)).toContain("moment 3999 ");
   });
 
@@ -295,7 +295,7 @@ describe("Context assembly", () => {
       },
     });
     // All 4,000 records fit the host's budget, far past 64k.
-    expect(result.breakdown.records).toBeGreaterThan(100_000);
+    expect(result.estimatedTokens).toBeGreaterThan(100_000);
     expect(result.estimatedTokens).toBeLessThanOrEqual(990_000);
   });
 

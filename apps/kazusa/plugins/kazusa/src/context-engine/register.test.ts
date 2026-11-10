@@ -51,6 +51,7 @@ async function setup(
       register: async (key: string, value: unknown) => {
         store.set(key, value);
       },
+      clear: async () => store.clear(),
     };
   };
   const register = vi.fn<OpenClawPluginApi["registerContextEngine"]>();
@@ -136,7 +137,7 @@ describe("Native context-engine registration", () => {
   it.each(["preflight_required", "manual", "context_overflow"])(
     "owns context management and skips %s compaction without accessing ledgers",
     async (forceReason) => {
-      const { engine, service, readHistory, lookupTask } = await setup();
+      const { engine, readHistory, lookupTask } = await setup();
       expect(engine.info.ownsCompaction).toBe(true);
       const result = await engine.compact({
         sessionId: "brain",
@@ -153,7 +154,6 @@ describe("Native context-engine registration", () => {
       });
       expect(readHistory).not.toHaveBeenCalled();
       expect(lookupTask).not.toHaveBeenCalled();
-      expect(await service.recentContexts("alice")).toEqual([]);
     },
   );
 
@@ -335,7 +335,7 @@ describe("Native context-engine registration", () => {
   });
 
   it("registers a replay-safe engine and reads only the current character's ledgers", async () => {
-    const { engine, service, register, readHistory } = await setup();
+    const { engine, register, readHistory } = await setup();
     expect(register.mock.calls[0][0]).toBe("kazusa");
     expect(engine.info.transcriptSemantics?.currentTurnFence).toBe(
       "before-current-turn-entry-v1",
@@ -367,10 +367,6 @@ describe("Native context-engine registration", () => {
       "# Kazusa Task Lifecycle",
     );
     expect(result.systemPromptAddition).toContain("memory_search");
-    // The situation the model saw is kept for observers.
-    const [recorded] = await service.recentContexts("alice");
-    expect(recorded?.situation).toContain("Current simulation time");
-    expect(recorded?.inPerson).toBe(false);
     expect(result.systemPromptAddition).not.toContain("user-invocable");
   });
 
@@ -653,30 +649,6 @@ describe("A turn's builds", () => {
       await fresh.engine.assemble({ ...brain(), tokenBudget: 990_000 }),
     );
     expect(JSON.stringify(later.messages)).toContain("Reading");
-  });
-
-  it("records each situation a turn was given once", async () => {
-    let current: ActiveTask | undefined = undefined;
-    const { engine, service, lookupTask } = await setup(
-      {},
-      undefined,
-      "/test/workspace",
-      { memory: recollect(), runOf: () => "run-1" },
-    );
-    lookupTask.mockImplementation(async () => current);
-    await engine.assemble(brain());
-    await engine.assemble(brain());
-    expect(await service.recentContexts("alice")).toHaveLength(1);
-    current = {
-      id: "alice:task-1",
-      type: "studying",
-      description: "Reading",
-      startedAt: "2026-10-23T07:30:00.000Z",
-      endAt: "2026-10-23T09:00:00.000Z",
-      duration: 90,
-    };
-    await engine.assemble(brain());
-    expect(await service.recentContexts("alice")).toHaveLength(2);
   });
 
   it("builds fully every time when no turn is under way", async () => {

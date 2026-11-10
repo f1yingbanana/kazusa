@@ -2,7 +2,6 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
   ContextSettingsSavePayloadSchema,
-  type ContextResponse,
   type ContextSettingsResponse,
 } from "@kazusa/client";
 import { currentConfig } from "../current-config.ts";
@@ -11,37 +10,19 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import type { ContextEngineService } from "./register.ts";
 import { contextSettings, contextSettingsBase } from "./settings.ts";
 
 /**
- * Serves what each brain turn was given (`GET /kazusa/context?id=`), and the
- * world's and each character's context settings (`GET /kazusa/context/settings
- * [?agentId=]`, `POST /kazusa/context/settings/save`).
+ * Serves the world's and each character's context settings (`GET
+ * /kazusa/context/settings[?agentId=]`, `POST /kazusa/context/settings/save`).
  */
-export function registerContextHttp(
-  api: OpenClawPluginApi,
-  deps: { readonly context: ContextEngineService },
-): void {
+export function registerContextHttp(api: OpenClawPluginApi): void {
   const route = createRouteRegistrar(api);
   const settings = contextSettings(api);
   const base = () => contextSettingsBase(api.pluginConfig);
   const unknownAgent = (agentId: string | undefined): boolean =>
     agentId !== undefined &&
     !listAgentIds(currentConfig(api)).includes(agentId);
-
-  route("context", "GET", async (req, res) => {
-    const id = new URL(req.url ?? "/", "http://localhost").searchParams.get(
-      "id",
-    );
-    if (!id) {
-      sendJson(res, 400, { error: "Missing required id query parameter." });
-      return;
-    }
-    sendJson(res, 200, {
-      contexts: await deps.context.recentContexts(id),
-    } satisfies ContextResponse);
-  });
 
   const read = async (
     agentId: string | undefined,

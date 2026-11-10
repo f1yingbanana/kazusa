@@ -5,7 +5,6 @@ import { ContextSettingsResponseSchema } from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { describe, expect, it } from "vitest";
 import { registerContextHttp } from "./http.ts";
-import type { ContextEngineService } from "./register.ts";
 
 type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 
@@ -13,36 +12,33 @@ function setup(contextEngine: Record<string, unknown> = {}) {
   const routes: Record<string, Handler> = {};
   const stores = new Map<string, Map<string, unknown>>();
   const config = { agents: { list: [{ id: "alice" }, { id: "bob" }] } };
-  registerContextHttp(
-    {
-      config: { gateway: { auth: { token: "test-service-token" } } },
-      pluginConfig: { contextEngine },
-      registerHttpRoute: (route: { path: string; handler: Handler }) => {
-        routes[route.path] = route.handler;
-      },
-      runtime: {
-        config: { current: () => config },
-        state: {
-          openKeyedStore: ({ namespace }: { namespace: string }) => {
-            const store = stores.get(namespace) ?? new Map<string, unknown>();
-            stores.set(namespace, store);
-            return {
-              lookup: async (key: string) => store.get(key),
-              register: async (key: string, value: unknown) => {
-                store.set(key, value);
-              },
-            };
-          },
-        },
-        agent: {
-          session: {
-            getSessionEntryAsync: async () => ({ contextTokens: 1_048_576 }),
-          },
+  registerContextHttp({
+    config: { gateway: { auth: { token: "test-service-token" } } },
+    pluginConfig: { contextEngine },
+    registerHttpRoute: (route: { path: string; handler: Handler }) => {
+      routes[route.path] = route.handler;
+    },
+    runtime: {
+      config: { current: () => config },
+      state: {
+        openKeyedStore: ({ namespace }: { namespace: string }) => {
+          const store = stores.get(namespace) ?? new Map<string, unknown>();
+          stores.set(namespace, store);
+          return {
+            lookup: async (key: string) => store.get(key),
+            register: async (key: string, value: unknown) => {
+              store.set(key, value);
+            },
+          };
         },
       },
-    } as unknown as OpenClawPluginApi,
-    { context: {} as ContextEngineService },
-  );
+      agent: {
+        session: {
+          getSessionEntryAsync: async () => ({ contextTokens: 1_048_576 }),
+        },
+      },
+    },
+  } as unknown as OpenClawPluginApi);
   const call = async (route: string, body?: unknown) => {
     const req = Readable.from(
       body === undefined ? [] : [Buffer.from(JSON.stringify(body))],

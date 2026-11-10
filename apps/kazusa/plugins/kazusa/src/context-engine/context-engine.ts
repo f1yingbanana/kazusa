@@ -9,7 +9,7 @@ import { personLabel } from "../person-label.ts";
 import { createSkillText } from "../skill-text.ts";
 import { renderToolHistory } from "./tool-history.ts";
 
-import type { AssembledContext, BrainTurn } from "@kazusa/client";
+import type { BrainTurn } from "@kazusa/client";
 export type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { HarnessContextEngine as ContextEngine } from "openclaw/plugin-sdk/agent-harness-runtime";
 import {
@@ -90,8 +90,6 @@ export async function assembleContext(params: {
   readonly contextWindow?: number;
 }): Promise<
   Awaited<ReturnType<ContextEngine["assemble"]>> & {
-    readonly breakdown: NonNullable<AssembledContext["breakdown"]>;
-    readonly situationText: string;
     /** Where these records start, for the next turn. */
     readonly recordsFrom?: number;
   }
@@ -298,17 +296,6 @@ export async function assembleContext(params: {
       systemPromptTokens,
     systemPromptAddition,
     ...(records.from === undefined ? {} : { recordsFrom: records.from }),
-    situationText:
-      typeof situation.content === "string"
-        ? situation.content
-        : JSON.stringify(situation.content),
-    breakdown: {
-      skills: skillTokens,
-      situation: situationTokens,
-      history: history.reduce((sum, m) => sum + estimateTokens(m), 0),
-      records: context.reduce((sum, m) => sum + estimateTokens(m), 0),
-      tools: toolHistoryMessages.reduce((sum, m) => sum + estimateTokens(m), 0),
-    },
   };
 }
 
