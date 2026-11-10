@@ -87,6 +87,27 @@ function history(seed: number, count: number): MessageDelivery[] {
   });
 }
 
+/**
+ * What readers use of a message. A delivered one reads back slim: its copies
+ * keep who, which side, their address and when they read it, and it says it is
+ * settled; one still in delivery reads back exactly as saved.
+ */
+const view = (delivery: MessageDelivery | undefined) => {
+  if (!delivery || !isDeliverySettled(delivery)) return delivery;
+  const { settled: _settled, copies, ...rest } = delivery;
+  return {
+    ...rest,
+    settled: true,
+    copies: copies.map(({ agentId, role, sessionKey, readAt }) => ({
+      agentId,
+      role,
+      sessionKey,
+      ...(readAt === undefined ? {} : { readAt }),
+    })),
+  };
+};
+const views = (deliveries: readonly MessageDelivery[]) => deliveries.map(view);
+
 /** Every message in the test chats, oldest first. */
 const everything = (store: MessageStore) =>
   CHATS.flatMap((chat) => store.page(chat, { limit: 10_000 }).messages)
@@ -160,8 +181,12 @@ describe("message database", () => {
             if (!page.hasMore) break;
             before = page.messages[0].value.sequence;
           }
-          expect(paged, `${participant} in ${chatId}`).toEqual(seen);
-          expect(store.latest(chatId, participant)?.value).toEqual(seen.at(-1));
+          expect(views(paged), `${participant} in ${chatId}`).toEqual(
+            views(seen),
+          );
+          expect(view(store.latest(chatId, participant)?.value)).toEqual(
+            view(seen.at(-1)),
+          );
         }
         for (const agentId of ["alice", "bob", "carol"]) {
           const theirs = inChat.filter((m) => m.audience.includes(agentId));
@@ -174,10 +199,12 @@ describe("message database", () => {
             ),
           );
           expect(
-            store.unreadFrom(agentId, chatId),
+            views(store.unreadFrom(agentId, chatId)),
             `${agentId} ${chatId}`,
           ).toEqual(
-            oldest ? theirs.filter((m) => m.sequence >= oldest.sequence) : [],
+            views(
+              oldest ? theirs.filter((m) => m.sequence >= oldest.sequence) : [],
+            ),
           );
         }
       }
@@ -265,7 +292,7 @@ describe("message database", () => {
     }
     old.close();
     const store = openMessageDatabase({ path: file });
-    expect(everything(store)).toEqual(messages);
+    expect(views(everything(store))).toEqual(views(messages));
     expect(store.unsettled()).toEqual(
       messages.filter((delivery) => !isDeliverySettled(delivery)),
     );
@@ -281,9 +308,65 @@ describe("message database", () => {
           c.agentId === "bob" && c.readAt === undefined && c.role === "user",
       ),
     );
-    expect(store.unreadFrom("bob", "group:b")).toEqual(
-      oldest ? bob.filter((m) => m.sequence >= oldest.sequence) : [],
+    expect(views(store.unreadFrom("bob", "group:b"))).toEqual(
+      views(oldest ? bob.filter((m) => m.sequence >= oldest.sequence) : []),
     );
+  });
+
+  it("slims a delivered message, keeping what readers use", async () => {
+    const store = openMessageDatabase({ path: ":memory:" });
+    const sent = message(1, "alice", "direct:ab", ["alice", "bob"]);
+    // At an address other than the usual one, which must survive slimming.
+    const odd = message(2, "alice", "group:b", ["alice", "bob", "carol"]);
+    const delivered = (m: MessageDelivery): MessageDelivery => ({
+      ...m,
+      copies: m.copies.map((copy, index) => ({
+        ...copy,
+        sessionKey:
+          m === odd && index === 1
+            ? "agent:bob:chat:group:old"
+            : copy.sessionKey,
+        sessionId: `session-${index}`,
+        messageId: `ledger-${index}`,
+        published: true,
+        notified: true,
+        ...(copy.role === "user" ? { readAt: 5 } : {}),
+      })),
+    });
+    const inFlight = message(3, "alice", "group:b", ["alice", "bob"]);
+    for (const m of [delivered(sent), delivered(odd), inFlight])
+      await store.register(m.id, m);
+    const read = await store.lookup(sent.id);
+    expect(read).toMatchObject({
+      settled: true,
+      sequence: 1,
+      chatId: "direct:ab",
+    });
+    expect(read && isDeliverySettled(read)).toBe(true);
+    // The ledger ids are gone; the rest is as it was, addresses included.
+    expect(read?.copies).toEqual([
+      {
+        agentId: "alice",
+        sessionKey: "agent:alice:chat:direct:ab",
+        role: "assistant",
+        published: true,
+      },
+      {
+        agentId: "bob",
+        sessionKey: "agent:bob:chat:direct:ab",
+        role: "user",
+        published: true,
+        notified: true,
+        readAt: 5,
+      },
+    ]);
+    expect(view(await store.lookup(odd.id))).toEqual(view(delivered(odd)));
+    expect((await store.lookup(odd.id))?.copies[1].sessionKey).toBe(
+      "agent:bob:chat:group:old",
+    );
+    // Still in delivery: exactly as saved, ledger ids and all.
+    expect(await store.lookup(inFlight.id)).toEqual(inFlight);
+    expect(store.unsettled()).toEqual([inFlight]);
   });
 
   it("keeps a message once as its delivery progresses", async () => {
@@ -338,7 +421,7 @@ describe("message database", () => {
     await store.ready?.();
     expect(entries).toHaveBeenCalledTimes(1);
     expect(clear).toHaveBeenCalledTimes(1);
-    expect(everything(store)).toEqual(old);
+    expect(views(everything(store))).toEqual(views(old));
     expect(store.latest(old[0].chatId)?.createdAt).toBe(42);
     // One database per file in the process, whoever opens it.
     expect(openMessageDatabase({ path: file })).toBe(store);

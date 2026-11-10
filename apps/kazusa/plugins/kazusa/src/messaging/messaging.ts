@@ -95,6 +95,11 @@ export interface MessageDelivery {
   readonly params: SendMessageParams;
   readonly timestamp: number;
   readonly copies: MessageCopy[];
+  /**
+   * Set on a message read back from the database once every copy was delivered:
+   * it keeps no ledger ids, so its copies can't show that themselves.
+   */
+  readonly settled?: true;
 }
 
 export interface SendMessageResult {
@@ -1463,9 +1468,10 @@ export class Messaging {
         sessionKey: chat
           ? chatSummary(chat, sender).sessionKey
           : (delivery.copies[0]?.sessionKey ?? ""),
-        status: delivery.copies.every((copy) => copy.messageId)
-          ? ("delivered" as const)
-          : ("pending" as const),
+        status:
+          delivery.settled || delivery.copies.every((copy) => copy.messageId)
+            ? ("delivered" as const)
+            : ("pending" as const),
         recipients: delivery.audience.filter(
           (member) => member !== delivery.sender,
         ),
