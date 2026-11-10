@@ -18,8 +18,11 @@ export interface Conversation {
   readonly unanswered: number;
   /** When the first of those arrived. */
   readonly waitingSince: number | null;
-  /** Those sent at or after `from`, oldest first; none without `from`. */
-  readonly recent: readonly ReceivedMessage[];
+  /**
+   * The newest of those sent at or after `from` that they have read, as their
+   * read receipts say; none without `from`.
+   */
+  readonly lastRead?: ReceivedMessage;
 }
 
 /** A message as stored, with the real time it was first saved. */
@@ -455,12 +458,17 @@ function createStore({
         ORDER BY sequence LIMIT 1) AS waitingSince
      FROM received WHERE participant = ?1 AND chat = ?2 AND sequence > ?3`,
   );
-  const recent = db.prepare(
+  // An unread copy has an `unread` row; any other they received is read.
+  const lastRead = db.prepare(
     `SELECT m.id, m.sender, m.sender_name AS senderName, r.timestamp
      FROM received r JOIN messages m ON m.n = r.n
      WHERE r.participant = ? AND r.chat = ? AND r.sequence > ?
        AND r.timestamp >= ?
-     ORDER BY r.sequence`,
+       AND NOT EXISTS (
+         SELECT 1 FROM unread u
+         WHERE u.agent_id = r.participant AND u.chat = r.chat
+           AND u.sequence = r.sequence AND u.n = r.n)
+     ORDER BY r.sequence DESC LIMIT 1`,
   );
   const chatPage = db.prepare(
     `SELECT ${MESSAGE} FROM ${FROM}
@@ -716,19 +724,16 @@ function createStore({
               unanswered: number;
               waitingSince: number | null;
             });
+      const read =
+        from === undefined || chat === undefined
+          ? undefined
+          : (lastRead.get(participant, chat, since, from) as
+              ReceivedMessage | undefined);
       return {
         lastSpokeAt: own?.timestamp ?? null,
         unanswered: tail.unanswered,
         waitingSince: tail.waitingSince,
-        recent:
-          from === undefined || chat === undefined
-            ? []
-            : (recent.all(
-                participant,
-                chat,
-                since,
-                from,
-              ) as unknown as ReceivedMessage[]),
+        ...(read ? { lastRead: read } : {}),
       };
     },
     page,

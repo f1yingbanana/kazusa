@@ -464,10 +464,7 @@ describe("Tuning out", () => {
     );
     expect(h.deliveries).toEqual([]);
     const state = h.snapshot();
-    const key = stimulusKey(line("lunch-1"));
     expect(state.pending).toEqual([]);
-    expect(state.processedIds).toContain(key);
-    expect(state.ignoredIds).toContain(key);
     expect(state.tunedOut).toEqual([
       { conversation: "chat:huddle:lunch", at: NOW },
     ]);
@@ -482,7 +479,7 @@ describe("Tuning out", () => {
     h.evaluateDecision.mockClear();
     await h.router.receive("alice", { ...line("lunch-2"), timestamp: NOW - 1 });
     expect(h.evaluateDecision).not.toHaveBeenCalled();
-    expect(h.snapshot().ignoredIds).toContain(stimulusKey(line("lunch-2")));
+    expect(h.snapshot().pending).toEqual([]);
 
     // Anything else still reaches them, without the conversation they left.
     h.evaluateDecision.mockResolvedValue(answer("FOLLOWING", "WAKE"));
@@ -507,12 +504,9 @@ describe("Tuning out", () => {
     await h.router.receive("alice", line("lunch-1"));
     await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
     expect(h.deliveries[0].ids).toEqual(["text-0"]);
-    expect(h.snapshot().ignoredIds).toEqual(
-      expect.arrayContaining([
-        stimulusKey(line("lunch-0")),
-        stimulusKey(line("lunch-1")),
-      ]),
-    );
+    expect(
+      h.snapshot().pending.filter(({ id }) => id.startsWith("lunch")),
+    ).toEqual([]);
   });
 
   it("goes on as before while they still follow it", async () => {
@@ -570,7 +564,7 @@ describe("Tuning out", () => {
       expect(state.tunedOut).toBeUndefined();
       expect([...h.decisions.values()][0]).not.toHaveProperty("tunedOut");
       // Judged as the main answer says: ignored here, like any line.
-      expect(state.ignoredIds).toContain(stimulusKey(line("lunch-1")));
+      expect(state.pending).toEqual([]);
     },
   );
 });
@@ -610,9 +604,6 @@ describe("Stale conversation", () => {
       "last",
       "text",
     ]);
-    const noticed = await h.router.noticed("alice");
-    expect(noticed(line("old", 5))).toBe(false);
-    expect(h.snapshot().ignoredIds).toHaveLength(2);
   });
 
   it("keeps a line already handed to the brain", async () => {
@@ -665,9 +656,10 @@ describe("Message bursts", () => {
 
     await h.router.drain("alice");
     await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
-    expect(h.deliveries[0].keys).toHaveLength(2);
-    const noticed = await h.router.noticed("alice");
-    expect(noticed({ id: "b", sessionKey: chat })).toBe(true);
+    expect(h.deliveries[0].keys).toEqual([
+      stimulusKey({ id: "a", sessionKey: chat }),
+      stimulusKey({ id: "b", sessionKey: chat }),
+    ]);
   });
 
   it("keeps apart other senders, later messages and sent items", async () => {
@@ -889,6 +881,39 @@ describe("Attention regression cases", () => {
     expect(h.deliveries[0].id).not.toBe(h.deliveries[1].id);
   });
 
+  it("checks in once for a task that has ended, however often its wake fires", async () => {
+    // Unpausing re-arms every lease, ended ones too: the wake fires again for
+    // a character still deciding what to do next.
+    const h = setupWake();
+    h.tasks.set("alice", {
+      id: "task-1",
+      type: "studying" as const,
+      description: "Physics",
+      duration: 60,
+      startedAt: new Date(NOW - 3_600_000).toISOString(),
+      endAt: new Date(NOW).toISOString(),
+    });
+    await h.router.deadline("alice");
+    await h.router.ended("alice", "external", false);
+    expect(h.deliveries).toHaveLength(1);
+    h.setTime(NOW + 60_000);
+    await h.router.deadline("alice");
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.snapshot().pending).toEqual([]);
+  });
+
+  it("leaves out the stimulus key lists older records carry on their next save", async () => {
+    const h = setupWake();
+    h.states.set("alice", {
+      pending: [],
+      processedIds: ["a", "b"],
+      ignoredIds: ["b"],
+    } as never);
+    await h.router.drain("alice");
+    expect(h.snapshot()).not.toHaveProperty("processedIds");
+    expect(h.snapshot()).not.toHaveProperty("ignoredIds");
+  });
+
   it("rechecks task identity after evaluation even when replacement has identical times", async () => {
     const h = setup();
     const task = {
@@ -917,11 +942,10 @@ describe("Attention regression cases", () => {
     expect(h.snapshot().pending).toEqual([]);
   });
 
-  it("scopes duplicate IDs to the ledger and preserves original simulation time", async () => {
+  it("scopes IDs to the ledger and preserves original simulation time", async () => {
     const h = setupWake();
     const item = { ...stimulus("same"), timestamp: NOW - 123_456 };
     await h.router.receive("alice", item);
-    await h.router.receive("alice", { ...item, timestamp: NOW });
     expect(h.deliveries).toHaveLength(1);
     await h.router.receive("alice", {
       ...item,
@@ -929,7 +953,6 @@ describe("Attention regression cases", () => {
     });
     expect(h.deliveries).toHaveLength(2);
     expect(h.deliveries[0].message).toContain("Sat 2026-10-24 11:57");
-    expect(h.snapshot().processedIds).toContain(stimulusKey(item));
   });
 
   it("preserves incoming text without emitting instruction markers", async () => {
@@ -1157,7 +1180,6 @@ describe("Brain handoff custody", () => {
     // Its turn ran: never replayed.
     expect(h.deliver).toHaveBeenCalledTimes(1);
     expect(h.snapshot().pending).toEqual([]);
-    expect(h.snapshot().processedIds).toContain(stimulusKey(stimulus("a")));
   });
 
   it("on restart, hands over again what the brain never got", async () => {
@@ -2551,28 +2573,19 @@ describe("Human reply timing and task boundaries", () => {
     expect(h.deliveries[0].ids).toContain("text");
   });
 
-  it("discards ignored stimuli for good and reports only what the brain was shown", async () => {
+  it("discards ignored stimuli and hands over only what the brain is shown", async () => {
     const h = setup({ assembleDecisionContext });
     h.tasks.set("alice", study());
     h.evaluateDecision.mockResolvedValueOnce(answer("IGNORE"));
     await h.router.receive("alice", stimulus("chatter"));
     h.evaluateDecision.mockResolvedValueOnce(answer("DEFER"));
     await h.router.receive("alice", stimulus("later"));
-    let noticed = await h.router.noticed("alice");
-    expect(noticed(stimulus("chatter"))).toBe(false);
-    expect(noticed(stimulus("later"))).toBe(false);
+    expect(h.snapshot().pending.map((item) => item.id)).toEqual(["later"]);
 
     h.setTime(NOW + HOUR);
     await h.router.deadline("alice");
     expect(h.deliveries[0].ids).not.toContain("chatter");
-    noticed = await h.router.noticed("alice");
-    expect(noticed(stimulus("chatter"))).toBe(false);
-    expect(noticed(stimulus("later"))).toBe(true);
-    // A duplicate of the ignored stimulus is still deduplicated.
-    await h.router.receive("alice", stimulus("chatter"));
-    expect(h.snapshot().pending.map((item) => item.id)).not.toContain(
-      "chatter",
-    );
+    expect(h.deliveries[0].ids).toContain("later");
   });
 
   it("treats a deferral with no activity as attention now", async () => {
@@ -2870,7 +2883,6 @@ describe("Foreseen stimuli", () => {
     await h.router.receive("alice", stimulus("text"));
     await h.router.forgetForeseen("alice");
     expect(h.snapshot().pending.map(({ id }) => id)).toEqual(["text"]);
-    expect(h.snapshot().processedIds ?? []).toEqual([]);
   });
 
   it("never holds a sighting for someone offstage", async () => {
@@ -3043,7 +3055,6 @@ describe("Conversation coverage review", () => {
     await h.router.ended("alice", "reply-1", false);
     expect(h.deliver).not.toHaveBeenCalled();
     expect(h.snapshot().pending).toEqual([]);
-    expect(h.snapshot().ignoredIds).toContain(stimulusKey(greeting));
     expect(requests[1]).toMatchObject({
       queuedReview: true,
       incomingBundle: [{ id: "hello-again" }],

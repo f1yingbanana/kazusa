@@ -334,11 +334,13 @@ the brain was actually shown at least one of those messages**. Each line is
 `- <address>: <sender id> at <sim time>` for the latest such message; the text
 is already in the ledger history. Messaging computes the conversation tail from
 its canonical store, not from catalog attribution (outgoing catalog records can
-lack sender metadata), and `Perception.noticed()` filters it: `IGNORE`d stimuli
-were discarded for good and waiting (`DEFER`, delayed `WAKE`) ones are unread.
-This is how a character notices a conversation they read but forgot to answer.
-The `context-conventions` skill says the list is not a demand: a closed
-conversation or a deliberate silence needs nothing.
+lack sender metadata), and keeps only messages the character has read, by their
+read receipts (`markRead`): `IGNORE`d stimuli were never shown and waiting
+(`DEFER`, delayed `WAKE`) ones are unread. In a text chat, showing one message
+reads everything above it, as opening the chat would. This is how a character
+notices a conversation they read but forgot to answer. The `context-conventions`
+skill says the list is not a demand: a closed conversation or a deliberate
+silence needs nothing.
 
 ## Transcript envelope & speaker attribution
 

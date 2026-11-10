@@ -144,12 +144,6 @@ export interface AwaitingReply {
   readonly timestamp: number;
 }
 
-/** A message reference in the participant's own ledger addressing. */
-export interface MessageRef {
-  readonly id: string;
-  readonly sessionKey: string;
-}
-
 /**
  * Canonical facts a person weighs before answering: who is in the chat and
  * where the conversation stands for this participant.
@@ -1939,13 +1933,12 @@ export class Messaging {
 
   /**
    * Chats where someone spoke after this participant's latest message and the
-   * participant actually read at least one of those messages. `noticed` comes
-   * from attention: ignored or still-waiting stimuli never count as read.
+   * participant read at least one of those messages, as their read receipts say
+   * (`markRead`): one never shown to their brain is not read.
    */
   async awaitingReplies(
     agentId: string,
     since: number,
-    noticed: (ref: MessageRef) => boolean,
   ): Promise<AwaitingReply[]> {
     PARTICIPANT_ID.parse(agentId);
     await this.ready();
@@ -1953,10 +1946,11 @@ export class Messaging {
     for (const chat of this.chats.values()) {
       if (!chat.members.includes(agentId)) continue;
       const { sessionKey } = chatSummary(chat, agentId);
-      const latest = this.deps.store
-        .conversation(agentId, chat.id, since)
-        .recent.filter((message) => noticed({ id: message.id, sessionKey }))
-        .at(-1);
+      const latest = this.deps.store.conversation(
+        agentId,
+        chat.id,
+        since,
+      ).lastRead;
       if (latest)
         result.push({
           sessionKey,
