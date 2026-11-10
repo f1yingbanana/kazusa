@@ -1020,6 +1020,57 @@ describe("location registration", () => {
     expect(await location.confirm("kurimura-airi", crossing!)).toBeUndefined();
   });
 
+  it("does not foresee again the crossings an arrival settled late has passed", async () => {
+    const { context, location, call, setNow } = setup();
+    const received: Stimulus[] = [];
+    location.attachPerception({
+      receive: async (_agentId, stimulus) => {
+        received.push(stimulus);
+      },
+    });
+    await call("location.place", {
+      id: "kurimura-airi",
+      placeId: "room_kazusa",
+    });
+    await executeStartTask(
+      {
+        type: "traveling",
+        description: "Walking to school",
+        duration: 11,
+        afterwards: {},
+        where: "school",
+      },
+      context(),
+    );
+    const arriveAt = (await location.record("kazusa"))!.trip!.arriveAt;
+    // Once Kazusa is there, Airi's walk to the club passes her at school.
+    setNow(arriveAt);
+    await executeStartTask(
+      {
+        type: "traveling",
+        description: "Walking to the club",
+        duration: 14,
+        afterwards: {},
+        where: "club",
+      },
+      context("kurimura-airi"),
+    );
+    const foreseen = received
+      .map(({ id }) => id)
+      .filter((id) => id.startsWith("sighting|cross|"));
+    expect(foreseen).toContain(
+      `sighting|cross|kurimura-airi|school|${arriveAt + minutes(11) - T0}`,
+    );
+
+    // Kazusa's check-in comes after Airi has gone by.
+    setNow(arriveAt + minutes(12) - T0);
+    received.length = 0;
+    await location.settle("kazusa");
+    expect(
+      received.filter(({ id }) => id.startsWith("sighting|cross|")),
+    ).toEqual([]);
+  });
+
   it("pushes every record write and sighting to observers, wire-valid", async () => {
     const { context, location, call, setNow, broadcasts } = setup();
     const received: Stimulus[] = [];

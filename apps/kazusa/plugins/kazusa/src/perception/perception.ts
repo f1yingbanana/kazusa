@@ -143,6 +143,17 @@ export interface PerceptionState {
 }
 
 /** Said where they had already stopped listening. */
+/** The check-in at the end of `task`, as `deadline` builds it. */
+function checkIn(
+  agentId: string,
+  task: { readonly id: string; readonly endAt: string },
+): Pick<Stimulus, "id" | "sessionKey"> {
+  return {
+    id: `task-deadline:${task.id}:${task.endAt}`,
+    sessionKey: `agent:${agentId}:tasks`,
+  };
+}
+
 function unheard(
   state: PerceptionState,
   item: { readonly sessionKey: string; readonly timestamp: number },
@@ -505,8 +516,7 @@ export class Perception {
     )
       return;
     const stimulus: Stimulus = {
-      id: `task-deadline:${task.id}:${task.endAt}`,
-      sessionKey: `agent:${agentId}:tasks`,
+      ...checkIn(agentId, task),
       sender: "kazusa:clock",
       text: this.text(
         "kazusa-deliveries#check-in",
@@ -854,6 +864,12 @@ export class Perception {
       processedIds?: unknown;
       ignoredIds?: unknown;
     };
+    if (Array.isArray(legacy.processedIds) && state.checkedIn === undefined) {
+      // The check-in for a task that has already ended may be among them.
+      const task = await this.taskStore.lookup(agentId);
+      const key = task?.id && stimulusKey(checkIn(agentId, task));
+      if (key && legacy.processedIds.includes(key)) state.checkedIn = key;
+    }
     delete legacy.processedIds;
     delete legacy.ignoredIds;
     await this.store.register(agentId, state, {
