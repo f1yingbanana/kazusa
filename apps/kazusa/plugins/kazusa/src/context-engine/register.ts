@@ -1,4 +1,5 @@
 import { currentConfig } from "../current-config.ts";
+import { inBackground } from "../background.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import {
   buildMemorySystemPromptAddition,
@@ -123,15 +124,21 @@ export function registerContextEngine(
 ): ContextEngineService {
   const getConfig = () => currentConfig(api);
   // Earlier versions kept each character's last 20 situations here, for
-  // debugging only, and rewrote them on every first build. Drop what is left.
-  void api.runtime.state
-    .openKeyedStore({ namespace: "context", retention: "retained" })
-    .clear()
-    .catch((error: unknown) =>
-      api.logger.warn(
-        `Context engine: could not drop old situations: ${String(error)}`,
-      ),
+  // debugging only, and rewrote them on every first build. Drop what is left,
+  // once the plugin state database is open: it isn't while plugins register.
+  api.on("gateway_start", () => {
+    inBackground(
+      api,
+      () =>
+        api.runtime.state
+          .openKeyedStore({ namespace: "context", retention: "retained" })
+          .clear(),
+      (error) =>
+        api.logger.warn(
+          `Context engine: could not drop old situations: ${String(error)}`,
+        ),
     );
+  });
   const caches: TurnCaches = { turns: new Map(), windows: new Map() };
   api.registerContextEngine("kazusa", () =>
     createContextEngine(api, deps, getConfig, caches),

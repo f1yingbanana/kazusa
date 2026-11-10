@@ -157,6 +157,15 @@ describe("Native context-engine registration", () => {
     },
   );
 
+  it("drops the situations earlier versions kept, once the Gateway has started", async () => {
+    const { on, stores } = await setup();
+    stores.set("context", new Map([["alice", [{ situation: "old" }]]]));
+    const start = on.mock.calls.find(([event]) => event === "gateway_start");
+    expect(start).toBeDefined();
+    start?.[1]();
+    await vi.waitFor(() => expect(stores.get("context")?.size).toBe(0));
+  });
+
   it("asks memory with the pending stimulus and who is here, into the situation", async () => {
     const memory = vi.fn(async () => ({
       onYourMind: "Airi `airi` (friend): Likes mint chocolate.",
