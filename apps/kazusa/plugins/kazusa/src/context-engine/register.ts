@@ -129,10 +129,11 @@ export function registerContextEngine(
   api.on("gateway_start", () => {
     inBackground(
       api,
-      () =>
-        api.runtime.state
+      async () => {
+        await api.runtime.state
           .openKeyedStore({ namespace: "context", retention: "retained" })
-          .clear(),
+          .clear();
+      },
       (error) =>
         api.logger.warn(
           `Context engine: could not drop old situations: ${String(error)}`,

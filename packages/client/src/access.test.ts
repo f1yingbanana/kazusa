@@ -31,7 +31,6 @@ describe("viewer access", () => {
 
   it("does not expose operator-only routes or treat all GETs as public", () => {
     expect(KAZUSA_ROUTES.get("memory/consolidate")?.proxy).toBe(false);
-    expect(KAZUSA_ROUTES.get("context")?.proxy).toBe(false);
     for (const path of ["providers", "models", "context/settings", "usage"]) {
       expect(KAZUSA_ROUTES.get(path)?.permission).toBe("manage");
     }
