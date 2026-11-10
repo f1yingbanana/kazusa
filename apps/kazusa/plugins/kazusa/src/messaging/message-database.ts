@@ -193,16 +193,18 @@ function createStore({
     if (!legacy) return;
     if (readMeta.get(MIGRATED) === undefined) {
       const entries = await legacy.entries();
+      // A short copy rolls back, flag included, so the next read tries again
+      // and the old store is never cleared.
       transaction(() => {
         for (const { key, value, createdAt } of entries)
           if (!find.get(key)) save(key, value, createdAt);
+        const { n } = count.get() as { n: number };
+        if (n < entries.length)
+          throw new Error(
+            `Kazusa messages: copied ${n} of ${entries.length}; the old store is kept`,
+          );
         writeMeta.run(MIGRATED, String(entries.length));
       });
-      const { n } = count.get() as { n: number };
-      if (n < entries.length)
-        throw new Error(
-          `Kazusa messages: copied ${n} of ${entries.length}; the old store is kept`,
-        );
     }
     // Also after a stop between the copy and this. A failure leaves the rows
     // for the next start: they are never read again.

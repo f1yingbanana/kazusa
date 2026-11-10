@@ -138,6 +138,30 @@ describe("message database", () => {
     expect(openMessageDatabase({ path: file })).toBe(store);
   });
 
+  it("keeps the old store, and tries again, when the copy comes up short", async () => {
+    const [first] = history(9, 1);
+    // Two entries under one key copy as one message: fewer than were read.
+    const entries = vi.fn(async () => [
+      { key: first.id, value: first, createdAt: 1 },
+      { key: first.id, value: first, createdAt: 2 },
+    ]);
+    const clear = vi.fn(async () => {});
+    const store = openMessageDatabase({
+      path: ":memory:",
+      legacy: {
+        lookup: async () => undefined,
+        register: async () => {},
+        entries,
+        clear,
+      },
+    });
+    await expect(store.ready?.()).rejects.toThrow("copied 1 of 2");
+    await expect(store.ready?.()).rejects.toThrow("copied 1 of 2");
+    expect(entries).toHaveBeenCalledTimes(2);
+    expect(clear).not.toHaveBeenCalled();
+    expect(await store.entries()).toEqual([]);
+  });
+
   it("clears the old store without copying again after a stop between the two", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "kazusa-messages-"));
     dirs.push(dir);
