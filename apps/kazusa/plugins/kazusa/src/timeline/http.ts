@@ -14,9 +14,10 @@ import {
   messageJournal,
   type MessageDelivery,
 } from "../messaging/messaging.ts";
-import type {
-  DecisionWindow,
-  RecordedDecision,
+import {
+  decisionEvent,
+  type DecisionWindow,
+  type RecordedDecision,
 } from "../perception/decision-database.ts";
 import type { LogWindow } from "../messaging/message-database.ts";
 import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
@@ -184,21 +185,15 @@ export function registerTimelineHttp(
       }
     }
 
-    // Attention decisions are machine records in Perception's own database,
-    // not a ledger: nothing character-facing ever reads them.
+    // The attention decisions worth showing, in Perception's own database, not
+    // a ledger: nothing character-facing ever reads them.
     if (wants("attention.decided")) {
       try {
         const targets = new Set(targetAgents);
         for (const { agentId, record } of (await deps.decisions?.(window)) ??
           []) {
-          if (!targets.has(agentId)) continue;
-          const { simTime, wallTime: _wallTime, ...payload } = record;
-          rawEvents.push({
-            simTime,
-            kind: "attention.decided",
-            actors: [agentId],
-            payload,
-          });
+          if (targets.has(agentId))
+            rawEvents.push(decisionEvent(agentId, record));
         }
       } catch (error: unknown) {
         api.logger.warn(`Timeline decision read failed: ${String(error)}`);

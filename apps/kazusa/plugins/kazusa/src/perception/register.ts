@@ -11,7 +11,13 @@ import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { Perception, type PerceptionDeps } from "./perception.ts";
-import { PERCEPTION_CONFIG, type PerceptionDecisionRecord } from "./types.ts";
+import {
+  PERCEPTION_CONFIG,
+  type AttentionDecision,
+  type DecisionTrace,
+  type PerceptionDecisionRecord,
+} from "./types.ts";
+import { decisionEvent } from "./decision-database.ts";
 import type { ThinkingLevel } from "@kazusa/client";
 import { adoptedByBrain, registerBrainChannel } from "./brain-channel.ts";
 import { registerBrainRunLimits } from "./run-limits.ts";
@@ -72,28 +78,24 @@ export function registerPerception(
 ): Perception {
   const lifetime = new AbortController();
   const endBrainRun = registerBrainRunLimits(api, deps.clock);
-  // Each decision is persisted by Perception in its decisions database, which
-  // the timeline reads; this only broadcasts it to live observers.
+  // Perception keeps the decisions worth showing for the timeline; this only
+  // broadcasts them to live observers.
   const onDecision = (
     agentId: string,
-    record: PerceptionDecisionRecord,
+    decision: AttentionDecision & DecisionTrace,
+    record?: PerceptionDecisionRecord,
   ): void => {
     if (
-      record.source !== "automatic" &&
-      record.action !== "DEFER" &&
-      record.action !== "IGNORE"
+      decision.source !== "automatic" &&
+      decision.action !== "DEFER" &&
+      decision.action !== "IGNORE"
     )
       deps.onAwoken?.(agentId);
-    const { simTime, wallTime: _wallTime, stimulusIds, ...rest } = record;
-    deps.broadcaster?.broadcast({
-      type: "journal",
-      event: withJournalSeq({
-        simTime,
-        actors: [agentId],
-        kind: "attention.decided",
-        payload: { ...rest, stimulusIds: [...stimulusIds] },
-      }),
-    });
+    if (record)
+      deps.broadcaster?.broadcast({
+        type: "journal",
+        event: withJournalSeq(decisionEvent(agentId, record)),
+      });
   };
   const perception = new Perception({
     api,

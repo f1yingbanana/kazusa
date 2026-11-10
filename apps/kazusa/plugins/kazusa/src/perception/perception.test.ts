@@ -53,10 +53,14 @@ type SetupOptions = Partial<PerceptionConfig> & {
   systemAgentId?: string;
 };
 
+type Judged = Parameters<NonNullable<PerceptionDeps["onDecision"]>>[1];
+
 function setup(options: SetupOptions = {}) {
-  // The inbox namespace, and decisions keyed `<agentId>:decision:<n>`.
+  // The inbox namespace, and kept decisions keyed `<agentId>:decision:<n>`.
   const states = new Map<string, PerceptionState>();
   const decisions = new Map<string, PerceptionDecisionRecord>();
+  /** Every decision, kept or not. */
+  const judged: Judged[] = [];
   const tasks = new Map<string, ActiveTask>();
   let simTime = NOW;
   let speed = 1;
@@ -166,6 +170,9 @@ function setup(options: SetupOptions = {}) {
   const deps = {
     stateStore,
     decisionStore,
+    onDecision: (_agentId: string, decision: Judged) => {
+      judged.push(decision);
+    },
     clock: {
       time: () => simTime,
       now: () => ({ simTime, speed, formatted: "" }),
@@ -211,6 +218,7 @@ function setup(options: SetupOptions = {}) {
     router,
     states,
     decisions,
+    judged,
     tasks,
     deliveries,
     deliver,
@@ -475,11 +483,20 @@ describe("Tuning out", () => {
     expect(state.tunedOut).toEqual([
       { conversation: "chat:huddle:lunch", at: NOW },
     ]);
-    expect([...h.decisions.values()]).toEqual([
+    expect(h.judged).toEqual([
       expect.objectContaining({
         action: "IGNORE",
         tunedOut: "chat:huddle:lunch",
       }),
+    ]);
+    // Kept for the timeline: the conversation they left, not its lines.
+    expect([...h.decisions.values()]).toEqual([
+      {
+        simTime: NOW,
+        wallTime: expect.any(Number),
+        lines: [],
+        tunedOut: "huddle:lunch",
+      },
     ]);
 
     // A line said there before they left, arriving late, goes unheard too.
@@ -525,7 +542,8 @@ describe("Tuning out", () => {
     await vi.waitFor(() => expect(h.deliveries).toHaveLength(1));
     expect(h.deliveries[0].ids).toEqual(["lunch-1"]);
     expect(tuneOut).not.toHaveBeenCalled();
-    expect([...h.decisions.values()][0]).not.toHaveProperty("tunedOut");
+    expect(h.judged[0]).not.toHaveProperty("tunedOut");
+    expect(h.decisions.size).toBe(0);
   });
 
   it("still follows lines it would wake for, whatever the second answer", async () => {
@@ -566,10 +584,12 @@ describe("Tuning out", () => {
       h.router.attachConversations({ tuneOut });
       h.evaluateDecision.mockResolvedValue(answer("TUNED_OUT"));
       await h.router.receive("alice", line("lunch-1"));
-      await vi.waitFor(() => expect(h.decisions.size).toBe(1));
+      await vi.waitFor(() => expect(h.judged).toHaveLength(1));
       const state = h.snapshot();
       expect(state.tunedOut).toBeUndefined();
-      expect([...h.decisions.values()][0]).not.toHaveProperty("tunedOut");
+      expect(h.judged[0]).not.toHaveProperty("tunedOut");
+      // Someone else's line in person, not caught: nothing to show.
+      expect(h.decisions.size).toBe(0);
       // Judged as the main answer says: ignored here, like any line.
       expect(state.pending).toEqual([]);
     },
@@ -1679,7 +1699,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       });
       expect(h.snapshot().pending).toHaveLength(0);
       // Live: a busy STEER was recorded as a fallback ("unusable answer").
-      expect([...h.decisions.values()]).toEqual([
+      expect(h.judged).toEqual([
         expect.objectContaining({ action: "STEER", source: "model" }),
       ]);
     });
@@ -2548,40 +2568,89 @@ describe("Human reply timing and task boundaries", () => {
     expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
   });
 
-  it("records each decision on its own, apart from the character state", async () => {
+  it("keeps only the decisions worth showing, apart from the character state", async () => {
     const h = setup({ assembleDecisionContext });
     h.tasks.set("alice", study());
+    // Seen, and answered within the hour: nothing to show.
     h.evaluateDecision.mockResolvedValue(answer("WAKE", 1));
     await h.router.receive("alice", stimulus("text"));
-    h.evaluateDecision.mockResolvedValue({
-      status: "unavailable",
-      reason: "timeout",
+    // Set aside until studying ends.
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("homework"));
+    // Left unread.
+    h.evaluateDecision.mockResolvedValue(answer("IGNORE"));
+    await h.router.receive(
+      "alice",
+      stimulus("spam", "alice", `  Buy\n ${"now ".repeat(40)}`),
+    );
+    // Someone else's line in person, not caught: nothing to show.
+    await h.router.receive("alice", {
+      ...stimulus("aside"),
+      sessionKey: "agent:alice:chat:huddle:cafe",
     });
-    await h.router.receive("alice", stimulus("again"));
+    // The player's is.
+    await h.router.receive("alice", {
+      ...stimulus("hey"),
+      sessionKey: "agent:alice:chat:huddle:cafe",
+      sender: "user:sensei",
+    });
 
-    expect([...h.decisions.keys()]).toEqual([
-      expect.stringMatching(/^alice:decision:/),
-      expect.stringMatching(/^alice:decision:/),
+    expect(h.judged.map(({ action }) => action)).toEqual([
+      "STEER",
+      "DEFER",
+      "IGNORE",
+      "IGNORE",
+      "IGNORE",
     ]);
     // Newest first; oldest first here.
-    const recorded = (await h.router.decisions({ limit: 10 })).reverse();
-    expect(recorded.map(({ agentId }) => agentId)).toEqual(["alice", "alice"]);
-    expect(recorded[0].record).toMatchObject({
-      question: "wake_decision",
-      action: "STEER",
-      source: "model",
-      choice: "WAKE",
-      latencyScore: 1,
-      delayMs: HOUR,
-      simTime: NOW,
-      stimulusIds: ["text"],
-      taskId: "study",
-    });
-    expect(recorded[1].record).toMatchObject({
-      action: "QUEUE_NEXT",
-      source: "fallback",
-      note: "decision unavailable: timeout",
-    });
+    const kept = (await h.router.decisions({ limit: 10 })).reverse();
+    expect(kept.map(({ agentId }) => agentId)).toEqual([
+      "alice",
+      "alice",
+      "alice",
+    ]);
+    const activity = {
+      type: "studying",
+      description: "Revising for the exam",
+      endAt: NOW + HOUR,
+    };
+    expect(kept.map(({ record }) => record)).toEqual([
+      {
+        simTime: NOW,
+        wallTime: expect.any(Number),
+        outcome: "deferred",
+        lines: [
+          {
+            messageId: "homework",
+            chatId: expect.stringMatching(/^direct:/),
+            sender: "sender-homework",
+            excerpt: "Message homework",
+          },
+        ],
+        activity,
+      },
+      expect.objectContaining({
+        outcome: "ignored",
+        lines: [
+          expect.objectContaining({
+            messageId: "spam",
+            // Whitespace folded, cut at 100 characters.
+            excerpt: `${`Buy ${"now ".repeat(40)}`.slice(0, 99).trimEnd()}…`,
+          }),
+        ],
+        activity,
+      }),
+      expect.objectContaining({
+        outcome: "ignored",
+        lines: [
+          expect.objectContaining({
+            messageId: "hey",
+            chatId: "huddle:cafe",
+            sender: "user:sensei",
+          }),
+        ],
+      }),
+    ]);
 
     // The inbox holds character states only.
     await h.restart().recover();
@@ -2733,13 +2802,10 @@ describe("Human reply timing and task boundaries", () => {
       }),
     );
     expect(h.evaluateDecision).not.toHaveBeenCalled();
-    expect([...h.decisions.values()]).toEqual([
-      expect.objectContaining({
-        action: "STEER",
-        source: "automatic",
-        stimulusIds: ["not at schale!"],
-      }),
+    expect(h.judged).toEqual([
+      expect.objectContaining({ action: "STEER", source: "automatic" }),
     ]);
+    expect(h.decisions.size).toBe(0);
   });
 
   it("finishes the line being said before taking in one said over it", async () => {

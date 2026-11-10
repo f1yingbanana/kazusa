@@ -37,10 +37,15 @@ interface JournalIdentity {
 /** What tells one journal event from another, however it was read. */
 export function journalKey(event: JournalIdentity): string {
   const { payload } = event;
-  // Attention decisions share a task (and, while paused, a sim time); their
-  // stimuli tell them apart.
+  // Attention decisions can share a sim time (the clock paused); the lines, or
+  // the conversation left, tell them apart.
   const entityId =
-    (Array.isArray(payload.stimulusIds) ? payload.stimulusIds.join(",") : "") ||
+    (Array.isArray(payload.lines)
+      ? payload.lines
+          .map((line: { messageId?: unknown }) => String(line.messageId))
+          .join(",")
+      : "") ||
+    (typeof payload.tunedOut === "string" ? payload.tunedOut : "") ||
     (typeof payload.taskId === "string" ? payload.taskId : "") ||
     (typeof payload.messageId === "string" ? payload.messageId : "");
   return `${event.kind}:${event.actors.join(",")}:${event.simTime}:${entityId}`;
