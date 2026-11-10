@@ -237,7 +237,8 @@ export default definePluginEntry({
     registerTimelineHttp(api, {
       clock,
       decisions: () => perception.decisions(),
-      messages: async () => (await messagingRef.current?.messageLog()) ?? [],
+      messages: async (window) =>
+        (await messagingRef.current?.messageLog(window)) ?? [],
     });
 
     const getStatuses = async (): Promise<Record<string, CharacterStatus>> => {

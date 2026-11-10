@@ -281,11 +281,19 @@ someone's last line, meant reading every message ever sent (measured 2026-11-10:
 table (one row per audience member, indexed by participant, chat and sequence,
 with a partial index for their own lines) makes a participant's side of a chat
 an indexed read (`conversation()`), which chat facts and "awaiting your reply"
-use without the `messages` queue. `node:sqlite` is synchronous, so every query
-must stay indexed: a full read and parse of 10k messages holds the main thread
-about 26 ms. One connection per file for the process. Messages kept in
-OpenClaw's `messaging` keyed store before this are copied in on first start,
-checked, and that namespace is cleared.
+use without the `messages` queue. Every other reader has its own indexed query
+too, and none lists every message: a history page (by chat and sequence, or by
+what one participant received), a chat's latest message, everyone who received
+in a chat, the timeline's window (by sim time, newest first, the newest `limit`
+plus any sharing the last one's time), and read receipts from the reader's
+oldest unread message (`unread`). Startup reads only the highest sequence and
+the unfinished deliveries (`unsettled`). Both small tables are kept by the same
+write as the message. `node:sqlite` is synchronous, so a new query must stay
+indexed: a full read and parse of 10k messages holds the main thread about 26
+ms. One connection per file for the process. The schema is versioned with
+`PRAGMA user_version`; an upgrade runs once, in one transaction, at open.
+Messages kept in OpenClaw's `messaging` keyed store before this are copied in on
+first start, checked, and that namespace is cleared.
 
 Each native `agent:<id>:chat:*` transcript is that character's private **client
 projection**, retained for context assembly and native session-memory search. It
@@ -304,11 +312,10 @@ means accepted, not necessarily projected, noticed or answered.
 Tradeoff: canonical text plus agent transcripts consumes extra disk space, and
 cross-store appends still need small recovery checkpoints. In return, history
 and retry identity have one source of truth, human groups need no dummy agent,
-and clients can resynchronize without merging private ledgers. Startup and
-current human history queries scan the message database; history is then
-filtered and paginated by acceptance sequence. History, the chat list, read
-receipts and the timeline still read every message (`entries()`); they move to
-range queries, with old messages in sealed archive files, in a later change.
+and clients can resynchronize without merging private ledgers. History is read
+by acceptance sequence, filtered by frozen audience before paging. The database
+keeps every message in one file for now; sealed archive files for old messages
+are a later change.
 
 ## Tool and delivery lifecycle
 
