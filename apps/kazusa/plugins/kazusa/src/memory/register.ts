@@ -96,7 +96,110 @@ export interface RememberedPlace {
   readonly byName: boolean;
 }
 
+/** How long a started query embedding waits to be used. */
+const QUERY_VECTOR_TTL_MS = 120_000;
+/** At most this many recent query embeddings are kept. */
+const QUERY_VECTOR_LIMIT = 256;
+
+interface QueryVectorCache {
+  readonly entries: Map<
+    string,
+    {
+      readonly at: number;
+      readonly vector: Promise<Float32Array | undefined>;
+      /** Started by `warm`, and not yet read by a turn. */
+      unused: boolean;
+    }
+  >;
+  /** Embeddings `warm` started. */
+  warmed: number;
+  /** Turns that found theirs started or done. */
+  hits: number;
+  /** Turns that had to start their own. */
+  misses: number;
+  /** Warmed embeddings no turn read before they left. */
+  wasted: number;
+}
+
+const QUERY_VECTORS = Symbol.for("kazusa.queryVectors");
+
+/** The process's query embeddings, shared by every registration. */
+function queryVectorCache(): QueryVectorCache {
+  const holder = globalThis as { [QUERY_VECTORS]?: QueryVectorCache };
+  return (holder[QUERY_VECTORS] ??= {
+    entries: new Map(),
+    warmed: 0,
+    hits: 0,
+    misses: 0,
+    wasted: 0,
+  });
+}
+
+/** Forget every query embedding and count, as at process start. */
+export function resetQueryVectors(): void {
+  const cache = queryVectorCache();
+  cache.entries.clear();
+  cache.warmed = cache.hits = cache.misses = cache.wasted = 0;
+}
+
+/** How many query embeddings are kept, and how often warming paid off. */
+export function queryVectorStats(): Omit<QueryVectorCache, "entries"> & {
+  readonly entries: number;
+} {
+  const { entries, ...counts } = queryVectorCache();
+  return { ...counts, entries: entries.size };
+}
+
+/**
+ * One embedding per model and text, shared for two minutes: a turn reuses one
+ * Perception started at handoff. Expired and least recent entries leave; a
+ * failed one leaves at once, so the next asks again.
+ */
+export async function queryVectorFor(
+  embedder: Pick<Embedder, "model">,
+  text: string,
+  warming: boolean,
+  embed: (text: string) => Promise<Float32Array | undefined>,
+): Promise<Float32Array | undefined> {
+  const cache = queryVectorCache();
+  const now = Date.now();
+  for (const [key, entry] of cache.entries) {
+    if (now - entry.at < QUERY_VECTOR_TTL_MS) break;
+    if (entry.unused) cache.wasted += 1;
+    cache.entries.delete(key);
+  }
+  const key = `${embedder.model}\u0000${text}`;
+  const found = cache.entries.get(key);
+  if (found) {
+    if (!warming) {
+      if (found.unused) cache.hits += 1;
+      found.unused = false;
+    }
+    return found.vector;
+  }
+  if (warming) cache.warmed += 1;
+  else cache.misses += 1;
+  const vector = embed(text);
+  const entry = { at: now, vector, unused: warming };
+  cache.entries.set(key, entry);
+  void vector.then((value) => {
+    if (!value && cache.entries.get(key) === entry) cache.entries.delete(key);
+  });
+  while (cache.entries.size > QUERY_VECTOR_LIMIT) {
+    const [oldest, first] = cache.entries.entries().next().value!;
+    if (first.unused) cache.wasted += 1;
+    cache.entries.delete(oldest);
+  }
+  return vector;
+}
+
 export interface MemoryService {
+  /**
+   * Starts the embedding `prefetch` will want for this request, without
+   * waiting: Perception calls it as it hands a brain its messages, so the
+   * turn's first build finds the embedding started or done.
+   */
+  readonly warm: (request: RetrievalRequest) => void;
   readonly prefetch: (
     request: RetrievalRequest,
     options?: {
@@ -281,10 +384,14 @@ export function registerMemory(
   }
   const withVector = async (
     request: RetrievalRequest,
+    warming = false,
   ): Promise<RetrievalRequest> => {
     const embedder = await currentEmbedder();
     const queryVector =
-      embedder && (await embedQuery(embedder, searchText(request), warn));
+      embedder &&
+      (await queryVectorFor(embedder, searchText(request), warming, (text) =>
+        embedQuery(embedder, text, warn),
+      ));
     return queryVector ? { ...request, queryVector } : request;
   };
 
@@ -382,15 +489,28 @@ export function registerMemory(
     passes,
   );
 
+  /** Today's plans from MEMORY.md, which a query falls back to with no words. */
+  const plansFor = (agentId: string, now: number): string[] => {
+    const memory = path.join(workspaceOf(agentId), "MEMORY.md");
+    return plansOn(
+      existsSync(memory) ? readFileSync(memory, "utf8") : "",
+      new Date(now).toISOString().slice(0, 10),
+    );
+  };
+
   const service: MemoryService = {
     sleep,
+    warm: (request) => {
+      void withVector(
+        { ...request, plans: plansFor(request.agentId, request.now) },
+        true,
+      ).catch((error: unknown) => {
+        warn(`Memory: could not start an embedding early: ${String(error)}`);
+      });
+    },
     prefetch: async (request, options) => {
       const familiar = await familiarTo(request.agentId, request.now);
-      const memory = path.join(workspaceOf(request.agentId), "MEMORY.md");
-      const plans = plansOn(
-        existsSync(memory) ? readFileSync(memory, "utf8") : "",
-        new Date(request.now).toISOString().slice(0, 10),
-      );
+      const plans = plansFor(request.agentId, request.now);
       const entities = retrieve(
         index,
         await withVector({ ...request, plans, familiarity: familiar }),

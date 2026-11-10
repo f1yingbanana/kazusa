@@ -58,6 +58,8 @@ export function registerPerception(
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
     readonly realtime?: PerceptionDeps["realtime"];
+    /** Starts a turn's memory embedding at handoff (Memory). */
+    readonly warm?: PerceptionDeps["warm"];
     /** The reasoning level each brain turn runs at (Models). */
     readonly thinking?: (agentId: string) => Promise<ThinkingLevel | undefined>;
     /** The chat model each brain turn runs on, `provider/model` (Models). */
@@ -112,6 +114,7 @@ export function registerPerception(
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
     ...(deps.realtime ? { realtime: deps.realtime } : {}),
+    ...(deps.warm ? { warm: deps.warm } : {}),
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)

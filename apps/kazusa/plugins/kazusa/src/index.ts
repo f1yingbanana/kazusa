@@ -11,6 +11,7 @@ import { createDecisionContextAssembler } from "./context-engine/decision-source
 import { registerClock } from "./clock/register.ts";
 import { DEFAULT_CAPABILITIES, registerClockHttp } from "./clock/http.ts";
 import { registerContextEngine } from "./context-engine/register.ts";
+import { brainRequest } from "./memory/retrieve.ts";
 import { registerContextHttp } from "./context-engine/http.ts";
 import { directDecisions } from "./decisions/direct.ts";
 import { createJevProvider, gatewayJevDeps } from "./decisions/jev.ts";
@@ -223,6 +224,26 @@ export default definePluginEntry({
           false),
       thinking: async (agentId) => (await models.read(agentId)).thinking,
       model: models.model,
+      // The turn's first build waits for this embedding; start it at handoff.
+      warm: (agentId, message) => {
+        void taskman.store
+          .lookup(agentId)
+          .then((task) => {
+            memory.warm(
+              brainRequest({
+                agentId,
+                prompt: message,
+                ...(task ? { task: task.description } : {}),
+                now: clock.time(),
+              }),
+            );
+          })
+          .catch((error: unknown) => {
+            api.logger.warn(
+              `Memory: could not start ${agentId}'s embedding early: ${String(error)}`,
+            );
+          });
+      },
     });
     registerBrainHttp(api);
     registerBrainTraceHttp(

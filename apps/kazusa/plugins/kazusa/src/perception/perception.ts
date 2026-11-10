@@ -236,6 +236,11 @@ export interface PerceptionDeps {
   readonly onstage?: (agentId: string) => Promise<boolean>;
   /** Live in-person conversation, validated against current membership. */
   readonly realtime?: (agentId: string, item: Stimulus) => Promise<boolean>;
+  /**
+   * A brain is about to be handed this message to start a turn on: begin what
+   * its first build will wait for (the memory embedding). Must not block.
+   */
+  readonly warm?: (agentId: string, message: string) => void;
   readonly confirm?: (
     agentId: string,
     item: Stimulus,
@@ -1773,8 +1778,16 @@ export class Perception {
     mode: PerceptionDelivery["mode"],
   ): Promise<PerceptionDelivery> {
     const delivery = this.deliveryOf(agentId, bundle, mode);
-    if (mode === "followup") this.slots.dispatch(agentId);
-    else steerCustody().set(delivery.id, new AbortController());
+    if (mode === "followup") {
+      // A new turn: its first build needs this message's embedding, so start
+      // it now rather than after the run begins.
+      try {
+        this.deps.warm?.(agentId, delivery.message);
+      } catch (error: unknown) {
+        this.warn(error);
+      }
+      this.slots.dispatch(agentId);
+    } else steerCustody().set(delivery.id, new AbortController());
     state.deliveries = [...(state.deliveries ?? []), delivery];
     await this.save(agentId, state);
     return delivery;
