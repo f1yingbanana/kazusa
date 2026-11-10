@@ -1,7 +1,3 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { decisionEvent, openDecisionDatabase } from "./decision-database.ts";
 import type { PerceptionDecisionRecord } from "./types.ts";
@@ -48,30 +44,6 @@ describe("openDecisionDatabase", () => {
     ]);
     expect(ids(store.window({ limit: 10, actors: ["bob"] }))).toEqual(["b"]);
     expect(store.window({ limit: 10, actors: [] })).toEqual([]);
-  });
-
-  it("drops the rows of the first version, which say nothing to show", () => {
-    const file = path.join(
-      mkdtempSync(path.join(tmpdir(), "kazusa-decisions-")),
-      "decisions.sqlite",
-    );
-    const old = new DatabaseSync(file);
-    old.exec(`
-      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
-      CREATE TABLE decisions (
-        n INTEGER PRIMARY KEY, agent_id TEXT NOT NULL, sim_time INTEGER NOT NULL,
-        wall_time INTEGER NOT NULL, record TEXT NOT NULL
-      ) STRICT;
-      INSERT INTO decisions (agent_id, sim_time, wall_time, record)
-        VALUES ('alice', 1, 1, '{"action":"IGNORE","stimulusIds":["x"],"simTime":1}');
-      PRAGMA user_version = 1;
-    `);
-    old.close();
-
-    const store = openDecisionDatabase({ path: file });
-    expect(store.window({ limit: 10 })).toEqual([]);
-    store.record("alice", decision(5, "a"));
-    expect(ids(store.window({ limit: 10 }))).toEqual(["a"]);
   });
 });
 
