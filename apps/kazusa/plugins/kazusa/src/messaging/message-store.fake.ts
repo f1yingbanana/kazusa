@@ -61,6 +61,7 @@ export function mirroredStore(
     void store.register(value.id, structuredClone(value));
   return {
     ...store,
+    // The database first: a refused write leaves the map as it was.
     register: async (key, value, opts) => {
       await store.register(key, value, opts);
       map.set(key, structuredClone(value));

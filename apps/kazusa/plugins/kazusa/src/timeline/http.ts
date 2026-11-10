@@ -30,6 +30,13 @@ interface RawKazusaMetadata {
   payload: Record<string, unknown>;
 }
 
+/**
+ * `GET /kazusa/timeline`: one page of the world's journal, newest first, merged
+ * from three sources: what characters did (their ledgers), messages (the
+ * message database, only the window the page can use) and attention decisions.
+ * Filters by actor, kind and sim-time window, then cuts `limit` rows, with
+ * `nextCursor` for the page before.
+ */
 export function registerTimelineHttp(
   api: OpenClawPluginApi,
   deps: {
@@ -162,9 +169,10 @@ export function registerTimelineHttp(
     if (wantsMessages) {
       try {
         const targets = new Set(targetAgents);
-        // Only the newest `limit` in the window can make the page.
+        // Only the newest `limit` in the window can make the page; one more
+        // tells the page whether older messages remain (`hasMore`).
         const window = {
-          limit,
+          limit: limit + 1,
           ...(before === undefined ? {} : { before }),
           ...(after === undefined ? {} : { after }),
           ...(actorsFilter ? { actors: [...targets] } : {}),

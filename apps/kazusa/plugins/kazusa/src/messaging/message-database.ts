@@ -54,7 +54,14 @@ export interface LogWindow {
 export interface MessageStore {
   /** Runs before the first read, once per process. */
   readonly ready?: () => Promise<void>;
+  /** One message by its stable id, as last saved. */
   lookup(id: string): Promise<MessageDelivery | undefined>;
+  /**
+   * Saves a new message, with who received it, or a known one's delivery
+   * progress. The message's chat, audience, sender, time and sequence never
+   * change after the first save. `assertCurrent` runs before the write, so a
+   * retired owner's write is refused.
+   */
   register(
     id: string,
     delivery: MessageDelivery,
@@ -64,6 +71,11 @@ export interface MessageStore {
   lastSequence(): number;
   /** Messages some copy of which is unfinished, in acceptance order. */
   unsettled(): MessageDelivery[];
+  /**
+   * One participant's side of a chat: when they last spoke there and what they
+   * received after. With `from`, those received messages from that sim time on,
+   * for "awaiting your reply".
+   */
   conversation(
     participant: string,
     chatId: string,
@@ -218,14 +230,21 @@ interface MessageRow {
   readonly delivery: string;
 }
 
+/** A stored row's message. */
 const parse = (row: Pick<MessageRow, "delivery">): MessageDelivery =>
   JSON.parse(row.delivery) as MessageDelivery;
 
+/** A stored row's message with when it was first saved. */
 const stored = (row: MessageRow): StoredMessage => ({
   value: parse(row),
   createdAt: row.created_at,
 });
 
+/**
+ * Opens the file, creates or upgrades its schema, prepares every statement
+ * once, and returns the store over them. Use `openMessageDatabase`, which keeps
+ * one per file.
+ */
 function createStore({
   path: file,
   legacy,
@@ -236,6 +255,11 @@ function createStore({
     "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;",
   );
 
+  /**
+   * Runs `run` as one write: all of it commits, or, if it throws, none of it.
+   * `IMMEDIATE` takes the write lock up front, so nothing can change in between
+   * its reads and its writes.
+   */
   function transaction<T>(run: () => T): T {
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -248,6 +272,8 @@ function createStore({
     }
   }
 
+  // Create the schema, then bring it up to the current version, in one go: a
+  // stop part-way leaves the file as it was. Each version runs once.
   transaction(() => {
     db.exec(BASE_SCHEMA);
     const { user_version: version } = db
@@ -384,6 +410,11 @@ function createStore({
   }
 
   let migrating: Promise<void> | undefined;
+  /**
+   * Copies the messages kept in OpenClaw's keyed store before this database,
+   * once (the `migrated` flag records it), then clears that store. Without a
+   * legacy store there is nothing to do.
+   */
   async function migrate(): Promise<void> {
     if (!legacy) return;
     if (readMeta.get(MIGRATED) === undefined) {
@@ -417,6 +448,12 @@ function createStore({
     }
   }
 
+  /**
+   * The newest `limit` messages of a chat before sequence `before`, oldest
+   * first, reading one more to know whether older ones remain. With a
+   * participant, only what they received, read from `received`, so messages
+   * they never saw cannot hide an older page across a leave and rejoin.
+   */
   function page(
     chatId: string,
     {
@@ -493,6 +530,7 @@ function createStore({
         const row = find.get(key) as Pick<MessageRow, "delivery"> | undefined;
         return row ? parse(row) : undefined;
       }),
+    // The owner check, then the message and its indexes in one transaction.
     register: (key, value, opts) =>
       settle(() => {
         opts?.assertCurrent?.();
@@ -505,6 +543,8 @@ function createStore({
       (unfinished.all() as unknown as Pick<MessageRow, "delivery">[]).map(
         parse,
       ),
+    // Their last line in the chat, then everything they received after it:
+    // three index reads, however long the chat.
     conversation(participant, chatId, from) {
       const own = lastOwn.get(participant, chatId) as
         { sequence: number; timestamp: number } | undefined;
@@ -529,6 +569,7 @@ function createStore({
       };
     },
     page,
+    // A page of one, newest.
     latest: (chatId, participant) =>
       page(chatId, {
         ...(participant === undefined ? {} : { participant }),
@@ -539,6 +580,9 @@ function createStore({
         (row) => row.participant,
       ),
     log,
+    // Their oldest unread message in the chat, from `unread`, then every
+    // message they received from there on: read receipts need the read ones
+    // in between to know how far a shown message reaches.
     unreadFrom(agentId, chatId) {
       const { n } = oldestUnread.get(agentId, chatId) as { n: number | null };
       if (n === null) return [];

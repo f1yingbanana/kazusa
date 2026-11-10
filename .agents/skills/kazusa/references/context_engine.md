@@ -482,12 +482,13 @@ turn that exceeded its budget. Raw transcripts and separate task/chat ledgers
 remain intact and keep growing on disk. Memory consolidation into `MEMORY.md` is
 a separate future workflow, not a compaction side effect we rely on.
 
-OpenClaw persists native agent transcripts, including private projections of
-canonical messages in Kazusa's message database. The context engine creates no
-additional database or mirror. `ingest`/`commitTurn` have no side effects.
-Declare the native current-turn fence and idempotent advancement contract; the
-host appends the pending turn after assembled history. Never persist synthetic
-memory views back into the source ledgers.
+OpenClaw persists native agent transcripts, including each character's private
+copies of canonical messages; the canonical messages themselves are in Kazusa's
+message database. The context engine creates no additional database or mirror.
+`ingest`/`commitTurn` have no side effects. Declare the native current-turn
+fence and idempotent advancement contract; the host appends the pending turn
+after assembled history. Never persist synthetic memory views back into the
+source ledgers.
 
 ## Skill expansion and future scope
 
