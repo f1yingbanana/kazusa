@@ -681,7 +681,8 @@ and `references/context_engine.md`.
    migrations.
 4. **Index and retrieval**: SQLite index, watcher, lexical + graph signals,
    replacing `readPersonalWiki` and Places-you-know relevance; the roster; an
-   evaluation set from `/kazusa/context` snapshots with expected pages.
+   evaluation set from situation snapshots with expected pages (that record was
+   removed in 2026-11).
 5. **Embeddings**: the semantic signal, measured against the evaluation set.
 6. **Tools**: `recall`, `look_up`, `remember`; drop memory-core and character
    file tools; conventions text.

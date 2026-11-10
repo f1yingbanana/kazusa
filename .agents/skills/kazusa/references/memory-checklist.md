@@ -137,9 +137,10 @@ Review fixes (2026-10-30): sleep watermark no longer loses a backlog;
 
 ## Live acceptance (after the first section is clear)
 
-Pace at 1x or paused and jump with `clock.advance`. Read prompts from
-`GET /kazusa/context?id=<agent>`. Each test records the expected page and
-whether it appeared, and the reply is read for whether it was used.
+Pace at 1x or paused and jump with `clock.advance`. Each test records the
+expected page, and the reply is read for whether it was used. The situation
+message itself is no longer kept, so whether the page was on their mind is read
+from the reply alone.
 
 1. **Interlocutor recognition**: Sensei texts Kazusa something with no names;
    her `sensei` page is in **On your mind**.

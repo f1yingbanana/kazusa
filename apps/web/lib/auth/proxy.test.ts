@@ -152,7 +152,7 @@ describe("Kazusa browser proxy", () => {
   });
 
   it("refuses unknown/private routes, wrong methods, and missing configuration", async () => {
-    for (const path of ["unknown", "context", "memory/consolidate"])
+    for (const path of ["unknown", "memory/consolidate"])
       expect((await call(path)).status).toBe(404);
     expect((await call("clock")).status).toBe(405);
     vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", undefined);

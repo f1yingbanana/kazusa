@@ -294,8 +294,7 @@ are in.
 9. **Live run 1**: passers-by are sighted but never `noticed`; a walk too long
    for the activity is refused naming the walk; head-on walkers `meet`; a huddle
    of one dissolves and every membership change is announced; speaking aloud to
-   another group merges both; the last 20 assembled situations are kept per
-   character (`GET /kazusa/context`).
+   another group merges both.
 10. **Entry, measured**: judged as "do they get in?" at planning, the decision
     model said `likely` for half of all public places (a fifth of moves failed)
     and the refusal reached the visitor before the walk. Moved to arrival and

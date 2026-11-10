@@ -1292,41 +1292,6 @@ export const MoveResponseSchema = z.object({ record: LocationRecordSchema });
 export type MoveResponse = z.infer<typeof MoveResponseSchema>;
 
 /* ========================================================================== */
-/* Read model: assembled brain context (GET /kazusa/context?id=)              */
-/* ========================================================================== */
-
-/**
- * The situation message one brain turn was given, exactly as the model saw it
- * (time, activity, Where you are, feelings, chats awaiting a reply). Earlier
- * turns are in the transcript; skills are files.
- */
-export const AssembledContextSchema = z.object({
-  simTime: z.number(),
-  situation: z.string(),
-  /** Whether the `in-person` skill was attached. */
-  inPerson: z.boolean(),
-  estimatedTokens: z.number(),
-  /** Estimated tokens by part; the host's own prompt is on top of these. */
-  breakdown: z
-    .object({
-      skills: z.number(),
-      situation: z.number(),
-      history: z.number(),
-      records: z.number(),
-      /** Past turns' tool calls and outcomes. */
-      tools: z.number().default(0),
-    })
-    .optional(),
-});
-export type AssembledContext = z.infer<typeof AssembledContextSchema>;
-
-/** A character's last turns' contexts, newest first. */
-export const ContextResponseSchema = z.object({
-  contexts: z.array(AssembledContextSchema),
-});
-export type ContextResponse = z.infer<typeof ContextResponseSchema>;
-
-/* ========================================================================== */
 /* Read model: world journal (PROPOSED — src/journal/, GET /kazusa/timeline)  */
 /* ========================================================================== */
 

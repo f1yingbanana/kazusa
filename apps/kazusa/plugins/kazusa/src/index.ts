@@ -195,7 +195,7 @@ export default definePluginEntry({
         )) ?? [],
     });
     contextRef.current = context;
-    registerContextHttp(api, { context });
+    registerContextHttp(api);
     registerSkills(api);
     registerUsageHttp(api, decisionUsage);
 
