@@ -12,6 +12,7 @@ import { shutdownSignal } from "../shutdown.ts";
 import { stickerUrl } from "../stickers/stickers.ts";
 import type { CurrentSpeech, SpeechHandoff } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
+import type { MessageStore } from "./message-database.ts";
 import { stimulusKey, type Stimulus } from "../stimulus.ts";
 import {
   COMPOSING_RATES,
@@ -159,13 +160,6 @@ export interface ChatFacts {
   readonly waitingSince: number | null;
 }
 
-interface ConversationTail {
-  readonly chat: ChatConversation;
-  readonly sessionKey: string;
-  lastSpokeAt: number | null;
-  since: MessageDelivery[];
-}
-
 interface Speech {
   readonly planId: string;
   readonly controller: AbortController;
@@ -267,7 +261,7 @@ export interface MessagingDeps {
   readonly api: OpenClawPluginApi;
   /** Where its refusals' wording comes from. Absent: Kazusa's own skills. */
   readonly text?: SkillText;
-  readonly store: StateStore<MessageDelivery>;
+  readonly store: MessageStore;
   readonly conversations: StateStore<ChatConversation>;
   readonly outbox: RemovableStateStore<OutboxPlan>;
   readonly clock: Pick<Clock, "init" | "time" | "now">;
@@ -579,6 +573,8 @@ export class Messaging {
   private async init(): Promise<void> {
     this.assertCurrent();
     if (this.initialized) return;
+    await this.deps.store.ready?.();
+    this.assertCurrent();
     await this.deps.clock.init();
     const [entries, chats] = await Promise.all([
       this.deps.store.entries(),
@@ -1976,34 +1972,12 @@ export class Messaging {
   }
 
   /**
-   * Per current chat: this participant's address and the messages from others
-   * after their own latest message, in order. Reads canonical history, never
-   * catalog attribution.
+   * Messaging has read its chats. Only the first call waits, behind whatever
+   * else is queued; reads after it don't take the queue.
    */
-  private async conversationTails(
-    agentId: string,
-  ): Promise<Map<string, ConversationTail>> {
-    const visible = (await this.deps.store.entries())
-      .map(({ value }) => value)
-      .filter((message) => message.audience.includes(agentId))
-      .sort((a, b) => a.sequence - b.sequence);
-    const tails = new Map<string, ConversationTail>();
-    for (const message of visible) {
-      const chat = this.chats.get(message.chatId);
-      if (!chat?.members.includes(agentId)) continue;
-      const tail = tails.get(chat.id) ?? {
-        chat,
-        sessionKey: chatSummary(chat, agentId).sessionKey,
-        lastSpokeAt: null,
-        since: [],
-      };
-      if (message.sender === agentId) {
-        tail.lastSpokeAt = message.timestamp;
-        tail.since = [];
-      } else tail.since.push(message);
-      tails.set(chat.id, tail);
-    }
-    return tails;
+  private async ready(): Promise<void> {
+    if (!this.initialized)
+      await this.serial.enqueue("messages", () => this.init());
   }
 
   /**
@@ -2017,28 +1991,24 @@ export class Messaging {
     noticed: (ref: MessageRef) => boolean,
   ): Promise<AwaitingReply[]> {
     PARTICIPANT_ID.parse(agentId);
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      const result: AwaitingReply[] = [];
-      for (const { sessionKey, since: tail } of (
-        await this.conversationTails(agentId)
-      ).values()) {
-        const read = tail.filter(
-          (message) =>
-            message.timestamp >= since &&
-            noticed({ id: message.id, sessionKey }),
-        );
-        const latest = read.at(-1);
-        if (latest)
-          result.push({
-            sessionKey,
-            sender: latest.sender,
-            senderName: latest.senderName,
-            timestamp: latest.timestamp,
-          });
-      }
-      return result.sort((a, b) => a.timestamp - b.timestamp);
-    });
+    await this.ready();
+    const result: AwaitingReply[] = [];
+    for (const chat of this.chats.values()) {
+      if (!chat.members.includes(agentId)) continue;
+      const { sessionKey } = chatSummary(chat, agentId);
+      const latest = this.deps.store
+        .conversation(agentId, chat.id, since)
+        .recent.filter((message) => noticed({ id: message.id, sessionKey }))
+        .at(-1);
+      if (latest)
+        result.push({
+          sessionKey,
+          sender: latest.sender,
+          senderName: latest.senderName,
+          timestamp: latest.timestamp,
+        });
+    }
+    return result.sort((a, b) => a.timestamp - b.timestamp);
   }
 
   /**
@@ -2123,27 +2093,33 @@ export class Messaging {
     sessionKeys: readonly string[],
   ): Promise<ChatFacts[]> {
     PARTICIPANT_ID.parse(agentId);
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      const tails = await this.conversationTails(agentId);
-      return [...new Set(sessionKeys)].flatMap((sessionKey) => {
-        const chat = this.chats.get(conversationId(agentId, sessionKey));
-        if (!chat?.members.includes(agentId)) return [];
-        const tail = tails.get(chat.id);
-        return [
-          {
-            sessionKey: chatSummary(chat, agentId).sessionKey,
-            kind: chat.kind,
-            title: chat.kind === "direct" ? null : chat.title,
-            memberCount: chat.members.length,
-            lastSpokeAt: tail?.lastSpokeAt ?? null,
-            joinedAt: chat.joinedAt?.[agentId] ?? null,
-            unanswered: tail?.since.length ?? 0,
-            waitingSince: tail?.since[0]?.timestamp ?? null,
-          },
-        ];
-      });
+    await this.ready();
+    return [...new Set(sessionKeys)].flatMap((sessionKey) => {
+      const chat = this.chats.get(conversationId(agentId, sessionKey));
+      if (!chat?.members.includes(agentId)) return [];
+      const { lastSpokeAt, unanswered, waitingSince } =
+        this.deps.store.conversation(agentId, chat.id);
+      return [
+        {
+          sessionKey: chatSummary(chat, agentId).sessionKey,
+          kind: chat.kind,
+          title: chat.kind === "direct" ? null : chat.title,
+          memberCount: chat.members.length,
+          lastSpokeAt,
+          joinedAt: chat.joinedAt?.[agentId] ?? null,
+          unanswered,
+          waitingSince,
+        },
+      ];
     });
+  }
+
+  /** Whether this chat of the participant's is a huddle: said face to face. */
+  async isHuddle(agentId: string, sessionKey: string): Promise<boolean> {
+    PARTICIPANT_ID.parse(agentId);
+    await this.ready();
+    const chat = this.chats.get(conversationId(agentId, sessionKey));
+    return chat?.kind === "huddle" && chat.members.includes(agentId);
   }
 
   /** Send every bubble of plans a previous generation left unfinished. */

@@ -100,8 +100,9 @@ agent sends use `"bot"`.
 
 ## Persistence and notification
 
-- Use the public session-transcript runtime to append and publish updates. No
-  custom SQLite reads/writes or transcript schema patches.
+- Use the public session-transcript runtime to append and publish ledger
+  updates. Never read or write OpenClaw's own SQLite or patch its transcript
+  schema. Canonical messages are in Kazusa's own database (below).
 - Record native `message.timestamp` in simulation milliseconds. Preserve the
   occurrence timestamp across recipient copies and later attention admission;
   keep host envelope timestamps and session bookkeeping in real time.
@@ -265,13 +266,26 @@ Changing the frontend while retaining native `chat.send` does not fix this.
 
 ### Design decision: canonical server and private agent projections
 
-The retained native `messaging` keyed store is the **canonical conversation
-server**. Each accepted message is stored once, permanently, keyed by its stable
-message ID. It records text, sender ID/name, conversation ID, simulation time,
+Kazusa's message database, `<state dir>/kazusa/messages.sqlite`
+(`messaging/message-database.ts`), is the **canonical conversation server**.
+Each accepted message is stored once, permanently, keyed by its stable message
+ID. It records text, sender ID/name, conversation ID, simulation time,
 acceptance sequence, frozen `audience`, and agent-copy progress. There is no TTL
-or deletion on delivery completion. The separate retained `chats` store owns
-current membership and titles. There is no additional `messages` namespace,
-custom SQLite schema, or second canonical message database.
+or deletion on delivery completion. The separate retained `chats` keyed store
+owns current membership and titles.
+
+It is Kazusa's own SQLite file, not an OpenClaw keyed store, because a keyed
+store can only be read by its key: who received what, and what came after
+someone's last line, meant reading every message ever sent (measured 2026-11-10:
+964 ms of a 975 ms decision context with 16 deciding at once). A `received`
+table (one row per audience member, indexed by participant, chat and sequence,
+with a partial index for their own lines) makes a participant's side of a chat
+an indexed read (`conversation()`), which chat facts and "awaiting your reply"
+use without the `messages` queue. `node:sqlite` is synchronous, so every query
+must stay indexed: a full read and parse of 10k messages holds the main thread
+about 26 ms. One connection per file for the process. Messages kept in
+OpenClaw's `messaging` keyed store before this are copied in on first start,
+checked, and that namespace is cleared.
 
 Each native `agent:<id>:chat:*` transcript is that character's private **client
 projection**, retained for context assembly and native session-memory search. It
@@ -291,10 +305,10 @@ Tradeoff: canonical text plus agent transcripts consumes extra disk space, and
 cross-store appends still need small recovery checkpoints. In return, history
 and retry identity have one source of truth, human groups need no dummy agent,
 and clients can resynchronize without merging private ledgers. Startup and
-current human history queries scan the retained store; history is then filtered
-and paginated by acceptance sequence. This is O(total retained messages), not an
-indexed range query. Add an actual supported index only when measured volume
-requires it; do not query `msg:...` keys that the writer never saves.
+current human history queries scan the message database; history is then
+filtered and paginated by acceptance sequence. History, the chat list, read
+receipts and the timeline still read every message (`entries()`); they move to
+range queries, with old messages in sealed archive files, in a later change.
 
 ## Tool and delivery lifecycle
 
@@ -314,17 +328,16 @@ They do not promise a read receipt, an immediate reply, or exactly-once
 thinking. No settled-result cache is needed; durable message lookup handles
 internal delivery retries.
 
-The retained native `messaging` store records intent before any append and
-tracks session identity, committed message ID, publication, and attention
-notification for each copy. The model supplies no request ID: the adapter
-creates a fresh server-owned UUID inside each tool execution, scoped again to
-the sender. Provider tool-call IDs are correlation metadata and may repeat
-within one brain session; never use them for durable deduplication. Re-executing
-the tool accepts a new send, even with identical text or a reused call ID. This
-avoids rejecting valid speech and requiring another model call. A host replay
-after acceptance persists but before its result is recorded can therefore
-duplicate a send; this is an accepted tradeoff, not an exactly-once invocation
-guarantee.
+The message database records intent before any append and tracks session
+identity, committed message ID, publication, and attention notification for each
+copy. The model supplies no request ID: the adapter creates a fresh server-owned
+UUID inside each tool execution, scoped again to the sender. Provider tool-call
+IDs are correlation metadata and may repeat within one brain session; never use
+them for durable deduplication. Re-executing the tool accepts a new send, even
+with identical text or a reused call ID. This avoids rejecting valid speech and
+requiring another model call. A host replay after acceptance persists but before
+its result is recorded can therefore duplicate a send; this is an accepted
+tradeoff, not an exactly-once invocation guarantee.
 
 Delivery retries run automatically from retained state without another agent
 call. They reuse the accepted message, timestamp, frozen audience and per-copy

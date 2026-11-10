@@ -202,7 +202,7 @@ file-parsing overhead.
 | :------------------------------------ | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"location"`, `"perception"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's records: one inbox/custody state per character (key `<agentId>`) plus one entry per attention decision (key `<agentId>:decision:<uuid>`), uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                    |
 | **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                                  | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
-| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`, `"messaging"`)                                        | Retained stores tracking group chat memberships, titles, and canonical messages with frozen audiences. Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                     |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`                | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                           |
 | **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`          | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
 | **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                              | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
 | **Objective Canon**                   | `shared/wiki/`                                                                                       | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
@@ -750,24 +750,25 @@ connect these modules in process.
   `AmbientTranscriptBody` for clean room-event text while preserving the host's
   queue/adoption behavior. Native room-event social hints still exist; the skill
   explains the Kazusa interpretation and `send_message` tool.
-- Messaging owns retained `"chats"` membership and permanent canonical
-  `"messaging"` records. Native agent chat sessions are private projections;
-  human clients read canonical history filtered by frozen message audience.
-  `send_message` says something at an address (`sessionKey` is required);
-  `create_group` starts a text group and `talk` a face-to-face conversation,
-  each returning the address; `list_chats` discovers memberships; any current
-  member can `manage_chat`. **Huddles** (`kind: "huddle"`, `chat:huddle:<id>`,
-  with a `placeId`) are face-to-face conversations, many at a place at once.
-  `talk` turns to people at the sender's place (Messaging asks Location's
-  `placeOf`) one person's move at a time, and huddles never merge: to people in
-  another huddle, the speaker walks over to it; to some of the speaker's own, a
-  side conversation splits off (`*turns to talk with …*` to the rest); to people
-  in none, they join the speaker's, or one starts. People in two huddles at once
-  are refused (`kazusa-results#aloud-apart`). Older merged huddles keep
-  `mergedInto`, so replies to an old address land in the new one. Speaking into
-  a huddle's address at its place walks over to it and leaves the speaker's
-  other one. Walking away (`leavePlace`, called by Location) leaves every huddle
-  there with a line to those still in it (moving to another huddle posts
+- Messaging owns retained `"chats"` membership and the permanent canonical
+  messages in its own database (`messaging/message-database.ts`). Native agent
+  chat sessions are private projections; human clients read canonical history
+  filtered by frozen message audience. `send_message` says something at an
+  address (`sessionKey` is required); `create_group` starts a text group and
+  `talk` a face-to-face conversation, each returning the address; `list_chats`
+  discovers memberships; any current member can `manage_chat`. **Huddles**
+  (`kind: "huddle"`, `chat:huddle:<id>`, with a `placeId`) are face-to-face
+  conversations, many at a place at once. `talk` turns to people at the sender's
+  place (Messaging asks Location's `placeOf`) one person's move at a time, and
+  huddles never merge: to people in another huddle, the speaker walks over to
+  it; to some of the speaker's own, a side conversation splits off
+  (`*turns to talk with …*` to the rest); to people in none, they join the
+  speaker's, or one starts. People in two huddles at once are refused
+  (`kazusa-results#aloud-apart`). Older merged huddles keep `mergedInto`, so
+  replies to an old address land in the new one. Speaking into a huddle's
+  address at its place walks over to it and leaves the speaker's other one.
+  Walking away (`leavePlace`, called by Location) leaves every huddle there with
+  a line to those still in it (moving to another huddle posts
   `*moves to another conversation*`); with fewer than two left it dissolves.
   Every `manage_chat` change is posted to the group in the actor's voice
   (`*adds Natsu to the chat*`), to those going before they go and those coming

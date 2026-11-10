@@ -21,6 +21,8 @@ import { localAvatarUrl } from "../characters/avatar.ts";
 import { z } from "zod";
 import { untilRunning, type Clock } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
+import { resolveStateDir } from "../state-dir.ts";
+import { openMessageDatabase, type MessageStore } from "./message-database.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
 import { readStickers, stickerText } from "../stickers/stickers.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -216,6 +218,11 @@ export function registerMessaging(
     readonly placeOf?: MessagingDeps["placeOf"];
     /** Lets go of anything frozen on a paused clock; the process's shutdown. */
     readonly release?: AbortSignal;
+    /**
+     * Where messages are kept; Kazusa's database in the state folder by
+     * default.
+     */
+    readonly messages?: MessageStore;
     /** A line in a character's own records; `appendLedgerEntry` by default. */
     readonly appendLedger?: (
       entry: Parameters<typeof appendLedgerEntry>[1],
@@ -234,10 +241,15 @@ export function registerMessaging(
     api,
     text,
     state: sharedMessagingState(),
-    store: api.runtime.state.openKeyedStore<MessageDelivery>({
-      namespace: "messaging",
-      retention: "retained",
-    }),
+    store:
+      deps.messages ??
+      openMessageDatabase({
+        path: path.join(resolveStateDir(), "kazusa", "messages.sqlite"),
+        legacy: api.runtime.state.openKeyedStore<MessageDelivery>({
+          namespace: "messaging",
+          retention: "retained",
+        }),
+      }),
     conversations: api.runtime.state.openKeyedStore<ChatConversation>({
       namespace: "chats",
       retention: "retained",

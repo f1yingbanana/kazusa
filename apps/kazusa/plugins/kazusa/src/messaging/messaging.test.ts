@@ -13,6 +13,7 @@ import {
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
 import { stimulusKey } from "../stimulus.ts";
+import { replayConversation } from "./conversation.fake.ts";
 
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const active: Messaging[] = [];
@@ -77,6 +78,8 @@ function setup(
           value: structuredClone(value),
           createdAt: NOW,
         })),
+      conversation: (participant, chatId, from) =>
+        replayConversation(retained.values(), participant, chatId, from),
     },
     conversations: {
       lookup: async (key) => structuredClone(chats.get(key)),
@@ -1802,6 +1805,56 @@ describe("chats awaiting a reply", () => {
     ).toMatchObject([
       { lastSpokeAt: NOW + 20 * 60_000, unanswered: 0, waitingSince: null },
     ]);
+  });
+
+  it("answers from what has committed, without waiting behind a send", async () => {
+    const h = setup();
+    await h.send();
+    const before = h.register.mock.calls.length;
+    let finish = () => {};
+    h.register.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const slow = h.send(
+      { requestId: "slow", sessionKey: "chat:direct:alice", text: "Hm?" },
+      "bob",
+    );
+    // Accepting it holds the queue until the write finishes.
+    await vi.waitFor(() =>
+      expect(h.register).toHaveBeenCalledTimes(before + 1),
+    );
+    expect(
+      await h.messaging.chatFacts("alice", ["agent:alice:chat:direct:bob"]),
+    ).toMatchObject([{ lastSpokeAt: NOW, unanswered: 0 }]);
+    expect(await h.messaging.awaitingReplies("alice", NOW, () => true)).toEqual(
+      [],
+    );
+    finish();
+    await slow;
+  });
+
+  it("tells a huddle from a text chat without reading messages", async () => {
+    const h = setup();
+    h.places.set("alice", "club").set("bob", "club");
+    const huddle = await h.messaging.send("alice", "ALICE", {
+      text: "Hi!",
+      requestId: "aloud",
+      members: ["bob"],
+      aloud: true,
+    });
+    await h.send();
+    const as = (id: string) =>
+      huddle.sessionKey.replace("agent:alice:", `agent:${id}:`);
+    const lookups = vi.spyOn(h.retained, "values");
+    expect(await h.messaging.isHuddle("bob", as("bob"))).toBe(true);
+    expect(
+      await h.messaging.isHuddle("bob", "agent:bob:chat:direct:alice"),
+    ).toBe(false);
+    expect(await h.messaging.isHuddle("carol", as("carol"))).toBe(false);
+    expect(lookups).not.toHaveBeenCalled();
   });
 });
 
