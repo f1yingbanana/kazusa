@@ -19,9 +19,6 @@ import type { PerceptionState } from "./perception.ts";
 const LEGACY_NAMESPACE = "perception";
 const INBOX_NAMESPACE = "inbox";
 
-/** The most rows `moveEntriesFrom` takes at once. */
-const MOVE_LIMIT = 10_000;
-
 /** Perception's two stores, ready once the old namespace has moved. */
 export interface PerceptionStores {
   /** One record per character, keyed by agent id. */
@@ -34,7 +31,7 @@ const MIGRATION = Symbol.for("kazusa.perception.storeMigration");
 /**
  * Opens the inbox namespace and the decisions database. Every inbox access
  * first waits for the move out of the old namespace: copy its decisions into
- * the database, move its inbox records, then empty it. Each step can be cut
+ * the database, copy its inbox records, then empty it. Each step can be cut
  * short by a stop and finished by the next start, so the move runs once per
  * process and its failure is retried by the next access.
  */
@@ -61,19 +58,14 @@ export function openPerceptionStores(api: OpenClawPluginApi): PerceptionStores {
     const records = (await legacyEntries()).filter(
       ({ key }) => !isLegacyDecisionKey(key),
     );
-    if (inbox.moveEntriesFrom) {
-      // Atomic per call; a record already in the inbox wins.
-      for (let at = 0; at < records.length; at += MOVE_LIMIT)
-        await inbox.moveEntriesFrom({
-          namespace: LEGACY_NAMESPACE,
-          entries: records
-            .slice(at, at + MOVE_LIMIT)
-            .map(({ key }) => ({ sourceKey: key, targetKey: key })),
-        });
-    } else {
-      for (const { key, value } of records)
-        if ((await inbox.lookup(key)) === undefined)
-          await inbox.register(key, value as PerceptionState);
+    // Copied, not moved: OpenClaw's `moveEntriesFrom` takes only a bounded
+    // source, and the old namespace is retained. A record already in the inbox
+    // is newer and wins. Each is read back before anything is emptied.
+    for (const { key, value } of records) {
+      if ((await inbox.lookup(key)) === undefined)
+        await inbox.register(key, value as PerceptionState);
+      if ((await inbox.lookup(key)) === undefined)
+        throw new Error(`the inbox record of ${key} did not copy`);
     }
     const all = await legacyEntries();
     // Nothing keeps the old rows in memory once they have moved.
