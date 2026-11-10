@@ -1441,6 +1441,57 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
       expect(h.snapshot().pending).toHaveLength(0);
     });
 
+    it("starts the turn's embedding as it hands the brain its messages", async () => {
+      const h = setup();
+      const warm = vi.fn();
+      const router = h.restart({ warm });
+      h.evaluateDecision.mockResolvedValueOnce({
+        status: "ok",
+        result: {
+          answers: {
+            wake_decision: {
+              type: "choice",
+              choice: "WAKE",
+              probabilities: { WAKE: 0.8, IGNORE: 0.2 },
+            },
+          },
+        },
+      });
+
+      await router.receive("alice", stimulus("a"));
+
+      expect(h.deliveries[0]).toMatchObject({ mode: "followup" });
+      expect(warm).toHaveBeenCalledExactlyOnceWith(
+        "alice",
+        h.deliveries[0].message,
+      );
+    });
+
+    it("hands the brain its messages even if starting the embedding fails", async () => {
+      const h = setup();
+      const router = h.restart({
+        warm: () => {
+          throw new Error("no embedder");
+        },
+      });
+      h.evaluateDecision.mockResolvedValueOnce({
+        status: "ok",
+        result: {
+          answers: {
+            wake_decision: {
+              type: "choice",
+              choice: "WAKE",
+              probabilities: { WAKE: 0.8, IGNORE: 0.2 },
+            },
+          },
+        },
+      });
+
+      await router.receive("alice", stimulus("a"));
+
+      expect(h.deliver).toHaveBeenCalledTimes(1);
+    });
+
     it("filters routine chatter while character is sleeping without waking LLM", async () => {
       const h = setup();
       h.tasks.set("alice", {
