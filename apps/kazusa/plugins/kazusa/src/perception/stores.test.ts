@@ -69,9 +69,8 @@ describe("openPerceptionStores", () => {
       yuzu: { pending: [{ id: "new" }] },
     });
     expect(await legacy.entries()).toEqual([]);
-    expect(stores.decisions.window({ limit: 10, actors: [agent] })).toEqual([
-      { agentId: agent, record: expect.objectContaining({ simTime: 1_000 }) },
-    ]);
+    // Old decisions are dropped: they can't say what they were about.
+    expect(stores.decisions.window({ limit: 10, actors: [agent] })).toEqual([]);
   });
 
   it("keeps the old namespace when the copy fails, and tries again", async () => {

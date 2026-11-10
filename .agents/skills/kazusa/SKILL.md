@@ -820,8 +820,8 @@ connect these modules in process.
 3. **Tier 3 (Session Stream Tails)**: Merges recent entries from the agent's
    `:tasks`, `:chat:direct:*`, and `:chat:group:*` streams (implemented). The
    decision model's context reads `:tasks` too, so every ledger row reaches a
-   prompt. Observer-only records (attention decisions) live in keyed stores,
-   never in a ledger.
+   prompt. Observer-only records (attention decisions) live in their own
+   database, never in a ledger.
 
 ### 3.4 `src/perception/` — Stimulus Router & Attention Gate (Jev Decision Model)
 
@@ -921,21 +921,30 @@ connect these modules in process.
 - **Zero Second-Character Sessions**: Completely eliminates the previous
   `agent:<id>:perception` chat session, tool stripping (`toolsAllow: []`), and
   JSON string parsing. Perception operates purely in-process.
-- **Decision Recording**: Every attention decision is recorded with its question
-  (`wake_decision` / `attention_allocation`), action, `source` (`model`,
-  `automatic` for deadlines and idle check-ins on an idle brain, or `fallback`
-  with a `note` when the model was unavailable or gave an unusable answer),
-  model `choice`, `latencyScore`, `delayMs`, stimulus ids, task id, and sim and
-  wall time (`PerceptionDecisionRecord`). It goes to:
+- **Decision Recording**: Every attention decision is logged as one
+  `Perception <agent>: …` Gateway line with its question (`wake_decision` /
+  `attention_allocation`), action, `source` (`model`, `automatic` for deadlines
+  and idle check-ins on an idle brain, or `fallback` with a `note` when the
+  model was unavailable or gave an unusable answer), model `choice`,
+  `latencyScore` and delay. Only the decisions the player would want to see are
+  kept (`PerceptionDecisionRecord`): texts left unread (`IGNORE`) or set aside
+  (`DEFER`), the player's words unheard in person, and a conversation in person
+  they stopped following. The record says what it was about (per line: message
+  id, chat id, sender, a 100-character excerpt), the `outcome`, and the
+  activity (type, description, end). Lines others say in person are not kept:
+  in the lab they were nine in ten decisions (23,264 in one sim-day for 51
+  characters, 7.3 MB), almost all overheard and not caught; about 1.5% of
+  decisions are kept. A kept decision goes to:
   - one row in `<stateDir>/kazusa/decisions.sqlite` (`decision-database.ts`),
-    uncapped and restart-safe, a synchronous insert. This is the one durable
-    copy; the timeline reads only its window, by index, through
-    `perception.decisions(window)`. Until 2026-11 decisions shared the
-    `"perception"` keyed namespace with the inbox; the first start moves both
-    out (`perception/stores.ts`) and empties it.
-  - one `Perception <agent>: …` Gateway log line;
+    uncapped and restart-safe, a synchronous insert. The timeline reads only
+    its window, by index, through `perception.decisions(window)`. Until 2026-11
+    every decision shared the `"perception"` keyed namespace with the inbox;
+    the first start moves the inbox records out (`perception/stores.ts`) and
+    empties it, dropping the old decisions, which say neither what they were
+    about nor what the character was doing.
   - an `attention.decided` SSE journal event (`onDecision` in
-    `perception/register.ts`).
+    `perception/register.ts`, which sees every decision and calls `onAwoken`,
+    sleep's wake, for those acted on).
 
   A failed write is logged and never fails routing. Decisions stay out of
   ledgers on purpose: every ledger is replayed into a prompt, and attention
