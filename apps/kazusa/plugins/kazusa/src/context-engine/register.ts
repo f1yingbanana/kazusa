@@ -6,7 +6,11 @@ import {
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
 import { parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
-import type { AssembledContext } from "@kazusa/client";
+import type {
+  AssembledContext,
+  BrainTurn,
+  ContextSettings,
+} from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
 import type { StateStore } from "../state.ts";
 import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
@@ -66,6 +70,40 @@ interface ContextEngineDeps {
       readonly exclude?: readonly string[];
     },
   ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster" | "ids">>;
+  /** The character's brain run under way, if any (`currentBrainRun`). */
+  readonly runOf?: (agentId: string) => string | undefined;
+}
+
+/**
+ * What one brain turn reads once and every later build of it reuses: none of it
+ * changes within a turn. OpenClaw assembles before every model call of a turn
+ * (its tool loop), so a turn of four model calls built everything five times,
+ * measured at 3.4 s a build with 16 characters thinking.
+ */
+interface TurnInputs {
+  readonly runId: string;
+  /** The world's and the character's context settings. */
+  readonly chosen: ContextSettings;
+  /** What memory brought to mind, for this prompt. */
+  readonly prompt: string;
+  readonly recollection:
+    Pick<MemoryPrefetch, "onYourMind" | "roster" | "ids"> | undefined;
+  /** Past turns for the past-tool-call note; the current one is left out. */
+  readonly brainTurns: readonly BrainTurn[];
+  /** The last build's situation, so an unchanged one isn't recorded twice. */
+  readonly situation: string;
+}
+
+/**
+ * What a turn reuses, and the model windows read so far, for one registration.
+ * The engine object itself may be made afresh for each run, so these outlive
+ * it.
+ */
+interface TurnCaches {
+  /** Each character's current turn. */
+  readonly turns: Map<string, TurnInputs>;
+  /** A model's window per character and model: it changes only with the model. */
+  readonly windows: Map<string, number>;
 }
 
 /**
@@ -101,8 +139,9 @@ export function registerContextEngine(
     namespace: "context",
     retention: "retained",
   });
+  const caches: TurnCaches = { turns: new Map(), windows: new Map() };
   api.registerContextEngine("kazusa", () =>
-    createContextEngine(api, deps, recent, getConfig),
+    createContextEngine(api, deps, recent, getConfig, caches),
   );
   return {
     recentContexts: async (agentId) => (await recent.lookup(agentId)) ?? [],
@@ -211,9 +250,11 @@ function createContextEngine(
     inCompany,
     presence,
     memory,
+    runOf = currentBrainRun,
   }: ContextEngineDeps,
   recent: StateStore<AssembledContext[]>,
   getConfig: () => OpenClawConfig,
+  { turns, windows }: TurnCaches,
 ): ContextEngine {
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
@@ -283,18 +324,26 @@ function createContextEngine(
         };
       }
       const brainAgentId = owner.agentId;
+      // Later builds of the same turn reuse what can't have changed.
+      const runId = runOf(brainAgentId);
+      const prompt = params.prompt ?? "";
+      const cached = turns.get(brainAgentId);
+      const turn =
+        runId !== undefined && cached?.runId === runId ? cached : undefined;
       await clock.init();
       const now = clock.time();
       // The world's and this character's choices in Settings, over the config.
-      const chosen = await settings
-        .resolve(contextSettingsBase(api.pluginConfig), brainAgentId)
-        .then(({ effective }) => effective)
-        .catch((error: unknown) => {
-          api.logger.warn(
-            `Context engine: can't read ${brainAgentId}'s context settings: ${String(error)}`,
-          );
-          return contextSettingsBase(api.pluginConfig);
-        });
+      const chosen =
+        turn?.chosen ??
+        (await settings
+          .resolve(contextSettingsBase(api.pluginConfig), brainAgentId)
+          .then(({ effective }) => effective)
+          .catch((error: unknown) => {
+            api.logger.warn(
+              `Context engine: can't read ${brainAgentId}'s context settings: ${String(error)}`,
+            );
+            return contextSettingsBase(api.pluginConfig);
+          }));
       const turnConfig: ContextEngineConfig = {
         ...config,
         shortTermHours: chosen.shortTermHours,
@@ -309,6 +358,35 @@ function createContextEngine(
         turnConfig.shortTermHours,
         turnConfig.ledgerGridHours,
       );
+      // Past turns, read while the rest is: only the first build waits.
+      const pastTurns: Promise<readonly BrainTurn[]> = turn
+        ? Promise.resolve(turn.brainTurns)
+        : readBrainTurns({
+            agentId: brainAgentId,
+            sessionId: params.sessionId,
+          }).catch((error: unknown) => {
+            api.logger.warn(
+              `Context engine: can't read past tool calls of ${brainAgentId}: ${String(error)}`,
+            );
+            return [];
+          });
+      // The model's window, which the host budgets: read once per model. Its
+      // session entry waited in OpenClaw's transcript worker (1.9 s of each
+      // build with 16 characters thinking).
+      const windowKey = `${brainAgentId}\u0000${params.model ?? ""}`;
+      const contextWindow: Promise<number | undefined> = windows.has(windowKey)
+        ? Promise.resolve(windows.get(windowKey))
+        : api.runtime.agent.session
+            .getSessionEntryAsync({
+              agentId: brainAgentId,
+              sessionKey: `agent:${brainAgentId}:brain`,
+            })
+            .then((session) => {
+              if (session?.contextTokens)
+                windows.set(windowKey, session.contextTokens);
+              return session?.contextTokens;
+            })
+            .catch(() => undefined);
       const { storePath, streams } = await ownLedgers(
         api,
         getConfig,
@@ -318,6 +396,7 @@ function createContextEngine(
         getConfig(),
         brainAgentId,
       );
+      // What a tool call can change: read again for every build.
       const [
         sessionsContext,
         activeTask,
@@ -326,7 +405,7 @@ function createContextEngine(
         feeling,
         company,
         recordsStart,
-        session,
+        window,
       ] = await Promise.all([
         readSessionStreams({
           agentId: brainAgentId,
@@ -347,40 +426,36 @@ function createContextEngine(
           );
           return undefined;
         }),
-        // Its `contextTokens` is the model's window, which the host budgets.
-        api.runtime.agent.session
-          .getSessionEntryAsync({
-            agentId: brainAgentId,
-            sessionKey: `agent:${brainAgentId}:brain`,
-          })
-          .catch(() => undefined),
+        contextWindow,
       ]);
-      const recollection = await memory?.(
-        brainRequest({
-          agentId: brainAgentId,
-          prompt: params.prompt ?? "",
-          ...(activeTask ? { task: activeTask.description } : {}),
-          here,
-          awaiting: awaiting.map((chat) => chat.sender),
-          now,
-        }),
-        {
-          maxTokens: chosen.onYourMindTokens,
-          rosterLimit: chosen.peopleLimit,
-          // Who is in front of them is in With you already.
-          exclude: here,
-        },
-      );
+      // One memory search a turn: what comes to mind is about what arrived.
+      const recollection =
+        turn && turn.prompt === prompt
+          ? turn.recollection
+          : await memory?.(
+              brainRequest({
+                agentId: brainAgentId,
+                prompt,
+                ...(activeTask ? { task: activeTask.description } : {}),
+                here,
+                awaiting: awaiting.map((chat) => chat.sender),
+                now,
+              }),
+              {
+                maxTokens: chosen.onYourMindTokens,
+                rosterLimit: chosen.peopleLimit,
+                // Who is in front of them is in With you already.
+                exclude: here,
+              },
+            );
       // After memory: Places you know leaves out what On your mind shows.
-      const place = await whereabouts?.(
-        brainAgentId,
-        now,
-        params.prompt ?? "",
-        {
-          listLimit: chosen.placesLimit,
-          exclude: recollection?.ids ?? [],
-        },
-      );
+      const place = await whereabouts?.(brainAgentId, now, prompt, {
+        listLimit: chosen.placesLimit,
+        exclude: recollection?.ids ?? [],
+      });
+      const brainTurns = await pastTurns;
+      // Every build assembles afresh, for its own token budget: each model
+      // call leaves less, as the turn's own messages grow.
       const assembled = await assembleContext({
         run: params,
         agentId: brainAgentId,
@@ -395,26 +470,25 @@ function createContextEngine(
         inCompany: company,
         simTime: now,
         config: turnConfig,
-        ...(session?.contextTokens
-          ? { contextWindow: session.contextTokens }
-          : {}),
+        ...(window ? { contextWindow: window } : {}),
         skillLoader,
         toolHistoryMaxTokens:
           getConfig().agents?.defaults?.systemAgent?.agentId === brainAgentId
             ? config.systemAgentToolHistoryMaxTokens
             : turnConfig.toolHistoryMaxTokens,
-        runId: currentBrainRun(brainAgentId),
+        runId,
         ...(recordsStart ? { recordsFrom: recordsStart.from } : {}),
-        brainTurns: await readBrainTurns({
-          agentId: brainAgentId,
-          sessionId: params.sessionId,
-        }).catch((error: unknown) => {
-          api.logger.warn(
-            `Context engine: can't read past tool calls of ${brainAgentId}: ${String(error)}`,
-          );
-          return [];
-        }),
+        brainTurns,
       });
+      if (runId !== undefined)
+        turns.set(brainAgentId, {
+          runId,
+          chosen,
+          prompt,
+          recollection,
+          brainTurns,
+          situation: assembled.situationText,
+        });
       try {
         if (
           assembled.recordsFrom !== undefined &&
@@ -428,26 +502,29 @@ function createContextEngine(
           `Context engine: could not keep where records start: ${String(error)}`,
         );
       }
-      try {
-        const previous = (await recent.lookup(brainAgentId)) ?? [];
-        await recent.register(
-          brainAgentId,
-          [
-            {
-              simTime: now,
-              situation: assembled.situationText,
-              inPerson: company,
-              estimatedTokens: assembled.estimatedTokens,
-              breakdown: assembled.breakdown,
-            },
-            ...previous,
-          ].slice(0, RECENT_CONTEXTS),
-        );
-      } catch (error: unknown) {
-        api.logger.warn(
-          `Context engine: could not record context: ${String(error)}`,
-        );
-      }
+      // Observers see each situation a turn was given, once: a later build
+      // that changed nothing adds nothing.
+      if (turn?.situation !== assembled.situationText)
+        try {
+          const previous = (await recent.lookup(brainAgentId)) ?? [];
+          await recent.register(
+            brainAgentId,
+            [
+              {
+                simTime: now,
+                situation: assembled.situationText,
+                inPerson: company,
+                estimatedTokens: assembled.estimatedTokens,
+                breakdown: assembled.breakdown,
+              },
+              ...previous,
+            ].slice(0, RECENT_CONTEXTS),
+          );
+        } catch (error: unknown) {
+          api.logger.warn(
+            `Context engine: could not record context: ${String(error)}`,
+          );
+        }
       return assembled;
     },
   };

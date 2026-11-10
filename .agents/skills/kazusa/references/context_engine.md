@@ -490,6 +490,26 @@ fence and idempotent advancement contract; the host appends the pending turn
 after assembled history. Never persist synthetic memory views back into the
 source ledgers.
 
+### A turn's builds
+
+OpenClaw calls `assemble()` before every model call of a turn: once before the
+prompt, then from its tool loop each time the turn's messages grow. A turn of
+three model calls builds four times. Kazusa's turns run as deferred turns, so
+the loop never calls `ingest`, and `assemble` always receives the history from
+before the turn; only the token budget shrinks as the turn's own messages grow.
+
+So a turn reads once what can't change within it, and every later build reuses
+it (`TurnInputs` in `register.ts`, keyed by character and `currentBrainRun`):
+the context settings, the memory search for this prompt (one embedding a turn),
+and past turns for the tool-call note. The model's window is remembered per
+character and model, across turns. What a tool call can change is read again for
+every build, since each costs tens of milliseconds: the ledgers, the current
+task, presence, company, chats awaiting a reply, feelings and where you are.
+Assembly itself runs afresh each time, for that call's exact budget. Measured on
+2026-11-10 with 16 characters thinking: a build was 3.4 s, two or more a turn;
+the window alone waited 1.9 s in OpenClaw's transcript worker. Recent contexts
+record a situation only when it differs from the turn's last one.
+
 ## Skill expansion and future scope
 
 Use `pluginSkillLoader` for names, not ad-hoc paths in routing code. Behavioral

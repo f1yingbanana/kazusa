@@ -453,7 +453,7 @@ decision context for Perception.
    | Seeds       | current place and trip destination, people noticed or in the huddle, stimulus senders, chats awaiting reply, the current task's `where` |
    | Mentions    | alias matches in the stimulus, the last ledger records, the task description                                                            |
    | Keywords    | BM25 over what they think about (below); a page only keywords found must share two query words (half of them if merely heard of)        |
-   | Semantic    | embedding of what they think about (one provider call per brain turn)                                                                   |
+   | Semantic    | embedding of what they think about (one provider call per brain turn: later builds reuse it)                                            |
    | Graph       | one hop from seeds and mentions; personal edges before world edges                                                                      |
    | News        | `· news` from the last 3 sim days on pages they could know (2 at most)                                                                  |
    | Salience    | open threads, recent `seen`/notes (sim time), today's day page                                                                          |

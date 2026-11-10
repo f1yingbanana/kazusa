@@ -63,6 +63,7 @@ async function setup(
     ],
   }));
   const assertCurrent = vi.fn();
+  const sessionEntry = vi.fn(async () => ({ contextTokens: 1_000_000 }));
   const sessionKeys = [
     "agent:alice:tasks",
     "agent:alice:chat:direct:bob",
@@ -89,7 +90,7 @@ async function setup(
         resolveAgentWorkspaceDir: () => workspace,
         session: {
           resolveStorePath: () => "/test/store",
-          getSessionEntryAsync: async () => ({ contextTokens: 1_000_000 }),
+          getSessionEntryAsync: sessionEntry,
           createSessionEntryListReader: async () => async () => ({
             entries: sessionKeys.map((sessionKey) => ({
               sessionKey,
@@ -123,6 +124,7 @@ async function setup(
     on,
     lookupTask,
     stores,
+    sessionEntry,
   };
 }
 
@@ -565,5 +567,122 @@ describe("Native context-engine registration", () => {
     expect(lookupTask).toHaveBeenCalledWith("alice");
     expect(JSON.stringify(result.messages)).toContain("Study for class");
     expect(JSON.stringify(result.messages)).not.toContain("not-for-the-prompt");
+  });
+});
+
+describe("A turn's builds", () => {
+  const brain = (prompt = "Incoming chats:\n- [Bob `bob` Fri]: Hi?") => ({
+    sessionId: "brain",
+    sessionKey: "agent:alice:brain",
+    messages: [],
+    prompt,
+    model: "glm",
+  });
+  const recollect = () =>
+    vi.fn(async () => ({
+      onYourMind: "Bob `bob` (friend): Owes you a coffee.",
+      roster: "Bob `bob` (friend)",
+      ids: ["bob"],
+    }));
+  const pastTurns = vi.mocked(readVisibleSessionTranscriptMessageEntries);
+
+  it("reads memory, past turns and settings once a turn, and the rest every build", async () => {
+    let run = "run-1";
+    const memory = recollect();
+    const { engine, lookupTask, readHistory, sessionEntry } = await setup(
+      {},
+      undefined,
+      "/test/workspace",
+      { memory, runOf: () => run },
+    );
+    pastTurns.mockClear();
+    const first = await engine.assemble(brain());
+    const second = await engine.assemble(brain());
+    await engine.assemble(brain());
+    expect(memory).toHaveBeenCalledTimes(1);
+    expect(pastTurns).toHaveBeenCalledTimes(1);
+    expect(sessionEntry).toHaveBeenCalledTimes(1);
+    // What a tool call can change is read for every build.
+    expect(lookupTask).toHaveBeenCalledTimes(3);
+    expect(readHistory.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(second).toEqual(first);
+
+    // A new turn searches memory and reads past turns again; the model's
+    // window is still known.
+    run = "run-2";
+    await engine.assemble(brain());
+    expect(memory).toHaveBeenCalledTimes(2);
+    expect(pastTurns).toHaveBeenCalledTimes(2);
+    expect(sessionEntry).toHaveBeenCalledTimes(1);
+    // Another model's window is read once.
+    await engine.assemble({ ...brain(), model: "kimi" });
+    await engine.assemble({ ...brain(), model: "kimi" });
+    expect(sessionEntry).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives a later build what a fresh build would, for its own budget", async () => {
+    const task: ActiveTask = {
+      id: "alice:task-1",
+      type: "studying",
+      description: "Reading",
+      startedAt: "2026-10-23T07:30:00.000Z",
+      endAt: "2026-10-23T09:00:00.000Z",
+      duration: 90,
+    };
+    let current: ActiveTask | undefined = undefined;
+    const reused = await setup({}, undefined, "/test/workspace", {
+      memory: recollect(),
+      runOf: () => "run-1",
+    });
+    reused.lookupTask.mockImplementation(async () => current);
+    await reused.engine.assemble({ ...brain(), tokenBudget: 995_000 });
+    // A tool call starts an activity; the next build has less room.
+    current = task;
+    const later = await reused.engine.assemble({
+      ...brain(),
+      tokenBudget: 990_000,
+    });
+    const fresh = await setup({}, task, "/test/workspace", {
+      memory: recollect(),
+    });
+    expect(later).toEqual(
+      await fresh.engine.assemble({ ...brain(), tokenBudget: 990_000 }),
+    );
+    expect(JSON.stringify(later.messages)).toContain("Reading");
+  });
+
+  it("records each situation a turn was given once", async () => {
+    let current: ActiveTask | undefined = undefined;
+    const { engine, service, lookupTask } = await setup(
+      {},
+      undefined,
+      "/test/workspace",
+      { memory: recollect(), runOf: () => "run-1" },
+    );
+    lookupTask.mockImplementation(async () => current);
+    await engine.assemble(brain());
+    await engine.assemble(brain());
+    expect(await service.recentContexts("alice")).toHaveLength(1);
+    current = {
+      id: "alice:task-1",
+      type: "studying",
+      description: "Reading",
+      startedAt: "2026-10-23T07:30:00.000Z",
+      endAt: "2026-10-23T09:00:00.000Z",
+      duration: 90,
+    };
+    await engine.assemble(brain());
+    expect(await service.recentContexts("alice")).toHaveLength(2);
+  });
+
+  it("builds fully every time when no turn is under way", async () => {
+    const memory = recollect();
+    const { engine } = await setup({}, undefined, "/test/workspace", {
+      memory,
+      runOf: () => undefined,
+    });
+    await engine.assemble(brain());
+    await engine.assemble(brain());
+    expect(memory).toHaveBeenCalledTimes(2);
   });
 });
