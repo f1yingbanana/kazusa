@@ -5,6 +5,10 @@ import {
   readVisibleSessionTranscriptMessageEntries,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { registerTimelineHttp } from "./http.ts";
+import {
+  openMessageDatabase,
+  type LogWindow,
+} from "../messaging/message-database.ts";
 import type { Clock } from "../clock/clock.ts";
 import { resetLedgerJournal, withJournalSeq } from "../realtime.ts";
 
@@ -329,6 +333,91 @@ describe("registerTimelineHttp", () => {
     const parsed = JSON.parse(resJson ?? "{}");
     expect(parsed.events.length).toBe(1);
     expect(parsed.events[0].payload.taskId).toBe("t1");
+  });
+
+  it("pages through messages to the oldest, reading only a window each time", async () => {
+    const routes: Record<
+      string,
+      (req: unknown, res: unknown) => Promise<boolean>
+    > = {};
+    const api = {
+      id: "kazusa",
+      config: {
+        gateway: { auth: { token: "test-service-token" } },
+        agents: { list: [{ id: "alice" }, { id: "bob" }] },
+        session: { store: "/tmp/sessions" },
+      },
+      runtime: {
+        agent: {
+          session: {
+            resolveStorePath: vi.fn(() => "/tmp/sessions/store"),
+            createSessionEntryListReader: vi.fn(async () => async () => ({
+              entries: [],
+            })),
+          },
+        },
+      },
+      registerHttpRoute: vi.fn((opts) => {
+        routes[opts.path] = opts.handler;
+      }),
+    } as unknown as OpenClawPluginApi;
+    Object.assign(api, {
+      runtime: { ...api.runtime, config: { current: () => api.config } },
+    });
+    // The real database, so the route gets the window it asks for.
+    const store = openMessageDatabase({ path: ":memory:" });
+    for (let sequence = 1; sequence <= 25; sequence++)
+      await store.register(`m${sequence}`, {
+        id: `m${sequence}`,
+        sequence,
+        sender: "alice",
+        senderName: "Alice",
+        chatId: "direct:ab",
+        audience: ["alice", "bob"],
+        params: { text: `line ${sequence}`, requestId: `r${sequence}` },
+        timestamp: 1_000 * sequence,
+        copies: [],
+      });
+    const log = vi.fn(async (window: LogWindow) => store.log(window));
+    registerTimelineHttp(api, { clock: createMockClock(), messages: log });
+
+    const page = async (before?: number) => {
+      let body = "{}";
+      await routes["/kazusa/timeline"]?.(
+        {
+          method: "GET",
+          headers: { authorization: "Bearer test-service-token" },
+          url: `/kazusa/timeline?kinds=message.sent&limit=10${before ? `&before=${before}` : ""}`,
+        },
+        {
+          writeHead: vi.fn(),
+          setHeader: vi.fn(),
+          end: (data?: string) => {
+            body = data ?? "{}";
+          },
+        },
+      );
+      return JSON.parse(body) as {
+        events: { payload: { messageId: string } }[];
+        hasMore: boolean;
+        nextCursor?: number;
+      };
+    };
+    const seen: string[] = [];
+    let cursor: number | undefined;
+    for (;;) {
+      const result = await page(cursor);
+      seen.push(...result.events.map((event) => event.payload.messageId));
+      if (!result.hasMore) break;
+      cursor = result.nextCursor;
+    }
+    expect(seen).toEqual(
+      Array.from({ length: 25 }, (_, index) => `m${25 - index}`),
+    );
+    // Each page asked for one more than it shows, never everything.
+    expect(log.mock.calls.map(([window]) => window.limit)).toEqual([
+      11, 11, 11,
+    ]);
   });
 
   it("serves Perception's recorded decisions without collapsing them", async () => {

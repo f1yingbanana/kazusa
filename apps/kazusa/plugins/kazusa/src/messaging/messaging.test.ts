@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { StateStore } from "../state.ts";
 import {
   Messaging,
   createMessagingState,
@@ -13,7 +12,8 @@ import {
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
 import { stimulusKey } from "../stimulus.ts";
-import { replayConversation } from "./conversation.fake.ts";
+import { mirroredStore } from "./message-store.fake.ts";
+import type { MessageStore } from "./message-database.ts";
 
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const active: Messaging[] = [];
@@ -40,11 +40,11 @@ function setup(
   let speed = 0;
   let anchor = Date.now();
   const simNow = () => now + Math.round((Date.now() - anchor) * speed);
-  const register = vi.fn<StateStore<MessageDelivery>["register"]>(
+  const store = mirroredStore(retained, () => NOW);
+  const register = vi.fn<MessageStore["register"]>(
     async (key, value, options) => {
-      options?.assertCurrent?.();
       z.json().parse(value);
-      retained.set(key, structuredClone(value));
+      await store.register(key, value, options);
     },
   );
   const append = vi.fn(async (delivery: MessageDelivery, copy: MessageCopy) => {
@@ -69,18 +69,7 @@ function setup(
       },
     } as unknown as import("openclaw/plugin-sdk/core").OpenClawPluginApi,
     ...(state ? { state } : {}),
-    store: {
-      lookup: async (key) => structuredClone(retained.get(key)),
-      register,
-      entries: async () =>
-        [...retained].map(([key, value]) => ({
-          key,
-          value: structuredClone(value),
-          createdAt: NOW,
-        })),
-      conversation: (participant, chatId, from) =>
-        replayConversation(retained.values(), participant, chatId, from),
-    },
+    store: { ...store, register },
     conversations: {
       lookup: async (key) => structuredClone(chats.get(key)),
       register: async (key, value, options) => {

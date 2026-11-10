@@ -12,7 +12,11 @@ import { shutdownSignal } from "../shutdown.ts";
 import { stickerUrl } from "../stickers/stickers.ts";
 import type { CurrentSpeech, SpeechHandoff } from "../perception/types.ts";
 import type { RemovableStateStore, StateStore } from "../state.ts";
-import type { MessageStore } from "./message-database.ts";
+import {
+  isDeliverySettled,
+  type LogWindow,
+  type MessageStore,
+} from "./message-database.ts";
 import { stimulusKey, type Stimulus } from "../stimulus.ts";
 import {
   COMPOSING_RATES,
@@ -246,15 +250,6 @@ export function messageJournal(delivery: MessageDelivery) {
       preview: readAs(delivery.params).slice(0, 100),
     },
   };
-}
-
-function isDeliverySettled(delivery: MessageDelivery): boolean {
-  return delivery.copies.every(
-    (copy) =>
-      Boolean(copy.messageId) &&
-      Boolean(copy.published) &&
-      (copy.role === "assistant" || Boolean(copy.notified)),
-  );
 }
 
 export interface MessagingDeps {
@@ -576,17 +571,12 @@ export class Messaging {
     await this.deps.store.ready?.();
     this.assertCurrent();
     await this.deps.clock.init();
-    const [entries, chats] = await Promise.all([
-      this.deps.store.entries(),
-      this.deps.conversations.entries(),
-    ]);
+    const chats = await this.deps.conversations.entries();
     this.assertCurrent();
-    for (const { value } of entries.sort(
-      (a, b) => a.value.sequence - b.value.sequence,
-    )) {
-      this.rememberDelivery(value);
-      this.sequence = Math.max(this.sequence, value.sequence);
-    }
+    // Only what is unfinished, not all of history.
+    for (const delivery of this.deps.store.unsettled())
+      this.rememberDelivery(delivery);
+    this.sequence = Math.max(this.sequence, this.deps.store.lastSequence());
     for (const { value } of chats) this.chats.set(value.id, value);
     this.initialized = true;
   }
@@ -840,14 +830,9 @@ export class Messaging {
     const limit = Math.max(1, Math.min(input.limit ?? 30, 100));
     const before = input.before;
 
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      assertInvocationCurrent?.();
-
-      return await this.historyPage(chatId, before, limit, (message) =>
-        message.audience.includes(input.userId),
-      );
-    });
+    await this.ready();
+    assertInvocationCurrent?.();
+    return this.historyPage(chatId, before, limit, input.userId);
   }
 
   /**
@@ -859,99 +844,65 @@ export class Messaging {
     input: ObserveHistoryInput,
   ): Promise<MessagesResponse> {
     const limit = Math.max(1, Math.min(input.limit ?? 30, 100));
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      return await this.historyPage(
-        input.chatId,
-        input.before,
-        limit,
-        () => true,
-      );
-    });
+    await this.ready();
+    return this.historyPage(input.chatId, input.before, limit);
   }
 
-  /** Runs inside the `messages` queue. */
-  private async historyPage(
+  /**
+   * A page of a chat, oldest first: only what `participant` received, when
+   * given, filtered before paging so messages they never saw cannot hide an
+   * older page across a leave and rejoin.
+   */
+  private historyPage(
     chatId: string,
     before: number | undefined,
     limit: number,
-    visible: (message: MessageDelivery) => boolean,
-  ): Promise<MessagesResponse> {
-    // Records are keyed by stable message ID, not a chat/sequence index.
-    // Filter audience before paging so invisible messages cannot hide an
-    // older eligible page across a leave/rejoin interval.
-    const entries = await this.deps.store.entries();
-    const eligible = entries
-      .filter(
-        ({ value: message }) =>
-          message.chatId === chatId &&
-          visible(message) &&
-          (before === undefined || message.sequence < before),
-      )
-      .sort((a, b) => b.value.sequence - a.value.sequence);
-    const hasMore = eligible.length > limit;
-    const page = eligible.slice(0, limit);
-    page.sort((a, b) => a.value.sequence - b.value.sequence);
-
-    const messages = page.map(({ value, createdAt }) =>
-      clientMessage(value, createdAt),
-    );
-
-    const nextCursor =
-      hasMore && page.length > 0 ? page[0].value.sequence : undefined;
+    participant?: string,
+  ): MessagesResponse {
+    const page = this.deps.store.page(chatId, {
+      limit,
+      ...(before === undefined ? {} : { before }),
+      ...(participant === undefined ? {} : { participant }),
+    });
+    const [oldest] = page.messages;
     return {
-      messages,
-      nextCursor,
-      hasMore,
+      messages: page.messages.map(({ value, createdAt }) =>
+        clientMessage(value, createdAt),
+      ),
+      nextCursor: page.hasMore && oldest ? oldest.value.sequence : undefined,
+      hasMore: page.hasMore,
     };
   }
 
   /**
    * Every conversation `viewer` is not in, newest first. A dissolved huddle
-   * stays readable, named by who took part. One scan of retained history, so it
-   * costs the same however many chats there are.
+   * stays readable, named by who took part. Two indexed reads per chat.
    */
   async observeChats(viewer: string): Promise<ObservedConversation[]> {
     PARTICIPANT_ID.parse(viewer);
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      const latest = new Map<string, MessageDelivery>();
-      const heard = new Map<string, Set<string>>();
-      for (const { value: message } of await this.deps.store.entries()) {
-        const current = latest.get(message.chatId);
-        if (!current || current.sequence < message.sequence)
-          latest.set(message.chatId, message);
-        const people = heard.get(message.chatId) ?? new Set<string>();
-        for (const id of message.audience) people.add(id);
-        heard.set(message.chatId, people);
-      }
-      return [...this.chats.values()]
-        .filter(
-          (chat) =>
-            !chat.members.includes(viewer) &&
-            (chat.members.length > 0 || latest.has(chat.id)),
-        )
-        .map((chat) => {
-          const ended = chat.members.length === 0;
-          return {
+    await this.ready();
+    return [...this.chats.values()]
+      .filter((chat) => !chat.members.includes(viewer))
+      .flatMap((chat) => {
+        const latest = this.deps.store.latest(chat.id)?.value;
+        const ended = chat.members.length === 0;
+        if (ended && !latest) return [];
+        return [
+          {
             chat,
             ended,
-            members: ended
-              ? [...(heard.get(chat.id) ?? [])].sort()
-              : chat.members,
-            ...(latest.has(chat.id) ? { latest: latest.get(chat.id) } : {}),
-          };
-        })
-        .sort((a, b) => (b.latest?.sequence ?? 0) - (a.latest?.sequence ?? 0));
-    });
+            members: ended ? this.deps.store.audienceOf(chat.id) : chat.members,
+            ...(latest ? { latest } : {}),
+          },
+        ];
+      })
+      .sort((a, b) => (b.latest?.sequence ?? 0) - (a.latest?.sequence ?? 0));
   }
 
-  /** All retained messages, for the world journal. */
-  async messageLog(): Promise<MessageDelivery[]> {
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      return (await this.deps.store.entries()).map(({ value }) => value);
-    });
+  /** Messages for the world journal, newest first, in `window`. */
+  async messageLog(window: LogWindow): Promise<MessageDelivery[]> {
+    await this.ready();
+    return this.deps.store.log(window);
   }
 
   /**
@@ -2034,7 +1985,22 @@ export class Messaging {
         { delivery: MessageDelivery; copy: MessageCopy; seen: boolean }[]
       >();
       const upTo = new Map<string, number>();
-      for (const { value } of await this.deps.store.entries()) {
+      // Each chat from the reader's oldest unread message on: anything older
+      // is read already, and a shown message older than every unread one
+      // makes nothing more read.
+      const chatIds = new Set(
+        [...chats].flatMap((sessionKey) => {
+          try {
+            return [conversationId(agentId, sessionKey)];
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const candidates = [...chatIds].flatMap((chatId) =>
+        this.deps.store.unreadFrom(agentId, chatId),
+      );
+      for (const value of candidates) {
         // An unsettled delivery's live copy, so its other progress isn't lost.
         const delivery = this.deliveries.get(value.id) ?? value;
         const copy = delivery.copies.find(

@@ -15,6 +15,7 @@ import {
   type MessageDelivery,
 } from "../messaging/messaging.ts";
 import type { PerceptionDecisionRecord } from "../perception/types.ts";
+import type { LogWindow } from "../messaging/message-database.ts";
 import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
 import {
   journalKey,
@@ -29,6 +30,13 @@ interface RawKazusaMetadata {
   payload: Record<string, unknown>;
 }
 
+/**
+ * `GET /kazusa/timeline`: one page of the world's journal, newest first, merged
+ * from three sources: what characters did (their ledgers), messages (the
+ * message database, only the window the page can use) and attention decisions.
+ * Filters by actor, kind and sim-time window, then cuts `limit` rows, with
+ * `nextCursor` for the page before.
+ */
 export function registerTimelineHttp(
   api: OpenClawPluginApi,
   deps: {
@@ -41,7 +49,10 @@ export function registerTimelineHttp(
       }>
     >;
     /** Canonical messages: one row each, however many ledgers hold a copy. */
-    readonly messages?: () => Promise<readonly MessageDelivery[]>;
+    /** Messages in a sim-time window, newest first (`MessageStore.log`). */
+    readonly messages?: (
+      window: LogWindow,
+    ) => Promise<readonly MessageDelivery[]>;
   },
 ): void {
   const getConfig = () => currentConfig(api);
@@ -158,11 +169,16 @@ export function registerTimelineHttp(
     if (wantsMessages) {
       try {
         const targets = new Set(targetAgents);
-        for (const delivery of (await deps.messages?.()) ?? []) {
-          const row = messageJournal(delivery);
-          if (!actorsFilter || row.actors.some((id) => targets.has(id)))
-            rawEvents.push(row);
-        }
+        // Only the newest `limit` in the window can make the page; one more
+        // tells the page whether older messages remain (`hasMore`).
+        const window = {
+          limit: limit + 1,
+          ...(before === undefined ? {} : { before }),
+          ...(after === undefined ? {} : { after }),
+          ...(actorsFilter ? { actors: [...targets] } : {}),
+        };
+        for (const delivery of (await deps.messages?.(window)) ?? [])
+          rawEvents.push(messageJournal(delivery));
       } catch (error: unknown) {
         api.logger.warn(`Timeline message read failed: ${String(error)}`);
       }

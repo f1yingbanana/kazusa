@@ -22,7 +22,7 @@ import {
 import type { Messaging, MessageDelivery } from "./messaging.ts";
 import type { ConversationSource } from "../perception/types.ts";
 import { registerMessaging, speechReply } from "./register.ts";
-import { replayConversation } from "./conversation.fake.ts";
+import { mirroredStore } from "./message-store.fake.ts";
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
   appendSessionTranscriptMessageByIdentityStrict: vi.fn(),
@@ -140,21 +140,7 @@ async function setup(
       now: () => ({ simTime: 123456, speed: 0, formatted: "" }),
     },
     perception: { receive },
-    messages: {
-      lookup: async (key) => structuredClone(retained.get(key)),
-      register: async (key, value, opts) => {
-        opts?.assertCurrent?.();
-        retained.set(key, structuredClone(value));
-      },
-      entries: async () =>
-        [...retained].map(([key, value]) => ({
-          key,
-          value: structuredClone(value),
-          createdAt: Date.now(),
-        })),
-      conversation: (participant, chatId, from) =>
-        replayConversation(retained.values(), participant, chatId, from),
-    },
+    messages: mirroredStore(retained),
     ...options,
   });
   instances.push(messaging);
