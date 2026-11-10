@@ -27,7 +27,7 @@ import {
   type SpeechJudgment,
 } from "../messaging/floor.ts";
 import { stimulusKey } from "../stimulus.ts";
-import type { StateStore } from "../state.ts";
+import { cachedStore, type StateStore } from "../state.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
@@ -358,10 +358,15 @@ export class Perception {
     if (this.deps.tasks) {
       this.taskStore = this.deps.tasks;
     } else if (this.api) {
-      this.taskStore = this.api.runtime.state.openKeyedStore<ActiveTask>({
-        namespace: "tasks",
-        retention: "retained",
-      });
+      const api = this.api;
+      this.taskStore = cachedStore(
+        "tasks",
+        api.runtime.state.openKeyedStore<ActiveTask>({
+          namespace: "tasks",
+          retention: "retained",
+        }),
+        { warn: (message) => api.logger.warn(message) },
+      );
     } else {
       throw new Error("Perception requires an api or a tasks dependency.");
     }

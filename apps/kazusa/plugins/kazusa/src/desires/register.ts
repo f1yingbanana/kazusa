@@ -1,3 +1,4 @@
+import { cachedStore } from "../state.ts";
 import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -74,10 +75,15 @@ export function registerDesires(
   const { clock } = deps;
   const config = DESIRES_CONFIG.parse(api.pluginConfig?.desires ?? {});
   const schemas = createSchemas(config);
-  const store = api.runtime.state.openKeyedStore<DesireRecord>({
-    namespace: "desires",
-    retention: "retained",
-  });
+  // Read for every brain build's feelings; Desires alone writes it.
+  const store = cachedStore(
+    "desires",
+    api.runtime.state.openKeyedStore<DesireRecord>({
+      namespace: "desires",
+      retention: "retained",
+    }),
+    { warn: (message) => api.logger.warn(message) },
+  );
   const listeners = new Set<(agentId: string, record: DesireRecord) => void>();
   const write = async (agentId: string, record: DesireRecord) => {
     await store.register(agentId, record);

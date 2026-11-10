@@ -1,3 +1,4 @@
+import { cachedStore } from "../state.ts";
 import { currentConfig } from "../current-config.ts";
 import {
   generateSecureUuid,
@@ -106,10 +107,15 @@ export function registerTaskman(
     extensions.flatMap((extension) =>
       extension.required.filter((name) => name in extension[tool]),
     );
-  const store = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  // Read on every brain build and decision; Taskman alone writes it.
+  const store = cachedStore(
+    "tasks",
+    api.runtime.state.openKeyedStore<ActiveTask>({
+      namespace: "tasks",
+      retention: "retained",
+    }),
+    { warn: (message) => api.logger.warn(message) },
+  );
   const taskChangeListeners = new Set<
     (agentId: string, task: ActiveTask) => void
   >();

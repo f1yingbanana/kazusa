@@ -358,10 +358,14 @@ export function registerLocation(
       `Location: no places under ${config.wikiDir}; characters have no positions.`,
     );
   }
-  const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  const tasks = cachedStore(
+    "tasks",
+    api.runtime.state.openKeyedStore<ActiveTask>({
+      namespace: "tasks",
+      retention: "retained",
+    }),
+    { warn: (message) => api.logger.warn(message) },
+  );
   const userConfig = USER.parse(api.pluginConfig?.user ?? {});
   /** The name others know them by, never their id. */
   const displayName = async (id: string): Promise<string> =>

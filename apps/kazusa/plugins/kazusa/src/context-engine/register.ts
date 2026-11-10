@@ -12,7 +12,7 @@ import type {
   ContextSettings,
 } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
-import type { StateStore } from "../state.ts";
+import { cachedStore, type StateStore } from "../state.ts";
 import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
 import { contextSettings, contextSettingsBase } from "./settings.ts";
 import {
@@ -260,16 +260,25 @@ function createContextEngine(
     api.pluginConfig?.contextEngine ?? {},
   );
   const skillLoader = pluginSkillLoader(api);
-  const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  // Kazusa's own state, read on every build: kept in memory, written through.
+  const tasks = cachedStore(
+    "tasks",
+    api.runtime.state.openKeyedStore<ActiveTask>({
+      namespace: "tasks",
+      retention: "retained",
+    }),
+    { warn: (message) => api.logger.warn(message) },
+  );
   const settings = contextSettings(api);
   // Where each character's records started last turn, so the start holds and
   // the provider keeps them cached. Losing it costs one re-read.
-  const recordsStarts = api.runtime.state.openKeyedStore<{
-    readonly from: number;
-  }>({ namespace: "records", retention: "retained" });
+  const recordsStarts = cachedStore(
+    "records",
+    api.runtime.state.openKeyedStore<{
+      readonly from: number;
+    }>({ namespace: "records", retention: "retained" }),
+    { warn: (message) => api.logger.warn(message) },
+  );
   return {
     info: {
       id: "kazusa",

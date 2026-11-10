@@ -4,7 +4,8 @@ import {
   readSessionTranscriptCatalogPage,
   readVisibleSessionTranscriptMessageEntries,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetStateCaches } from "../state.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
@@ -22,6 +23,9 @@ vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
 
 const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
 const workspaces: string[] = [];
+// Tasks, settings and where records start are cached in memory, written
+// through; these tests also write them behind the cache.
+beforeEach(resetStateCaches);
 afterEach(async () => {
   await Promise.all(
     workspaces
@@ -602,9 +606,10 @@ describe("A turn's builds", () => {
     expect(memory).toHaveBeenCalledTimes(1);
     expect(pastTurns).toHaveBeenCalledTimes(1);
     expect(sessionEntry).toHaveBeenCalledTimes(1);
-    // What a tool call can change is read for every build.
-    expect(lookupTask).toHaveBeenCalledTimes(3);
+    // What a tool call can change is read for every build: ledgers from
+    // OpenClaw, the task from Kazusa's in-memory copy of its store.
     expect(readHistory.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(lookupTask).toHaveBeenCalledTimes(1);
     expect(second).toEqual(first);
 
     // A new turn searches memory and reads past turns again; the model's
@@ -638,6 +643,7 @@ describe("A turn's builds", () => {
     await reused.engine.assemble({ ...brain(), tokenBudget: 995_000 });
     // A tool call starts an activity; the next build has less room.
     current = task;
+    resetStateCaches(); // Written behind the task store's cache.
     const later = await reused.engine.assemble({
       ...brain(),
       tokenBudget: 990_000,
@@ -663,6 +669,7 @@ describe("A turn's builds", () => {
     await engine.assemble(brain());
     await engine.assemble(brain());
     expect(await service.recentContexts("alice")).toHaveLength(1);
+    resetStateCaches(); // The task below is written behind the cache.
     current = {
       id: "alice:task-1",
       type: "studying",
