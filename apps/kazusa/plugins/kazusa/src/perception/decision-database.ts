@@ -38,9 +38,8 @@ export function decisionEvent(
   record: PerceptionDecisionRecord,
 ) {
   const { simTime, wallTime: _wallTime, ...payload } = record;
-  const chats = new Set(record.lines.map((line) => line.chatId));
-  const chatId =
-    record.tunedOut ?? (chats.size === 1 ? [...chats][0] : undefined);
+  // The chat the row opens: the first line's, else the conversation left.
+  const chatId = record.lines[0]?.chatId ?? record.tunedOut;
   return {
     simTime,
     actors: [agentId],
@@ -66,7 +65,11 @@ CREATE INDEX IF NOT EXISTS decisions_by_time ON decisions (sim_time);
 CREATE INDEX IF NOT EXISTS decisions_by_agent ON decisions (agent_id, sim_time);
 `;
 
-const VERSION = 1;
+/**
+ * 2: only the decisions worth showing, each saying what it was about. Rows of
+ * version 1 (every decision, by stimulus id) are dropped.
+ */
+const VERSION = 2;
 
 const DATABASES = Symbol.for("kazusa.decisionDatabases");
 
@@ -119,6 +122,11 @@ function createStore({ path: file }: DecisionDatabaseOptions): DecisionStore {
   db.exec(
     "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;",
   );
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as {
+    user_version: number;
+  };
+  if (version < VERSION)
+    db.exec("DROP TABLE IF EXISTS decisions; DROP TABLE IF EXISTS meta;");
   db.exec(SCHEMA);
   db.exec(`PRAGMA user_version = ${VERSION}`);
 

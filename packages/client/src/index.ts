@@ -1416,6 +1416,8 @@ export const AttentionDecidedEventSchema = z.object({
         sender: z.string(),
         /** The start of the line, as the character would have read it. */
         excerpt: z.string(),
+        /** Messages of a burst read as one; `messageId` is the first. */
+        count: z.number().int().positive().optional(),
       }),
     ),
     /** The conversation in person (its chat id) they stopped following. */

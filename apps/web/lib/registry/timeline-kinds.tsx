@@ -239,9 +239,14 @@ export const TIMELINE_KINDS: KindMap = {
       );
     },
     target: (event) => {
+      // The row's chat: the first line's, else the conversation left.
       const [first] = event.payload.lines;
-      const chatId = first?.chatId ?? event.payload.tunedOut;
-      return chatId ? openChat(chatId, first?.messageId) : undefined;
+      return event.chatId
+        ? openChat(
+            event.chatId,
+            first?.chatId === event.chatId ? first.messageId : undefined,
+          )
+        : undefined;
     },
   },
   "location.noticed": {
@@ -348,14 +353,17 @@ function passedLines({
   if (!outcome || !lines.length) return null;
   const senders = [...new Set(lines.map((line) => line.sender))];
   const chats = new Set(lines.map((line) => line.chatId));
-  const inPerson = lines.every((line) => line.chatId.startsWith("huddle:"));
+  const spoken = lines.filter((line) => line.chatId.startsWith("huddle:"));
+  const inPerson = spoken.length === lines.length;
   const group = chats.size === 1 && lines[0].chatId.startsWith("group:");
+  // A burst of texts read as one counts each.
+  const count = lines.reduce((sum, line) => sum + (line.count ?? 1), 0);
   const what =
-    lines.length === 1
+    count === 1
       ? inPerson
         ? "words"
         : "text"
-      : `${lines.length} ${inPerson ? "lines" : "texts"}`;
+      : `${count} ${inPerson ? "lines" : spoken.length ? "messages" : "texts"}`;
   const said = (
     <>
       {senders.length <= 2 ? <>{whose(senders)} </> : null}

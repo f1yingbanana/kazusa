@@ -72,6 +72,11 @@ export interface PassedLine {
   readonly sender: string;
   /** The start of it, as the character would have read it. */
   readonly excerpt: string;
+  /**
+   * Several messages a sender sent in a burst, read as one: `messageId` is the
+   * first, and `excerpt` runs them together.
+   */
+  readonly count?: number;
 }
 
 /**

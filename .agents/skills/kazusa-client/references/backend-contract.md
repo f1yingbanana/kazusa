@@ -364,7 +364,7 @@ characters; it never parses their prose.
 | `message.sent`                                           | Messaging canonical acceptance                       | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience              |
 | `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management                            | `{ title?, added?, removed? }`                                                               |
 | `clock.changed`                                          | Clock `set_speed` / `advance`                        | `{ speed?, advancedMinutes? }`                                                               |
-| `attention.decided`                                      | Perception, per decision worth showing (row in `decisions.sqlite`); `chatId` when about one chat | `{ outcome?: "ignored" \| "deferred", lines: [{ messageId, chatId, sender, excerpt }], tunedOut?, activity?: { type, description, endAt } }` |
+| `attention.decided`                                      | Perception, per decision worth showing (row in `decisions.sqlite`); `chatId` when about one chat | `{ outcome?: "ignored" \| "deferred", lines: [{ messageId, chatId, sender, excerpt, count? }], tunedOut?, activity?: { type, description, endAt } }` |
 
 **Planned kinds** (registered when their backends exist): `location.moved`,
 `encounter`, `relationship.changed`, `reflection.written`.

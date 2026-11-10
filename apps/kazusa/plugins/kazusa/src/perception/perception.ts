@@ -105,11 +105,15 @@ const worthShowing = (item: Stimulus): boolean =>
 /** How much of a line the timeline shows. */
 const EXCERPT_CHARS = 100;
 
+/** In characters, not UTF-16 units, so an emoji is never cut in half. */
 const excerptOf = (text: string): string => {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length <= EXCERPT_CHARS
-    ? flat
-    : `${flat.slice(0, EXCERPT_CHARS - 1).trimEnd()}…`;
+  const characters = Array.from(text.replace(/\s+/g, " ").trim());
+  return characters.length <= EXCERPT_CHARS
+    ? characters.join("")
+    : `${characters
+        .slice(0, EXCERPT_CHARS - 1)
+        .join("")
+        .trimEnd()}…`;
 };
 
 /**
@@ -123,10 +127,11 @@ function worthKeeping(
   task: ActiveTask | undefined,
   simTime: number,
 ): PerceptionDecisionRecord | undefined {
+  // Deferred with nothing going on, the lines are taken in at the next turn.
   const outcome =
     decision.action === "IGNORE"
       ? "ignored"
-      : decision.action === "DEFER"
+      : decision.action === "DEFER" && task
         ? "deferred"
         : undefined;
   const lines = outcome
@@ -135,6 +140,7 @@ function worthKeeping(
         chatId: conversationId(agentId, item.sessionKey),
         sender: item.sender,
         excerpt: excerptOf(item.text),
+        ...(item.burstKeys?.length ? { count: 1 + item.burstKeys.length } : {}),
       }))
     : [];
   if (!lines.length && !decision.tunedOut) return undefined;
@@ -1272,7 +1278,6 @@ export class Perception {
         ...(left ? { tunedOut } : {}),
       };
       const { action, delayMs } = effective;
-      await this.recordDecision(agentId, effective, fresh, busy, task, heard);
       // start_task/delay_task can execute while Jev is evaluating.
       const currentTask = await this.taskStore.lookup(agentId);
       const current = heard.filter((item) => this.isCurrent(item, currentTask));
@@ -1289,6 +1294,16 @@ export class Perception {
         currentTask && Date.parse(currentTask.endAt) > this.deps.clock.time()
           ? currentTask
           : undefined;
+      // Recorded with the activity the lines now wait for, not the one judged
+      // against.
+      await this.recordDecision(
+        agentId,
+        effective,
+        fresh,
+        busy,
+        activeTask,
+        heard,
+      );
       if (action === "STEER" && current.length && !busy && delayMs > 0) {
         const notBefore = this.deps.clock.time() + delayMs;
         for (const item of current) {

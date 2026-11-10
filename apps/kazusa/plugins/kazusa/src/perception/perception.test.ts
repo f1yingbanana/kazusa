@@ -689,6 +689,30 @@ describe("Message bursts", () => {
     ]);
   });
 
+  it("records a burst left unread as all of its texts", async () => {
+    const h = setupWake({ coalesceWindowMs: 60_000 });
+    h.evaluateDecision.mockResolvedValue({
+      status: "ok",
+      result: {
+        answers: { wake_decision: { type: "choice", choice: "IGNORE" } },
+      },
+    });
+    await h.router.receive("alice", message("a", NOW));
+    await h.router.receive("alice", message("b", NOW + 30_000));
+    await h.router.receive("alice", message("c", NOW + 40_000));
+    await h.router.drain("alice");
+    await vi.waitFor(() => expect(h.decisions.size).toBe(1));
+    expect([...h.decisions.values()][0].lines).toEqual([
+      {
+        messageId: "a",
+        chatId: expect.stringMatching(/^direct:/),
+        sender: "bob",
+        excerpt: "text a text b text c",
+        count: 3,
+      },
+    ]);
+  });
+
   it("keeps apart other senders, later messages and sent items", async () => {
     const h = setupWake({ coalesceWindowMs: 60_000 });
     await h.router.receive("alice", message("a", NOW));
@@ -2655,6 +2679,29 @@ describe("Human reply timing and task boundaries", () => {
     // The inbox holds character states only.
     await h.restart().recover();
     expect([...h.states.keys()]).toEqual(["alice"]);
+  });
+
+  it("keeps no record of a deferral with nothing going on", async () => {
+    // Nothing to wait for: the text is taken in at the next turn.
+    const h = setup({ assembleDecisionContext });
+    h.evaluateDecision.mockResolvedValue(answer("DEFER"));
+    await h.router.receive("alice", stimulus("text"));
+    await vi.waitFor(() => expect(h.judged).toHaveLength(1));
+    expect(h.judged[0]).toMatchObject({ action: "DEFER" });
+    expect(h.decisions.size).toBe(0);
+  });
+
+  it("cuts an excerpt between characters, never inside an emoji", async () => {
+    const h = setup({ assembleDecisionContext });
+    h.evaluateDecision.mockResolvedValue(answer("IGNORE"));
+    await h.router.receive(
+      "alice",
+      stimulus("long", "alice", `${"a".repeat(98)}😀😀😀`),
+    );
+    await vi.waitFor(() => expect(h.decisions.size).toBe(1));
+    expect([...h.decisions.values()][0].lines[0].excerpt).toBe(
+      `${"a".repeat(98)}😀…`,
+    );
   });
 
   it("checks earlier when the activity ends before the delay", async () => {

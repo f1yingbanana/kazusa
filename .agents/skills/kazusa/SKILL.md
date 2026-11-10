@@ -928,10 +928,12 @@ connect these modules in process.
   model was unavailable or gave an unusable answer), model `choice`,
   `latencyScore` and delay. Only the decisions the player would want to see are
   kept (`PerceptionDecisionRecord`): texts left unread (`IGNORE`) or set aside
-  (`DEFER`), the player's words unheard in person, and a conversation in person
-  they stopped following. The record says what it was about (per line: message
-  id, chat id, sender, a 100-character excerpt), the `outcome`, and the
-  activity (type, description, end). Lines others say in person are not kept:
+  until an activity ends (`DEFER`; with no activity running they are taken in
+  at the next turn, and not kept), the player's words unheard in person, and a
+  conversation in person they stopped following. The record says what it was
+  about (per line: message id, chat id, sender, a 100-character excerpt, and
+  the `count` of a burst read as one), the `outcome`, and the activity the
+  lines now wait for (type, description, end), looked up after the judgment. Lines others say in person are not kept:
   in the lab they were nine in ten decisions (23,264 in one sim-day for 51
   characters, 7.3 MB), almost all overheard and not caught; about 1.5% of
   decisions are kept. A kept decision goes to:
