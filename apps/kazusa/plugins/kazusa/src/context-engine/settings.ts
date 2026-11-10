@@ -4,7 +4,7 @@ import {
   type ContextSettings,
 } from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type { StateStore } from "../state.ts";
+import { cachedStore, type StateStore } from "../state.ts";
 import { LOCATION_CONFIG } from "../location/config.ts";
 import { MEMORY_CONFIG } from "../memory/config.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
@@ -99,12 +99,24 @@ function createContextSettings(
   };
 }
 
-/** The one retained store, from any module. Never read it during registration. */
+/**
+ * The one retained store, from any module. Never read it during registration.
+ *
+ * Kept in memory, written through: every brain turn reads the world's and the
+ * character's overrides before anything else (the ledger window depends on
+ * them), and each read waited about 150 ms in OpenClaw's shared database queue
+ * with 16 characters thinking. Only `save` writes them, through this same
+ * cache, so a change applies from the next turn as before.
+ */
 export function contextSettings(api: OpenClawPluginApi): ContextSettingsStore {
   return createContextSettings(
-    api.runtime.state.openKeyedStore<ContextOverrides>({
-      namespace: "contextSettings",
-      retention: "retained",
-    }),
+    cachedStore(
+      "contextSettings",
+      api.runtime.state.openKeyedStore<ContextOverrides>({
+        namespace: "contextSettings",
+        retention: "retained",
+      }),
+      { warn: (message) => api.logger.warn(message) },
+    ),
   );
 }
