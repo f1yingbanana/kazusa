@@ -29,21 +29,36 @@ export function replayConversation(
       lastSpokeAt = message.timestamp;
       since = [];
     } else since.push(message);
+  const read =
+    from === undefined
+      ? undefined
+      : since
+          .filter(
+            (message) =>
+              message.timestamp >= from &&
+              // Read unless their copy says otherwise, as `unread` rows do.
+              !message.copies.some(
+                (copy) =>
+                  copy.agentId === participant &&
+                  copy.role === "user" &&
+                  copy.readAt === undefined,
+              ),
+          )
+          .at(-1);
   return {
     lastSpokeAt,
     unanswered: since.length,
     waitingSince: since[0]?.timestamp ?? null,
-    recent:
-      from === undefined
-        ? []
-        : since
-            .filter((message) => message.timestamp >= from)
-            .map(({ id, sender, senderName, timestamp }) => ({
-              id,
-              sender,
-              senderName,
-              timestamp,
-            })),
+    ...(read
+      ? {
+          lastRead: {
+            id: read.id,
+            sender: read.sender,
+            senderName: read.senderName,
+            timestamp: read.timestamp,
+          },
+        }
+      : {}),
   };
 }
 

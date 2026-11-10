@@ -185,14 +185,10 @@ export default definePluginEntry({
       inCompany: location.inCompany,
       presence: location.presence,
       memory: memory.prefetch,
-      // Only conversations the character actually read: an ignored message was
-      // discarded and a deferred one has not been seen yet.
+      // Only conversations the character read: an ignored message was never
+      // shown, and a deferred one has not been yet.
       awaitingReplies: async (agentId, since) =>
-        (await messagingRef.current?.awaitingReplies(
-          agentId,
-          since,
-          await perception.noticed(agentId),
-        )) ?? [],
+        (await messagingRef.current?.awaitingReplies(agentId, since)) ?? [],
     });
     contextRef.current = context;
     registerContextHttp(api);

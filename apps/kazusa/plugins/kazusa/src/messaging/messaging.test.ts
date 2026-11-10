@@ -1713,50 +1713,58 @@ describe("paced speech", () => {
 });
 
 describe("chats awaiting a reply", () => {
-  const all = () => true;
+  const bobsChat = "agent:bob:chat:direct:alice";
+  const alicesChat = "agent:alice:chat:direct:bob";
+  const read = (
+    h: ReturnType<typeof setup>,
+    reader: string,
+    sessionKey: string,
+    id: string,
+  ) =>
+    h.messaging.markRead(
+      reader,
+      [stimulusKey({ id, sessionKey })],
+      [sessionKey],
+    );
 
-  it("lists chats where someone spoke after the reader, from canonical history", async () => {
+  it("lists chats where someone spoke after the reader and they read it", async () => {
     const h = setup();
-    await h.send();
-    expect(await h.messaging.awaitingReplies("bob", NOW, all)).toEqual([
+    const first = await h.send();
+    expect(await h.messaging.awaitingReplies("bob", NOW)).toEqual([]);
+    await read(h, "bob", bobsChat, first.messageId);
+    expect(await h.messaging.awaitingReplies("bob", NOW)).toEqual([
       {
-        sessionKey: "agent:bob:chat:direct:alice",
+        sessionKey: bobsChat,
         sender: "alice",
         senderName: "ALICE",
         timestamp: NOW,
       },
     ]);
-    expect(await h.messaging.awaitingReplies("alice", NOW, all)).toEqual([]);
-    expect(await h.messaging.awaitingReplies("bob", NOW + 1, all)).toEqual([]);
-    await h.send(
+    expect(await h.messaging.awaitingReplies("alice", NOW)).toEqual([]);
+    expect(await h.messaging.awaitingReplies("bob", NOW + 1)).toEqual([]);
+    const reply = await h.send(
       { requestId: "reply", sessionKey: "chat:direct:alice", text: "Hi!" },
       "bob",
     );
-    expect(await h.messaging.awaitingReplies("bob", NOW, all)).toEqual([]);
-    expect(await h.messaging.awaitingReplies("alice", NOW, all)).toHaveLength(
-      1,
-    );
+    expect(await h.messaging.awaitingReplies("bob", NOW)).toEqual([]);
+    expect(await h.messaging.awaitingReplies("alice", NOW)).toEqual([]);
+    await read(h, "alice", alicesChat, reply.messageId);
+    expect(await h.messaging.awaitingReplies("alice", NOW)).toHaveLength(1);
   });
 
-  it("leaves out messages the reader never noticed", async () => {
+  it("names the newest message they read, not one they have yet to read", async () => {
     const h = setup();
     const first = await h.send();
+    h.setNow(NOW + 60_000);
     await h.send({
       requestId: "second",
       sessionKey: "chat:direct:bob",
       text: "Still there?",
     });
-    const seen = new Set([first.messageId]);
-    expect(
-      await h.messaging.awaitingReplies("bob", NOW, (ref) => {
-        expect(ref.sessionKey).toBe("agent:bob:chat:direct:alice");
-        return seen.has(ref.id);
-      }),
-    ).toHaveLength(1);
-    seen.clear();
-    expect(
-      await h.messaging.awaitingReplies("bob", NOW, (ref) => seen.has(ref.id)),
-    ).toEqual([]);
+    await read(h, "bob", bobsChat, first.messageId);
+    expect(await h.messaging.awaitingReplies("bob", NOW)).toMatchObject([
+      { sessionKey: bobsChat, timestamp: NOW },
+    ]);
   });
 
   it("describes where each conversation stands for the reader", async () => {
@@ -1818,9 +1826,7 @@ describe("chats awaiting a reply", () => {
     expect(
       await h.messaging.chatFacts("alice", ["agent:alice:chat:direct:bob"]),
     ).toMatchObject([{ lastSpokeAt: NOW, unanswered: 0 }]);
-    expect(await h.messaging.awaitingReplies("alice", NOW, () => true)).toEqual(
-      [],
-    );
+    expect(await h.messaging.awaitingReplies("alice", NOW)).toEqual([]);
     finish();
     await slow;
   });

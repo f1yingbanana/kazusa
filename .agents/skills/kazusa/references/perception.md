@@ -818,7 +818,8 @@ When a development input arrives on `agent:<id>:chat:direct:user:<userId>`:
    default unmanaged LLM auto-replies.
 2. Identifies the sender as `user:<userId>` (resolving the direct-chat peer or
    plugin config `user.id`), stamps in-world simulation time from Clock, and
-   builds a deterministic SHA-256 deduplication ID.
+   builds a deterministic SHA-256 ID (a resend while the first still waits in
+   the inbox is dropped).
 3. Forwards the stimulus to `perception.receive(agentId, stimulus)` for
    attention evaluation against the character's active task.
 4. If admitted, the character's decision model and brain evaluate the human's
@@ -846,11 +847,14 @@ One `DecisionBatch` carries every question; this adds no Jev latency.
 | Busy  | `attention_allocation`: `STEER`, `QUEUE_NEXT`, `DEFER`, `IGNORE` | —                                     |
 | Both  | —                                                                | `still_following` (see below)         |
 
-- `IGNORE` is final. Ignored keys are kept in `ignoredIds` (bounded like
-  `processedIds`); `Perception.noticed()` excludes them, so an ignored message
-  never reaches the brain or its "Chats awaiting your reply" view. "Maybe later"
-  is `DEFER`. A future cheap pre-filter (e.g. large-group chatter that never
-  mentions the character) could skip Jev entirely; it is not built.
+- `IGNORE` is final for that stimulus: it leaves the inbox and never reaches the
+  brain, so it is not read and not in "Chats awaiting your reply" (read
+  receipts, `markRead`). Nothing remembers it: the same stimulus arriving again
+  is judged again. The one repeat Perception refuses is a task check-in: the
+  record's `checkedIn` names the last one taken in, since unpausing re-arms
+  every lease, ended ones too. "Maybe later" is `DEFER`. A future cheap
+  pre-filter (e.g. large-group chatter that never mentions the character) could
+  skip Jev entirely; it is not built.
 - `response_latency` is a `score` question whose ordered criteria are objects
   `{ minutes, description }` from the perception rubric (default anchors 0, 1,
   5, 20, 60, 180 simulated minutes). Perception reads the same criteria from the

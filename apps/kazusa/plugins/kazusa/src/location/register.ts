@@ -602,6 +602,9 @@ export function registerLocation(
       }
     }
     const windowMs = config.passWindowMinutes * 60_000;
+    // Crossings already behind the clock were foreseen with the plans that
+    // made them; an arrival settled late must not foresee them again.
+    const from = Math.max(at, clock.time());
     for (const other of await participants()) {
       if (other === who) continue;
       const theirs = await record(other);
@@ -609,7 +612,7 @@ export function registerLocation(
       for (const crossing of crossings(
         { id: who, record: current },
         { id: other, record: theirs },
-        at,
+        from,
         windowMs,
       )) {
         await sight(

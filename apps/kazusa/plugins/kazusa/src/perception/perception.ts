@@ -129,10 +129,12 @@ export interface PerceptionState {
    */
   carried?: CarriedDelivery[];
   stopped?: boolean;
-  /** Adopted or ignored stimulus keys, for deduplication. */
-  processedIds?: string[];
-  /** The ignored subset: discarded on purpose, never shown to the brain. */
-  ignoredIds?: string[];
+  /**
+   * The last task check-in taken in (its stimulus key). Any later cron run for
+   * a task that has already ended builds the same check-in again (unpausing
+   * re-arms every lease), and it is not delivered twice.
+   */
+  checkedIn?: string;
   /**
    * Conversations in person they stopped following, and when (sim time):
    * whatever was said there until then goes unheard, even arriving later.
@@ -141,6 +143,17 @@ export interface PerceptionState {
 }
 
 /** Said where they had already stopped listening. */
+/** The check-in at the end of `task`, as `deadline` builds it. */
+function checkIn(
+  agentId: string,
+  task: { readonly id: string; readonly endAt: string },
+): Pick<Stimulus, "id" | "sessionKey"> {
+  return {
+    id: `task-deadline:${task.id}:${task.endAt}`,
+    sessionKey: `agent:${agentId}:tasks`,
+  };
+}
+
 function unheard(
   state: PerceptionState,
   item: { readonly sessionKey: string; readonly timestamp: number },
@@ -150,13 +163,6 @@ function unheard(
     (entry) =>
       entry.conversation === conversation && item.timestamp <= entry.at,
   );
-}
-
-/** Keys discarded on purpose: never shown to the brain, never redelivered. */
-function discard(state: PerceptionState, keys: Iterable<string>): void {
-  const all = [...keys];
-  state.processedIds = [...(state.processedIds ?? []), ...all].slice(-1_000);
-  state.ignoredIds = [...(state.ignoredIds ?? []), ...all].slice(-1_000);
 }
 
 /*
@@ -400,14 +406,7 @@ export class Perception {
     await this.change(
       agentId,
       (state) => {
-        // Drop duplicates of recently adopted or ignored stimuli
-        if (state.processedIds?.includes(stimulusKey(stimulus))) {
-          return;
-        }
-        if (unheard(state, stimulus)) {
-          discard(state, [stimulusKey(stimulus)]);
-          return;
-        }
+        if (unheard(state, stimulus)) return;
 
         const alreadyPending = state.pending.some((item) =>
           keysOf(item).includes(stimulusKey(stimulus)),
@@ -424,6 +423,11 @@ export class Perception {
             ).length;
           }
           return;
+        }
+        // The check-in for this ended task came already and was taken in.
+        if (stimulus.deadline) {
+          if (state.checkedIn === stimulusKey(stimulus)) return;
+          state.checkedIn = stimulusKey(stimulus);
         }
 
         if (!state.deliveries?.length) state.stopped = false;
@@ -512,8 +516,7 @@ export class Perception {
     )
       return;
     const stimulus: Stimulus = {
-      id: `task-deadline:${task.id}:${task.endAt}`,
-      sessionKey: `agent:${agentId}:tasks`,
+      ...checkIn(agentId, task),
       sender: "kazusa:clock",
       text: this.text(
         "kazusa-deliveries#check-in",
@@ -691,22 +694,6 @@ export class Perception {
     }
   }
 
-  /**
-   * Which stimuli the brain was actually shown. Ignored ones were discarded on
-   * purpose, and waiting ones have not been read yet.
-   */
-  async noticed(
-    agentId: string,
-  ): Promise<(ref: Pick<Stimulus, "id" | "sessionKey">) => boolean> {
-    const state = await this.store.lookup(agentId);
-    const processed = new Set(state?.processedIds);
-    const ignored = new Set(state?.ignoredIds);
-    return (ref) => {
-      const key = stimulusKey(ref);
-      return processed.has(key) && !ignored.has(key);
-    };
-  }
-
   /** Let attention see, and cut off, what the character is saying. */
   attachSpeech(source: SpeechSource): void {
     this.speech = source;
@@ -819,10 +806,6 @@ export class Perception {
                   state.pending = state.pending.filter(
                     (item) => !keys.has(stimulusKey(item)),
                   );
-                  state.processedIds = [
-                    ...(state.processedIds ?? []),
-                    ...delivery.keys,
-                  ].slice(-1_000);
                 }
                 state.deliveries = state.deliveries?.filter(
                   (item) => item.id !== delivery.id,
@@ -875,6 +858,20 @@ export class Perception {
 
   private async save(agentId: string, state: PerceptionState): Promise<void> {
     this.assertCurrent();
+    // Records from before 2026-11 carry up to 2,000 stimulus keys (about
+    // 130 KB) that nothing reads any more; the next save leaves them out.
+    const legacy = state as PerceptionState & {
+      processedIds?: unknown;
+      ignoredIds?: unknown;
+    };
+    if (Array.isArray(legacy.processedIds) && state.checkedIn === undefined) {
+      // The check-in for a task that has already ended may be among them.
+      const task = await this.taskStore.lookup(agentId);
+      const key = task?.id && stimulusKey(checkIn(agentId, task));
+      if (key && legacy.processedIds.includes(key)) state.checkedIn = key;
+    }
+    delete legacy.processedIds;
+    delete legacy.ignoredIds;
     await this.store.register(agentId, state, {
       assertCurrent: () => this.assertCurrent(),
     });
@@ -1055,11 +1052,6 @@ export class Perception {
         state.pending = state.pending.filter(
           (item) => !moot.has(stimulusKey(item)),
         );
-        // Let go unread, as an ignored line is: never shown to the brain.
-        state.processedIds = [...(state.processedIds ?? []), ...moot].slice(
-          -1_000,
-        );
-        state.ignoredIds = [...(state.ignoredIds ?? []), ...moot].slice(-1_000);
         this.api?.logger.info(
           `Perception ${agentId}: let ${moot.size} unread lines of conversation go`,
         );
@@ -1092,10 +1084,6 @@ export class Perception {
         state.pending = state.pending.filter(
           (item) => !unconfirmed.has(stimulusKey(item)),
         );
-        state.processedIds = [
-          ...(state.processedIds ?? []),
-          ...unconfirmed,
-        ].slice(-1_000);
         await this.save(agentId, state);
         continue;
       }
@@ -1302,13 +1290,6 @@ export class Perception {
       state.pending = state.pending.filter(
         (item) => !ignored.has(stimulusKey(item)),
       );
-      state.processedIds = [...(state.processedIds ?? []), ...ignored].slice(
-        -1_000,
-      );
-      if (ignored.size)
-        state.ignoredIds = [...(state.ignoredIds ?? []), ...ignored].slice(
-          -1_000,
-        );
       await this.save(agentId, state);
       // Continue through all unevaluated batches, including after IGNORE.
     }
@@ -1355,7 +1336,6 @@ export class Perception {
     state.pending = state.pending.filter(
       (item) => !gone.has(stimulusKey(item)),
     );
-    discard(state, gone);
     return bundle.filter((item) => !gone.has(stimulusKey(item)));
   }
 
@@ -1753,10 +1733,6 @@ export class Perception {
     state.pending = state.pending.filter(
       (item) => !delivery.keys.includes(stimulusKey(item)),
     );
-    state.processedIds = [
-      ...(state.processedIds ?? []),
-      ...delivery.keys,
-    ].slice(-1_000);
     if (state.deliveries)
       state.deliveries = state.deliveries.filter(
         (item) => item.id !== delivery.id,
