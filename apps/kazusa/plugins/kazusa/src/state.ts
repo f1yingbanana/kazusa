@@ -19,45 +19,132 @@ export type RemovableStateStore<T> = StateStore<T> &
  */
 const SHARED_CACHES = Symbol.for("kazusa.state-caches");
 
-function sharedCaches(): Map<string, Map<string, unknown>> {
+/** The most keys one store keeps in memory; the least recently used go first. */
+const CACHE_LIMIT = 4_096;
+
+/** One store's cache: values in recency order, oldest first, and its counts. */
+interface StateCache {
+  readonly values: Map<string, unknown>;
+  hits: number;
+  misses: number;
+  evictions: number;
+  /** Warned once that the limit was reached. */
+  full: boolean;
+}
+
+function sharedCaches(): Map<string, StateCache> {
   const scope = globalThis as {
-    [SHARED_CACHES]?: Map<string, Map<string, unknown>>;
+    [SHARED_CACHES]?: Map<string, StateCache>;
   };
-  return (scope[SHARED_CACHES] ??= new Map());
+  return (scope[SHARED_CACHES] ??= new Map<string, StateCache>());
+}
+
+/** How big each store's cache is now, and how often it answered. */
+export interface StateCacheStats {
+  readonly namespace: string;
+  readonly entries: number;
+  /** Serialized size of the cached values, roughly what they hold. */
+  readonly bytes: number;
+  readonly hits: number;
+  readonly misses: number;
+  readonly evictions: number;
+}
+
+/** Every cached store's size and counts, for monitoring. */
+export function stateCacheStats(): StateCacheStats[] {
+  return [...sharedCaches()].map(([namespace, cache]) => ({
+    namespace,
+    entries: cache.values.size,
+    bytes: [...cache.values].reduce(
+      (sum, [key, value]) =>
+        sum + key.length + (JSON.stringify(value)?.length ?? 0),
+      0,
+    ),
+    hits: cache.hits,
+    misses: cache.misses,
+    evictions: cache.evictions,
+  }));
 }
 
 /**
- * Write-through cache for a store read in loops over the whole cast, where each
- * native lookup is a worker round trip. Every write in the process must go
- * through the returned store.
+ * Write-through cache for a store Kazusa alone writes, read on every brain
+ * build and decision, where each native lookup waits in OpenClaw's shared
+ * database queue. Every write in the process must go through a store this
+ * returns for the same namespace, and none may expire (`ttlMs`): a cached copy
+ * would outlive it. At most `limit` keys stay in memory, the least recently
+ * used leaving first; `warn` hears once if a store fills up, which a cast-sized
+ * store never should.
  */
 export function cachedStore<T>(
   namespace: string,
   store: StateStore<T>,
+  {
+    limit = CACHE_LIMIT,
+    warn,
+  }: {
+    readonly limit?: number;
+    readonly warn?: (message: string) => void;
+  } = {},
 ): StateStore<T> {
   const caches = sharedCaches();
-  let cache = caches.get(namespace) as Map<string, T | undefined> | undefined;
+  let cache = caches.get(namespace);
   if (!cache) {
-    cache = new Map();
+    cache = {
+      values: new Map(),
+      hits: 0,
+      misses: 0,
+      evictions: 0,
+      full: false,
+    };
     caches.set(namespace, cache);
   }
-  const values = cache;
+  const state = cache;
+  const { values } = state;
+  /** Most recent last; the oldest leaves when the store is full. */
+  const remember = (key: string, value: T | undefined): void => {
+    values.delete(key);
+    values.set(key, value);
+    if (values.size <= limit) return;
+    const [oldest] = values.keys();
+    values.delete(oldest);
+    state.evictions += 1;
+    if (!state.full) {
+      state.full = true;
+      warn?.(
+        `Kazusa state cache "${namespace}" reached ${limit} keys; the least recently used are dropped.`,
+      );
+    }
+  };
   return {
     entries: () => store.entries(),
     lookup: async (key) => {
-      if (values.has(key)) return values.get(key);
+      if (values.has(key)) {
+        state.hits += 1;
+        const value = values.get(key) as T | undefined;
+        remember(key, value);
+        return value;
+      }
+      state.misses += 1;
       const value = await store.lookup(key);
       // A write that landed during this read is newer.
-      if (!values.has(key)) values.set(key, value);
-      return values.get(key);
+      if (!values.has(key)) remember(key, value);
+      return values.get(key) as T | undefined;
     },
     register: async (key, value, options) => {
+      if (options?.ttlMs !== undefined)
+        throw new Error(
+          `Kazusa state cache "${namespace}" can't hold entries that expire.`,
+        );
       await store.register(key, value, options);
-      values.set(key, value);
+      remember(key, value);
     },
   };
 }
 
 export function resetStateCaches(): void {
-  for (const cache of sharedCaches().values()) cache.clear();
+  for (const cache of sharedCaches().values()) {
+    cache.values.clear();
+    cache.hits = cache.misses = cache.evictions = 0;
+    cache.full = false;
+  }
 }

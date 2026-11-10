@@ -4,7 +4,8 @@ import {
   readSessionTranscriptCatalogPage,
   readVisibleSessionTranscriptMessageEntries,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetStateCaches } from "../state.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
@@ -22,6 +23,9 @@ vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
 
 const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
 const workspaces: string[] = [];
+// Context settings are cached in memory, written through; these tests also
+// write them behind the cache.
+beforeEach(resetStateCaches);
 afterEach(async () => {
   await Promise.all(
     workspaces
