@@ -14,7 +14,10 @@ import {
   messageJournal,
   type MessageDelivery,
 } from "../messaging/messaging.ts";
-import type { PerceptionDecisionRecord } from "../perception/types.ts";
+import type {
+  DecisionWindow,
+  RecordedDecision,
+} from "../perception/decision-database.ts";
 import type { LogWindow } from "../messaging/message-database.ts";
 import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
 import {
@@ -41,14 +44,10 @@ export function registerTimelineHttp(
   api: OpenClawPluginApi,
   deps: {
     readonly clock: Clock;
-    /** Perception's recorded attention decisions (the "perception" store). */
-    readonly decisions?: () => Promise<
-      ReadonlyArray<{
-        readonly agentId: string;
-        readonly record: PerceptionDecisionRecord;
-      }>
-    >;
-    /** Canonical messages: one row each, however many ledgers hold a copy. */
+    /** Attention decisions in a sim-time window, newest first. */
+    readonly decisions?: (
+      window: DecisionWindow,
+    ) => Promise<readonly RecordedDecision[]>;
     /** Messages in a sim-time window, newest first (`MessageStore.log`). */
     readonly messages?: (
       window: LogWindow,
@@ -91,9 +90,10 @@ export function registerTimelineHttp(
           )
       : undefined;
 
-    // Clients hide messages by default; skip reading them all then.
-    const wantsMessages =
-      !kindsFilter?.length || kindsFilter.includes("message.sent");
+    // Clients hide messages by default; skip reading them then.
+    const wants = (kind: JournalKind): boolean =>
+      !kindsFilter?.length || kindsFilter.includes(kind);
+    const wantsMessages = wants("message.sent");
 
     const allAgentIds = [...new Set(listAgentIds(getConfig()))];
     const targetAgents = actorsFilter
@@ -166,17 +166,17 @@ export function registerTimelineHttp(
       }
     }
 
+    // Only the newest `limit` in the window can make the page; one more tells
+    // the page whether older rows remain (`hasMore`).
+    const window = {
+      limit: limit + 1,
+      ...(before === undefined ? {} : { before }),
+      ...(after === undefined ? {} : { after }),
+      ...(actorsFilter ? { actors: targetAgents } : {}),
+    };
+
     if (wantsMessages) {
       try {
-        const targets = new Set(targetAgents);
-        // Only the newest `limit` in the window can make the page; one more
-        // tells the page whether older messages remain (`hasMore`).
-        const window = {
-          limit: limit + 1,
-          ...(before === undefined ? {} : { before }),
-          ...(after === undefined ? {} : { after }),
-          ...(actorsFilter ? { actors: [...targets] } : {}),
-        };
         for (const delivery of (await deps.messages?.(window)) ?? [])
           rawEvents.push(messageJournal(delivery));
       } catch (error: unknown) {
@@ -184,22 +184,25 @@ export function registerTimelineHttp(
       }
     }
 
-    // Attention decisions are machine records in the "perception" store, not a
-    // ledger: nothing character-facing ever reads them.
-    try {
-      const targets = new Set(targetAgents);
-      for (const { agentId, record } of (await deps.decisions?.()) ?? []) {
-        if (!targets.has(agentId)) continue;
-        const { simTime, wallTime: _wallTime, ...payload } = record;
-        rawEvents.push({
-          simTime,
-          kind: "attention.decided",
-          actors: [agentId],
-          payload,
-        });
+    // Attention decisions are machine records in Perception's own database,
+    // not a ledger: nothing character-facing ever reads them.
+    if (wants("attention.decided")) {
+      try {
+        const targets = new Set(targetAgents);
+        for (const { agentId, record } of (await deps.decisions?.(window)) ??
+          []) {
+          if (!targets.has(agentId)) continue;
+          const { simTime, wallTime: _wallTime, ...payload } = record;
+          rawEvents.push({
+            simTime,
+            kind: "attention.decided",
+            actors: [agentId],
+            payload,
+          });
+        }
+      } catch (error: unknown) {
+        api.logger.warn(`Timeline decision read failed: ${String(error)}`);
       }
-    } catch (error: unknown) {
-      api.logger.warn(`Timeline decision read failed: ${String(error)}`);
     }
 
     // Apply filtering

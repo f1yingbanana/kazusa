@@ -499,10 +499,10 @@ We explicitly choose to store separate subjective transcripts per character:
      Jev, and delivers cognitive prompts to `agent:<id>:brain`.
    - Perception never calls `appendSessionTranscriptMessageByIdentity` or
      manages session entries for any ledger.
-   - Its own records live in the `"perception"` keyed store: per-character inbox
-     state, and one entry per attention decision (`<agentId>:decision:<uuid>`).
-     Every ledger is replayed into a prompt, so attention mechanics ("noticed
-     after 94s", "queued, not steered") stay out of ledgers and never reach a
+   - Its own records: per-character inbox state in the `"inbox"` keyed store,
+     and attention decisions in its own `decisions.sqlite` database. Every
+     ledger is replayed into a prompt, so attention mechanics ("noticed after
+     94s", "queued, not steered") stay out of ledgers and never reach a
      character or the decision model.
 
 2. **`send_message` Tool (Egress & Mutual Ledger Writer)**:
@@ -780,7 +780,7 @@ discrete categorical attention decisions directly:
 | Task deadline arrives while busy        | Coalesced flag set; delivered together with queued chats on next brain turn.                      |
 | Task extended during active turn        | If `delay_task` was called, stale deadline check is dropped when turn finishes.                   |
 | Decision model unavailable / error      | `QUEUE_NEXT` (group chat `DEFER`): delivered now if idle, after the turn if busy; never dropped.  |
-| Process restart                         | Retained stimuli in `"perception"` store recovered; re-evaluates against live clock and task.     |
+| Process restart                         | Retained stimuli in `"inbox"` store recovered; re-evaluates against live clock and task.          |
 | Restart mid-turn                        | Custody reconciled with the brain transcript; a tombstoned `:brain` is cleared and retried once.  |
 | Deferred chat when the task ends        | Delivered in the same turn as the deadline check-in (§12).                                        |
 | `STEER` while `send_message` is pacing  | Remaining bubbles are dropped; the tool returns said/unsaid before the steer is injected (§12.4). |

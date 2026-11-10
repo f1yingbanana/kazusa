@@ -25,6 +25,7 @@ import {
   type PerceptionState,
 } from "./perception.ts";
 import { BrainSlots } from "./brain-slots.ts";
+import type { DecisionStore } from "./decision-database.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
@@ -53,15 +54,9 @@ type SetupOptions = Partial<PerceptionConfig> & {
 };
 
 function setup(options: SetupOptions = {}) {
-  // One "perception" namespace: character states and decision entries.
+  // The inbox namespace, and decisions keyed `<agentId>:decision:<n>`.
   const states = new Map<string, PerceptionState>();
   const decisions = new Map<string, PerceptionDecisionRecord>();
-  const namespaceEntries = () =>
-    [...states, ...decisions].map(([key, value]) => ({
-      key,
-      createdAt: NOW,
-      value: structuredClone(value),
-    }));
   const tasks = new Map<string, ActiveTask>();
   let simTime = NOW;
   let speed = 1;
@@ -84,22 +79,34 @@ function setup(options: SetupOptions = {}) {
       states.set(key, structuredClone(value));
     },
     entries: async () =>
-      namespaceEntries().map((entry) => ({
-        ...entry,
-        value: entry.value as PerceptionState,
+      [...states].map(([key, value]) => ({
+        key,
+        createdAt: NOW,
+        value: structuredClone(value),
       })),
   };
-  const decisionStore = {
-    lookup: async (key: string) => structuredClone(decisions.get(key)),
-    register: async (key: string, value: PerceptionDecisionRecord) => {
-      z.json().parse(value);
-      decisions.set(key, structuredClone(value));
+  const decisionStore: DecisionStore = {
+    record: (agentId, record) => {
+      z.json().parse(record);
+      decisions.set(
+        `${agentId}:decision:${decisions.size}`,
+        structuredClone(record),
+      );
     },
-    entries: async () =>
-      namespaceEntries().map((entry) => ({
-        ...entry,
-        value: entry.value as PerceptionDecisionRecord,
-      })),
+    // Newest first, as the database answers.
+    window: ({ before, after, actors }) =>
+      [...decisions]
+        .map(([key, record]) => ({
+          agentId: key.slice(0, key.indexOf(":decision:")),
+          record: structuredClone(record),
+        }))
+        .filter(
+          ({ agentId, record }) =>
+            (before === undefined || record.simTime < before) &&
+            (after === undefined || record.simTime > after) &&
+            (!actors || actors.includes(agentId)),
+        )
+        .reverse(),
   };
 
   const {
@@ -2239,11 +2246,7 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
           },
           entries: async () => [],
         },
-        decisionStore: {
-          lookup: async () => undefined,
-          register: async () => {},
-          entries: async () => [],
-        },
+        decisionStore: { record: () => {}, window: () => [] },
         clock: {
           time: () => NOW,
           now: () => ({ simTime: NOW, speed: 1, formatted: "" }),
@@ -2545,7 +2548,7 @@ describe("Human reply timing and task boundaries", () => {
     expect(h.evaluateDecision).toHaveBeenCalledTimes(1);
   });
 
-  it("records each decision as its own entry, beside the character state", async () => {
+  it("records each decision on its own, apart from the character state", async () => {
     const h = setup({ assembleDecisionContext });
     h.tasks.set("alice", study());
     h.evaluateDecision.mockResolvedValue(answer("WAKE", 1));
@@ -2560,7 +2563,8 @@ describe("Human reply timing and task boundaries", () => {
       expect.stringMatching(/^alice:decision:/),
       expect.stringMatching(/^alice:decision:/),
     ]);
-    const recorded = await h.router.decisions();
+    // Newest first; oldest first here.
+    const recorded = (await h.router.decisions({ limit: 10 })).reverse();
     expect(recorded.map(({ agentId }) => agentId)).toEqual(["alice", "alice"]);
     expect(recorded[0].record).toMatchObject({
       question: "wake_decision",
@@ -2579,7 +2583,7 @@ describe("Human reply timing and task boundaries", () => {
       note: "decision unavailable: timeout",
     });
 
-    // Recovery walks character states only, never decision entries.
+    // The inbox holds character states only.
     await h.restart().recover();
     expect([...h.states.keys()]).toEqual(["alice"]);
   });

@@ -1,6 +1,6 @@
 import { resetContinuations } from "./continue.ts";
 import { inBackground } from "../background.ts";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   KeyedAsyncQueue,
   type OpenClawPluginApi,
@@ -28,6 +28,12 @@ import {
 } from "../messaging/floor.ts";
 import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
+import type {
+  DecisionStore,
+  DecisionWindow,
+  RecordedDecision,
+} from "./decision-database.ts";
+import { openPerceptionStores } from "./stores.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
@@ -165,17 +171,6 @@ function unheard(
   );
 }
 
-/*
- * The "perception" store holds Perception's records: one `PerceptionState`
- * per character, keyed by agent id, and one entry per attention decision,
- * keyed `<agentId>:decision:<id>`. Agent ids never contain ":".
- */
-const DECISION_KEY = ":decision:";
-
-function isDecisionKey(key: string): boolean {
-  return key.includes(DECISION_KEY);
-}
-
 export interface PerceptionDelivery {
   id: string;
   agentId: string;
@@ -205,9 +200,10 @@ export interface PerceptionDeps {
   readonly api?: OpenClawPluginApi;
   readonly config?: Partial<PerceptionConfig>;
   readonly assertCurrent?: () => void;
+  /** One inbox record per character, keyed by agent id ("inbox"). */
   readonly stateStore?: StateStore<PerceptionState>;
-  /** The same "perception" namespace, viewed as decision entries. */
-  readonly decisionStore?: StateStore<PerceptionDecisionRecord>;
+  /** Attention decisions, for the timeline (`decisions.sqlite`). */
+  readonly decisionStore?: DecisionStore;
   readonly tasks?: Pick<TaskStore, "lookup">;
   readonly deliver?: (
     delivery: PerceptionDelivery,
@@ -320,7 +316,7 @@ export class Perception {
   private readonly config: PerceptionConfig;
   private readonly text: SkillText;
   private readonly store: StateStore<PerceptionState>;
-  private readonly decisionStore: StateStore<PerceptionDecisionRecord>;
+  private readonly decisionStore: DecisionStore;
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
@@ -351,15 +347,9 @@ export class Perception {
       this.store = this.deps.stateStore;
       this.decisionStore = this.deps.decisionStore;
     } else if (this.api) {
-      this.store = this.api.runtime.state.openKeyedStore<PerceptionState>({
-        namespace: "perception",
-        retention: "retained",
-      });
-      this.decisionStore =
-        this.api.runtime.state.openKeyedStore<PerceptionDecisionRecord>({
-          namespace: "perception",
-          retention: "retained",
-        });
+      const stores = openPerceptionStores(this.api);
+      this.store = stores.inbox;
+      this.decisionStore = stores.decisions;
     } else {
       throw new Error(
         "Perception requires an api or stateStore and decisionStore dependencies.",
@@ -777,9 +767,7 @@ export class Perception {
    * goes back to waiting. Without a way to tell, it is quarantined.
    */
   async recover(): Promise<void> {
-    const entries = (await this.store.entries()).filter(
-      ({ key }) => !isDecisionKey(key),
-    );
+    const entries = await this.store.entries();
     const read: PerceptionDelivery[] = [];
     await Promise.all(
       entries.map(({ key: agentId }) =>
@@ -844,11 +832,13 @@ export class Perception {
   ): Promise<void> {
     const delivery = await this.serial.enqueue(agentId, async () => {
       this.assertCurrent();
-      const state = (await this.store.lookup(agentId)) ?? {
-        pending: [],
-      };
+      const stored = await this.store.lookup(agentId);
+      const state = stored ?? { pending: [] };
+      // Read back unchanged, a record is not written again: draining an idle
+      // character is a read, not a write queued behind everyone else's.
+      const before = stored && JSON.stringify(stored);
       await update(state);
-      await this.save(agentId, state);
+      if (JSON.stringify(state) !== before) await this.save(agentId, state);
       if (autoDrain && !state.stopped) return this.drainState(agentId, state);
     });
     // Host dispatch can await this agent's lifecycle callbacks. Never run it
@@ -897,11 +887,14 @@ export class Perception {
     );
   }
 
-  /** The clock runs again: take up whatever waited while it was paused. */
+  /**
+   * The clock runs again: take up whatever waited while it was paused. Only
+   * characters with something waiting: draining an empty inbox does nothing.
+   */
   async resume(): Promise<void> {
     const agents = (await this.store.entries())
-      .map(({ key }) => key)
-      .filter((key) => !isDecisionKey(key));
+      .filter(({ value }) => value.pending.length > 0 && !value.stopped)
+      .map(({ key }) => key);
     await Promise.all(agents.map((agentId) => this.drain(agentId)));
   }
 
@@ -1926,10 +1919,8 @@ export class Perception {
       ...(task ? { taskId: task.id } : {}),
     };
     try {
-      await this.decisionStore.register(
-        `${agentId}${DECISION_KEY}${randomUUID()}`,
-        record,
-      );
+      await this.decisionStore.ready?.();
+      this.decisionStore.record(agentId, record);
     } catch (error) {
       this.warn(error);
     }
@@ -1952,24 +1943,10 @@ export class Perception {
     );
   }
 
-  /** Every recorded attention decision, oldest first. */
-  async decisions(): Promise<
-    Array<{
-      readonly agentId: string;
-      readonly record: PerceptionDecisionRecord;
-    }>
-  > {
-    return (await this.decisionStore.entries())
-      .filter(({ key }) => isDecisionKey(key))
-      .map(({ key, value }) => ({
-        agentId: key.slice(0, key.indexOf(DECISION_KEY)),
-        record: value,
-      }))
-      .sort(
-        (a, b) =>
-          a.record.simTime - b.record.simTime ||
-          a.record.wallTime - b.record.wallTime,
-      );
+  /** Recorded attention decisions in a sim-time window, newest first. */
+  async decisions(window: DecisionWindow): Promise<RecordedDecision[]> {
+    await this.decisionStore.ready?.();
+    return this.decisionStore.window(window);
   }
 
   private warn(error: unknown): void {

@@ -357,14 +357,14 @@ characters; it never parses their prose.
 
 **First-draft kinds and producers:**
 
-| Kind                                                     | Producer (same code path that writes the ledger)             | Payload                                                                                      |
-| -------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `task.started`                                           | Taskman `start_task`                                         | `{ taskId, type, description, duration, endAt, summary?, monologue?, replacedTaskId? }`      |
-| `task.delayed`                                           | Taskman `delay_task`                                         | `{ taskId, endAt, reason?, monologue? }`                                                     |
-| `message.sent`                                           | Messaging canonical acceptance                               | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience              |
-| `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management                                    | `{ title?, added?, removed? }`                                                               |
-| `clock.changed`                                          | Clock `set_speed` / `advance`                                | `{ speed?, advancedMinutes? }`                                                               |
-| `attention.decided`                                      | Perception, per decision (entry in the `"perception"` store) | `{ question, action, source, delayMs, choice?, latencyScore?, note?, stimulusIds, taskId? }` |
+| Kind                                                     | Producer (same code path that writes the ledger)     | Payload                                                                                      |
+| -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `task.started`                                           | Taskman `start_task`                                 | `{ taskId, type, description, duration, endAt, summary?, monologue?, replacedTaskId? }`      |
+| `task.delayed`                                           | Taskman `delay_task`                                 | `{ taskId, endAt, reason?, monologue? }`                                                     |
+| `message.sent`                                           | Messaging canonical acceptance                       | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience              |
+| `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management                            | `{ title?, added?, removed? }`                                                               |
+| `clock.changed`                                          | Clock `set_speed` / `advance`                        | `{ speed?, advancedMinutes? }`                                                               |
+| `attention.decided`                                      | Perception, per decision (row in `decisions.sqlite`) | `{ question, action, source, delayMs, choice?, latencyScore?, note?, stimulusIds, taskId? }` |
 
 **Planned kinds** (registered when their backends exist): `location.moved`,
 `encounter`, `relationship.changed`, `reflection.written`.
@@ -372,9 +372,9 @@ characters; it never parses their prose.
 **Where history comes from:** `GET /kazusa/timeline` reads `:tasks` rows'
 structured `__openclaw.kazusa = { kind, payload }` with
 `readVisibleSessionTranscriptMessageEntries` (the catalog reader drops
-`__openclaw`), canonical message deliveries, and attention decisions from the
-`"perception"` store. Ledger text is never parsed (D4). Rows without metadata
-are skipped.
+`__openclaw`), canonical message deliveries, and attention decisions from
+Perception's `decisions.sqlite`, only the page's window. Ledger text is never
+parsed (D4). Rows without metadata are skipped.
 
 **Retained-journal proposal (not implemented):** An append-only retained store
 would need the following guarantees. Do not assume the current timeline

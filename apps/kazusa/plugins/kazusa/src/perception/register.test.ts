@@ -158,7 +158,7 @@ describe("Perception host integration", () => {
       { cleanedBody: "Answer Bob about exams" },
       { agentId: "alice", sessionKey: "agent:alice:brain" },
     );
-    expect(h.stores.get("perception")?.get("alice")).toMatchObject({
+    expect(h.stores.get("inbox")?.get("alice")).toMatchObject({
       brainContext: "Answer Bob about exams",
     });
   });
@@ -226,7 +226,7 @@ describe("Perception host integration", () => {
         });
       const failure = async (agent = "alice") =>
         (
-          (await h.stores.get("perception")?.get(agent)) as
+          (await h.stores.get("inbox")?.get(agent)) as
             { failure?: { error: string; runId: string } } | undefined
         )?.failure;
       return { h, event, failure };
@@ -279,7 +279,7 @@ describe("Perception host integration", () => {
       data: { phase: "start" },
     });
 
-    const state1 = (await h.stores.get("perception")?.get("alice")) as {
+    const state1 = (await h.stores.get("inbox")?.get("alice")) as {
       brainRun?: string;
     };
     expect(state1?.brainRun).toBe("brain-run-1");
@@ -291,7 +291,7 @@ describe("Perception host integration", () => {
       data: { phase: "end" },
     });
 
-    const state2 = (await h.stores.get("perception")?.get("alice")) as {
+    const state2 = (await h.stores.get("inbox")?.get("alice")) as {
       brainRun?: string;
     };
     expect(state2?.brainRun).toBeUndefined();
@@ -461,7 +461,7 @@ describe("Perception host integration", () => {
     const { ctx, replyOptions } = h.dispatchBrain.mock.calls[0][0];
     expect(ctx.InboundEventKind).toBe("user_request");
     expect(ctx.SessionKey).toBe("agent:alice:brain");
-    expect(h.stores.get("perception")?.get("alice")).toMatchObject({
+    expect(h.stores.get("inbox")?.get("alice")).toMatchObject({
       pending: [
         expect.objectContaining({
           id: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -469,7 +469,7 @@ describe("Perception host integration", () => {
       ],
     });
     await replyOptions?.turnAdoptionLifecycle?.onAdopted();
-    expect(h.stores.get("perception")?.get("alice")).toMatchObject({
+    expect(h.stores.get("inbox")?.get("alice")).toMatchObject({
       pending: [],
     });
     expect(h.runEmbeddedAgent).not.toHaveBeenCalled();
@@ -493,7 +493,7 @@ describe("Perception host integration", () => {
     await expect(
       replyOptions?.turnAdoptionLifecycle?.onAdopted(),
     ).rejects.toThrow();
-    expect(h.stores.get("perception")?.get("alice")).toMatchObject({
+    expect(h.stores.get("inbox")?.get("alice")).toMatchObject({
       pending: [
         expect.objectContaining({
           id: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -517,7 +517,7 @@ describe("Perception host integration", () => {
       return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
     });
     await h.dispatch();
-    expect(h.stores.get("perception")?.get("alice")).toMatchObject({
+    expect(h.stores.get("inbox")?.get("alice")).toMatchObject({
       brainRun: "native-1",
       pending: [],
     });

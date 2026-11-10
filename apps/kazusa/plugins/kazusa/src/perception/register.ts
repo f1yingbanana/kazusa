@@ -138,8 +138,16 @@ export function registerPerception(
   // registration had no decision runtime, and every resume fell back.
   const resumer = globalThis as { [PERCEPTION_RESUME]?: () => void };
   if (!resumer[PERCEPTION_RESUME]) {
-    const unsubscribe = deps.clock.onClockChange(async (now, before) => {
-      if (before.speed <= 0 && now.speed > 0) await perception.resume();
+    // In the background: the play request that started the clock answers at
+    // once instead of waiting for every inbox to be read.
+    const unsubscribe = deps.clock.onClockChange((now, before) => {
+      if (before.speed <= 0 && now.speed > 0)
+        inBackground(
+          api,
+          () => perception.resume(),
+          (error) =>
+            api.logger.warn(`Perception: resume failed: ${String(error)}`),
+        );
     });
     resumer[PERCEPTION_RESUME] = unsubscribe;
     api.lifecycle.onDispose?.(() => {
