@@ -32,6 +32,7 @@ import { unstable_serialize } from "swr/infinite";
 import { dispatchLive } from "@/lib/registry/live";
 import { fetchTimeline } from "@/lib/source/timeline/http";
 import { mergeJournal, setStatuses } from "./state";
+import { applySceneEvent, silenceScenes } from "./scene-state";
 import {
   appendCachedMessage,
   chatsKey,
@@ -95,6 +96,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     clearUnread();
     const seenMessages = new Set<string>();
     clearTyping();
+    silenceScenes();
 
     const rememberMessage = (id: string): boolean => {
       if (seenMessages.has(id)) return false;
@@ -110,6 +112,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const { chatId, message } = event;
       if (!rememberMessage(message.id)) return;
       clearTypist(chatId, message.senderId);
+      applySceneEvent(chatId, { type: "message", message, at: Date.now() });
 
       void appendCachedMessage(mutate, chatId, message);
 
@@ -140,6 +143,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const handleObservedMessage = ({ chatId, message }: MessageStreamEvent) => {
       if (!rememberMessage(message.id)) return;
       clearTypist(chatId, message.senderId);
+      applySceneEvent(chatId, { type: "message", message, at: Date.now() });
       void appendCachedMessage(mutate, chatId, message, OBSERVED_MESSAGES_KEY);
       let knownChat = true;
       void mutate(
@@ -158,6 +162,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const handleTyping = (event: TypingStreamEvent) => {
       if (event.senderId === userId) return;
       applyTyping(event);
+      applySceneEvent(event.chatId, {
+        type: "typing",
+        typing: event,
+        at: Date.now(),
+      });
     };
 
     const onEvent = (raw: MessageEvent<string>) => {
@@ -192,6 +201,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           break;
         case "connected": {
           clearTyping();
+          silenceScenes();
           for (const typing of data.typing) handleTyping(typing);
           if (data.statuses) {
             setStatuses(Object.entries(data.statuses));
@@ -271,6 +281,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       };
       next.onerror = () => {
         clearTyping();
+        silenceScenes();
         if (next.readyState !== EventSource.CLOSED && navigator.onLine) {
           setStatus("connecting");
           return;
@@ -289,6 +300,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       retryTimer = undefined;
       disconnect();
       clearTyping();
+      silenceScenes();
       setStatus("error");
     };
     const onOnline = () => {
@@ -302,6 +314,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       disposed = true;
       clearTyping();
+      silenceScenes();
       setStatus("connecting");
       window.clearTimeout(retryTimer);
       window.clearTimeout(observedRefresh);

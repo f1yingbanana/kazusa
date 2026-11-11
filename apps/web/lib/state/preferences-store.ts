@@ -10,6 +10,11 @@ export interface PreferencesState {
   readonly inspectorFolds: Readonly<Record<string, boolean>>;
   readonly observedCollapsed: boolean;
   readonly dismissedUpdateVersion: string | null;
+  /**
+   * How huddles open when the link doesn't say (`chats.as`): as a scene (with
+   * or without art) or as the transcript.
+   */
+  readonly huddleRendering: "scene" | "list";
 }
 
 export const DEFAULT_PREFERENCES: PreferencesState = {
@@ -17,6 +22,7 @@ export const DEFAULT_PREFERENCES: PreferencesState = {
   inspectorFolds: {},
   observedCollapsed: false,
   dismissedUpdateVersion: null,
+  huddleRendering: "scene",
 };
 
 const STORAGE_KEY = "kazusa:preferences";
@@ -58,11 +64,17 @@ export function sanitizePreferences(raw: unknown): PreferencesState {
       ? obj.dismissedUpdateVersion
       : DEFAULT_PREFERENCES.dismissedUpdateVersion;
 
+  const huddleRendering =
+    obj.huddleRendering === "scene" || obj.huddleRendering === "list"
+      ? obj.huddleRendering
+      : DEFAULT_PREFERENCES.huddleRendering;
+
   return {
     watchlist,
     inspectorFolds,
     observedCollapsed,
     dismissedUpdateVersion,
+    huddleRendering,
   };
 }
 
@@ -140,6 +152,10 @@ export function dismissUpdate(version: string): void {
   usePreferencesStore.setState({ dismissedUpdateVersion: version });
 }
 
+export function setHuddleRendering(rendering: "scene" | "list"): void {
+  usePreferencesStore.setState({ huddleRendering: rendering });
+}
+
 export function resetPreferences(): void {
   usePreferencesStore.setState(DEFAULT_PREFERENCES, true);
 }
@@ -158,4 +174,8 @@ export function useObservedCollapsed(): boolean {
 
 export function useDismissedUpdateVersion(): string | null {
   return usePreferencesStore((state) => state.dismissedUpdateVersion);
+}
+
+export function useHuddleRendering(): "scene" | "list" {
+  return usePreferencesStore((state) => state.huddleRendering);
 }

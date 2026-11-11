@@ -14,6 +14,7 @@ import {
   observedChatsKey,
 } from "@/lib/source/observe/http";
 import { useSources } from "@/lib/source/provider";
+import { syncSceneMembers } from "@/lib/live/scene-state";
 
 /**
  * The one read path for chats the player isn't in. Reads nothing in the world
@@ -25,7 +26,11 @@ function useObservedResource() {
   const resource = useSWR<ObservedChatsResponse, Error>(
     live ? observedChatsKey() : null,
     () => fetchObservedChats(),
-    { revalidateOnFocus: false },
+    {
+      revalidateOnFocus: false,
+      // Others' huddles: an ended one has nobody left in its scene.
+      onSuccess: ({ chats }) => syncSceneMembers(chats),
+    },
   );
   return { resource, available: live };
 }

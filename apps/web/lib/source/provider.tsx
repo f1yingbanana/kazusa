@@ -24,6 +24,8 @@ import {
   useLiveStore,
 } from "@/lib/live/state";
 import { sampleClock, setClock, useClockStore } from "@/lib/live/clock-state";
+import { syncSceneDrawable } from "@/lib/live/scene-state";
+import { drawableIds } from "@/lib/scene/director";
 import { resolveSources, type ResolvedSources } from "./capabilities";
 import { fetchCharacters } from "./characters/http";
 import { DESIRES_KEY, fetchDesires } from "./desires/http";
@@ -49,6 +51,8 @@ interface SourcesValue {
 const NO_PLAYER = { id: "", name: "You" };
 const WORLD_KEY = ["kazusa/world"] as const;
 const WORLD_CACHE_KEY = unstable_serialize(WORLD_KEY);
+export const CHARACTERS_KEY = ["kazusa/characters"] as const;
+const NOBODY: ReadonlySet<string> = new Set();
 
 function isLive(cache: Cache<unknown>, domain: Domain): boolean {
   const world = cache.get(WORLD_CACHE_KEY)?.data as WorldResponse | undefined;
@@ -141,18 +145,25 @@ export function useSources(): SourcesValue {
   };
 }
 
+/**
+ * The roster. Each read also tells open scenes who can be drawn (nobody without
+ * the scene capability).
+ */
 export function useCharactersResource(
   poll = false,
 ): SWRResponse<CharacterSummary[], Error> {
   const { cache } = useSWRConfig();
   const { resolved } = useSources();
+  const sceneLive = resolved.scene === "live";
   return useSWR<CharacterSummary[], Error>(
-    resolved.characters === "live" ? (["kazusa/characters"] as const) : null,
+    resolved.characters === "live" ? CHARACTERS_KEY : null,
     () => loadCharacters(cache),
     {
       revalidateOnFocus: true,
       refreshInterval: poll ? 30_000 : 0,
       revalidateIfStale: false,
+      onSuccess: (characters) =>
+        syncSceneDrawable(sceneLive ? drawableIds(characters) : NOBODY),
     },
   );
 }
