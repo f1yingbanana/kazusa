@@ -693,17 +693,33 @@ workspaces/<id>/
   by eye position was tried and dropped: it enlarged short characters and gave
   one character's outfits different head sizes.
 - **Placement is per outfit**, in `portraits.json`:
-  `"placement": { "": { "centre": 0.52 }, "gym": { "centre": 0.48, "scale": 0.8, "offset": [0, -20] } }`.
+  `"placement": { "": { "centre": 0.52, "scale": 0.93 }, "gym": { "centre": 0.48, "scale": 0.85, "offset": [0, -20] } }`.
   Keys are an outfit's word (`""` for pictures without one) or one picture's
-  name, which wins. `centre` is where the figure is across the picture (0 left
-  edge, 1 right; the middle when absent): the importer writes the middle of the
-  face the stickers were cut from. `scale` (1) and `offset` (`[right, down]` in
-  the picture's own pixels) are set by hand for the outfit that needs them, and
-  the importer keeps them on a re-import. The source art fills its canvas from
-  halo to shoes whatever the pose, so a seated or crouching figure is drawn
-  larger than a standing one: that is what `scale` is for. Measuring where the
-  feet are from the picture's bottom rows was tried and dropped: a wing tip, a
-  bike wheel or one toe is often all that reaches them.
+  name, which wins.
+  - `centre` is where the figure is across the picture (0 left edge, 1 right;
+    the middle when absent): the importer writes the middle of the face the
+    stickers were cut from. Measuring where the feet are from the picture's
+    bottom rows was tried and dropped: a wing tip, a bike wheel or one toe is
+    often all that reaches them.
+  - `scale` (1 when absent) draws the character as tall as they are. The source
+    art fills its canvas from halo to shoes whoever it shows, so its pixels say
+    nothing about height. The importer takes the character's height (the plan's
+    `height`, or `--height`) and where the eyes are in the picture: while
+    standing, the eyes are at one fraction of anyone's height, whatever the
+    arms, wings, weapon or halo do, so
+    `scale = 8.11 px/cm × height ÷ eye height in the picture`. For this cast
+    that is 0.81 (128 cm) to 1.17 (180 cm), median 1.
+  - The rule is wrong for a figure that isn't standing (seated, kneeling, lying,
+    crouched): its eyes are low for another reason. Those are set by hand, to
+    the value that makes the head as large as in the character's standing
+    outfits (19 of this cast's 357 outfits; the world repository lists them in
+    `art-sources/portraits/_scales-by-hand.json`). The importer keeps a `scale`
+    or `offset` it finds, so a correction outlives a re-import.
+  - `offset` is `[right, down]` in the picture's own pixels, by hand.
+  - Sizing by face size across characters was tried twice (the sticker's box,
+    and the area where expressions differ) and dropped: both vary too much
+    between characters. Within one character they agree well enough to check one
+    outfit against the others.
 - `size` and `eyeline` are still written, from the `neutral` set, but nothing
   reads them.
 - The default portrait is `neutral`, else the first by name. A character with no
@@ -874,7 +890,7 @@ One pull request per item (the project's rule), each usable alone.
 | Reading mode still feels slow                       | Measure click-to-line wait in a live huddle. If it is often over a second: a deeper buffer for watching, off by default. |
 | A reading-mode hold left on freezes the world       | Not durable; released when the view closes; the top bar shows the pause.                                                 |
 | The clock above 1x makes a live scene unreadable    | The catch-up buffer and "Jump to live".                                                                                  |
-| Portrait sizes differ between characters and worlds | One scale from the pixels; a hand-set `scale` and `offset` per outfit in `portraits.json` (§8.1).                        |
+| Portrait sizes differ between characters and worlds | A `scale` per outfit from the character's height, corrected by hand for poses that aren't standing (§8.1).               |
 | Repository size                                     | Pilot numbers before the full import; the reserve in §8.3.                                                               |
 
 ## 12. Open questions
@@ -955,9 +971,11 @@ One pull request per item (the project's rule), each usable alone.
   which dimmed a speaker the moment their line finished.
 - **Figures share one scale** (2026-11-12). Sizing by eye position rescaled
   every character; the importer's per-set height fit did too. Both are gone.
-- **Figures are centred on the face** (2026-11-12), not the picture's box, and
-  an outfit can carry a hand-set `scale` and `offset`. Matching face sizes
-  automatically was tried and made sizes worse.
+- **Figures are centred on the face** (2026-11-12), not the picture's box.
+- **Figures are as tall as their characters** (2026-11-12): a `scale` per outfit
+  from the character's height and the eye height in the picture, set by hand for
+  the few poses that aren't standing. Matching face sizes across characters was
+  tried and made sizes worse.
 - **No "…"** (2026-11-12): with the line delivered as it starts, a line being
   said is the typewriter.
 
