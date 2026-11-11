@@ -16,6 +16,7 @@ import {
   assignNames,
   cacheKey,
   placePortraits,
+  politeGet,
   stagePortraits,
   signature,
 } from "./portraits.mjs";
@@ -132,11 +133,12 @@ describe("portraits stage", () => {
     firstRunRequests = wiki.requests.slice(before);
   }, 60_000);
 
-  it("keeps the originals in the cache, by plan id and set", () => {
-    expect(cacheKey(read(plan))).toBe("placeholder");
-    expect(
-      readdirSync(path.join(cache, "placeholder", "casual")).sort(),
-    ).toEqual(MOODS.map(file).sort());
+  it("keeps the originals in the cache, one folder per wiki", () => {
+    const host = new URL(wiki.url).host.replace(":", "_");
+    expect(cacheKey(read(plan))).toBe(host);
+    expect(readdirSync(path.join(cache, host)).sort()).toEqual(
+      MOODS.map(file).sort(),
+    );
     // Originals, not thumbnails, asked for as the original format.
     const downloads = firstRunRequests.filter((url) => !url.startsWith("/api"));
     expect(downloads).toHaveLength(MOODS.length);
@@ -275,7 +277,6 @@ describe("portraits stage, alignment and failures", () => {
         maxHeight: 10_000,
       },
     );
-    // Without a plan id the cache is named after the wiki's host.
     expect(readdirSync(path.join(dir, "cache"))).toEqual([
       new URL(wiki.url).host.replace(":", "_"),
     ]);
@@ -338,9 +339,39 @@ describe("portraits stage, alignment and failures", () => {
       wiki.requests.filter((url) => url.startsWith("/images/Broken.png")),
     ).toHaveLength(1);
     // What was fetched before the failure stays cached.
-    expect(readdirSync(path.join(dir, "cache", "failing", "broken"))).toEqual([
-      file("neutral"),
-    ]);
+    expect(
+      readdirSync(
+        path.join(dir, "cache", new URL(wiki.url).host.replace(":", "_")),
+      ),
+    ).toEqual([file("neutral")]);
+  });
+});
+
+describe("politeGet", () => {
+  it("sends a generic User-Agent, or the one given", async () => {
+    const agents = [];
+    const fetchImpl = async (_url, init) => {
+      agents.push(init.headers["User-Agent"]);
+      return new Response("ok");
+    };
+    await politeGet("http://example.test/a", fetchImpl);
+    await politeGet("http://example.test/b", fetchImpl, "other/2.0");
+    expect(agents).toEqual(["art-importer/1.0", "other/2.0"]);
+  });
+
+  it("waits out a 429's Retry-After once, then gives up", async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      return new Response("busy", {
+        status: 429,
+        headers: { "Retry-After": "0" },
+      });
+    };
+    await expect(politeGet("http://example.test/a", fetchImpl)).rejects.toThrow(
+      /HTTP 429/,
+    );
+    expect(calls).toBe(2);
   });
 });
 

@@ -15,8 +15,8 @@
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
  *   `portraits.json` with the size and eyeline. It writes nothing else.
  *
- * Originals are kept in `.cache/art/<plan id or wiki host>/<set>/<File>`
- * (git-ignored). A re-run reads them and fetches only what is missing.
+ * Originals are kept in `.cache/art/<wiki host>/<File>` (git-ignored, or
+ * `--cache`). A re-run reads them and fetches only what is missing.
  */
 import {
   copyFileSync,
@@ -32,7 +32,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import {
-  AGENT,
   FACE_SOURCE_WIDTH,
   NAME,
   contactSheet,
@@ -49,6 +48,8 @@ export const DEFAULTS = {
   maxHeight: 1600,
   /** Between downloads, not between cache reads. */
   delay: 500,
+  /** Sent with every request; generic, so it names no project or person. */
+  userAgent: "art-importer/1.0",
   /** Largest accepted distance (see `distance`), on a 0–255 scale. */
   maxDistance: 16,
   /** The runner-up must be at least this many times as far as the best… */
@@ -76,15 +77,28 @@ const CELL = 4;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Seconds a Retry-After header asks for (seconds or a date), else 5. */
+export function retryAfter(header, now = Date.now()) {
+  if (header === null || header === undefined || header.trim() === "") return 5;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(seconds, 0);
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? 5 : Math.max((at - now) / 1000, 0);
+}
+
 /**
  * One request; a 429 or 503 is tried once more after the server's Retry-After
  * (at most 30 s). Anything else that fails stops the run with what failed.
  */
-export async function politeGet(url, fetchImpl = fetch) {
+export async function politeGet(
+  url,
+  fetchImpl = fetch,
+  userAgent = DEFAULTS.userAgent,
+) {
   for (let attempt = 1; ; attempt++) {
     let response;
     try {
-      response = await fetchImpl(url, { headers: { "User-Agent": AGENT } });
+      response = await fetchImpl(url, { headers: { "User-Agent": userAgent } });
     } catch (error) {
       throw new Error(`Couldn't fetch ${url}: ${error.message}`, {
         cause: error,
@@ -92,7 +106,7 @@ export async function politeGet(url, fetchImpl = fetch) {
     }
     if (response.ok) return response;
     if (attempt === 1 && (response.status === 429 || response.status === 503)) {
-      const wait = Number(response.headers.get("retry-after")) || 5;
+      const wait = retryAfter(response.headers.get("retry-after"));
       await sleep(Math.min(wait, 30) * 1000);
       continue;
     }
@@ -102,9 +116,12 @@ export async function politeGet(url, fetchImpl = fetch) {
 
 const safe = (name) => name.replace(/[/\\:*?"<>|]/g, "_");
 
-/** `.cache/art/<this>`: the plan's `id`, else the wiki's host. */
-export const cacheKey = (plan) =>
-  safe(plan.id && NAME.test(plan.id) ? plan.id : new URL(plan.wiki).host);
+/**
+ * `.cache/art/<this>`: the wiki's host. A wiki's file names are unique, so one
+ * folder per wiki means a file shared by two sets or plans, or a renamed set,
+ * is never fetched twice.
+ */
+export const cacheKey = (plan) => safe(new URL(plan.wiki).host);
 
 /**
  * A set's originals, from the cache or else the wiki, in the plan's order.
@@ -415,7 +432,7 @@ const thumb = (buffer) =>
 
 export async function stagePortraits(planFile, workspace, dir, options = {}) {
   const opts = { ...DEFAULTS, ...options };
-  const get = (url) => politeGet(url, opts.fetch);
+  const get = (url) => politeGet(url, opts.fetch, opts.userAgent);
   const plan = JSON.parse(readFileSync(planFile, "utf8"));
   const face = plan.crop !== "whole";
   const cache = path.join(opts.cache, cacheKey(plan));
@@ -436,7 +453,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
   const run = { downloads: 0 };
   for (const set of plan.sets) {
     if (!NAME.test(set.id)) throw new Error(`Set id isn't a name: ${set.id}`);
-    const pictures = await originals(plan, set, path.join(cache, set.id), {
+    const pictures = await originals(plan, set, cache, {
       delay: opts.delay,
       get,
       run,
@@ -669,6 +686,7 @@ const USAGE = `Usage:
       --cache <dir>          originals cache (default .cache/art)
       --max-height <px>      height cap (default ${DEFAULTS.maxHeight})
       --delay <ms>           pause between downloads (default ${DEFAULTS.delay})
+      --user-agent <text>    User-Agent header (default ${DEFAULTS.userAgent})
       --max-distance <n>     match threshold, 0-255 (default ${DEFAULTS.maxDistance})
   portraits.mjs place <dir>/stage.json
     Write <workspace>/portraits/<name>.webp for every picture with a "name"
@@ -679,6 +697,7 @@ function parseOptions(args) {
     "--cache": ["cache", String],
     "--max-height": ["maxHeight", Number],
     "--delay": ["delay", Number],
+    "--user-agent": ["userAgent", String],
     "--max-distance": ["maxDistance", Number],
   };
   const options = {};
