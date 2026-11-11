@@ -1,3 +1,5 @@
+import type { PortraitPlacement } from "@kazusa/client";
+
 /** Slots in a wide scene: five columns, figures balanced about the middle. */
 export const WIDE_SLOTS = 5;
 /**
@@ -21,7 +23,8 @@ export const BACKDROP_POSITION = "50% 40%";
  * The source pictures share one canvas and one scale: relative size is in their
  * pixels. A picture this many pixels tall is drawn `FIGURE_HEIGHT` of the
  * scene's height (`BUST_HEIGHT` in the one-slot scene); every other at the same
- * pixels-per-pixel, never fitted to a box, never per character or outfit. The
+ * pixels-per-pixel, never fitted to a box. Only a `scale` set by hand in a
+ * character's `portraits.json` changes one outfit's size (`standFigure`). The
  * reference is a standard picture as the importer writes it: a 1920-high source
  * canvas at its 0.8 scale (`scripts/portraits.mjs`).
  */
@@ -85,6 +88,42 @@ export type Framing = "full" | "bust";
 export function figureScale(sceneHeightPx: number, framing: Framing): number {
   const height = framing === "bust" ? BUST_HEIGHT : FIGURE_HEIGHT;
   return (sceneHeightPx * height) / REFERENCE_PX;
+}
+
+/** A picture's place in a scene: CSS `zoom`, and a move from its column. */
+export interface Standing {
+  /** Screen pixels per picture pixel: the scene's scale times its own. */
+  readonly zoom: number;
+  /**
+   * How far left of its column's centre the picture starts, in % of its own
+   * width: the point it stands on is then on the centre.
+   */
+  readonly feetPercent: number;
+  /** A further move right and down, in screen pixels. */
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Where a picture goes in a scene `sceneHeightPx` tall. Its bottom edge is on
+ * the floor line and the point it stands on (`feet` across it; the middle when
+ * it has none) on its column's centre, so a weapon held out to one side doesn't
+ * push the body off it. Its own `scale` multiplies the scene's, about that
+ * point. `offset` is in its own pixels, so it grows and shrinks with it.
+ */
+export function standFigure(
+  placement: PortraitPlacement | undefined,
+  sceneHeightPx: number,
+  framing: Framing,
+): Standing {
+  const zoom = figureScale(sceneHeightPx, framing) * (placement?.scale ?? 1);
+  const [right, down] = placement?.offset ?? [0, 0];
+  return {
+    zoom,
+    feetPercent: (placement?.feet ?? 0.5) * 100,
+    x: right * zoom,
+    y: down * zoom,
+  };
 }
 
 /** Where pictures stand: their bottom edge, in % of the scene's height. */
