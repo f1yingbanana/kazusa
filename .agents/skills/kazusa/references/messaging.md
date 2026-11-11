@@ -539,6 +539,9 @@ places a labelled set into a workspace:
   resizes them.
 - Labelling is by eye from the staged contact sheet. `place` writes the files
   and `stickers.json`.
+- `scripts/portraits.mjs` imports the same pictures whole into `portraits/`,
+  keeping originals in `.cache/art/`. It names each one by matching the sticker
+  `stage` would cut from it against the existing stickers.
 
 See [context assembly](context_engine.md) for the shared simulated-time window
 and [Perception](perception.md) for attention admission. The always-loaded

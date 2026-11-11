@@ -15,6 +15,9 @@ build/
 # Updates staged from Settings (`scripts/update.mjs`)
 .update/
 
+# Downloaded art originals (`scripts/portraits.mjs`)
+.cache/
+
 # Logs
 *.log
 npm-debug.log*
