@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  backdropOf,
   buildMap,
   describeTravel,
   parsePlace,
@@ -234,6 +235,48 @@ Body text.
     expect(renderTravelTimes(map, "club", ["dorm", "street", "annex"], 2)).toBe(
       "Annex `annex` 1 min · Street `street` 11 min on foot, 7 by bike",
     );
+  });
+
+  it("resolves a backdrop up the tree, and reports one naming no set", () => {
+    const map = buildMap(
+      [
+        place("campus", { backdrop: "grounds" }),
+        place("hall", { parent: "campus" }),
+        place("lab", { parent: "hall", backdrop: "missing" }),
+        place("roof", { parent: "hall", backdrop: "sky" }),
+        place("pier", { parent: "campus" }),
+      ],
+      new Set(["grounds", "sky"]),
+    );
+    expect(backdropOf(map, "campus")).toBe("grounds");
+    expect(backdropOf(map, "hall")).toBe("grounds");
+    // An unknown set is left out and reported; the place takes its area's.
+    expect(backdropOf(map, "lab")).toBe("grounds");
+    expect(backdropOf(map, "roof")).toBe("sky");
+    expect(backdropOf(map, "pier")).toBe("grounds");
+    expect(map.problems).toEqual([
+      {
+        place: "lab",
+        message: expect.stringContaining("backdrop missing isn't a set"),
+      },
+    ]);
+    expect(
+      backdropOf(buildMap([place("pier")], new Set()), "pier"),
+    ).toBeUndefined();
+  });
+
+  it("keeps a page whose backdrop isn't a name, and reports it", () => {
+    const page = (backdrop: string): Place =>
+      parsePlace(
+        `---\nplace_id: lab\nname: Lab\nsummary: A lab.\nbackdrop: ${backdrop}\n---\n`,
+      );
+    expect(page("[1, 2]").backdrop).toBe("[1,2]");
+    expect(page("''").backdrop).toBe('""');
+    expect(page("").backdrop).toBeUndefined();
+    expect(page(" lab-set ").backdrop).toBe("lab-set");
+    expect(buildMap([page("[1, 2]")]).problems).toEqual([
+      expect.objectContaining({ place: "lab" }),
+    ]);
   });
 
   // Worlds live in their own repositories (`apps/kazusa/world-sources.json`): only those

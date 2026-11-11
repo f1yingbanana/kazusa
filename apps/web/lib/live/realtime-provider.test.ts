@@ -132,7 +132,11 @@ beforeEach(() => {
     },
     records: { alice: { anchorAt: 1, levels: {}, drain: {} } },
   });
-  vi.mocked(fetchPlaces).mockResolvedValue({ places: [] });
+  vi.mocked(fetchPlaces).mockResolvedValue({
+    places: [],
+    backdrops: {},
+    times: [{ name: "day", from: "06:00" }],
+  });
   vi.mocked(fetchLocations).mockResolvedValue({
     records: { alice: { placeId: "home", since: 0 } },
   });

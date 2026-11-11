@@ -28,6 +28,18 @@ export const PLACE_FRONTMATTER = z.object({
     })
     .optional()
     .catch(undefined),
+  /**
+   * The backdrop set (`shared/backdrops/<set>/`) it is drawn in front of; a
+   * place without one uses its area's. Only a picture: any other value than a
+   * name (left empty means none) is kept as written, so `buildMap` reports it
+   * like an unknown set instead of the page failing.
+   */
+  backdrop: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .catch(({ value }) => (value === null ? undefined : JSON.stringify(value))),
   connections: z
     .array(
       z.strictObject({
@@ -67,6 +79,8 @@ export interface Place {
     readonly x: number;
     readonly y: number;
   };
+  /** The backdrop set its page names; `backdropOf` resolves it up the tree. */
+  readonly backdrop?: string;
   readonly bodyMarkdown: string;
 }
 
@@ -81,6 +95,7 @@ export function parsePlace(text: string): Place {
     entryMinutes: data.entry_minutes,
     connections: data.connections,
     ...(data.map === undefined ? {} : { map: data.map }),
+    ...(data.backdrop === undefined ? {} : { backdrop: data.backdrop }),
     bodyMarkdown: body,
   };
 }
@@ -121,8 +136,18 @@ const byName =
 
 const withoutParent = ({ parent: _parent, ...place }: Place): Place => place;
 
-/** Builds the graph from what's usable, listing every problem it worked around. */
-export function buildMap(list: readonly Place[]): WorldMap {
+const withoutBackdrop = ({ backdrop: _backdrop, ...place }: Place): Place =>
+  place;
+
+/**
+ * Builds the graph from what's usable, listing every problem it worked around.
+ * `backdrops` are the sets the world's library has; a page naming any other is
+ * a problem, and the place takes its area's.
+ */
+export function buildMap(
+  list: readonly Place[],
+  backdrops: ReadonlySet<string> = new Set(),
+): WorldMap {
   const problems: MapProblem[] = [];
   const places = new Map<string, Place>();
   for (const place of list) {
@@ -143,6 +168,14 @@ export function buildMap(list: readonly Place[]): WorldMap {
       });
       places.set(place.id, withoutParent(place));
     }
+  }
+  for (const place of places.values()) {
+    if (place.backdrop === undefined || backdrops.has(place.backdrop)) continue;
+    problems.push({
+      place: place.id,
+      message: `backdrop ${place.backdrop} isn't a set in shared/backdrops (a folder with a picture), so it uses its area's for now`,
+    });
+    places.set(place.id, withoutBackdrop(place));
   }
   for (const id of places.keys()) {
     const seen = new Set([id]);
@@ -353,6 +386,17 @@ export function ancestors(map: WorldMap, id: string): string[] {
     chain.push(up);
   }
   return chain;
+}
+
+/** The backdrop set a place is drawn in: its own, else the nearest area's. */
+export function backdropOf(map: WorldMap, id: string): string | undefined {
+  const own = map.places.get(id)?.backdrop;
+  if (own !== undefined) return own;
+  for (const up of ancestors(map, id)) {
+    const backdrop = map.places.get(up)?.backdrop;
+    if (backdrop !== undefined) return backdrop;
+  }
+  return undefined;
 }
 
 /** `Sweets Club Room `sweets_club_room` (West Annex › Trinity General School)`. */

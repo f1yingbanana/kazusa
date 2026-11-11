@@ -55,6 +55,7 @@ import { registerTimelineHttp } from "./timeline/http.ts";
 import { registerUsageHttp } from "./usage/http.ts";
 import { registerStage, stageControl } from "./stage/register.ts";
 import { registerStickerHttp } from "./stickers/http.ts";
+import { registerScene } from "./scene/http.ts";
 import { createRouteRegistrar } from "./http/helpers.ts";
 import { usesOfMessage } from "./memory/familiarity.ts";
 
@@ -150,7 +151,8 @@ export default definePluginEntry({
       use: memory.use,
     });
     placesRef.current = location.pages;
-    registerLocationHttp(api, { location });
+    const scene = registerScene(api, createRouteRegistrar(api));
+    registerLocationHttp(api, { location, times: scene.times });
     registerWorldUpdate(api, { clock, location });
     registerRepoSearch(api);
     // On unless a world turns it off: observing is what the client is for.

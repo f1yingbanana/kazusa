@@ -270,6 +270,7 @@ export const DomainSchema = z.enum([
   "brain",
   "usage",
   "context",
+  "scene",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -1057,6 +1058,11 @@ export const CharacterSummarySchema = z.object({
   kind: CharacterKindSchema,
   isSystemAgent: z.boolean().optional(),
   avatarUrl: z.string().optional(),
+  /**
+   * The default portrait (`GET /kazusa/portrait`): the look named `neutral`,
+   * else the first. Absent for a character without portraits.
+   */
+  portraitUrl: z.string().optional(),
   occupation: z.string().optional(),
   affiliation: z.string().optional(),
   aliases: z.array(z.string()),
@@ -1216,12 +1222,60 @@ export const PlaceSchema = z.object({
       y: z.number(),
     })
     .optional(),
+  /**
+   * The backdrop set it is drawn in front of, a key of
+   * `PlacesResponse.backdrops`: its own `backdrop`, else the nearest area's
+   * above it. Absent when none up the chain names a set that exists.
+   */
+  backdrop: z.string().optional(),
   bodyMarkdown: z.string(),
 });
 export type Place = z.infer<typeof PlaceSchema>;
 
-/** Places in tree order: each area, then its places by name. */
-export const PlacesResponseSchema = z.object({ places: z.array(PlaceSchema) });
+/**
+ * One picture of a backdrop set, named `[<state>-]<time>`. The first word is a
+ * state only when the set declares it (`states`).
+ */
+export const BackdropFileSchema = z.object({
+  name: z.string(),
+  /** `GET /kazusa/backdrop`; versioned, so cacheable forever. */
+  url: z.string(),
+  state: z.string().optional(),
+  /** The rest of the name: a time of day, by convention one of `times`. */
+  time: z.string(),
+});
+export type BackdropFile = z.infer<typeof BackdropFileSchema>;
+
+/** A backdrop set (`shared/backdrops/<set>/`) with at least one picture. */
+export const BackdropSetSchema = z.object({
+  /** Sorted by file name. */
+  files: z.array(BackdropFileSchema),
+  /** State word → what it means, for states some picture shows. */
+  states: z.record(z.string(), z.string()).optional(),
+});
+export type BackdropSet = z.infer<typeof BackdropSetSchema>;
+
+/**
+ * A time of day, from `from` (`HH:MM`, sim time, UTC) until the next one's; the
+ * last runs past midnight to the first.
+ */
+export const TimeOfDaySchema = z.object({
+  name: z.string(),
+  from: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
+});
+export type TimeOfDay = z.infer<typeof TimeOfDaySchema>;
+
+/**
+ * Places in tree order: each area, then its places by name. The server picks no
+ * backdrop picture: the client picks from `backdrops` and `times` by sim time.
+ */
+export const PlacesResponseSchema = z.object({
+  places: z.array(PlaceSchema),
+  /** Every set in the world's library that has a picture, by name. */
+  backdrops: z.record(z.string(), BackdropSetSchema),
+  /** The world's times of day, sorted by `from`; never empty. */
+  times: z.array(TimeOfDaySchema).min(1),
+});
 export type PlacesResponse = z.infer<typeof PlacesResponseSchema>;
 
 /**
@@ -1290,6 +1344,68 @@ export type MovePayload = z.infer<typeof MovePayloadSchema>;
 
 export const MoveResponseSchema = z.object({ record: LocationRecordSchema });
 export type MoveResponse = z.infer<typeof MoveResponseSchema>;
+
+/* ========================================================================== */
+/* Read model: scene art (GET /kazusa/portraits|portrait|backdrop)            */
+/* ========================================================================== */
+
+/**
+ * GET /kazusa/portraits?id=: a character's portrait set. 400 without `id`, 404
+ * for an id not on the roster; a character without portraits has an empty set.
+ */
+export const PortraitsQuerySchema = z.object({ id: z.string().min(1) });
+export type PortraitsQuery = z.infer<typeof PortraitsQuerySchema>;
+
+/**
+ * One whole-figure picture, named `[<outfit>-]<mood>` like the sticker of the
+ * same look. The first word is an outfit only when the character's
+ * `stickers/stickers.json` declares it.
+ */
+export const PortraitSchema = z.object({
+  name: z.string(),
+  /** `GET /kazusa/portrait`; versioned, so cacheable forever. */
+  url: z.string(),
+  outfit: z.string().optional(),
+  /** The rest of the name, dashes kept. */
+  mood: z.string(),
+});
+export type Portrait = z.infer<typeof PortraitSchema>;
+
+export const PortraitsResponseSchema = z.object({
+  /** Sorted by file name. */
+  portraits: z.array(PortraitSchema),
+  /** `neutral` if the set has it, else the first; absent for an empty set. */
+  default: z.string().optional(),
+  /** `[width, height]` the pictures are drawn at, in pixels. */
+  size: z.tuple([z.number(), z.number()]).optional(),
+  /** The eyes' height as a fraction of the picture's, from the top (0–1). */
+  eyeline: z.number().optional(),
+});
+export type PortraitsResponse = z.infer<typeof PortraitsResponseSchema>;
+
+/**
+ * GET /kazusa/portrait?id=&name=&v=: one portrait's picture (image bytes, not
+ * JSON), served like stickers. `v` only keys the cache. 404 for anything not in
+ * a roster character's set.
+ */
+export const PortraitQuerySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  v: z.string().optional(),
+});
+export type PortraitQuery = z.infer<typeof PortraitQuerySchema>;
+
+/**
+ * GET /kazusa/backdrop?set=&name=&v=: one backdrop's picture (image bytes, not
+ * JSON) from the world's `shared/backdrops/<set>/`. `v` only keys the cache.
+ * 404 for anything not in the library.
+ */
+export const BackdropQuerySchema = z.object({
+  set: z.string().min(1),
+  name: z.string().min(1),
+  v: z.string().optional(),
+});
+export type BackdropQuery = z.infer<typeof BackdropQuerySchema>;
 
 /* ========================================================================== */
 /* Read model: world journal (PROPOSED — src/journal/, GET /kazusa/timeline)  */

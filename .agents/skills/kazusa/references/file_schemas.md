@@ -246,6 +246,10 @@ After-School Sweets Club.
   Coordinates are a fraction of the map; each `plane` is its own map, and a
   place without one takes its parent's. A bad value is ignored. Arranging the
   map in the client rewrites this line. Routes and travel times never read it.
+- `backdrop` (optional): the backdrop set (`shared/backdrops/<set>/`) the
+  client's Scene view draws behind conversations here. A place without one uses
+  its area's. A value naming no set with a picture is listed by `wiki_lint` and
+  ignored, so the area's applies.
 - `status` and opening hours are not yet part of the schema.
 
 ### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)

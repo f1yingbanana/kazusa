@@ -1,6 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
-import { STICKER_NAME } from "../stickers/stickers.ts";
+import { PICTURE_NAME } from "../pictures.ts";
 
 export const AGENT_ID = z
   .string()
@@ -62,7 +62,7 @@ export type MessageType = z.infer<typeof DELIVERED_TYPE>;
 
 /** A sent sticker: its name in the sender's set and that file's version. */
 export const STICKER_REF = z.strictObject({
-  name: STICKER_NAME,
+  name: PICTURE_NAME,
   v: z
     .string()
     .regex(/^[a-z0-9]+$/)

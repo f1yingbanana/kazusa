@@ -43,6 +43,7 @@ export const DEFAULT_CAPABILITIES: Readonly<
   wiki: "live",
   brain: "live",
   usage: "live",
+  scene: "live",
 };
 
 export function toClockState(clock: Clock): ClockState {

@@ -131,6 +131,29 @@ record changes only on `start_task`/`delay_task` and `desires.configure`, each
 pushed as SSE `desires`. The timeline route skips reading chat ledgers when
 `kinds` excludes `message.sent` (the client default).
 
+### Built: scene art
+
+| Route                                | Response                                                                                                                                                                                     | Backed by                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `GET /kazusa/portraits?id=`          | `PortraitsResponse = { portraits: { name, url, outfit?, mood }[], default?, size?, eyeline? }`. 400 without `id`, 404 off the roster; a character without portraits gets `{ portraits: [] }` | `workspaces/<id>/portraits/<name>.<raster>` + `portraits.json`; `stickers.json` outfits |
+| `GET /kazusa/portrait?id=&name=&v=`  | The picture, served like `/kazusa/sticker`; 404 for anything not in a roster character's set                                                                                                 | Same folder (`src/scene/http.ts`)                                                       |
+| `GET /kazusa/backdrop?set=&name=&v=` | The picture, served like `/kazusa/sticker`; 404 for anything not in the library                                                                                                              | `shared/backdrops/<set>/<name>.<raster>` beside the World Wiki                          |
+
+- Names are lowercase words joined by `-`: a portrait is `[<outfit>-]<mood>` (an
+  outfit only when the character's `stickers/stickers.json` declares the word),
+  a backdrop `[<state>-]<time>` (a state only when the set's `backdrops.json`
+  declares it). URLs carry the file's mtime as `v`, so they are cached forever
+  (`immutable`, `nosniff`).
+- `CharacterSummary.portraitUrl`: the default portrait (`neutral`, else the
+  first), found with a `stat` or two per character, never a listing.
+- `GET /kazusa/places` adds `Place.backdrop` (the place's own set, else the
+  nearest area's), `backdrops` (every set in the library with a picture:
+  `{ files: { name, url, state?, time }[], states? }`) and `times` (the world's
+  times of day from `scene.times`, sorted). The client picks the picture for the
+  sim time; the server pushes nothing as time passes. SSE `places` also fires
+  when the library changes. A `backdrop` naming no set is a `wiki_lint` problem
+  and the place uses its area's.
+
 ### Built: profile
 
 - `GET /kazusa/profile` returns `{ id, name, about, wikiPage }`.
@@ -357,13 +380,13 @@ characters; it never parses their prose.
 
 **First-draft kinds and producers:**
 
-| Kind                                                     | Producer (same code path that writes the ledger)     | Payload                                                                                      |
-| -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `task.started`                                           | Taskman `start_task`                                 | `{ taskId, type, description, duration, endAt, summary?, monologue?, replacedTaskId? }`      |
-| `task.delayed`                                           | Taskman `delay_task`                                 | `{ taskId, endAt, reason?, monologue? }`                                                     |
-| `message.sent`                                           | Messaging canonical acceptance                       | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience              |
-| `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management                            | `{ title?, added?, removed? }`                                                               |
-| `clock.changed`                                          | Clock `set_speed` / `advance`                        | `{ speed?, advancedMinutes? }`                                                               |
+| Kind                                                     | Producer (same code path that writes the ledger)                                                 | Payload                                                                                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `task.started`                                           | Taskman `start_task`                                                                             | `{ taskId, type, description, duration, endAt, summary?, monologue?, replacedTaskId? }`                                                              |
+| `task.delayed`                                           | Taskman `delay_task`                                                                             | `{ taskId, endAt, reason?, monologue? }`                                                                                                             |
+| `message.sent`                                           | Messaging canonical acceptance                                                                   | `{ messageId, sequence, senderId, preview }`, with `actors` = sender + audience                                                                      |
+| `chat.created` / `chat.renamed` / `chat.members_changed` | Messaging chat management                                                                        | `{ title?, added?, removed? }`                                                                                                                       |
+| `clock.changed`                                          | Clock `set_speed` / `advance`                                                                    | `{ speed?, advancedMinutes? }`                                                                                                                       |
 | `attention.decided`                                      | Perception, per decision worth showing (row in `decisions.sqlite`); `chatId` when about one chat | `{ outcome?: "ignored" \| "deferred", lines: [{ messageId, chatId, sender, excerpt, count? }], tunedOut?, activity?: { type, description, endAt } }` |
 
 **Planned kinds** (registered when their backends exist): `location.moved`,
@@ -373,8 +396,8 @@ characters; it never parses their prose.
 structured `__openclaw.kazusa = { kind, payload }` with
 `readVisibleSessionTranscriptMessageEntries` (the catalog reader drops
 `__openclaw`), canonical message deliveries, and the attention decisions
-Perception keeps in `decisions.sqlite`, only the page's window. Ledger text is never
-parsed (D4). Rows without metadata are skipped.
+Perception keeps in `decisions.sqlite`, only the page's window. Ledger text is
+never parsed (D4). Rows without metadata are skipped.
 
 **Retained-journal proposal (not implemented):** An append-only retained store
 would need the following guarantees. Do not assume the current timeline
@@ -406,6 +429,7 @@ projection provides them, or implement a second client storage layer for them.
 | `location`                   | Built: `GET /kazusa/locations` (closed-form `LocationRecord`s, homes included); SSE `location` (`{ characterId, record }`, one per record write); `location.noticed` journal events (observer's `:tasks` ledger, plus SSE `journal`); trips in `task.started` payloads (`where`, `from`, `arriveAt`, `usualMinutes`); in-person conversations are chats of type `huddle` (`chat:huddle:<id>`), many per place; `POST /kazusa/move` (`MovePayload` → `MoveResponse`) moves the player straight to a place; `SendPayload.aloud` speaks face to face | Client wiring (in-person thread style) SSE `places` means the map changed on disk: refetch `GET /kazusa/places`. |
 | `desires`                    | Built: `/kazusa/desires`, SSE `desires`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | —                                                                                                                |
 | `models`                     | Built: `GET /kazusa/models`, `POST /kazusa/model`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                |
+| `scene`                      | Built: art read model only (`/kazusa/portraits`, `/kazusa/portrait`, `/kazusa/backdrop`, place backdrops and times on `/kazusa/places`); always live                                                                                                                                                                                                                                                                                                                                                                                              | Client state and renderer                                                                                        |
 | `relationships`, `attention` | Schema only / drafted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | See the roadmap                                                                                                  |
 
 Until a domain is live, its panels show an honest unavailable state (D10).
