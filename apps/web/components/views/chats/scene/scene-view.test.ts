@@ -522,7 +522,7 @@ describe("the scene", () => {
     expect(vi.mocked(fetchPortraits).mock.calls).toEqual([["alice"]]);
   });
 
-  it("lights the speaker of the panel's line by brightness alone, and narrates an action without a name plate", async () => {
+  it("lights the speaker of the panel's line by brightness alone, shows a line as it is said, and narrates an action without a name plate", async () => {
     listed(huddle([PLAYER, "alice", "carol"]));
     const { container } = renderWith(
       chatView(huddle([PLAYER, "alice", "carol"])),
@@ -531,22 +531,31 @@ describe("the scene", () => {
     await screen.findByRole("img", { name: "Alice" });
     const alice = figure(container, "alice");
     const place = (element: HTMLElement | null) =>
-      [
-        element?.style.left,
-        element?.style.top,
-        element?.style.height,
-        element?.className,
-      ].join(" ");
+      [element?.style.left, element?.style.bottom, element?.className].join(
+        " ",
+      );
     const before = place(alice);
     // Nothing said yet: nobody is dimmed.
     expect(figure(container, "alice")?.dataset.lit).toBe("none");
+    // Saying "You are late, again." across a second of sim time; the clock is
+    // paused halfway through it.
+    const now = DAY + 12 * HOUR;
     act(() =>
       stream().emit({
-        type: "message",
+        type: "typing",
         chatId: "huddle",
-        message: message("alice", "You're late."),
+        senderId: "alice",
+        senderName: "Alice",
+        isTyping: true,
+        mode: "speaking",
+        speech: {
+          text: "You are late, again.",
+          from: now - 500,
+          until: now + 500,
+        },
       }),
     );
+    // Her line is the panel's: she is lit from its start.
     expect(figure(container, "alice")?.dataset.lit).toBe("true");
     expect(figure(container, "carol")?.dataset.lit).toBe("false");
     // The same element, in the same place and size; only its picture is
@@ -559,20 +568,17 @@ describe("the scene", () => {
     expect(screen.getByRole("img", { name: "Carol" }).className).toMatch(
       /brightness-/,
     );
-    // Carol speaking does not take the light: her line is not in the panel.
-    act(() =>
-      stream().emit({
-        type: "typing",
-        chatId: "huddle",
-        senderId: "carol",
-        senderName: "Carol",
-        isTyping: true,
-        mode: "speaking",
-      }),
+    // Her line as it is said: the words heard so far (the paused clock holds
+    // it halfway), the whole line for a screen reader, no dots.
+    expect(plate()).toBe("Alice");
+    const saying = screen.getByRole("log").querySelector("[data-saying]");
+    expect(saying?.querySelector("[aria-hidden]")?.textContent).toBe("You are");
+    expect(saying?.querySelector(".sr-only:last-child")?.textContent).toBe(
+      "You are late, again.",
     );
-    expect(figure(container, "alice")?.dataset.lit).toBe("true");
     expect(screen.getByRole("log").querySelector("[data-dots]")).toBeNull();
 
+    // An action done meanwhile waits for her line to be said.
     act(() =>
       stream().emit({
         type: "message",
@@ -580,14 +586,26 @@ describe("the scene", () => {
         message: message("carol", "sets the bag down.", "action"),
       }),
     );
+    expect(plate()).toBe("Alice");
+    expect(figure(container, "alice")?.dataset.lit).toBe("true");
+    // Her line lands in place, as said; she stays lit.
+    act(() =>
+      stream().emit({
+        type: "message",
+        chatId: "huddle",
+        message: message("alice", "You are late, again."),
+      }),
+    );
+    expect(lines()).toEqual(["Alice: You are late, again."]);
+    expect(figure(container, "alice")?.dataset.lit).toBe("true");
     fireEvent.click(
       screen.getByRole("button", { name: "1 behind · Jump to live" }),
     );
-    // An action has no plate: narrated, never under someone's name; its
-    // doer is lit as long as it is the panel's line.
+    // An action has no plate: narrated, never under someone's name; its doer
+    // is lit as long as it is the panel's line.
     expect(lines()).toEqual(["Carol sets the bag down."]);
     expect(plate()).toBeUndefined();
-    expect(echoes()).toEqual(["AliceYou're late."]);
+    expect(echoes()).toEqual(["AliceYou are late, again."]);
     expect(figure(container, "carol")?.dataset.lit).toBe("true");
     expect(figure(container, "alice")?.dataset.lit).toBe("false");
   });

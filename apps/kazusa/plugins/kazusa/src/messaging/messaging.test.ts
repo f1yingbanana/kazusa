@@ -11,6 +11,8 @@ import {
   clientMessage,
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
+import { heardOf } from "./composing.ts";
+import type { TypingStreamEvent } from "@kazusa/client";
 import { stimulusKey } from "../stimulus.ts";
 import { mirroredStore } from "./message-store.fake.ts";
 import type { MessageStore } from "./message-database.ts";
@@ -2579,6 +2581,88 @@ describe("the floor", () => {
       "alice: one two three four five six—",
     ]);
     expect(await h.messaging.getTyping()).toEqual([]);
+  });
+
+  it("sends a line said aloud with its speaking event, replayed while said and gone after", async () => {
+    const { h, say, speaking } = await table();
+    const emitted: { typing: TypingStreamEvent }[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing") emitted.push(event);
+    });
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    const start = emitted.find((event) => event.typing.isTyping)?.typing;
+    // The text and its sim-time window, as it starts: 19 letters, 1,583 ms.
+    expect(start).toMatchObject({
+      senderId: "alice",
+      mode: "speaking",
+      speech: {
+        text: "one two three four five",
+        from: NOW,
+        until: NOW + 1_583,
+      },
+    });
+    // A reconnecting client is told it again, window and all.
+    expect(await h.messaging.getTyping("bob")).toMatchObject([
+      { senderId: "alice", speech: start?.speech },
+    ]);
+    h.setNow(NOW + 1_583);
+    await said;
+    // Said: stopped without the line, and no longer replayed.
+    const stop = emitted.findLast((event) => !event.typing.isTyping)?.typing;
+    expect(stop).toMatchObject({ senderId: "alice", isTyping: false });
+    expect(stop).not.toHaveProperty("speech");
+    expect(await h.messaging.getTyping()).toEqual([]);
+  });
+
+  it("commits what was heard of a line cut off, the event having carried the whole line", async () => {
+    const { h, say, lines, speaking } = await table();
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing" && event.typing.isTyping)
+        emitted.push(event.typing);
+    });
+    const alice = say("alice", [
+      "one two three four five six seven eight nine ten",
+    ]);
+    await speaking("alice");
+    const { speech: line } = emitted[0] ?? {};
+    h.setNow(NOW + 2_000);
+    h.messaging.interrupt("alice");
+    await alice;
+    const cut = lines().at(-1)?.slice("alice: ".length) ?? "";
+    // What the server keeps is what a client revealing the line by the same
+    // rule had shown by then, and a dash.
+    expect(cut).toBe(
+      `${heardOf(line?.text ?? "", (2_000 - 0) / ((line?.until ?? 0) - (line?.from ?? 0)))}—`,
+    );
+    expect(cut).toBe("one two three four five six—");
+  });
+
+  it("never sends typed text with a typing event", async () => {
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+    );
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing") emitted.push(event.typing);
+    });
+    const result = h.messaging.speak("alice", "ALICE", {
+      requestId: "secret",
+      members: ["bob"],
+      messages: ["Secret plan"],
+    });
+    await vi.waitFor(() => expect(emitted.length).toBeGreaterThan(0));
+    expect(emitted[0]).toMatchObject({ mode: "typing", isTyping: true });
+    expect(emitted[0]).not.toHaveProperty("speech");
+    await h.finishBubble();
+    await result;
   });
 
   it("says a line at the speaker's judged pace", async () => {

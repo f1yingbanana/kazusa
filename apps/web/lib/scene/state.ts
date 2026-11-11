@@ -44,8 +44,17 @@ export interface SceneLine {
   readonly kind: "speech" | "action";
   /** Raw text; an action is shown through `actionLine()` at render time. */
   readonly text: string;
-  /** Sim-time window of the saying, when known (§6.2). */
+  /**
+   * Sim-time window of the saying, for a line still being said: it is revealed
+   * across it (`heardOf`), as the speaking event said (§6.2).
+   */
   readonly said?: { readonly from: number; readonly until: number };
+  /**
+   * Shown whole before it was said through: the reader (reading mode) advanced
+   * onto a line already started. Its commit still replaces it (a cut shortens
+   * it).
+   */
+  readonly whole?: boolean;
   /** Stopped mid-line: the committed text ends where it was cut ("—"). */
   readonly cutOff: boolean;
   /**
@@ -58,6 +67,14 @@ export interface SceneLine {
    * history), so an echo can fade a while after it was pushed up.
    */
   readonly leftAt?: number;
+}
+
+/** A line being said: its words and its sim-time window. */
+export interface Spoken {
+  readonly name: string;
+  readonly text: string;
+  readonly from: number;
+  readonly until: number;
 }
 
 export interface SceneState {
@@ -84,16 +101,24 @@ export interface SceneState {
   /** Who is drawn, leaving figures included; at most one per id. */
   readonly figures: readonly Figure[];
   /**
-   * The one line in the panel, under its speaker's name: the newest said, or
-   * someone's line still being said (no `messageId`, while they speak and the
-   * line before it has had its time). `undefined` before anything is said.
+   * The one line in the panel, under its speaker's name: the newest said, or a
+   * line still being said (no `messageId`), revealed as it is said. A line
+   * being said takes the panel once the one before it has had its time, or at
+   * once over another line being said (a cut-in: the newest start wins).
+   * `undefined` before anything is said.
    */
   readonly line: SceneLine | undefined;
   /**
    * What was just said: the lines that left the panel, oldest first, at most
-   * `MAX_ECHOES`. Never a line still being said.
+   * `MAX_ECHOES`. A line still being said that was pushed up goes on being
+   * revealed here, and commits here.
    */
   readonly echoes: readonly SceneLine[];
+  /**
+   * Who is saying which line now, from speaking events that carry it, in the
+   * order they started; gone when the line commits or the saying stops.
+   */
+  readonly saying: Readonly<Record<string, Spoken>>;
   /** Lines received but not shown yet: catching up, or reading mode (§7). */
   readonly ahead: readonly SceneLine[];
   /**

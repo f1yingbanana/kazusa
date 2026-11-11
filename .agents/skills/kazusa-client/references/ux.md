@@ -245,23 +245,29 @@ rehoused as a stage view.
   grows or steps forward. The scene runs down to the bottom edge; at its foot,
   in one centred column with one left edge, a panel on a flat scrim of the
   background colour holds exactly one line: the newest, under a name plate that
-  is always its speaker's, or an action as italic narration without a plate.
-  Nothing shows for a line until it lands; no animated dots. The panel is never
-  taller than half the scene; a long line scrolls inside it. The two lines said
-  before it float above it as echoes, each small on its own thin scrim with its
-  own name, the older fainter, fading about 12 seconds after they left the panel
-  (hovering holds them); they never sit between a plate and its words. "N behind
-  · Jump to live" appears on the panel's edge while lines wait their turn. In
-  your own huddle the panel ends with the reply row: a borderless box that grows
-  to about four lines ("Say something, or _do something_"; Enter sends,
-  Shift+Enter breaks the line) and Send, the same draft as the transcript's box;
-  why nobody answers shows as a slim row just above the panel. Someone else's
-  huddle ends its panel with the read-only note instead. People walk in and out
-  with a short fade and slide. A **Scene | Transcript** control in the header
-  switches (`chats.as`, also remembered as the default); every huddle opens as a
-  scene, with or without art, unless the link or that choice says Transcript;
-  the buttons only the scene has sit left of it, so it never moves. Text chats
-  never show it.
+  is always its speaker's, or an action as italic narration without a plate. A
+  line being said appears as it is said, word by word at the speaker's own pace
+  (a word whole or not at all, a little behind the clock, frozen while it is
+  paused), and becomes the line as committed when it lands: whole, or cut short
+  with a dash. Someone cutting in takes the panel; the line they cut goes on
+  above it and lands there. A line that never lands goes, and the one before it
+  comes back. No animated dots anywhere. (A Gateway too old to send the words:
+  the panel keeps the previous line until the new one lands whole.) The panel is
+  never taller than half the scene; a long line scrolls inside it. The two lines
+  said before it float above it as echoes, each small on its own thin scrim with
+  its own name, the older fainter, fading about 12 seconds after they left the
+  panel (hovering holds them); they never sit between a plate and its words. "N
+  behind · Jump to live" appears on the panel's edge while lines wait their
+  turn. In your own huddle the panel ends with the reply row: a borderless box
+  that grows to about four lines ("Say something, or _do something_"; Enter
+  sends, Shift+Enter breaks the line) and Send, the same draft as the
+  transcript's box; why nobody answers shows as a slim row just above the panel.
+  Someone else's huddle ends its panel with the read-only note instead. People
+  walk in and out with a short fade and slide. A **Scene | Transcript** control
+  in the header switches (`chats.as`, also remembered as the default); every
+  huddle opens as a scene, with or without art, unless the link or that choice
+  says Transcript; the buttons only the scene has sit left of it, so it never
+  moves. Text chats never show it.
 - **Full screen:** while the scene shows, a button left of the switch shows it
   full screen: the backdrop, the people and the panel with, in your own huddle,
   its reply row, so you can keep talking (someone else's huddle keeps its
@@ -292,17 +298,17 @@ rehoused as a stage view.
   world to run. An advance (a click or tap anywhere on the scene but its
   controls, the reply row, the echoes and the backlog, or Space, Enter or →
   outside a text field; the whole scene shows the pointer) shows the next
-  waiting line; when nothing else waits the world runs again. Asked for with
-  nothing waiting, the next line shows the moment it lands, and the panel's
-  corner says in words who is thinking or speaking (no animated dots); a
-  breathing caret there says a line is ready. Echoes stay until pushed out. A
-  reply first shows what waited, is sent, then the world runs. It ends, showing
-  everything that waited and putting back the speed it found exactly (paused
-  included), when turned off, on switching to the transcript, on leaving the
-  chat or the page, when the huddle ends, or when the speed is changed from the
-  top bar or the scene's own clock controls (then without setting anything
-  back). It is not remembered and not in the link: opening a chat never pauses
-  the world.
+  waiting line (one that has started being said counts, and shows whole); when
+  nothing else waits the world runs again. Asked for with nothing waiting, the
+  next line shows the moment it lands, and the panel's corner says in words who
+  is thinking or speaking (no animated dots); a breathing caret there says a
+  line is ready. Echoes stay until pushed out. A reply first shows what waited,
+  is sent, then the world runs. It ends, showing everything that waited and
+  putting back the speed it found exactly (paused included), when turned off, on
+  switching to the transcript, on leaving the chat or the page, when the huddle
+  ends, or when the speed is changed from the top bar or the scene's own clock
+  controls (then without setting anything back). It is not remembered and not in
+  the link: opening a chat never pauses the world.
 - Deep links: `view=chats&chat=<chatId>&msg=<messageId>` scrolls to the message
   and highlights it. Timeline rows link here.
 

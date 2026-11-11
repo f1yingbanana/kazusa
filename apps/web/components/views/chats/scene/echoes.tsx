@@ -6,6 +6,7 @@ import { ECHO_MS } from "@/lib/scene/director";
 import type { SceneLine } from "@/lib/scene/state";
 import { actionLine } from "@/lib/source/chats/display";
 import { cn } from "@/lib/utils";
+import { lineKey, useRevealed } from "./said-text";
 
 /** How long an echo takes to fade out, at the end of its `ECHO_MS`. */
 const FADE_MS = 1_000;
@@ -48,7 +49,7 @@ export function Echoes({
       <li aria-hidden className="h-0 w-full" />
       {newestFirst.map((line, index) => (
         <Echo
-          key={line.messageId ?? `${line.speakerId}:${index}`}
+          key={lineKey(line, index)}
           line={line}
           name={nameOf(line)}
           older={index > 0}
@@ -89,6 +90,8 @@ function Echo({
     0,
     (line.leftAt ?? mountedAt) + ECHO_MS - FADE_MS - mountedAt,
   );
+  // A line still being said goes on being revealed here.
+  const text = useRevealed(line);
   const action = line.kind === "action" ? actionLine(name, line.text) : null;
   return (
     <li
@@ -131,7 +134,7 @@ function Echo({
           ) : (
             <>
               <span className="mr-2 font-semibold text-foreground">{name}</span>
-              <span className="text-foreground/85">{line.text}</span>
+              <span className="text-foreground/85">{text}</span>
             </>
           )}
         </span>

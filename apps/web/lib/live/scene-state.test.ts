@@ -161,7 +161,7 @@ describe("scene store", () => {
     expect(renders.oneFigures).toBe(initial.oneFigures);
     expect(renders.oneLines).toBe(initial.oneLines + 1);
     expect(renders.two).toBe(initial.two);
-    // Nothing waits to be shown for someone speaking.
+    // Without the line's words, nothing waits to be shown.
     expect(renders.behind).toBe(initial.behind);
   });
 

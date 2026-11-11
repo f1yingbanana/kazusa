@@ -493,6 +493,8 @@ export class Messaging {
     sessionKey: string,
     composing: Medium | false,
     assertInvocationCurrent?: () => void,
+    /** The line being said aloud and its sim-time window; never typed text. */
+    speech?: TypingStreamEvent["speech"],
   ): Promise<void> {
     await this.serial.enqueue("messages", async () => {
       await this.init();
@@ -509,6 +511,7 @@ export class Messaging {
         ...(composing && isUser(participantId)
           ? { expiresAt: Date.now() + 8000 }
           : {}),
+        ...(composing === "speaking" && speech ? { speech } : {}),
       };
       if (composing) this.typing.set(key, event);
       else this.typing.delete(key);
@@ -525,9 +528,11 @@ export class Messaging {
       )
         continue;
       this.typing.delete(key);
+      // Stopped: the line, if any, is no longer being said.
+      const { speech: _speech, ...stopped } = event;
       this.emit({
         type: "typing",
-        typing: { ...event, isTyping: false },
+        typing: { ...stopped, isTyping: false },
         audience: this.chats.get(event.chatId)?.members ?? [],
       });
     }
@@ -1710,12 +1715,21 @@ export class Messaging {
             ms,
           };
           speech.composing = medium;
+          // Said aloud, the line goes out with its time as it starts: it is
+          // heard as it is said. Typed text stays unseen until it is sent.
           await this.setTyping(
             sender,
             senderName,
             sessionKey,
             medium,
             assertInvocationCurrent,
+            medium === "speaking" && !sticker
+              ? {
+                  text,
+                  from: saying.startedAt,
+                  until: saying.startedAt + saying.ms,
+                }
+              : undefined,
           );
           // A paused world holds the bubble; a stopping Gateway lets the rest
           // go at once rather than wait on a frozen clock.

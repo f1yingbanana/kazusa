@@ -16,6 +16,7 @@ import { actionLine } from "@/lib/source/chats/display";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 import { Echoes } from "./echoes";
+import { lineKey, useRevealed } from "./said-text";
 import type { ReadingStatus } from "./use-reading-mode";
 import { SCRIM } from "./scrim";
 
@@ -156,7 +157,7 @@ export function DialogueBox({
                 )
               ) : (
                 <Line
-                  key={line.messageId}
+                  key={lineKey(line, "panel")}
                   line={line}
                   name={nameOf(line)}
                   className={REVEAL}
@@ -202,14 +203,30 @@ function Line({
   return (
     <p
       data-line="speech"
+      data-saying={isBeingSaid(line) || undefined}
       className={cn(
         "text-base leading-relaxed whitespace-pre-wrap text-foreground sm:text-lg",
         className,
       )}
     >
       <span className="sr-only">{`${name}: `}</span>
-      {line.text}
+      <Said line={line} />
     </p>
+  );
+}
+
+/**
+ * Speech as it is said: what has been heard so far for the eye, the whole line
+ * at once for a screen reader (the reveal would announce every word).
+ */
+function Said({ line }: { line: SceneLine }) {
+  const shown = useRevealed(line);
+  if (!isBeingSaid(line)) return line.text;
+  return (
+    <>
+      <span aria-hidden>{shown}</span>
+      <span className="sr-only">{line.text}</span>
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 export * from "./access.ts";
+export * from "./speech.ts";
 
 /* ========================================================================== */
 /* Core Entities & Wire Schemas                                               */
@@ -205,6 +206,15 @@ export const TypingStreamEventSchema = z.object({
   mode: z.enum(["typing", "speaking"]),
   /** A person's own signal lapses unless renewed; a character's is cleared. */
   expiresAt: z.number().optional(),
+  /**
+   * The line being said and when (sim-time ms), present only while a line is
+   * said aloud (`mode: "speaking"`, `isTyping: true`): clients reveal it across
+   * `from..until` (`heardOf`). The message still commits once it has been said;
+   * a cut-off commits what was heard (`cutOff`). Never on a typed message.
+   */
+  speech: z
+    .object({ text: z.string(), from: z.number(), until: z.number() })
+    .optional(),
 });
 export type TypingStreamEvent = z.infer<typeof TypingStreamEventSchema>;
 

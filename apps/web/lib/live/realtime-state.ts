@@ -7,6 +7,8 @@ export interface Typist {
   readonly senderName: string;
   readonly mode: TypingStreamEvent["mode"];
   readonly expiresAt?: number;
+  /** The line being said aloud, and when (a scene opened mid-line shows it). */
+  readonly speech?: TypingStreamEvent["speech"];
 }
 
 export interface RealtimeState {
@@ -88,6 +90,7 @@ export function applyTyping(event: TypingStreamEvent): void {
           senderName: event.senderName,
           mode: event.mode,
           expiresAt: event.expiresAt,
+          ...(event.speech ? { speech: event.speech } : {}),
         },
       ],
     },
