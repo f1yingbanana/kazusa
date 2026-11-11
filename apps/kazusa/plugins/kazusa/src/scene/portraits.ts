@@ -14,9 +14,9 @@ const DEFAULT_LOOK = "neutral";
 
 /** How a picture is stood in a scene; every field has a default. */
 const PLACEMENT = z.object({
-  /** Where the figure stands across the picture: 0 its left edge, 1 its right. */
-  feet: z.number().min(0).max(1).optional().catch(undefined),
-  /** Drawn this many times its size, about where it stands. */
+  /** Where the figure is across the picture: 0 its left edge, 1 its right. */
+  centre: z.number().min(0).max(1).optional().catch(undefined),
+  /** Drawn this many times its size, about that point on the floor. */
   scale: z.number().positive().optional().catch(undefined),
   /** Moved `[right, down]`, in the picture's own pixels. */
   offset: z.tuple([z.number(), z.number()]).optional().catch(undefined),
@@ -37,7 +37,7 @@ const MANIFEST = z.object({
   eyeline: z.number().min(0).max(1).optional().catch(undefined),
   /**
    * Placement by outfit word (`""` for pictures without one), or by one
-   * picture's name, which wins. The importer measures `feet`; `scale` and
+   * picture's name, which wins. The importer measures `centre`; `scale` and
    * `offset` are set by hand for the picture that needs them.
    */
   placement: z
@@ -87,9 +87,9 @@ function definedOf(
   placement: PortraitPlacement | undefined,
 ): PortraitPlacement | undefined {
   if (placement === undefined) return undefined;
-  const { feet, scale, offset } = placement;
+  const { centre, scale, offset } = placement;
   const set = {
-    ...(feet === undefined ? {} : { feet }),
+    ...(centre === undefined ? {} : { centre }),
     ...(scale === undefined ? {} : { scale }),
     ...(offset === undefined ? {} : { offset }),
   };

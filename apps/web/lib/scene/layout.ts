@@ -96,9 +96,9 @@ export interface Standing {
   readonly zoom: number;
   /**
    * How far left of its column's centre the picture starts, in % of its own
-   * width: the point it stands on is then on the centre.
+   * width: the figure's own centre is then on the column's.
    */
-  readonly feetPercent: number;
+  readonly centrePercent: number;
   /** A further move right and down, in screen pixels. */
   readonly x: number;
   readonly y: number;
@@ -106,10 +106,11 @@ export interface Standing {
 
 /**
  * Where a picture goes in a scene `sceneHeightPx` tall. Its bottom edge is on
- * the floor line and the point it stands on (`feet` across it; the middle when
- * it has none) on its column's centre, so a weapon held out to one side doesn't
- * push the body off it. Its own `scale` multiplies the scene's, about that
- * point. `offset` is in its own pixels, so it grows and shrinks with it.
+ * the floor line and the figure's centre (`centre` across the picture; its
+ * middle when it has none) on its column's, so a weapon or wing out to one side
+ * doesn't push the body off it. Its own `scale` multiplies the scene's, about
+ * that point on the floor. `offset` is in its own pixels, so it grows and
+ * shrinks with it.
  */
 export function standFigure(
   placement: PortraitPlacement | undefined,
@@ -120,7 +121,7 @@ export function standFigure(
   const [right, down] = placement?.offset ?? [0, 0];
   return {
     zoom,
-    feetPercent: (placement?.feet ?? 0.5) * 100,
+    centrePercent: (placement?.centre ?? 0.5) * 100,
     x: right * zoom,
     y: down * zoom,
   };
