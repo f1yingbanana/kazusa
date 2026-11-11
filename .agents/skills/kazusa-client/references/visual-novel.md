@@ -1,9 +1,12 @@
 # Visual Novel Mode for Huddles (the Scene view)
 
-Status (2026-11-11): design, revised the same day after review (§13). Nothing
-here is built. It answers the preliminary research report "Real-Time Visual
-Novel Stage and Text Rendering Architecture" (Gemini, written without access to
-this code); §14 lists where that report and this code disagree.
+Status (2026-11-12): the prototype (M0) is built, along with the line as it is
+said (§6.2), full screen, the backlog and reading mode; faces (§6.3) and outfits
+(§6.4) are not. §4.1 says what was built where it differs from the sketches, and
+§13 logs every change of mind. This document began as an answer to the
+preliminary research report "Real-Time Visual Novel Stage and Text Rendering
+Architecture" (Gemini, written without access to this code); §14 lists where
+that report and this code disagree.
 
 Goal: a face-to-face conversation looks like people in a place, not like a group
 chat. A background for where they are, a figure for each person talking, a line
@@ -247,6 +250,47 @@ Acceptance for M0:
 6. On an upright phone one figure shows, whoever is speaking, cropped to the
    bust, and the dialogue box and composer stay reachable.
 
+### 4.1 As built
+
+What the prototype became after being used with real art. Where this differs
+from the sketch and table above, this is right.
+
+```text
+┌ scene: the backdrop fills all of it, down to the bottom edge ─────────┐
+│ 10:00 ⏸ 1× 10× 60× ⏩                        [log] [read] [exit]     │  full screen only
+│                    figures                                            │
+│   Alex   I haven't. What does it say?             echoes: earlier     │
+│   Hanae  That they need volunteers, and nobody—   lines, own names    │
+│  ┌ Neru ┐                                                             │
+│  ┌──────┴──────────────────────────────────────────────────────┐      │
+│  │ Signed up yet. Right, Juno? Nobody but us.               ▾  │      │  one speaker, one line
+│  ├─────────────────────────────────────────────────────────────┤      │
+│  │ Say something, or *do something*                         ↑  │      │  reply row, same panel
+│  └─────────────────────────────────────────────────────────────┘      │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+- **The panel holds one line**, under a name plate that is always that line's
+  speaker. An action is narration with no plate. A line being said types out at
+  the speaker's pace (§6.2).
+- **Echoes**: up to two earlier lines above the plate, each under its own name,
+  older on top and fainter. In live mode an echo fades about 12 seconds after
+  leaving the panel. Clicking one opens the backlog.
+- **The reply row is the panel's footer**, and the scene runs to the bottom
+  edge. It is the transcript composer's own implementation in another shell, so
+  drafts are shared. There is no Say | Do: a reply wholly wrapped in asterisks
+  (`*waves*`) is sent as an action, anything else as speech.
+- **Controls.** Header: Reading mode, Full screen, then Scene | Transcript, so
+  the toggle never moves. Full screen: the time with the top bar's clock
+  controls at the top left, and an icon cluster at the top right (backlog,
+  reading mode, exit).
+- **Full screen** uses the browser's API and falls back to an in-app full-window
+  layout where that is missing or refused. View state only.
+- **Backlog**: the transcript (`MessageList`) in a panel inside the scene, so it
+  also works in browser full screen.
+- **Backdrop crop**: `object-fit: cover` anchored at 50% across, 40% down. The
+  real pictures are about 1.42:1.
+
 ## 5. Architecture
 
 ### 5.1 Layers
@@ -355,15 +399,20 @@ time of day (renderers read `useSimNow`).
 - **More drawable members than five.** The rest are not drawn and nothing lists
   them. When one of them speaks or acts, they take the place of whoever did so
   longest ago.
-- **Speaker.** From speaking events, not from messages, so the light starts when
-  the line starts. The speaker is at full brightness and the others slightly
-  dimmed. Nobody changes size or position for speaking. A committed message from
-  someone not marked speaking (recovered sends) lights them briefly.
+- **The lit figure** is the speaker of the line in the panel, for exactly as
+  long as that line is there: speech or action, finished or still being said,
+  and in reading mode the line shown, not the one waiting. Everyone else is
+  slightly dimmed, even someone speaking into the echoes. When the panel is
+  empty, or its line belongs to the player or to someone who is not drawn,
+  nobody is dimmed. Nobody changes size or position for speaking.
+- **One scale.** Every portrait is drawn at its natural pixel size times one
+  factor for the whole scene, standing on one floor line. Nothing is fitted to a
+  box or sized per character or outfit (§8.1).
 - **Face.** A figure keeps the mood of its last line that carried a `face`
   (§6.3). It returns to neutral when the person leaves the huddle.
-- **Lines.** Speech replaces the same speaker's previous speech line and pushes
-  others up; at most three lines stay visible, older ones dimmer. An action line
-  never replaces speech and never takes the name plate.
+- **Lines.** The panel holds one line. The line it replaces becomes an echo; at
+  most two echoes show. When two people speak at once, the line that started
+  most recently takes the panel and the other lands in the echoes.
 - **Cut-offs.** A committed text that ends in "—" and is shorter than the line
   being revealed stops the reveal there.
 - **Catching up.** At 1x the server's pacing is the pacing. When the clock runs
@@ -445,10 +494,23 @@ proxy allowlist and access policy (`observe`, like stickers).
 
 ### 6.2 The line as it is said (M1)
 
-Today a spoken bubble sets `typing { mode: "speaking" }`, waits its speaking
-time, then commits the message. Clients learn the words only when they are over,
-so a scene can only show "…" and then a finished line while the next speaker has
-already started.
+Built (2026-11-12) as described below, with these rules for the reveal:
+
+- `composingMs`, `cutOff` and `heardOf` (what has been heard so far, at word
+  boundaries) live in `@kazusa/client`, so the client reveals by the rule the
+  server cuts by. The reveal runs about 150 ms behind the clock; what is shown
+  is always a prefix of what a cut would commit.
+- A line that never lands (the speaker's run ended, they left) disappears.
+- There is no "…" state: a line being said is the typewriter. Against a Gateway
+  whose speaking events carry no text, the panel keeps the previous line until
+  the message lands.
+- A world's custom `messaging.rates` are not sent to the client yet, so its
+  reveal uses the default rates.
+
+Before this, a spoken bubble sets `typing { mode: "speaking" }`, waits its
+speaking time, then commits the message. Clients learn the words only when they
+are over, so a scene can only show "…" and then a finished line while the next
+speaker has already started.
 
 Change: the speaking event carries the line.
 
@@ -569,82 +631,34 @@ is state, and it belongs to the planned status system, designed in
 
 ## 7. Reading mode: advance on click
 
-A toggle for people who want a traditional visual novel: the world waits, and
-advances when they click. Offered only to someone who may control the clock
-(`manage`, the permission `POST /kazusa/clock` already needs); the world's time
-is one clock for everyone, so pausing it is not a visitor's choice.
+A toggle (the open book) for people who want to read at their own pace. It is a
+client-side convenience and deliberately simple. Offered only to someone who may
+control the clock (`manage`), because the world's time is one clock for
+everyone.
 
-### 7.1 The problem to design around
+- While on, new lines wait. The world runs while nothing is waiting and pauses
+  as soon as a line is.
+- An advance shows the next waiting line: a click or tap anywhere on the scene,
+  or Space, Enter or →. When nothing else waits, the world runs again at the
+  speed it had.
+- A line counts as waiting from the moment it starts being said (§6.2), so the
+  next line is usually there when the reader clicks. If someone cuts in on it
+  afterwards, the panel shortens to what was said.
+- When the reader has asked and nothing waits, the panel says who is thinking or
+  speaking, in words.
+- Turned on with the clock at 0, it starts the world at 1×, since it needs the
+  world running to get a line. Turned off, it restores exactly the speed it
+  found, 0 included.
+- It turns itself off, showing everything that waited, when the rendering
+  switches to the transcript, the chat is left, the huddle ends, or the speed is
+  changed elsewhere (then nothing is set back).
+- Replying shows what waited first, then sends.
+- View state: never saved, never in the URL. Opening a chat cannot pause the
+  world.
 
-A naive version pauses after each line and resumes on click. Then every click
-waits for a model: the listener must hear the line, decide to answer, and
-generate a reply, several seconds each time. A visual novel that makes you wait
-after every click is worse than the live view.
-
-### 7.2 One line ahead
-
-Keep the world exactly one unheard line ahead of the reader.
-
-```text
-reader sees line N            world: line N+1 has started being said → hold
-click                         show N+1 at once (it was already here)
-                              world: N+1 is heard; listeners think
-reader reads N+1              world: N+2 starts being said → hold
-click                         show N+2 at once
-```
-
-- **Hold point: the start of the next spoken line.** With §6.2 the client has
-  that line's whole text the moment it starts. The world holds there, before the
-  line has been heard by anyone.
-- **Click: show the held line, and let the world go.** The line is shown whole
-  with a quick reveal. The clock then jumps past the rest of that line's
-  speaking time (the reader has it already), so it is heard at once and the
-  listeners start thinking immediately.
-- **The reader's reading time hides the model's thinking time.** While they read
-  N+1, the reply to it is being generated. By the time they click again, N+2 has
-  usually started and is waiting. Speaking time is skipped in real time but
-  still counted in sim time, so the conversation's own clock stays true.
-- **Not ready yet.** If they click before the next line exists, the scene shows
-  who is thinking or about to speak (the presence ring and speaking events), and
-  the line appears the moment it starts. No extra click.
-- **Nobody is going to speak.** If the hold is released and nobody starts a
-  line, time simply runs at 1x. That is the player's cue; the composer is there.
-
-### 7.3 Why exactly one
-
-Buffering two or more lines would hide more latency, but the characters would
-have heard things the reader has not seen. When the reader then speaks, their
-line would land after replies they never read. With one line ahead, held before
-it is heard, nothing has happened that the reader has not seen. If the reader
-speaks instead of clicking, their line goes out at once, as the player's always
-does, and the held speaker hears it mid-line and stops or carries on by the
-ordinary judgment: the player interrupted them, which is what happened.
-
-A deeper buffer can be a setting later, for people who only watch.
-
-### 7.4 Mechanics
-
-The hold belongs in Messaging, not in the browser:
-
-- `POST /kazusa/scene/reading` `{ chatId, on }` (`manage`): one huddle at a time
-  is being read. Kept in Messaging's process-wide cell; not durable, and turning
-  it off (or closing the view) restores the clock's speed.
-- In `Messaging.play`, when a spoken bubble in that huddle is about to start:
-  announce it (§6.2), then pause the clock unless the reader is already waiting
-  for a line.
-- `POST /kazusa/scene/advance` `{ chatId }`: resume, and advance the clock by
-  the held line's remaining speaking time. The clock's advance is in whole
-  minutes on the wire today; in process it can take milliseconds.
-- Doing this in the client instead (pause on the SSE event) is simpler but
-  races: a short line can finish and the next begin before the pause arrives,
-  and the reader is two lines behind. The first build may still do it that way
-  to try the feel; the server hold is the real design.
-- A paused clock freezes the whole world, by design. Reading mode is therefore a
-  single-player way to play: everything else waits while you read. The top bar
-  already shows the pause.
-- Action bubbles take no time and arrive with their send; they show with the
-  spoken line they precede.
-- The player is not paced or held, as now.
+Not built, by decision: holding the clock inside Messaging, and jumping the
+clock past the rest of a line on advance. They would shave a few seconds and
+close one edge case, at the cost of new state in the code that owns pacing.
 
 ## 8. Assets
 
@@ -668,9 +682,15 @@ workspaces/<id>/
 
 - A sticker and a portrait with the same name are the same look: one outfit, one
   mood. `stickers.json` describes both. No second vocabulary.
-- `eyeline` (the eyes' height as a fraction of the picture) lets the layout line
-  heads up across characters drawn at different sizes, and crop to the bust on a
-  phone. The importer knows it: it already finds the face.
+- **Scale is in the pixels.** The importer scales every picture by one factor
+  (0.8) relative to a 1,920-high source canvas, so a sprite drawn on a taller or
+  shorter canvas comes out the same size as the rest, and it never trims the
+  canvas bottom, which is the floor every figure stands on. The renderer draws
+  each picture at its natural size times one scene-wide factor. Sizing figures
+  by eye position was tried and dropped: it enlarged short characters and gave
+  one character's outfits different head sizes.
+- `size` and `eyeline` are still written, from the `neutral` set, but nothing
+  reads them for scale.
 - The default portrait is `neutral`, else the first by name. A character with no
   `portraits/` is not drawn in a scene at all.
 
@@ -721,46 +741,24 @@ whole figure per outfit plus a small face patch per mood (the imported pictures
 differ only in the face) and stack them in the renderer. It is an optimization,
 not part of the plan.
 
-### 8.4 Download plan (not run)
+### 8.4 The import (run 2026-11-11 and 12)
 
-Findings first:
+The earlier sticker runs kept nothing but the 256 px crops, so the source files
+and the mapping from file to sticker name were rebuilt.
 
-- The earlier downloads are gone. `scripts/stickers.mjs stage` holds originals
-  only in memory and writes 256 px crops; a 640 px `preview.png` per set was the
-  largest thing it kept.
-- No `plan.json`, `labels.json`, `stage.json` or staging folder survives in the
-  repository, its history or the usual folders. So the list of source files per
-  character, and which source file became which sticker name, must be rebuilt.
-- What does survive: 144 sticker sets (4,769 files) with names, outfits and
-  looks, in `world/workspaces/*/stickers/`.
-
-Steps:
-
-1. **Keep provenance this time.** A git-ignored cache
-   (`.cache/art/<world>/<character>/<File>`) for originals, and the plans (small
-   text) kept with the world's own repository.
-2. **Rebuild the file lists** per character from the same MediaWiki the stickers
-   came from (the old plan's `wiki`), through its API as `stage` already does.
-3. **Add a portrait mode to the importer** (`crop: "none"`, or a sibling
-   `scripts/portraits.mjs` sharing the download code): fetch originals without
-   the 1200 px face cap, trim transparent margins by the union box of the whole
-   set so every look stays aligned, cap the height (about 1600 px), write WebP.
-4. **Recover names without relabelling.** For each downloaded picture, run the
-   existing `faceBox` and `toSticker` in memory and match the result against the
-   character's existing stickers by pixel difference. A match inherits the name.
-   Report what did not match on a contact sheet for labelling by eye.
-5. **Write `portraits/`** under the matched names, and `portraits.json` with
-   `size` and `eyeline` from the face position.
-6. **Backdrops**: list the source wiki's background gallery, pick a few dozen by
-   eye, name sets and times, set `backdrop` on area pages.
-7. **Pilot on three characters** (many outfits; few; unusual proportions).
-   Measure bytes, time and match rate; then decide whether §8.3's reserve is
-   needed.
-8. **Full run**, throttled and resumable from the cache: roughly 4,800
-   originals.
-
-For M0, steps 1 to 3 and 5 for the starting cast's `neutral` picture, and a
-handful of backdrop sets, are enough.
+- **Tools.** `scripts/portraits.mjs` (stage, then place) and
+  `scripts/backdrops.mjs` (list, stage, place, assign, check). Originals are
+  cached outside the repository and never fetched twice; plans, labels and place
+  assignments are kept with the world under `art-sources/`.
+- **Portraits.** Each downloaded picture is cut the way its sticker was and
+  matched to the character's existing stickers by the face, within the set's
+  outfit; anything unmatched or ambiguous is left out, never guessed. For the
+  Kivotos world: 4,316 of 4,769 stickers got a portrait (90.5%), 142 characters,
+  about 0.9 GB. Two characters got none, because the source's art differs from
+  what their stickers were cut from.
+- **Backdrops.** 1,363 files in the source category, 1,042 used, in 528 sets
+  (361 with more than one time of day, 75 with states), about 130 MB. 321 places
+  name a set, 382 more inherit one, 17 have none.
 
 ## 9. Rigs and 3D
 
@@ -823,34 +821,30 @@ One pull request per item (the project's rule), each usable alone.
 **M0. A scene you can show.** No model changes.
 
 1. Contract and plugin: portraits, backdrop sets and `scene.times`, `backdrop`
-   on places, the `scene` domain, proxy allowlist and access policy.
-2. `lib/scene` (director, pick, layout, tests) and the Zustand store.
-3. DOM renderer, dialogue box, `chats.as`, both chat views.
-4. Importer portrait mode; pilot portraits and a few backdrop sets for the
-   starting cast (in the world's repository, not this one).
+   on places, the `scene` domain, proxy allowlist and access policy. Built.
+2. `lib/scene` (director, pick, layout, tests) and the Zustand store. Built.
+3. DOM renderer, dialogue dock, `chats.as`, both chat views, full screen, the
+   backlog, reading mode (§7). Built.
+4. The portrait and backdrop importers, and the import (§8.4). Built and run.
 
 **M1. It feels alive.**
 
-5. Speech carried on the speaking event (§6.2); the reveal.
+5. Speech carried on the speaking event (§6.2); the reveal. Built.
 6. `face` on spoken bubbles (§6.3): schema, delivery, what listeners read, the
-   two skills' wording, the client field.
-7. The full portrait import.
+   two skills' wording, the client field. **M2. Clothes.**
 
-**M2. Reading, and clothes.**
-
-8. Reading mode (§7): the hold in Messaging, the two routes, the controls.
-9. The status system's first slice, `outfit`
+7. The status system's first slice, `outfit`
    ([status](../../kazusa/references/status.md) §5), and the scene reading it.
-10. Scene screenshot (the existing `modern-screenshot` path and credit footer).
+8. Scene screenshot (the existing `modern-screenshot` path and credit footer).
 
 **M3. Sharing.**
 
-11. Replay a past huddle as a scene from canonical messages. Needs the said
-    window stored on the message (pace is judged, so it cannot be recomputed).
-12. A read-only link to a live or replayed scene in public visitor mode
+9. Replay a past huddle as a scene from canonical messages. Needs the said
+   window stored on the message (pace is judged, so it cannot be recomputed).
+10. A read-only link to a live or replayed scene in public visitor mode
     ([auth](../../kazusa/references/auth.md)).
-13. Follow a character: the scene moves with them between huddles and places.
-14. A place's state choosing backdrops, once places have one.
+11. Follow a character: the scene moves with them between huddles and places.
+12. A place's state choosing backdrops, once places have one.
 
 **M4. Rigs and 3D** (§9), when a world has the art.
 
@@ -931,6 +925,23 @@ One pull request per item (the project's rule), each usable alone.
 - **No reduced-motion variant** (2026-11-11, review).
 - **Scene state is a Zustand store** (2026-11-11, review), per the client's
   rules.
+
+- **One line in the panel, echoes above it** (2026-11-12, after use). The
+  three-line box put the newest speaker's name plate over an older line by
+  someone else. Now the panel holds one line and earlier lines sit above the
+  plate under their own names.
+- **The reply row is in the panel; no Say | Do** (2026-11-12). The separate
+  composer below the scene did not match its width and stopped the backdrop
+  short. A reply wrapped in asterisks is an action.
+- **Reading mode is client-side and simple** (2026-11-12). An Auto / Manual
+  rework with quiet detection was built and withdrawn in favour of the first
+  logic. The server-side hold and clock jump from the earlier §7 are dropped.
+- **The lit figure follows the panel's line** (2026-11-12), not speaking events,
+  which dimmed a speaker the moment their line finished.
+- **Figures share one scale** (2026-11-12). Sizing by eye position rescaled
+  every character; the importer's per-set height fit did too. Both are gone.
+- **No "…"** (2026-11-12): with the line delivered as it starts, a line being
+  said is the typewriter.
 
 ## 14. Where the research report differs from this code
 
