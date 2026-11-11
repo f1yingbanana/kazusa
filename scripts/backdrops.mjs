@@ -375,8 +375,9 @@ function wrap(text, width, lines) {
  */
 export async function backdropSheets(entries, outDir, options = {}) {
   const opts = { ...DEFAULTS, ...options };
-  const cellWidth = 384;
-  const thumbHeight = 216;
+  const cellWidth = opts.cellWidth ?? 384;
+  const thumbHeight = Math.round((cellWidth * 9) / 16);
+  const chars = Math.floor(cellWidth / 7.6);
   const captionHeight = 52;
   const gap = 8;
   const perPage = opts.columns * opts.rows;
@@ -403,7 +404,7 @@ export async function backdropSheets(entries, outDir, options = {}) {
         left,
         top,
       });
-      const [first, second] = wrap(entry.title, 50, 2);
+      const [first, second] = wrap(entry.title, chars, 2);
       const lines = [
         `#${entry.n} ${first}`,
         second ?? "",
@@ -974,6 +975,8 @@ Options:
   --delay <ms>         pause between requests (default ${DEFAULTS.delay})
   --thumb-width <px>   width of the wiki's rendering for large originals (default ${DEFAULTS.thumbWidth})
   --times <a,b,c>      the world's times of day (default ${TIMES.join(",")})
+  --columns, --rows    contact sheet grid (default ${DEFAULTS.columns} × ${DEFAULTS.rows})
+  --cell <px>          contact sheet thumbnail width (default 384)
   --refresh            list the category again
   --force              stage past the size guard (${DEFAULTS.maxFiles} files, ${DEFAULTS.maxBytes / 1e9} GB)`;
 
@@ -987,6 +990,9 @@ function parseOptions(args) {
     "--delay": ["delay", Number],
     "--thumb-width": ["thumbWidth", Number],
     "--times": ["times", (value) => value.split(",")],
+    "--columns": ["columns", Number],
+    "--rows": ["rows", Number],
+    "--cell": ["cellWidth", Number],
   };
   const switches = { "--refresh": "refresh", "--force": "force" };
   const options = {};
