@@ -16,6 +16,7 @@ import {
   alignBox,
   cacheKey,
   centreOf,
+  floorOf,
   heightScale,
   matchPictures,
   outfitOf,
@@ -300,9 +301,16 @@ describe("portraits stage", () => {
     ]);
     // One entry per outfit placed: where the figure is across its pictures.
     const outfit = labels.sets[0].outfit;
-    expect(manifest.placement).toEqual({
-      [outfit]: { centre: labels.sets[0].centre },
-    });
+    // …where it stands (the drawn figure ends a little above the canvas's
+    // bottom) and where its eyes are.
+    const measured = {
+      centre: labels.sets[0].centre,
+      floor: labels.sets[0].floor,
+      eyes: labels.sets[0].eyeline,
+    };
+    expect(measured.floor).toBeGreaterThan(0.95);
+    expect(measured.floor).toBeLessThan(0.99);
+    expect(manifest.placement).toEqual({ [outfit]: measured });
     expect(manifest.size).toEqual(labels.sets[0].size);
     expect(manifest.size.every(Number.isInteger)).toBe(true);
     expect(manifest.eyeline).toBeGreaterThan(0);
@@ -322,11 +330,7 @@ describe("portraits stage", () => {
     writeFileSync(manifestFile, JSON.stringify(manifest));
     placePortraits(labelsFile);
     expect(read(manifestFile).placement).toEqual({
-      [outfit]: {
-        centre: labels.sets[0].centre,
-        scale: 0.75,
-        offset: [12, -30],
-      },
+      [outfit]: { ...measured, scale: 0.75, offset: [12, -30] },
     });
   });
 
@@ -339,7 +343,13 @@ describe("portraits stage", () => {
     );
     const [set] = tall.sets;
     expect(set.heightScale).toBe(
-      heightScale(150, set.eyeline, set.size[1], DEFAULTS.eyePerCm),
+      heightScale(
+        150,
+        set.eyeline,
+        set.floor ?? 1,
+        set.size[1],
+        DEFAULTS.eyePerCm,
+      ),
     );
     expect(report.sets[0]).not.toHaveProperty("heightScale");
     const reportFile = path.join(root, "staged-height", "stage.json");
@@ -352,7 +362,19 @@ describe("portraits stage", () => {
     placePortraits(reportFile);
     expect(read(manifestFile).placement[set.outfit]).toEqual({
       centre: set.centre,
+      floor: set.floor,
+      eyes: set.eyeline,
       scale: set.heightScale,
+    });
+    // A floor set by hand is kept, and the scale follows it.
+    writeFileSync(
+      manifestFile,
+      JSON.stringify({ placement: { [set.outfit]: { floor: 0.9 } } }),
+    );
+    placePortraits(reportFile);
+    expect(read(manifestFile).placement[set.outfit]).toMatchObject({
+      floor: 0.9,
+      scale: heightScale(150, set.eyeline, 0.9, set.size[1], DEFAULTS.eyePerCm),
     });
   });
 });
@@ -360,12 +382,63 @@ describe("portraits stage", () => {
 describe("heightScale", () => {
   it("draws a character as tall as they are, from where the eyes are", () => {
     // Eyes 1,280 px above the floor of a 1,600-high picture.
-    const scale = (cm) => heightScale(cm, 0.2, 1600, 8);
+    const scale = (cm) => heightScale(cm, 0.2, 1, 1600, 8);
     expect(scale(160)).toBe(1);
     expect(scale(128)).toBe(0.8);
     expect(scale(180)).toBe(1.125);
     // The same character with more above the head (a halo, a raised rifle).
-    expect(heightScale(160, 0.36, 1600, 8)).toBe(1.25);
+    expect(heightScale(160, 0.36, 1, 1600, 8)).toBe(1.25);
+    // …or standing above the picture's bottom edge: less of it is the figure.
+    expect(heightScale(160, 0.2, 0.84, 1600, 8)).toBe(1.25);
+  });
+});
+
+describe("floorOf", () => {
+  const WIDTH = 400;
+  const HEIGHT = 1000;
+  const picture = (blocks) =>
+    sharp({
+      create: {
+        width: WIDTH,
+        height: HEIGHT,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite(
+        blocks.map(([left, top, width, height]) => ({
+          input: {
+            create: {
+              width,
+              height,
+              channels: 4,
+              background: { r: 200, g: 60, b: 60, alpha: 1 },
+            },
+          },
+          left,
+          top,
+        })),
+      )
+      .png()
+      .toBuffer();
+  const body = [170, 100, 60, 840];
+
+  it("is the bottom edge for a figure that stands on it", async () => {
+    expect(await floorOf(await picture([[170, 100, 60, 900]]))).toBe(1);
+  });
+
+  it("is where the shoes end, not a tip or a wheel that reaches lower", async () => {
+    const buffer = await picture([
+      body,
+      // A wing tip under the figure, and a wheel far out to one side.
+      [250, 940, 10, 60],
+      [0, 900, 40, 100],
+    ]);
+    expect(await floorOf(buffer)).toBe(0.94);
+  });
+
+  it("is the bottom edge when nothing is found", async () => {
+    expect(await floorOf(await picture([[170, 100, 60, 300]]))).toBe(1);
   });
 });
 

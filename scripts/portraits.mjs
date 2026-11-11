@@ -17,10 +17,11 @@
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
  *   `portraits.json` with the size, the eyeline and, per outfit, where the
- *   figure is across its pictures and how large to draw it (`placement`:
- *   `centre`, the middle of the face; `scale`, from the character's height,
- *   `--height` or the plan's `height`, and where the eyes are; a `scale` or
- *   `offset` already in the file is kept). It writes nothing else.
+ *   figure is and how large to draw it (`placement`: `centre`, the middle of
+ *   the face; `floor` and `eyes`, where it stands and where its eyes are;
+ *   `scale`, from the character's height, `--height` or the plan's `height`,
+ *   and the eye height in the picture; a `scale`, `floor` or `offset` already
+ *   in the file is kept). It writes nothing else.
  *
  * Originals are kept in `.cache/art/<wiki host>/<File>` (git-ignored, or
  * `--cache`). A re-run reads them and fetches only what is missing.
@@ -275,18 +276,73 @@ export function centreOf(faceBox, trim) {
   return round(Math.min(Math.max((middle - trim.left) / trim.width, 0), 1), 3);
 }
 
+/** Where a figure's feet are looked for, and how much picture counts as them. */
+const FEET = {
+  /** Rows above this fraction of the picture are never the floor. */
+  above: 0.6,
+  /** How far to each side of the figure's centre, in picture heights. */
+  reach: 0.15,
+  /** The rows just above a candidate row that are counted, in picture heights. */
+  rows: 0.015,
+  /** Solid pixels needed in them, in picture heights squared. */
+  area: 0.00042,
+  /** A floor this near the bottom edge is the bottom edge. */
+  snap: 0.99,
+};
+
+/**
+ * Where a figure stands down its picture, 0 (top) to 1 (the bottom edge): the
+ * lowest row with enough solid picture just above it, within reach of the
+ * figure's `centre`. The canvas bottom is usually the floor, but a wing, a
+ * weapon or a bike's wheel can reach lower than the shoes, and then the figure
+ * would float. A wing tip, a strand of hair or a soft shadow is too little to
+ * count; what is far out to one side isn't looked at.
+ */
+export async function floorOf(buffer, centre = 0.5) {
+  const { data, info } = await sharp(buffer)
+    .ensureAlpha()
+    .extractChannel(3)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const left = Math.max(0, Math.floor(centre * width - FEET.reach * height));
+  const right = Math.min(
+    width,
+    Math.ceil(centre * width + FEET.reach * height),
+  );
+  const top = Math.floor(height * FEET.above);
+  const solid = new Uint32Array(height);
+  for (let y = top; y < height; y++)
+    for (let x = left; x < right; x++)
+      if (data[y * width + x] > 200) solid[y]++;
+  const rows = Math.max(1, Math.round(height * FEET.rows));
+  const needed = FEET.area * height * height;
+  for (let y = height - 1; y >= top + rows; y--) {
+    let sum = 0;
+    for (let row = 0; row < rows; row++) sum += solid[y - row];
+    if (sum < needed) continue;
+    // The rows counted may end in a tip: the floor is their lowest wide row.
+    let foot = y;
+    while (foot > y - rows + 1 && solid[foot] < needed / rows) foot--;
+    const floor = round((foot + 1) / height, 3);
+    return floor >= FEET.snap ? 1 : floor;
+  }
+  return 1;
+}
+
 /**
  * The scale a scene draws a set at so that a character `heightCm` tall is drawn
  * that tall. The art fills its canvas whoever it shows, so its pixels say
  * nothing about height; the eyes do. They are at one fraction of anyone's
  * height while standing, whatever the arms, wings, weapon or halo do, so the
  * scale is the eye height wanted (`eyePerCm` per cm) over the one in the
- * picture, whose bottom edge is the floor. Wrong for a figure that isn't
- * standing (seated, kneeling, lying, crouched): its eyes are low for another
- * reason, and its scale is set by hand.
+ * picture: from `floor`, where the figure stands, up to `eyes` (both fractions
+ * of `pictureHeight` from the top). Wrong for a figure that isn't standing
+ * (seated, kneeling, lying, crouched): its eyes are low for another reason, and
+ * its scale is set by hand.
  */
-export const heightScale = (heightCm, eyeline, pictureHeight, eyePerCm) =>
-  round((eyePerCm * heightCm) / ((1 - eyeline) * pictureHeight), 3);
+export const heightScale = (heightCm, eyes, floor, pictureHeight, eyePerCm) =>
+  round((eyePerCm * heightCm) / ((floor - eyes) * pictureHeight), 3);
 
 /** The scale for a set on a canvas `canvasHeight` high. */
 export const setScale = (canvasHeight, scale, referenceHeight) =>
@@ -971,11 +1027,13 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     minAdvantage: opts.minAdvantage,
     maxOffset: opts.maxOffset,
   };
+  const height = opts.height ?? plan.height;
   const report = {
     workspace: path.resolve(workspace),
     wiki: plan.wiki,
     cache,
     match: rule,
+    ...(height === undefined ? {} : { height, eyePerCm: opts.eyePerCm }),
     sets: [],
   };
   mkdirSync(dir, { recursive: true });
@@ -1089,17 +1147,9 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         )
       : undefined;
 
-    const height = opts.height ?? plan.height;
-    const drawn =
-      height === undefined || eyeline === undefined
-        ? undefined
-        : heightScale(height, eyeline, size[1], opts.eyePerCm);
-    if (drawn !== undefined && eyeline > opts.lowEyes)
-      console.warn(
-        `${set.id}: eyes ${eyeline} down the picture; if the figure isn't standing, set its scale by hand`,
-      );
-
     const entries = [];
+    // A set's pictures are aligned, so the first says where all of them stand.
+    let floor = 1;
     for (const [index, picture] of pictures.entries()) {
       const entry = { n: index + 1, source: picture.file };
       if (!fits[index]) {
@@ -1108,7 +1158,9 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         continue;
       }
       const file = path.resolve(out, `${index + 1}.webp`);
-      writeFileSync(file, await normalize(picture.buffer, trim, size));
+      const staged = await normalize(picture.buffer, trim, size);
+      if (index === fits.indexOf(true)) floor = await floorOf(staged, centre);
+      writeFileSync(file, staged);
       entries.push({
         ...entry,
         file,
@@ -1116,6 +1168,14 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         name: names[index].match,
       });
     }
+    const drawn =
+      height === undefined || eyeline === undefined
+        ? undefined
+        : heightScale(height, eyeline, floor, size[1], opts.eyePerCm);
+    if (drawn !== undefined && eyeline > opts.lowEyes)
+      console.warn(
+        `${set.id}: eyes ${eyeline} down the picture; if the figure isn't standing, set its scale by hand`,
+      );
 
     // Matched: picture, its would-be sticker, the sticker it matched.
     // The rest: picture, would-be sticker, the nearest two stickers.
@@ -1183,6 +1243,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       ...(fits.includes(false) ? { canvasesDiffer: true } : {}),
       ...(eyeline === undefined ? {} : { eyeline }),
       ...(centre === undefined ? {} : { centre }),
+      ...(floor === 1 ? {} : { floor }),
       ...(drawn === undefined ? {} : { heightScale: drawn }),
       portraits: entries,
     });
@@ -1206,7 +1267,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
   return report;
 }
 
-/** The `scale` and `offset` someone set by hand in a `portraits.json`. */
+/** The placement already in a `portraits.json`: its hand-set values are kept. */
 function handPlacement(file) {
   try {
     const { placement } = JSON.parse(readFileSync(file, "utf8"));
@@ -1219,10 +1280,12 @@ function handPlacement(file) {
 /**
  * Replaces `<workspace>/portraits/` with the report's named pictures and a
  * `portraits.json`: size and eyeline from the set holding `neutral` (else the
- * first name), and per outfit where the figure is across its pictures
- * (`centre`) and, when the report has one, the scale for the character's height
- * (`scale`). A `scale` or `offset` already in the file for an outfit is kept: a
- * correction made by hand outlives the next import.
+ * first name), and per outfit its placement: where the figure is across its
+ * pictures (`centre`), where it stands and where its eyes are down them
+ * (`floor`, `eyes`) and, when the report has the character's height, the scale
+ * that draws them that tall (`scale`). A `scale`, `floor` or `offset` already
+ * in the file for an outfit is kept: a correction made by hand outlives the
+ * next import.
  */
 export function placePortraits(reportFile) {
   const report = JSON.parse(readFileSync(reportFile, "utf8"));
@@ -1270,11 +1333,26 @@ export function placePortraits(reportFile) {
       );
   const placement = {};
   for (const set of new Set(chosen.map(({ set }) => set))) {
-    const { scale = set.heightScale, offset } = hand[set.outfit ?? ""] ?? {};
+    const kept = hand[set.outfit ?? ""] ?? {};
+    const floor = kept.floor ?? set.floor;
+    // A floor moved by hand moves the eye height, and the scale with it.
+    const scale =
+      kept.scale ??
+      (report.height === undefined || set.eyeline === undefined
+        ? undefined
+        : heightScale(
+            report.height,
+            set.eyeline,
+            floor ?? 1,
+            set.size[1],
+            report.eyePerCm,
+          ));
     const entry = {
       ...(set.centre === undefined ? {} : { centre: set.centre }),
+      ...(floor === undefined ? {} : { floor }),
+      ...(set.eyeline === undefined ? {} : { eyes: set.eyeline }),
       ...(scale === undefined ? {} : { scale }),
-      ...(offset === undefined ? {} : { offset }),
+      ...(kept.offset === undefined ? {} : { offset: kept.offset }),
     };
     if (Object.keys(entry).length > 0) placement[set.outfit ?? ""] = entry;
   }
