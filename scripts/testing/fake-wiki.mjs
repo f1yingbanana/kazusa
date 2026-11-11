@@ -1,7 +1,7 @@
 /**
- * Test support for the art importers (`stickers.mjs`, `portraits.mjs`): a local
- * stand-in for the two MediaWiki responses they use, and a synthetic character
- * drawn with `sharp`. Nothing here touches the network.
+ * Test support for the art importers (`stickers.mjs`, `portraits.mjs`,
+ * `backdrops.mjs`): a local stand-in for the MediaWiki responses they use, and
+ * a synthetic character drawn with `sharp`. Nothing here touches the network.
  */
 import { createServer } from "node:http";
 import sharp from "sharp";
@@ -11,8 +11,16 @@ import sharp from "sharp";
  * (file name → PNG buffer). `failures` maps a file name to an HTTP status its
  * download answers with. Thumbnails are resized with a different kernel than
  * `sharp`'s default, as a wiki's own thumbnailer would be.
+ *
+ * `categories` (`Category:Name` → file names) answers
+ * `list=categorymembers&cmtype=file`, at most `pageSize` a page (whatever
+ * `cmlimit` asks) with a `cmcontinue` for the next. `fandom: false` serves
+ * files without `format=original`, as a plain MediaWiki does.
  */
-export async function startFakeWiki(files, { failures = {} } = {}) {
+export async function startFakeWiki(
+  files,
+  { failures = {}, categories = {}, fandom = true, pageSize = 10 } = {},
+) {
   const requests = [];
   const server = createServer((request, response) => {
     const url = new URL(request.url, "http://localhost");
@@ -22,6 +30,42 @@ export async function startFakeWiki(files, { failures = {} } = {}) {
       response.end(body);
     };
     void (async () => {
+      if (
+        url.pathname === "/api.php" &&
+        url.searchParams.get("list") === "categorymembers"
+      ) {
+        const members = categories[url.searchParams.get("cmtitle")];
+        if (!members)
+          return send(
+            200,
+            "application/json",
+            JSON.stringify({ query: { categorymembers: [] } }),
+          );
+        const limit = Math.min(
+          Number(url.searchParams.get("cmlimit")) || 10,
+          pageSize,
+        );
+        const from = Number(
+          (url.searchParams.get("cmcontinue") ?? "file|0").split("|")[1],
+        );
+        const page = members.slice(from, from + limit);
+        const next = from + limit;
+        return send(
+          200,
+          "application/json",
+          JSON.stringify({
+            ...(next < members.length
+              ? { continue: { cmcontinue: `file|${next}`, continue: "-||" } }
+              : {}),
+            query: {
+              categorymembers: page.map((name) => ({
+                ns: 6,
+                title: `File:${name}`,
+              })),
+            },
+          }),
+        );
+      }
       if (url.pathname === "/api.php") {
         const width = Number(url.searchParams.get("iiurlwidth")) || undefined;
         const pages = [];
@@ -36,7 +80,10 @@ export async function startFakeWiki(files, { failures = {} } = {}) {
           const image = {
             width: meta.width,
             height: meta.height,
+            size: buffer.length,
+            mime: "image/png",
             url: `${base}/images/${encodeURIComponent(name)}?cb=1`,
+            descriptionurl: `${base}/wiki/File:${encodeURIComponent(name)}`,
           };
           if (width) {
             image.thumbwidth = Math.min(width, meta.width);
@@ -55,7 +102,7 @@ export async function startFakeWiki(files, { failures = {} } = {}) {
       if (!match || !files.has(name)) return send(404, "text/plain", "none");
       if (failures[name]) return send(failures[name], "text/plain", "failed");
       // Like Fandom: without `format=original` the answer would be WebP.
-      if (url.searchParams.get("format") !== "original")
+      if (fandom && url.searchParams.get("format") !== "original")
         return send(400, "text/plain", "ask for the original");
       const buffer = files.get(name);
       if (!match[1]) return send(200, "image/png", buffer);
