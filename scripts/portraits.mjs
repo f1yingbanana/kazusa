@@ -62,6 +62,8 @@ export const DEFAULTS = {
    * two differ (see `advantage`): 1 is "exactly it", 0 "halfway between".
    */
   minAdvantage: 0.3,
+  /** The largest common difference taken off a set (see `commonOffset`). */
+  maxOffset: 8,
 };
 /** Matching works on 128 px stickers, lightly blurred against resampling. */
 const FINE = 128;
@@ -254,11 +256,11 @@ export async function signature(input) {
  * a little, so a sticker cut by another resizer from another copy of the same
  * picture comes out the same.
  */
-export async function fineSignature(input) {
+export async function fineSignature(input, side = FINE, blur = FINE_BLUR) {
   const image = typeof input?.raw === "function" ? input : sharp(input);
   const data = await image
     .ensureAlpha()
-    .resize(FINE, FINE, {
+    .resize(side, side, {
       fit: "contain",
       background: { r: 0, g: 0, b: 0, alpha: 0 },
     })
@@ -267,13 +269,17 @@ export async function fineSignature(input) {
   for (let at = 0; at < data.length; at += 4)
     for (let c = 0; c < 3; c++)
       data[at + c] = Math.round((data[at + c] * data[at + 3]) / 255);
+  if (!blur) return Float32Array.from(data);
   return Float32Array.from(
-    await sharp(data, { raw: { width: FINE, height: FINE, channels: 4 } })
-      .blur(FINE_BLUR)
+    await sharp(data, { raw: { width: side, height: side, channels: 4 } })
+      .blur(blur)
       .raw()
       .toBuffer(),
   );
 }
+
+/** A sticker at its full 256 px, unblurred: the second look (`matchPictures`). */
+export const fullSignature = (input) => fineSignature(input, 256, 0);
 
 /**
  * The face: pixels where `stickers` (one outfit's) or `pictures` (one set's
@@ -336,7 +342,7 @@ export function faceDistance(a, b, mask) {
  * where `a` and `b` differ: 1 when it is `a` there, -1 when it is `b`, 0
  * halfway. Undefined when `a` and `b` are twins (see `MIN_CHANNELS`).
  */
-export function advantage(picture, a, b) {
+export function advantage(picture, a, b, minChannels = MIN_CHANNELS) {
   let gained = 0;
   let total = 0;
   let channels = 0;
@@ -347,7 +353,7 @@ export function advantage(picture, a, b) {
     gained += Math.abs(picture[at] - b[at]) - Math.abs(picture[at] - a[at]);
     total += apart;
   }
-  return channels < MIN_CHANNELS ? undefined : gained / total;
+  return channels < minChannels ? undefined : gained / total;
 }
 
 /** The mean absolute difference of two signatures, 0–255. */
@@ -355,6 +361,114 @@ export function meanDistance(a, b) {
   let sum = 0;
   for (let at = 0; at < a.length; at++) sum += Math.abs(a[at] - b[at]);
   return sum / a.length;
+}
+
+const COARSE = 32;
+
+/** A 64 px signature averaged down to 32 px. */
+function coarseOf(signature) {
+  const out = new Float32Array(COARSE * COARSE * 4);
+  for (let y = 0; y < COARSE; y++)
+    for (let x = 0; x < COARSE; x++)
+      for (let c = 0; c < 4; c++) {
+        let sum = 0;
+        for (const [dy, dx] of [
+          [0, 0],
+          [0, 1],
+          [1, 0],
+          [1, 1],
+        ])
+          sum += signature[((2 * y + dy) * SIGNATURE + 2 * x + dx) * 4 + c];
+        out[(y * COARSE + x) * 4 + c] = sum / 4;
+      }
+  return out;
+}
+
+/**
+ * Where the stickers were cut, searched widely: the box's side from 0.6 to 1.6
+ * times `box`'s and its centre anywhere within half a side, on up to four
+ * pictures shrunk so the box is about 64 px, compared at 32 px. The face box
+ * found from a set's differences can be far off the one the stickers were cut
+ * with: a set whose pictures differ only in the mouth gives a small box, a prop
+ * that changes between pictures a large one, and the old run may have used
+ * another set of the same outfit. Returns a box in `sources`' pixels.
+ */
+export async function searchBox(sources, box, targets) {
+  if (targets.length === 0) return box;
+  const k = Math.min(1, 64 / box[2]);
+  const shrunk = [];
+  const step = Math.max(1, Math.floor(sources.length / 4));
+  for (let at = 0; at < sources.length && shrunk.length < 4; at += step) {
+    const meta = await sharp(sources[at]).metadata();
+    const width = Math.max(1, Math.round(meta.width * k));
+    const height = Math.max(1, Math.round(meta.height * k));
+    const data = await sharp(sources[at])
+      .ensureAlpha()
+      .resize(width, height, { fit: "fill" })
+      .raw()
+      .toBuffer();
+    const pre = new Float32Array(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++)
+        pre[i + c] = (data[i + c] * data[i + 3]) / 255;
+      pre[i + 3] = data[i + 3];
+    }
+    shrunk.push({ data: pre, width, height });
+  }
+  const wanted = targets.map(coarseOf);
+  const cell = new Float32Array(COARSE * COARSE * 4);
+  // A crop sampled at 32×32 points, each the mean of a 2×2 of samples; past
+  // the canvas is transparent, as `stickerOf` pads by fitting.
+  const sample = ({ data, width, height }, left, top, side) => {
+    const unit = side / COARSE;
+    for (let y = 0; y < COARSE; y++)
+      for (let x = 0; x < COARSE; x++) {
+        const at = (y * COARSE + x) * 4;
+        cell.fill(0, at, at + 4);
+        for (const oy of [0.25, 0.75])
+          for (const ox of [0.25, 0.75]) {
+            const sx = Math.floor(left + (x + ox) * unit);
+            const sy = Math.floor(top + (y + oy) * unit);
+            if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+            const from = (sy * width + sx) * 4;
+            for (let c = 0; c < 4; c++) cell[at + c] += data[from + c] / 4;
+          }
+      }
+    return cell;
+  };
+  const side0 = box[2] * k;
+  const centre = [(box[0] + box[2] / 2) * k, (box[1] + box[2] / 2) * k];
+  let best;
+  for (let scale = 0.6; scale <= 1.61; scale *= 1.04) {
+    const side = side0 * scale;
+    const stride = Math.max(1, side / 12);
+    for (let dy = -side0 / 2; dy <= side0 / 2; dy += stride)
+      for (let dx = -side0 / 2; dx <= side0 / 2; dx += stride) {
+        const left = centre[0] + dx - side / 2;
+        const top = centre[1] + dy - side / 2;
+        let total = 0;
+        for (const picture of shrunk) {
+          const own = sample(picture, left, top, side);
+          let nearest = Infinity;
+          for (const target of wanted) {
+            let sum = 0;
+            for (let i = 0; i < own.length; i++)
+              sum += Math.abs(own[i] - target[i]);
+            nearest = Math.min(nearest, sum);
+          }
+          total += nearest;
+          if (best && total >= best.total) break;
+        }
+        if (!best || total < best.total) best = { total, left, top, side };
+      }
+  }
+  const meta = await sharp(sources[0]).metadata();
+  const side = Math.min(Math.round(best.side / k), meta.width, meta.height);
+  return [
+    Math.min(Math.max(Math.round(best.left / k), 0), meta.width - side),
+    Math.min(Math.max(Math.round(best.top / k), 0), meta.height - side),
+    side,
+  ];
 }
 
 /**
@@ -445,18 +559,119 @@ const round = (value, places = 1) =>
   value === undefined ? undefined : Number(value.toFixed(places));
 
 /**
- * Names for a set's pictures (`pictures`, fine signatures of their would-be
- * stickers) from one outfit's `stickers` and `names`. A picture takes its
- * nearest sticker's name only when it is near over the face (`maxDistance`,
- * `maxWorst`) and nearer than every other sticker where the two differ
- * (`minAdvantage`); a sticker with a twin is never chosen. Otherwise it is
- * `unmatched` or `ambiguous`. When pictures take the same name, the nearest
- * keeps it if the others are its twins (`duplicate`: the same look twice on the
- * wiki); else none does (`conflict`).
+ * What a set's pictures have in common against their nearest stickers: per
+ * channel, the median over pictures of picture minus nearest sticker. When the
+ * stickers were cut from another copy of the same pictures (another wiki,
+ * another export, a glow or a colour rendered differently), every picture
+ * carries this same difference, while a picture's own look differs from its
+ * nearest sticker only where its face is not that sticker's. Zero with fewer
+ * than three pictures.
  */
-export function matchPictures(pictures, stickers, names, rule = DEFAULTS) {
+export function commonOffset(pictures, stickers, mask) {
+  if (pictures.length < 3 || stickers.length === 0)
+    return new Float32Array(pictures[0]?.length ?? 0);
+  return medianOffset(pictures, stickers, nearestOf(pictures, stickers, mask));
+}
+
+/** Each picture's nearest sticker over `mask`, by index. */
+function nearestOf(pictures, stickers, mask) {
+  return pictures.map((picture) => {
+    let best;
+    for (const [index, sticker] of stickers.entries()) {
+      const { mean } = faceDistance(picture, sticker, mask);
+      if (!best || mean < best.mean) best = { mean, index };
+    }
+    return best.index;
+  });
+}
+
+/** Per channel, the median over pictures of picture minus `nearest` sticker. */
+function medianOffset(pictures, stickers, nearest) {
+  const offset = new Float32Array(pictures[0]?.length ?? 0);
+  if (pictures.length < 3) return offset;
+  const values = new Float32Array(pictures.length);
+  for (let at = 0; at < offset.length; at++) {
+    for (const [index, picture] of pictures.entries())
+      values[index] = picture[at] - stickers[nearest[index]][at];
+    values.sort();
+    const middle = values.length >> 1;
+    offset[at] =
+      values.length % 2
+        ? values[middle]
+        : (values[middle - 1] + values[middle]) / 2;
+  }
+  return offset;
+}
+
+/**
+ * Names for a set's pictures (`pictures`, fine signatures of their would-be
+ * stickers) from one outfit's `stickers` and `names`.
+ *
+ * - The set's common difference to the stickers (`commonOffset`) is taken off
+ *   every picture first, when it is small (`maxOffset`, mean over the face): a
+ *   rendering difference, not another outfit.
+ * - A picture takes its nearest sticker's name only when it is near over the face
+ *   (`maxDistance`, `maxWorst`) and nearer than every other sticker where the
+ *   two differ (`minAdvantage`); otherwise it is `unmatched` or `ambiguous`.
+ * - Stickers that are twins (the same picture under two names in the sticker set)
+ *   are one look: a picture that is that look takes every name of it (`match`
+ *   and `also`).
+ * - When pictures take the same name, the one the sticker is clearly nearer to
+ *   keeps it (judged where the pictures differ), or the nearest when the others
+ *   are its twins (`duplicate`: the same look twice on the wiki); else none
+ *   does (`conflict`).
+ *
+ * Returns `{ results, offset }`, `offset` being the mean taken off, or 0.
+ */
+export function matchPictures(
+  pictures,
+  stickers,
+  names,
+  rule = DEFAULTS,
+  full = undefined,
+) {
   const mask = faceMask(stickers, pictures);
-  const results = pictures.map((picture) => {
+  const nearest =
+    pictures.length >= 3 && stickers.length
+      ? nearestOf(pictures, stickers, mask)
+      : undefined;
+  const common = nearest
+    ? medianOffset(pictures, stickers, nearest)
+    : new Float32Array(pictures[0]?.length ?? 0);
+  let size = 0;
+  for (const at of mask)
+    for (let c = 0; c < 4; c++) size += Math.abs(common[at * 4 + c]);
+  size /= Math.max(mask.length * 4, 1);
+  const correct = size > 0 && size <= rule.maxOffset;
+  const corrected = correct
+    ? pictures.map((picture) => picture.map((value, at) => value - common[at]))
+    : pictures;
+  // The second look, at full size: small features (a sweat drop, an eyelid)
+  // that the blur of the first look spreads too thin to decide on.
+  let closerLook;
+  if (full) {
+    const fullCommon = correct
+      ? medianOffset(full.pictures, full.stickers, nearest)
+      : undefined;
+    const fullPictures = fullCommon
+      ? full.pictures.map((picture) =>
+          picture.map((value, at) => value - fullCommon[at]),
+        )
+      : full.pictures;
+    closerLook = (picture, a, b) =>
+      advantage(fullPictures[picture], a, b, MIN_CHANNELS * 4);
+    closerLook.picture = (index) => fullPictures[index];
+  }
+  const twinsOf = (index) =>
+    stickers
+      .map((_, other) => other)
+      .filter(
+        (other) =>
+          other !== index &&
+          advantage(stickers[index], stickers[index], stickers[other]) ===
+            undefined,
+      );
+  const results = corrected.map((picture, pictureIndex) => {
     const order = stickers
       .map((sticker, index) => ({
         index,
@@ -475,13 +690,27 @@ export function matchPictures(pictures, stickers, names, rule = DEFAULTS) {
     };
     if (!best || best.mean > rule.maxDistance || best.worst > rule.maxWorst)
       return result;
-    // The least the best wins by, over every other sticker.
+    const twins = new Set(twinsOf(best.index));
+    // The least the best wins by, over every other sticker but its twins.
     let least = Infinity;
     let rival;
+    let looked = false;
     for (const other of order.slice(1)) {
-      const value =
+      if (twins.has(other.index)) continue;
+      let value =
         advantage(picture, stickers[best.index], stickers[other.index]) ??
         -Infinity;
+      if (value < rule.minAdvantage && closerLook) {
+        const closer = closerLook(
+          pictureIndex,
+          full.stickers[best.index],
+          full.stickers[other.index],
+        );
+        if (closer !== undefined) {
+          value = closer;
+          looked = true;
+        }
+      }
       if (value < least) {
         least = value;
         rival = other.index;
@@ -491,34 +720,60 @@ export function matchPictures(pictures, stickers, names, rule = DEFAULTS) {
     const judged = {
       ...result,
       advantage: Number.isFinite(least) ? round(least, 2) : null,
+      ...(looked ? { secondLook: true } : {}),
       ...(rival === undefined ? {} : { rival: names[rival] }),
     };
-    return least < rule.minAdvantage
-      ? { ...judged, status: "ambiguous" }
-      : { ...judged, status: "matched", match: names[best.index] };
+    if (least < rule.minAdvantage) return { ...judged, status: "ambiguous" };
+    return {
+      ...judged,
+      status: "matched",
+      match: names[best.index],
+      ...(twins.size
+        ? { also: [...twins].map((index) => names[index]).sort() }
+        : {}),
+    };
   });
+  // A look is claimed by its name and its twins' names together.
   const takers = new Map();
   for (const [index, result] of results.entries())
-    if (result.match)
-      takers.set(result.match, [...(takers.get(result.match) ?? []), index]);
+    if (result.match) {
+      const look = [result.match, ...(result.also ?? [])].sort().join(" ");
+      takers.set(look, [...(takers.get(look) ?? []), index]);
+    }
   for (const claim of takers.values()) {
     if (claim.length < 2) continue;
     claim.sort((a, b) => results[a].distance - results[b].distance);
     const [keep, ...rest] = claim;
-    const twins = rest.every(
-      (index) =>
-        advantage(pictures[keep], pictures[keep], pictures[index]) ===
-        undefined,
-    );
-    for (const index of twins ? rest : claim)
+    const sticker = stickers[names.indexOf(results[keep].match)];
+    const settled = rest.map((index) => {
+      const value = advantage(sticker, corrected[keep], corrected[index]);
+      if (value === undefined) return "duplicate";
+      if (value >= rule.minAdvantage || !closerLook)
+        return value >= rule.minAdvantage;
+      const fullSticker = full.stickers[names.indexOf(results[keep].match)];
+      const closer = advantage(
+        fullSticker,
+        closerLook.picture(keep),
+        closerLook.picture(index),
+        MIN_CHANNELS * 4,
+      );
+      return closer !== undefined && closer >= rule.minAdvantage;
+    });
+    const fine = settled.every((value) => value !== false);
+    for (const [at, index] of (fine ? rest : claim).entries())
       results[index] = {
         ...results[index],
-        status: twins ? "duplicate" : "conflict",
+        status: !fine
+          ? "conflict"
+          : settled[at] === "duplicate"
+            ? "duplicate"
+            : "outmatched",
         match: null,
-        ...(twins ? { duplicateOf: keep + 1 } : {}),
+        also: undefined,
+        ...(fine ? { lostTo: keep + 1 } : {}),
       };
   }
-  return results;
+  return { results, offset: round(size === Infinity ? 0 : size, 2) };
 }
 
 /** Name → signature of every sticker in a workspace. */
@@ -536,14 +791,16 @@ async function stickerSignatures(workspace) {
   const names = [];
   const signatures = [];
   const fine = [];
+  const full = [];
   const paths = [];
   for (const file of files) {
     names.push(file.replace(/\.[^.]+$/, ""));
     paths.push(path.join(dir, file));
     signatures.push(await signature(path.join(dir, file)));
     fine.push(await fineSignature(path.join(dir, file)));
+    full.push(await fullSignature(path.join(dir, file)));
   }
-  return { names, signatures, fine, paths, outfits };
+  return { names, signatures, fine, full, paths, outfits };
 }
 
 /**
@@ -600,6 +857,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     maxDistance: opts.maxDistance,
     maxWorst: opts.maxWorst,
     minAdvantage: opts.minAdvantage,
+    maxOffset: opts.maxOffset,
   };
   const report = {
     workspace: path.resolve(workspace),
@@ -639,24 +897,35 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       .filter(
         (index) => outfitOf(stickers.names[index], stickers.outfits) === outfit,
       );
+    const targets = candidates.map((index) => stickers.signatures[index]);
+    // A box from the plan is where to look; one found from differences is
+    // only a start for a wide search.
     const stickerBox =
       face && crop.box
         ? await alignBox(
             sources,
-            crop.box,
-            candidates.map((index) => stickers.signatures[index]),
+            set.box ? crop.box : await searchBox(sources, crop.box, targets),
+            targets,
           )
         : undefined;
     const wouldBe = [];
     for (const source of sources)
       wouldBe.push(await stickerOf(source, stickerBox));
     const own = [];
-    for (const sticker of wouldBe) own.push(await fineSignature(sticker));
-    const names = matchPictures(
+    const ownFull = [];
+    for (const sticker of wouldBe) {
+      own.push(await fineSignature(sticker));
+      ownFull.push(await fullSignature(sticker));
+    }
+    const { results: names, offset } = matchPictures(
       own,
       candidates.map((index) => stickers.fine[index]),
       candidates.map((index) => stickers.names[index]),
       rule,
+      {
+        pictures: ownFull,
+        stickers: candidates.map((index) => stickers.full[index]),
+      },
     );
 
     // One box and scale for the whole set, from pictures of the first's size.
@@ -769,6 +1038,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     report.sets.push({
       id: set.id,
       outfit,
+      offset,
       ...(stickerBox
         ? {
             faceBox: inSource(crop.box),
@@ -809,7 +1079,9 @@ export function placePortraits(reportFile) {
   const chosen = [];
   for (const set of report.sets)
     for (const entry of set.portraits)
-      if (entry.name) chosen.push({ set, entry, name: entry.name });
+      if (entry.name)
+        for (const name of [entry.name, ...(entry.also ?? [])])
+          chosen.push({ set, entry, name });
   const names = new Set();
   for (const { name, entry } of chosen) {
     if (!NAME.test(name)) throw new Error(`Not a portrait name: ${name}`);

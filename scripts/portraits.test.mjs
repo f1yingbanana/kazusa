@@ -18,6 +18,7 @@ import {
   matchPictures,
   outfitOf,
   outfitOfSet,
+  searchBox,
   placePortraits,
   politeGet,
   stagePortraits,
@@ -154,12 +155,12 @@ describe("portraits stage", () => {
       });
       expect(byMood[mood].distance).toBeLessThan(report.match.maxDistance / 2);
     }
-    // `happy` and its copy `glad` are twins.
-    expect(byMood.happy).toMatchObject({ status: "ambiguous", name: null });
-    expect([byMood.happy.nearest, byMood.happy.runnerUp].sort()).toEqual([
-      "glad",
-      "happy",
-    ]);
+    // `happy` and its copy `glad` are twins: one look with two names.
+    expect(byMood.happy).toMatchObject({
+      status: "matched",
+      name: "happy",
+      also: ["glad"],
+    });
     // No sticker was ever made of `sad`.
     expect(byMood.sad).toMatchObject({ status: "unmatched", name: null });
     expect(byMood.sad.distance).toBeGreaterThan(report.match.maxDistance);
@@ -227,6 +228,8 @@ describe("portraits stage", () => {
     expect(added).toEqual(
       [
         "angry.webp",
+        "glad.webp",
+        "happy.webp",
         "neutral.webp",
         "portraits.json",
         "sad.webp",
@@ -383,6 +386,28 @@ describe("alignBox", () => {
   });
 });
 
+describe("searchBox", () => {
+  it("finds a box far from the one the differences give", async () => {
+    const sources = [];
+    for (const mood of ["neutral", "happy", "surprised"])
+      sources.push((await drawCharacter({ expression: mood })).png);
+    const found = await faceBox(sources);
+    // As if the stickers were cut wider and lower, past alignBox's reach.
+    const truth = [
+      found[0] - Math.round(found[2] * 0.2),
+      found[1] - Math.round(found[2] * 0.05),
+      Math.round(found[2] * 1.35),
+    ];
+    const targets = [];
+    for (const source of sources)
+      targets.push(await signature(await stickerOf(source, truth)));
+    const searched = await searchBox(sources, found, targets);
+    const refined = await alignBox(sources, searched, targets);
+    for (const [index, value] of refined.entries())
+      expect(Math.abs(value - truth[index])).toBeLessThanOrEqual(2);
+  });
+});
+
 describe("matchPictures", () => {
   const SIDE = 128;
   /** A grey fine signature with squares (`[x, y, size, value]`) drawn on. */
@@ -410,23 +435,33 @@ describe("matchPictures", () => {
   const names = ["calm", "wide", "talking"];
 
   it("names each picture through a common offset, by where looks differ", () => {
-    const pictures = stickers.map((sticker) => shifted(sticker, 3));
-    expect(
-      matchPictures(pictures, stickers, names).map((result) => [
-        result.status,
-        result.match,
-      ]),
-    ).toEqual([
+    // 10 on every channel: past maxDistance, but common to the whole set.
+    const pictures = stickers.map((sticker) => shifted(sticker, 10));
+    const { results, offset } = matchPictures(pictures, stickers, names);
+    expect(results.map((result) => [result.status, result.match])).toEqual([
       ["matched", "calm"],
       ["matched", "wide"],
       ["matched", "talking"],
+    ]);
+    expect(offset).toBeCloseTo(7.5, 1);
+  });
+
+  it("takes off no difference as large as another outfit's", () => {
+    const pictures = stickers.map((sticker) => shifted(sticker, 40));
+    const { results } = matchPictures(pictures, stickers, names);
+    expect(results.map((result) => result.status)).toEqual([
+      "unmatched",
+      "unmatched",
+      "unmatched",
     ]);
   });
 
   it("leaves a picture unmatched when even the nearest is far", () => {
     // A second picture, as in any real set: where the set's pictures spread
     // is face too.
-    const [result] = matchPictures(
+    const {
+      results: [result],
+    } = matchPictures(
       [face(...eyes(0), [20, 20, 30, 0]), stickers[1]],
       stickers,
       names,
@@ -435,43 +470,103 @@ describe("matchPictures", () => {
   });
 
   it("calls a picture between two looks ambiguous", () => {
-    const [result] = matchPictures(
-      [face(...eyes(0), [60, 90, 12, 64])],
-      stickers,
-      names,
-      { ...DEFAULTS, maxDistance: 50, maxWorst: 255 },
-    );
+    const {
+      results: [result],
+    } = matchPictures([face(...eyes(0), [60, 90, 12, 64])], stickers, names, {
+      ...DEFAULTS,
+      maxDistance: 50,
+      maxWorst: 255,
+    });
     expect(result).toMatchObject({ status: "ambiguous", match: null });
     expect([result.nearest, result.rival].sort()).toEqual(["calm", "talking"]);
   });
 
-  it("never picks a sticker that has a twin", () => {
+  it("gives a look every name its twin stickers have", () => {
     const twins = [stickers[0], face(...eyes(0), [5, 5, 2, 0]), stickers[1]];
-    const [result] = matchPictures([stickers[0]], twins, ["a", "b", "c"]);
-    expect(result).toMatchObject({ status: "ambiguous", advantage: null });
+    const {
+      results: [result],
+    } = matchPictures([stickers[0]], twins, ["a", "b", "c"]);
+    expect(result).toMatchObject({ status: "matched", match: "a" });
+    expect(result.also).toEqual(["b"]);
+    // Two copies of that look, one nearer each twin, still make one claim.
+    const both = matchPictures(
+      [shifted(stickers[0], 1), shifted(twins[1], 2)],
+      twins,
+      ["a", "b", "c"],
+    ).results;
+    expect(both.filter((one) => one.match)).toHaveLength(1);
   });
 
-  it("keeps the nearest of the same look twice, and no name for two looks", () => {
+  it("settles two pictures taking one name by the sticker, else by none", () => {
     const twice = matchPictures(
       [shifted(stickers[1], 2), shifted(stickers[1], 1)],
       stickers,
       names,
-    );
+    ).results;
     expect(twice.map((result) => [result.status, result.match])).toEqual([
       ["duplicate", null],
       ["matched", "wide"],
     ]);
-    expect(twice[0].duplicateOf).toBe(2);
-    const clash = matchPictures(
+    expect(twice[0].lostTo).toBe(2);
+    const loose = { ...DEFAULTS, maxDistance: 50, maxWorst: 255 };
+    const nearer = matchPictures(
       [stickers[1], face(...eyes(255), [60, 90, 4, 100])],
       stickers.slice(0, 2),
       names.slice(0, 2),
-      { ...DEFAULTS, maxDistance: 50, maxWorst: 255 },
-    );
+      loose,
+    ).results;
+    expect(nearer.map((result) => result.status)).toEqual([
+      "matched",
+      "outmatched",
+    ]);
+    // The sticker is halfway between two pictures: no one can say which.
+    const clash = matchPictures(
+      [
+        face(...eyes(255), [20, 90, 8, 60]),
+        face(...eyes(255), [100, 90, 8, 60]),
+      ],
+      stickers.slice(0, 2),
+      names.slice(0, 2),
+      loose,
+    ).results;
     expect(clash.map((result) => result.status)).toEqual([
       "conflict",
       "conflict",
     ]);
+  });
+});
+
+describe("matchPictures, second look", () => {
+  /** Grey, `side` px, with one square drawn on, at the same place at any size. */
+  const square = (side, value) => {
+    const out = new Float32Array(side * side * 4).fill(128);
+    for (let at = 3; at < out.length; at += 4) out[at] = 255;
+    const from = Math.round(side * 0.4);
+    const to = Math.round(side * 0.5);
+    for (let y = from; y < to; y++)
+      for (let x = from; x < to; x++)
+        for (let c = 0; c < 3; c++) out[(y * side + x) * 4 + c] = value;
+    return out;
+  };
+  it("decides at full size what the blurred look leaves halfway", () => {
+    const fine = [square(128, 128), square(128, 160)];
+    const full = { stickers: [square(256, 128), square(256, 160)] };
+    // Blurred, the picture is about halfway; at full size it is `marked`.
+    const pictures = [square(128, 146)];
+    const names = ["plain", "marked"];
+    const rule = { ...DEFAULTS, maxDistance: 50, maxWorst: 255 };
+    expect(matchPictures(pictures, fine, names, rule).results[0].status).toBe(
+      "ambiguous",
+    );
+    const [result] = matchPictures(pictures, fine, names, rule, {
+      ...full,
+      pictures: [square(256, 160)],
+    }).results;
+    expect(result).toMatchObject({
+      status: "matched",
+      match: "marked",
+      secondLook: true,
+    });
   });
 });
 
