@@ -182,8 +182,8 @@ portrait, and later a 3D model's expression.
 - **A picture worth sharing.** A scene screenshot (backdrop, figures, the line,
   the world's credit).
 
-Where it surfaces: the Chats view, for a huddle, as its default rendering when
-the world has art. One control switches to the transcript and back. Text chats
+Where it surfaces: the Chats view, for a huddle, as its default rendering, with
+or without art. One control switches to the transcript and back. Text chats
 never use it.
 
 Never fun: a figure for every one of 40 people in a cafeteria, faces that
@@ -215,36 +215,37 @@ model reads or says.
 
 What it does, and from which data:
 
-| Behaviour            | Source                                                                                                              |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| Backdrop             | `Chat.placeId` → place → backdrop set (new, §6.1) → the picture for the sim hour. No set: a plain surface and name. |
-| Figures              | Huddle `members` minus the player → each character's default portrait (new). No portrait: an avatar card.           |
-| Enter and leave      | Diff of `members` on SSE `chats`. A fade and a short slide.                                                         |
-| Speaker              | `typing` events with `mode: "speaking"`, replayed in `connected.typing`. Two at once light two.                     |
-| The line             | `message` events. In M0 a line arrives when it has been said, so it appears whole (§6.2 fixes this).                |
-| Actions              | `type: "action"` through the existing `actionLine()`; shown as narration, never in the name plate.                  |
-| The player           | Not drawn (first person). Their lines show under their display name. Composer unchanged.                            |
-| Backlog              | The Transcript toggle (`chats.as=list`).                                                                            |
-| Observed huddles     | `ObservedChatView` renders the same scene, read-only.                                                               |
-| Paused clock         | Nothing arrives; the scene holds.                                                                                   |
-| More people than fit | Only as many figures as fit are drawn. The rest are not shown; their lines still appear with their names.           |
+| Behaviour        | Source                                                                                                                                                          |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backdrop         | `Chat.placeId` → place → backdrop set (new, §6.1) → the picture for the sim hour. No set: no picture, a transparent surface darkened slightly for contrast.     |
+| Figures          | Huddle `members` minus the player → each character's default portrait (new). Someone with no portraits is not drawn and takes no slot.                          |
+| Enter and leave  | Diff of `members` on SSE `chats`. A fade and a short slide.                                                                                                     |
+| Speaker          | `typing` events with `mode: "speaking"`, replayed in `connected.typing`. Two at once light two.                                                                 |
+| The line         | `message` events. In M0 a line arrives when it has been said, so it appears whole (§6.2 fixes this).                                                            |
+| Actions          | `type: "action"` through the existing `actionLine()`; shown as narration, never in the name plate.                                                              |
+| The player       | Not drawn (first person). Their lines show under their display name. Composer unchanged.                                                                        |
+| Backlog          | The Transcript toggle (`chats.as=list`).                                                                                                                        |
+| Observed huddles | `ObservedChatView` renders the same scene, read-only.                                                                                                           |
+| Paused clock     | Nothing arrives; the scene holds.                                                                                                                               |
+| Slots            | Five in a wide scene, one on an upright phone (whoever is speaking). More people than slots: the rest are not shown; their lines still appear with their names. |
 
 Left out of M0: expressions, outfits, live reveal, reading mode, audio, replay,
 screenshots, anything on a canvas.
 
 Acceptance for M0:
 
-1. With a world that has a backdrop and portraits, opening a huddle shows the
-   scene; with none, the same view degrades to avatar cards on a plain surface
-   and is still usable.
+1. Opening any huddle shows the scene. With a backdrop and portraits it is the
+   place and the people; with no backdrop the figures stand on a slightly
+   darkened transparent surface; with no portraits either it is that surface and
+   the dialogue box, still usable.
 2. A character joining, speaking, acting and leaving are each visible without
    opening the transcript.
 3. Switching Scene and Transcript loses nothing: same messages, same receipts,
    same composer draft.
 4. An observed huddle opens as a scene from a link.
 5. The backdrop changes with the sim hour when the set has more than one time.
-6. At phone width one or two figures show, cropped to the bust, and the dialogue
-   box and composer stay reachable.
+6. On an upright phone one figure shows, whoever is speaking, cropped to the
+   bust, and the dialogue box and composer stay reachable.
 
 ## 5. Architecture
 
@@ -328,15 +329,36 @@ time of day (renderers read `useSimNow`).
 
 ### 5.3 Director rules
 
-- **Slots.** A figure keeps its slot from entering to leaving, so nobody jumps
-  sideways when someone else arrives. Slots fill from the centre outward. The
-  renderer says how many fit (5 wide, 2 on a phone).
-- **More members than slots.** Members without a slot are simply not drawn, and
-  nothing lists them. When one of them speaks, they take the slot of whoever
-  spoke longest ago, in place, so the speaker always has a figure.
-- **Speaker.** From speaking events, not from messages, so the highlight starts
-  when the line starts. A committed message from someone not marked speaking
-  (the player, recovered sends) lights them briefly.
+- **Who is drawn.** Only members who have portraits. Someone without them is
+  never a figure and never takes a slot, whatever they say or do; their lines
+  show in the dialogue box under their name, as the player's do. Until it is
+  known whether a member has portraits, nothing is drawn or reserved for them.
+- **Five slots or one.** A wide scene has five slots; an upright phone has one.
+  There is nothing in between.
+- **Balanced.** In the five-slot scene the figures stand evenly about the
+  centre, and an even number skips the middle slot:
+
+  | Figures | Columns (0 to 4, left to right) |
+  | :------ | :------------------------------ |
+  | 1       | 2                               |
+  | 2       | 1, 3                            |
+  | 3       | 1, 2, 3                         |
+  | 4       | 0, 1, 3, 4                      |
+  | 5       | 0, 1, 2, 3, 4                   |
+
+  People keep their left-to-right order. When someone joins or leaves, the
+  others slide to their new columns; nobody jumps, and nobody moves because
+  someone speaks.
+
+- **One slot.** The figure is whoever the newest line belongs to or is speaking
+  now, at bust framing; a change of speaker is a cross-fade in place.
+- **More drawable members than five.** The rest are not drawn and nothing lists
+  them. When one of them speaks or acts, they take the place of whoever did so
+  longest ago.
+- **Speaker.** From speaking events, not from messages, so the light starts when
+  the line starts. The speaker is at full brightness and the others slightly
+  dimmed. Nobody changes size or position for speaking. A committed message from
+  someone not marked speaking (recovered sends) lights them briefly.
 - **Face.** A figure keeps the mood of its last line that carried a `face`
   (§6.3). It returns to neutral when the person leaves the huddle.
 - **Lines.** Speech replaces the same speaker's previous speech line and pushes
@@ -363,7 +385,7 @@ interface SceneRendererProps {
 ```
 
 A renderer draws the best form of art it supports and falls back down the list:
-model → rig → portrait → avatar card.
+model → rig → portrait. With none of them the person is not drawn.
 
 ### 5.5 Where it lives in the client
 
@@ -650,7 +672,7 @@ workspaces/<id>/
   heads up across characters drawn at different sizes, and crop to the bust on a
   phone. The importer knows it: it already finds the face.
 - The default portrait is `neutral`, else the first by name. A character with no
-  `portraits/` is drawn as their avatar.
+  `portraits/` is not drawn in a scene at all.
 
 ### 8.2 Backdrop sets
 
@@ -852,14 +874,12 @@ One pull request per item (the project's rule), each usable alone.
    exposure than 256 px stickers. Shipping it with the world is decided; this is
    only a flag.
 2. **Is the player drawn?** Assumed no (first person).
-3. **Default rendering of a huddle**: assumed the scene whenever the world has
-   art.
-4. **The name** "Scene" in the UI.
-5. **"Assets placed together"** is read here as: a character's stickers and
+3. **The name** "Scene" in the UI.
+4. **"Assets placed together"** is read here as: a character's stickers and
    portraits side by side in their workspace under the same names, and one
    shared `shared/backdrops/` library. If it meant one top-level art folder for
    the whole world, §8.1 moves but nothing else changes.
-6. **The status system's code name** and the rest of
+5. **The status system's code name** and the rest of
    [status](../../kazusa/references/status.md) §6.
 
 ## 13. Decision log
@@ -890,6 +910,20 @@ One pull request per item (the project's rule), each usable alone.
   stickers share one source.
 - **Members without a slot are ignored** (2026-11-11, review). No chips, no
   "also here".
+- **Five slots or one, balanced** (2026-11-11, third review, after seeing the
+  prototype in a browser). Filling from the centre outward left a lone figure
+  off-centre with an even slot count, and two-to-four-slot layouts on narrow
+  screens overlapped badly. Now a wide scene always has five slots with the
+  figures balanced about the centre (even counts skip the middle), and an
+  upright phone shows one figure, the speaker.
+- **The speaker is lit, not scaled** (2026-11-11, third review). Scaling from
+  the feet lifted the speaker's eyes above everyone else's.
+- **No portraits, no figure** (2026-11-11, third review). The avatar card stood
+  in a slot among full figures and looked wrong; someone without art is not
+  important enough to take one. Their lines still show.
+- **Every huddle is a scene** (2026-11-11, third review). Without a backdrop the
+  surface is transparent, slightly darkened; the figures in front are still
+  worth seeing. The "has art" gate on the default is gone.
 - **Art ships in the world's repository** (2026-11-11, review). The optional art
   pack was dropped; layered storage is only a reserve.
 - **Reading mode** (2026-11-11, review): advance on click by holding the world
