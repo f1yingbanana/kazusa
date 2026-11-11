@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUST_EYES_Y,
   BUST_FLOOR_Y,
   BUST_HEIGHT,
   FIGURE_HEIGHT,
@@ -80,10 +81,12 @@ describe("one scale for every figure", () => {
 });
 
 describe("standing a figure", () => {
-  it("centres the picture and keeps the scene's scale without a placement", () => {
+  it("stands the picture's bottom edge and middle on the floor and the column without a placement", () => {
     expect(standFigure(undefined, 768, "full")).toEqual({
       zoom: figureScale(768, "full"),
       centrePercent: 50,
+      rowPercent: 100,
+      atPercent: FLOOR_Y * 100,
       x: 0,
       y: 0,
     });
@@ -100,5 +103,30 @@ describe("standing a figure", () => {
     expect(stood.zoom).toBeCloseTo(scene * 0.75);
     expect(stood.x).toBeCloseTo(40 * scene * 0.75);
     expect(stood.y).toBeCloseTo(-20 * scene * 0.75);
+  });
+
+  it("stands a figure on its feet when something reaches lower than them", () => {
+    const stood = standFigure({ floor: 0.95, eyes: 0.2 }, 768, "full");
+    expect(stood.rowPercent).toBeCloseTo(95);
+    expect(stood.atPercent).toBeCloseTo(FLOOR_Y * 100);
+  });
+
+  it("frames the one-slot scene by the eyes, whoever is shown", () => {
+    const short = standFigure({ eyes: 0.25, scale: 0.8 }, 683, "bust");
+    const tall = standFigure({ eyes: 0.15, scale: 1.17 }, 683, "bust");
+    expect([short.rowPercent, tall.rowPercent]).toEqual([25, 15]);
+    expect(short.atPercent).toBe(BUST_EYES_Y * 100);
+    expect(tall.atPercent).toBe(BUST_EYES_Y * 100);
+    // Without eyes, the floor line, as before.
+    expect(standFigure({ floor: 0.9 }, 683, "bust")).toMatchObject({
+      rowPercent: 90,
+      atPercent: BUST_FLOOR_Y * 100,
+    });
+  });
+
+  it("keeps even the tallest characters' heads in the wide scene", () => {
+    // A 180 cm character's eyes are about 1,460 px up at scale 1; their head
+    // ends about 8% above that.
+    expect((1_460 * 1.08 * FIGURE_HEIGHT) / REFERENCE_PX).toBeLessThan(FLOOR_Y);
   });
 });
