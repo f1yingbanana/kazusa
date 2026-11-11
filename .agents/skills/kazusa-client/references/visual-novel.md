@@ -407,7 +407,11 @@ time of day (renderers read `useSimNow`).
   nobody is dimmed. Nobody changes size or position for speaking.
 - **One scale.** Every portrait is drawn at its natural pixel size times one
   factor for the whole scene, standing on one floor line. Nothing is fitted to a
-  box or sized per character or outfit (§8.1).
+  box (§8.1).
+- **Centred on the figure, not the picture.** The point put on a column's centre
+  is the figure's own (`placement.centre`, the middle of the face), so a wing,
+  weapon or bag out to one side does not push the body off its column. One
+  outfit's pictures can also be scaled and moved by hand (§8.1).
 - **Face.** A figure keeps the mood of its last line that carried a `face`
   (§6.3). It returns to neutral when the person leaves the huddle.
 - **Lines.** The panel holds one line. The line it replaces becomes an echo; at
@@ -470,8 +474,7 @@ proxy allowlist and access policy (`observe`, like stickers).
 ### 6.1 Art routes and fields (M0)
 
 - `GET /kazusa/portraits?id=`: a character's portrait set: names, each picture's
-  URL, and the set's `eyeline` (§8.1). Fetched per scene member, never per
-  roster row.
+  URL and `placement` (§8.1). Fetched per scene member, never per roster row.
 - `GET /kazusa/portrait?id=&name=&v=`: one picture, served exactly like stickers
   (roster ids only, names in the set only, raster only, immutable cache, version
   from mtime).
@@ -677,7 +680,7 @@ workspaces/<id>/
     neutral.webp
     happy.webp
     gym-happy.webp
-    portraits.json          # optional: { "size": [820, 1640], "eyeline": 0.21 }
+    portraits.json          # optional: size, eyeline, placement (below)
 ```
 
 - A sticker and a portrait with the same name are the same look: one outfit, one
@@ -689,8 +692,20 @@ workspaces/<id>/
   each picture at its natural size times one scene-wide factor. Sizing figures
   by eye position was tried and dropped: it enlarged short characters and gave
   one character's outfits different head sizes.
+- **Placement is per outfit**, in `portraits.json`:
+  `"placement": { "": { "centre": 0.52 }, "gym": { "centre": 0.48, "scale": 0.8, "offset": [0, -20] } }`.
+  Keys are an outfit's word (`""` for pictures without one) or one picture's
+  name, which wins. `centre` is where the figure is across the picture (0 left
+  edge, 1 right; the middle when absent): the importer writes the middle of the
+  face the stickers were cut from. `scale` (1) and `offset` (`[right, down]` in
+  the picture's own pixels) are set by hand for the outfit that needs them, and
+  the importer keeps them on a re-import. The source art fills its canvas from
+  halo to shoes whatever the pose, so a seated or crouching figure is drawn
+  larger than a standing one: that is what `scale` is for. Measuring where the
+  feet are from the picture's bottom rows was tried and dropped: a wing tip, a
+  bike wheel or one toe is often all that reaches them.
 - `size` and `eyeline` are still written, from the `neutral` set, but nothing
-  reads them for scale.
+  reads them.
 - The default portrait is `neutral`, else the first by name. A character with no
   `portraits/` is not drawn in a scene at all.
 
@@ -859,7 +874,7 @@ One pull request per item (the project's rule), each usable alone.
 | Reading mode still feels slow                       | Measure click-to-line wait in a live huddle. If it is often over a second: a deeper buffer for watching, off by default. |
 | A reading-mode hold left on freezes the world       | Not durable; released when the view closes; the top bar shows the pause.                                                 |
 | The clock above 1x makes a live scene unreadable    | The catch-up buffer and "Jump to live".                                                                                  |
-| Portrait sizes differ between characters and worlds | `eyeline` and `size`; layout by eyeline, not by image height.                                                            |
+| Portrait sizes differ between characters and worlds | One scale from the pixels; a hand-set `scale` and `offset` per outfit in `portraits.json` (§8.1).                        |
 | Repository size                                     | Pilot numbers before the full import; the reserve in §8.3.                                                               |
 
 ## 12. Open questions
@@ -940,6 +955,9 @@ One pull request per item (the project's rule), each usable alone.
   which dimmed a speaker the moment their line finished.
 - **Figures share one scale** (2026-11-12). Sizing by eye position rescaled
   every character; the importer's per-set height fit did too. Both are gone.
+- **Figures are centred on the face** (2026-11-12), not the picture's box, and
+  an outfit can carry a hand-set `scale` and `offset`. Matching face sizes
+  automatically was tried and made sizes worse.
 - **No "…"** (2026-11-12): with the line delivered as it starts, a line being
   said is the typewriter.
 
