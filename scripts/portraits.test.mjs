@@ -12,9 +12,12 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  DEFAULTS,
   alignBox,
-  assignNames,
   cacheKey,
+  matchPictures,
+  outfitOf,
+  outfitOfSet,
   placePortraits,
   politeGet,
   stagePortraits,
@@ -83,20 +86,10 @@ beforeAll(async () => {
   await stage(plan, path.join(root, "old"));
   const staged = read(path.join(root, "old", "stage.json")).sets[0].stickers;
   const from = (mood) => staged[MOODS.indexOf(mood)].file;
-  // A near copy of `happy` that no one could tell apart by pixels.
+  // `happy` again under another name, as when one picture was labelled twice:
+  // no one could tell the two apart.
   const glad = path.join(root, "glad.webp");
-  await sharp(from("happy"))
-    .composite([
-      {
-        input: {
-          create: { width: 2, height: 2, channels: 4, background: "#888" },
-        },
-        left: 10,
-        top: 10,
-      },
-    ])
-    .webp({ quality: 82 })
-    .toFile(glad);
+  await sharp(from("happy")).webp({ lossless: true }).toFile(glad);
   workspace = path.join(root, "workspaces", "someone");
   writeFileSync(
     path.join(root, "labels.json"),
@@ -161,7 +154,7 @@ describe("portraits stage", () => {
       });
       expect(byMood[mood].distance).toBeLessThan(report.match.maxDistance / 2);
     }
-    // `happy` and its near copy `glad` are equally close.
+    // `happy` and its copy `glad` are twins.
     expect(byMood.happy).toMatchObject({ status: "ambiguous", name: null });
     expect([byMood.happy.nearest, byMood.happy.runnerUp].sort()).toEqual([
       "glad",
@@ -390,36 +383,111 @@ describe("alignBox", () => {
   });
 });
 
-describe("assignNames", () => {
-  const names = ["a", "b", "c"];
-  it("matches the clear nearest, within the threshold", () => {
-    expect(assignNames([[2, 30, 40]], names)[0]).toMatchObject({
-      status: "matched",
-      match: "a",
-      runnerUp: "b",
-      runnerUpDistance: 30,
-    });
+describe("matchPictures", () => {
+  const SIDE = 128;
+  /** A grey fine signature with squares (`[x, y, size, value]`) drawn on. */
+  const face = (...marks) => {
+    const out = new Float32Array(SIDE * SIDE * 4).fill(128);
+    for (let at = 3; at < out.length; at += 4) out[at] = 255;
+    for (const [x0, y0, size, value] of marks)
+      for (let y = y0; y < y0 + size; y++)
+        for (let x = x0; x < x0 + size; x++)
+          for (let c = 0; c < 3; c++) out[(y * SIDE + x) * 4 + c] = value;
+    return out;
+  };
+  /** Every pixel moved by `by`: the common error of another source. */
+  const shifted = (signature, by) =>
+    signature.map((value, at) => (at % 4 === 3 ? value : value + by));
+  const eyes = (value) => [
+    [40, 50, 10, value],
+    [80, 50, 10, value],
+  ];
+  const stickers = [
+    face(...eyes(0)),
+    face(...eyes(255)),
+    face(...eyes(0), [60, 90, 12, 0]),
+  ];
+  const names = ["calm", "wide", "talking"];
+
+  it("names each picture through a common offset, by where looks differ", () => {
+    const pictures = stickers.map((sticker) => shifted(sticker, 3));
+    expect(
+      matchPictures(pictures, stickers, names).map((result) => [
+        result.status,
+        result.match,
+      ]),
+    ).toEqual([
+      ["matched", "calm"],
+      ["matched", "wide"],
+      ["matched", "talking"],
+    ]);
   });
+
   it("leaves a picture unmatched when even the nearest is far", () => {
-    expect(assignNames([[40, 50, 60]], names)[0].status).toBe("unmatched");
-  });
-  it("calls it ambiguous when the runner-up is close", () => {
-    expect(assignNames([[4, 7, 40]], names)[0].status).toBe("ambiguous");
-    expect(assignNames([[1, 5, 40]], names)[0].status).toBe("ambiguous");
-  });
-  it("gives a name to at most one picture", () => {
-    const results = assignNames(
-      [
-        [2, 30, 40],
-        [3, 30, 40],
-        [30, 2, 40],
-      ],
+    // A second picture, as in any real set: where the set's pictures spread
+    // is face too.
+    const [result] = matchPictures(
+      [face(...eyes(0), [20, 20, 30, 0]), stickers[1]],
+      stickers,
       names,
     );
-    expect(results.map((result) => [result.status, result.match])).toEqual([
-      ["conflict", null],
-      ["conflict", null],
-      ["matched", "b"],
+    expect(result).toMatchObject({ status: "unmatched", match: null });
+  });
+
+  it("calls a picture between two looks ambiguous", () => {
+    const [result] = matchPictures(
+      [face(...eyes(0), [60, 90, 12, 64])],
+      stickers,
+      names,
+      { ...DEFAULTS, maxDistance: 50, maxWorst: 255 },
+    );
+    expect(result).toMatchObject({ status: "ambiguous", match: null });
+    expect([result.nearest, result.rival].sort()).toEqual(["calm", "talking"]);
+  });
+
+  it("never picks a sticker that has a twin", () => {
+    const twins = [stickers[0], face(...eyes(0), [5, 5, 2, 0]), stickers[1]];
+    const [result] = matchPictures([stickers[0]], twins, ["a", "b", "c"]);
+    expect(result).toMatchObject({ status: "ambiguous", advantage: null });
+  });
+
+  it("keeps the nearest of the same look twice, and no name for two looks", () => {
+    const twice = matchPictures(
+      [shifted(stickers[1], 2), shifted(stickers[1], 1)],
+      stickers,
+      names,
+    );
+    expect(twice.map((result) => [result.status, result.match])).toEqual([
+      ["duplicate", null],
+      ["matched", "wide"],
     ]);
+    expect(twice[0].duplicateOf).toBe(2);
+    const clash = matchPictures(
+      [stickers[1], face(...eyes(255), [60, 90, 4, 100])],
+      stickers.slice(0, 2),
+      names.slice(0, 2),
+      { ...DEFAULTS, maxDistance: 50, maxWorst: 255 },
+    );
+    expect(clash.map((result) => result.status)).toEqual([
+      "conflict",
+      "conflict",
+    ]);
+  });
+});
+
+describe("outfits", () => {
+  const outfits = ["gym", "swimsuit"];
+  it("reads a sticker's outfit from a declared first word only", () => {
+    expect(outfitOf("gym-happy", outfits)).toBe("gym");
+    expect(outfitOf("happy", outfits)).toBe("");
+    expect(outfitOf("very-happy", outfits)).toBe("");
+  });
+  it("takes a set's outfit from the plan, else its id", () => {
+    expect(outfitOfSet({ id: "gym" }, outfits)).toBe("gym");
+    expect(outfitOfSet({ id: "battle-2", outfit: "gym" }, outfits)).toBe("gym");
+    expect(outfitOfSet({ id: "school" }, outfits)).toBe("");
+    expect(() => outfitOfSet({ id: "x", outfit: "mask" }, outfits)).toThrow(
+      /no outfit mask/,
+    );
   });
 });
