@@ -20,6 +20,7 @@ import {
   outfitOfSet,
   outputSize,
   searchBox,
+  setScale,
   placePortraits,
   politeGet,
   stagePortraits,
@@ -180,7 +181,9 @@ describe("portraits stage", () => {
     expect(set.faceBox[0]).toBeLessThanOrEqual(head.left);
     expect(set.faceBox[2]).toBeGreaterThan(head.right - head.left);
     expect(set.stickerBox).toHaveLength(3);
-    expect([width, height].map((value) => Math.round(value * 0.8))).toEqual(
+    // A 2400-high canvas: 0.8 × 1920 / 2400.
+    expect(set.scale).toBe(0.64);
+    expect([width, height].map((value) => Math.round(value * 0.64))).toEqual(
       set.size,
     );
   });
@@ -202,6 +205,21 @@ describe("portraits stage", () => {
     for (let x = 0; x < info.width; x++)
       opaque += data[((info.height - 1) * info.width + x) * 4 + 3] > 8;
     expect(opaque).toBe(0);
+  });
+
+  it("scales each canvas height to the same figure size", () => {
+    // A whole canvas kept: every one comes out 0.8 × 1920 high.
+    for (const [height, factor] of [
+      [2560, 0.6],
+      [1920, 0.8],
+      [1280, 1.2],
+    ]) {
+      expect(setScale(height, 0.8, 1920)).toBeCloseTo(factor, 10);
+      expect(
+        outputSize({ width: 1000, height }, setScale(height, 0.8, 1920), 4000)
+          .size[1],
+      ).toBe(1536);
+    }
   });
 
   it("caps an absurd height, and says so", () => {

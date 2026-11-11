@@ -7,13 +7,13 @@
  * - `stage <plan.json> <workspace> <dir>` fetches each set's originals, trims the
  *   set by the union of its opaque areas on the left, right and top (never the
  *   bottom: the canvas bottom is the baseline figures stand on) so every look
- *   stays aligned, scales every picture of every character by one factor
- *   (`--scale`, 0.8) so sizes stay as drawn, and writes `<dir>/<set>/<n>.webp`.
- *   It names each picture by cutting the sticker `stickers.mjs stage` would
- *   have cut from it and matching that against `<workspace>/stickers/`.
- *   `<dir>/stage.json` reports every match; `matched.png` and `unmatched.png`
- *   per set show them. The plan is the sticker plan: `{ id?, wiki, crop?, sets:
- *   [{ id, files, box? }] }`.
+ *   stays aligned, scales every picture by one factor for a 1920-high canvas
+ *   (`--scale`, 0.8; other canvases in proportion, so sizes stay as drawn), and
+ *   writes `<dir>/<set>/<n>.webp`. It names each picture by cutting the sticker
+ *   `stickers.mjs stage` would have cut from it and matching that against
+ *   `<workspace>/stickers/`. `<dir>/stage.json` reports every match;
+ *   `matched.png` and `unmatched.png` per set show them. The plan is the
+ *   sticker plan: `{ id?, wiki, crop?, sets: [{ id, files, box? }] }`.
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
  *   `portraits.json` with the size and eyeline. It writes nothing else.
@@ -53,6 +53,12 @@ export const DEFAULTS = {
    * drew them: between characters, and between one character's outfits.
    */
   scale: 0.8,
+  /**
+   * The canvas height `scale` is for. A set on another canvas is scaled by
+   * `scale × referenceHeight ÷ its canvas height`, since the game draws its
+   * figures at one size per canvas height (2560-high canvases at 4/3).
+   */
+  referenceHeight: 1920,
   /** A guard only: a set taller than this after `scale` is shrunk, and said. */
   maxHeight: 4000,
   /** Between downloads, not between cache reads. */
@@ -244,6 +250,10 @@ export function keptBox(union, canvasHeight) {
     height: canvasHeight - union.top,
   };
 }
+
+/** The scale for a set on a canvas `canvasHeight` high. */
+export const setScale = (canvasHeight, scale, referenceHeight) =>
+  (scale * referenceHeight) / canvasHeight;
 
 /**
  * Output size for a kept box: `scale` times its pixels, unless that would be
@@ -1010,10 +1020,11 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         `${set.id}: canvases differ; kept the ${first.width}×${first.height} ones`,
       );
     const trim = keptBox(union, first.height);
-    const { size, capped } = outputSize(trim, opts.scale, opts.maxHeight);
+    const factor = setScale(first.height, opts.scale, opts.referenceHeight);
+    const { size, capped } = outputSize(trim, factor, opts.maxHeight);
     if (capped)
       console.warn(
-        `${set.id}: taller than ${opts.maxHeight} px at scale ${opts.scale}; shrunk to fit`,
+        `${set.id}: taller than ${opts.maxHeight} px at scale ${factor}; shrunk to fit`,
       );
     const features =
       crop.features ??
@@ -1113,6 +1124,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       canvas: [first.width, first.height],
       trim: [trim.left, trim.top, trim.width, trim.height],
       size,
+      scale: round(factor, 4),
       ...(capped ? { capped: true } : {}),
       ...(fits.includes(false) ? { canvasesDiffer: true } : {}),
       ...(eyeline === undefined ? {} : { eyeline }),
@@ -1203,7 +1215,8 @@ const USAGE = `Usage:
     stickers. Writes <dir>/<set>/<n>.webp, matched.png, unmatched.png and
     <dir>/stage.json. Options:
       --cache <dir>          originals cache (default .cache/art)
-      --scale <f>            one scale for every picture (default ${DEFAULTS.scale})
+      --scale <f>            scale for a canvas --reference-height high (default ${DEFAULTS.scale})
+      --reference-height <px>  other canvases scale by this ÷ their height (default ${DEFAULTS.referenceHeight})
       --max-height <px>      guard: shrink a set taller than this (default ${DEFAULTS.maxHeight})
       --delay <ms>           pause between downloads (default ${DEFAULTS.delay})
       --user-agent <text>    User-Agent header (default ${DEFAULTS.userAgent})
@@ -1216,6 +1229,7 @@ function parseOptions(args) {
   const flags = {
     "--cache": ["cache", String],
     "--scale": ["scale", Number],
+    "--reference-height": ["referenceHeight", Number],
     "--max-height": ["maxHeight", Number],
     "--delay": ["delay", Number],
     "--user-agent": ["userAgent", String],
