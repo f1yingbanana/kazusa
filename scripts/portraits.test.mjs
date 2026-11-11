@@ -15,6 +15,7 @@ import {
   DEFAULTS,
   alignBox,
   cacheKey,
+  feetOf,
   matchPictures,
   outfitOf,
   outfitOfSet,
@@ -287,7 +288,18 @@ describe("portraits stage", () => {
       ].map((name) => path.join("portraits", name)),
     );
     const manifest = read(path.join(workspace, "portraits", "portraits.json"));
-    expect(Object.keys(manifest).sort()).toEqual(["eyeline", "size"]);
+    expect(Object.keys(manifest).sort()).toEqual([
+      "eyeline",
+      "placement",
+      "size",
+    ]);
+    // One entry per outfit placed: where its pictures stand.
+    const outfit = labels.sets[0].outfit;
+    expect(manifest.placement).toEqual({
+      [outfit]: { feet: labels.sets[0].feet },
+    });
+    expect(manifest.placement[outfit].feet).toBeGreaterThan(0);
+    expect(manifest.placement[outfit].feet).toBeLessThan(1);
     expect(manifest.size).toEqual(labels.sets[0].size);
     expect(manifest.size.every(Number.isInteger)).toBe(true);
     expect(manifest.eyeline).toBeGreaterThan(0);
@@ -296,6 +308,60 @@ describe("portraits stage", () => {
       path.join(workspace, "portraits", "neutral.webp"),
     ).metadata();
     expect([meta.width, meta.height]).toEqual(manifest.size);
+
+    // A scale and offset set by hand outlive the next import.
+    const manifestFile = path.join(workspace, "portraits", "portraits.json");
+    manifest.placement[outfit] = {
+      feet: 0.9,
+      scale: 0.75,
+      offset: [12, -30],
+    };
+    writeFileSync(manifestFile, JSON.stringify(manifest));
+    placePortraits(labelsFile);
+    expect(read(manifestFile).placement).toEqual({
+      [outfit]: { feet: labels.sets[0].feet, scale: 0.75, offset: [12, -30] },
+    });
+  });
+});
+
+describe("feetOf", () => {
+  const picture = (blocks) =>
+    sharp({
+      create: {
+        width: 200,
+        height: 100,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite(
+        blocks.map(([left, top, width, height]) => ({
+          input: {
+            create: {
+              width,
+              height,
+              channels: 4,
+              background: { r: 200, g: 60, b: 60, alpha: 1 },
+            },
+          },
+          left,
+          top,
+        })),
+      )
+      .png()
+      .toBuffer();
+
+  it("is the middle of what reaches the bottom rows, not of the picture", async () => {
+    // A body on the right down to the floor, a weapon held out to the left.
+    const buffer = await picture([
+      [120, 10, 40, 90],
+      [0, 30, 120, 10],
+    ]);
+    expect(await feetOf(buffer)).toBe(0.7);
+  });
+
+  it("is undefined when nothing reaches the bottom rows", async () => {
+    expect(await feetOf(await picture([[20, 10, 40, 40]]))).toBeUndefined();
   });
 });
 
