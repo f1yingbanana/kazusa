@@ -1376,6 +1376,16 @@ export const PortraitSchema = z.object({
        * scene puts this point on the figure's column. Absent: the middle.
        */
       centre: z.number().optional(),
+      /**
+       * Where the figure stands down the picture: 0 its top edge, 1 its bottom.
+       * A scene puts this row on its floor. Absent: the bottom edge.
+       */
+      floor: z.number().optional(),
+      /**
+       * Where its eyes are down the picture, the same way: what a close framing
+       * (one figure, from the chest up) is placed by.
+       */
+      eyes: z.number().optional(),
       /** Drawn this many times its size, about that point. Absent: 1. */
       scale: z.number().optional(),
       /** Moved `[right, down]`, in the picture's own pixels. Absent: none. */

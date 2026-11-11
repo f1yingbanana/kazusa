@@ -1269,13 +1269,13 @@ connect these modules in process.
   whole figures named like the stickers (`[<outfit>-]<mood>`; the first word is
   an outfit only when `stickers/stickers.json` declares it), plus optional
   `portraits.json` (`size`, `eyeline`, and `placement` by outfit word, `""` for
-  none, or by picture name: `centre`, where the figure is across the picture
-  0–1, and `scale`, which draws the character as tall as they are, both written
-  by the importer, and a hand-set `offset`; a bad field is ignored). The default
-  is `neutral`, else the first. `GET /kazusa/portraits?id=`,
-  `GET /kazusa/portrait` (served like stickers), `CharacterSummary.portraitUrl`
-  (a `stat` or two per character; the folder is listed again only when its mtime
-  changes).
+  none, or by picture name: `centre`, `floor` and `eyes` (where the figure is
+  across the picture, where it stands and where its eyes are down it, each 0–1)
+  and `scale`, which draws the character as tall as they are, all written by the
+  importer, and a hand-set `offset`; a bad field is ignored). The default is
+  `neutral`, else the first. `GET /kazusa/portraits?id=`, `GET /kazusa/portrait`
+  (served like stickers), `CharacterSummary.portraitUrl` (a `stat` or two per
+  character; the folder is listed again only when its mtime changes).
 - **Backdrops** (`backdrops.ts`): a shared library, `shared/backdrops/<set>/`
   beside the World Wiki, pictures named `[<state>-]<time>` (a state only when
   the set's `backdrops.json` declares it). Location reads the library with the
