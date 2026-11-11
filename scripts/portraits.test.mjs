@@ -15,6 +15,7 @@ import {
   DEFAULTS,
   alignBox,
   cacheKey,
+  centreOf,
   matchPictures,
   outfitOf,
   outfitOfSet,
@@ -177,6 +178,10 @@ describe("portraits stage", () => {
     const eyes = top + set.eyeline * height;
     expect(eyes).toBeGreaterThan(head.top);
     expect(eyes).toBeLessThan(head.bottom);
+    // …and the figure's centre across it.
+    const middle = left + set.centre * width;
+    expect(middle).toBeGreaterThan(head.left);
+    expect(middle).toBeLessThan(head.right);
     // The face box from the existing pipeline is reported, in source pixels.
     expect(set.faceBox[0]).toBeLessThanOrEqual(head.left);
     expect(set.faceBox[2]).toBeGreaterThan(head.right - head.left);
@@ -287,7 +292,16 @@ describe("portraits stage", () => {
       ].map((name) => path.join("portraits", name)),
     );
     const manifest = read(path.join(workspace, "portraits", "portraits.json"));
-    expect(Object.keys(manifest).sort()).toEqual(["eyeline", "size"]);
+    expect(Object.keys(manifest).sort()).toEqual([
+      "eyeline",
+      "placement",
+      "size",
+    ]);
+    // One entry per outfit placed: where the figure is across its pictures.
+    const outfit = labels.sets[0].outfit;
+    expect(manifest.placement).toEqual({
+      [outfit]: { centre: labels.sets[0].centre },
+    });
     expect(manifest.size).toEqual(labels.sets[0].size);
     expect(manifest.size.every(Number.isInteger)).toBe(true);
     expect(manifest.eyeline).toBeGreaterThan(0);
@@ -296,6 +310,35 @@ describe("portraits stage", () => {
       path.join(workspace, "portraits", "neutral.webp"),
     ).metadata();
     expect([meta.width, meta.height]).toEqual(manifest.size);
+
+    // A scale and offset set by hand outlive the next import.
+    const manifestFile = path.join(workspace, "portraits", "portraits.json");
+    manifest.placement[outfit] = {
+      centre: 0.9,
+      scale: 0.75,
+      offset: [12, -30],
+    };
+    writeFileSync(manifestFile, JSON.stringify(manifest));
+    placePortraits(labelsFile);
+    expect(read(manifestFile).placement).toEqual({
+      [outfit]: {
+        centre: labels.sets[0].centre,
+        scale: 0.75,
+        offset: [12, -30],
+      },
+    });
+  });
+});
+
+describe("centreOf", () => {
+  it("is the face's middle across the kept box, not the box's own", () => {
+    // A face 100 wide, 250 into a box that starts at 100 and is 500 wide.
+    expect(centreOf([350, 40, 100], { left: 100, width: 500 })).toBe(0.6);
+  });
+
+  it("stays inside the box", () => {
+    expect(centreOf([0, 0, 50], { left: 100, width: 500 })).toBe(0);
+    expect(centreOf([900, 0, 50], { left: 100, width: 500 })).toBe(1);
   });
 });
 

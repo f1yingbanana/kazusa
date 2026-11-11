@@ -16,7 +16,10 @@
  *   sticker plan: `{ id?, wiki, crop?, sets: [{ id, files, box? }] }`.
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
- *   `portraits.json` with the size and eyeline. It writes nothing else.
+ *   `portraits.json` with the size, the eyeline and, per outfit, where the
+ *   figure is across its pictures (`placement`: `centre`, the middle of the
+ *   face, measured here; a `scale` or `offset` set by hand in the file is
+ *   kept). It writes nothing else.
  *
  * Originals are kept in `.cache/art/<wiki host>/<File>` (git-ignored, or
  * `--cache`). A re-run reads them and fetches only what is missing.
@@ -249,6 +252,17 @@ export function keptBox(union, canvasHeight) {
     width: union.width,
     height: canvasHeight - union.top,
   };
+}
+
+/**
+ * Where a figure is across its kept box, 0 (left edge) to 1 (right): the middle
+ * of its face, `faceBox` (`[left, top, side]`, source pixels). The body hangs
+ * under the head, so this is the point a scene centres; a weapon, wing or bag
+ * out to one side moves the box's middle but not this.
+ */
+export function centreOf(faceBox, trim) {
+  const middle = faceBox[0] + faceBox[2] / 2;
+  return round(Math.min(Math.max((middle - trim.left) / trim.width, 0), 1), 3);
 }
 
 /** The scale for a set on a canvas `canvasHeight` high. */
@@ -1045,6 +1059,13 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
             3,
           );
 
+    const centre = stickerBox
+      ? centreOf(
+          stickerBox.map((value) => value / crop.scale),
+          trim,
+        )
+      : undefined;
+
     const entries = [];
     for (const [index, picture] of pictures.entries()) {
       const entry = { n: index + 1, source: picture.file };
@@ -1128,6 +1149,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       ...(capped ? { capped: true } : {}),
       ...(fits.includes(false) ? { canvasesDiffer: true } : {}),
       ...(eyeline === undefined ? {} : { eyeline }),
+      ...(centre === undefined ? {} : { centre }),
       portraits: entries,
     });
     const counts = entries.reduce(
@@ -1150,9 +1172,22 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
   return report;
 }
 
+/** The `scale` and `offset` someone set by hand in a `portraits.json`. */
+function handPlacement(file) {
+  try {
+    const { placement } = JSON.parse(readFileSync(file, "utf8"));
+    return placement && typeof placement === "object" ? placement : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Replaces `<workspace>/portraits/` with the report's named pictures and a
- * `portraits.json` from the set holding `neutral` (else the first name).
+ * `portraits.json`: size and eyeline from the set holding `neutral` (else the
+ * first name), and per outfit where the figure is across its pictures
+ * (`centre`). A `scale` or `offset` already in the file for an outfit is kept:
+ * those are set by hand.
  */
 export function placePortraits(reportFile) {
   const report = JSON.parse(readFileSync(reportFile, "utf8"));
@@ -1182,6 +1217,7 @@ export function placePortraits(reportFile) {
       console.warn(`${name}: no sticker has this name`);
 
   const dir = path.join(report.workspace, "portraits");
+  const hand = handPlacement(path.join(dir, "portraits.json"));
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   chosen.sort((a, b) => a.name.localeCompare(b.name));
@@ -1197,9 +1233,20 @@ export function placePortraits(reportFile) {
       console.warn(
         `${set.id}: size ${set.size.join("×")}, eyeline ${set.eyeline}; portraits.json has ${lead.id}'s`,
       );
+  const placement = {};
+  for (const set of new Set(chosen.map(({ set }) => set))) {
+    const { scale, offset } = hand[set.outfit ?? ""] ?? {};
+    const entry = {
+      ...(set.centre === undefined ? {} : { centre: set.centre }),
+      ...(scale === undefined ? {} : { scale }),
+      ...(offset === undefined ? {} : { offset }),
+    };
+    if (Object.keys(entry).length > 0) placement[set.outfit ?? ""] = entry;
+  }
   const manifest = {
     size: lead.size,
     ...(lead.eyeline === undefined ? {} : { eyeline: lead.eyeline }),
+    ...(Object.keys(placement).length > 0 ? { placement } : {}),
   };
   writeFileSync(
     path.join(dir, "portraits.json"),
