@@ -18,6 +18,7 @@ import {
   matchPictures,
   outfitOf,
   outfitOfSet,
+  outputSize,
   searchBox,
   placePortraits,
   politeGet,
@@ -171,8 +172,6 @@ describe("portraits stage", () => {
   it("puts the eyeline inside the head", () => {
     const [set] = report.sets;
     const [left, top, width, height] = set.trim;
-    expect(set.size[1]).toBe(1600);
-    expect(set.size[0]).toBe(Math.round((width * 1600) / height));
     expect(left).toBeGreaterThan(0);
     const eyes = top + set.eyeline * height;
     expect(eyes).toBeGreaterThan(head.top);
@@ -181,6 +180,39 @@ describe("portraits stage", () => {
     expect(set.faceBox[0]).toBeLessThanOrEqual(head.left);
     expect(set.faceBox[2]).toBeGreaterThan(head.right - head.left);
     expect(set.stickerBox).toHaveLength(3);
+    expect([width, height].map((value) => Math.round(value * 0.8))).toEqual(
+      set.size,
+    );
+  });
+
+  it("scales by one factor and keeps the canvas bottom", async () => {
+    const [set] = report.sets;
+    const [, top, , height] = set.trim;
+    // Trimmed on top, never at the bottom: the canvas bottom is the baseline.
+    expect(top).toBeGreaterThan(0);
+    expect(top + height).toBe(HEIGHT);
+    expect(set.canvas).toEqual([WIDTH, HEIGHT]);
+    // The drawn figure stops above the canvas bottom, so the bottom rows of
+    // the output stay transparent.
+    const { data, info } = await sharp(set.portraits[0].file)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let opaque = 0;
+    for (let x = 0; x < info.width; x++)
+      opaque += data[((info.height - 1) * info.width + x) * 4 + 3] > 8;
+    expect(opaque).toBe(0);
+  });
+
+  it("caps an absurd height, and says so", () => {
+    expect(outputSize({ width: 100, height: 1000 }, 0.8, 4000)).toEqual({
+      size: [80, 800],
+      factor: 0.8,
+      capped: false,
+    });
+    expect(
+      outputSize({ width: 1000, height: 10_000 }, 0.8, 4000),
+    ).toMatchObject({ size: [400, 4000], capped: true });
   });
 
   it("writes every portrait at the set's size as WebP", async () => {
@@ -270,7 +302,7 @@ describe("portraits stage, alignment and failures", () => {
       path.join(dir, "out"),
       {
         ...options(path.join(dir, "cache")),
-        maxHeight: 10_000,
+        scale: 1,
       },
     );
     expect(readdirSync(path.join(dir, "cache"))).toEqual([

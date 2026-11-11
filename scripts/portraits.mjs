@@ -5,12 +5,15 @@
  * stickers were cut from, in two steps:
  *
  * - `stage <plan.json> <workspace> <dir>` fetches each set's originals, trims the
- *   set by the union of its opaque areas so every look stays aligned, caps the
- *   height and writes `<dir>/<set>/<n>.webp`. It names each picture by cutting
- *   the sticker `stickers.mjs stage` would have cut from it and matching that
- *   against `<workspace>/stickers/`. `<dir>/stage.json` reports every match;
- *   `matched.png` and `unmatched.png` per set show them. The plan is the
- *   sticker plan: `{ id?, wiki, crop?, sets: [{ id, files, box? }] }`.
+ *   set by the union of its opaque areas on the left, right and top (never the
+ *   bottom: the canvas bottom is the baseline figures stand on) so every look
+ *   stays aligned, scales every picture of every character by one factor
+ *   (`--scale`, 0.8) so sizes stay as drawn, and writes `<dir>/<set>/<n>.webp`.
+ *   It names each picture by cutting the sticker `stickers.mjs stage` would
+ *   have cut from it and matching that against `<workspace>/stickers/`.
+ *   `<dir>/stage.json` reports every match; `matched.png` and `unmatched.png`
+ *   per set show them. The plan is the sticker plan: `{ id?, wiki, crop?, sets:
+ *   [{ id, files, box? }] }`.
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
  *   `portraits.json` with the size and eyeline. It writes nothing else.
@@ -45,7 +48,13 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULTS = {
   cache: path.join(ROOT, ".cache", "art"),
-  maxHeight: 1600,
+  /**
+   * One scale for every picture of every character, so sizes stay as the game
+   * drew them: between characters, and between one character's outfits.
+   */
+  scale: 0.8,
+  /** A guard only: a set taller than this after `scale` is shrunk, and said. */
+  maxHeight: 4000,
   /** Between downloads, not between cache reads. */
   delay: 500,
   /** Longest a request may take, body included, in ms. */
@@ -208,18 +217,48 @@ export async function unionBox(buffers) {
 }
 
 /**
- * The set's pictures cut to `box` and scaled to at most `maxHeight`, as WebP.
- * Every picture gets the same box and scale, so they stay pixel-aligned.
+ * A picture cut to `box` and resized to `size`, as WebP. Every picture of a set
+ * gets the same box and size, so they stay pixel-aligned.
  */
-export async function normalize(buffer, box, maxHeight) {
+export async function normalize(buffer, box, size) {
   let image = sharp(buffer).ensureAlpha().extract(box);
-  if (box.height > maxHeight)
-    image = image.resize(
-      Math.max(1, Math.round((box.width * maxHeight) / box.height)),
-      maxHeight,
+  if (size[0] !== box.width || size[1] !== box.height)
+    image = sharp(await image.png({ compressionLevel: 1 }).toBuffer()).resize(
+      size[0],
+      size[1],
       { fit: "fill" },
     );
   return image.webp(PORTRAIT_WEBP).toBuffer();
+}
+
+/**
+ * The part of a canvas a set keeps: the union of its pictures' opaque areas
+ * (`union`) on the left, right and top, and always the canvas's own bottom, the
+ * baseline the game stands every figure on.
+ */
+export function keptBox(union, canvasHeight) {
+  return {
+    left: union.left,
+    top: union.top,
+    width: union.width,
+    height: canvasHeight - union.top,
+  };
+}
+
+/**
+ * Output size for a kept box: `scale` times its pixels, unless that would be
+ * taller than `maxHeight` (then shrunk to it, and `capped`).
+ */
+export function outputSize(box, scale, maxHeight) {
+  const factor = Math.min(scale, maxHeight / box.height);
+  return {
+    size: [
+      Math.max(1, Math.round(box.width * factor)),
+      Math.max(1, Math.round(box.height * factor)),
+    ],
+    factor,
+    capped: factor < scale,
+  };
 }
 
 /** The picture `stickers.mjs stage` worked from: the wiki's 1200 px thumbnail. */
@@ -961,18 +1000,21 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       const meta = await sharp(buffer).metadata();
       fits.push(meta.width === first.width && meta.height === first.height);
     }
-    const trim = await unionBox(buffers.filter((_, index) => fits[index]));
-    if (!trim) {
+    const union = await unionBox(buffers.filter((_, index) => fits[index]));
+    if (!union) {
       console.warn(`${set.id}: every picture is transparent`);
       continue;
     }
-    const height = Math.min(trim.height, opts.maxHeight);
-    const size = [
-      trim.height > opts.maxHeight
-        ? Math.max(1, Math.round((trim.width * height) / trim.height))
-        : trim.width,
-      height,
-    ];
+    if (fits.includes(false))
+      console.warn(
+        `${set.id}: canvases differ; kept the ${first.width}×${first.height} ones`,
+      );
+    const trim = keptBox(union, first.height);
+    const { size, capped } = outputSize(trim, opts.scale, opts.maxHeight);
+    if (capped)
+      console.warn(
+        `${set.id}: taller than ${opts.maxHeight} px at scale ${opts.scale}; shrunk to fit`,
+      );
     const features =
       crop.features ??
       (face && sources.length > 1 ? await faceFeatures(sources) : undefined);
@@ -1001,10 +1043,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         continue;
       }
       const file = path.resolve(out, `${index + 1}.webp`);
-      writeFileSync(
-        file,
-        await normalize(picture.buffer, trim, opts.maxHeight),
-      );
+      writeFileSync(file, await normalize(picture.buffer, trim, size));
       entries.push({
         ...entry,
         file,
@@ -1071,8 +1110,11 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
             stickerBox: inSource(stickerBox),
           }
         : {}),
+      canvas: [first.width, first.height],
       trim: [trim.left, trim.top, trim.width, trim.height],
       size,
+      ...(capped ? { capped: true } : {}),
+      ...(fits.includes(false) ? { canvasesDiffer: true } : {}),
       ...(eyeline === undefined ? {} : { eyeline }),
       portraits: entries,
     });
@@ -1161,7 +1203,8 @@ const USAGE = `Usage:
     stickers. Writes <dir>/<set>/<n>.webp, matched.png, unmatched.png and
     <dir>/stage.json. Options:
       --cache <dir>          originals cache (default .cache/art)
-      --max-height <px>      height cap (default ${DEFAULTS.maxHeight})
+      --scale <f>            one scale for every picture (default ${DEFAULTS.scale})
+      --max-height <px>      guard: shrink a set taller than this (default ${DEFAULTS.maxHeight})
       --delay <ms>           pause between downloads (default ${DEFAULTS.delay})
       --user-agent <text>    User-Agent header (default ${DEFAULTS.userAgent})
       --max-distance <n>     match threshold, 0-255 (default ${DEFAULTS.maxDistance})
@@ -1172,6 +1215,7 @@ const USAGE = `Usage:
 function parseOptions(args) {
   const flags = {
     "--cache": ["cache", String],
+    "--scale": ["scale", Number],
     "--max-height": ["maxHeight", Number],
     "--delay": ["delay", Number],
     "--user-agent": ["userAgent", String],
