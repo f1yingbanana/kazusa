@@ -1372,11 +1372,11 @@ export const PortraitSchema = z.object({
   placement: z
     .object({
       /**
-       * Where the figure stands across the picture: 0 its left edge, 1 its
-       * right. Absent: the middle.
+       * Where the figure is across the picture: 0 its left edge, 1 its right. A
+       * scene puts this point on the figure's column. Absent: the middle.
        */
-      feet: z.number().optional(),
-      /** Drawn this many times its size, about where it stands. Absent: 1. */
+      centre: z.number().optional(),
+      /** Drawn this many times its size, about that point. Absent: 1. */
       scale: z.number().optional(),
       /** Moved `[right, down]`, in the picture's own pixels. Absent: none. */
       offset: z.tuple([z.number(), z.number()]).optional(),
