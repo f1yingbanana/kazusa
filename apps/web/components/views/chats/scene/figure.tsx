@@ -45,8 +45,8 @@ function layer(
  * One person in the scene: their portrait for the look they wear, drawn at its
  * own natural size times the scene's one scale, never fitted, so relative size
  * is the pictures' own. It stands with its bottom edge on the scene's floor
- * line and its feet on its column's centre; `portraits.json` can scale and move
- * one outfit's pictures (`standFigure`). Only people with portraits are
+ * line and the figure's centre on its column's; `portraits.json` can scale and
+ * move one outfit's pictures (`standFigure`). Only people with portraits are
  * figures. `lit`: the speaker of the panel's line, at full brightness while the
  * others are dimmed (`undefined`: nobody dimmed); nobody changes size or place
  * for it. Walking in and out ends in `settle`; a change of column slides.
@@ -112,14 +112,14 @@ export function SceneFigure({
         {...data}
         onAnimationEnd={settle}
         className={cn("pointer-events-none absolute", SLIDE, motion)}
-        // Its bottom edge on the floor line, its feet on the column. `translate`
+        // Its bottom edge on the floor line, its centre on the column. `translate`
         // is its own property, so the walk's `transform` adds to it.
         style={{
           left,
           bottom: `${100 - floorPercent(framing)}%`,
           zIndex,
           translate: stood
-            ? `calc(${-stood.feetPercent}% + ${stood.x}px) ${stood.y}px`
+            ? `calc(${-stood.centrePercent}% + ${stood.x}px) ${stood.y}px`
             : "-50%",
         }}
       >
