@@ -263,6 +263,31 @@ describe("place", () => {
     ]);
   });
 
+  it("prunes set folders the labels no longer name, and only with --prune", () => {
+    const world = makeWorld();
+    const index = path.join(stageDir, "index.json");
+    placeBackdrops(labelsFile(root, SETS), index, world, { log: quiet });
+    const renamed = [{ ...SETS[0], set: "school-classroom-front" }, SETS[1]];
+    const library = path.join(world, "shared", "backdrops");
+    placeBackdrops(labelsFile(root, renamed), index, world, { log: quiet });
+    expect(readdirSync(library).sort()).toEqual([
+      "school-classroom",
+      "school-classroom-front",
+      "station",
+    ]);
+    writeFileSync(path.join(library, "notes.txt"), "kept");
+    const result = placeBackdrops(labelsFile(root, renamed), index, world, {
+      log: quiet,
+      prune: true,
+    });
+    expect(result.pruned).toEqual(["school-classroom"]);
+    expect(readdirSync(library).sort()).toEqual([
+      "notes.txt",
+      "school-classroom-front",
+      "station",
+    ]);
+  });
+
   it.each([
     [
       "a bad set name",

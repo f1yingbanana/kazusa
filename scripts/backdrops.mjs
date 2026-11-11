@@ -725,10 +725,24 @@ export function placeBackdrops(labelsFile, indexFile, world, options = {}) {
         `${JSON.stringify({ states: entry.states }, null, 2)}\n`,
       );
   }
+  // With `prune`, set folders the labels no longer name (renamed or merged
+  // sets) go, so the library is exactly the labels.
+  const pruned = [];
+  if (options.prune) {
+    const named = new Set(labels.sets.map((entry) => entry.set));
+    for (const entry of readdirSync(library, { withFileTypes: true }))
+      if (entry.isDirectory() && isName(entry.name) && !named.has(entry.name)) {
+        rmSync(inside(library, path.join(library, entry.name)), {
+          recursive: true,
+          force: true,
+        });
+        pruned.push(entry.name);
+      }
+  }
   log(
-    `${library}: ${labels.sets.length} sets, ${pictures} pictures, ${(bytes / 1e6).toFixed(1)} MB`,
+    `${library}: ${labels.sets.length} sets, ${pictures} pictures, ${(bytes / 1e6).toFixed(1)} MB${pruned.length ? `, ${pruned.length} old sets removed` : ""}`,
   );
-  return { library, sets: labels.sets.length, pictures, bytes };
+  return { library, sets: labels.sets.length, pictures, bytes, pruned };
 }
 
 /** The library's sets that hold at least one picture, as the plugin reads it. */
@@ -962,8 +976,9 @@ const USAGE = `Usage:
   backdrops.mjs stage <dir> --wiki <api base> --category <Category:Name> [options]
     Download what the cache lacks, normalise every picture into
     <dir>/pictures/, write <dir>/index.json and <dir>/sheets/sheet-NNN.jpg.
-  backdrops.mjs place <labels.json> <index.json> <world>
-    Write the labelled sets into <world>/shared/backdrops/.
+  backdrops.mjs place <labels.json> <index.json> <world> [--prune]
+    Write the labelled sets into <world>/shared/backdrops/; --prune also
+    removes set folders the labels no longer name (after a rename).
   backdrops.mjs assign <places.json> <world>
     Set "backdrop: <set>" on each mapped place page.
   backdrops.mjs check <world>
@@ -994,7 +1009,11 @@ function parseOptions(args) {
     "--rows": ["rows", Number],
     "--cell": ["cellWidth", Number],
   };
-  const switches = { "--refresh": "refresh", "--force": "force" };
+  const switches = {
+    "--refresh": "refresh",
+    "--force": "force",
+    "--prune": "prune",
+  };
   const options = {};
   const positional = [];
   for (let at = 0; at < args.length; at++) {
