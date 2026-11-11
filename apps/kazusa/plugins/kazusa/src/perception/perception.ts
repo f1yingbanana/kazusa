@@ -1,6 +1,6 @@
 import { resetContinuations } from "./continue.ts";
 import { inBackground } from "../background.ts";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   KeyedAsyncQueue,
   type OpenClawPluginApi,
@@ -21,6 +21,7 @@ import {
   type DecisionContextAssembler,
 } from "../context-engine/decision-context.ts";
 import { paceAt } from "../messaging/composing.ts";
+import { conversationId, isUser } from "../messaging/conversations.ts";
 import {
   FLOOR_CHOICES,
   type SpeechFacts,
@@ -28,6 +29,12 @@ import {
 } from "../messaging/floor.ts";
 import { stimulusKey } from "../stimulus.ts";
 import type { StateStore } from "../state.ts";
+import type {
+  DecisionStore,
+  DecisionWindow,
+  RecordedDecision,
+} from "./decision-database.ts";
+import { openPerceptionStores } from "./stores.ts";
 export type { StateStore } from "../state.ts";
 import type { ActiveTask, TaskStore } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
@@ -87,6 +94,81 @@ const isHuddle = (item: Stimulus): boolean =>
 /** Someone's line in a chat, as opposed to a sighting or a check-in. */
 const isChatLine = (item: Stimulus): boolean =>
   !item.deadline && !item.idle && item.sessionKey.includes(":chat:");
+
+/**
+ * A line whose fate the player would want to know: a text, or what the player
+ * said in person. Others' talk in person is mostly overheard, and not caught.
+ */
+const worthShowing = (item: Stimulus): boolean =>
+  isChatLine(item) && (!isHuddle(item) || isUser(item.sender));
+
+/** How much of a line the timeline shows. */
+const EXCERPT_CHARS = 100;
+
+/** In characters, not UTF-16 units, so an emoji is never cut in half. */
+const excerptOf = (text: string): string => {
+  const characters = Array.from(text.replace(/\s+/g, " ").trim());
+  return characters.length <= EXCERPT_CHARS
+    ? characters.join("")
+    : `${characters
+        .slice(0, EXCERPT_CHARS - 1)
+        .join("")
+        .trimEnd()}…`;
+};
+
+/**
+ * The record of a decision the player would want to see, or nothing: lines of
+ * `heard` left unread or set aside, or a conversation stopped following.
+ */
+function worthKeeping(
+  agentId: string,
+  decision: AttentionDecision & DecisionTrace,
+  heard: readonly PendingItem[],
+  task: ActiveTask | undefined,
+  simTime: number,
+): PerceptionDecisionRecord | undefined {
+  // Deferred with nothing going on, the lines are taken in at the next turn.
+  const outcome =
+    decision.action === "IGNORE"
+      ? "ignored"
+      : decision.action === "DEFER" && task
+        ? "deferred"
+        : undefined;
+  const lines = outcome
+    ? heard.filter(worthShowing).map((item) => ({
+        messageId: item.id,
+        chatId: conversationId(agentId, item.sessionKey),
+        sender: item.sender,
+        excerpt: excerptOf(item.text),
+        ...(item.burstKeys?.length ? { count: 1 + item.burstKeys.length } : {}),
+      }))
+    : [];
+  if (!lines.length && !decision.tunedOut) return undefined;
+  const endAt = task ? Date.parse(task.endAt) : Number.NaN;
+  return {
+    simTime,
+    wallTime: Date.now(),
+    ...(lines.length ? { outcome } : {}),
+    lines,
+    ...(decision.tunedOut
+      ? {
+          tunedOut: conversationId(
+            agentId,
+            `agent:${agentId}:${decision.tunedOut}`,
+          ),
+        }
+      : {}),
+    ...(task && endAt > simTime
+      ? {
+          activity: {
+            type: task.type,
+            description: task.description,
+            endAt,
+          },
+        }
+      : {}),
+  };
+}
 
 /** `shared/skills/perception/SKILL.md` `metadata.rubricVersion`. */
 const RUBRIC_VERSION = "13";
@@ -165,17 +247,6 @@ function unheard(
   );
 }
 
-/*
- * The "perception" store holds Perception's records: one `PerceptionState`
- * per character, keyed by agent id, and one entry per attention decision,
- * keyed `<agentId>:decision:<id>`. Agent ids never contain ":".
- */
-const DECISION_KEY = ":decision:";
-
-function isDecisionKey(key: string): boolean {
-  return key.includes(DECISION_KEY);
-}
-
 export interface PerceptionDelivery {
   id: string;
   agentId: string;
@@ -205,9 +276,10 @@ export interface PerceptionDeps {
   readonly api?: OpenClawPluginApi;
   readonly config?: Partial<PerceptionConfig>;
   readonly assertCurrent?: () => void;
+  /** One inbox record per character, keyed by agent id ("inbox"). */
   readonly stateStore?: StateStore<PerceptionState>;
-  /** The same "perception" namespace, viewed as decision entries. */
-  readonly decisionStore?: StateStore<PerceptionDecisionRecord>;
+  /** Attention decisions, for the timeline (`decisions.sqlite`). */
+  readonly decisionStore?: DecisionStore;
   readonly tasks?: Pick<TaskStore, "lookup">;
   readonly deliver?: (
     delivery: PerceptionDelivery,
@@ -217,10 +289,14 @@ export interface PerceptionDeps {
   readonly slots?: BrainSlots;
   readonly evaluateDecision?: DecisionRuntimeV1["evaluate"];
   readonly assembleDecisionContext?: DecisionContextAssembler;
-  /** Observes each recorded decision; must not throw or block routing. */
+  /**
+   * Observes each decision, with the record kept for the timeline when it is
+   * one worth showing; must not throw or block routing.
+   */
   readonly onDecision?: (
     agentId: string,
-    record: PerceptionDecisionRecord,
+    decision: AttentionDecision & DecisionTrace,
+    record?: PerceptionDecisionRecord,
   ) => void;
   /**
    * When a foreseen stimulus's moment comes: what actually happens? Its
@@ -320,7 +396,7 @@ export class Perception {
   private readonly config: PerceptionConfig;
   private readonly text: SkillText;
   private readonly store: StateStore<PerceptionState>;
-  private readonly decisionStore: StateStore<PerceptionDecisionRecord>;
+  private readonly decisionStore: DecisionStore;
   private readonly taskStore: Pick<TaskStore, "lookup">;
   private readonly lifetime = new AbortController();
   private readonly debounceTimers = new Map<string, () => void>();
@@ -351,15 +427,9 @@ export class Perception {
       this.store = this.deps.stateStore;
       this.decisionStore = this.deps.decisionStore;
     } else if (this.api) {
-      this.store = this.api.runtime.state.openKeyedStore<PerceptionState>({
-        namespace: "perception",
-        retention: "retained",
-      });
-      this.decisionStore =
-        this.api.runtime.state.openKeyedStore<PerceptionDecisionRecord>({
-          namespace: "perception",
-          retention: "retained",
-        });
+      const stores = openPerceptionStores(this.api);
+      this.store = stores.inbox;
+      this.decisionStore = stores.decisions;
     } else {
       throw new Error(
         "Perception requires an api or stateStore and decisionStore dependencies.",
@@ -777,9 +847,7 @@ export class Perception {
    * goes back to waiting. Without a way to tell, it is quarantined.
    */
   async recover(): Promise<void> {
-    const entries = (await this.store.entries()).filter(
-      ({ key }) => !isDecisionKey(key),
-    );
+    const entries = await this.store.entries();
     const read: PerceptionDelivery[] = [];
     await Promise.all(
       entries.map(({ key: agentId }) =>
@@ -844,11 +912,13 @@ export class Perception {
   ): Promise<void> {
     const delivery = await this.serial.enqueue(agentId, async () => {
       this.assertCurrent();
-      const state = (await this.store.lookup(agentId)) ?? {
-        pending: [],
-      };
+      const stored = await this.store.lookup(agentId);
+      const state = stored ?? { pending: [] };
+      // Read back unchanged, a record is not written again: draining an idle
+      // character is a read, not a write queued behind everyone else's.
+      const before = stored && JSON.stringify(stored);
       await update(state);
-      await this.save(agentId, state);
+      if (JSON.stringify(state) !== before) await this.save(agentId, state);
       if (autoDrain && !state.stopped) return this.drainState(agentId, state);
     });
     // Host dispatch can await this agent's lifecycle callbacks. Never run it
@@ -897,11 +967,14 @@ export class Perception {
     );
   }
 
-  /** The clock runs again: take up whatever waited while it was paused. */
+  /**
+   * The clock runs again: take up whatever waited while it was paused. Only
+   * characters with something waiting: draining an empty inbox does nothing.
+   */
   async resume(): Promise<void> {
     const agents = (await this.store.entries())
-      .map(({ key }) => key)
-      .filter((key) => !isDecisionKey(key));
+      .filter(({ value }) => value.pending.length > 0 && !value.stopped)
+      .map(({ key }) => key);
     await Promise.all(agents.map((agentId) => this.drain(agentId)));
   }
 
@@ -1205,7 +1278,6 @@ export class Perception {
         ...(left ? { tunedOut } : {}),
       };
       const { action, delayMs } = effective;
-      await this.recordDecision(agentId, effective, fresh, busy, task);
       // start_task/delay_task can execute while Jev is evaluating.
       const currentTask = await this.taskStore.lookup(agentId);
       const current = heard.filter((item) => this.isCurrent(item, currentTask));
@@ -1222,6 +1294,16 @@ export class Perception {
         currentTask && Date.parse(currentTask.endAt) > this.deps.clock.time()
           ? currentTask
           : undefined;
+      // Recorded with the activity the lines now wait for, not the one judged
+      // against.
+      await this.recordDecision(
+        agentId,
+        effective,
+        fresh,
+        busy,
+        activeTask,
+        heard,
+      );
       if (action === "STEER" && current.length && !busy && delayMs > 0) {
         const notBefore = this.deps.clock.time() + delayMs;
         for (const item of current) {
@@ -1907,8 +1989,11 @@ export class Perception {
   }
 
   /**
-   * Persist one decision as its own entry, then log and report it. A failed
-   * write is logged and never fails attention routing.
+   * Logs and reports one decision, and keeps it for the timeline when the
+   * player would want to see it: lines of `heard` (the batch, less what went
+   * unheard with a conversation they stopped following) left unread or set
+   * aside, or the conversation itself. A failed write is logged and never fails
+   * attention routing.
    */
   private async recordDecision(
     agentId: string,
@@ -1916,25 +2001,24 @@ export class Perception {
     bundle: readonly PendingItem[],
     busy: boolean,
     task: ActiveTask | undefined,
+    heard: readonly PendingItem[] = bundle,
   ): Promise<void> {
-    const record: PerceptionDecisionRecord = {
-      ...decision,
-      simTime: this.deps.clock.time(),
-      wallTime: Date.now(),
-      question: busy ? "attention_allocation" : "wake_decision",
-      stimulusIds: bundle.map((item) => item.id),
-      ...(task ? { taskId: task.id } : {}),
-    };
+    const simTime = this.deps.clock.time();
+    let record: PerceptionDecisionRecord | undefined;
     try {
-      await this.decisionStore.register(
-        `${agentId}${DECISION_KEY}${randomUUID()}`,
-        record,
-      );
+      record = worthKeeping(agentId, decision, heard, task, simTime);
     } catch (error) {
       this.warn(error);
     }
+    if (record) {
+      try {
+        this.decisionStore.record(agentId, record);
+      } catch (error) {
+        this.warn(error);
+      }
+    }
     try {
-      this.deps.onDecision?.(agentId, record);
+      this.deps.onDecision?.(agentId, decision, record);
     } catch (error) {
       this.warn(error);
     }
@@ -1943,33 +2027,18 @@ export class Perception {
       decision.latencyScore !== undefined &&
         `latencyScore=${decision.latencyScore}`,
       decision.delayMs > 0 &&
-        `delay=${Math.round(decision.delayMs / 1000)}s readyAt=${formatSimTime(record.simTime + decision.delayMs)}`,
+        `delay=${Math.round(decision.delayMs / 1000)}s readyAt=${formatSimTime(simTime + decision.delayMs)}`,
       decision.note && `note=${JSON.stringify(decision.note)}`,
       decision.tunedOut && `tunedOut=${decision.tunedOut}`,
     ].filter(Boolean);
     this.api?.logger.info(
-      `Perception ${agentId}: ${record.question} -> ${decision.action} (${decision.source}) for ${bundle.length} stimuli${detail.length ? ` ${detail.join(" ")}` : ""}`,
+      `Perception ${agentId}: ${busy ? "attention_allocation" : "wake_decision"} -> ${decision.action} (${decision.source}) for ${bundle.length} stimuli${detail.length ? ` ${detail.join(" ")}` : ""}`,
     );
   }
 
-  /** Every recorded attention decision, oldest first. */
-  async decisions(): Promise<
-    Array<{
-      readonly agentId: string;
-      readonly record: PerceptionDecisionRecord;
-    }>
-  > {
-    return (await this.decisionStore.entries())
-      .filter(({ key }) => isDecisionKey(key))
-      .map(({ key, value }) => ({
-        agentId: key.slice(0, key.indexOf(DECISION_KEY)),
-        record: value,
-      }))
-      .sort(
-        (a, b) =>
-          a.record.simTime - b.record.simTime ||
-          a.record.wallTime - b.record.wallTime,
-      );
+  /** The decisions kept for the timeline in a sim-time window, newest first. */
+  async decisions(window: DecisionWindow): Promise<RecordedDecision[]> {
+    return this.decisionStore.window(window);
   }
 
   private warn(error: unknown): void {

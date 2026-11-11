@@ -1392,37 +1392,44 @@ export const ClockChangedEventSchema = z.object({
 });
 
 /**
- * Perception's attention verdict for one stimulus batch: why a character
- * replied late, deferred, or never saw a message. Observer-only; never replayed
- * into any character's context.
+ * A text a character left unread or set aside, something the player said in
+ * person that went unheard, or a conversation in person they stopped following:
+ * why someone didn't answer. Only these attention decisions are kept; overheard
+ * talk and what was acted on at once are not. Observer-only; never replayed
+ * into any character's context. `chatId` is the chat, when the decision was
+ * about one.
  */
 export const AttentionDecidedEventSchema = z.object({
   ...JournalBase,
   kind: z.literal("attention.decided"),
   payload: z.object({
-    /** `wake_decision` for an idle brain, `attention_allocation` for a busy one. */
-    question: z.enum(["wake_decision", "attention_allocation"]),
-    action: z.enum(["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"]),
     /**
-     * `model` asked the decision model; `automatic` skipped it (deadlines and
-     * idle check-ins); `fallback` admitted because the model was unavailable.
+     * What became of `lines`: `ignored`, left unread (or unheard, in person);
+     * `deferred`, set aside until the current activity ends.
      */
-    source: z.enum(["model", "automatic", "fallback"]),
-    /** Sim ms before a delayed wake is noticed; 0 when immediate. */
-    delayMs: z.number().nonnegative(),
-    /** The model's categorical answer. */
-    choice: z.string().optional(),
-    /** The model's response-latency score, mapped to `delayMs`. */
-    latencyScore: z.number().optional(),
-    /** Why a fallback was taken. */
-    note: z.string().optional(),
-    /**
-     * A conversation in person (its address) they stopped following: its lines
-     * in this batch went unheard, and they left it.
-     */
+    outcome: z.enum(["ignored", "deferred"]).optional(),
+    /** Oldest first; empty when they only stopped following `tunedOut`. */
+    lines: z.array(
+      z.object({
+        messageId: z.string(),
+        chatId: z.string(),
+        sender: z.string(),
+        /** The start of the line, as the character would have read it. */
+        excerpt: z.string(),
+        /** Messages of a burst read as one; `messageId` is the first. */
+        count: z.number().int().positive().optional(),
+      }),
+    ),
+    /** The conversation in person (its chat id) they stopped following. */
     tunedOut: z.string().optional(),
-    stimulusIds: z.array(z.string()),
-    taskId: z.string().optional(),
+    /** What they were doing; `endAt` in sim ms. */
+    activity: z
+      .object({
+        type: z.string(),
+        description: z.string(),
+        endAt: z.number(),
+      })
+      .optional(),
   }),
 });
 

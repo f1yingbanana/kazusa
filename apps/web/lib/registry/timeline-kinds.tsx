@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  BrainIcon,
   ClockIcon,
   EyeIcon,
+  MessageSquareDashedIcon,
   MessageSquareTextIcon,
   MoonIcon,
   PencilLineIcon,
@@ -13,13 +13,19 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import type { JournalEvent, JournalKind } from "@kazusa/client";
+import { Fragment, type ReactNode } from "react";
 import {
   CharacterChip,
   ChatChip,
   PlaceChip,
 } from "@/components/entities/chips";
 import { taskLabel } from "@/components/entities/task-icon";
-import { formatSimDuration, formatSpeed, MINUTE } from "@/lib/time/sim";
+import {
+  formatSimDuration,
+  formatSimTime,
+  formatSpeed,
+  MINUTE,
+} from "@/lib/time/sim";
 import type { StageLink, TimelineKind } from "./types";
 
 type KindMap = { [K in JournalKind]: TimelineKind<K> };
@@ -204,52 +210,44 @@ export const TIMELINE_KINDS: KindMap = {
   "attention.decided": {
     kind: "attention.decided",
     label: "Attention",
-    icon: BrainIcon,
-    facet: "mind",
-    salience: "low",
+    icon: MessageSquareDashedIcon,
+    facet: "chat",
+    salience: "normal",
     fact: (event) => {
-      const {
-        action,
-        delayMs,
-        question,
-        source,
-        choice,
-        latencyScore,
-        note,
-        tunedOut,
-        stimulusIds,
-      } = event.payload;
-      const outcome =
-        action === "IGNORE"
-          ? "Ignored"
-          : action === "DEFER"
-            ? "Deferred until the current activity ends"
-            : action === "QUEUE_NEXT"
-              ? "Queued after the current thought"
-              : question === "attention_allocation"
-                ? "Interrupted the current thought"
-                : delayMs > 0
-                  ? `Noticed after ${formatDelay(delayMs)}`
-                  : "Noticed immediately";
-      const why =
-        source === "model"
-          ? [choice, latencyScore !== undefined && `score ${latencyScore}`]
-              .filter(Boolean)
-              .join(" · ")
-          : source === "fallback"
-            ? `fallback${note ? `: ${note}` : ""}`
-            : "automatic";
+      const { tunedOut, outcome, lines } = event.payload;
+      // Setting a text aside already says until when.
+      const activity =
+        outcome === "deferred" && lines.length
+          ? undefined
+          : event.payload.activity;
       return (
         <>
-          <span>{outcome}</span>
-          {tunedOut && <span>{` · stopped following ${tunedOut}`}</span>}
-          <span className="font-mono text-xs text-muted-foreground">
-            {` · ${stimulusIds.length} ${stimulusIds.length === 1 ? "stimulus" : "stimuli"} · ${why}`}
-          </span>
+          {passedLines(event.payload)}
+          {tunedOut ? (
+            <>
+              {event.payload.lines.length ? "; stopped" : "Stopped"} following{" "}
+              <ChatChip id={tunedOut} />
+            </>
+          ) : null}
+          {activity ? (
+            <span
+              className="text-muted-foreground"
+              title={activity.description}
+            >{` · ${taskLabel(activity.type)}`}</span>
+          ) : null}
         </>
       );
     },
-    target: (event) => ({ kind: "character", id: event.actors[0] }),
+    target: (event) => {
+      // The row's chat: the first line's, else the conversation left.
+      const [first] = event.payload.lines;
+      return event.chatId
+        ? openChat(
+            event.chatId,
+            first?.chatId === event.chatId ? first.messageId : undefined,
+          )
+        : undefined;
+    },
   },
   "location.noticed": {
     kind: "location.noticed",
@@ -327,8 +325,81 @@ const NOTICED_WHERE = {
  * Pickup delays are often under a minute, which `formatSimDuration` floors to
  * 0m.
  */
-function formatDelay(ms: number) {
-  return ms < MINUTE ? `${Math.round(ms / 1000)}s` : formatSimDuration(ms);
+type AttentionPayload = Extract<
+  JournalEvent,
+  { kind: "attention.decided" }
+>["payload"];
+
+/** "Momoi's", or "Momoi's and Yuzu's". */
+function whose(senders: readonly string[]): ReactNode {
+  return senders.map((id, index) => (
+    <Fragment key={id}>
+      {index > 0 ? (index === senders.length - 1 ? " and " : ", ") : null}
+      <CharacterChip id={id} />
+      {"'s"}
+    </Fragment>
+  ));
+}
+
+/**
+ * What became of the lines, in a few words: a text left unread or set aside, or
+ * the player unheard in person. One line shows its start.
+ */
+function passedLines({
+  outcome,
+  lines,
+  activity,
+}: AttentionPayload): ReactNode {
+  if (!outcome || !lines.length) return null;
+  const senders = [...new Set(lines.map((line) => line.sender))];
+  const chats = new Set(lines.map((line) => line.chatId));
+  const spoken = lines.filter((line) => line.chatId.startsWith("huddle:"));
+  const inPerson = spoken.length === lines.length;
+  const group = chats.size === 1 && lines[0].chatId.startsWith("group:");
+  // A burst of texts read as one counts each.
+  const count = lines.reduce((sum, line) => sum + (line.count ?? 1), 0);
+  const what =
+    count === 1
+      ? inPerson
+        ? "words"
+        : "text"
+      : `${count} ${inPerson ? "lines" : spoken.length ? "messages" : "texts"}`;
+  const said = (
+    <>
+      {senders.length <= 2 ? <>{whose(senders)} </> : null}
+      {what}
+      {group ? (
+        <>
+          {" in "}
+          <ChatChip id={lines[0].chatId} />
+        </>
+      ) : null}
+    </>
+  );
+  const quote =
+    lines.length === 1 ? (
+      <span className="text-muted-foreground">{`: “${lines[0].excerpt}”`}</span>
+    ) : null;
+  if (outcome === "ignored")
+    return inPerson ? (
+      <>
+        Didn&apos;t catch {said}
+        {quote}
+      </>
+    ) : (
+      <>
+        Left {said} unread{quote}
+      </>
+    );
+  return (
+    <>
+      Set {said} aside
+      {activity
+        ? ` until ${taskLabel(activity.type)} ends (${formatSimTime(activity.endAt)})`
+        : " for later"}
+      {quote}
+    </>
+  );
 }
 
 export const TIMELINE_KIND_LIST = Object.values(
@@ -342,9 +413,8 @@ export const DEFAULT_TIMELINE_KINDS: readonly JournalKind[] =
   );
 
 /**
- * The inspector's Recent: what the character did and ran into. Attention
- * bookkeeping (the `mind` facet) fires on every stimulus and would bury it; it
- * stays in the Timeline.
+ * The inspector's Recent: what the character did and ran into, without what
+ * goes on in their head (the `mind` facet), which stays in the Timeline.
  */
 export const RECENT_KINDS: readonly JournalKind[] = TIMELINE_KIND_LIST.filter(
   (kind) => !kind.hiddenByDefault && kind.facet !== "mind",

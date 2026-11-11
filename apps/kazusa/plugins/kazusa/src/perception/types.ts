@@ -44,7 +44,7 @@ export interface AttentionDecision {
 }
 
 /**
- * How an attention decision was reached, retained for debugging. `automatic`
+ * How an attention decision was reached, logged for debugging. `automatic`
  * skips the model (the system console, or idle task check-ins); `fallback` is
  * taken when the model was unavailable: it defers a group chat and queues
  * everything else for the next turn, never interrupting one.
@@ -64,19 +64,48 @@ export interface DecisionTrace {
   readonly tunedOut?: string;
 }
 
-/** One retained attention decision for a stimulus batch. */
-export interface PerceptionDecisionRecord
-  extends AttentionDecision, DecisionTrace {
+/** A text, or something the player said in person, that a character let pass. */
+export interface PassedLine {
+  readonly messageId: string;
+  /** The chat it was said in. */
+  readonly chatId: string;
+  readonly sender: string;
+  /** The start of it, as the character would have read it. */
+  readonly excerpt: string;
   /**
-   * Simulation time of the decision. Delayed attention is ready at simTime +
-   * delayMs.
+   * Several messages a sender sent in a burst, read as one: `messageId` is the
+   * first, and `excerpt` runs them together.
    */
+  readonly count?: number;
+}
+
+/**
+ * An attention decision the player would want to see: a text left unread or set
+ * aside, the player unheard in person, a conversation stopped following. Kept
+ * for the timeline. Every other decision (nine in ten are lines overheard in
+ * person, and most of the rest are acted on at once) is only logged.
+ */
+export interface PerceptionDecisionRecord {
+  /** Simulation time of the decision. */
   readonly simTime: number;
   /** Wall-clock time of the decision, to correlate with Gateway logs. */
   readonly wallTime: number;
-  readonly question: "wake_decision" | "attention_allocation";
-  readonly stimulusIds: readonly string[];
-  readonly taskId?: string;
+  /**
+   * What became of `lines`: `ignored`, left unread (or unheard, in person);
+   * `deferred`, set aside until the current activity ends.
+   */
+  readonly outcome?: "ignored" | "deferred";
+  /** Oldest first; empty when the decision only `tunedOut`. */
+  readonly lines: readonly PassedLine[];
+  /** The conversation in person (its chat) they stopped following. */
+  readonly tunedOut?: string;
+  /** What they were doing. */
+  readonly activity?: {
+    readonly type: string;
+    readonly description: string;
+    /** Sim ms. */
+    readonly endAt: number;
+  };
 }
 
 /** What the character is in the middle of saying through send_message. */

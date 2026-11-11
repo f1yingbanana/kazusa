@@ -269,7 +269,7 @@ apps/kazusa/ (or repository root)
     stimuli.
   - Task deadline re-validation: Expired lease triggers wake; delayed lease
     drops check.
-  - Process restart: Retained stimuli in `"perception"` store survive and
+  - Process restart: Retained stimuli in `"inbox"` store survive and
     re-evaluate.
 
 ---

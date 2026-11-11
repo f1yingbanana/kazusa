@@ -450,18 +450,20 @@ describe("registerTimelineHttp", () => {
       runtime: { ...api.runtime, config: { current: () => api.config } },
     });
 
-    // Two decisions at one sim time (a paused clock) for the same task.
-    const decision = (agentId: string, stimulusIds: string[]) => ({
+    // Two decisions at one sim time (a paused clock) during the same task.
+    const decision = (agentId: string, messageId: string) => ({
       agentId,
       record: {
-        question: "wake_decision" as const,
-        action: "STEER" as const,
-        source: "model" as const,
-        choice: "WAKE",
-        latencyScore: 0.4,
-        delayMs: 94_000,
-        stimulusIds,
-        taskId: "sleep",
+        outcome: "ignored" as const,
+        lines: [
+          {
+            messageId,
+            chatId: "direct:abc",
+            sender: "user:sensei",
+            excerpt: "Are you up?",
+          },
+        ],
+        activity: { type: "sleeping", description: "Nap", endAt: 9_000 },
         simTime: 500,
         wallTime: 1_000,
       },
@@ -469,9 +471,9 @@ describe("registerTimelineHttp", () => {
     registerTimelineHttp(api, {
       clock: createMockClock(),
       decisions: async () => [
-        decision("alice", ["chat-1"]),
-        decision("alice", ["chat-2"]),
-        decision("bob", ["chat-3"]),
+        decision("alice", "chat-1"),
+        decision("alice", "chat-2"),
+        decision("bob", "chat-3"),
       ],
     });
 
@@ -495,15 +497,16 @@ describe("registerTimelineHttp", () => {
     expect(parsed.events).toHaveLength(2);
     expect(
       parsed.events.map(
-        (event: { payload: { stimulusIds: string[] } }) =>
-          event.payload.stimulusIds[0],
+        (event: { payload: { lines: { messageId: string }[] } }) =>
+          event.payload.lines[0]?.messageId,
       ),
     ).toEqual(expect.arrayContaining(["chat-1", "chat-2"]));
     expect(parsed.events[0]).toMatchObject({
       kind: "attention.decided",
       simTime: 500,
       actors: ["alice"],
-      payload: { delayMs: 94_000, choice: "WAKE" },
+      chatId: "direct:abc",
+      payload: { outcome: "ignored", activity: { type: "sleeping" } },
     });
     expect(parsed.events[0].payload).not.toHaveProperty("wallTime");
   });
