@@ -187,10 +187,15 @@ rehoused as a stage view.
 - **Face to face vs. on the phone:** huddles (`type: "huddle"`) are listed first
   under "In person at <place>", and the text chats under "Messages" (no headings
   when there is no huddle). A huddle's header says "In person at <place>", its
-  composer offers **Say / Do**, it has no member management (people join by
-  speaking and leave by walking away), and someone saying a line reads
-  "speaking" (the event's `mode`). Titles come from members when the server's
-  title is just a member id (`chatTitle`), so a DM shows the partner's name.
+  composer reads a message wholly wrapped in asterisks (`*waves*`, `**waves**`)
+  as something done, sent as an action without them (`parseReply`; anything else
+  is said as typed, and text chats read nothing into asterisks); its placeholder
+  says so ("Say something, or _do something_") and a draft that would be sent as
+  an action shows in the actions' muted italics. It has no member management
+  (people join by speaking and leave by walking away), and someone saying a line
+  reads "speaking" (the event's `mode`). Titles come from members when the
+  server's title is just a member id (`chatTitle`), so a DM shows the partner's
+  name.
 - **Actions** (`type: "action"`) are narrated, never bubbled: one line in the
   sender's lane, the name upright and the rest italic ("**Kazusa** leans back.
   She sips her tea."). The text is stored without its subject, the client
@@ -215,6 +220,89 @@ rehoused as a stage view.
   huddle's place). It is a quiet selection: below `xl` it does not pop the
   inspector sheet over the chat. Selecting something else afterwards sticks; a
   link that carries both `chats.id` and `sel` keeps its `sel`.
+- **Scene or Transcript:** a sent huddle (yours or observed) can be drawn as a
+  scene instead of the transcript. Behind the people is the place's backdrop for
+  the sim hour; a place without one has no picture, only the app's background
+  darkened slightly, and no big place name (the header names it). Only people
+  with portraits are drawn: anyone without them never appears and never takes a
+  place, and their lines show in the dialogue box under their name, as the
+  player's do. A wide scene has five places and an upright one (a phone held
+  upright) has one, nothing in between. In the wide scene the figures stand
+  balanced about the middle (one in the middle; two either side of it; three in
+  the middle three; four skipping the middle; five across), in the same
+  left-to-right order; when someone comes or goes the others slide to their new
+  places, and nobody moves because someone speaks. With more than five who can
+  be drawn, someone not shown who speaks or acts takes the place of whoever did
+  so longest ago. On an upright phone the one figure, from the chest up, is
+  whoever said the newest line or started speaking last, a change fading across
+  in place. Every picture is drawn at one scale, standing on one floor line at
+  the scene's foot: the pictures share a canvas, so who is taller or smaller is
+  in them, and nobody is enlarged or shrunk to fit, by character or by outfit.
+  Whoever's line is in the panel (said or done, still being said or finished) is
+  at full brightness for as long as it is there, and everyone else a little
+  dimmed, even someone else who is speaking; when the panel's line is the
+  player's or someone not drawn, or there is none, nobody is dimmed. Nobody
+  grows or steps forward. The scene runs down to the bottom edge; at its foot,
+  in one centred column with one left edge, a panel on a flat scrim of the
+  background colour holds exactly one line: the newest, under a name plate that
+  is always its speaker's, or an action as italic narration without a plate.
+  Nothing shows for a line until it lands; no animated dots. The panel is never
+  taller than half the scene; a long line scrolls inside it. The two lines said
+  before it float above it as echoes, each small on its own thin scrim with its
+  own name, the older fainter, fading about 12 seconds after they left the panel
+  (hovering holds them); they never sit between a plate and its words. "N behind
+  · Jump to live" appears on the panel's edge while lines wait their turn. In
+  your own huddle the panel ends with the reply row: a borderless box that grows
+  to about four lines ("Say something, or _do something_"; Enter sends,
+  Shift+Enter breaks the line) and Send, the same draft as the transcript's box;
+  why nobody answers shows as a slim row just above the panel. Someone else's
+  huddle ends its panel with the read-only note instead. People walk in and out
+  with a short fade and slide. A **Scene | Transcript** control in the header
+  switches (`chats.as`, also remembered as the default); every huddle opens as a
+  scene, with or without art, unless the link or that choice says Transcript;
+  the buttons only the scene has sit left of it, so it never moves. Text chats
+  never show it.
+- **Full screen:** while the scene shows, a button left of the switch shows it
+  full screen: the backdrop, the people and the panel with, in your own huddle,
+  its reply row, so you can keep talking (someone else's huddle keeps its
+  read-only note instead). The browser's full screen where it can, else the
+  scene laid over the whole window (an iPhone); either way an icon-only exit
+  button, in a cluster of icon buttons with tooltips at the top right (Backlog,
+  Reading mode, Exit full screen), and Escape leave, and the sim time shows
+  quietly in the other corner since the top bar is hidden, with the top bar's
+  own clock controls (pause, speeds, advance) beside it for someone who may
+  control the clock. A wide screen gets five places, an upright phone one.
+  Switching to the transcript, the huddle ending or leaving the chat ends it. It
+  is not remembered and not in the link. Backdrops are cropped, never stretched
+  or boxed: an upright or near-square scene shows the middle of the picture, a
+  wide one a little more of the top than the foot, which the dialogue box
+  covers.
+- **Backlog:** the transcript over the scene, as a visual novel's backlog: the
+  same messages, receipts, stickers and actions, opened at the latest. A
+  right-hand panel of readable width over a flat shade of the background (the
+  whole scene on a phone), inside the scene, so it works in full screen too.
+  Opened by clicking an echo, or by Backlog in full screen's cluster; closed by
+  its button, a click on the shade, or Escape, which then does nothing else (it
+  does not leave full screen). It never advances anything in reading mode.
+- **Reading mode:** an open-book button left of full screen (and in full
+  screen's cluster), off by default, offered only to someone who may control the
+  clock. While on, new lines do not show as they arrive: they wait for the
+  reader. The world runs while nothing waits and pauses while a line waits; a
+  paused world is started at 1× when it is turned on, since a line needs the
+  world to run. An advance (a click or tap anywhere on the scene but its
+  controls, the reply row, the echoes and the backlog, or Space, Enter or →
+  outside a text field; the whole scene shows the pointer) shows the next
+  waiting line; when nothing else waits the world runs again. Asked for with
+  nothing waiting, the next line shows the moment it lands, and the panel's
+  corner says in words who is thinking or speaking (no animated dots); a
+  breathing caret there says a line is ready. Echoes stay until pushed out. A
+  reply first shows what waited, is sent, then the world runs. It ends, showing
+  everything that waited and putting back the speed it found exactly (paused
+  included), when turned off, on switching to the transcript, on leaving the
+  chat or the page, when the huddle ends, or when the speed is changed from the
+  top bar or the scene's own clock controls (then without setting anything
+  back). It is not remembered and not in the link: opening a chat never pauses
+  the world.
 - Deep links: `view=chats&chat=<chatId>&msg=<messageId>` scrolls to the message
   and highlights it. Timeline rows link here.
 

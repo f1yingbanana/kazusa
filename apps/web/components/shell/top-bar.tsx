@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { FastForwardIcon, PauseIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,15 +61,30 @@ function SimClock() {
   );
 }
 
-function SpeedControls() {
+/**
+ * Pause, the speeds and advancing the clock: here, and over a scene in full
+ * screen (`embedded`: always shown, on the surface it sits on, and only to a
+ * viewer who may use it; its menu drawn inside `container`, the full-screen
+ * element, where anything on the page's body is hidden).
+ */
+export function SpeedControls({
+  embedded = false,
+  container,
+}: {
+  embedded?: boolean;
+  container?: RefObject<HTMLElement | null>;
+}) {
   const anchor = useClockAnchor();
   const { apply, enabled } = useClockActions();
   const speed = anchor?.clock.speed;
-  if (!anchor) return null;
+  if (!anchor || (embedded && !enabled)) return null;
 
   return (
     <div
-      className="hidden items-center gap-0.5 rounded-lg border p-0.5 sm:flex"
+      className={cn(
+        "items-center gap-0.5",
+        embedded ? "flex" : "hidden rounded-lg border p-0.5 sm:flex",
+      )}
       role="group"
       aria-label="Simulation speed"
     >
@@ -102,7 +118,7 @@ function SpeedControls() {
           <FastForwardIcon />
           <span className="sr-only">Advance clock</span>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent align="end" className="w-40" container={container}>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Advance (forward only)</DropdownMenuLabel>
             {ADVANCE_PRESETS.map((preset) => (

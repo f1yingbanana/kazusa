@@ -2,7 +2,13 @@
 
 import { useQueryStates, parseAsString } from "nuqs";
 import { chatsParsers } from "./search-params";
-import { ChevronLeftIcon, InfoIcon, SpeechIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  ChevronLeftIcon,
+  InfoIcon,
+  Maximize2Icon,
+  SpeechIcon,
+} from "lucide-react";
 import type { CharacterSummary } from "@kazusa/client";
 import { AddPeople } from "@/components/inspector/sections/chat-controls";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
@@ -26,6 +32,12 @@ import { sameEntity, type EntityRef } from "@/lib/state/entity-ref";
 import { requestInspector } from "@/lib/state/ui-store";
 import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
+import {
+  READING_HINT,
+  type ReadingToggleProps,
+} from "./scene/fullscreen-controls";
+import { SceneSwitch } from "./scene/scene-switch";
+import type { ChatRenderingState } from "./scene/use-chat-rendering";
 
 const MAX_FACES = 4;
 
@@ -36,7 +48,8 @@ const MAX_FACES = 4;
  * Details shows the whole chat (pressed while the inspector already does).
  * `own` is the player's own sent chat, for its one contextual action: Add
  * people to a group, call people over in person, or talk in person with the
- * partner of a DM standing where you are.
+ * partner of a DM standing where you are. `rendering` adds Scene | Transcript
+ * for a huddle that can be drawn.
  */
 export function ChatHeader({
   chat,
@@ -44,12 +57,20 @@ export function ChatHeader({
   userId,
   typists,
   onBack,
+  rendering,
+  onFullscreen,
+  reading,
 }: {
   chat: ChatInfo;
   own?: Chat;
   userId: string;
   typists: readonly Typist[];
   onBack: () => void;
+  rendering?: ChatRenderingState;
+  /** Shows the scene full screen; given only while the scene is showing. */
+  onFullscreen?: () => void;
+  /** Reading mode; given only while the scene shows, to a clock manager. */
+  reading?: ReadingToggleProps;
 }) {
   const { canPlay } = useAccess();
   const { byId } = useCharacters();
@@ -117,6 +138,48 @@ export function ChatHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {/* What only the scene has comes first, so Scene | Transcript stays
+            where it is when the rendering changes. */}
+        {reading ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-pressed={reading.on}
+                  className={cn(reading.on && "bg-muted text-foreground")}
+                  onClick={(event) => {
+                    // Turning it on leaves focus on the page, so Space advances
+                    // the scene instead of pressing this button again.
+                    if (!reading.on) event.currentTarget.blur();
+                    reading.onToggle();
+                  }}
+                />
+              }
+            >
+              <BookOpenIcon />
+              <span className="sr-only">Reading mode</span>
+            </TooltipTrigger>
+            <TooltipContent>{READING_HINT}</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {onFullscreen ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" onClick={onFullscreen} />
+              }
+            >
+              <Maximize2Icon />
+              <span className="sr-only">Full screen</span>
+            </TooltipTrigger>
+            <TooltipContent>Full screen</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {rendering?.canScene ? (
+          <SceneSwitch as={rendering.as} onChange={rendering.setAs} />
+        ) : null}
         {!isDirect && others.length > 0 ? (
           <Faces
             ids={others}
