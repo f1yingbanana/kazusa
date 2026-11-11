@@ -6,8 +6,8 @@ import { usePortraits } from "@/hooks/use-scene";
 import { applySceneEvent } from "@/lib/live/scene-state";
 import {
   columnLeft,
-  figureScale,
   floorPercent,
+  standFigure,
   type Framing,
   type SlotCount,
 } from "@/lib/scene/layout";
@@ -42,14 +42,14 @@ function layer(
 }
 
 /**
- * One person in the scene: their portrait for the look they wear, stood in
- * their column on the scene's floor line, drawn at its own natural size times
- * the scene's one scale (`figureScale`): never fitted, never sized per person
- * or outfit, so relative size is the pictures' own. Only people with portraits
- * are figures. `lit`: the speaker of the panel's line, at full brightness while
- * the others are dimmed (`undefined`: nobody dimmed); nobody changes size or
- * place for it. Walking in and out ends in `settle`; a change of column
- * slides.
+ * One person in the scene: their portrait for the look they wear, drawn at its
+ * own natural size times the scene's one scale, never fitted, so relative size
+ * is the pictures' own. It stands with its bottom edge on the scene's floor
+ * line and its feet on its column's centre; `portraits.json` can scale and move
+ * one outfit's pictures (`standFigure`). Only people with portraits are
+ * figures. `lit`: the speaker of the panel's line, at full brightness while the
+ * others are dimmed (`undefined`: nobody dimmed); nobody changes size or place
+ * for it. Walking in and out ends in `settle`; a change of column slides.
  */
 export function SceneFigure({
   chatId,
@@ -103,18 +103,25 @@ export function SceneFigure({
   // portrait would carry the walk's timing into `top` and `height`.
   if (set && portrait && broken !== portrait.url) {
     const mood = figure.look.mood;
+    const stood = sceneHeight
+      ? standFigure(portrait.placement, sceneHeight, framing)
+      : undefined;
     return (
       <div
         key="portrait"
         {...data}
         onAnimationEnd={settle}
-        className={cn(
-          "pointer-events-none absolute -translate-x-1/2",
-          SLIDE,
-          motion,
-        )}
-        // Its bottom edge on the floor line.
-        style={{ left, bottom: `${100 - floorPercent(framing)}%`, zIndex }}
+        className={cn("pointer-events-none absolute", SLIDE, motion)}
+        // Its bottom edge on the floor line, its feet on the column. `translate`
+        // is its own property, so the walk's `transform` adds to it.
+        style={{
+          left,
+          bottom: `${100 - floorPercent(framing)}%`,
+          zIndex,
+          translate: stood
+            ? `calc(${-stood.feetPercent}% + ${stood.x}px) ${stood.y}px`
+            : "-50%",
+        }}
       >
         <img
           src={portrait.url}
@@ -126,8 +133,8 @@ export function SceneFigure({
             "transition-[filter] duration-300 ease-out",
             dimmed && "brightness-[0.72]",
           )}
-          // Natural size, at the scene's one scale.
-          style={sceneHeight ? { zoom: figureScale(sceneHeight, framing) } : {}}
+          // Natural size, at the scene's scale times its own.
+          style={stood ? { zoom: stood.zoom } : {}}
         />
       </div>
     );
