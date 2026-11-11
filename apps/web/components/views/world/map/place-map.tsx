@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CharacterSummary } from "@kazusa/client";
+import type { CharacterSummary, PlacesResponse } from "@kazusa/client";
 import { LocateFixedIcon, MinusIcon, MoveIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
@@ -445,9 +445,10 @@ export function PlaceMap({
     try {
       await savePlacePositions(positions);
       // Show it now; the wiki watcher's `places` event confirms it shortly.
-      await mutate(
+      await mutate<PlacesResponse>(
         [PLACES_KEY],
-        { places: withPositions(world, positions) },
+        (current) =>
+          current && { ...current, places: withPositions(world, positions) },
         { revalidate: false },
       );
       setDraft(null);
