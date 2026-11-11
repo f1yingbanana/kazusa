@@ -17,9 +17,10 @@
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
  *   one filled in by hand) to `<workspace>/portraits/<name>.webp`, and
  *   `portraits.json` with the size, the eyeline and, per outfit, where the
- *   figure is across its pictures (`placement`: `centre`, the middle of the
- *   face, measured here; a `scale` or `offset` set by hand in the file is
- *   kept). It writes nothing else.
+ *   figure is across its pictures and how large to draw it (`placement`:
+ *   `centre`, the middle of the face; `scale`, from the character's height,
+ *   `--height` or the plan's `height`, and where the eyes are; a `scale` or
+ *   `offset` already in the file is kept). It writes nothing else.
  *
  * Originals are kept in `.cache/art/<wiki host>/<File>` (git-ignored, or
  * `--cache`). A re-run reads them and fetches only what is missing.
@@ -62,6 +63,15 @@ export const DEFAULTS = {
    * figures at one size per canvas height (2560-high canvases at 4/3).
    */
   referenceHeight: 1920,
+  /**
+   * How high a standing character's eyes are in a placed picture, in pixels per
+   * cm of their height, when the picture is drawn at scale 1: this cast's
+   * median at `scale` 0.8. With a `height`, each set gets the scale that puts
+   * its eyes there (`heightScale`), so a short character is drawn short.
+   */
+  eyePerCm: 8.11,
+  /** Eyes lower in the picture than this fraction: probably not standing. */
+  lowEyes: 0.24,
   /** A guard only: a set taller than this after `scale` is shrunk, and said. */
   maxHeight: 4000,
   /** Between downloads, not between cache reads. */
@@ -264,6 +274,19 @@ export function centreOf(faceBox, trim) {
   const middle = faceBox[0] + faceBox[2] / 2;
   return round(Math.min(Math.max((middle - trim.left) / trim.width, 0), 1), 3);
 }
+
+/**
+ * The scale a scene draws a set at so that a character `heightCm` tall is drawn
+ * that tall. The art fills its canvas whoever it shows, so its pixels say
+ * nothing about height; the eyes do. They are at one fraction of anyone's
+ * height while standing, whatever the arms, wings, weapon or halo do, so the
+ * scale is the eye height wanted (`eyePerCm` per cm) over the one in the
+ * picture, whose bottom edge is the floor. Wrong for a figure that isn't
+ * standing (seated, kneeling, lying, crouched): its eyes are low for another
+ * reason, and its scale is set by hand.
+ */
+export const heightScale = (heightCm, eyeline, pictureHeight, eyePerCm) =>
+  round((eyePerCm * heightCm) / ((1 - eyeline) * pictureHeight), 3);
 
 /** The scale for a set on a canvas `canvasHeight` high. */
 export const setScale = (canvasHeight, scale, referenceHeight) =>
@@ -1066,6 +1089,16 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
         )
       : undefined;
 
+    const height = opts.height ?? plan.height;
+    const drawn =
+      height === undefined || eyeline === undefined
+        ? undefined
+        : heightScale(height, eyeline, size[1], opts.eyePerCm);
+    if (drawn !== undefined && eyeline > opts.lowEyes)
+      console.warn(
+        `${set.id}: eyes ${eyeline} down the picture; if the figure isn't standing, set its scale by hand`,
+      );
+
     const entries = [];
     for (const [index, picture] of pictures.entries()) {
       const entry = { n: index + 1, source: picture.file };
@@ -1150,6 +1183,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       ...(fits.includes(false) ? { canvasesDiffer: true } : {}),
       ...(eyeline === undefined ? {} : { eyeline }),
       ...(centre === undefined ? {} : { centre }),
+      ...(drawn === undefined ? {} : { heightScale: drawn }),
       portraits: entries,
     });
     const counts = entries.reduce(
@@ -1186,8 +1220,9 @@ function handPlacement(file) {
  * Replaces `<workspace>/portraits/` with the report's named pictures and a
  * `portraits.json`: size and eyeline from the set holding `neutral` (else the
  * first name), and per outfit where the figure is across its pictures
- * (`centre`). A `scale` or `offset` already in the file for an outfit is kept:
- * those are set by hand.
+ * (`centre`) and, when the report has one, the scale for the character's height
+ * (`scale`). A `scale` or `offset` already in the file for an outfit is kept: a
+ * correction made by hand outlives the next import.
  */
 export function placePortraits(reportFile) {
   const report = JSON.parse(readFileSync(reportFile, "utf8"));
@@ -1235,7 +1270,7 @@ export function placePortraits(reportFile) {
       );
   const placement = {};
   for (const set of new Set(chosen.map(({ set }) => set))) {
-    const { scale, offset } = hand[set.outfit ?? ""] ?? {};
+    const { scale = set.heightScale, offset } = hand[set.outfit ?? ""] ?? {};
     const entry = {
       ...(set.centre === undefined ? {} : { centre: set.centre }),
       ...(scale === undefined ? {} : { scale }),
@@ -1264,6 +1299,7 @@ const USAGE = `Usage:
       --cache <dir>          originals cache (default .cache/art)
       --scale <f>            scale for a canvas --reference-height high (default ${DEFAULTS.scale})
       --reference-height <px>  other canvases scale by this ÷ their height (default ${DEFAULTS.referenceHeight})
+      --height <cm>          the character's height: each set gets the scale that draws them that tall
       --max-height <px>      guard: shrink a set taller than this (default ${DEFAULTS.maxHeight})
       --delay <ms>           pause between downloads (default ${DEFAULTS.delay})
       --user-agent <text>    User-Agent header (default ${DEFAULTS.userAgent})
@@ -1277,6 +1313,7 @@ function parseOptions(args) {
     "--cache": ["cache", String],
     "--scale": ["scale", Number],
     "--reference-height": ["referenceHeight", Number],
+    "--height": ["height", Number],
     "--max-height": ["maxHeight", Number],
     "--delay": ["delay", Number],
     "--user-agent": ["userAgent", String],

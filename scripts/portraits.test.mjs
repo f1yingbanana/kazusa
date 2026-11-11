@@ -16,6 +16,7 @@ import {
   alignBox,
   cacheKey,
   centreOf,
+  heightScale,
   matchPictures,
   outfitOf,
   outfitOfSet,
@@ -327,6 +328,44 @@ describe("portraits stage", () => {
         offset: [12, -30],
       },
     });
+  });
+
+  it("gives each set the scale for the character's height, unless one is set", async () => {
+    const tall = await stagePortraits(
+      plan,
+      workspace,
+      path.join(root, "staged-height"),
+      { ...options(cache), height: 150 },
+    );
+    const [set] = tall.sets;
+    expect(set.heightScale).toBe(
+      heightScale(150, set.eyeline, set.size[1], DEFAULTS.eyePerCm),
+    );
+    expect(report.sets[0]).not.toHaveProperty("heightScale");
+    const reportFile = path.join(root, "staged-height", "stage.json");
+    const manifestFile = path.join(workspace, "portraits", "portraits.json");
+    // The scale set by hand in the last test stays…
+    placePortraits(reportFile);
+    expect(read(manifestFile).placement[set.outfit].scale).toBe(0.75);
+    // …and without one, the height's is written.
+    writeFileSync(manifestFile, JSON.stringify({}));
+    placePortraits(reportFile);
+    expect(read(manifestFile).placement[set.outfit]).toEqual({
+      centre: set.centre,
+      scale: set.heightScale,
+    });
+  });
+});
+
+describe("heightScale", () => {
+  it("draws a character as tall as they are, from where the eyes are", () => {
+    // Eyes 1,280 px above the floor of a 1,600-high picture.
+    const scale = (cm) => heightScale(cm, 0.2, 1600, 8);
+    expect(scale(160)).toBe(1);
+    expect(scale(128)).toBe(0.8);
+    expect(scale(180)).toBe(1.125);
+    // The same character with more above the head (a halo, a raised rifle).
+    expect(heightScale(160, 0.36, 1600, 8)).toBe(1.25);
   });
 });
 
