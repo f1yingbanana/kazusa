@@ -10,6 +10,7 @@ import {
   columnLeft,
   figureColumns,
   figureScale,
+  standFigure,
   floorPercent,
   slotCount,
 } from "./layout";
@@ -75,5 +76,29 @@ describe("one scale for every figure", () => {
     expect(floorPercent("full")).toBeCloseTo(FLOOR_Y * 100);
     expect(floorPercent("bust")).toBeCloseTo(BUST_FLOOR_Y * 100);
     expect(FLOOR_Y).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("standing a figure", () => {
+  it("centres the picture and keeps the scene's scale without a placement", () => {
+    expect(standFigure(undefined, 768, "full")).toEqual({
+      zoom: figureScale(768, "full"),
+      feetPercent: 50,
+      x: 0,
+      y: 0,
+    });
+  });
+
+  it("puts the feet on the column, and scales the offset with the picture", () => {
+    const scene = figureScale(1_536, "full");
+    const stood = standFigure(
+      { feet: 0.6, scale: 0.75, offset: [40, -20] },
+      1_536,
+      "full",
+    );
+    expect(stood.feetPercent).toBe(60);
+    expect(stood.zoom).toBeCloseTo(scene * 0.75);
+    expect(stood.x).toBeCloseTo(40 * scene * 0.75);
+    expect(stood.y).toBeCloseTo(-20 * scene * 0.75);
   });
 });

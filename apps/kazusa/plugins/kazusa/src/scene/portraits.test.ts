@@ -35,7 +35,16 @@ describe("portrait sets", () => {
         "figure.svg",
       ],
       {
-        portraits: { size: [820, 1640], eyeline: 0.21 },
+        portraits: {
+          size: [820, 1640],
+          eyeline: 0.21,
+          placement: {
+            "": { feet: 0.4 },
+            gym: { feet: 0.6, scale: 0.8 },
+            "gym-happy": { offset: [10, -20] },
+            happy: { feet: 7, scale: 0 },
+          },
+        },
         stickers: { outfits: { gym: "a gym uniform" } },
       },
     );
@@ -57,6 +66,17 @@ describe("portrait sets", () => {
     });
     expect(set.portraits.get("eyes-closed")).not.toHaveProperty("outfit");
     expect(set.portraits.get("gym")).toMatchObject({ mood: "gym" });
+    // Placement: by outfit ("" without one); one picture's own entry wins
+    // whole; bad fields are dropped, and an entry left empty with them.
+    expect(set.portraits.get("eyes-closed")?.placement).toEqual({ feet: 0.4 });
+    expect(set.portraits.get("gym")?.placement).toEqual({
+      feet: 0.6,
+      scale: 0.8,
+    });
+    expect(set.portraits.get("gym-happy")?.placement).toEqual({
+      offset: [10, -20],
+    });
+    expect(set.portraits.get("happy")).not.toHaveProperty("placement");
     expect(set).toMatchObject({
       default: "eyes-closed",
       size: [820, 1640],

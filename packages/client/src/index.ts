@@ -1378,7 +1378,24 @@ export const PortraitSchema = z.object({
   outfit: z.string().optional(),
   /** The rest of the name, dashes kept. */
   mood: z.string(),
+  /** How to stand it in a scene, where `portraits.json` says. */
+  placement: z
+    .object({
+      /**
+       * Where the figure stands across the picture: 0 its left edge, 1 its
+       * right. Absent: the middle.
+       */
+      feet: z.number().optional(),
+      /** Drawn this many times its size, about where it stands. Absent: 1. */
+      scale: z.number().optional(),
+      /** Moved `[right, down]`, in the picture's own pixels. Absent: none. */
+      offset: z.tuple([z.number(), z.number()]).optional(),
+    })
+    .optional(),
 });
+export type PortraitPlacement = NonNullable<
+  z.infer<typeof PortraitSchema>["placement"]
+>;
 export type Portrait = z.infer<typeof PortraitSchema>;
 
 export const PortraitsResponseSchema = z.object({
