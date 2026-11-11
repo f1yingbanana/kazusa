@@ -355,6 +355,16 @@ describe("politeGet", () => {
     expect(agents).toEqual(["art-importer/1.0", "other/2.0"]);
   });
 
+  it("gives up on a request that stalls", async () => {
+    const fetchImpl = (_url, init) =>
+      new Promise((_resolve, reject) =>
+        init.signal.addEventListener("abort", () => reject(init.signal.reason)),
+      );
+    await expect(
+      politeGet("http://example.test/a", fetchImpl, undefined, 50),
+    ).rejects.toThrow(/Couldn't fetch .*/);
+  });
+
   it("waits out a 429's Retry-After once, then gives up", async () => {
     let calls = 0;
     const fetchImpl = async () => {

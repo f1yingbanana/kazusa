@@ -48,6 +48,8 @@ export const DEFAULTS = {
   maxHeight: 1600,
   /** Between downloads, not between cache reads. */
   delay: 500,
+  /** Longest a request may take, body included, in ms. */
+  timeout: 120_000,
   /** Sent with every request; generic, so it names no project or person. */
   userAgent: "art-importer/1.0",
   /**
@@ -103,18 +105,24 @@ export function retryAfter(header, now = Date.now()) {
 }
 
 /**
- * One request; a 429 or 503 is tried once more after the server's Retry-After
- * (at most 30 s). Anything else that fails stops the run with what failed.
+ * One request, given up after `timeout` ms; a 429 or 503 is tried once more
+ * after the server's Retry-After (at most 30 s). Anything else that fails stops
+ * the run with what failed.
  */
 export async function politeGet(
   url,
   fetchImpl = fetch,
   userAgent = DEFAULTS.userAgent,
+  timeout = DEFAULTS.timeout,
 ) {
   for (let attempt = 1; ; attempt++) {
     let response;
     try {
-      response = await fetchImpl(url, { headers: { "User-Agent": userAgent } });
+      // The timeout covers reading the body too: a stalled download fails.
+      response = await fetchImpl(url, {
+        headers: { "User-Agent": userAgent },
+        signal: AbortSignal.timeout(timeout),
+      });
     } catch (error) {
       throw new Error(`Couldn't fetch ${url}: ${error.message}`, {
         cause: error,
@@ -848,7 +856,7 @@ const thumb = (buffer) =>
 
 export async function stagePortraits(planFile, workspace, dir, options = {}) {
   const opts = { ...DEFAULTS, ...options };
-  const get = (url) => politeGet(url, opts.fetch, opts.userAgent);
+  const get = (url) => politeGet(url, opts.fetch, opts.userAgent, opts.timeout);
   const plan = JSON.parse(readFileSync(planFile, "utf8"));
   const face = plan.crop !== "whole";
   const cache = path.join(opts.cache, cacheKey(plan));
