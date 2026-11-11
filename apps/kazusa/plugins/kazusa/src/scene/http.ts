@@ -87,6 +87,9 @@ export function registerScene(
         url: portraitUrl(id, portrait),
         ...(portrait.outfit === undefined ? {} : { outfit: portrait.outfit }),
         mood: portrait.mood,
+        ...(portrait.placement === undefined
+          ? {}
+          : { placement: portrait.placement }),
       })),
       ...(set.default === undefined ? {} : { default: set.default }),
       ...(set.size === undefined ? {} : { size: [set.size[0], set.size[1]] }),
