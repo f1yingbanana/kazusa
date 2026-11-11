@@ -37,8 +37,9 @@ const MANIFEST = z.object({
   eyeline: z.number().min(0).max(1).optional().catch(undefined),
   /**
    * Placement by outfit word (`""` for pictures without one), or by one
-   * picture's name, which wins. The importer measures `centre`; `scale` and
-   * `offset` are set by hand for the picture that needs them.
+   * picture's name, which wins. The importer writes `centre` and, from the
+   * character's height, `scale`; either can be corrected by hand, as `offset`
+   * always is, and the importer keeps a `scale` or `offset` it finds.
    */
   placement: z
     .record(z.string(), PLACEMENT.catch({}))
