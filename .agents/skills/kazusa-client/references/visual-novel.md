@@ -1,0 +1,924 @@
+# Visual Novel Mode for Huddles (the Scene view)
+
+Status (2026-11-11): design, revised the same day after review (§13). Nothing
+here is built. It answers the preliminary research report "Real-Time Visual
+Novel Stage and Text Rendering Architecture" (Gemini, written without access to
+this code); §14 lists where that report and this code disagree.
+
+Goal: a face-to-face conversation looks like people in a place, not like a group
+chat. A background for where they are, a figure for each person talking, a line
+of dialogue as it is said. Everything else in Kazusa stays as it is: the scene
+is another way to look at a huddle, never another kind of conversation.
+
+Names. "Stage" is taken twice (the client's main area, `StageView`; the
+backend's onstage/offstage, `src/stage/`), so this document says **Scene** for
+the visual novel view, **figure** for a person drawn in it and **backdrop** for
+the picture behind them. A checkpoint's `scene.json`
+([worlds](../../kazusa/references/worlds.md) §4) is unrelated.
+
+## Contents
+
+0. Decisions
+1. Build or adopt an engine
+2. Simulation: what a conversation looks like
+3. Player: what is fun, and where it shows
+4. The prototype (M0)
+5. Architecture
+6. Backend changes
+7. Reading mode: advance on click
+8. Assets
+9. Rigs and 3D
+10. Phases
+11. Risks and what to measure
+12. Open questions
+13. Decision log
+14. Where the research report differs from this code
+
+## 0. Decisions
+
+1. **We build the scene ourselves and adopt no visual novel engine** (§1).
+2. **The prototype is DOM only**: one `<img>` for the backdrop, one per figure,
+   a dialogue box. No canvas, no WebGL, no new dependency.
+3. **The scene is a renderer of a huddle**, chosen like the World view's
+   `world.as=map|list`: `chats.as=scene|list`. Same chat, same messages, same
+   composer. The transcript is the scene's backlog.
+4. **The server keeps pacing.** The floor already makes speech take time, one
+   speaker at a time ([floor](../../kazusa/references/floor.md)). The client
+   lays out and reveals.
+5. **No feature here adds a model call or a decision call.** What the scene
+   needs beyond the words rides calls that already happen (a field on a bubble
+   the character is already sending) or is computed by code (time of day).
+6. **A face is the speaker's own choice and everyone present sees it**: an
+   optional `face` on a spoken bubble of `send_message`, from the same
+   vocabulary as stickers (§6.3).
+7. **Looks come in sets, for people and for places.** A character's set is
+   outfit × mood (`[<outfit>-]<mood>`, as stickers are today). A place's
+   backdrop set is state × time of day (`[<state>-]<time>`). The mood is chosen
+   by the character; the outfit and the place's state come from the status
+   system ([status](../../kazusa/references/status.md)); the time is picked by
+   code from the sim clock.
+8. **Art belongs to the world and ships with it**, in the world's repository,
+   kept together by file convention and served by plugin routes. Nothing goes in
+   `apps/web/public`, and nothing in `IDENTITY.md`, which is in every turn's
+   system prompt.
+9. **Scene state lives in a Zustand store**, changed by pure reducer functions;
+   renderers hold no rules, so rigs or 3D can replace the DOM renderer later
+   (§9).
+
+## 1. Build or adopt an engine
+
+The report concludes we should not adopt an engine. That conclusion is right.
+Its reasons are partly beside the point, so here is the argument from our code.
+
+### 1.1 What an engine is, and what we would use of it
+
+| Part of a VN engine                       | Kazusa already has                                                                                      | Use the engine's? |
+| :---------------------------------------- | :------------------------------------------------------------------------------------------------------ | :---------------- |
+| Script language and parser                | There is no script. The story is the simulation, live.                                                  | No                |
+| Flow control (advance on click, labels)   | Speech is timed by the floor and the sim clock. Advance on click is a clock hold (§7), not a script.    | No                |
+| Game state, variables                     | Keyed stores, ledgers, the canonical message database.                                                  | No                |
+| Save, load, rollback                      | Worlds, checkpoints and saves ([worlds](../../kazusa/references/worlds.md) §4). Play is not reversible. | No                |
+| Backlog / history                         | `messages.sqlite`, `GET /kazusa/messages`, the virtualized `MessageList`.                               | No                |
+| Live updates                              | One SSE stream per tab, `LiveHandler` registry.                                                         | No                |
+| Menus, settings, UI chrome                | The shell, registries, shadcn components, URL state.                                                    | No                |
+| Asset loading                             | Immutable versioned URLs (`/kazusa/avatar`, `/kazusa/sticker`), the browser's image cache.              | No                |
+| **Stage: backdrop, figures, transitions** | Nothing.                                                                                                | This is the gap   |
+| **Text box: name, line, reveal**          | Bubbles only.                                                                                           | This is the gap   |
+
+The gap is the two smallest parts, and for static pictures they are image
+elements with CSS transitions and a text reveal. Adopting an engine to get them
+means running a second state container beside ours and fighting the other eight
+rows. It would also break the client's fixed decisions: one backend (D2),
+contracts in `@kazusa/client` (D3), registries (D8), one lens layer (D9).
+
+### 1.2 The candidates
+
+License and versions rechecked 2026-11-11 for the first two; the other two are
+as the report states them.
+
+| Engine     | Stack                                      | License  | Why not                                                                                                                                                       |
+| :--------- | :----------------------------------------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WebGAL     | React 17, Redux, PixiJS 6 (`webgal` 4.6.6) | MPL-2.0  | We are on React 19 and Next 16. Driven by `.txt` scripts; every line would be serialized into its DSL to be parsed back. Its whole runtime is the click loop. |
+| Pixi'VN    | PixiJS 8 canvas, UI left to React          | LGPL-2.1 | The closest fit, and still: one dialogue slot, a step history we would have to disable, and a canvas we do not need for `<img>` figures.                      |
+| Monogatari | Web Components, global singletons          | MIT      | DOM images like our prototype, but built on reversible script actions and a one-time global init that breaks on React remount.                                |
+| Narrat     | Vue 3, Pinia                               | MIT      | Wrong framework. Its side dialogue panel is a layout idea, not code we can use.                                                                               |
+
+SillyTavern's visual novel mode is the nearest prior art for chat-driven
+sprites: figures divided across the width, a classifier picking one of a fixed
+set of expression labels from each reply. Ours differs where it matters: looks
+are per character, and the speaker chooses their own face.
+
+### 1.3 Where the report's reasoning is off
+
+- Its percentages ("85% discarded") are estimates, and its main technical
+  objections are about problems we do not have. Text clobbering, a playback
+  queue with time dilation and a 4-slot LRU cache for 100-person rooms all
+  assume raw, unpaced lines from a crowd. Here a huddle is a small conversation
+  and the floor already paces it (§14).
+- It recommends PixiJS, Spine and Live2D as phase two. For static pictures a
+  canvas adds cost (context loss, texture lifecycle, harder screenshots) and
+  nothing we need. A canvas is justified only when figures are rigs (§9).
+
+### 1.4 What we will take from outside, later
+
+Renderer runtimes, not engines, and only when a world's art needs them:
+
+- `three` with `@pixiv/three-vrm` (MIT) for VRM figures.
+- A Spine or Live2D runtime for 2D rigs. Both carry license conditions (Spine's
+  runtimes are licensed to Spine Editor licensees; Live2D's Cubism SDK has its
+  own release terms). Read them before a world depends on either.
+
+## 2. Simulation: what a conversation looks like
+
+The design method ([kazusa skill](../../kazusa/SKILL.md) §0) starts here. What
+do people in a room perceive, what does Kazusa already simulate, and what would
+the scene show?
+
+| In a real conversation                         | Kazusa today                                                                                             | The scene shows                                   | Missing                                                               |
+| :--------------------------------------------- | :------------------------------------------------------------------------------------------------------- | :------------------------------------------------ | :-------------------------------------------------------------------- |
+| You are somewhere.                             | `Chat.placeId`; the place page (`summary`, body, `parent`).                                              | The backdrop.                                     | A backdrop set for the place (§8.2).                                  |
+| It is some time of day.                        | The sim clock, `useSimNow()`.                                                                            | The set's picture for that time.                  | Nothing: code picks.                                                  |
+| The place is in some condition.                | Nothing.                                                                                                 | The set's picture for that state.                 | A place's state (the status system; default only for now).            |
+| Certain people are in this conversation.       | Huddle `members`; SSE `chats`; journal `chat.members_changed`.                                           | Their figures.                                    | Portraits (§8.1).                                                     |
+| People walk up and walk off.                   | `talk`, `leavePlace`, system action lines.                                                               | Figures enter and leave.                          | Nothing.                                                              |
+| One person speaks at a time, and it takes time | The floor; `composingMs(…, "speaking")`; the `typing` event with `mode: "speaking"`.                     | The speaker stands out; the line appears as said. | The line's text at its start, not its end (§6.2).                     |
+| Someone cuts in; a sentence breaks off.        | `CUT_IN`; cut-off lines commit up to the word reached, ending in "—".                                    | Two speakers lit; the first line stops.           | Nothing beyond §6.2.                                                  |
+| You see what people do.                        | Action bubbles (`type: "action"`), third person, face to face only.                                      | A narration line.                                 | Nothing.                                                              |
+| You see their faces, and they see each other's | Nothing face to face. Stickers (a picture of a mood, 50 to 84 per character) are dropped in huddles      | The figure's expression.                          | A face on a spoken line, shown to viewers and to listeners (§6.3).    |
+| You see what they wear.                        | Outfits exist only as sticker name prefixes and `stickers.json` `outfits`. No state says who wears what. | The figure's outfit.                              | The `outfit` status ([status](../../kazusa/references/status.md)).    |
+| You do not see thoughts.                       | Monologues live on task rows (observer data). Unsaid lines reach no ledger.                              | Nothing in the Player lens.                       | Lens selectors (`lib/lens/`, not built), if the Observer wants minds. |
+
+Two things follow.
+
+**Characters already give stage directions.** An action bubble is one, and the
+`in-person` skill already teaches it. We do not need the model to write more
+prose. What is missing is one small categorical fact per line (the face) and one
+piece of slow state (the outfit).
+
+**Looks already exist as a vocabulary.** A sticker set names each look
+`[<outfit>-]<mood>` and `stickers.json` describes outfits and faces in words.
+The imported sets are face crops of full-body expression portraits, so every
+sticker name corresponds to a whole-figure picture we can fetch again (§8.4).
+One vocabulary drives three pictures of the same thing: the sticker, the
+portrait, and later a 3D model's expression.
+
+## 3. Player: what is fun, and where it shows
+
+- **Walking in.** You go to a place, the backdrop is that place at this hour,
+  and the people you turned to are standing there.
+- **Reading a table by looking at it.** Who is speaking, who just stopped, who
+  walked off.
+- **A face that changes, and gets noticed.** The same sentence lands differently
+  said with a flat stare. Because the others see it too, someone can ask what
+  that look was for.
+- **Being cut off.** A line stops mid-word with "—" and another figure lights
+  up.
+- **Small physical business.** Action lines read as narration between spoken
+  lines.
+- **Reading at your own pace.** Reading mode (§7): the world waits for your
+  click, like a visual novel, and the next line is already there when you do.
+- **Peeking.** The Observer opens someone else's huddle and watches it as a
+  scene, read-only. Also the easiest thing to show a new user.
+- **A picture worth sharing.** A scene screenshot (backdrop, figures, the line,
+  the world's credit).
+
+Where it surfaces: the Chats view, for a huddle, as its default rendering when
+the world has art. One control switches to the transcript and back. Text chats
+never use it.
+
+Never fun: a figure for every one of 40 people in a cafeteria, faces that
+flicker on every line, waiting several seconds after every click, or any wording
+in a character's prompt about sprites, slots or scenes.
+
+## 4. The prototype (M0)
+
+The smallest thing that reads as a visual novel and can be shown. Static
+backdrop, static whole-figure portraits, one dialogue box. No change to what any
+model reads or says.
+
+```text
+┌ chat header (unchanged) ──────────────────────────  [Scene | Transcript] ┐
+│                                                                          │
+│   backdrop <img>, object-fit: cover                                      │
+│                                                                          │
+│        ┌────┐      ┌────┐        ┌────┐                                  │
+│        │    │      │ ★  │        │    │      ★ speaking: full brightness │
+│        │ A  │      │ B  │        │ C  │        others: slightly dimmed   │
+│        │    │      │    │        │    │                                  │
+│  ┌─────┴────┴──────┴────┴────────┴────┴───────────────────────────────┐  │
+│  │ B                                                                  │  │
+│  │ The line being said, revealed as text.                             │  │
+│  │ sets the bag down                         (action: italic, muted)  │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+├ composer (unchanged: Say / Do) ──────────────────────────────────────────┤
+```
+
+What it does, and from which data:
+
+| Behaviour            | Source                                                                                                              |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| Backdrop             | `Chat.placeId` → place → backdrop set (new, §6.1) → the picture for the sim hour. No set: a plain surface and name. |
+| Figures              | Huddle `members` minus the player → each character's default portrait (new). No portrait: an avatar card.           |
+| Enter and leave      | Diff of `members` on SSE `chats`. A fade and a short slide.                                                         |
+| Speaker              | `typing` events with `mode: "speaking"`, replayed in `connected.typing`. Two at once light two.                     |
+| The line             | `message` events. In M0 a line arrives when it has been said, so it appears whole (§6.2 fixes this).                |
+| Actions              | `type: "action"` through the existing `actionLine()`; shown as narration, never in the name plate.                  |
+| The player           | Not drawn (first person). Their lines show under their display name. Composer unchanged.                            |
+| Backlog              | The Transcript toggle (`chats.as=list`).                                                                            |
+| Observed huddles     | `ObservedChatView` renders the same scene, read-only.                                                               |
+| Paused clock         | Nothing arrives; the scene holds.                                                                                   |
+| More people than fit | Only as many figures as fit are drawn. The rest are not shown; their lines still appear with their names.           |
+
+Left out of M0: expressions, outfits, live reveal, reading mode, audio, replay,
+screenshots, anything on a canvas.
+
+Acceptance for M0:
+
+1. With a world that has a backdrop and portraits, opening a huddle shows the
+   scene; with none, the same view degrades to avatar cards on a plain surface
+   and is still usable.
+2. A character joining, speaking, acting and leaving are each visible without
+   opening the transcript.
+3. Switching Scene and Transcript loses nothing: same messages, same receipts,
+   same composer draft.
+4. An observed huddle opens as a scene from a link.
+5. The backdrop changes with the sim hour when the set has more than one time.
+6. At phone width one or two figures show, cropped to the bust, and the dialogue
+   box and composer stay reachable.
+
+## 5. Architecture
+
+### 5.1 Layers
+
+```text
+plugin read model          existing: chats, message, typing, clock
+  + portraits, backdrops   new art routes and fields (§6.1)
+  + speech start, face     later fields on existing events (§6.2, §6.3)
+        │  @kazusa/client schemas, parsed at the fetch boundary
+        ▼
+lib/scene/director.ts      pure reducers: (SceneState, event) → SceneState
+lib/scene/pick.ts          pure: backdrop file for (set, state, sim time);
+                           portrait file for (set, outfit, mood)
+        │
+lib/live/scene-state.ts    Zustand store: scenes by chat id, reading buffer
+        │  per-chat selectors, useShallow for collections
+        ▼
+SceneRenderer              components/views/chats/scene/*
+  dom (M0: <img> + CSS)    later: rigs, three (§9), same props
+        ▼
+overlay (DOM, always)      name plate, line, narration, controls
+```
+
+### 5.2 State
+
+Scene state is shared client state, so it follows the client's Zustand rules
+([kazusa-client skill](../SKILL.md) §5):
+
+- `lib/live/scene-state.ts` holds data only:
+  `scenes: Record<chatId, SceneState>`. Actions are named module exports that
+  call `setState` with a reducer from `lib/scene/director.ts`. No store
+  wrappers, no contexts mirroring it.
+- The existing live handlers and the SWR fetchers call those actions: `message`,
+  `typing` and `chats` events, and the huddle's first read (which seeds the
+  scene, as other snapshots seed their projections).
+- Components subscribe per chat with scalar selectors (`useSceneLine(chatId)`)
+  and `useShallow` for the figure list. A scene is created when its view mounts
+  and dropped when it unmounts.
+- Preferences (reading mode on or off, the default rendering) live in the
+  persisted preferences store in `lib/state/`. `chats.as` stays in the URL.
+- Art manifests are resources, so they are SWR, not Zustand.
+
+```ts
+/** A look by its set-name parts. No outfit means usual clothes. */
+interface Look {
+  readonly outfit?: string;
+  readonly mood?: string;
+}
+
+interface Figure {
+  readonly id: string; // character id
+  readonly slot: number; // stable while present
+  readonly look: Look;
+  readonly presence: "entering" | "here" | "leaving";
+  readonly speaking: boolean;
+}
+
+interface SceneLine {
+  readonly messageId?: string; // absent while the line is still being said
+  readonly speakerId: string;
+  readonly kind: "speech" | "action";
+  readonly text: string;
+  /** Sim-time window of the saying, when known (§6.2). */
+  readonly said?: { readonly from: number; readonly until: number };
+  readonly cutOff: boolean;
+}
+
+interface SceneState {
+  readonly chatId: string;
+  readonly placeId?: string;
+  readonly figures: readonly Figure[];
+  readonly lines: readonly SceneLine[]; // the few on screen, newest last
+  /** Lines received but not shown yet: reading mode (§7), or catching up. */
+  readonly ahead: readonly SceneLine[];
+}
+```
+
+Deliberately absent: URLs, pixel positions, timers, the renderer kind, and the
+time of day (renderers read `useSimNow`).
+
+### 5.3 Director rules
+
+- **Slots.** A figure keeps its slot from entering to leaving, so nobody jumps
+  sideways when someone else arrives. Slots fill from the centre outward. The
+  renderer says how many fit (5 wide, 2 on a phone).
+- **More members than slots.** Members without a slot are simply not drawn, and
+  nothing lists them. When one of them speaks, they take the slot of whoever
+  spoke longest ago, in place, so the speaker always has a figure.
+- **Speaker.** From speaking events, not from messages, so the highlight starts
+  when the line starts. A committed message from someone not marked speaking
+  (the player, recovered sends) lights them briefly.
+- **Face.** A figure keeps the mood of its last line that carried a `face`
+  (§6.3). It returns to neutral when the person leaves the huddle.
+- **Lines.** Speech replaces the same speaker's previous speech line and pushes
+  others up; at most three lines stay visible, older ones dimmer. An action line
+  never replaces speech and never takes the name plate.
+- **Cut-offs.** A committed text that ends in "—" and is shorter than the line
+  being revealed stops the reveal there.
+- **Catching up.** At 1x the server's pacing is the pacing. When the clock runs
+  faster, lines can arrive faster than they can be read: they wait in `ahead`,
+  each line gets a minimum time on screen by its length, and the overlay shows
+  "N behind · Jump to live". The view never changes the clock outside reading
+  mode.
+- **Opening mid-conversation.** The scene starts from the current members and
+  the last few cached messages; nothing is replayed.
+
+### 5.4 Renderer contract
+
+```ts
+interface SceneRendererProps {
+  readonly chatId: string; // subscribes to its own scene
+  readonly art: SceneArt; // manifests for this scene's cast and backdrop
+  readonly maxFigures: number;
+}
+```
+
+A renderer draws the best form of art it supports and falls back down the list:
+model → rig → portrait → avatar card.
+
+### 5.5 Where it lives in the client
+
+- `components/views/chats/scene/`: `scene-view.tsx`, `dom-renderer.tsx`,
+  `dialogue-box.tsx`, `figure.tsx`, `reading-controls.tsx`.
+- `lib/scene/`: `state.ts`, `director.ts`, `pick.ts`, `layout.ts`, tests beside
+  each (tables of events in, states out).
+- `lib/live/scene-state.ts`: the store and its actions.
+- `chats/search-params.ts`: `chats.as` (`scene` | `list`), default `scene` for a
+  huddle when the `scene` domain is live, `history: "replace"`.
+- `chat-view.tsx` and `observed-chat-view.tsx` pick `MessageList` or `SceneView`
+  for `chat.type === "huddle"`. No shell change and no new registry entry: this
+  is inside an existing stage view.
+- Domain `scene` in `Domain` and in `/kazusa/world` capabilities (D10).
+- D1 holds: no lore in components. D5 holds: a scene loads art only for its own
+  cast. The chrome stays the neutral instrument panel; the scene is the one
+  surface where the world's art dominates, so the overlay uses the existing
+  surface and foreground tokens over a scrim, no gradients.
+
+## 6. Backend changes
+
+Each is a contract change first (`@kazusa/client`), then the plugin, then the
+proxy allowlist and access policy (`observe`, like stickers).
+
+| #   | Change                                 | Phase | New model calls | New decision calls | Prompt and schema cost                                                     |
+| :-- | :------------------------------------- | :---- | :-------------- | :----------------- | :------------------------------------------------------------------------- |
+| 6.1 | Portrait and backdrop routes, fields   | M0    | 0               | 0                  | None                                                                       |
+| 6.2 | A spoken line's text when it starts    | M1    | 0               | 0                  | None                                                                       |
+| 6.3 | `face` on a spoken bubble, seen by all | M1    | 0               | 0                  | About 20 mood words once in the cached tool schema; a few tokens when used |
+| 6.4 | Outfit, from the status system         | M2    | 0               | 0                  | One optional `start_task` parameter for characters with outfits            |
+| 6.5 | Reading mode hold                      | M2    | 0               | 0                  | None                                                                       |
+
+### 6.1 Art routes and fields (M0)
+
+- `GET /kazusa/portraits?id=`: a character's portrait set: names, each picture's
+  URL, and the set's `eyeline` (§8.1). Fetched per scene member, never per
+  roster row.
+- `GET /kazusa/portrait?id=&name=&v=`: one picture, served exactly like stickers
+  (roster ids only, names in the set only, raster only, immutable cache, version
+  from mtime).
+- `CharacterSummary.portraitUrl?`: the default portrait (the look named
+  `neutral`, else the first), beside `avatarUrl`.
+- Place frontmatter gains `backdrop: <set>` in `PLACE_FRONTMATTER`
+  (`location/map.ts`). The read model resolves it up the `parent` chain, so a
+  room without one uses its building's and 720 places need a few dozen sets.
+  `Place.backdrop?: string`.
+- `PlacesResponse.backdrops`: `Record<set, { files: Record<name, url> }>`, and
+  the world's `times` (§8.2). The client picks the file; the server pushes
+  nothing as time passes.
+- `GET /kazusa/backdrop?set=&name=&v=`: one picture from the world's
+  `shared/backdrops/<set>/`.
+- A `backdrop` that names no set is a `problems` entry for `wiki_lint`, never a
+  failed map load.
+- This is a frontmatter field, not prose mining (D4), and something a
+  description cannot say, so it does not break Location's "no flag for what a
+  description can say".
+
+### 6.2 The line as it is said (M1)
+
+Today a spoken bubble sets `typing { mode: "speaking" }`, waits its speaking
+time, then commits the message. Clients learn the words only when they are over,
+so a scene can only show "…" and then a finished line while the next speaker has
+already started.
+
+Change: the speaking event carries the line.
+
+```ts
+// TypingStreamEvent, when mode is "speaking" and isTyping is true
+speech?: {
+  text: string;
+  face?: { name: string; v: string }; // §6.3
+  from: number; // sim time
+  until: number;
+}
+```
+
+- `Messaging.play` already has the text and the duration when it calls
+  `setTyping`. Nothing else changes: the message still commits at the end, and
+  characters still hear a line when it is finished.
+- The client reveals the text across `from..until`, converted through the clock
+  projection, so a pause freezes the reveal and speed changes are followed.
+- A cut-off commits `cutOff(text, fraction)`; the reveal snaps to the committed
+  text.
+- Faithful to the simulation: [floor](../../kazusa/references/floor.md) says a
+  line "is heard as it is said". Only the wire was late.
+- It is what makes reading mode possible (§7), and the hook for voice later.
+
+### 6.3 Face (M1)
+
+The character chooses the face, in the `send_message` call they are already
+making, and everyone present sees it.
+
+**Which tool.** There is no separate tool for speaking in person. `talk` only
+turns to people where you are and returns the conversation's address
+(`chat:huddle:<id>`); it carries no line. Every line, face to face or by text,
+is a bubble of `send_message` to an address, and the address alone says which
+medium it is. So `face` is a field of `send_message` bubbles and of nothing
+else: `talk`, `create_group` and `manage_chat` say nothing and take no face. The
+same call serves both media, so each bubble kind is kept in one and dropped in
+the other, and `face` follows the rule already there:
+
+| Bubble part      | Face to face (`chat:huddle:`, or the player's `aloud`) | Text chat (`chat:direct:`, `chat:group:`) |
+| :--------------- | :----------------------------------------------------- | :---------------------------------------- |
+| speech           | said, takes speaking time and the floor                | typed, takes typing time                  |
+| `type: "action"` | kept, takes no time                                    | dropped                                   |
+| `{ sticker }`    | dropped                                                | kept                                      |
+| `face` (new)     | kept, shown and read                                   | dropped                                   |
+
+**The field.** A text bubble object may carry `face`:
+
+```json
+{ "text": "I said no.", "face": "annoyed" }
+```
+
+- The value is a mood from the character's own set: the distinct moods across
+  all their looks (the part of each sticker name after the outfit). About 20
+  words for the largest imported sets, against about 80 full names.
+- The list does not depend on what they are wearing or how they feel, so the
+  tool definition never changes with state and stays in the cached prefix.
+- A character with no looks has no `face` field at all, as with stickers.
+- It applies from that bubble on. Most lines carry none. The wording
+  (`kazusa-tools#send_message.messages.face`) follows the sticker's: set it when
+  your face changes, not on every line. `in-person` gains two sentences.
+- An unknown mood is dropped silently and the line is said. It never fails the
+  call: a refused `send_message` costs a whole retry.
+- Face to face only. In a text chat it is dropped, as actions are; a phone has
+  stickers.
+- An action bubble may carry it too ("looks away", `sad`).
+
+**Resolving it.** With the outfit the character has on (§6.4; usual clothes
+until that exists), the look is `<outfit>-<mood>`. If that outfit has no such
+mood, the figure keeps the outfit and shows its neutral face; listeners still
+read the mood. The resolved name and version are frozen on the delivery
+(`face: { name, v }`, exactly like `sticker`), so an old line shows the outfit
+of its moment.
+
+**What everyone reads.** People see faces, so listeners do too:
+
+- The line a listener receives, and the same line in every ledger and in the
+  decision model's context, carries the look in a few words when it changes: the
+  `look` text from `stickers.json`, else the mood word. Wording and placement
+  belong to `kazusa-deliveries`; as a shape:
+  `- [Hoshino 12:03] (annoyed, a flat stare) I said no.`
+- Frozen at send, like a sticker's text. Nobody makes a vision call.
+- Only on change: a face equal to that speaker's previous one adds nothing.
+- It is part of the line, not a message of its own, so it adds no stimulus and
+  no attention decision.
+
+**On the wire.** `ChatMessage.face?: { name: string }` and the same on the 6.2
+event, so the figure's face changes as the line starts.
+
+Why a field and not a sticker bubble: a sticker bubble is a message of its own,
+and every message in a huddle is a stimulus and an attention decision for each
+listener. The field reuses the sticker vocabulary without that cost. Why not the
+decision model: a face that characters react to has to be the speaker's own, and
+a judged face would also be one more answer to produce per send.
+
+### 6.4 Outfit (M2, from the status system)
+
+Clothes persist: nobody changes between two lines. What a character is wearing
+is state, and it belongs to the planned status system, designed in
+[status](../../kazusa/references/status.md). In short:
+
+- `outfit` is the first attribute: a state on a character, whose possible values
+  are the outfits their set declares plus their usual clothes.
+- The character changes it in a call they already make: an optional parameter on
+  `start_task`, since changing clothes happens at an activity boundary. No new
+  call of any kind.
+- The scene reads it through SSE and sets `Look.outfit`; stickers can use it to
+  be picked by mood alone; people present read it in a few words.
+- Until it exists, everyone wears their usual clothes. Nothing in M0 or M1 waits
+  for it, and nothing built there has to change when it arrives: `Look` already
+  has the field.
+
+### 6.5 What does not change
+
+- No new tool. No decision question added.
+- No ticking push: reveal progress and the time of day are computed on the
+  client from sim time, like desires and trips.
+- No floor hold while the player types (§14).
+
+## 7. Reading mode: advance on click
+
+A toggle for people who want a traditional visual novel: the world waits, and
+advances when they click. Offered only to someone who may control the clock
+(`manage`, the permission `POST /kazusa/clock` already needs); the world's time
+is one clock for everyone, so pausing it is not a visitor's choice.
+
+### 7.1 The problem to design around
+
+A naive version pauses after each line and resumes on click. Then every click
+waits for a model: the listener must hear the line, decide to answer, and
+generate a reply, several seconds each time. A visual novel that makes you wait
+after every click is worse than the live view.
+
+### 7.2 One line ahead
+
+Keep the world exactly one unheard line ahead of the reader.
+
+```text
+reader sees line N            world: line N+1 has started being said → hold
+click                         show N+1 at once (it was already here)
+                              world: N+1 is heard; listeners think
+reader reads N+1              world: N+2 starts being said → hold
+click                         show N+2 at once
+```
+
+- **Hold point: the start of the next spoken line.** With §6.2 the client has
+  that line's whole text the moment it starts. The world holds there, before the
+  line has been heard by anyone.
+- **Click: show the held line, and let the world go.** The line is shown whole
+  with a quick reveal. The clock then jumps past the rest of that line's
+  speaking time (the reader has it already), so it is heard at once and the
+  listeners start thinking immediately.
+- **The reader's reading time hides the model's thinking time.** While they read
+  N+1, the reply to it is being generated. By the time they click again, N+2 has
+  usually started and is waiting. Speaking time is skipped in real time but
+  still counted in sim time, so the conversation's own clock stays true.
+- **Not ready yet.** If they click before the next line exists, the scene shows
+  who is thinking or about to speak (the presence ring and speaking events), and
+  the line appears the moment it starts. No extra click.
+- **Nobody is going to speak.** If the hold is released and nobody starts a
+  line, time simply runs at 1x. That is the player's cue; the composer is there.
+
+### 7.3 Why exactly one
+
+Buffering two or more lines would hide more latency, but the characters would
+have heard things the reader has not seen. When the reader then speaks, their
+line would land after replies they never read. With one line ahead, held before
+it is heard, nothing has happened that the reader has not seen. If the reader
+speaks instead of clicking, their line goes out at once, as the player's always
+does, and the held speaker hears it mid-line and stops or carries on by the
+ordinary judgment: the player interrupted them, which is what happened.
+
+A deeper buffer can be a setting later, for people who only watch.
+
+### 7.4 Mechanics
+
+The hold belongs in Messaging, not in the browser:
+
+- `POST /kazusa/scene/reading` `{ chatId, on }` (`manage`): one huddle at a time
+  is being read. Kept in Messaging's process-wide cell; not durable, and turning
+  it off (or closing the view) restores the clock's speed.
+- In `Messaging.play`, when a spoken bubble in that huddle is about to start:
+  announce it (§6.2), then pause the clock unless the reader is already waiting
+  for a line.
+- `POST /kazusa/scene/advance` `{ chatId }`: resume, and advance the clock by
+  the held line's remaining speaking time. The clock's advance is in whole
+  minutes on the wire today; in process it can take milliseconds.
+- Doing this in the client instead (pause on the SSE event) is simpler but
+  races: a short line can finish and the next begin before the pause arrives,
+  and the reader is two lines behind. The first build may still do it that way
+  to try the feel; the server hold is the real design.
+- A paused clock freezes the whole world, by design. Reading mode is therefore a
+  single-player way to play: everything else waits while you read. The top bar
+  already shows the pause.
+- Action bubbles take no time and arrive with their send; they show with the
+  spoken line they precede.
+- The player is not paced or held, as now.
+
+## 8. Assets
+
+### 8.1 Character looks
+
+Everything for a character stays in their workspace, under the same names:
+
+```text
+workspaces/<id>/
+  avatar.webp
+  stickers/                 # exists: face crops, 256 px
+    happy.webp
+    gym-happy.webp
+    stickers.json           # the vocabulary: outfits, each look in words
+  portraits/                # new: whole figures, same names as the stickers
+    neutral.webp
+    happy.webp
+    gym-happy.webp
+    portraits.json          # optional: { "size": [820, 1640], "eyeline": 0.21 }
+```
+
+- A sticker and a portrait with the same name are the same look: one outfit, one
+  mood. `stickers.json` describes both. No second vocabulary.
+- `eyeline` (the eyes' height as a fraction of the picture) lets the layout line
+  heads up across characters drawn at different sizes, and crop to the bust on a
+  phone. The importer knows it: it already finds the face.
+- The default portrait is `neutral`, else the first by name. A character with no
+  `portraits/` is drawn as their avatar.
+
+### 8.2 Backdrop sets
+
+A place's pictures are a set, as a character's are, with the two axes that fit a
+place: its **state** (like an outfit) and the **time of day** (like a mood).
+Many places share one set, so sets live in one shared library:
+
+```text
+shared/backdrops/
+  classroom/
+    day.webp
+    dusk.webp
+    night.webp
+    festival-day.webp       # later: a state of the place, as a name prefix
+    backdrops.json          # optional: { "states": { "festival": "…" } }
+  hallway/
+    day.webp                # a set with one picture shows it at every hour
+```
+
+- A place page names a set: `backdrop: classroom`. Rooms inherit their
+  building's unless they name their own.
+- A name is `[<state>-]<time>`. A first word is a state only when
+  `backdrops.json` declares it, the rule sticker names use for outfits.
+- **Code picks the picture; no model is asked.** Time is deterministic:
+  - The world declares its times of day once, in the plugin's config
+    (`scene.times`, default `day` from 06:00, `dusk` from 17:00, `night` from
+    19:00; a world sets its own names and hours).
+  - The picture is the set's file for the current time. If the set has none for
+    it, the nearest earlier time it does have, wrapping round the day.
+  - The place's state is the default (no prefix) for now. When the status system
+    gives places a state, the same pick tries `<state>-<time>` first.
+- The pick is a pure function in `lib/scene/pick.ts`, evaluated from
+  `useSimNow("minute")`, with a cross-fade when it changes.
+- 16:9, about 1920 wide, WebP, `object-fit: cover`.
+
+### 8.3 Distribution
+
+Art ships in the world's repository, beside the stickers that are already there;
+cloning it at setup is acceptable. The pilot (§8.4, step 7) measures the real
+size before the full import. For scale: the 4,769 stickers at 256 px are most of
+the Kivotos template's 75 MB, and whole-figure portraits will be several times
+that per picture.
+
+If the measured size turns out to be a problem, the reserve is to store one
+whole figure per outfit plus a small face patch per mood (the imported pictures
+differ only in the face) and stack them in the renderer. It is an optimization,
+not part of the plan.
+
+### 8.4 Download plan (not run)
+
+Findings first:
+
+- The earlier downloads are gone. `scripts/stickers.mjs stage` holds originals
+  only in memory and writes 256 px crops; a 640 px `preview.png` per set was the
+  largest thing it kept.
+- No `plan.json`, `labels.json`, `stage.json` or staging folder survives in the
+  repository, its history or the usual folders. So the list of source files per
+  character, and which source file became which sticker name, must be rebuilt.
+- What does survive: 144 sticker sets (4,769 files) with names, outfits and
+  looks, in `world/workspaces/*/stickers/`.
+
+Steps:
+
+1. **Keep provenance this time.** A git-ignored cache
+   (`.cache/art/<world>/<character>/<File>`) for originals, and the plans (small
+   text) kept with the world's own repository.
+2. **Rebuild the file lists** per character from the same MediaWiki the stickers
+   came from (the old plan's `wiki`), through its API as `stage` already does.
+3. **Add a portrait mode to the importer** (`crop: "none"`, or a sibling
+   `scripts/portraits.mjs` sharing the download code): fetch originals without
+   the 1200 px face cap, trim transparent margins by the union box of the whole
+   set so every look stays aligned, cap the height (about 1600 px), write WebP.
+4. **Recover names without relabelling.** For each downloaded picture, run the
+   existing `faceBox` and `toSticker` in memory and match the result against the
+   character's existing stickers by pixel difference. A match inherits the name.
+   Report what did not match on a contact sheet for labelling by eye.
+5. **Write `portraits/`** under the matched names, and `portraits.json` with
+   `size` and `eyeline` from the face position.
+6. **Backdrops**: list the source wiki's background gallery, pick a few dozen by
+   eye, name sets and times, set `backdrop` on area pages.
+7. **Pilot on three characters** (many outfits; few; unusual proportions).
+   Measure bytes, time and match rate; then decide whether §8.3's reserve is
+   needed.
+8. **Full run**, throttled and resumable from the cache: roughly 4,800
+   originals.
+
+For M0, steps 1 to 3 and 5 for the starting cast's `neutral` picture, and a
+handful of backdrop sets, are enough.
+
+## 9. Rigs and 3D
+
+Nothing in §5 or §6 is specific to flat pictures. That is the whole plan for 3D:
+the state and the signals are the durable part, and a renderer is replaceable.
+
+### 9.1 What carries over unchanged
+
+| Need in 3D                        | Already supplied by                                                  |
+| :-------------------------------- | :------------------------------------------------------------------- |
+| Who is present, entering, leaving | `SceneState.figures[].presence`                                      |
+| Who is speaking, and for how long | §6.2 (`from..until`): drives mouth movement without audio            |
+| Expression                        | §6.3 `Look.mood`, mapped to the model's expressions                  |
+| Outfit                            | §6.4 `Look.outfit`, mapped to a model variant                        |
+| Gaze                              | The speaker (everyone looks at who is talking)                       |
+| Where they stand                  | Slots now; later, spots within a place (Location already has `spot`) |
+| Light and the place's condition   | The same time and state that pick a backdrop                         |
+
+### 9.2 What is new
+
+- **A renderer chunk.** `three` with `@pixiv/three-vrm`, loaded with
+  `next/dynamic` (`ssr: false`) only when a scene's art has models, so worlds
+  without them never download it. Dispose models on leave; the same cap on
+  figures.
+- **A model manifest** per character (`workspaces/<id>/model/model.json` beside
+  `model.vrm`): mood → expression weights, outfit → model file or material set,
+  height and eye height.
+- **A mood map with defaults.** VRM's standard expressions are few (happy,
+  angry, sad, relaxed, surprised, neutral). The shared mood vocabulary maps onto
+  them by default, and `model.json` overrides per model. Unknown moods fall back
+  to neutral.
+- **Gestures.** A small shared pool of body animations (idle, explain, excited,
+  arms crossed, thinking, nod). If chosen at all, chosen like the face: an
+  optional field on the bubble, never a call of its own. Action bubbles stay
+  narration text: free prose is not turned into animation.
+- **Who a line is to.** Heads turning to the person addressed would need that
+  fact. It is not planned; if it ever is, it rides a call that already happens.
+- **Camera.** Deterministic shots from scene state, computed in the renderer.
+- **The room.** First the same flat backdrop behind a transparent canvas. Then a
+  panorama. Then a modelled place with named spots.
+- **Fallback.** A character with no model is drawn as their portrait on an
+  upright plane, so a world never needs every model before turning 3D on.
+
+### 9.3 One renderer per scene
+
+Flat rigs (Spine, Live2D) and 3D models do not share a canvas well. A scene
+picks one renderer from its world's art (`dom`, `rig` or `three`) and every
+figure falls back within it. The report is right about this.
+
+### 9.4 Voice
+
+Out of scope, but the seam is §6.2: speech has a start, a text and a duration. A
+voice clip would start there, and its real length would have to become the
+line's speaking time, which is a floor change with its own design.
+
+## 10. Phases
+
+One pull request per item (the project's rule), each usable alone.
+
+**M0. A scene you can show.** No model changes.
+
+1. Contract and plugin: portraits, backdrop sets and `scene.times`, `backdrop`
+   on places, the `scene` domain, proxy allowlist and access policy.
+2. `lib/scene` (director, pick, layout, tests) and the Zustand store.
+3. DOM renderer, dialogue box, `chats.as`, both chat views.
+4. Importer portrait mode; pilot portraits and a few backdrop sets for the
+   starting cast (in the world's repository, not this one).
+
+**M1. It feels alive.**
+
+5. Speech carried on the speaking event (§6.2); the reveal.
+6. `face` on spoken bubbles (§6.3): schema, delivery, what listeners read, the
+   two skills' wording, the client field.
+7. The full portrait import.
+
+**M2. Reading, and clothes.**
+
+8. Reading mode (§7): the hold in Messaging, the two routes, the controls.
+9. The status system's first slice, `outfit`
+   ([status](../../kazusa/references/status.md) §5), and the scene reading it.
+10. Scene screenshot (the existing `modern-screenshot` path and credit footer).
+
+**M3. Sharing.**
+
+11. Replay a past huddle as a scene from canonical messages. Needs the said
+    window stored on the message (pace is judged, so it cannot be recomputed).
+12. A read-only link to a live or replayed scene in public visitor mode
+    ([auth](../../kazusa/references/auth.md)).
+13. Follow a character: the scene moves with them between huddles and places.
+14. A place's state choosing backdrops, once places have one.
+
+**M4. Rigs and 3D** (§9), when a world has the art.
+
+## 11. Risks and what to measure
+
+| Risk                                                | Measure or mitigation                                                                                                    |
+| :-------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- |
+| Models set `face` on every line, or never           | Count faces per spoken line and distinct moods per character in a live run; tune the skill wording, as for stickers.     |
+| `face` raises `send_message` failures               | Unknown moods are dropped, not refused. Compare the failure rate before and after.                                       |
+| Seen faces make characters talk about faces         | Read a live table after M1. The look is shown only on change and in few words; cut it to the mood word if needed.        |
+| Lines land late relative to the highlight in M0     | Known and accepted for M0; §6.2 is the first item of M1.                                                                 |
+| Reading mode still feels slow                       | Measure click-to-line wait in a live huddle. If it is often over a second: a deeper buffer for watching, off by default. |
+| A reading-mode hold left on freezes the world       | Not durable; released when the view closes; the top bar shows the pause.                                                 |
+| The clock above 1x makes a live scene unreadable    | The catch-up buffer and "Jump to live".                                                                                  |
+| Portrait sizes differ between characters and worlds | `eyeline` and `size`; layout by eyeline, not by image height.                                                            |
+| Repository size                                     | Pilot numbers before the full import; the reserve in §8.3.                                                               |
+
+## 12. Open questions
+
+1. **Rights**: full-size franchise art in a public repository is a larger
+   exposure than 256 px stickers. Shipping it with the world is decided; this is
+   only a flag.
+2. **Is the player drawn?** Assumed no (first person).
+3. **Default rendering of a huddle**: assumed the scene whenever the world has
+   art.
+4. **The name** "Scene" in the UI.
+5. **"Assets placed together"** is read here as: a character's stickers and
+   portraits side by side in their workspace under the same names, and one
+   shared `shared/backdrops/` library. If it meant one top-level art folder for
+   the whole world, §8.1 moves but nothing else changes.
+6. **The status system's code name** and the rest of
+   [status](../../kazusa/references/status.md) §6.
+
+## 13. Decision log
+
+- **`face` is on `send_message`, the one tool that says anything** (2026-11-11,
+  second review). `talk` opens or joins a face-to-face conversation and returns
+  its address; lines still go through `send_message`. The field is kept face to
+  face and dropped in text chats, mirroring how stickers are dropped face to
+  face.
+- **Relationship values are not frontmatter and not fixed** (2026-11-11, second
+  review): generic pair attributes in the status system, with a design of their
+  own ([status](../../kazusa/references/status.md) §4).
+- **Faces are a bubble field, chosen by the speaker, and seen by listeners**
+  (2026-11-11, review). The first draft had the decision model judge a face in
+  the speech judgment and kept it invisible to characters. Review asked for
+  characters to see faces and for the choice to come through the chat tool. A
+  face characters react to must be the speaker's own, and a field costs no call.
+  A sticker bubble in huddles was rejected: one more message, so one more
+  attention decision per listener per face.
+- **No new model or decision calls** (2026-11-11, review). Judged outfit and
+  judged addressee were dropped. Outfit moved to the status system, set on
+  `start_task`; who a line is to is not planned.
+- **Backdrops are sets, like stickers** (2026-11-11, review): state × time of
+  day, `[<state>-]<time>`, picked by code from the sim clock. Replaces "one
+  picture and a colour tint". States exist in the naming now and switch later.
+- **Outfit belongs to the status system** (2026-11-11, review), sketched in the
+  kazusa skill's [status](../../kazusa/references/status.md) so the scene and
+  stickers share one source.
+- **Members without a slot are ignored** (2026-11-11, review). No chips, no
+  "also here".
+- **Art ships in the world's repository** (2026-11-11, review). The optional art
+  pack was dropped; layered storage is only a reserve.
+- **Reading mode** (2026-11-11, review): advance on click by holding the world
+  one unheard line ahead, so the next line is there when the reader clicks.
+- **No reduced-motion variant** (2026-11-11, review).
+- **Scene state is a Zustand store** (2026-11-11, review), per the client's
+  rules.
+
+## 14. Where the research report differs from this code
+
+The report had no access to the repository. Corrections, so its details are not
+copied by mistake:
+
+| The report says                                                                | In this code                                                                                                                                                                    |
+| :----------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Places are `shared/locations/<loc>.md`                                         | `shared/wiki/entities/places/<place_id>.md`, parsed by `PLACE_FRONTMATTER`.                                                                                                     |
+| A room holds 20 to 100 agents in one conversation                              | A place holds many huddles. A huddle is one small conversation; huddles never merge, and people split off side conversations.                                                   |
+| `sub_clusters` in place frontmatter for "conversation islands"                 | Redundant: that is what a huddle is, created by `talk`, not by a place's configuration.                                                                                         |
+| A 4-slot LRU cache is the core of the stage                                    | A one-line rule for the rare large huddle (§5.3).                                                                                                                               |
+| A client "time-dilation playback queue" paces lines by word count              | The server paces speech: speaking time per writing system, a judged pace, one floor per huddle. The client only catches up above 1x.                                            |
+| Lines clobber each other 200 ms apart                                          | A spoken line waits for the floor unless its speaker cuts in, which is a judged, visible event.                                                                                 |
+| Focusing the input sends a floor-hold that pauses NPC turns                    | No such route, and the opposite design: the player is unpaced and can talk over anyone, to see who stops. Holding the world is reading mode's job, on a click, not on focus.    |
+| Emotion comes from a `record_thought` tool and `[emotion]` tags, 5 or 6 values | No such tool. Looks are per character (`[outfit-]mood`, 50 to 84 each in the imported world) with outfits and face descriptions; the speaker picks a mood on the bubble (§6.3). |
+| "Mask vs. motive" subtext under each line                                      | Monologues exist only on task transitions and are observer data. Showing minds goes through the lens layer, later.                                                              |
+| A `visual:` block in `IDENTITY.md`                                             | `IDENTITY.md` is injected into every turn's system prompt. Art is files by convention in the workspace, like `avatar.*` and `stickers/`.                                        |
+| Assets under `public/characters/<id>/` in the Next app                         | Art belongs to the world and is served by plugin routes through the proxy (D2). The app ships no world content (D1).                                                            |
+| Backgrounds are `stage_backgrounds: { day, sunset, night }` URLs per place     | A place names a shared set; the set's files are named by state and time; code picks (§8.2).                                                                                     |
+| "Zero-SQLite, file-first"                                                      | Machine state is in SQLite-backed keyed stores and Kazusa's own message database. Only qualitative content is Markdown.                                                         |
+| Transport is "SSE / WebSocket / cached poll"                                   | One SSE stream per tab, `GET /kazusa/events`; no WebSocket from the browser.                                                                                                    |
+| A new Zustand "Stage Director" store with its own roster, history and locks    | A Zustand store, yes (§5.2), holding only layout and lines. Roster, history and typing already live in existing stores and SWR caches.                                          |
+| Phase 2 is PixiJS with Spine and Live2D; phase 3 is React Three Fiber          | Not scheduled. DOM covers static pictures. A canvas arrives with rigs or models (§9), and Spine and Live2D have licence terms to check first.                                   |
+| A scroll lock and "Reading history" banner                                     | The transcript toggle is the backlog; the scene itself has no scrollback to lock.                                                                                               |

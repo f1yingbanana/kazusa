@@ -1497,3 +1497,8 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.
+- `references/status.md` — Design, not built: named values and states on
+  characters, places and pairs (an outfit, a relationship value, a place's
+  condition) that code and characters both change, without new model calls. Read
+  before adding any per-character or per-place state that another module will
+  read; `outfit` is the first slice, for the client's Scene view and stickers.
