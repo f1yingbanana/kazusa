@@ -15,7 +15,7 @@ import {
   DEFAULTS,
   alignBox,
   cacheKey,
-  feetOf,
+  centreOf,
   matchPictures,
   outfitOf,
   outfitOfSet,
@@ -178,6 +178,10 @@ describe("portraits stage", () => {
     const eyes = top + set.eyeline * height;
     expect(eyes).toBeGreaterThan(head.top);
     expect(eyes).toBeLessThan(head.bottom);
+    // …and the figure's centre across it.
+    const middle = left + set.centre * width;
+    expect(middle).toBeGreaterThan(head.left);
+    expect(middle).toBeLessThan(head.right);
     // The face box from the existing pipeline is reported, in source pixels.
     expect(set.faceBox[0]).toBeLessThanOrEqual(head.left);
     expect(set.faceBox[2]).toBeGreaterThan(head.right - head.left);
@@ -293,13 +297,11 @@ describe("portraits stage", () => {
       "placement",
       "size",
     ]);
-    // One entry per outfit placed: where its pictures stand.
+    // One entry per outfit placed: where the figure is across its pictures.
     const outfit = labels.sets[0].outfit;
     expect(manifest.placement).toEqual({
-      [outfit]: { feet: labels.sets[0].feet },
+      [outfit]: { centre: labels.sets[0].centre },
     });
-    expect(manifest.placement[outfit].feet).toBeGreaterThan(0);
-    expect(manifest.placement[outfit].feet).toBeLessThan(1);
     expect(manifest.size).toEqual(labels.sets[0].size);
     expect(manifest.size.every(Number.isInteger)).toBe(true);
     expect(manifest.eyeline).toBeGreaterThan(0);
@@ -312,56 +314,31 @@ describe("portraits stage", () => {
     // A scale and offset set by hand outlive the next import.
     const manifestFile = path.join(workspace, "portraits", "portraits.json");
     manifest.placement[outfit] = {
-      feet: 0.9,
+      centre: 0.9,
       scale: 0.75,
       offset: [12, -30],
     };
     writeFileSync(manifestFile, JSON.stringify(manifest));
     placePortraits(labelsFile);
     expect(read(manifestFile).placement).toEqual({
-      [outfit]: { feet: labels.sets[0].feet, scale: 0.75, offset: [12, -30] },
+      [outfit]: {
+        centre: labels.sets[0].centre,
+        scale: 0.75,
+        offset: [12, -30],
+      },
     });
   });
 });
 
-describe("feetOf", () => {
-  const picture = (blocks) =>
-    sharp({
-      create: {
-        width: 200,
-        height: 100,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      },
-    })
-      .composite(
-        blocks.map(([left, top, width, height]) => ({
-          input: {
-            create: {
-              width,
-              height,
-              channels: 4,
-              background: { r: 200, g: 60, b: 60, alpha: 1 },
-            },
-          },
-          left,
-          top,
-        })),
-      )
-      .png()
-      .toBuffer();
-
-  it("is the middle of what reaches the bottom rows, not of the picture", async () => {
-    // A body on the right down to the floor, a weapon held out to the left.
-    const buffer = await picture([
-      [120, 10, 40, 90],
-      [0, 30, 120, 10],
-    ]);
-    expect(await feetOf(buffer)).toBe(0.7);
+describe("centreOf", () => {
+  it("is the face's middle across the kept box, not the box's own", () => {
+    // A face 100 wide, 250 into a box that starts at 100 and is 500 wide.
+    expect(centreOf([350, 40, 100], { left: 100, width: 500 })).toBe(0.6);
   });
 
-  it("is undefined when nothing reaches the bottom rows", async () => {
-    expect(await feetOf(await picture([[20, 10, 40, 40]]))).toBeUndefined();
+  it("stays inside the box", () => {
+    expect(centreOf([0, 0, 50], { left: 100, width: 500 })).toBe(0);
+    expect(centreOf([900, 0, 50], { left: 100, width: 500 })).toBe(1);
   });
 });
 
