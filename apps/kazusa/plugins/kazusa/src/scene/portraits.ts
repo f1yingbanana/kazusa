@@ -12,6 +12,17 @@ import { declaredOutfits } from "../stickers/stickers.ts";
 /** The look shown when nothing else is asked for, if the set has it. */
 const DEFAULT_LOOK = "neutral";
 
+/** How a picture is stood in a scene; every field has a default. */
+const PLACEMENT = z.object({
+  /** Where the figure stands across the picture: 0 its left edge, 1 its right. */
+  feet: z.number().min(0).max(1).optional().catch(undefined),
+  /** Drawn this many times its size, about where it stands. */
+  scale: z.number().positive().optional().catch(undefined),
+  /** Moved `[right, down]`, in the picture's own pixels. */
+  offset: z.tuple([z.number(), z.number()]).optional().catch(undefined),
+});
+export type PortraitPlacement = z.infer<typeof PLACEMENT>;
+
 /**
  * `portraits/portraits.json`: what the pictures share. Each field is only a
  * layout hint, so a bad one is dropped, never the set.
@@ -24,6 +35,15 @@ const MANIFEST = z.object({
     .catch(undefined),
   /** The eyes' height as a fraction of the picture's, from the top. */
   eyeline: z.number().min(0).max(1).optional().catch(undefined),
+  /**
+   * Placement by outfit word (`""` for pictures without one), or by one
+   * picture's name, which wins. The importer measures `feet`; `scale` and
+   * `offset` are set by hand for the picture that needs them.
+   */
+  placement: z
+    .record(z.string(), PLACEMENT.catch({}))
+    .optional()
+    .catch(undefined),
 });
 
 export interface Portrait {
@@ -37,6 +57,8 @@ export interface Portrait {
   readonly outfit?: string;
   /** The rest of the name, dashes kept. */
   readonly mood: string;
+  /** From `portraits.json`, when it says anything for this picture. */
+  readonly placement?: PortraitPlacement;
 }
 
 export interface PortraitSet {
@@ -60,6 +82,20 @@ function readManifest(file: string): z.infer<typeof MANIFEST> {
   }
 }
 
+/** A placement's set fields, or nothing when it has none. */
+function definedOf(
+  placement: PortraitPlacement | undefined,
+): PortraitPlacement | undefined {
+  if (placement === undefined) return undefined;
+  const { feet, scale, offset } = placement;
+  const set = {
+    ...(feet === undefined ? {} : { feet }),
+    ...(scale === undefined ? {} : { scale }),
+    ...(offset === undefined ? {} : { offset }),
+  };
+  return Object.keys(set).length > 0 ? set : undefined;
+}
+
 /**
  * A workspace's portraits (`<workspace>/portraits/`), whole figures named as
  * its stickers are, read from disk on every call: per scene member, never per
@@ -71,9 +107,13 @@ export function readPortraits(workspace: string): PortraitSet {
   const pictures = readPictures(dir) ?? [];
   if (pictures.length === 0) return { portraits: new Map() };
   const outfits = declaredOutfits(workspace);
+  const { size, eyeline, placement } = readManifest(
+    path.join(dir, "portraits.json"),
+  );
   const portraits = new Map<string, Portrait>();
   for (const { name, file, contentType, modified } of pictures) {
     const { prefix, rest } = splitPictureName(name, outfits);
+    const placed = definedOf(placement?.[name] ?? placement?.[prefix ?? ""]);
     portraits.set(name, {
       name,
       file,
@@ -81,9 +121,9 @@ export function readPortraits(workspace: string): PortraitSet {
       version: pictureVersion(modified),
       ...(prefix === undefined ? {} : { outfit: prefix }),
       mood: rest,
+      ...(placed === undefined ? {} : { placement: placed }),
     });
   }
-  const { size, eyeline } = readManifest(path.join(dir, "portraits.json"));
   return {
     portraits,
     default: portraits.has(DEFAULT_LOOK) ? DEFAULT_LOOK : pictures[0].name,

@@ -19,7 +19,7 @@ async function setup() {
     await writeFile(path.join(workspace, "portraits", file), file);
   await writeFile(
     path.join(workspace, "portraits", "portraits.json"),
-    JSON.stringify({ eyeline: 0.2 }),
+    JSON.stringify({ eyeline: 0.2, placement: { "": { feet: 0.6 } } }),
   );
   const bare = path.join(root, "workspaces", "momoi");
   await mkdir(bare, { recursive: true });
@@ -109,11 +109,13 @@ describe("scene routes", () => {
             /^\/kazusa\/portrait\?id=aris&name=happy&v=\w+$/,
           ),
           mood: "happy",
+          placement: { feet: 0.6 },
         },
         {
           name: "neutral",
           url: expect.stringContaining("name=neutral"),
           mood: "neutral",
+          placement: { feet: 0.6 },
         },
       ],
       default: "neutral",
