@@ -781,6 +781,24 @@ export function matchPictures(
         ...(fine ? { lostTo: keep + 1 } : {}),
       };
   }
+  // Twins need not be twins of each other's twins (a like b, b like c, a
+  // unlike c), so two looks can both bring the same twin's name. A name stays
+  // with the picture that matched it itself; a name only brought along by two
+  // or more is given to none.
+  const bringers = new Map();
+  for (const [index, result] of results.entries())
+    for (const name of result.also ?? [])
+      bringers.set(name, [...(bringers.get(name) ?? []), index]);
+  const matched = new Set(results.map((result) => result.match));
+  for (const [name, indices] of bringers)
+    if (matched.has(name) || indices.length > 1)
+      for (const index of indices) {
+        const also = results[index].also.filter((other) => other !== name);
+        results[index] = {
+          ...results[index],
+          also: also.length ? also : undefined,
+        };
+      }
   return { results, offset: round(size === Infinity ? 0 : size, 2) };
 }
 

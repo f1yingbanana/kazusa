@@ -507,6 +507,29 @@ describe("matchPictures", () => {
     expect(both.filter((one) => one.match)).toHaveLength(1);
   });
 
+  it("gives a twin's name to one picture only, when twins chain", () => {
+    // a like b, b like c, a unlike c: the looks a and c both bring b along.
+    const chain = [
+      face(...eyes(0)),
+      face(...eyes(0), [70, 20, 3, 60]),
+      face(...eyes(0), [70, 20, 3, 60], [75, 20, 3, 60]),
+      stickers[1],
+    ];
+    const twinNames = ["a", "b", "c", "d"];
+    const { results } = matchPictures(
+      [chain[0], chain[2], stickers[1]],
+      chain,
+      twinNames,
+    );
+    const placed = results.flatMap((one) =>
+      one.match ? [one.match, ...(one.also ?? [])] : [],
+    );
+    expect(new Set(placed).size).toBe(placed.length);
+    expect(results[0]).toMatchObject({ match: "a" });
+    expect(results[1]).toMatchObject({ match: "c" });
+    expect(placed).not.toContain("b");
+  });
+
   it("settles two pictures taking one name by the sticker, else by none", () => {
     const twice = matchPictures(
       [shifted(stickers[1], 2), shifted(stickers[1], 1)],
