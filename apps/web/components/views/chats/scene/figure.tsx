@@ -44,12 +44,13 @@ function layer(
 /**
  * One person in the scene: their portrait for the look they wear, drawn at its
  * own natural size times the scene's one scale, never fitted, so relative size
- * is the pictures' own. It stands with its bottom edge on the scene's floor
- * line and the figure's centre on its column's; `portraits.json` can scale and
- * move one outfit's pictures (`standFigure`). Only people with portraits are
- * figures. `lit`: the speaker of the panel's line, at full brightness while the
- * others are dimmed (`undefined`: nobody dimmed); nobody changes size or place
- * for it. Walking in and out ends in `settle`; a change of column slides.
+ * is the pictures' own. It stands with its feet on the scene's floor line and
+ * its centre on its column's, each outfit at the scale that draws the character
+ * as tall as they are (`standFigure`; `portraits.json` says where and how
+ * large). Only people with portraits are figures. `lit`: the speaker of the
+ * panel's line, at full brightness while the others are dimmed (`undefined`:
+ * nobody dimmed); nobody changes size or place for it. Walking in and out ends
+ * in `settle`; a change of column slides.
  */
 export function SceneFigure({
   chatId,
@@ -112,15 +113,17 @@ export function SceneFigure({
         {...data}
         onAnimationEnd={settle}
         className={cn("pointer-events-none absolute", SLIDE, motion)}
-        // Its bottom edge on the floor line, its centre on the column. `translate`
-        // is its own property, so the walk's `transform` adds to it.
+        // Hung by one point of the picture: across, the figure's centre on the
+        // column; down, the row it stands on at the floor line (or its eyes,
+        // framed closely). `translate` is its own property, so the walk's
+        // `transform` adds to it.
         style={{
           left,
-          bottom: `${100 - floorPercent(framing)}%`,
+          top: `${stood ? stood.atPercent : floorPercent(framing)}%`,
           zIndex,
           translate: stood
-            ? `calc(${-stood.centrePercent}% + ${stood.x}px) ${stood.y}px`
-            : "-50%",
+            ? `calc(${-stood.centrePercent}% + ${stood.x}px) calc(${-stood.rowPercent}% + ${stood.y}px)`
+            : "-50% -100%",
         }}
       >
         <img
