@@ -1,4 +1,5 @@
 import { resetContinuations } from "./continue.ts";
+import { deadlineSignal } from "../deadline.ts";
 import { inBackground } from "../background.ts";
 import { createHash } from "node:crypto";
 import {
@@ -1612,10 +1613,10 @@ export class Perception {
         : undefined);
     if (!assemble || !evaluate)
       return decide(ordinary, "fallback", "no decision runtime");
-    const signal = AbortSignal.any([
+    const deadline = deadlineSignal(this.config.decisionTimeoutMs, [
       this.lifetime.signal,
-      AbortSignal.timeout(this.config.decisionTimeoutMs),
     ]);
+    const { signal } = deadline;
     try {
       const [state, task] = await Promise.all([
         this.store.lookup(agentId),
@@ -1666,6 +1667,8 @@ export class Perception {
     } catch (error) {
       this.assertCurrent();
       return decide(ordinary, "fallback", String(error));
+    } finally {
+      deadline.dispose();
     }
   }
 
