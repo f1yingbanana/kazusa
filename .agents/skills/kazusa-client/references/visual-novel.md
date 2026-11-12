@@ -707,9 +707,14 @@ workspaces/<id>/
     the bottom edge when absent). The canvas bottom is usually the floor, but a
     wing, a weapon or a bike's wheel can reach lower than the shoes, and the
     figure then floats above everyone else's feet. The importer looks for the
-    lowest row with enough solid picture just above it, within reach of the
-    figure's centre, so a tip or a strand doesn't count (52 of this cast's 357
-    outfits stand above the bottom edge, most by 1–2%, the largest by 28%).
+    lowest row with enough solid picture just above it, within a stride of the
+    figure's centre, so a tip or a strand doesn't count (36 of this cast's 357
+    outfits stand above the bottom edge, most by 1–2%, the largest by 17%). A
+    stride, not less: in a wide stance the nearer foot is the lower one in the
+    picture and well out from under the head, and a narrower look took the far
+    foot for the floor and sank the figure. Something solid within a stride that
+    isn't a foot (a flag, a rifle's muzzle, a wheel) is corrected by hand (3
+    outfits).
   - `eyes` is where the eyes are down the picture, the same way.
   - `scale` (1 when absent) draws the character as tall as they are. The source
     art fills its canvas from halo to shoes whoever it shows, so its pixels say
@@ -721,9 +726,13 @@ workspaces/<id>/
   - The rule is wrong for a figure that isn't standing (seated, kneeling, lying,
     crouched): its eyes are low for another reason. Those are set by hand, to
     the value that makes the head as large as in the character's standing
-    outfits (20 of this cast's outfits; the world repository lists them in
-    `art-sources/portraits/_scales-by-hand.json`). The importer keeps a `scale`,
-    `floor` or `offset` it finds, so a correction outlives a re-import.
+    outfits (20 of this cast's outfits). The importer keeps a `scale`, `floor`
+    or `offset` it finds, so a correction outlives a re-import; the world
+    repository lists the ones made by hand, with reasons, in
+    `art-sources/portraits/_placement-by-hand.json`. Head size within a
+    character is checked by eye, heads side by side as drawn, and by the
+    distance between the eyes where both show; the sticker's box was used first
+    and ran 5–10% small.
   - `offset` is `[right, down]` in the picture's own pixels, by hand.
   - Sizing by face size across characters was tried twice (the sticker's box,
     and the area where expressions differ) and dropped: both vary too much
@@ -733,9 +742,11 @@ workspaces/<id>/
   centre and `floor` on the scene's floor line, at `scale` times the scene's own
   factor. `FIGURE_HEIGHT` is that factor's one knob, the size of the whole cast:
   it is below 1 so that the tallest characters' heads stay in the scene, and no
-  figure is ever shrunk on its own to fit. In the one-slot scene (an upright
-  phone) the `eyes` go to one height instead, so a short, a tall and a seated
-  character's faces are framed alike.
+  figure is ever shrunk on its own to fit. The one-slot scene (an upright phone)
+  is framed by the `eyes` instead: a character of typical height's are at one
+  place, and a fifth of the wide scene's height difference is kept
+  (`BUST_HEIGHT_SHARE`), so a tall character's face is a little higher in the
+  frame and a short or seated one's a little lower, without anyone's leaving it.
 - `size` and `eyeline` are still written, from the `neutral` set, but nothing
   reads them.
 - The default portrait is `neutral`, else the first by name. A character with no
