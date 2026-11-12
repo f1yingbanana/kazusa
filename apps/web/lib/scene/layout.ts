@@ -46,11 +46,22 @@ export const BUST_HEIGHT = 1.8;
 export const FLOOR_Y = 1.02;
 export const BUST_FLOOR_Y = 1.74;
 /**
- * Where the one figure's eyes go in the one-slot scene, in scene heights from
- * the top, when its picture says where they are: a short and a tall character's
- * faces are then in the same place.
+ * Where the eyes of a character of typical height go in the one-slot scene, in
+ * scene heights from the top, when the picture says where its eyes are.
  */
 export const BUST_EYES_Y = 0.27;
+/**
+ * How much of the wide scene's height differences the one-slot scene keeps: 0
+ * would put everyone's eyes at `BUST_EYES_Y`, 1 would stand everyone on one
+ * floor again and push a tall character's face off the top. A little, so a
+ * short character still looks up from lower in the frame than a tall one.
+ */
+export const BUST_HEIGHT_SHARE = 0.2;
+/**
+ * A character of typical height's eyes above the floor, in reference pixels at
+ * scale 1: the importer's 8.11 px per cm, at 157 cm.
+ */
+export const TYPICAL_EYES_PX = 1_273;
 
 /**
  * Five slots or one: five when the scene is at least as wide as it is tall and
@@ -130,9 +141,11 @@ export interface Standing {
  *   the body off it.
  * - Down: the row the figure stands on (`floor`; the bottom edge when it has
  *   none) on the floor line, so a wing or wheel that reaches lower than the
- *   shoes doesn't leave it floating. In the one-slot scene the eyes (`eyes`) go
- *   to `BUST_EYES_Y` instead, whoever is shown; without them, the floor line as
- *   in the wide scene.
+ *   shoes doesn't leave it floating. The one-slot scene is framed by the eyes
+ *   (`eyes`) instead: a character of typical height's go to `BUST_EYES_Y`, a
+ *   taller one's a little higher and a shorter or seated one's a little lower
+ *   (`BUST_HEIGHT_SHARE` of the difference in the wide scene). Without `eyes`,
+ *   the floor line as in the wide scene.
  * - Size: its own `scale` times the scene's, about that point.
  * - `offset` is in its own pixels, so it grows and shrinks with it.
  */
@@ -143,12 +156,25 @@ export function standFigure(
 ): Standing {
   const zoom = figureScale(sceneHeightPx, framing) * (placement?.scale ?? 1);
   const [right, down] = placement?.offset ?? [0, 0];
+  const floor = placement?.floor ?? 1;
   const eyes = framing === "bust" ? placement?.eyes : undefined;
+  const hung =
+    eyes === undefined
+      ? { rowPercent: floor * 100, atPercent: floorPercent(framing) }
+      : {
+          // Hung by a row a little below the eyes, toward the feet: that much
+          // of how far the eyes are above the floor shows as height.
+          rowPercent: (eyes + BUST_HEIGHT_SHARE * (floor - eyes)) * 100,
+          atPercent:
+            (BUST_EYES_Y +
+              (BUST_HEIGHT_SHARE * TYPICAL_EYES_PX * BUST_HEIGHT) /
+                REFERENCE_PX) *
+            100,
+        };
   return {
     zoom,
     centrePercent: (placement?.centre ?? 0.5) * 100,
-    rowPercent: (eyes ?? placement?.floor ?? 1) * 100,
-    atPercent: eyes === undefined ? floorPercent(framing) : BUST_EYES_Y * 100,
+    ...hung,
     x: right * zoom,
     y: down * zoom,
   };
