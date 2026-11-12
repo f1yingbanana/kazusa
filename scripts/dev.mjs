@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import {
   allowChatStarters,
+  denyImpliedTools,
   loadNewPlugins,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
@@ -330,6 +331,11 @@ if (!stopping) {
     for (const line of allowChatStarters(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't let characters start chats: ${error.message}`);
+  }
+  try {
+    for (const line of denyImpliedTools(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't settle characters' tool policy: ${error.message}`);
   }
   try {
     for (const line of startProviderPlugins(ROOT)) console.log(line);
