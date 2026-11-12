@@ -564,3 +564,9 @@ resolves `@/` to `apps/web` for hook and component integration tests.
 - `references/roadmap.md`: read before building any deferred feature (map,
   social, wiki, needs, beliefs, attention log, Player lens, replay). It lists
   which slot each feature plugs into and what it depends on.
+- `references/visual-novel.md`: design, not built. The Scene view: a huddle
+  drawn as a backdrop, figures and a dialogue box (`chats.as=scene`), why we
+  build it ourselves, its Zustand state and renderer contract, the backend
+  changes (art routes, the line as it is said, `face` on a bubble), reading
+  mode, the asset layout and import plan, and the path to rigs and 3D. Read
+  before building any of it.

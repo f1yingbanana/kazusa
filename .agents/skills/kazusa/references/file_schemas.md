@@ -384,8 +384,14 @@ talkative, though he procrastinates on assignments.
   directly to build the **Eager Compact Contact Roster** in the prompt:
   `- <name> (@<peer_id>, <relation_type>): <summary> [chat:direct:<peer_id>]`.
 - `familiarity` (number 0..100): Quantitative depth of shared history.
-- `affinity` (number 0..100): Emotional warmth / liking.
-- `trust` (number 0..100): Perceived reliability and honesty.
+  deprecated: computed from use in the retained `"familiarity"` store
+  ([memory](memory.md)), never written in a card.
+- `affinity` (number 0..100): Emotional warmth / liking. deprecated:
+  relationship numbers do not live in card frontmatter (`memory/page.ts` reports
+  them as a problem); they will be pair attributes, see [status](status.md) §4.
+- `trust` (number 0..100): Perceived reliability and honesty. deprecated:
+  relationship numbers do not live in card frontmatter (`memory/page.ts` reports
+  them as a problem); they will be pair attributes, see [status](status.md) §4.
 - `last_interaction_iso` (ISO 8601 string): Timestamp of latest interaction.
 
 ### Agent Personal Wiki Maintenance Contract
