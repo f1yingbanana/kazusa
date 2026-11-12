@@ -161,11 +161,10 @@ describe("pickPortrait", () => {
     expect(pickPortrait(PORTRAITS, look)?.name).toBe(name);
   });
 
-  it("falls back to the first without a default, and to nothing for an empty set", () => {
+  it("shows no outfit nobody asked for: without a default, nothing", () => {
     expect(
-      pickPortrait({ portraits: [portrait("sad-ish"), portrait("happy")] }, {})
-        ?.name,
-    ).toBe("sad-ish");
+      pickPortrait({ portraits: [portrait("swim-angry", "swim")] }, {}),
+    ).toBeUndefined();
     expect(pickPortrait({ portraits: [] }, { mood: "happy" })).toBeUndefined();
   });
 });

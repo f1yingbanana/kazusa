@@ -1087,8 +1087,8 @@ export const CharacterSummarySchema = z.object({
   isSystemAgent: z.boolean().optional(),
   avatarUrl: z.string().optional(),
   /**
-   * The default portrait (`GET /kazusa/portrait`): the look named `neutral`,
-   * else the first. Absent for a character without portraits.
+   * The portrait the figure rests in (`GET /kazusa/portrait`), as `default` of
+   * the portraits. Absent for a character who isn't drawn.
    */
   portraitUrl: z.string().optional(),
   occupation: z.string().optional(),
@@ -1429,7 +1429,11 @@ export type Portrait = z.infer<typeof PortraitSchema>;
 export const PortraitsResponseSchema = z.object({
   /** Sorted by file name. */
   portraits: z.array(PortraitSchema),
-  /** `neutral` if the set has it, else the first; absent for an empty set. */
+  /**
+   * What the figure rests in: a picture in the usual clothes, `neutral` if
+   * there is one, else `calm`, `content` or `happy`, else the first. Absent
+   * when no picture is in the usual clothes, and the figure isn't drawn.
+   */
   default: z.string().optional(),
   /** `[width, height]` the pictures are drawn at, in pixels. */
   size: z.tuple([z.number(), z.number()]).optional(),

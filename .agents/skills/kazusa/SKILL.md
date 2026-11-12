@@ -1272,10 +1272,12 @@ connect these modules in process.
   none, or by picture name: `centre`, `floor` and `eyes` (where the figure is
   across the picture, where it stands and where its eyes are down it, each 0–1)
   and `scale`, which draws the character as tall as they are, all written by the
-  importer, and a hand-set `offset`; a bad field is ignored). The default is
-  `neutral`, else the first. `GET /kazusa/portraits?id=`, `GET /kazusa/portrait`
-  (served like stickers), `CharacterSummary.portraitUrl` (a `stat` or two per
-  character; the folder is listed again only when its mtime changes).
+  importer, and a hand-set `offset`; a bad field is ignored). The default, what
+  the figure rests in, is in the usual clothes: `neutral`, else `calm`,
+  `content` or `happy`, else the first; none (not drawn) when every picture is
+  of an outfit. `GET /kazusa/portraits?id=`, `GET /kazusa/portrait` (served like
+  stickers), `CharacterSummary.portraitUrl` (a `stat` or two per character; the
+  folder is listed again only when its mtime changes).
 - **Backdrops** (`backdrops.ts`): a shared library, `shared/backdrops/<set>/`
   beside the World Wiki, pictures named `[<state>-]<time>` (a state only when
   the set's `backdrops.json` declares it). Location reads the library with the

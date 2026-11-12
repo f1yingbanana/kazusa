@@ -144,8 +144,10 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
   a backdrop `[<state>-]<time>` (a state only when the set's `backdrops.json`
   declares it). URLs carry the file's mtime as `v`, so they are cached forever
   (`immutable`, `nosniff`).
-- `CharacterSummary.portraitUrl`: the default portrait (`neutral`, else the
-  first), found with a `stat` or two per character, never a listing.
+- `CharacterSummary.portraitUrl`: the portrait the figure rests in (in the usual
+  clothes: `neutral`, else `calm`, `content` or `happy`, else the first), found
+  with a `stat` or two per character, never a listing. Absent when no picture is
+  in the usual clothes: that character isn't drawn.
 - `GET /kazusa/places` adds `Place.backdrop` (the place's own set, else the
   nearest area's), `backdrops` (every set in the library with a picture:
   `{ files: { name, url, state?, time }[], states? }`) and `times` (the world's

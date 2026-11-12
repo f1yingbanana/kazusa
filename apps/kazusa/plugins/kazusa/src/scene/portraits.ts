@@ -2,15 +2,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import {
-  defaultPicture,
+  pictureEntry,
   pictureVersion,
   readPictures,
   splitPictureName,
 } from "../pictures.ts";
 import { declaredOutfits } from "../stickers/stickers.ts";
 
-/** The look shown when nothing else is asked for, if the set has it. */
-const DEFAULT_LOOK = "neutral";
+/** The moods a figure rests in when nothing else is asked for, best first. */
+const RESTING_MOODS = ["neutral", "calm", "content", "happy"];
 
 /** How a picture is stood in a scene; every field has a default. */
 const PLACEMENT = z.object({
@@ -69,10 +69,29 @@ export interface Portrait {
 export interface PortraitSet {
   /** By name, sorted. */
   readonly portraits: ReadonlyMap<string, Portrait>;
-  /** `neutral`, else the first by name; absent for an empty set. */
+  /**
+   * What the figure rests in (`restingPortrait`); absent when no picture is in
+   * the usual clothes, and such a character isn't drawn.
+   */
   readonly default?: string;
   readonly size?: readonly [number, number];
   readonly eyeline?: number;
+}
+
+/**
+ * The picture a figure rests in: in the usual clothes, since nobody changes
+ * outfit yet (§6.4), in the first of `RESTING_MOODS` there is, else the first
+ * usual picture by name. None when every picture is of an outfit.
+ */
+function restingPortrait<
+  P extends { readonly outfit?: string; readonly mood: string },
+>(pictures: readonly P[]): P | undefined {
+  const usual = pictures.filter(({ outfit }) => outfit === undefined);
+  for (const resting of RESTING_MOODS) {
+    const found = usual.find(({ mood }) => mood === resting);
+    if (found) return found;
+  }
+  return usual[0];
 }
 
 const portraitsDir = (workspace: string): string =>
@@ -131,9 +150,10 @@ export function readPortraits(workspace: string): PortraitSet {
       ...(placed === undefined ? {} : { placement: placed }),
     });
   }
+  const resting = restingPortrait([...portraits.values()]);
   return {
     portraits,
-    default: portraits.has(DEFAULT_LOOK) ? DEFAULT_LOOK : pictures[0].name,
+    ...(resting === undefined ? {} : { default: resting.name }),
     ...(size === undefined ? {} : { size }),
     ...(eyeline === undefined ? {} : { eyeline }),
   };
@@ -163,11 +183,13 @@ const defaults = new Map<
 >();
 
 /**
- * The default portrait's URL, for the roster: one `stat` of the folder for a
- * character without portraits, and one more of the picture for one with them.
- * The folder is listed again only when it changes (a picture added, removed or
- * renamed); one replaced in place changes only its own mtime, which the second
- * `stat` reads.
+ * The default portrait's URL, for the roster, and absent for a character who
+ * isn't drawn: one `stat` of the folder for a character without portraits, and
+ * one more of the picture for one with them. The folder is listed again only
+ * when it changes (a picture added, removed or renamed); one replaced in place
+ * changes only its own mtime, which the second `stat` reads. Outfits are read
+ * with the listing, so newly declared ones count from the folder's next
+ * change.
  */
 export function defaultPortraitUrl(
   agentId: string,
@@ -190,8 +212,25 @@ export function defaultPortraitUrl(
     } catch {
       return undefined;
     }
-    const chosen = defaultPicture(entries, DEFAULT_LOOK);
-    cached = { folderMtime, ...chosen };
+    const outfits = declaredOutfits(workspace);
+    const pictures = entries.flatMap((entry) => {
+      const picture = pictureEntry(entry);
+      if (!picture) return [];
+      const { prefix, rest } = splitPictureName(picture.name, outfits);
+      return [
+        {
+          entry,
+          name: picture.name,
+          mood: rest,
+          ...(prefix === undefined ? {} : { outfit: prefix }),
+        },
+      ];
+    });
+    const resting = restingPortrait(pictures);
+    cached = {
+      folderMtime,
+      ...(resting ? { entry: resting.entry, name: resting.name } : {}),
+    };
     defaults.set(dir, cached);
   }
   if (cached.entry === undefined || cached.name === undefined) return undefined;

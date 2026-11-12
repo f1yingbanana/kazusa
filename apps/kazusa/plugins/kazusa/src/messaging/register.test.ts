@@ -486,9 +486,13 @@ describe("send_message SDK integration", () => {
     await mkdir(portraits);
     await mkdir(stickers);
     await Promise.all(
-      ["neutral.webp", "annoyed.webp", "gym-happy.webp"].map((file) =>
-        writeFile(path.join(portraits, file), "RIFF"),
-      ),
+      [
+        "neutral.webp",
+        "annoyed.webp",
+        "happy.webp",
+        "gym-happy.webp",
+        "gym-smug.webp",
+      ].map((file) => writeFile(path.join(portraits, file), "RIFF")),
     );
     await writeFile(
       path.join(stickers, "stickers.json"),
@@ -498,7 +502,8 @@ describe("send_message SDK integration", () => {
       }),
     );
     await writeFile(path.join(stickers, "annoyed.webp"), "RIFF");
-    // Moods, not names: what is worn doesn't change the tool.
+    // Moods, not names, of the usual clothes only: nobody wears an outfit
+    // yet, so a mood only an outfit has (smug) is not offered.
     const face = textBubble().properties.face;
     expect(face.enum).toEqual(["annoyed", "happy", "neutral"]);
     expect(face.description).toContain("Face to face only");

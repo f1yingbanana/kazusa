@@ -73,8 +73,9 @@ export function pickBackdrop(
 /**
  * The portrait for a look (§6.3 "Resolving it"): `<outfit>-<mood>`; an outfit
  * without that mood keeps the outfit and shows its neutral face, else its
- * first. Without an outfit (or one the set lacks): `<mood>`, else the set's
- * default.
+ * first. Without an outfit (or one the set lacks): `<mood>` in the usual
+ * clothes, else the set's default, which is in them too. Never an outfit nobody
+ * asked for: a set without a default has no picture to show.
  */
 export function pickPortrait(
   set: PortraitsResponse,
@@ -94,8 +95,6 @@ export function pickPortrait(
   return (
     set.portraits.find(
       (portrait) => portrait.outfit === undefined && portrait.mood === mood,
-    ) ??
-    set.portraits.find((portrait) => portrait.name === set.default) ??
-    set.portraits[0]
+    ) ?? set.portraits.find((portrait) => portrait.name === set.default)
   );
 }

@@ -561,10 +561,11 @@ the line, not a message of its own, so it adds no stimulus and no attention
 decision ([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
 
 - **The field.** Only a character with portraits has it: an `enum` of the
-  distinct moods across their pictures (`faceMoods` in `messaging/faces.ts`,
-  from `readPortraits`), the same whatever they wear, so the schema stays in the
-  cached prefix. A mood they don't have is dropped (`.catch`) and the line is
-  still said. In a text chat the face is dropped, as an action is.
+  distinct moods of their pictures in the usual clothes (`faceMoods` in
+  `messaging/faces.ts`, from `readPortraits`; none when the figure isn't drawn),
+  the same from turn to turn, so the schema stays in the cached prefix. A mood
+  they don't have is dropped (`.catch`) and the line is still said. In a text
+  chat the face is dropped, as an action is.
 - **Frozen at send** (`sayFaces`): the bubble becomes `face: { name, seen? }`.
   `name` is the picture, `<mood>` in the usual clothes until outfits exist.
   `seen` is what everyone reads of it, `kazusa-deliveries#face` filled with the

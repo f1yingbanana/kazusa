@@ -480,8 +480,8 @@ proxy allowlist and access policy (`observe`, like stickers).
 - `GET /kazusa/portrait?id=&name=&v=`: one picture, served exactly like stickers
   (roster ids only, names in the set only, raster only, immutable cache, version
   from mtime).
-- `CharacterSummary.portraitUrl?`: the default portrait (the look named
-  `neutral`, else the first), beside `avatarUrl`.
+- `CharacterSummary.portraitUrl?`: the portrait the figure rests in (§8.1),
+  beside `avatarUrl`.
 - Place frontmatter gains `backdrop: <set>` in `PLACE_FRONTMATTER`
   (`location/map.ts`). The read model resolves it up the `parent` chain, so a
   room without one uses its building's and 720 places need a few dozen sets.
@@ -782,8 +782,12 @@ workspaces/<id>/
   frame and a short or seated one's a little lower, without anyone's leaving it.
 - `size` and `eyeline` are still written, from the `neutral` set, but nothing
   reads them.
-- The default portrait is `neutral`, else the first by name. A character with no
-  `portraits/` is not drawn in a scene at all.
+- The default portrait, what the figure rests in, is in the usual clothes until
+  outfits come (§6.4): `neutral`, else `calm`, `content` or `happy`, else the
+  first by name. A character with no `portraits/`, or with pictures of outfits
+  only, is not drawn in a scene at all. Built differently from the first plan
+  (first by name, any outfit): a character with only swimsuit art stood in a
+  meeting room in it, and one without `neutral` rested `angry`.
 
 ### 8.2 Backdrop sets
 

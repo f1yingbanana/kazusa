@@ -82,15 +82,46 @@ describe("portrait sets", () => {
     });
     expect(set.portraits.get("happy")).not.toHaveProperty("placement");
     expect(set).toMatchObject({
-      default: "eyes-closed",
+      default: "happy",
       size: [820, 1640],
       eyeline: 0.21,
     });
   });
 
-  it("shows neutral by default when there is one", async () => {
-    const workspace = await workspaceWith(["angry.webp", "neutral.webp"]);
-    expect(readPortraits(workspace).default).toBe("neutral");
+  it("rests in the usual clothes, neutral or else a calm face", async () => {
+    const outfits = { stickers: { outfits: { swim: "a swimsuit" } } };
+    const rest = async (files: string[]) => {
+      const workspace = await workspaceWith(files, outfits);
+      return {
+        set: readPortraits(workspace).default,
+        roster: defaultPortraitUrl("aris", workspace)?.match(
+          /name=([\w-]+)/,
+        )?.[1],
+      };
+    };
+    expect(await rest(["angry.webp", "neutral.webp"])).toEqual({
+      set: "neutral",
+      roster: "neutral",
+    });
+    // No neutral: a calm face, never angry for being first by name.
+    expect(await rest(["angry.webp", "happy.webp", "content.webp"])).toEqual({
+      set: "content",
+      roster: "content",
+    });
+    expect(await rest(["angry.webp", "teary.webp"])).toEqual({
+      set: "angry",
+      roster: "angry",
+    });
+    // An outfit is never worn at rest, even one first by name.
+    expect(await rest(["angry.webp", "swim-neutral.webp"])).toEqual({
+      set: "angry",
+      roster: "angry",
+    });
+    // Only outfits: not drawn.
+    expect(await rest(["swim-neutral.webp", "swim-happy.webp"])).toEqual({
+      set: undefined,
+      roster: undefined,
+    });
   });
 
   it("keeps the pictures when the manifest is broken, field by field", async () => {

@@ -41,7 +41,7 @@ export const pictureVersion = (modified: number): string =>
   Math.trunc(modified).toString(36);
 
 /** The picture name an entry would serve under, if it is a raster picture. */
-function pictureEntry(
+export function pictureEntry(
   entry: string,
 ): { readonly name: string; readonly contentType: string } | undefined {
   const ext = path.extname(entry).slice(1).toLowerCase();
@@ -79,25 +79,6 @@ export function readPictures(dir: string): Picture[] | undefined {
     seen.add(picture.name);
     return [{ ...picture, file, modified }];
   });
-}
-
-/**
- * In a sorted listing, the picture named `preferred`, else the first picture:
- * what to show when nothing else is asked for. Chosen from names alone, so it
- * costs no `stat` per file; the same choice `readPictures` would lead to.
- */
-export function defaultPicture(
-  entries: readonly string[],
-  preferred: string,
-): { readonly entry: string; readonly name: string } | undefined {
-  let first: { readonly entry: string; readonly name: string } | undefined;
-  for (const entry of entries) {
-    const picture = pictureEntry(entry);
-    if (!picture) continue;
-    if (picture.name === preferred) return { entry, name: picture.name };
-    first ??= { entry, name: picture.name };
-  }
-  return first;
 }
 
 /**

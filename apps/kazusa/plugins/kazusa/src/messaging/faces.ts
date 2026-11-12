@@ -3,13 +3,19 @@ import type { StickerSet } from "../stickers/stickers.ts";
 import type { FaceRef } from "./conversations.ts";
 
 /**
- * The moods a character can give a line (§6.3): the distinct moods across all
- * their portraits, sorted. They don't depend on what is worn, so the tool's
- * schema stays the same from turn to turn.
+ * The moods a character can give a line (§6.3): those of their portraits in the
+ * usual clothes, the only ones worn until outfits come (§6.4), sorted. None
+ * when the figure isn't drawn. They don't change from turn to turn, so neither
+ * does the tool's schema.
  */
 export function faceMoods(portraits: PortraitSet): string[] {
+  if (portraits.default === undefined) return [];
   return [
-    ...new Set([...portraits.portraits.values()].map(({ mood }) => mood)),
+    ...new Set(
+      [...portraits.portraits.values()]
+        .filter(({ outfit }) => outfit === undefined)
+        .map(({ mood }) => mood),
+    ),
   ].sort();
 }
 
