@@ -848,9 +848,20 @@ and the mapping from file to sticker name were rebuilt.
 - **Portraits.** Each downloaded picture is cut the way its sticker was and
   matched to the character's existing stickers by the face, within the set's
   outfit; anything unmatched or ambiguous is left out, never guessed. For the
-  Kivotos world: 4,316 of 4,769 stickers got a portrait (90.5%), 142 characters,
-  about 0.9 GB. Two characters got none, because the source's art differs from
-  what their stickers were cut from.
+  Kivotos world: 4,642 of 4,769 stickers have a portrait (97.3%), all 144
+  characters, about 0.9 GB.
+- **What the first run missed** (cross-checked against the stickers 2026-11-13).
+  Where the stickers were cut is now settled to the pixel and, when nothing
+  matches, searched for over the whole picture; a left-over picture just over
+  the threshold takes the one sticker left when it is clearly no other. The
+  match looks at the face only, so a series of another outfit can pass: staging
+  flags a set whose pictures are far from their stickers outside the face: five
+  outfits were drawn from another outfit's series, and five more had a series
+  that could never match (two pairs were swapped). Three outfits whose stickers
+  can't be matched by measure are named by eye, in
+  `art-sources/portraits/_names-by-hand.json`. What is still missing: pictures
+  the source doesn't have in that outfit's series, looks too alike to tell
+  apart, and two outfits whose stickers were cut from other art.
 - **Backdrops.** 1,363 files in the source category, 1,042 used, in 528 sets
   (361 with more than one time of day, 75 with states), about 130 MB. 321 places
   name a set, 382 more inherit one, 17 have none.
