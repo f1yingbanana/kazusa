@@ -2622,6 +2622,23 @@ describe("the floor", () => {
     expect(order).toEqual(["speaking", "message", "stopped"]);
   });
 
+  it("ends a line said aloud at the end of its window, however long its start took", async () => {
+    const { h, say, speaking } = await table();
+    h.messaging.onEvent((event) => {
+      // Time goes on while the line waits its turn to start.
+      if (event.type === "typing" && event.typing.isTyping)
+        h.setNow(NOW + 1_000);
+    });
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    h.setNow(NOW + 1_583);
+    const done = await Promise.race([
+      said.then(() => "said"),
+      new Promise((resolve) => setTimeout(resolve, 1_000, "still saying")),
+    ]);
+    expect(done).toBe("said");
+  });
+
   it("commits what was heard of a line cut off, the event having carried the whole line", async () => {
     const { h, say, lines, speaking } = await table();
     const emitted: TypingStreamEvent[] = [];

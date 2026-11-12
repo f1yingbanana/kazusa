@@ -1784,11 +1784,17 @@ export class Messaging {
               : undefined,
           );
           // A paused world holds the bubble; a stopping Gateway lets the rest
-          // go at once rather than wait on a frozen clock.
-          paced = await sleepSim(this.deps.clock, ms, signal, {
-            release: released,
-            hurry,
-          });
+          // go at once rather than wait on a frozen clock. It ends when the
+          // line was said to: the wait for the queue above is part of it.
+          paced = await sleepSim(
+            this.deps.clock,
+            Math.max(0, saying.startedAt + ms - this.deps.clock.now().simTime),
+            signal,
+            {
+              release: released,
+              hurry,
+            },
+          );
         }
         signal.throwIfAborted();
         sent.push(
