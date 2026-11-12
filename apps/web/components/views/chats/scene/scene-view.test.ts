@@ -1704,6 +1704,14 @@ describe("reading mode", () => {
     expect(speeds()).toEqual([0]);
     await act(async () => delivered());
     await waitFor(() => expect(speeds()).toEqual([0, SPEED]));
+    // Nobody clicks through their own line: the answer shows as it comes.
+    await waitFor(() => expect(lines()).toEqual(["Player Name: My answer."]));
+    say("alice", "An answer.");
+    expect(lines()).toEqual(["Alice: An answer."]);
+    // What follows that waits for the reader again.
+    say("bob", "And more.");
+    expect(lines()).toEqual(["Alice: An answer."]);
+    expect(corner()).toBe("ready");
   });
 
   it.each<[string, () => void]>([

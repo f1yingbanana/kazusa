@@ -673,17 +673,19 @@ function present(state: SceneState, at?: number): SceneState {
 /**
  * The next line waiting goes on screen. In reading mode that is the reader
  * getting to it: its speaker takes their turn and shows its face now, not when
- * it arrived.
+ * it arrived. The player's own line is nothing to read: with nothing else
+ * waiting, what comes after it shows as it arrives (`wanted`).
  */
 function show(state: SceneState, at: number): SceneState {
   const [head, ...ahead] = state.ahead;
   if (!head) return state;
+  const own = head.speakerId === state.playerId;
   const next: SceneState = {
     ...place(state, { ...head, shownAt: at }, at),
     ahead,
-    wanted: false,
+    wanted: state.reading && own && ahead.length === 0,
   };
-  if (!state.reading || head.speakerId === state.playerId) return next;
+  if (!state.reading || own) return next;
   const turned = speak(next, head.speakerId);
   return head.face === undefined
     ? turned

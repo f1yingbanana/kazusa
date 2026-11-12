@@ -135,7 +135,8 @@ export interface SceneState {
   readonly reading: boolean;
   /**
    * Reading mode: the reader asked for the next line before it came, so it is
-   * shown the moment it arrives (one pending request, never more).
+   * shown the moment it arrives (one pending request, never more). The player's
+   * own line asks by itself: nobody clicks through what they just said.
    */
   readonly wanted: boolean;
   /**

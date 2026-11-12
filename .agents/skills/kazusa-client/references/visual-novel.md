@@ -695,7 +695,8 @@ everyone.
 - It turns itself off, showing everything that waited, when the rendering
   switches to the transcript, the chat is left, the huddle ends, or the speed is
   changed elsewhere (then nothing is set back).
-- Replying shows what waited first, then sends.
+- Replying shows what waited first, then sends. Nobody clicks through their own
+  line: once it shows, what comes next shows as it arrives, as if asked for.
 - View state: never saved, never in the URL. Opening a chat cannot pause the
   world.
 

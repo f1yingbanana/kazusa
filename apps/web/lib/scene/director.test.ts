@@ -924,6 +924,39 @@ describe("reading mode", () => {
     expect(direct(live, typed(2_000))).toBe(live);
   });
 
+  it("never waits on the player's own line: what follows it shows as it comes, then lines wait again", () => {
+    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+      reading(true),
+      said(msg("a", "Unread.")),
+      said(msg(PLAYER, "My answer.")),
+    ]);
+    // What waited shows first, then the reply; the reader has asked already.
+    expect(shown(state)).toEqual(["a:Unread.", `${PLAYER}:My answer.`]);
+    expect(state.wanted).toBe(true);
+    state = direct(state, saying("a", "An answer.", 1_000, 2_000));
+    expect(shown(state).at(-1)).toBe("a:~An answer.");
+    expect(state.wanted).toBe(false);
+    state = direct(state, said(msg("b", "And more.")));
+    expect(state.ahead.map(text)).toEqual(["b:And more."]);
+    // Their own line read back with others behind it: those still wait.
+    const behind = run(scene({ members: [PLAYER, "a"] }), [
+      reading(true),
+      {
+        type: "history",
+        messages: [msg(PLAYER, "Earlier."), msg("a", "After it.")],
+      },
+      next(),
+    ]);
+    expect(shown(behind)).toEqual([`${PLAYER}:Earlier.`]);
+    expect(behind.wanted).toBe(false);
+    // Outside reading mode nothing is asked for.
+    const live = direct(
+      scene({ members: [PLAYER, "a"] }),
+      said(msg(PLAYER, "Hi.")),
+    );
+    expect(live.wanted).toBe(false);
+  });
+
   it("asked for with nothing waiting, shows a line being said live the moment it starts", () => {
     let state = run(scene({ members: [PLAYER, "a", "b"] }), [
       said(msg("a", "Shown."), 0),
