@@ -503,6 +503,16 @@ function known(state: SceneState, messageId: string): boolean {
 const saidBy = (line: SceneLine | undefined, id: string): boolean =>
   line !== undefined && isBeingSaid(line) && line.speakerId === id;
 
+/**
+ * Who is saying a line that is already on screen (the panel or the echoes): to
+ * the reader they have said it, however long its saying still runs.
+ */
+export function sayingOnScreen(state: SceneState): string[] {
+  return [state.line, ...state.echoes].flatMap((line) =>
+    line && isBeingSaid(line) ? [line.speakerId] : [],
+  );
+}
+
 /** Where the line `id` is saying is shown or waits, if anywhere. */
 function whereSaid(
   state: SceneState,

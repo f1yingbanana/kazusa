@@ -17,6 +17,7 @@ import {
   useSceneStore,
 } from "@/lib/live/scene-state";
 import { useLiveStore } from "@/lib/live/state";
+import { sayingOnScreen } from "@/lib/scene/director";
 import {
   READING_OFF,
   stepReadingClock,
@@ -120,6 +121,8 @@ export function useReadingClock({
   return { send };
 }
 
+const NOBODY: readonly string[] = [];
+
 /** What the people here are doing, for reading mode's status. */
 export interface HuddleActivity {
   /** Someone saying a line, or composing one, here. */
@@ -131,13 +134,23 @@ export interface HuddleActivity {
 /**
  * Who in this huddle is speaking (a speaking event, or composing in this chat,
  * as the header's faces say "Speaking") or thinking (as the presence ring
- * says), from the live stores; the first of each, by member order.
+ * says), from the live stores; the first of each, by member order. Someone
+ * whose line is already on screen is not speaking: the reader has it, and what
+ * they wait for is what comes after.
  */
 export function useHuddleActivity(
   chatId: string,
   members: readonly string[],
 ): HuddleActivity {
-  const speaker = useSceneStore((state) => state.scenes[chatId]?.speakers[0]);
+  const shown = useSceneStore(
+    useShallow((state) => {
+      const scene = state.scenes[chatId];
+      return scene ? sayingOnScreen(scene) : NOBODY;
+    }),
+  );
+  const speaker = useSceneStore((state) =>
+    state.scenes[chatId]?.speakers.find((id) => !shown.includes(id)),
+  );
   const [composing, thinking] = useLiveStore(
     useShallow((state) => {
       let composer: string | undefined;
@@ -145,7 +158,11 @@ export function useHuddleActivity(
       for (const id of members) {
         const status = state.statuses.get(id);
         if (!status) continue;
-        if (composer === undefined && status.composingIn.includes(chatId))
+        if (
+          composer === undefined &&
+          status.composingIn.includes(chatId) &&
+          !shown.includes(id)
+        )
           composer = id;
         if (thinker === undefined && status.brain === "thinking") thinker = id;
       }
@@ -169,7 +186,8 @@ export type ReadingStatus =
 
 /**
  * A line ready: the caret. Asked for with nothing ready: who is speaking or
- * thinking, else that it is on its way. Otherwise nothing.
+ * thinking, else only that the reader is waiting (nothing says a line is
+ * coming). Otherwise nothing.
  */
 export function readingStatus(
   waiting: number,

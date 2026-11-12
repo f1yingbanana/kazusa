@@ -233,7 +233,8 @@ function Said({ line }: { line: SceneLine }) {
 /**
  * Reading mode's word at the panel's lower right: a caret breathing when a line
  * is ready; asked for with none ready, who is speaking or thinking, in plain
- * words with the person's name; otherwise nothing. No animated dots.
+ * words with the person's name, or that the reader is waiting, never that a
+ * line is coming; otherwise nothing. No animated dots.
  */
 function ReadingCorner({ status }: { status: ReadingStatus }) {
   const { byId } = useCharacters();
@@ -244,7 +245,7 @@ function ReadingCorner({ status }: { status: ReadingStatus }) {
       : status.kind === "thinking"
         ? `${name(status.id)} is thinking`
         : status.kind === "waiting"
-          ? "The next line is on its way"
+          ? "Waiting for someone to speak"
           : undefined;
   return (
     <div

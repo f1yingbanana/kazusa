@@ -1481,7 +1481,7 @@ describe("reading mode", () => {
     await reading();
     expect(corner()).toBe("none");
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
-    expect(words()).toBe("The next line is on its way");
+    expect(words()).toBe("Waiting for someone to speak");
     act(() =>
       stream().emit({
         type: "status",
@@ -1511,6 +1511,45 @@ describe("reading mode", () => {
     expect(lines()).toEqual(["Alice: Here."]);
     await act(async () => {});
     expect(speeds()).toEqual([]);
+  });
+
+  it("does not call someone speaking whose line is already on screen", async () => {
+    await reading();
+    act(() =>
+      stream().emit({
+        type: "status",
+        characterId: "bob",
+        status: {
+          brain: "thinking",
+          composingIn: ["huddle"],
+          queued: 0,
+          onstage: true,
+        },
+      }),
+    );
+    // His line starts: ready at once, and shown whole when asked for.
+    const now = Date.now();
+    act(() =>
+      stream().emit({
+        type: "typing",
+        chatId: "huddle",
+        senderId: "bob",
+        senderName: "Bob",
+        isTyping: true,
+        mode: "speaking",
+        speech: { text: "And here.", from: now, until: now + 60_000 },
+      }),
+    );
+    expect(corner()).toBe("ready");
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(
+      screen.getByRole("log").querySelector("[data-saying] [aria-hidden]")
+        ?.textContent,
+    ).toBe("And here.");
+    // Asked for the next while its saying runs on: he is not "speaking" a
+    // line the reader has; what is true is that he is thinking.
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(words()).toBe("Bob is thinking");
   });
 
   it("starts a paused world at 1x, and pauses it again when turned off", async () => {
