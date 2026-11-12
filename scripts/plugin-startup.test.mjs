@@ -4,6 +4,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   allowChatStarters,
+  denyImpliedTools,
+  IMPLIED_TOOLS,
   loadNewPlugins,
   NO_BUNDLED_SKILLS,
   scopeCharacterSkills,
@@ -178,6 +180,74 @@ describe("allowChatStarters", () => {
 
   it("does nothing without a world", () => {
     expect(allowChatStarters(repo().root)).toEqual([]);
+  });
+});
+
+describe("denyImpliedTools", () => {
+  const arona = {
+    $include: "./.state/kazusa/system-agent.json",
+    workspace: "./workspaces/arona",
+  };
+
+  it("denies the implied tools to each plain character, once", () => {
+    const { root, read } = repo({
+      tools: {
+        profile: "minimal",
+        fs: { workspaceOnly: true },
+        exec: { applyPatch: { enabled: false } },
+      },
+      agents: {
+        defaults: { systemAgent: { agentId: "arona" } },
+        entries: {
+          arona,
+          hina: { workspace: "./workspaces/hina" },
+          ui: { workspace: "./workspaces/ui", identity: { name: "Ui" } },
+          // Tools of her own are the world's decision.
+          yuuka: {
+            workspace: "./workspaces/yuuka",
+            tools: { alsoAllow: ["read"] },
+          },
+        },
+      },
+    });
+    expect(denyImpliedTools(root)).toEqual([
+      "2 characters now deny shell and file tools outright, which they never had.",
+    ]);
+    const world = read();
+    const deny = { deny: ["exec", "process", "read", "write", "edit"] };
+    expect(world.agents.entries).toEqual({
+      arona,
+      hina: { workspace: "./workspaces/hina", tools: deny },
+      ui: {
+        workspace: "./workspaces/ui",
+        identity: { name: "Ui" },
+        tools: deny,
+      },
+      yuuka: {
+        workspace: "./workspaces/yuuka",
+        tools: { alsoAllow: ["read"] },
+      },
+    });
+    // The sections stay: workspaceOnly still bounds view_image.
+    expect(world.tools.fs).toEqual({ workspaceOnly: true });
+    expect(denyImpliedTools(root)).toEqual([]);
+  });
+
+  it("covers a character added since the last start", () => {
+    const { root, read } = repo({
+      agents: { entries: { hina: { workspace: "./workspaces/hina" } } },
+    });
+    denyImpliedTools(root);
+    const file = path.join(root, "apps/kazusa/world/openclaw.json");
+    const world = read();
+    world.agents.entries.iroha = { workspace: "./workspaces/iroha" };
+    writeFileSync(file, JSON.stringify(world));
+    expect(denyImpliedTools(root)).toHaveLength(1);
+    expect(read().agents.entries.iroha.tools.deny).toEqual(IMPLIED_TOOLS);
+  });
+
+  it("does nothing before a world exists", () => {
+    expect(denyImpliedTools(repo().root)).toEqual([]);
   });
 });
 

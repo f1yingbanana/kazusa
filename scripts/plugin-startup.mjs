@@ -114,6 +114,41 @@ export function allowChatStarters(root) {
 }
 
 /**
+ * The tools OpenClaw once granted for `tools.exec` and `tools.fs` being set. It
+ * no longer does, but warns about it on every tool-policy check of every
+ * character (#47487): six lines per turn, 40% of a long run's log.
+ */
+export const IMPLIED_TOOLS = ["exec", "process", "read", "write", "edit"];
+
+/**
+ * Characters keep both sections, though neither grants anything to the
+ * `minimal` profile now: `fs.workspaceOnly` still holds `view_image` to their
+ * workspace, and `exec.applyPatch` keeps `apply_patch` off should `write` ever
+ * be allowed. A deny on the character itself is what tells OpenClaw the tools
+ * are meant to be missing; a global one would take ARONA's files too. It
+ * removes nothing a character has. Every character entry gets it before each
+ * start, so one added since the last start gets it at the next. Not the system
+ * agent, and not a character with tools of its own: that's the world's call.
+ */
+export function denyImpliedTools(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const system = config.agents?.defaults?.systemAgent?.agentId;
+  const characters = Object.entries(config.agents?.entries ?? {}).filter(
+    ([id, entry]) =>
+      id !== system && entry && !entry.$include && entry.tools === undefined,
+  );
+  if (!characters.length) return [];
+  for (const [, entry] of characters)
+    entry.tools = { deny: [...IMPLIED_TOOLS] };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [
+    `${characters.length} characters now deny shell and file tools outright, which they never had.`,
+  ];
+}
+
+/**
  * A skill name no bundled skill has. OpenClaw reads an empty `allowBundled` as
  * "every bundled skill", so the only way to allow none is a list that matches
  * none: this is that list's one entry, not a skill.
@@ -151,5 +186,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of allowChatStarters(root)) console.log(line);
+  for (const line of denyImpliedTools(root)) console.log(line);
   for (const line of scopeCharacterSkills(root)) console.log(line);
 }
