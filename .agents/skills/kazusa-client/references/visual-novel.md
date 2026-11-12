@@ -573,6 +573,8 @@ Built (2026-11-12) as described below, with these differences:
   reading mode a line's face, and its speaker's turn (who is drawn when not
   everyone fits), wait with the line: they change when the reader advances onto
   it (`show` in the director), so the picture never runs ahead of the text.
+  Someone who left while their line waited stays gone: the reader gets the
+  line, not its speaker back.
 
 The character chooses the face, in the `send_message` call they are already
 making, and everyone present sees it.
@@ -683,7 +685,9 @@ everyone.
   a line asked for before it came. If someone cuts in on it afterwards, the
   panel shortens to what was said.
 - An advance while the panel's line is still being typed out shows that line
-  whole; the next advance moves on.
+  whole; the next advance moves on. A line being said that the reader gets to
+  while others still wait shows whole at once: the world stays paused for
+  them, so it could not be typed out.
 - When the reader has asked and nothing waits, the panel says who is thinking or
   speaking, in words, and only what is known: someone whose line is already on
   screen is not "speaking" (its saying runs on after the reader has it), and
@@ -691,10 +695,12 @@ everyone.
   that a line is coming.
 - Turned on with the clock at 0, it starts the world at 1×, since it needs the
   world running to get a line. Turned off, it restores exactly the speed it
-  found, 0 included.
+  found, 0 included. A speed it could not set is tried again two seconds
+  later, and turned off meanwhile it still restores the speed found.
 - It turns itself off, showing everything that waited, when the rendering
   switches to the transcript, the chat is left, the huddle ends, or the speed is
-  changed elsewhere (then nothing is set back).
+  changed elsewhere (then nothing is set back). Back from the browser's
+  back-forward cache it is off: leaving the page already restored the speed.
 - Replying shows what waited first, then sends. Nobody clicks through their own
   line: once it shows, what comes next shows as it arrives, as if asked for.
 - View state: never saved, never in the URL. Opening a chat cannot pause the

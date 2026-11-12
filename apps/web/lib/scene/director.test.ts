@@ -1028,6 +1028,47 @@ describe("reading mode", () => {
     expect(state.line).toBeUndefined();
     expect(state.ahead.map(text)).toEqual(["a:missed"]);
   });
+
+  it("shows a history read's first line at once when the reader has asked", () => {
+    let state = run(scene({ members: [PLAYER, "a"] }), [reading(true), next()]);
+    expect(state.wanted).toBe(true);
+    state = direct(state, {
+      type: "history",
+      messages: [msg("a", "missed"), msg("a", "and this")],
+      at: 10,
+    });
+    expect(shown(state)).toEqual(["a:missed"]);
+    expect(state.ahead.map(text)).toEqual(["a:and this"]);
+    expect(state.wanted).toBe(false);
+  });
+
+  it("shows a line being said whole when more wait behind it, since the world stays paused", () => {
+    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+      reading(true),
+      saying("a", "Said first", 1_000, 4_000),
+      saying("b", "Said over it", 1_100, 4_000),
+      { type: "show-next", at: 0, sim: 1_100 },
+    ]);
+    expect(shown(state)).toEqual(["a:~!Said first"]);
+    expect(state.ahead.map(text)).toEqual(["b:~Said over it"]);
+    // The last one is typed out: the world runs again.
+    state = direct(state, { type: "show-next", at: 0, sim: 1_100 });
+    expect(shown(state)).toEqual(["a:~!Said first", "b:~Said over it"]);
+  });
+
+  it("does not bring back someone who left while their line waited", () => {
+    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+      reading(true),
+      said(msg("b", "Bye.", { face: { name: "happy" } })),
+      members("a"),
+    ]);
+    expect(lineup(state)).toEqual(["a@2"]);
+    state = direct(state, next());
+    expect(shown(state)).toEqual(["b:Bye."]);
+    expect(state.members).toEqual(["a"]);
+    expect(lineup(state)).toEqual(["a@2"]);
+    expect(state.moods).toEqual({});
+  });
 });
 
 describe("figures settle and change look", () => {

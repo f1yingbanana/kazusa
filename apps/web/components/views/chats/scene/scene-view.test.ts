@@ -10,6 +10,7 @@ import {
   within,
 } from "@testing-library/react";
 import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
+import { toast } from "sonner";
 import { SWRConfig } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -1866,5 +1867,25 @@ describe("the backlog", () => {
     expect(lines()).toEqual(["Alice: Latest."]);
     fireEvent.click(screen.getByRole("log"));
     expect(lines()).toEqual(["Alice: Waiting."]);
+  });
+
+  it("shows a reply that was not delivered, with Retry, from the failure's notice", async () => {
+    const failure = vi.spyOn(toast, "error");
+    vi.mocked(sendMessage).mockRejectedValue(new Error("Gateway down"));
+    renderWith(chatView(huddle([PLAYER, "alice"])));
+    await waitFor(() => expect(scene()).not.toBeNull());
+    const box = within(scene() as HTMLElement).getByRole("textbox", {
+      name: "Message",
+    });
+    fireEvent.change(box, { target: { value: "Count me in." } });
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    await waitFor(() => expect(failure).toHaveBeenCalledTimes(1));
+    const action = failure.mock.calls[0]?.[1]?.action as
+      { label: string; onClick: () => void } | undefined;
+    expect(action?.label).toBe("Show");
+    act(() => action?.onClick());
+    const dialog = backlog() as HTMLElement;
+    expect(within(dialog).getByText("Count me in.")).toBeDefined();
+    expect(within(dialog).getByRole("button", { name: /Retry/ })).toBeDefined();
   });
 });

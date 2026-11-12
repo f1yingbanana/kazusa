@@ -101,6 +101,7 @@ export function usePagedMessages<T extends MessagesResponse>(
             applySceneEvent(chatId, {
               type: "history",
               messages: latest.messages,
+              at: Date.now(),
             });
         },
       },

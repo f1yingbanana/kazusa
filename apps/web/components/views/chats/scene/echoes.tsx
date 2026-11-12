@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { applySceneEvent } from "@/lib/live/scene-state";
 import { ECHO_MS } from "@/lib/scene/director";
 import type { SceneLine } from "@/lib/scene/state";
@@ -86,6 +86,13 @@ function Echo({
   const Surface = onOpen ? "button" : "div";
   // Counted from when it left the panel, so a remount doesn't restart it.
   const [mountedAt] = useState(() => Date.now());
+  // Faded out while still being said: it goes once its message lands (the
+  // scene's state names an echo by its message).
+  const [faded, setFaded] = useState(false);
+  const gone = useEffectEvent(onFaded);
+  useEffect(() => {
+    if (faded && line.messageId) gone();
+  }, [faded, line.messageId]);
   const delay = Math.max(
     0,
     (line.leftAt ?? mountedAt) + ECHO_MS - FADE_MS - mountedAt,
@@ -110,7 +117,7 @@ function Echo({
             }
           : {})}
         onAnimationEnd={(event) => {
-          if (fading && event.target === event.currentTarget) onFaded();
+          if (fading && event.target === event.currentTarget) setFaded(true);
         }}
         className={cn(
           "pointer-events-auto max-w-full rounded-md px-2.5 py-1 text-left text-[13px] leading-snug outline-none focus-visible:outline-2 focus-visible:outline-ring sm:max-w-[85%]",

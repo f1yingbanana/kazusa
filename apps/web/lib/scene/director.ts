@@ -79,8 +79,16 @@ export type SceneEvent =
       readonly message: ChatMessage;
       readonly at: number;
     }
-  /** A history read: only messages newer than any seen are taken, unpaced. */
-  | { readonly type: "history"; readonly messages: readonly ChatMessage[] }
+  /**
+   * A history read: only messages newer than any seen are taken, unpaced. `at`:
+   * wall-clock ms it arrived, for a line the reader has asked for to show
+   * then.
+   */
+  | {
+      readonly type: "history";
+      readonly messages: readonly ChatMessage[];
+      readonly at?: number;
+    }
   /** The renderer finished a figure's enter or exit transition. */
   | { readonly type: "settle"; readonly id: string }
   /** Change a figure's look; keys given replace, `mood: undefined` is neutral. */
@@ -686,10 +694,25 @@ function show(state: SceneState, at: number): SceneState {
     wanted: state.reading && own && ahead.length === 0,
   };
   if (!state.reading || own) return next;
-  const turned = speak(next, head.speakerId);
-  return head.face === undefined
-    ? turned
-    : wear(turned, head.speakerId, head.face);
+  // Someone who left while their line waited stays gone, their face with
+  // them: only the line is left to read.
+  const id = head.speakerId;
+  if (!next.members.includes(id)) return next;
+  const turned = speak(next, id);
+  return head.face === undefined ? turned : wear(turned, id, head.face);
+}
+
+/**
+ * The reader's next line goes on screen. With more still waiting, the world
+ * stays paused for them, so a line being said could not be typed out: it shows
+ * whole.
+ */
+function showNext(state: SceneState, at: number): SceneState {
+  const next = show(state, at);
+  const line = next.line;
+  return state.reading && next.ahead.length && line && isBeingSaid(line)
+    ? { ...next, line: { ...line, whole: true } }
+    : next;
 }
 
 /** Whether `line` is still being typed out at sim time `sim`. */
@@ -783,6 +806,7 @@ function withMessage(
 function withHistory(
   state: SceneState,
   messages: readonly ChatMessage[],
+  at?: number,
 ): SceneState {
   const sequence = messages.reduce(
     (max, message) => Math.max(max, message.sequence),
@@ -798,13 +822,18 @@ function withHistory(
     .sort((a, b) => a.sequence - b.sequence);
   if (!fresh.length)
     return sequence === state.sequence ? state : { ...state, sequence };
-  // Reading mode: they wait for the reader like any line, turns and faces too.
-  if (state.reading)
-    return {
+  // Reading mode: they wait for the reader like any line, turns and faces too;
+  // the first shows at once if the reader has asked for it.
+  if (state.reading) {
+    const waiting: SceneState = {
       ...state,
       sequence,
       ahead: [...state.ahead, ...fresh.slice(-HISTORY_MESSAGES).map(toLine)],
     };
+    return state.wanted && !state.ahead.length && at !== undefined
+      ? show(waiting, at)
+      : waiting;
+  }
   let turn = state.turn;
   const spoke = { ...state.spoke };
   const faces: Record<string, string> = {};
@@ -974,7 +1003,7 @@ export function direct(state: SceneState, event: SceneEvent): SceneState {
     case "message":
       return withMessage(state, event.message, event.at);
     case "history":
-      return withHistory(state, event.messages);
+      return withHistory(state, event.messages, event.at);
     case "settle":
       return withFigures(
         state,
@@ -1008,7 +1037,7 @@ export function direct(state: SceneState, event: SceneEvent): SceneState {
       if (state.reading && state.line && stillTyped(state.line, event.sim))
         return { ...state, line: { ...state.line, whole: true } };
       return state.ahead.length
-        ? present(show(state, event.at), event.at)
+        ? present(showNext(state, event.at), event.at)
         : state.reading && !state.wanted
           ? present({ ...state, wanted: true }, event.at)
           : state;

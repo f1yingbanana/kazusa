@@ -112,10 +112,22 @@ export function ChatView({
         );
         toast.error("Message not delivered", {
           description: error instanceof Error ? error.message : undefined,
+          // The scene shows no unsent lines: the backlog has it, with Retry.
+          ...(rendering.as === "scene"
+            ? { action: { label: "Show", onClick: openBacklog } }
+            : {}),
         });
       }
     },
-    [chat, send, commitSentMessage, onSent, refreshChats],
+    [
+      chat,
+      send,
+      commitSentMessage,
+      onSent,
+      refreshChats,
+      rendering.as,
+      openBacklog,
+    ],
   );
 
   function handleSend(text: string, type: MessageType) {
