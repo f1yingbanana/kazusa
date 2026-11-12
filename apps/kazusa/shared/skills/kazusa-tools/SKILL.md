@@ -99,9 +99,10 @@ in a row unless the feeling is strong. {data}
 
 ## send_message.messages.face
 
-Face to face only: the face you show as you say or do this, one of your moods.
-Everyone with you sees it, and it stays until you show another. Most lines need
-none: set it when your expression changes, not on every line.
+Face to face only: the expression you show as you say or do this, one of your
+moods. Everyone with you sees it, and it stays until you show another. Give one
+on your first line in a conversation and whenever your expression changes; leave
+it out while it stays the same.
 
 ## send_message.sticker-outfits
 
