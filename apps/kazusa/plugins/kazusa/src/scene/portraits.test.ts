@@ -156,6 +156,27 @@ describe("portrait sets", () => {
 });
 
 describe("the default portrait's URL", () => {
+  it("chooses again when outfits are declared or dropped", async () => {
+    const workspace = await workspaceWith(["swim-neutral.webp"]);
+    expect(defaultPortraitUrl("aris", workspace)).toContain(
+      "name=swim-neutral",
+    );
+    const stickers = path.join(workspace, "stickers");
+    await mkdir(stickers);
+    await writeFile(
+      path.join(stickers, "stickers.json"),
+      JSON.stringify({ outfits: { swim: "a swimsuit" } }),
+    );
+    // Only the manifest changed, not the portraits folder.
+    expect(defaultPortraitUrl("aris", workspace)).toBeUndefined();
+    const later = new Date(Date.now() + 60_000);
+    await writeFile(path.join(stickers, "stickers.json"), "{}");
+    await utimes(path.join(stickers, "stickers.json"), later, later);
+    expect(defaultPortraitUrl("aris", workspace)).toContain(
+      "name=swim-neutral",
+    );
+  });
+
   it("follows the default without listing an unchanged folder", async () => {
     const workspace = await workspaceWith(["smile.webp"]);
     const dir = path.join(workspace, "portraits");

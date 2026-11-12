@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import {
+  fileMtime,
   pictureEntry,
   pictureVersion,
   readPictures,
@@ -172,11 +173,14 @@ export function portraitUrl(
   return `/kazusa/portrait?${query}`;
 }
 
-/** The default's file per portraits folder, while the folder is unchanged. */
+/**
+ * The default's file per portraits folder, while the folder and the outfits it
+ * was chosen by are unchanged.
+ */
 const defaults = new Map<
   string,
   {
-    readonly folderMtime: number;
+    readonly key: string;
     readonly entry?: string;
     readonly name?: string;
   }
@@ -187,25 +191,28 @@ const defaults = new Map<
  * isn't drawn: one `stat` of the folder for a character without portraits, and
  * one more of the picture for one with them. The folder is listed again only
  * when it changes (a picture added, removed or renamed); one replaced in place
- * changes only its own mtime, which the second `stat` reads. Outfits are read
- * with the listing, so newly declared ones count from the folder's next
- * change.
+ * changes only its own mtime, which the second `stat` reads. A third, of
+ * `stickers/stickers.json`, notices outfits declared or dropped: they decide
+ * which pictures count as the usual clothes.
  */
 export function defaultPortraitUrl(
   agentId: string,
   workspace: string,
 ): string | undefined {
   const dir = portraitsDir(workspace);
-  let folderMtime: number;
+  let key: string;
   try {
     const info = statSync(dir);
     if (!info.isDirectory()) return undefined;
-    folderMtime = info.mtimeMs;
+    const outfitsMtime = fileMtime(
+      path.join(workspace, "stickers", "stickers.json"),
+    );
+    key = `${info.mtimeMs}:${outfitsMtime ?? "none"}`;
   } catch {
     return undefined;
   }
   let cached = defaults.get(dir);
-  if (cached?.folderMtime !== folderMtime) {
+  if (cached?.key !== key) {
     let entries: string[];
     try {
       entries = readdirSync(dir).sort();
@@ -228,7 +235,7 @@ export function defaultPortraitUrl(
     });
     const resting = restingPortrait(pictures);
     cached = {
-      folderMtime,
+      key,
       ...(resting ? { entry: resting.entry, name: resting.name } : {}),
     };
     defaults.set(dir, cached);
