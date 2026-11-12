@@ -280,8 +280,13 @@ export function centreOf(faceBox, trim) {
 const FEET = {
   /** Rows above this fraction of the picture are never the floor. */
   above: 0.6,
-  /** How far to each side of the figure's centre, in picture heights. */
-  reach: 0.15,
+  /**
+   * How far to each side of the figure's centre, in picture heights: a stride.
+   * In a wide stance the nearer foot, the lower one in the picture, is well out
+   * from under the head; a narrower look takes the far foot for the floor and
+   * sinks the figure.
+   */
+  reach: 0.32,
   /** The rows just above a candidate row that are counted, in picture heights. */
   rows: 0.015,
   /** Solid pixels needed in them, in picture heights squared. */
@@ -296,7 +301,9 @@ const FEET = {
  * figure's `centre`. The canvas bottom is usually the floor, but a wing, a
  * weapon or a bike's wheel can reach lower than the shoes, and then the figure
  * would float. A wing tip, a strand of hair or a soft shadow is too little to
- * count; what is far out to one side isn't looked at.
+ * count; what is far out to one side isn't looked at. Something solid within a
+ * stride that reaches lower than the shoes (a flag, a rifle's muzzle, a wheel
+ * beside the figure) still counts: that `floor` is corrected by hand.
  */
 export async function floorOf(buffer, centre = 0.5) {
   const { data, info } = await sharp(buffer)

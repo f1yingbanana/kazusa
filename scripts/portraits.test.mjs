@@ -394,7 +394,7 @@ describe("heightScale", () => {
 });
 
 describe("floorOf", () => {
-  const WIDTH = 400;
+  const WIDTH = 1200;
   const HEIGHT = 1000;
   const picture = (blocks) =>
     sharp({
@@ -421,24 +421,34 @@ describe("floorOf", () => {
       )
       .png()
       .toBuffer();
-  const body = [170, 100, 60, 840];
+  // A figure about the middle whose shoes end 6% above the bottom edge.
+  const body = [570, 100, 60, 840];
 
   it("is the bottom edge for a figure that stands on it", async () => {
-    expect(await floorOf(await picture([[170, 100, 60, 900]]))).toBe(1);
+    expect(await floorOf(await picture([[570, 100, 60, 900]]))).toBe(1);
   });
 
   it("is where the shoes end, not a tip or a wheel that reaches lower", async () => {
     const buffer = await picture([
       body,
       // A wing tip under the figure, and a wheel far out to one side.
-      [250, 940, 10, 60],
+      [650, 940, 10, 60],
       [0, 900, 40, 100],
     ]);
     expect(await floorOf(buffer)).toBe(0.94);
   });
 
+  it("is the nearer foot of a stride, well out from under the head", async () => {
+    // The far foot under the head ends higher than the near one, a stride away.
+    const buffer = await picture([
+      [570, 100, 60, 780],
+      [820, 700, 60, 270],
+    ]);
+    expect(await floorOf(buffer)).toBe(0.97);
+  });
+
   it("is the bottom edge when nothing is found", async () => {
-    expect(await floorOf(await picture([[170, 100, 60, 300]]))).toBe(1);
+    expect(await floorOf(await picture([[570, 100, 60, 300]]))).toBe(1);
   });
 });
 
