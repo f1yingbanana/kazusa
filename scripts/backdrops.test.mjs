@@ -214,6 +214,57 @@ describe("stage", () => {
   });
 });
 
+describe("stage, files deleted since the listing", () => {
+  it("skips them, and resumes past five of them spread over the listing", async () => {
+    const names = [];
+    const files = new Map();
+    const failures = {};
+    for (let n = 1; n <= 10; n++) {
+      const name = `Gone ${n}.png`;
+      files.set(name, await scene(n, 320, 180));
+      names.push(name);
+      if (n % 2 === 0) failures[name] = 404;
+    }
+    const gone = await startFakeWiki(files, {
+      categories: { [CATEGORY]: names },
+      failures,
+      fandom: false,
+    });
+    try {
+      const own = { ...options(), cache: path.join(root, "cache-gone") };
+      const dir = path.join(root, "stage-gone");
+      const first = await stageBackdrops(gone.url, CATEGORY, dir, own);
+      expect(first.failed).toHaveLength(5);
+      // Every file left to fetch is a deleted one, with cached ones between.
+      const again = await stageBackdrops(gone.url, CATEGORY, dir, own);
+      expect(again.failed).toHaveLength(5);
+      expect(again.pictures).toHaveLength(5);
+    } finally {
+      await gone.close();
+    }
+  });
+});
+
+describe("check", () => {
+  it("names a picture the plugin skips, and a state of more than one word", () => {
+    const world = makeWorld();
+    const set = path.join(world, "shared", "backdrops", "station");
+    mkdirSync(set, { recursive: true });
+    writeFileSync(path.join(set, "day.webp"), "");
+    writeFileSync(path.join(set, "Night Time.webp"), "");
+    writeFileSync(
+      path.join(set, "backdrops.json"),
+      JSON.stringify({ states: { "rainy-day": "Raining" } }),
+    );
+    expect(checkWorld(world).problems).toEqual(
+      expect.arrayContaining([
+        "station/Night Time.webp: Night Time isn't lowercase words joined by -",
+        "station: state rainy-day isn't one lowercase word",
+      ]),
+    );
+  });
+});
+
 describe("names", () => {
   it("are a time, or a declared state and a time", () => {
     const states = { festival: "Decorated" };

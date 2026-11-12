@@ -498,7 +498,10 @@ export async function stageBackdrops(wiki, category, dir, options = {}) {
   for (const [at, entry] of listing.files.entries()) {
     const n = at + 1;
     const source = cachedFile(cache, entry);
-    if (!existsSync(source)) {
+    // A cached file breaks a run of deleted ones too, or a resumed run would
+    // count every deleted file in the listing as one run.
+    if (existsSync(source)) gone = 0;
+    else {
       let body;
       try {
         body = await client.bytes(entry.download.url);
@@ -919,6 +922,10 @@ export function checkWorld(world, options = {}) {
       } catch {
         problems.push(`${set}: backdrops.json isn't JSON`);
       }
+    // The plugin reads a state from a picture name's first word only.
+    for (const state of Object.keys(states))
+      if (!/^[a-z0-9]+$/.test(state))
+        problems.push(`${set}: state ${state} isn't one lowercase word`);
     for (const file of readdirSync(dir)) {
       if (file === "backdrops.json") continue;
       if (!RASTER.test(file)) {
@@ -927,6 +934,12 @@ export function checkWorld(world, options = {}) {
       }
       pictures++;
       bytes += statSync(path.join(dir, file)).size;
+      // `names` holds only what the plugin reads; say why the rest isn't.
+      const name = file.replace(/\.[^.]+$/, "");
+      if (!isName(name))
+        problems.push(
+          `${set}/${file}: ${name} isn't lowercase words joined by -`,
+        );
     }
     for (const name of names) {
       const problem = nameProblem(name, states, times);
