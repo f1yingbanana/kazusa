@@ -660,7 +660,10 @@ everyone.
   next line is usually there when the reader clicks. If someone cuts in on it
   afterwards, the panel shortens to what was said.
 - When the reader has asked and nothing waits, the panel says who is thinking or
-  speaking, in words.
+  speaking, in words, and only what is known: someone whose line is already on
+  screen is not "speaking" (its saying runs on after the reader has it whole),
+  and with nobody speaking or thinking it says "Waiting for someone to speak",
+  never that a line is coming.
 - Turned on with the clock at 0, it starts the world at 1×, since it needs the
   world running to get a line. Turned off, it restores exactly the speed it
   found, 0 included.
