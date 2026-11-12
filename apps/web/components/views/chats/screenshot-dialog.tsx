@@ -181,7 +181,7 @@ export function ScreenshotDialog({
             // Laid out where nobody sees it; the picture is taken of it.
             <div
               aria-hidden
-              className="pointer-events-none fixed top-0 -left-[10000px]"
+              className="pointer-events-none fixed top-0 -left-2500"
             >
               <ScreenshotCard
                 ref={card}
@@ -201,7 +201,7 @@ export function ScreenshotDialog({
             "flex max-h-[90dvh] flex-col sm:max-w-md",
             // A phone gets the whole screen: the picture is the point, and a
             // floating box leaves it a strip to be read in.
-            "max-sm:inset-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:ring-0",
+            "max-sm:inset-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-0 max-sm:rounded-none max-sm:ring-0",
             "max-sm:pt-[max(1rem,env(safe-area-inset-top))] max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]",
           )}
         >

@@ -1,31 +1,31 @@
-'use client'
+"use client";
 
-import { useQueryState } from 'nuqs'
-import { settingsParsers } from './search-params'
-import { ChevronLeftIcon } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { SettingsSidebar, useSettingsTab } from './settings-sidebar'
+import { useQueryState } from "nuqs";
+import { settingsParsers } from "./search-params";
+import { ChevronLeftIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SettingsSidebar, useSettingsTab } from "./settings-sidebar";
 
 /**
  * The open settings page (`settings.tab`). The category list is this section's
  * sidebar; on narrow screens it is this screen until one is opened.
  */
 export function SettingsView() {
-  const category = useSettingsTab()
+  const category = useSettingsTab();
   const [, setTab] = useQueryState(
-    'settings.tab',
-    settingsParsers['settings.tab'],
-  )
+    "settings.tab",
+    settingsParsers["settings.tab"],
+  );
 
   if (!category) {
     return (
       <div className="flex min-h-0 flex-1 flex-col bg-sidebar">
         <SettingsSidebar />
       </div>
-    )
+    );
   }
 
-  const Page = category.component
+  const Page = category.component;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 lg:px-6">
@@ -46,5 +46,5 @@ export function SettingsView() {
         </div>
       </div>
     </div>
-  )
+  );
 }

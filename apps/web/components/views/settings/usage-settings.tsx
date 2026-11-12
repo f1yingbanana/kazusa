@@ -139,7 +139,7 @@ function ByCharacter({ report }: { report: UsageResponse }) {
                 aria-current={selected ? "true" : undefined}
                 onClick={() => void select({ kind: "character", id: agentId })}
                 className={cn(
-                  "flex h-full w-full items-center gap-3 px-3 text-left outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+                  "flex size-full items-center gap-3 px-3 text-left outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
                   selected && "bg-muted",
                 )}
               >

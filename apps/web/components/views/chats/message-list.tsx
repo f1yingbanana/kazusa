@@ -255,7 +255,7 @@ export function MessageList({
             className={cn(
               "relative mx-auto w-full max-w-3xl gap-4 px-4 pt-6 pb-4",
               shooting &&
-                "pb-28 select-none [&_[data-shot-id]]:cursor-pointer [&_[data-shot-in]]:rounded-lg [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ring",
+                "pb-28 select-none **:data-shot-id:cursor-pointer **:data-shot-in:rounded-lg [&_[data-shot-in]:focus-visible]:outline-2 [&_[data-shot-in]:focus-visible]:outline-offset-4 [&_[data-shot-in]:focus-visible]:outline-ring",
             )}
           >
             {range ? (

@@ -408,7 +408,7 @@ export function WorldSidebar({
 
       {query.trim() ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-2">
-          <h3 className="px-3 pt-1 pb-1 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          <h3 className="px-3 py-1 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             {matches.length === 1 ? "1 match" : `${matches.length} matches`}
           </h3>
           {matches.length === 0 ? (

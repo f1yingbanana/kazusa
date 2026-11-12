@@ -443,7 +443,7 @@ export function ScreenshotBar({
     <div
       role="toolbar"
       aria-label="Screenshot"
-      className="absolute inset-x-3 bottom-4 z-20 mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-popover py-2 pr-2 pl-4 text-popover-foreground shadow-lg animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
+      className="absolute inset-x-3 bottom-4 z-20 mx-auto flex max-w-md animate-in items-center gap-3 rounded-xl border bg-popover py-2 pr-2 pl-4 text-popover-foreground shadow-lg fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
     >
       <div className="flex min-w-0 flex-1 flex-col" aria-live="polite">
         <span className="text-sm font-medium">

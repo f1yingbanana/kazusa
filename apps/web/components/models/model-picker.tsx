@@ -112,7 +112,7 @@ export function ModelPicker({
     return groups;
   }, [data?.models]);
 
-  const models = data?.models ?? (agentId ? world.data?.models ?? [] : []);
+  const models = data?.models ?? (agentId ? (world.data?.models ?? []) : []);
   const current = models.find((model) => model.ref === data?.current);
   const statusOf = new Map(
     (data?.providers ?? world.data?.providers ?? []).map((entry) => [
@@ -170,7 +170,9 @@ export function ModelPicker({
               ? modelName(current)
               : data?.current
                 ? `${refName(models, data.current)} (unreachable)`
-                : (isLoading ? "Loading models…" : "No model")}
+                : isLoading
+                  ? "Loading models…"
+                  : "No model"}
         </span>
         {current ? (
           <span className="shrink-0 text-xs text-muted-foreground">

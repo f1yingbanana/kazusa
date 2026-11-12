@@ -12,7 +12,14 @@ describe("EntityRef serialization", () => {
     });
   });
   it("rejects unknown kinds and malformed values", () => {
-    for (const value of [null, "", "alice", ":alice", "character:", "robot:x"]) {
+    for (const value of [
+      null,
+      "",
+      "alice",
+      ":alice",
+      "character:",
+      "robot:x",
+    ]) {
       expect(parseEntityRef(value)).toBeNull();
     }
   });

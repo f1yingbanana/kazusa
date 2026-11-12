@@ -1,7 +1,11 @@
-'use client'
+"use client";
 
-import { SearchIcon } from 'lucide-react'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { SearchIcon } from "lucide-react";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 /**
  * Same shape in every sidebar tab: search on the left, the tab's own action
@@ -15,14 +19,14 @@ export function PanelToolbar({
   label,
   children,
 }: {
-  query: string
-  onQueryChange: (query: string) => void
-  placeholder: string
-  label: string
-  children?: React.ReactNode
+  query: string;
+  onQueryChange: (query: string) => void;
+  placeholder: string;
+  label: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1.5 px-2 py-2">
+    <div className="flex shrink-0 items-center gap-1.5 p-2">
       <InputGroup className="h-8 flex-1">
         <InputGroupAddon>
           <SearchIcon />
@@ -37,5 +41,5 @@ export function PanelToolbar({
       </InputGroup>
       {children}
     </div>
-  )
+  );
 }

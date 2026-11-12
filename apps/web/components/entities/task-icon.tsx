@@ -8,7 +8,7 @@ import {
   SparklesIcon,
   UtensilsIcon,
   type LucideIcon,
-} from 'lucide-react'
+} from "lucide-react";
 
 /*
  * Presentation only: `task.type` is the category the character picked from
@@ -23,15 +23,15 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   studying: GraduationCapIcon,
   working: BriefcaseIcon,
   socializing: MessagesSquareIcon,
-  'having fun': SparklesIcon,
+  "having fun": SparklesIcon,
   miscellaneous: CircleDotIcon,
-}
+};
 
 export function taskIcon(type: string | undefined): LucideIcon {
-  return (type && TASK_ICONS[type]) || CircleDotIcon
+  return (type && TASK_ICONS[type]) || CircleDotIcon;
 }
 
 /** `having fun` → `Having fun`. Categories are freeform per world. */
 export function taskLabel(type: string) {
-  return type.charAt(0).toUpperCase() + type.slice(1)
+  return type.charAt(0).toUpperCase() + type.slice(1);
 }

@@ -5,9 +5,9 @@ export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
 
 /**
- * Interpolates sim time at a wall-clock instant. `offset` is
- * `serverNow - Date.now()` measured when the anchor arrived, so a skewed
- * browser clock doesn't drift the simulation display.
+ * Interpolates sim time at a wall-clock instant. `offset` is `serverNow -
+ * Date.now()` measured when the anchor arrived, so a skewed browser clock
+ * doesn't drift the simulation display.
  */
 export function simTimeAt(clock: ClockState, wallNow: number, offset = 0) {
   if (clock.speed === 0) return clock.simTime;

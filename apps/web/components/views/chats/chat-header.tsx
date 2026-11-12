@@ -308,7 +308,7 @@ function Faces({
         <button
           type="button"
           onClick={onMore}
-          className="-ml-1.5 flex size-7 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground ring-2 ring-background outline-none tabular-nums hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          className="-ml-1.5 flex size-7 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground tabular-nums ring-2 ring-background outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           {`+${rest}`}
           <span className="sr-only">{`and ${rest} more: details`}</span>

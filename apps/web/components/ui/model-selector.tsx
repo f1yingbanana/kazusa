@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import type { ComponentProps, ReactNode } from "react"
-import { cn } from "@/lib/utils"
+import type { ComponentProps, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 import {
   Command,
@@ -13,32 +13,32 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from "@/components/ui/command"
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 /* AI Elements Model Selector (registry.ai-sdk.dev/model-selector.json). */
 
-export type ModelSelectorProps = ComponentProps<typeof Dialog>
+export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
 export const ModelSelector = (props: ModelSelectorProps) => (
   <Dialog {...props} />
-)
+);
 
-export type ModelSelectorTriggerProps = ComponentProps<typeof DialogTrigger>
+export type ModelSelectorTriggerProps = ComponentProps<typeof DialogTrigger>;
 
 export const ModelSelectorTrigger = (props: ModelSelectorTriggerProps) => (
   <DialogTrigger {...props} />
-)
+);
 
 export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
-  title?: ReactNode
-  commandProps?: ComponentProps<typeof Command>
-}
+  title?: ReactNode;
+  commandProps?: ComponentProps<typeof Command>;
+};
 
 export const ModelSelectorContent = ({
   className,
@@ -53,71 +53,71 @@ export const ModelSelectorContent = ({
       {...commandProps}
       className={cn(
         "**:data-[slot=command-input-wrapper]:h-auto",
-        commandProps?.className
+        commandProps?.className,
       )}
     >
       {children}
     </Command>
   </DialogContent>
-)
+);
 
-export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>
+export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 
 export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
   <CommandDialog {...props} />
-)
+);
 
-export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>
+export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
 export const ModelSelectorInput = ({
   className,
   ...props
 }: ModelSelectorInputProps) => (
   <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
-)
+);
 
-export type ModelSelectorListProps = ComponentProps<typeof CommandList>
+export type ModelSelectorListProps = ComponentProps<typeof CommandList>;
 
 export const ModelSelectorList = (props: ModelSelectorListProps) => (
   <CommandList {...props} />
-)
+);
 
-export type ModelSelectorEmptyProps = ComponentProps<typeof CommandEmpty>
+export type ModelSelectorEmptyProps = ComponentProps<typeof CommandEmpty>;
 
 export const ModelSelectorEmpty = (props: ModelSelectorEmptyProps) => (
   <CommandEmpty {...props} />
-)
+);
 
-export type ModelSelectorGroupProps = ComponentProps<typeof CommandGroup>
+export type ModelSelectorGroupProps = ComponentProps<typeof CommandGroup>;
 
 export const ModelSelectorGroup = (props: ModelSelectorGroupProps) => (
   <CommandGroup {...props} />
-)
+);
 
-export type ModelSelectorItemProps = ComponentProps<typeof CommandItem>
+export type ModelSelectorItemProps = ComponentProps<typeof CommandItem>;
 
 export const ModelSelectorItem = (props: ModelSelectorItemProps) => (
   <CommandItem {...props} />
-)
+);
 
-export type ModelSelectorShortcutProps = ComponentProps<typeof CommandShortcut>
+export type ModelSelectorShortcutProps = ComponentProps<typeof CommandShortcut>;
 
 export const ModelSelectorShortcut = (props: ModelSelectorShortcutProps) => (
   <CommandShortcut {...props} />
-)
+);
 
 export type ModelSelectorSeparatorProps = ComponentProps<
   typeof CommandSeparator
->
+>;
 
 export const ModelSelectorSeparator = (props: ModelSelectorSeparatorProps) => (
   <CommandSeparator {...props} />
-)
+);
 
 export type ModelSelectorLogoProps = ComponentProps<"span"> & {
   /** A models.dev provider id (`zai`, `openrouter`, `venice`, …). */
-  provider: string
-}
+  provider: string;
+};
 
 /**
  * The upstream logo is an `<img>` with `dark:invert`; this app's dark theme
@@ -130,7 +130,7 @@ export const ModelSelectorLogo = ({
   style,
   ...props
 }: ModelSelectorLogoProps) => {
-  const url = `url(https://models.dev/logos/${provider}.svg)`
+  const url = `url(https://models.dev/logos/${provider}.svg)`;
   return (
     <span
       {...props}
@@ -145,10 +145,10 @@ export const ModelSelectorLogo = ({
         ...style,
       }}
     />
-  )
-}
+  );
+};
 
-export type ModelSelectorLogoGroupProps = ComponentProps<"div">
+export type ModelSelectorLogoGroupProps = ComponentProps<"div">;
 
 export const ModelSelectorLogoGroup = ({
   className,
@@ -156,18 +156,18 @@ export const ModelSelectorLogoGroup = ({
 }: ModelSelectorLogoGroupProps) => (
   <div
     className={cn(
-      "-space-x-1 flex shrink-0 items-center [&>[role=img]]:rounded-full [&>[role=img]]:ring-1",
-      className
+      "flex shrink-0 items-center -space-x-1 *:[[role=img]]:rounded-full *:[[role=img]]:ring-1",
+      className,
     )}
     {...props}
   />
-)
+);
 
-export type ModelSelectorNameProps = ComponentProps<"span">
+export type ModelSelectorNameProps = ComponentProps<"span">;
 
 export const ModelSelectorName = ({
   className,
   ...props
 }: ModelSelectorNameProps) => (
   <span className={cn("flex-1 truncate text-left", className)} {...props} />
-)
+);

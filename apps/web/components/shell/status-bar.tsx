@@ -1,24 +1,31 @@
 "use client";
 
-import { Fragment } from "react";
+import { cn } from "@/lib/utils";
 import { useAccess } from "@/hooks/use-access";
 import { STATUS_ITEMS } from "@/lib/registry/status";
 import { satisfies } from "@/lib/source/capabilities";
 import { useSources } from "@/lib/source/provider";
 import type { StatusItem } from "@/lib/registry/types";
 
+/**
+ * Items may render nothing (a failure count that is cleared, say), so each sits
+ * in a wrapper that collapses when empty and the divider is drawn by CSS only
+ * between wrappers that have content (the arbitrary variant on the slot).
+ */
 function Slot({ items }: { items: readonly StatusItem[] }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-3",
+        "[&>:not(:empty)~:not(:empty)::before]:mr-3 [&>:not(:empty)~:not(:empty)::before]:block [&>:not(:empty)~:not(:empty)::before]:h-3 [&>:not(:empty)~:not(:empty)::before]:w-px [&>:not(:empty)~:not(:empty)::before]:bg-border [&>:not(:empty)~:not(:empty)::before]:content-['']",
+      )}
+    >
       {[...items]
         .sort((a, b) => a.order - b.order)
-        .map((item, index) => (
-          <Fragment key={item.id}>
-            {index > 0 ? (
-              <span aria-hidden className="h-3 w-px bg-border" />
-            ) : null}
+        .map((item) => (
+          <div key={item.id} className="flex items-center empty:hidden">
             <item.component />
-          </Fragment>
+          </div>
         ))}
     </div>
   );

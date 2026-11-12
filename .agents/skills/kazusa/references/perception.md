@@ -500,12 +500,11 @@ We explicitly choose to store separate subjective transcripts per character:
    - Perception never calls `appendSessionTranscriptMessageByIdentity` or
      manages session entries for any ledger.
    - Its own records: per-character inbox state in the `"inbox"` keyed store,
-     and the attention decisions worth showing the player (a text left unread
-     or set aside, the player unheard in person, a conversation left) in its
-     own `decisions.sqlite` database. Every
-     ledger is replayed into a prompt, so attention mechanics ("noticed after
-     94s", "queued, not steered") stay out of ledgers and never reach a
-     character or the decision model.
+     and the attention decisions worth showing the player (a text left unread or
+     set aside, the player unheard in person, a conversation left) in its own
+     `decisions.sqlite` database. Every ledger is replayed into a prompt, so
+     attention mechanics ("noticed after 94s", "queued, not steered") stay out
+     of ledgers and never reach a character or the decision model.
 
 2. **`send_message` Tool (Egress & Mutual Ledger Writer)**:
    - Implemented in `src/messaging/`; follow

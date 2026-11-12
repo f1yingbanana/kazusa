@@ -54,7 +54,7 @@ export const MapRegions = memo(function MapRegions({
                 if (arranging) onDragStart(region.id, event);
               }}
               className={cn(
-                "fill-foreground/[0.05] stroke-foreground/25 transition-[fill] duration-150 [vector-effect:non-scaling-stroke] hover:fill-foreground/[0.08]",
+                "fill-foreground/5 stroke-foreground/25 transition-[fill] duration-150 [vector-effect:non-scaling-stroke] hover:fill-foreground/8",
                 arranging
                   ? "cursor-grab active:cursor-grabbing"
                   : "cursor-pointer",

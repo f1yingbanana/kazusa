@@ -202,7 +202,7 @@ export function TimelineView() {
                     ) : (
                       <TimelineRow
                         event={row.event}
-                        className="animate-in fade-in-0 slide-in-from-top-1 duration-300 motion-reduce:animate-none"
+                        className="animate-in duration-300 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
                       />
                     )}
                   </div>

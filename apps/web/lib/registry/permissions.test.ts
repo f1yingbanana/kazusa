@@ -56,12 +56,9 @@ describe("registry permissions", () => {
     expect(visitorSections).toContain("character.profile");
   });
 
-  it("registers read-only indicator and restricts update status item", () => {
-    const readOnlyItem = STATUS_ITEMS.find((item) => item.id === "read-only");
+  it("restricts the update status item to managers", () => {
     const updateItem = STATUS_ITEMS.find((item) => item.id === "update");
 
-    expect(readOnlyItem).toBeDefined();
-    expect(readOnlyItem?.order).toBe(5);
     expect(updateItem?.requiresPermission).toBe("manage");
 
     const visitorStatus = STATUS_ITEMS.filter(
@@ -70,7 +67,7 @@ describe("registry permissions", () => {
         hasPermission("visitor", item.requiresPermission),
     ).map((item) => item.id);
 
-    expect(visitorStatus).toContain("read-only");
+    expect(visitorStatus).toContain("connection");
     expect(visitorStatus).not.toContain("update");
   });
 

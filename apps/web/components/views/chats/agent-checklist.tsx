@@ -1,9 +1,14 @@
-'use client'
+"use client";
 
-import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldContent, FieldLabel, FieldTitle } from '@/components/ui/field'
-import type { Agent } from '@kazusa/client'
-import { ParticipantAvatar } from './chat-avatar'
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldContent,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
+import type { Agent } from "@kazusa/client";
+import { ParticipantAvatar } from "./chat-avatar";
 
 export function AgentChecklist({
   agents,
@@ -11,15 +16,15 @@ export function AgentChecklist({
   onToggle,
   idPrefix,
 }: {
-  agents: Agent[]
-  selected: Set<string>
-  onToggle: (agentId: string, checked: boolean) => void
-  idPrefix: string
+  agents: Agent[];
+  selected: Set<string>;
+  onToggle: (agentId: string, checked: boolean) => void;
+  idPrefix: string;
 }) {
   return (
     <div className="flex max-h-72 flex-col gap-1 overflow-y-auto pr-1">
       {agents.map((agent) => {
-        const id = `${idPrefix}-${agent.id}`
+        const id = `${idPrefix}-${agent.id}`;
         return (
           <FieldLabel key={agent.id} htmlFor={id}>
             <Field orientation="horizontal" className="items-center">
@@ -35,12 +40,14 @@ export function AgentChecklist({
               <Checkbox
                 id={id}
                 checked={selected.has(agent.id)}
-                onCheckedChange={(checked) => onToggle(agent.id, checked === true)}
+                onCheckedChange={(checked) =>
+                  onToggle(agent.id, checked === true)
+                }
               />
             </Field>
           </FieldLabel>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

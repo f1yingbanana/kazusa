@@ -62,7 +62,7 @@ export function Backdrop({ placeId }: { placeId: string | undefined }) {
         className={cn(
           "absolute inset-0 size-full object-cover select-none",
           under &&
-            (loaded === url ? "animate-in fade-in duration-700" : "opacity-0"),
+            (loaded === url ? "animate-in duration-700 fade-in" : "opacity-0"),
         )}
       />
     </div>

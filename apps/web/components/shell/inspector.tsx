@@ -103,7 +103,7 @@ function SectionFrame({
   return (
     <section
       aria-label={section.title || KIND_LABEL[entity.kind]}
-      className="flex flex-col gap-2 border-b px-4 py-4 last:border-b-0"
+      className="flex flex-col gap-2 border-b p-4 last:border-b-0"
     >
       {section.title ? (
         <h3 className="flex items-center justify-between gap-2 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">

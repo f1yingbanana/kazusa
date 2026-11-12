@@ -23,6 +23,7 @@ import {
   formatSimTime,
   simPhase,
 } from "@/lib/time/sim";
+import { SocialLinks } from "./social-links";
 import { cn } from "@/lib/utils";
 
 const SPEED_PRESETS = [1, 10, 60] as const;
@@ -146,7 +147,11 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-sidebar px-3">
       {/* World title comes from GET /kazusa/world once it exists (D1). */}
-      <h1 className="text-sm font-semibold tracking-tight">Kazusa</h1>
+      <h1 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+        {/* Noto Color Emoji 🐱, same artwork as the favicon (app/icon.png). */}
+        <img src="/logo.png" alt="" width={20} height={20} className="size-5" />
+        Kazusa
+      </h1>
 
       <div className="flex flex-1 items-center justify-center gap-3">
         <SimClock />
@@ -163,19 +168,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
           <SearchIcon />
           <span className="sr-only">Jump to anything</span>
         </Button>
-        <Tooltip>
-          <TooltipTrigger
-            render={<span />}
-            className={cn(
-              "hidden h-6 items-center rounded-md border px-2 font-mono text-[11px] text-muted-foreground sm:inline-flex",
-            )}
-          >
-            Observer
-          </TooltipTrigger>
-          <TooltipContent>
-            Lens: omniscient observer. Player lens comes later.
-          </TooltipContent>
-        </Tooltip>
+        <SocialLinks />
       </div>
     </header>
   );
