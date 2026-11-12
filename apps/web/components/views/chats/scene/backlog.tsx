@@ -7,6 +7,32 @@ import { Button } from "@/components/ui/button";
 /** Over the scene while the backlog is open: the page's colour, flat. */
 const SHADE = "color-mix(in oklch, var(--background) 55%, transparent)";
 
+/** What Tab stops at, unless something inert holds it. */
+const TABBABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Tab and Shift+Tab go round the panel's own stops: a modal backlog must not
+ * hand focus to the scene's controls behind it. Only the ends are taken over;
+ * between them the browser's own order stands.
+ */
+function keepFocusIn(panel: HTMLElement, event: KeyboardEvent): void {
+  const stops = [...panel.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+    (stop) => !stop.closest("[inert]"),
+  );
+  const first = stops[0];
+  const last = stops.at(-1);
+  if (!first || !last) return;
+  const at = document.activeElement;
+  let next: HTMLElement | undefined;
+  if (!panel.contains(at)) next = event.shiftKey ? last : first;
+  else if (event.shiftKey && at === first) next = last;
+  else if (!event.shiftKey && at === last) next = first;
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+}
+
 /** Keyboard Lock, where the browser has it (Chromium, in full screen). */
 interface KeyboardLock {
   lock?: (keys: string[]) => Promise<void>;
@@ -21,7 +47,7 @@ interface KeyboardLock {
  * Closes by its button, a click on the shade, or Escape, which then does
  * nothing else: not leaving full screen (in the browser's own full screen,
  * Escape is held for the page while it is open, where it can be), not reaching
- * the scene behind.
+ * the scene behind. Tab goes round its own controls.
  */
 export function Backlog({
   onClose,
@@ -32,8 +58,9 @@ export function Backlog({
   children: ReactNode;
 }) {
   const close = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const closing = useEffectEvent(onClose);
-  // Once, while open: focus in and back out, Escape, Keyboard Lock.
+  // Once, while open: focus in, kept in and back out, Escape, Keyboard Lock.
   useEffect(() => {
     const before =
       document.activeElement instanceof HTMLElement
@@ -41,7 +68,12 @@ export function Backlog({
         : null;
     close.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.defaultPrevented) return;
+      if (event.key === "Tab" && panel.current) {
+        keepFocusIn(panel.current, event);
+        return;
+      }
+      if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
       closing();
@@ -68,6 +100,7 @@ export function Backlog({
         onClick={onClose}
       />
       <section
+        ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label="Backlog"

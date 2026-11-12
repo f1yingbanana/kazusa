@@ -65,20 +65,22 @@ export function ChatFailure({
   const dismiss = () =>
     dismissFailures(failing.map(([id, error]) => keyOf(id, error)));
 
+  // One row while it fits; on a narrow scene the error, then the controls,
+  // wrap below the title rather than run past the scene's edge.
   if (slim)
     return (
       <div
         role="status"
-        className="flex min-w-0 items-center gap-2 rounded-lg border border-destructive/30 py-1 pr-1 pl-2.5 text-sm"
+        className="flex min-w-0 flex-wrap items-center gap-x-2 rounded-lg border border-destructive/30 py-1 pr-1 pl-2.5 text-sm"
         style={{ backgroundColor: SCRIM }}
       >
         <CircleAlertIcon
           aria-hidden
           className="size-4 shrink-0 text-destructive"
         />
-        <span className="shrink-0 font-medium text-destructive">{title}</span>
+        <span className="min-w-0 font-medium text-destructive">{title}</span>
         <span
-          className="min-w-0 truncate text-muted-foreground"
+          className="min-w-0 flex-1 basis-40 truncate text-muted-foreground"
           title={first[1]}
         >
           {first[1]}

@@ -88,26 +88,29 @@ class TestEventSource extends EventTarget {
 const stream = () =>
   TestEventSource.instances.findLast((source) => source.readyState === 1);
 
-function wrapper({ children }: { children: ReactNode }) {
-  return createElement(
-    StrictMode,
-    null,
-    createElement(
-      SWRConfig,
-      {
-        value: {
-          provider: () => new Map(),
-          dedupingInterval: 0,
-          errorRetryCount: 0,
+/** A new cache per mount, or `cache` for mounts that should share one. */
+const wrapperOn = (cache?: Map<string, unknown>) =>
+  function wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      StrictMode,
+      null,
+      createElement(
+        SWRConfig,
+        {
+          value: {
+            provider: () => cache ?? new Map(),
+            dedupingInterval: 0,
+            errorRetryCount: 0,
+          },
         },
-      },
-      createElement(SourcesProvider, {
-        fallback: null,
-        children: createElement(RealtimeProvider, { children }),
-      }),
-    ),
-  );
-}
+        createElement(SourcesProvider, {
+          fallback: null,
+          children: createElement(RealtimeProvider, { children }),
+        }),
+      ),
+    );
+  };
+const wrapper = wrapperOn();
 
 let seq = 0;
 const message = (senderId: string, text: string): ChatMessage => {
@@ -338,18 +341,22 @@ describe("scene wiring", () => {
       messages: [message("bob", "Earlier.")],
       hasMore: false,
     });
+    const cache = new Map<string, unknown>();
     const reader = renderHook(
       () => ({
         chats: useObservedChats().chats,
         messages: useObservedMessages("theirs").messages,
       }),
-      { wrapper },
+      { wrapper: wrapperOn(cache) },
     );
     await waitFor(() => expect(reader.result.current.messages).toHaveLength(1));
     reader.unmount();
 
     // A second view on the same cache would be the norm; here the session
-    // mounts after the reads land, so it seeds from the cache alone.
+    // mounts after the reads land, so it seeds from the cache alone: its own
+    // reads never land.
+    vi.mocked(fetchObservedChats).mockReturnValue(new Promise(() => {}));
+    vi.mocked(fetchObservedMessages).mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(
       () => {
         const observed = useObservedChats();
@@ -362,11 +369,9 @@ describe("scene wiring", () => {
           lines: useShown("theirs"),
         };
       },
-      { wrapper },
+      { wrapper: wrapperOn(cache) },
     );
-    await waitFor(() =>
-      expect(result.current.lines.map((l) => l.text)).toEqual(["Earlier."]),
-    );
+    expect(result.current.lines.map((l) => l.text)).toEqual(["Earlier."]);
     // Seeded with the roster already read: Alice stands there, nobody walks
     // in; Bob, without portraits, is not drawn.
     expect(result.current.figures.map((f) => [f.id, f.presence])).toEqual([
