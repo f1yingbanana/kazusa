@@ -2,8 +2,9 @@
  * How long a message takes to compose: typed on a phone, or said aloud. Each
  * writing system's characters take their own time, at a person's own pace.
  * Shared by the plugin, which paces and cuts lines with it, and the client,
- * which reveals a line as it is said by the same rule (`heardOf`), so the
- * screen never shows a word the server's cut will not keep.
+ * which reveals a line as it is said at the same pace, letter by letter
+ * (`sayingOf`): a cut keeps whole words (`heardOf`), so at most the word being
+ * said when it was cut leaves the screen.
  */
 
 /** Typed into a chat, or said aloud face to face. */
@@ -107,6 +108,24 @@ export function heardOf(
 ): string {
   if (fraction >= 1) return text;
   const chars = characters(text);
+  let end = saidUpTo(chars, fraction, rates);
+  if (end < chars.length && spaced(chars[end]))
+    while (end > 0 && spaced(chars[end - 1])) end--;
+  const kept = chars
+    .slice(0, end)
+    .join("")
+    .replace(/[\s\p{P}]+$/u, "");
+  return characters(kept).some((char) => secondsOf(char, "speaking", rates) > 0)
+    ? kept
+    : "";
+}
+
+/** How many of `chars` have been said through, `fraction` of the way in. */
+function saidUpTo(
+  chars: readonly string[],
+  fraction: number,
+  rates: ComposingRates,
+): number {
   const seconds = (char: string) => secondsOf(char, "speaking", rates);
   const total = chars.reduce((sum, char) => sum + seconds(char), 0);
   const reached = total * Math.max(0, fraction);
@@ -116,13 +135,25 @@ export function heardOf(
     if (spent + seconds(chars[end]) > reached + 1e-9) break;
     spent += seconds(chars[end]);
   }
-  if (end < chars.length && spaced(chars[end]))
-    while (end > 0 && spaced(chars[end - 1])) end--;
-  const kept = chars
-    .slice(0, end)
-    .join("")
-    .replace(/[\s\p{P}]+$/u, "");
-  return characters(kept).some((char) => seconds(char) > 0) ? kept : "";
+  return end;
+}
+
+/**
+ * What a line shows on screen `fraction` of the way through its saying: every
+ * character said through by then, one at a time, with the spaces and
+ * punctuation after it. Empty before it starts; the whole line once its time is
+ * up. Never shrinks as `fraction` grows, and always starts with what has been
+ * heard by then (`heardOf`): it is ahead of it by at most the word being said.
+ */
+export function sayingOf(
+  text: string,
+  fraction: number,
+  rates: ComposingRates = COMPOSING_RATES,
+): string {
+  if (fraction >= 1) return text;
+  if (!(fraction > 0)) return "";
+  const chars = characters(text);
+  return chars.slice(0, saidUpTo(chars, fraction, rates)).join("");
 }
 
 /**

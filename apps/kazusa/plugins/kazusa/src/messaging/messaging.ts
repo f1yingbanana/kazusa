@@ -521,6 +521,15 @@ export class Messaging {
 
   /** Stop showing someone typing: in one chat, or everywhere. */
   clearTyping(participantId: string, chatId?: string): void {
+    for (const stop of this.stopTyping(participantId, chatId)) stop();
+  }
+
+  /**
+   * Forgets that someone is typing, at once, and returns what tells the clients
+   * so: a message that ends it goes out before they are told.
+   */
+  private stopTyping(participantId: string, chatId?: string): (() => void)[] {
+    const stops: (() => void)[] = [];
     for (const [key, event] of this.typing) {
       if (
         event.senderId !== participantId ||
@@ -530,12 +539,16 @@ export class Messaging {
       this.typing.delete(key);
       // Stopped: the line, if any, is no longer being said.
       const { speech: _speech, ...stopped } = event;
-      this.emit({
-        type: "typing",
-        typing: { ...stopped, isTyping: false },
-        audience: this.chats.get(event.chatId)?.members ?? [],
-      });
+      const audience = this.chats.get(event.chatId)?.members ?? [];
+      stops.push(() =>
+        this.emit({
+          type: "typing",
+          typing: { ...stopped, isTyping: false },
+          audience,
+        }),
+      );
     }
+    return stops;
   }
 
   getComposingChats(participantId: string): string[] {
@@ -1340,8 +1353,11 @@ export class Messaging {
     // survives the invoking turn and can be completed by the plugin service.
     await this.save(delivery, assertInvocationCurrent);
     this.rememberDelivery(delivery);
-    this.clearTyping(sender, delivery.chatId);
+    // The message first, then that they stopped: a line said aloud that stops
+    // with no message was never said, and a client takes it off the screen.
+    const stops = this.stopTyping(sender, delivery.chatId);
     this.emit({ type: "message", delivery });
+    for (const stop of stops) stop();
     return delivery;
   }
 

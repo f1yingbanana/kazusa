@@ -88,9 +88,11 @@ line said aloud also carries itself as it starts:
 `speech: { text, from, until }` (sim-time ms), only while `mode` is `"speaking"`
 and `isTyping` is true, never on a typed message, and replayed in
 `connected.typing` while it is being said. Clients reveal it across that window
-with `heardOf` (`@kazusa/client`), the same rule the server's `cutOff` cuts by,
-so a cut-off never takes back a word already shown. The message still commits
-once the line has been said.
+letter by letter with `sayingOf` (`@kazusa/client`), at the pace the server says
+it; `cutOff` keeps whole words, so a cut-off takes back at most the word being
+said. The message still commits once the line has been said, and goes out before
+the stop that ends its saying: a stop with no message before it means the line
+was never said.
 
 Human typing comes from composer activity, refreshes while input continues and
 expires after eight seconds if the browser disappears. Agent typing lasts until

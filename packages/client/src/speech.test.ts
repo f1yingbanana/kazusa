@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composingMs, cutOff, heardOf } from "./speech.ts";
+import { composingMs, cutOff, heardOf, sayingOf } from "./speech.ts";
 
 const LINES = [
   "I told you not to go there",
@@ -40,6 +40,34 @@ describe("what is heard of a line as it is said", () => {
           expect(heardOf(text, at).startsWith(shown)).toBe(true);
         }
       }
+  });
+
+  it("shows on screen letter by letter, never behind what has been heard", () => {
+    expect(sayingOf("I told you not to go there", 0)).toBe("");
+    expect(sayingOf("I told you not to go there", 0.5)).toBe("I told you no");
+    expect(sayingOf("Wait, no. Listen", 0.34)).toBe("Wait, ");
+    expect(sayingOf("今日は元気ですか", 0.5)).toBe("今日は");
+    expect(sayingOf("Listen to me", 1)).toBe("Listen to me");
+    for (const text of LINES) {
+      let before = "";
+      for (let step = 0; step <= 400; step++) {
+        const shown = sayingOf(text, step / 400);
+        // One character at a time, with what is not pronounced after it.
+        const added = shown.slice(before.length);
+        expect(shown.startsWith(before)).toBe(true);
+        expect(added.replace(/[^\p{L}\p{N}]/gu, "").length).toBeLessThanOrEqual(
+          1,
+        );
+        // Ahead of what a cut now keeps by no more than the word being said.
+        const heard = heardOf(text, step / 400);
+        expect(shown.startsWith(heard)).toBe(true);
+        expect(
+          (shown.slice(heard.length).match(/[\p{L}\p{N}]+/gu) ?? []).length,
+        ).toBeLessThanOrEqual(1);
+        before = shown;
+      }
+      expect(before).toBe(text);
+    }
   });
 
   it("is said in the speaking time composingMs gives", () => {

@@ -1,12 +1,11 @@
-import { heardOf } from "@kazusa/client";
+import { sayingOf } from "@kazusa/client";
 import type { ClockAnchor } from "../live/clock-state";
 import { simTimeAt } from "../time/sim";
 import type { SceneLine } from "./state";
 
 /**
- * How far, in real time, the reveal runs behind the clock: what reached the
- * screen a moment late is never more than the server, cutting the line now,
- * will keep.
+ * How far, in real time, the reveal runs behind the clock: a line cut now has
+ * rarely shown more than the server keeps of it.
  */
 export const REVEAL_LAG_MS = 150;
 
@@ -31,10 +30,10 @@ export function revealFraction(
 }
 
 /**
- * What of a line shows at `simNow`: a line still being said, what has been
- * heard of it by then, by the rule the server cuts by (`heardOf`), so it is
- * always a prefix of what will be committed; otherwise, or shown whole, all of
- * it.
+ * What of a line shows at `simNow`: a line still being said, what has been said
+ * of it by then, letter by letter at the pace the server says it (`sayingOf`);
+ * otherwise, or shown whole, all of it. A line that is cut commits whole words
+ * only, so the letters of the word being said then go.
  */
 export function revealed(
   line: Pick<SceneLine, "text" | "said" | "whole" | "messageId">,
@@ -42,5 +41,5 @@ export function revealed(
 ): string {
   if (line.messageId !== undefined || line.whole || !line.said)
     return line.text;
-  return heardOf(line.text, revealFraction(line, simNow));
+  return sayingOf(line.text, revealFraction(line, simNow));
 }

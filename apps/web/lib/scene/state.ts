@@ -46,7 +46,7 @@ export interface SceneLine {
   readonly text: string;
   /**
    * Sim-time window of the saying, for a line still being said: it is revealed
-   * across it (`heardOf`), as the speaking event said (§6.2).
+   * across it (`sayingOf`), as the speaking event said (§6.2).
    */
   readonly said?: { readonly from: number; readonly until: number };
   /**

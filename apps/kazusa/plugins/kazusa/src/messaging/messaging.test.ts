@@ -2586,8 +2586,12 @@ describe("the floor", () => {
   it("sends a line said aloud with its speaking event, replayed while said and gone after", async () => {
     const { h, say, speaking } = await table();
     const emitted: { typing: TypingStreamEvent }[] = [];
+    const order: string[] = [];
     h.messaging.onEvent((event) => {
       if (event.type === "typing") emitted.push(event);
+      if (event.type === "message") order.push("message");
+      else if (event.type === "typing")
+        order.push(event.typing.isTyping ? "speaking" : "stopped");
     });
     const said = say("alice", ["one two three four five"]);
     await speaking("alice");
@@ -2613,6 +2617,9 @@ describe("the floor", () => {
     expect(stop).toMatchObject({ senderId: "alice", isTyping: false });
     expect(stop).not.toHaveProperty("speech");
     expect(await h.messaging.getTyping()).toEqual([]);
+    // The line lands before its saying stops: stopped first, a client would
+    // take a line that was never said off the screen, then show it again.
+    expect(order).toEqual(["speaking", "message", "stopped"]);
   });
 
   it("commits what was heard of a line cut off, the event having carried the whole line", async () => {

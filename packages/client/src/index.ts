@@ -209,8 +209,9 @@ export const TypingStreamEventSchema = z.object({
   /**
    * The line being said and when (sim-time ms), present only while a line is
    * said aloud (`mode: "speaking"`, `isTyping: true`): clients reveal it across
-   * `from..until` (`heardOf`). The message still commits once it has been said;
-   * a cut-off commits what was heard (`cutOff`). Never on a typed message.
+   * `from..until` (`sayingOf`). The message still commits once it has been
+   * said; a cut-off commits what was heard (`cutOff`). Never on a typed
+   * message.
    */
   speech: z
     .object({ text: z.string(), from: z.number(), until: z.number() })

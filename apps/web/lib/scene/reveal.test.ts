@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cutOff } from "@kazusa/client";
+import { heardOf } from "@kazusa/client";
 import { REVEAL_LAG_MS, revealFraction, revealTime, revealed } from "./reveal";
 
 const LINE = "one two three four five six seven eight nine ten";
@@ -11,8 +11,8 @@ const being = (from: number, until: number, text = LINE) => ({
 describe("revealing a line as it is said", () => {
   it.each([
     [0, ""],
-    [500, "one two three four five"],
-    [999, "one two three four five six seven eight nine"],
+    [500, "one two three four five "],
+    [999, "one two three four five six seven eight nine te"],
     [1_000, LINE],
     [5_000, LINE],
     [-100, ""],
@@ -27,7 +27,7 @@ describe("revealing a line as it is said", () => {
     expect(revealFraction({ said: { from: 5, until: 5 } }, 0)).toBe(1);
   });
 
-  it("never shows more than a cut at the same moment keeps, whatever the moment", () => {
+  it("is never ahead of what a cut at that moment keeps by more than a word", () => {
     for (const text of [
       LINE,
       "Wait, no. Listen!",
@@ -35,12 +35,16 @@ describe("revealing a line as it is said", () => {
       "Tokyo行き、もう?",
     ])
       for (let at = -50; at <= 1_050; at += 7) {
-        const cut = cutOff(text, at / 1_000);
+        const heard = heardOf(text, at / 1_000);
         // The client is REVEAL_LAG_MS behind, and any further behind.
-        for (const late of [0, REVEAL_LAG_MS, 400])
+        for (const late of [0, REVEAL_LAG_MS, 400]) {
+          const shown = revealed(being(0, 1_000, text), at - late);
+          expect(text.startsWith(shown)).toBe(true);
+          // Behind what was heard, the rest is empty.
           expect(
-            cut.startsWith(revealed(being(0, 1_000, text), at - late)),
-          ).toBe(true);
+            (shown.slice(heard.length).match(/[\p{L}\p{N}]+/gu) ?? []).length,
+          ).toBeLessThanOrEqual(1);
+        }
       }
   });
 
@@ -62,7 +66,7 @@ describe("revealing a line as it is said", () => {
     const line = being(10_000, 11_000);
     expect(revealed(line, revealTime(anchor(0), 5_000))).toBe("");
     expect(revealed(line, revealTime(anchor(1), 1_650))).toBe(
-      "one two three four five",
+      "one two three four five ",
     );
   });
 });

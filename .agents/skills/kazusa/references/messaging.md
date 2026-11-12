@@ -439,8 +439,10 @@ audiences, ledger copies and notifications are unchanged per bubble.
   its `composingMs`), so clients can show it as it is said; a typed message
   never does, and the stop never does. Nothing else changes: the message still
   commits when the line has been said, and is heard then; a cut-off still
-  commits `cutOff(text, fraction)`. `composingMs`, `cutOff` and `heardOf` live
-  in `@kazusa/client` (`speech.ts`), shared with the client's reveal. Reading a
+  commits `cutOff(text, fraction)`. `composingMs`, `cutOff`, `heardOf` and
+  `sayingOf` live in `@kazusa/client` (`speech.ts`), shared with the client's
+  reveal. A send emits its message before the stop that clears its indicator, so
+  a client can tell a line that landed from one that was dropped. Reading a
   message or thinking about a reply sets nothing: read receipts and the brain's
   status show those. A character's indicator has no expiry; a player's lapses
   after 8 s unless the composer renews it.
