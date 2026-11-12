@@ -501,11 +501,18 @@ proxy allowlist and access policy (`observe`, like stickers).
 
 Built (2026-11-12) as described below, with these rules for the reveal:
 
-- `composingMs`, `cutOff` and `heardOf` (what has been heard so far, at word
-  boundaries) live in `@kazusa/client`, so the client reveals by the rule the
-  server cuts by. The reveal runs about 150 ms behind the clock; what is shown
-  is always a prefix of what a cut would commit.
-- A line that never lands (the speaker's run ended, they left) disappears.
+- `composingMs`, `cutOff`, `heardOf` (what has been heard so far, at word
+  boundaries) and `sayingOf` (what shows so far, letter by letter) live in
+  `@kazusa/client`, so the client reveals at the pace the server says the line.
+  The reveal runs about 150 ms behind the clock. A cut commits whole words, so
+  at most the letters of the word being said then leave the screen.
+- A line that never lands (the speaker's run ended, they left) disappears: a
+  stop with no message before it. The server therefore sends a line's message
+  before the stop that ends its saying; the other way round, every finished line
+  left the panel, came back as a new line with its entrance, and held the next
+  line back until it was already said.
+- A line lands in place: the same element, no entrance, its time on screen
+  counted from when it started.
 - There is no "…" state: a line being said is the typewriter. Against a Gateway
   whose speaking events carry no text, the panel keeps the previous line until
   the message lands.
