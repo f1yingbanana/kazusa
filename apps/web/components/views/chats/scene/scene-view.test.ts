@@ -896,7 +896,7 @@ describe("the scene", () => {
     expect(alice?.style.left).toBe("50%");
     // The bust framing: the scene's one scale for it, on its lower floor,
     // cut at the chest by the scene's foot; the picture at its own size.
-    expect(alice?.style.bottom).toBe(`${100 - floorPercent("bust")}%`);
+    expect(alice?.style.top).toBe(`${floorPercent("bust")}%`);
     const picture = screen.getByRole("img", { name: "Alice" });
     expect(Number(picture.style.zoom)).toBeCloseTo(figureScale(560, "bust"));
     expect(picture.style.height).toBe("");

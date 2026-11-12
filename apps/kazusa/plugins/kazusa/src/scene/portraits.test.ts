@@ -40,7 +40,7 @@ describe("portrait sets", () => {
           eyeline: 0.21,
           placement: {
             "": { centre: 0.4 },
-            gym: { centre: 0.6, scale: 0.8 },
+            gym: { centre: 0.6, floor: 0.95, eyes: 0.2, scale: 0.8 },
             "gym-happy": { offset: [10, -20] },
             happy: { centre: 7, scale: 0 },
           },
@@ -73,6 +73,8 @@ describe("portrait sets", () => {
     });
     expect(set.portraits.get("gym")?.placement).toEqual({
       centre: 0.6,
+      floor: 0.95,
+      eyes: 0.2,
       scale: 0.8,
     });
     expect(set.portraits.get("gym-happy")?.placement).toEqual({

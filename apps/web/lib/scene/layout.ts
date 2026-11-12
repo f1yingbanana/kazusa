@@ -20,26 +20,37 @@ export const WIDE_MIN_WIDTH_PX = 600;
  */
 export const BACKDROP_POSITION = "50% 40%";
 /**
- * The source pictures share one canvas and one scale: relative size is in their
- * pixels. A picture this many pixels tall is drawn `FIGURE_HEIGHT` of the
+ * A picture this many pixels tall, at scale 1, is drawn `FIGURE_HEIGHT` of the
  * scene's height (`BUST_HEIGHT` in the one-slot scene); every other at the same
- * pixels-per-pixel, never fitted to a box. Only a `scale` set by hand in a
- * character's `portraits.json` changes one outfit's size (`standFigure`). The
- * reference is a standard picture as the importer writes it: a 1920-high source
- * canvas at its 0.8 scale (`scripts/portraits.mjs`).
+ * pixels-per-pixel, never fitted to a box. The reference is a standard picture
+ * as the importer writes it: a 1920-high source canvas at its 0.8 scale
+ * (`scripts/portraits.mjs`). Each outfit's own `scale` then draws the character
+ * as tall as they are (`standFigure`).
  */
 export const REFERENCE_PX = 1_536;
-/** A reference-tall picture, in scene heights, in the wide scene. */
-export const FIGURE_HEIGHT = 1.0;
+/**
+ * The size of every figure in the wide scene: the one number to change to make
+ * the whole cast larger or smaller, since it never changes their sizes relative
+ * to each other. At scale 1 a reference-tall picture is this many scene heights
+ * tall. Below 1, so that the tallest characters' heads stay in the scene:
+ * scales run to about 1.2.
+ */
+export const FIGURE_HEIGHT = 0.86;
 /** …and in the one-slot scene (an upright phone), drawn from the chest up. */
 export const BUST_HEIGHT = 1.8;
 /**
- * The floor line every picture's bottom edge stands on, in scene heights from
- * the top: the scene's foot in the wide scene, lower in the one-slot scene so
- * the one figure is cut at the chest.
+ * The floor line every figure stands on, in scene heights from the top: the
+ * scene's foot in the wide scene, lower in the one-slot scene so the one figure
+ * is cut at the chest.
  */
 export const FLOOR_Y = 1.02;
 export const BUST_FLOOR_Y = 1.74;
+/**
+ * Where the one figure's eyes go in the one-slot scene, in scene heights from
+ * the top, when its picture says where they are: a short and a tall character's
+ * faces are then in the same place.
+ */
+export const BUST_EYES_Y = 0.27;
 
 /**
  * Five slots or one: five when the scene is at least as wide as it is tall and
@@ -90,7 +101,7 @@ export function figureScale(sceneHeightPx: number, framing: Framing): number {
   return (sceneHeightPx * height) / REFERENCE_PX;
 }
 
-/** A picture's place in a scene: CSS `zoom`, and a move from its column. */
+/** A picture's place in a scene: CSS `zoom`, and where it hangs. */
 export interface Standing {
   /** Screen pixels per picture pixel: the scene's scale times its own. */
   readonly zoom: number;
@@ -99,18 +110,31 @@ export interface Standing {
    * width: the figure's own centre is then on the column's.
    */
   readonly centrePercent: number;
+  /**
+   * The row of the picture that is placed, in % of its own height from its top:
+   * where the figure stands or, framed closely, where its eyes are…
+   */
+  readonly rowPercent: number;
+  /** …and where that row goes, in % of the scene's height from its top. */
+  readonly atPercent: number;
   /** A further move right and down, in screen pixels. */
   readonly x: number;
   readonly y: number;
 }
 
 /**
- * Where a picture goes in a scene `sceneHeightPx` tall. Its bottom edge is on
- * the floor line and the figure's centre (`centre` across the picture; its
- * middle when it has none) on its column's, so a weapon or wing out to one side
- * doesn't push the body off it. Its own `scale` multiplies the scene's, about
- * that point on the floor. `offset` is in its own pixels, so it grows and
- * shrinks with it.
+ * Where a picture goes in a scene `sceneHeightPx` tall.
+ *
+ * - Across: the figure's centre (`centre` across the picture; its middle when it
+ *   has none) on its column's, so a weapon or wing out to one side doesn't push
+ *   the body off it.
+ * - Down: the row the figure stands on (`floor`; the bottom edge when it has
+ *   none) on the floor line, so a wing or wheel that reaches lower than the
+ *   shoes doesn't leave it floating. In the one-slot scene the eyes (`eyes`) go
+ *   to `BUST_EYES_Y` instead, whoever is shown; without them, the floor line as
+ *   in the wide scene.
+ * - Size: its own `scale` times the scene's, about that point.
+ * - `offset` is in its own pixels, so it grows and shrinks with it.
  */
 export function standFigure(
   placement: PortraitPlacement | undefined,
@@ -119,15 +143,18 @@ export function standFigure(
 ): Standing {
   const zoom = figureScale(sceneHeightPx, framing) * (placement?.scale ?? 1);
   const [right, down] = placement?.offset ?? [0, 0];
+  const eyes = framing === "bust" ? placement?.eyes : undefined;
   return {
     zoom,
     centrePercent: (placement?.centre ?? 0.5) * 100,
+    rowPercent: (eyes ?? placement?.floor ?? 1) * 100,
+    atPercent: eyes === undefined ? floorPercent(framing) : BUST_EYES_Y * 100,
     x: right * zoom,
     y: down * zoom,
   };
 }
 
-/** Where pictures stand: their bottom edge, in % of the scene's height. */
+/** The floor line figures stand on, in % of the scene's height from its top. */
 export function floorPercent(framing: Framing): number {
   return (framing === "bust" ? BUST_FLOOR_Y : FLOOR_Y) * 100;
 }

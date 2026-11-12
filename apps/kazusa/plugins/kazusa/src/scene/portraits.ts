@@ -16,6 +16,10 @@ const DEFAULT_LOOK = "neutral";
 const PLACEMENT = z.object({
   /** Where the figure is across the picture: 0 its left edge, 1 its right. */
   centre: z.number().min(0).max(1).optional().catch(undefined),
+  /** Where it stands down the picture: 0 its top edge, 1 its bottom. */
+  floor: z.number().gt(0).max(1).optional().catch(undefined),
+  /** Where its eyes are down the picture, the same way. */
+  eyes: z.number().min(0).max(1).optional().catch(undefined),
   /** Drawn this many times its size, about that point on the floor. */
   scale: z.number().positive().optional().catch(undefined),
   /** Moved `[right, down]`, in the picture's own pixels. */
@@ -37,9 +41,9 @@ const MANIFEST = z.object({
   eyeline: z.number().min(0).max(1).optional().catch(undefined),
   /**
    * Placement by outfit word (`""` for pictures without one), or by one
-   * picture's name, which wins. The importer writes `centre` and, from the
-   * character's height, `scale`; either can be corrected by hand, as `offset`
-   * always is, and the importer keeps a `scale` or `offset` it finds.
+   * picture's name, which wins. The importer writes `centre`, `floor`, `eyes`
+   * and, from the character's height, `scale`; any can be corrected by hand, as
+   * `offset` always is.
    */
   placement: z
     .record(z.string(), PLACEMENT.catch({}))
@@ -88,9 +92,11 @@ function definedOf(
   placement: PortraitPlacement | undefined,
 ): PortraitPlacement | undefined {
   if (placement === undefined) return undefined;
-  const { centre, scale, offset } = placement;
+  const { centre, floor, eyes, scale, offset } = placement;
   const set = {
     ...(centre === undefined ? {} : { centre }),
+    ...(floor === undefined ? {} : { floor }),
+    ...(eyes === undefined ? {} : { eyes }),
     ...(scale === undefined ? {} : { scale }),
     ...(offset === undefined ? {} : { offset }),
   };
