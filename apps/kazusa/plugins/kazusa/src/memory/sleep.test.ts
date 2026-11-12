@@ -66,10 +66,18 @@ const NIGHT: SleepOutput = {
 };
 
 function setup(
-  overrides: { complete?: () => Promise<string>; through?: number } = {},
+  overrides: {
+    complete?: (params: { message: string }) => Promise<string>;
+    through?: number;
+    records?: string;
+    pause?: (ms: number, signal: AbortSignal) => Promise<void>;
+  } = {},
 ) {
   const store = new Map<string, SleepState>();
   const events: SleepEvent[] = [];
+  const logs: string[] = [];
+  const warnings: string[] = [];
+  const pauses: number[] = [];
   const passes = new Map();
   const complete = vi.fn(
     overrides.complete ?? (async () => JSON.stringify(NIGHT)),
@@ -92,7 +100,8 @@ function setup(
       complete,
       instructions: async () => "sort out the day",
       experiences: async () => ({
-        text: "[Tobin Vell `tobin-vell`] Here is the rent.",
+        text:
+          overrides.records ?? "[Tobin Vell `tobin-vell`] Here is the rent.",
         speakers: ["tobin-vell"],
         through: overrides.through ?? NOW,
       }),
@@ -100,11 +109,18 @@ function setup(
       record: async (_agent, event) => {
         events.push(event);
       },
-      warn: () => {},
+      log: (message) => logs.push(message),
+      warn: (message) => warnings.push(message),
+      wallNow: () => 42,
+      pause:
+        overrides.pause ??
+        (async (ms) => {
+          pauses.push(ms);
+        }),
     },
     passes,
   );
-  return { sleep, store, events, complete, passes };
+  return { sleep, store, events, complete, passes, logs, warnings, pauses };
 }
 
 const task = (over: Partial<Record<string, unknown>> = {}) => ({
@@ -269,6 +285,7 @@ describe("when it runs", () => {
         experiences: async () => ({ text: "x", speakers: [], through: NOW }),
         nameOf: () => undefined,
         record: async () => {},
+        log: () => {},
         warn: () => {},
       },
       passes,
@@ -295,7 +312,11 @@ describe("when it runs", () => {
     finish(JSON.stringify(NIGHT));
     await sleep.settled(AGENT);
     expect(read("wiki/entities/characters/tobin-vell.md")).toBe(before);
-    expect(store.get(AGENT)).toBeUndefined();
+    expect(store.get(AGENT)).toMatchObject({
+      runs: [],
+      outcomes: [{ result: "interrupted", attempts: 1 }],
+    });
+    expect(store.get(AGENT)?.watermark).toBeUndefined();
     expect(events[0]).toMatchObject({ interrupted: true, pages: [] });
   });
 
@@ -312,7 +333,8 @@ describe("when it runs", () => {
     await commitTask(sleep, "started", task({ id: "up", type: "working" }));
     finish(JSON.stringify(NIGHT));
     await sleep.settled(AGENT);
-    expect(store.get(AGENT)).toBeUndefined();
+    expect(store.get(AGENT)?.runs).toEqual([]);
+    expect(store.get(AGENT)?.outcomes?.[0].result).toBe("interrupted");
   });
 
   it("nothing happened: no model call", async () => {
@@ -333,6 +355,7 @@ describe("when it runs", () => {
         experiences: async () => ({ text: " ", speakers: [], through: NOW }),
         nameOf: () => undefined,
         record: async () => {},
+        log: () => {},
         warn: () => {},
       },
       passes,
@@ -341,16 +364,194 @@ describe("when it runs", () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
-  it("a malformed reply changes nothing", async () => {
-    const warn = vi.fn();
-    const { sleep, store } = setup({
+  it("a reply that never reads changes nothing, and the day waits", async () => {
+    const { sleep, store, complete, warnings } = setup({
       complete: async () => "I dreamt of nothing.",
     });
-    void warn;
     const before = read("wiki/entities/characters/tobin-vell.md");
     await sleep.consolidate(AGENT);
     expect(read("wiki/entities/characters/tobin-vell.md")).toBe(before);
-    expect(store.get(AGENT)).toBeUndefined();
+    expect(complete).toHaveBeenCalledTimes(3);
+    const state = store.get(AGENT)!;
+    expect(state.watermark).toBeUndefined();
+    expect(state.runs).toEqual([]);
+    expect(state.outcomes?.[0]).toMatchObject({
+      result: "failed",
+      attempts: 3,
+      wallAt: 42,
+      errors: [
+        "Error: No JSON in the reply.",
+        "Error: No JSON in the reply.",
+        "Error: No JSON in the reply.",
+      ],
+    });
+    expect(warnings.at(-1)).toMatch(/failed after 3 attempts/);
+  });
+
+  it("nothing new since the last sleep is kept as an empty night", async () => {
+    const { sleep, store, complete } = setup({ records: " " });
+    await sleep.consolidate(AGENT);
+    expect(complete).not.toHaveBeenCalled();
+    expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+      result: "empty",
+      attempts: 0,
+    });
+  });
+});
+
+describe("a failed attempt", () => {
+  it("is tried again, and the night is applied once", async () => {
+    const replies = ['{"day": {"summary": "s"}}', JSON.stringify(NIGHT)];
+    const { sleep, store, complete, pauses, logs } = setup({
+      complete: async () => replies.shift()!,
+    });
+    await sleep.consolidate(AGENT);
+    expect(complete).toHaveBeenCalledTimes(2);
+    const retry = (
+      complete.mock.calls[1] as unknown as [{ message: string }]
+    )[0].message;
+    expect(retry).toContain("# Retry\nError: No usable day");
+    expect(pauses).toEqual([10_000]);
+    const page = index.personal(AGENT).get("tobin-vell")!;
+    expect(
+      page.notes.filter(({ text }) => text === "Paid the February rent."),
+    ).toHaveLength(1);
+    expect(store.get(AGENT)?.watermark).toBe(NOW);
+    expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+      result: "applied",
+      attempts: 2,
+      errors: [expect.stringContaining("No usable day")],
+      repaired: false,
+      pages: 2,
+      newPages: 1,
+      notes: 2,
+      views: 1,
+      self: true,
+      dream: true,
+    });
+    expect(logs[0]).toMatch(/applied on attempt 2: day page, 2 pages/);
+  });
+
+  it("a timeout is tried again too", async () => {
+    let calls = 0;
+    const { sleep, store } = setup({
+      complete: async () => {
+        calls++;
+        if (calls === 1)
+          throw new DOMException(
+            "The operation was aborted due to timeout",
+            "TimeoutError",
+          );
+        return JSON.stringify(NIGHT);
+      },
+    });
+    await sleep.consolidate(AGENT);
+    expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+      result: "applied",
+      attempts: 2,
+      errors: ["TimeoutError: The operation was aborted due to timeout"],
+    });
+  });
+
+  it("a wake while waiting to try again ends the pass", async () => {
+    const { sleep, store, complete, events } = setup({
+      complete: async () => "no",
+      pause: (_ms, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => {
+              reject(new Error("woken"));
+            },
+            { once: true },
+          );
+        }),
+    });
+    const pass = sleep.consolidate(AGENT);
+    await vi.waitFor(() => {
+      expect(complete).toHaveBeenCalledTimes(1);
+    });
+    sleep.wake(AGENT);
+    await pass;
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+      result: "interrupted",
+      attempts: 1,
+    });
+    expect(events[0]).toMatchObject({ interrupted: true });
+  });
+
+  it("a later sleep takes in the day a failed one left", async () => {
+    let fail = true;
+    const { sleep, store } = setup({
+      complete: async () => (fail ? "no" : JSON.stringify(NIGHT)),
+    });
+    await sleep.consolidate(AGENT);
+    fail = false;
+    await sleep.consolidate(AGENT);
+    expect(store.get(AGENT)?.outcomes?.map(({ result }) => result)).toEqual([
+      "applied",
+      "failed",
+    ]);
+    expect(store.get(AGENT)?.watermark).toBe(NOW);
+  });
+});
+
+// The reply shapes that cost whole nights on 2026-11-12.
+describe("what the model really sends", () => {
+  it("a dream given as an object or a list is still a dream", async () => {
+    for (const dream of [
+      { scene: "The bell rang", feeling: "inside a lamp." },
+      ["The bell rang", "inside a lamp."],
+    ]) {
+      const { sleep, store } = setup({
+        complete: async () => JSON.stringify({ ...NIGHT, dream }),
+      });
+      await sleep.consolidate(AGENT);
+      expect(read("wiki/days/2026-03-10.md")).toContain(
+        "The bell rang inside a lamp.",
+      );
+      expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+        result: "applied",
+        attempts: 1,
+        dream: true,
+      });
+      rmSync(path.join(workspace(), "wiki/days/2026-03-10.md"));
+    }
+  });
+
+  it("a reply cut off in its pages keeps the day, the dream and whole pages", async () => {
+    const whole = JSON.stringify(
+      {
+        day: NIGHT.day,
+        dream: NIGHT.dream,
+        self: NIGHT.self,
+        pages: NIGHT.pages,
+      },
+      null,
+      2,
+    );
+    const cut = whole.slice(0, whole.indexOf("It stops at"));
+    const { sleep, store } = setup({ complete: async () => cut });
+    await sleep.consolidate(AGENT);
+    expect(read("wiki/days/2026-03-10.md")).toContain("could not look at me");
+    expect(read("MEMORY.md")).toContain("Tired, less angry.");
+    expect(store.get(AGENT)?.outcomes?.[0]).toMatchObject({
+      result: "applied",
+      attempts: 1,
+      repaired: true,
+      pages: 1,
+      dream: true,
+    });
+  });
+
+  it("a raw line break inside a string is kept", async () => {
+    const { sleep } = setup({
+      complete: async () =>
+        '{"day": {"summary": "s", "gist": "He came by.\nHe left."}}',
+    });
+    await sleep.consolidate(AGENT);
+    expect(read("wiki/days/2026-03-10.md")).toContain("He came by.\nHe left.");
   });
 });
 
@@ -467,8 +668,7 @@ describe("validateSleep", () => {
 
 describe("parseSleepOutput", () => {
   it("loses only the bad part of a page, not the night", () => {
-    const dropped: string[] = [];
-    const output = parseSleepOutput(
+    const { output, dropped, repaired } = parseSleepOutput(
       JSON.stringify({
         day: { gist: "g" },
         pages: [
@@ -477,26 +677,58 @@ describe("parseSleepOutput", () => {
             id: "b",
             notes: [
               { text: "no source" },
-              { source: "seen it", certainty: "sure", text: "ok" },
+              { source: "seen it", certainty: "Sure ", text: "ok" },
             ],
           },
           { nope: true },
         ],
       }),
-      (what) => dropped.push(what),
     );
+    expect(repaired).toBe(false);
     expect(output.pages.map(({ id }) => id)).toEqual(["a", "b"]);
     expect(output.pages[0]).toMatchObject({ view: "kept" });
     expect(output.pages[0].theyThinkOfMe).toBeUndefined();
-    expect(output.pages[1].notes).toHaveLength(1);
-    expect(dropped).toHaveLength(3);
+    expect(output.pages[1].notes).toEqual([
+      { source: "seen it", certainty: "sure", text: "ok" },
+    ]);
+    expect(dropped).toEqual([
+      "malformed parts of a (theyThinkOfMe)",
+      "malformed parts of b (notes)",
+      "malformed parts of a page (id)",
+    ]);
   });
 
-  it("reads through a code fence and rejects non-JSON", () => {
+  it("loses a bad plan or dream, not the day", () => {
+    const { output, dropped } = parseSleepOutput(
+      JSON.stringify({
+        day: { gist: "g" },
+        self: {
+          lately: "tired",
+          plans: [
+            { on: "tomorrow", text: "x" },
+            { on: "2026-03-11", text: "y" },
+          ],
+        },
+        dream: null,
+      }),
+    );
+    expect(output.self).toEqual({
+      lately: "tired",
+      plans: [{ on: "2026-03-11", text: "y" }],
+    });
+    expect(output.dream).toBeUndefined();
+    expect(dropped).toEqual([
+      "malformed parts of self (plans)",
+      "a dream that was not words",
+    ]);
+  });
+
+  it("reads through a code fence and rejects non-JSON or no day", () => {
     expect(
-      parseSleepOutput('```json\n{"day":{"summary":"s","gist":"g"}}\n```').day
-        .gist,
+      parseSleepOutput('```json\n{"day":{"summary":"s","gist":"g"}}\n```')
+        .output.day.gist,
     ).toBe("g");
     expect(() => parseSleepOutput("no")).toThrow();
+    expect(() => parseSleepOutput('{"pages": []}')).toThrow(/No usable day/);
   });
 });
