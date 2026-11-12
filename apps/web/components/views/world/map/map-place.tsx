@@ -69,7 +69,7 @@ export const MapPlace = memo(function MapPlace({
       style={atPoint(x, y)}
       data-map-place=""
     >
-      <div className="absolute top-0 left-0 flex w-36 -translate-x-1/2 -translate-y-[7px] flex-col items-center gap-1">
+      <div className="absolute top-0 left-0 flex w-36 -translate-x-1/2 translate-y-[-7px] flex-col items-center gap-1">
         <button
           type="button"
           aria-label={
@@ -161,7 +161,7 @@ export const MapPlace = memo(function MapPlace({
               <button
                 type="button"
                 onClick={() => onSelect(id)}
-                className="z-[1] -ml-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border border-border bg-background px-1 font-mono text-[10px] text-foreground tabular-nums outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                className="z-1 -ml-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border border-border bg-background px-1 font-mono text-[10px] text-foreground tabular-nums outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
               >
                 {people.length > 0 ? "+" : ""}
                 {extra}
@@ -205,7 +205,7 @@ export const MapAreaLabel = memo(function MapAreaLabel({
         onClick={() => onSelect(id)}
         onDoubleClick={() => onFocus(id)}
         className={cn(
-          "absolute top-0 left-0 max-w-52 -translate-x-1/2 -translate-y-1/2 truncate rounded-sm px-1 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring",
+          "absolute top-0 left-0 max-w-52 -translate-1/2 truncate rounded-sm px-1 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring",
           HALO,
           depth === 0
             ? "text-[14px] font-semibold tracking-[0.01em] text-foreground"
@@ -247,7 +247,7 @@ export const MapTraveler = memo(function MapTraveler({
         title={`${person.name}, on the way`}
         onClick={() => onSelect(person.id)}
         className={cn(
-          "absolute top-0 left-0 flex -translate-x-1/2 -translate-y-1/2 rounded-full bg-background p-px outline-none focus-visible:outline-2 focus-visible:outline-ring",
+          "absolute top-0 left-0 flex -translate-1/2 rounded-full bg-background p-px outline-none focus-visible:outline-2 focus-visible:outline-ring",
           selected && "outline-2 outline-primary",
         )}
       >

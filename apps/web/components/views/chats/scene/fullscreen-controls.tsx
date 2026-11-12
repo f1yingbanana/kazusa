@@ -145,7 +145,7 @@ export function SceneControl({
           sideOffset={6}
           className="isolate z-50"
         >
-          <TooltipPrimitive.Popup className="z-50 rounded-md bg-foreground px-2.5 py-1 text-xs text-background data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0">
+          <TooltipPrimitive.Popup className="z-50 rounded-md bg-foreground px-2.5 py-1 text-xs text-background data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0">
             {hint}
           </TooltipPrimitive.Popup>
         </TooltipPrimitive.Positioner>

@@ -6,11 +6,7 @@ export type GroupBy = "none" | "affiliation" | "activity" | "brain";
  * them by whether they're being simulated right now.
  */
 export type KindFilter =
-  | "characters"
-  | "onstage"
-  | "offstage"
-  | "npc"
-  | "everyone";
+  "characters" | "onstage" | "offstage" | "npc" | "everyone";
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   none: "None",
@@ -49,7 +45,10 @@ export function filterCharacters(
   });
 }
 
-/** Honest buckets: characters without the structured field land in a named "none" group. */
+/**
+ * Honest buckets: characters without the structured field land in a named
+ * "none" group.
+ */
 export function groupCharacters(
   characters: readonly CharacterSummary[],
   by: GroupBy,

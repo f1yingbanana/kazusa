@@ -45,7 +45,7 @@ function RailItem({
         {current ? (
           <span
             aria-hidden
-            className="absolute top-2.5 bottom-2.5 -left-2 w-0.5 rounded-full bg-primary"
+            className="absolute inset-y-2.5 -left-2 w-0.5 rounded-full bg-primary"
           />
         ) : null}
         <view.icon className="size-5" />

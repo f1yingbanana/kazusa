@@ -89,9 +89,9 @@ export function DialogueBox({
     <div
       data-dock
       data-mode={reading ? "reading" : "live"}
-      className="pointer-events-none absolute inset-0 z-40 px-3 pt-12 pb-3 [container-type:size] sm:px-6 sm:pb-5"
+      className="@container-size pointer-events-none absolute inset-0 z-40 px-3 pt-12 pb-3 sm:px-6 sm:pb-5"
     >
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-end">
+      <div className="mx-auto flex size-full max-w-3xl flex-col justify-end">
         <Echoes
           chatId={chatId}
           echoes={echoes}
@@ -126,7 +126,7 @@ export function DialogueBox({
               size="xs"
               // Only for a hold long enough to notice: a line waiting a moment
               // for the one before it to be read needs no button.
-              className="absolute -top-3 right-2.5 z-10 animate-in bg-background shadow-sm delay-700 duration-300 fade-in fill-mode-backwards"
+              className="absolute -top-3 right-2.5 z-10 animate-in bg-background shadow-sm delay-700 duration-300 fill-mode-backwards fade-in"
               onClick={() =>
                 applySceneEvent(chatId, { type: "jump", at: Date.now() })
               }

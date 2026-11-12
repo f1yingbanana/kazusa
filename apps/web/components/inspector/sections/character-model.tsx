@@ -1,25 +1,25 @@
-'use client'
+"use client";
 
-import { useQueryStates, parseAsString } from 'nuqs'
-import { settingsParsers } from '@/components/views/settings/search-params'
-import { ArrowUpRightIcon } from 'lucide-react'
-import { refName, thinkingLabel } from '@/components/models/model-labels'
-import { ModelPicker } from '@/components/models/model-picker'
-import { ThinkingPicker } from '@/components/models/thinking-picker'
-import { Button } from '@/components/ui/button'
-import { useCharacter } from '@/hooks/use-characters'
-import { useModels } from '@/hooks/use-models'
-import type { EntityRef } from '@/lib/state/entity-ref'
+import { useQueryStates, parseAsString } from "nuqs";
+import { settingsParsers } from "@/components/views/settings/search-params";
+import { ArrowUpRightIcon } from "lucide-react";
+import { refName, thinkingLabel } from "@/components/models/model-labels";
+import { ModelPicker } from "@/components/models/model-picker";
+import { ThinkingPicker } from "@/components/models/thinking-picker";
+import { Button } from "@/components/ui/button";
+import { useCharacter } from "@/hooks/use-characters";
+import { useModels } from "@/hooks/use-models";
+import type { EntityRef } from "@/lib/state/entity-ref";
 
 function FieldHeader({
   htmlFor,
   label,
   onReset,
 }: {
-  htmlFor: string
-  label: string
+  htmlFor: string;
+  label: string;
   /** Shown only while the character has a choice of its own. */
-  onReset?: () => void
+  onReset?: () => void;
 }) {
   return (
     <div className="flex h-6 items-center justify-between gap-2">
@@ -37,7 +37,7 @@ function FieldHeader({
         </Button>
       ) : null}
     </div>
-  )
+  );
 }
 
 /**
@@ -46,23 +46,23 @@ function FieldHeader({
  * and still follow the world's reasoning level, or the other way round.
  */
 export function CharacterModelSection({ entity }: { entity: EntityRef }) {
-  const character = useCharacter(entity.id)
+  const character = useCharacter(entity.id);
   const [, setParams] = useQueryStates({
     view: parseAsString,
-    'settings.tab': settingsParsers['settings.tab'],
-  })
-  const { data, select, setThinking, error } = useModels(entity.id)
-  const world = useModels()
-  const name = character?.name ?? entity.id
-  const overrides = data?.overrides ?? {}
-  const model = data?.models.find((option) => option.ref === data.current)
+    "settings.tab": settingsParsers["settings.tab"],
+  });
+  const { data, select, setThinking, error } = useModels(entity.id);
+  const world = useModels();
+  const name = character?.name ?? entity.id;
+  const overrides = data?.overrides ?? {};
+  const model = data?.models.find((option) => option.ref === data.current);
 
   const worldModel = world.data?.current
     ? refName(world.data.models, world.data.current)
-    : undefined
-  const worldThinking = thinkingLabel(model, world.data?.thinking)
-  const modelId = `model-${entity.id}`
-  const thinkingId = `thinking-${entity.id}`
+    : undefined;
+  const worldThinking = thinkingLabel(model, world.data?.thinking);
+  const modelId = `model-${entity.id}`;
+  const thinkingId = `thinking-${entity.id}`;
 
   return (
     <div className="flex flex-col gap-3">
@@ -77,12 +77,12 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
         <ModelPicker agentId={entity.id} id={modelId} />
         <p className="text-xs leading-relaxed text-muted-foreground">
           {error && !data
-            ? 'Could not load character model settings. Use world default to reset.'
+            ? "Could not load character model settings. Use world default to reset."
             : overrides.model
               ? `Chosen for ${name}. Changing the world default won’t move them.`
               : worldModel
                 ? `Follows the world default, ${worldModel}.`
-                : 'Follows the world default.'}
+                : "Follows the world default."}
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
             <p className="text-xs leading-relaxed text-muted-foreground">
               {worldThinking
                 ? `Follows the world default, ${worldThinking}.`
-                : 'Follows the model’s own default.'}
+                : "Follows the model’s own default."}
             </p>
           ) : null}
         </div>
@@ -111,23 +111,23 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
         size="xs"
         className="self-start px-0 text-muted-foreground"
         onClick={() =>
-          void setParams({ view: 'settings', 'settings.tab': 'models' })
+          void setParams({ view: "settings", "settings.tab": "models" })
         }
       >
         World defaults in Settings
         <ArrowUpRightIcon />
       </Button>
     </div>
-  )
+  );
 }
 
 /** Folded: the model they run on, and whether it is their own pick. */
 export function CharacterModelSummary({ entity }: { entity: EntityRef }) {
-  const { data } = useModels(entity.id)
-  if (!data?.current) return null
+  const { data } = useModels(entity.id);
+  if (!data?.current) return null;
   // Outside the catalog the ref is all there is: its last part reads best.
-  const known = refName(data.models, data.current)
+  const known = refName(data.models, data.current);
   const name =
-    known === data.current ? (data.current.split('/').pop() ?? known) : known
-  return <>{data.overrides?.model ? name : `${name} (world)`}</>
+    known === data.current ? (data.current.split("/").pop() ?? known) : known;
+  return <>{data.overrides?.model ? name : `${name} (world)`}</>;
 }

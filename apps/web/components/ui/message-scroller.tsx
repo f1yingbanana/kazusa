@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
-} from "@shadcn/react/message-scroller"
-import { cn } from "cn"
+} from "@shadcn/react/message-scroller";
+import { cn } from "cn";
 
-import { Button } from "@/components/ui/button"
-import { ArrowDownIcon } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { ArrowDownIcon } from "lucide-react";
 
 function MessageScrollerProvider(
-  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
+  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>,
 ) {
-  return <MessageScrollerPrimitive.Provider {...props} />
+  return <MessageScrollerPrimitive.Provider {...props} />;
 }
 
 function MessageScroller({
@@ -27,21 +27,21 @@ function MessageScroller({
       data-slot="message-scroller"
       className={cn(
         "group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 /** The primitive's default `scrollEdgeThreshold`. */
-const END_THRESHOLD_PX = 8
+const END_THRESHOLD_PX = 8;
 
-const SCROLL_DOWN_KEYS = new Set(["ArrowDown", "End", "PageDown", " "])
+const SCROLL_DOWN_KEYS = new Set(["ArrowDown", "End", "PageDown", " "]);
 
 function isAtEnd(viewport: HTMLElement) {
-  const { scrollTop, clientHeight, scrollHeight } = viewport
-  return scrollHeight - scrollTop - clientHeight <= END_THRESHOLD_PX
+  const { scrollTop, clientHeight, scrollHeight } = viewport;
+  return scrollHeight - scrollTop - clientHeight <= END_THRESHOLD_PX;
 }
 
 function MessageScrollerViewport({
@@ -51,39 +51,39 @@ function MessageScrollerViewport({
   onKeyDown,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
-  const { scrollToEnd } = useMessageScroller()
+  const { scrollToEnd } = useMessageScroller();
   // The primitive stops following on any wheel, touch or scroll key, and only
   // a scroll event at the end resumes it. Scrolling down at the end moves
   // nothing, so no scroll event comes (a trackpad's momentum always ends this
   // way) and new messages stop scrolling into view. Resume it here.
   const followIfAtEnd = (viewport: HTMLElement) => {
-    if (isAtEnd(viewport)) scrollToEnd()
-  }
+    if (isAtEnd(viewport)) scrollToEnd();
+  };
 
   return (
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       className={cn(
         "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
-        className
+        className,
       )}
       onWheel={(event) => {
-        onWheel?.(event)
-        if (event.deltaY > 0) followIfAtEnd(event.currentTarget)
+        onWheel?.(event);
+        if (event.deltaY > 0) followIfAtEnd(event.currentTarget);
       }}
       onTouchEnd={(event) => {
-        onTouchEnd?.(event)
-        followIfAtEnd(event.currentTarget)
+        onTouchEnd?.(event);
+        followIfAtEnd(event.currentTarget);
       }}
       onKeyDown={(event) => {
-        onKeyDown?.(event)
+        onKeyDown?.(event);
         if (SCROLL_DOWN_KEYS.has(event.key) && !event.shiftKey) {
-          followIfAtEnd(event.currentTarget)
+          followIfAtEnd(event.currentTarget);
         }
       }}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerContent({
@@ -96,7 +96,7 @@ function MessageScrollerContent({
       className={cn("flex h-max min-h-full flex-col gap-6", className)}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerItem({
@@ -116,7 +116,7 @@ function MessageScrollerItem({
       className={cn("min-w-0 shrink-0", className)}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerButton({
@@ -138,22 +138,21 @@ function MessageScrollerButton({
       direction={direction}
       className={cn(
         "absolute inset-s-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)] data-[direction=end]:bottom-4 data-[direction=end]:data-[active=false]:translate-y-full data-[direction=start]:top-4 data-[direction=start]:data-[active=false]:-translate-y-full rtl:translate-x-1/2 data-[direction=start]:[&_svg]:rotate-180",
-        className
+        className,
       )}
       render={render ?? <Button variant={variant} size={size} />}
       {...props}
     >
       {children ?? (
         <>
-          <ArrowDownIcon
-          />
+          <ArrowDownIcon />
           <span className="sr-only">
             {direction === "end" ? "Scroll to end" : "Scroll to start"}
           </span>
         </>
       )}
     </MessageScrollerPrimitive.Button>
-  )
+  );
 }
 
 export {
@@ -166,4 +165,4 @@ export {
   useMessageScroller,
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
-}
+};

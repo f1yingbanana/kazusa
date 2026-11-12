@@ -92,7 +92,7 @@ export function Backlog({
   }, []);
 
   return (
-    <div data-backlog className="absolute inset-0 z-[60] flex justify-end">
+    <div data-backlog className="absolute inset-0 z-60 flex justify-end">
       <div
         aria-hidden
         className="absolute inset-0 animate-in duration-200 fade-in"
@@ -104,7 +104,7 @@ export function Backlog({
         role="dialog"
         aria-modal="true"
         aria-label="Backlog"
-        className="relative flex h-full w-full animate-in flex-col bg-background shadow-lg duration-200 fade-in slide-in-from-right-4 sm:w-[min(32rem,92%)] sm:border-l"
+        className="relative flex size-full animate-in flex-col bg-background shadow-lg duration-200 fade-in slide-in-from-right-4 sm:w-[min(32rem,92%)] sm:border-l"
       >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b pr-2 pl-4">
           <h2 className="flex-1 text-sm font-semibold">Backlog</h2>

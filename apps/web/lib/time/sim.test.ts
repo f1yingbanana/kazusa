@@ -10,7 +10,11 @@ import {
   simTimeAt,
 } from "./sim";
 
-const anchor = { simTime: Date.UTC(2026, 3, 14, 14, 0), speed: 60, updatedAt: 1_000 };
+const anchor = {
+  simTime: Date.UTC(2026, 3, 14, 14, 0),
+  speed: 60,
+  updatedAt: 1_000,
+};
 
 describe("sim clock interpolation", () => {
   it("advances by elapsed wall time times speed", () => {

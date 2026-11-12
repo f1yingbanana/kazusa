@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -19,13 +19,13 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
-import { useCharacters } from '@/hooks/use-characters'
-import { useChatActions } from '@/hooks/use-chats'
-import type { Chat } from '@/lib/source/chats/types'
-import { AgentChecklist } from './agent-checklist'
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { useCharacters } from "@/hooks/use-characters";
+import { useChatActions } from "@/hooks/use-chats";
+import type { Chat } from "@/lib/source/chats/types";
+import { AgentChecklist } from "./agent-checklist";
 
 export function NewGroupDialog({
   open,
@@ -33,10 +33,10 @@ export function NewGroupDialog({
   onCreated,
   initialAgentIds = [],
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreated: (chat: Chat) => void
-  initialAgentIds?: string[]
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (chat: Chat) => void;
+  initialAgentIds?: string[];
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,15 +45,15 @@ export function NewGroupDialog({
           <NewGroupForm
             initialAgentIds={initialAgentIds}
             onCreated={(chatId) => {
-              onOpenChange(false)
-              onCreated(chatId)
+              onOpenChange(false);
+              onCreated(chatId);
             }}
             onCancel={() => onOpenChange(false)}
           />
         ) : null}
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function NewGroupForm({
@@ -61,42 +61,42 @@ function NewGroupForm({
   onCreated,
   onCancel,
 }: {
-  initialAgentIds: string[]
-  onCreated: (chat: Chat) => void
-  onCancel: () => void
+  initialAgentIds: string[];
+  onCreated: (chat: Chat) => void;
+  onCancel: () => void;
 }) {
-  const { characters } = useCharacters()
-  const agents = characters.filter((character) => character.kind === 'agent')
-  const { createChat } = useChatActions()
-  const [name, setName] = useState('')
-  const [selected, setSelected] = useState(() => new Set(initialAgentIds))
-  const [submitted, setSubmitted] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { characters } = useCharacters();
+  const agents = characters.filter((character) => character.kind === "agent");
+  const { createChat } = useChatActions();
+  const [name, setName] = useState("");
+  const [selected, setSelected] = useState(() => new Set(initialAgentIds));
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const nameInvalid = submitted && name.trim().length === 0
+  const nameInvalid = submitted && name.trim().length === 0;
   // You and one agent is a direct chat; a group needs two.
-  const membersInvalid = submitted && selected.size < 2
+  const membersInvalid = submitted && selected.size < 2;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSubmitted(true)
-    if (!name.trim() || selected.size < 2) return
+    event.preventDefault();
+    setSubmitted(true);
+    if (!name.trim() || selected.size < 2) return;
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
       const chatId = createChat({
-        type: 'group',
+        type: "group",
         name: name.trim(),
         members: [...selected],
-      })
-      if (chatId) onCreated(chatId)
-      else onCancel()
+      });
+      if (chatId) onCreated(chatId);
+      else onCancel();
     } catch (error) {
-      toast.error('Could not create group', {
+      toast.error("Could not create group", {
         description: error instanceof Error ? error.message : undefined,
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -128,11 +128,13 @@ function NewGroupForm({
           <FieldLegend variant="label">Agents</FieldLegend>
           <FieldDescription>
             {selected.size === 0
-              ? 'Pick at least two agents to include.'
+              ? "Pick at least two agents to include."
               : `${selected.size} selected`}
           </FieldDescription>
           {agents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No agents are available.</p>
+            <p className="text-sm text-muted-foreground">
+              No agents are available.
+            </p>
           ) : (
             <AgentChecklist
               agents={agents}
@@ -140,15 +142,17 @@ function NewGroupForm({
               idPrefix="new-group"
               onToggle={(agentId, checked) =>
                 setSelected((current) => {
-                  const next = new Set(current)
-                  if (checked) next.add(agentId)
-                  else next.delete(agentId)
-                  return next
+                  const next = new Set(current);
+                  if (checked) next.add(agentId);
+                  else next.delete(agentId);
+                  return next;
                 })
               }
             />
           )}
-          {membersInvalid ? <FieldError>Select at least two agents.</FieldError> : null}
+          {membersInvalid ? (
+            <FieldError>Select at least two agents.</FieldError>
+          ) : null}
         </FieldSet>
       </FieldGroup>
 
@@ -162,5 +166,5 @@ function NewGroupForm({
         </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }

@@ -14,7 +14,7 @@ const CELL = Symbol.for("kazusa.perception.continuations");
 
 function cell(): Map<string, Continuation> {
   const scope = globalThis as { [CELL]?: Map<string, Continuation> };
-  return (scope[CELL] ??= new Map());
+  return (scope[CELL] ??= new Map<string, Continuation>());
 }
 
 /** False once `limit` runs have gone by without anyone saying a word. */

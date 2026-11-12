@@ -512,7 +512,7 @@ export function RemoveConfirm({
     <div
       role="group"
       aria-label={`Remove ${name}?`}
-      className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-2"
+      className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2"
     >
       <p className="text-sm leading-snug">
         <span className="font-medium">{`Remove ${name}?`}</span>{" "}

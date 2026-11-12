@@ -1,9 +1,7 @@
 import { ActivitySummaryItem } from "@/components/status/activity-summary";
 import { ConnectionStatusItem } from "@/components/status/connection";
-import { DataSourcesItem } from "@/components/status/data-sources";
 import { FailuresItem } from "@/components/status/failures";
 import { PlayerPlaceItem } from "@/components/status/player-place";
-import { ReadOnlyStatusItem } from "@/components/status/read-only";
 import { UpdateAvailableItem } from "@/components/status/update-available";
 import type { StatusItem } from "./types";
 
@@ -15,20 +13,6 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     order: 0,
     requires: [],
     component: ConnectionStatusItem,
-  },
-  {
-    id: "read-only",
-    side: "start",
-    order: 5,
-    requires: [],
-    component: ReadOnlyStatusItem,
-  },
-  {
-    id: "data-sources",
-    side: "start",
-    order: 10,
-    requires: [],
-    component: DataSourcesItem,
   },
   {
     id: "update",

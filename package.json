@@ -19,7 +19,7 @@
     "web:build": "npm run --workspace=@kazusa/web build",
     "typecheck": "tsc -p apps/kazusa/plugins/kazusa",
     "test": "vitest run --config ./vitest.config.ts",
-    "lint": "eslint . --fix",
+    "lint": "npm run lint --workspaces --if-present",
     "fix": "pretty-quick --branch main",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

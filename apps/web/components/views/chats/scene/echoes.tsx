@@ -104,7 +104,7 @@ function Echo({
     <li
       data-echo={line.kind}
       className={cn(
-        "flex w-full animate-in fade-in slide-in-from-bottom-1 duration-200",
+        "flex w-full animate-in duration-200 fade-in slide-in-from-bottom-1",
         older && "opacity-75",
       )}
     >
@@ -123,7 +123,7 @@ function Echo({
           "pointer-events-auto max-w-full rounded-md px-2.5 py-1 text-left text-[13px] leading-snug outline-none focus-visible:outline-2 focus-visible:outline-ring sm:max-w-[85%]",
           onOpen && "cursor-pointer hover:ring-1 hover:ring-foreground/20",
           fading &&
-            "animate-out fade-out fill-mode-forwards duration-1000 hover:paused focus-within:paused",
+            "animate-out duration-1000 fill-mode-forwards fade-out focus-within:paused hover:paused",
         )}
         style={{
           backgroundColor: ECHO_SCRIM,

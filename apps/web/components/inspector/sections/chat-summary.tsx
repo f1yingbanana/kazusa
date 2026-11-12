@@ -138,7 +138,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
               Reading this chat isn&apos;t available.
             </NeedsLine>
           ) : showOpen || (own && canLeave) ? (
-            <div className="-ml-1.5 mt-1.5 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1.5 -ml-1.5 flex flex-wrap items-center gap-1.5">
               {showOpen ? (
                 <Button
                   size="sm"
@@ -209,7 +209,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
             );
           })}
           {runsGroup && members.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-muted-foreground">
+            <p className="p-2 text-sm text-muted-foreground">
               Just you. Add people to talk to.
             </p>
           ) : null}

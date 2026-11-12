@@ -89,12 +89,12 @@ export const TimelineRow = memo(function TimelineRow({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Inline flow, not flex-wrap, so chips and fact text read as one sentence when they wrap. */}
-        <p className="min-w-0 text-pretty text-sm leading-relaxed">
+        <p className="min-w-0 text-sm leading-relaxed text-pretty">
           {actors.slice(0, MAX_CHIPS).map((id, index) => (
             <CharacterChip
               key={id}
               id={id}
-              className={index === 0 ? "-ml-1 mr-1" : "mr-1"}
+              className={index === 0 ? "mr-1 -ml-1" : "mr-1"}
             />
           ))}
           {actors.length > MAX_CHIPS ? (

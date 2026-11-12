@@ -553,7 +553,7 @@ export function PlaceMap({
           >
             <path
               d="M36 32v8M32 36h8"
-              className="stroke-foreground/[0.11]"
+              className="stroke-foreground/11"
               strokeWidth={1}
               fill="none"
             />
@@ -606,7 +606,7 @@ export function PlaceMap({
             style={atPoint(point.x, point.y)}
           >
             <span
-              className={`absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 font-mono text-[10px] whitespace-nowrap tabular-nums ${HALO} ${
+              className={`absolute top-0 left-0 -translate-1/2 font-mono text-[10px] whitespace-nowrap tabular-nums ${HALO} ${
                 called ? "font-medium text-primary" : "text-muted-foreground"
               }`}
             >

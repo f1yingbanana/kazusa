@@ -135,7 +135,7 @@ export function SceneFigure({
           draggable={false}
           onError={() => setBroken(portrait.url)}
           className={cn(
-            "block h-auto w-auto max-w-none select-none",
+            "block size-auto max-w-none select-none",
             "transition-[filter] duration-300 ease-out",
             dimmed && "brightness-[0.72]",
           )}
