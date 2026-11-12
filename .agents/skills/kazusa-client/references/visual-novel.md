@@ -503,9 +503,12 @@ Built (2026-11-12) as described below, with these rules for the reveal:
 
 - `composingMs`, `cutOff`, `heardOf` (what has been heard so far, at word
   boundaries) and `sayingOf` (what shows so far, letter by letter) live in
-  `@kazusa/client`, so the client reveals at the pace the server says the line.
-  The reveal runs about 150 ms behind the clock. A cut commits whole words, so
-  at most the letters of the word being said then leave the screen.
+  `@kazusa/client`, so the client reveals by the server's rates.
+- The screen is faster than the saying: a line is typed out in the first 70% of
+  its speaking time (`REVEAL_SHARE` in `apps/web/lib/scene/reveal.ts`) and
+  stands whole for the rest, a pause before it lands and the next begins. The
+  server's timing is untouched. A cut commits only what had been said, in whole
+  words, so what was typed ahead of that leaves the screen.
 - A line that never lands (the speaker's run ended, they left) disappears: a
   stop with no message before it. The server therefore sends a line's message
   before the stop that ends its saying; the other way round, every finished line
