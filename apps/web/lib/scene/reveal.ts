@@ -4,36 +4,38 @@ import { simTimeAt } from "../time/sim";
 import type { SceneLine } from "./state";
 
 /**
- * How far, in real time, the reveal runs behind the clock: a line cut now has
- * rarely shown more than the server keeps of it.
+ * How much of a line's saying its reveal takes: the line is typed out faster
+ * than it is said, and stands whole for the rest of its time, a pause before it
+ * lands and the next begins. Only the screen is faster; the line is still said,
+ * heard and cut at the server's pace.
  */
-export const REVEAL_LAG_MS = 150;
+export const REVEAL_SHARE = 0.7;
 
-/**
- * The sim time a line is revealed at: the clock's projection `REVEAL_LAG_MS`
- * ago. A paused clock stands still, lag and all; a speed change is followed.
- */
+/** The sim time a line is revealed at: the clock's now. A paused clock stands. */
 export function revealTime(anchor: ClockAnchor, wallNow: number): number {
-  return simTimeAt(anchor.clock, wallNow - REVEAL_LAG_MS, anchor.offset);
+  return simTimeAt(anchor.clock, wallNow, anchor.offset);
 }
 
-/** How far through its window a line being said is at `simNow`, 0 to 1. */
+/**
+ * How far through its reveal a line being said is at `simNow`, 0 to 1: 1 from
+ * `REVEAL_SHARE` of the way through its saying.
+ */
 export function revealFraction(
   line: Pick<SceneLine, "said">,
   simNow: number,
 ): number {
   const said = line.said;
   if (!said) return 1;
-  const span = said.until - said.from;
+  const span = (said.until - said.from) * REVEAL_SHARE;
   if (!(span > 0)) return 1;
   return Math.min(1, Math.max(0, (simNow - said.from) / span));
 }
 
 /**
- * What of a line shows at `simNow`: a line still being said, what has been said
- * of it by then, letter by letter at the pace the server says it (`sayingOf`);
- * otherwise, or shown whole, all of it. A line that is cut commits whole words
- * only, so the letters of the word being said then go.
+ * What of a line shows at `simNow`: a line still being said, letter by letter
+ * (`sayingOf`) at the server's pace sped up by `REVEAL_SHARE`; otherwise, or
+ * shown whole, all of it. A line that is cut commits only what had been said,
+ * in whole words, so what was typed ahead of the saying goes.
  */
 export function revealed(
   line: Pick<SceneLine, "text" | "said" | "whole" | "messageId">,

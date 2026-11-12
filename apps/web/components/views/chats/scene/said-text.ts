@@ -18,8 +18,8 @@ export function lineKey(line: SceneLine, fallback: string | number): string {
 
 /**
  * What of `line` shows now: a line being said, what has been heard of it,
- * following the clock frame by frame (still while paused, the reveal running
- * `REVEAL_LAG_MS` behind); any other line whole.
+ * following the clock frame by frame (still while paused); any other line
+ * whole.
  */
 export function useRevealed(line: SceneLine): string {
   const anchor = useClockAnchor();

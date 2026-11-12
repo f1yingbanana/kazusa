@@ -568,12 +568,13 @@ describe("the scene", () => {
     expect(screen.getByRole("img", { name: "Carol" }).className).toMatch(
       /brightness-/,
     );
-    // Her line as it is said: letter by letter (the paused clock holds it
-    // halfway, mid-word), the whole line for a screen reader, no dots.
+    // Her line as it is said: letter by letter, ahead of the saying (the
+    // paused clock holds it halfway through being said, further through
+    // being typed), the whole line for a screen reader, no dots.
     expect(plate()).toBe("Alice");
     const saying = screen.getByRole("log").querySelector("[data-saying]");
     expect(saying?.querySelector("[aria-hidden]")?.textContent).toBe(
-      "You are l",
+      "You are late, ",
     );
     expect(saying?.querySelector(".sr-only:last-child")?.textContent).toBe(
       "You are late, again.",
