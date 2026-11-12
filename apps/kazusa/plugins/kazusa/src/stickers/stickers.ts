@@ -1,22 +1,12 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-
-/** `<outfit>-<mood>` or `<mood>`: lowercase words joined by `-`. */
-export const STICKER_NAME = z
-  .string()
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-  .max(64);
-
-/** Raster formats only, as for avatars: an SVG could run script on our origin. */
-const STICKER_TYPES: Readonly<Record<string, string>> = {
-  webp: "image/webp",
-  png: "image/png",
-  gif: "image/gif",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  avif: "image/avif",
-};
+import {
+  fileMtime,
+  pictureVersion,
+  readPictures,
+  splitPictureName,
+} from "../pictures.ts";
 
 /** `stickers/stickers.json`: what the files can't say. */
 const MANIFEST = z.object({
@@ -51,13 +41,30 @@ export interface StickerSet {
 
 const EMPTY: StickerSet = { stickers: new Map(), outfits: new Map() };
 
-const mtime = (file: string): number | undefined => {
+/** The manifest, or none when it is missing or broken: names alone. */
+function readManifest(file: string): z.infer<typeof MANIFEST> {
   try {
-    return statSync(file).mtimeMs;
+    return MANIFEST.parse(JSON.parse(readFileSync(file, "utf8")));
   } catch {
-    return undefined;
+    return {};
   }
-};
+}
+
+/**
+ * Outfit word → what is worn, as a workspace's `stickers/stickers.json`
+ * declares them, whether or not a sticker shows them. Portraits share this
+ * vocabulary.
+ */
+export function declaredOutfits(
+  workspace: string,
+): ReadonlyMap<string, string> {
+  return new Map(
+    Object.entries(
+      readManifest(path.join(workspace, "stickers", "stickers.json")).outfits ??
+        {},
+    ),
+  );
+}
 
 const sets = new Map<
   string,
@@ -73,52 +80,29 @@ const sets = new Map<
 export function readStickers(workspace: string): StickerSet {
   const dir = path.join(workspace, "stickers");
   const manifestFile = path.join(dir, "stickers.json");
-  let entries: string[];
-  try {
-    entries = readdirSync(dir).sort();
-  } catch {
-    return EMPTY;
-  }
-  // Each picture by its mtime: one replaced in place is a new version.
-  const pictures = entries.flatMap((entry) => {
-    const ext = path.extname(entry).slice(1).toLowerCase();
-    const name = entry.slice(0, -(ext.length + 1));
-    const contentType = STICKER_TYPES[ext];
-    if (!contentType || !STICKER_NAME.safeParse(name).success) return [];
-    const file = path.join(dir, entry);
-    const modified = mtime(file);
-    return modified === undefined
-      ? []
-      : [{ name, file, contentType, modified }];
-  });
+  const pictures = readPictures(dir);
+  if (!pictures) return EMPTY;
   const key = JSON.stringify([
-    mtime(manifestFile) ?? null,
+    fileMtime(manifestFile) ?? null,
     pictures.map(({ file, modified }) => [file, modified]),
   ]);
   const cached = sets.get(dir);
   if (cached?.key === key) return cached.set;
 
-  let manifest: z.infer<typeof MANIFEST> = {};
-  try {
-    manifest = MANIFEST.parse(JSON.parse(readFileSync(manifestFile, "utf8")));
-  } catch {
-    // No or unreadable manifest: names alone.
-  }
+  const manifest = readManifest(manifestFile);
   const declared = new Map(Object.entries(manifest.outfits ?? {}));
   const stickers = new Map<string, Sticker>();
   const outfits = new Map<string, string>();
   for (const { name, file, contentType, modified } of pictures) {
-    if (stickers.has(name)) continue;
-    const [first, ...rest] = name.split("-");
-    const outfitWord = rest.length && declared.has(first) ? first : undefined;
-    const mood = (outfitWord ? rest : [first, ...rest]).join(" ");
+    const { prefix: outfitWord, rest } = splitPictureName(name, declared);
+    const mood = rest.replaceAll("-", " ");
     const outfit = outfitWord ? declared.get(outfitWord) : undefined;
     if (outfitWord && outfit) outfits.set(outfitWord, outfit);
     stickers.set(name, {
       name,
       file,
       contentType,
-      version: Math.trunc(modified).toString(36),
+      version: pictureVersion(modified),
       look: manifest.stickers?.[name]?.look ?? mood,
       ...(outfit ? { outfit } : {}),
     });

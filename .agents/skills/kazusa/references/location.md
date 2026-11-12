@@ -121,7 +121,9 @@ deferred (§5).
 `shared/wiki/entities/places/<id>.md`: `place_id`, `name`, `aliases`, `summary`,
 `parent` (a tree; every place is somewhere to stand, an area meaning its open
 space), `entry_minutes` (walk to the parent, default 1), `connections` (two-way,
-declared once, `ways` with the usual one first; `walk` reads as on foot). The
+declared once, `ways` with the usual one first; `walk` reads as on foot),
+optional `backdrop` (the Scene view's picture set in `shared/backdrops/`,
+inherited by the places inside; one naming no set is reported and ignored). The
 body is the full description: whose a place is, how it is kept, how busy it
 gets. Character cards carry `home`. A file watcher keeps them current, so a new
 place needs no reload. Nothing broken stops the map loading: an unparseable

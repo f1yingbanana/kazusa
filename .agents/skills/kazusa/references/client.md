@@ -83,7 +83,17 @@ A character shows typing only while `send_message` is composing a bubble: from
 when that bubble's typing (or, face to face, speaking) time starts until it is
 sent or stopped, in that bubble's chat. Perception, model start, adoption and
 thinking are not typing signals; the read receipt and the brain's status show
-those. Events carry `mode: "typing" | "speaking"`, which the client words.
+those. Events carry `mode: "typing" | "speaking"`, which the client words. A
+line said aloud also carries itself as it starts:
+`speech: { text, from, until }` (sim-time ms), only while `mode` is `"speaking"`
+and `isTyping` is true, never on a typed message, and replayed in
+`connected.typing` while it is being said. Clients reveal it across that window
+letter by letter with `sayingOf` (`@kazusa/client`); a client may type it out
+faster than it is said, to leave a pause before the next line (the Scene view
+does). `cutOff` keeps only what had been said, in whole words, so a cut-off
+takes back whatever a client showed beyond that. The message still commits once
+the line has been said, and goes out before the stop that ends its saying: a
+stop with no message before it means the line was never said.
 
 Human typing comes from composer activity, refreshes while input continues and
 expires after eight seconds if the browser disappears. Agent typing lasts until

@@ -97,6 +97,12 @@ A sticker of yourself, as a bubble of its own, to show how you feel. Most
 messages need none: send one when your mood shifts, and not the same mood twice
 in a row unless the feeling is strong. {data}
 
+## send_message.messages.face
+
+Face to face only: the face you show as you say or do this, one of your moods.
+Everyone with you sees it, and it stays until you show another. Most lines need
+none: set it when your expression changes, not on every line.
+
 ## send_message.sticker-outfits
 
 A name that starts with an outfit shows you wearing it; the others show your

@@ -446,6 +446,34 @@
           }
         }
       },
+      "scene": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The Scene view's art: how the world's day divides, for picking backdrop pictures.",
+        "properties": {
+          "times": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Times of day, each from its start (HH:MM, sim time, UTC) until the next one's; the last runs past midnight. Backdrop pictures are named for them. Names and starts must be unique; any order. Default: day 06:00, dusk 17:00, night 19:00.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "from"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                "from": {
+                  "type": "string",
+                  "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                }
+              }
+            }
+          }
+        }
+      },
       "world": {
         "type": "object",
         "additionalProperties": false,

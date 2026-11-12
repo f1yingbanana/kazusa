@@ -418,24 +418,34 @@ audiences, ledger copies and notifications are unchanged per bubble.
 
 - **Pacing.** Every bubble, the first included, takes its time to compose before
   it is sent: thinking is not typing. `composingMs(text, medium, rates, pace)`
-  (`messaging/composing.ts`) sums each character's time per writing system
-  (`messaging.rates.typing` and `.speaking`), counted as graphemes, so an emoji
-  is one key. Typed on a phone every key counts, spaces and punctuation too:
-  letters 3/s (36 words a minute, Palin et al. 2019), Chinese characters and
-  kanji 0.75/s (a reading, then a pick), kana 1.5/s, Hangul blocks 1.2/s; the
-  last three are estimates from small studies. Said aloud only what is
-  pronounced takes time (letters 12/s, han 5/s, kana 8/s, hangul 7/s). A sticker
-  takes 1.5 s to pick; an action takes no time. No cap: a long message takes
-  long. Jev judges the pace once per send (`pace`, 0.6-1.6) for texts and speech
-  alike. The wait is on the simulation clock: wall time is the remaining sim
-  time divided by speed, re-checked at most every 250ms. A paused clock
-  (speed 0) holds the bubble until it runs again; the shutdown signal lets the
-  rest go at once. The system agent and recovered plans send at once.
+  (`@kazusa/client` `speech.ts`, re-exported by `messaging/composing.ts`) sums
+  each character's time per writing system (`messaging.rates.typing` and
+  `.speaking`), counted as graphemes, so an emoji is one key. Typed on a phone
+  every key counts, spaces and punctuation too: letters 3/s (36 words a minute,
+  Palin et al. 2019), Chinese characters and kanji 0.75/s (a reading, then a
+  pick), kana 1.5/s, Hangul blocks 1.2/s; the last three are estimates from
+  small studies. Said aloud only what is pronounced takes time (letters 12/s,
+  han 5/s, kana 8/s, hangul 7/s). A sticker takes 1.5 s to pick; an action takes
+  no time. No cap: a long message takes long. Jev judges the pace once per send
+  (`pace`, 0.6-1.6) for texts and speech alike. The wait is on the simulation
+  clock: wall time is the remaining sim time divided by speed, re-checked at
+  most every 250ms. A paused clock (speed 0) holds the bubble until it runs
+  again; the shutdown signal lets the rest go at once. The system agent and
+  recovered plans send at once.
 - **Typing indicator.** Set only while a bubble is being typed or said, in that
   bubble's chat, with `mode: "typing" | "speaking"`; the send, or anything that
-  stops it, clears it. Reading a message or thinking about a reply sets nothing:
-  read receipts and the brain's status show those. A character's indicator has
-  no expiry; a player's lapses after 8 s unless the composer renews it.
+  stops it, clears it. A line said aloud carries itself on its speaking event,
+  as it starts: `speech: { text, from, until }` (sim time, `until` = `from` +
+  its `composingMs`), so clients can show it as it is said; a typed message
+  never does, and the stop never does. Nothing else changes: the message still
+  commits when the line has been said, and is heard then; a cut-off still
+  commits `cutOff(text, fraction)`. `composingMs`, `cutOff`, `heardOf` and
+  `sayingOf` live in `@kazusa/client` (`speech.ts`), shared with the client's
+  reveal. A send emits its message before the stop that clears its indicator, so
+  a client can tell a line that landed from one that was dropped. Reading a
+  message or thinking about a reply sets nothing: read receipts and the brain's
+  status show those. A character's indicator has no expiry; a player's lapses
+  after 8 s unless the composer renews it.
 - **Face to face** (a huddle), every spoken line also waits for the huddle's
   floor; actions never do. A steer that stops a line mid-way commits what was
   heard of it, ending in "—"; a text stopped while being typed is never sent.
@@ -539,6 +549,33 @@ places a labelled set into a workspace:
   resizes them.
 - Labelling is by eye from the staged contact sheet. `place` writes the files
   and `stickers.json`.
+
+## Faces
+
+Face to face, a line or an action can carry the face it is said or done with:
+`{ "text": "I said no.", "face": "annoyed" }`. Unlike a sticker it is part of
+the line, not a message of its own, so it adds no stimulus and no attention
+decision ([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
+
+- **The field.** Only a character with portraits has it: an `enum` of the
+  distinct moods across their pictures (`faceMoods` in `messaging/faces.ts`,
+  from `readPortraits`), the same whatever they wear, so the schema stays in the
+  cached prefix. A mood they don't have is dropped (`.catch`) and the line is
+  still said. In a text chat the face is dropped, as an action is.
+- **Frozen at send** (`sayFaces`): the bubble becomes `face: { name, seen? }`.
+  `name` is the picture, `<mood>` in the usual clothes until outfits exist.
+  `seen` is what everyone reads of it, `kazusa-deliveries#face` filled with the
+  look of the sticker of that name, else the mood word; it is set only when the
+  face differs from the speaker's previous one in that chat, or the one before
+  it in the same call.
+- **The previous face** is `Messaging.shownFace`: kept in memory per chat and
+  speaker as messages are accepted, and forgotten when they leave. After a
+  restart the first face a speaker shows is read again.
+- **What everyone reads.** `heardAs` puts `seen` before the line, after any
+  `[type=action]`: `(annoyed, a flat stare) I said no.` Stimuli and ledgers read
+  that; `said` and the journal preview do not.
+- **Client.** `ChatMessage.face: { name }`, and the speaking event's
+  `speech.face`, so a figure changes face as the line starts.
 
 See [context assembly](context_engine.md) for the shared simulated-time window
 and [Perception](perception.md) for attention admission. The always-loaded

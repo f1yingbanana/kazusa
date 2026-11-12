@@ -7,6 +7,7 @@ import {
   dismissUpdate,
   resetPreferences,
   sanitizePreferences,
+  setHuddleRendering,
   setObservedCollapsed,
   setSectionOpen,
   syncPreferences,
@@ -70,6 +71,13 @@ describe("preferences-store actions", () => {
     dismissUpdate("1.2.3");
     expect(usePreferencesStore.getState().dismissedUpdateVersion).toBe("1.2.3");
   });
+
+  it("remembers how huddles open, a scene by default", () => {
+    expect(usePreferencesStore.getState().huddleRendering).toBe("scene");
+
+    setHuddleRendering("list");
+    expect(usePreferencesStore.getState().huddleRendering).toBe("list");
+  });
 });
 
 describe("sanitizePreferences", () => {
@@ -121,6 +129,15 @@ describe("sanitizePreferences", () => {
         .dismissedUpdateVersion,
     ).toBe("2026.11.08");
   });
+
+  it("sanitizes how huddles open", () => {
+    expect(
+      sanitizePreferences({ huddleRendering: "canvas" }).huddleRendering,
+    ).toBe("scene");
+    expect(
+      sanitizePreferences({ huddleRendering: "list" }).huddleRendering,
+    ).toBe("list");
+  });
 });
 
 describe("preferences-store persistence", () => {
@@ -144,6 +161,7 @@ describe("preferences-store persistence", () => {
           inspectorFolds: { "character.desires": false },
           observedCollapsed: true,
           dismissedUpdateVersion: "1.2.3",
+          huddleRendering: "list",
         },
       }),
     );
@@ -153,6 +171,7 @@ describe("preferences-store persistence", () => {
       inspectorFolds: { "character.desires": false },
       observedCollapsed: true,
       dismissedUpdateVersion: "1.2.3",
+      huddleRendering: "list",
     });
 
     toggleWatch("bob");
