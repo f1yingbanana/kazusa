@@ -31,19 +31,26 @@ import { executeClockAction } from "@/lib/source/clock/http";
  * the late one is not someone else changing the speed.
  */
 const ECHO_WINDOW_MS = 3_000;
+/** How long after a speed it could not set it tries again. */
+const RETRY_MS = 2_000;
 
 /** The clock as reading mode sees it: its speed, and a way to set it. */
 export interface ReadingClockSource {
   /** Sim speed now; `undefined` until the clock is known. */
   readonly speed: number | undefined;
-  /** `leaving`: the page is going away; the call must outlive it. */
-  readonly setSpeed: (speed: number, leaving?: boolean) => void;
+  /**
+   * Resolves whether the clock took the speed. `leaving`: the page is going
+   * away; the call must outlive it, and nobody waits for it.
+   */
+  readonly setSpeed: (speed: number, leaving?: boolean) => Promise<boolean>;
 }
 
 /**
  * Reading mode's clock (`stepReadingClock`) bound to a clock: while `on`, it
- * follows the lines `waiting`, and lets go when someone else sets the speed
- * (`onTakenBack`). Turned off, unmounted or the page left, it puts back the
+ * follows the lines `waiting`, trying again a little later when a speed it set
+ * fails. It lets go (`onTakenBack`) when someone else sets the speed, and when
+ * the page comes back from the back-forward cache, the speed already put back
+ * as it was left. Turned off, unmounted or the page left, it puts back the
  * speed it found.
  */
 export function useReadingClock({
@@ -63,16 +70,31 @@ export function useReadingClock({
     latest.current = { waiting, clock, onTakenBack };
   });
   const asked = useRef<{ speed: number; at: number }[]>([]);
+  // Each time it is turned on: a reply sent before is not this one's to wait
+  // for.
+  const session = useRef(0);
+  const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const step = useCallback((event: ReadingClockEvent, leaving = false) => {
     const next = stepReadingClock(machine.current, event);
     machine.current = next.state;
-    if (next.set !== undefined) {
+    const speed = next.set;
+    if (speed !== undefined) {
       const now = Date.now();
       asked.current = [
         ...asked.current.filter((item) => now - item.at < ECHO_WINDOW_MS),
-        { speed: next.set, at: now },
+        { speed, at: now },
       ];
-      latest.current.clock.setSpeed(next.set, leaving);
+      void latest.current.clock.setSpeed(speed, leaving).then((ok) => {
+        if (ok || leaving) return;
+        // The speed is unknown now: set it again soon, from what waits then.
+        step({ type: "failed", speed });
+        if (!machine.current.on) return;
+        clearTimeout(retry.current);
+        retry.current = setTimeout(
+          () => step({ type: "waiting", waiting: latest.current.waiting }),
+          RETRY_MS,
+        );
+      });
     }
     if (next.takenBack) latest.current.onTakenBack();
   }, []);
@@ -83,11 +105,20 @@ export function useReadingClock({
 
   useEffect(() => {
     if (!on) return;
+    session.current += 1;
     step({ type: "enter", ...found() });
     const leave = () => step({ type: "leave" }, true);
+    // Restored from the back-forward cache: leaving put the speed back, and
+    // the clock is no longer its to hold.
+    const back = (event: PageTransitionEvent) => {
+      if (event.persisted) latest.current.onTakenBack();
+    };
     window.addEventListener("pagehide", leave);
+    window.addEventListener("pageshow", back);
     return () => {
       window.removeEventListener("pagehide", leave);
+      window.removeEventListener("pageshow", back);
+      clearTimeout(retry.current);
       step({ type: "leave" });
     };
   }, [on, step]);
@@ -111,9 +142,10 @@ export function useReadingClock({
 
   const send = useCallback(() => {
     step({ type: "send" });
+    const sentIn = session.current;
     let done = false;
     return () => {
-      if (done) return;
+      if (done || sentIn !== session.current) return;
       done = true;
       step({ type: "sent", waiting: latest.current.waiting });
     };
@@ -258,11 +290,14 @@ export function useReadingMode(
       speed,
       setSpeed: (next, leaving) =>
         leaving
-          ? void executeClockAction(
+          ? executeClockAction(
               { action: "set_speed", speed: next },
               { keepalive: true },
-            ).catch(() => {})
-          : void apply({ action: "set_speed", speed: next }),
+            ).then(
+              () => true,
+              () => false,
+            )
+          : apply({ action: "set_speed", speed: next }),
     },
     onTakenBack: () => setWantedOn(false),
   });

@@ -8,7 +8,10 @@ export interface ReadingClock {
   readonly on: boolean;
   /** The speed when reading mode was turned on: what leaving puts back. */
   readonly found: number | undefined;
-  /** The speed the clock should show; any other is someone else's doing. */
+  /**
+   * The speed the clock should show; any other is someone else's doing.
+   * `undefined` once a speed it set failed: unknown until it sets one again.
+   */
   readonly expected: number | undefined;
   /** Replies being sent: the world waits for them before it runs again. */
   readonly sending: number;
@@ -30,7 +33,9 @@ export type ReadingClockEvent =
   /** It was sent, or failed; `waiting`: lines waiting now. */
   | { readonly type: "sent"; readonly waiting: number }
   /** The clock's speed, as it changed. */
-  | { readonly type: "speed"; readonly speed: number | undefined };
+  | { readonly type: "speed"; readonly speed: number | undefined }
+  /** Setting the clock to `speed` failed. */
+  | { readonly type: "failed"; readonly speed: number };
 
 export interface ReadingStep {
   readonly state: ReadingClock;
@@ -68,7 +73,9 @@ function follow(state: ReadingClock, waiting: number): ReadingStep {
  * - A line waiting pauses the world; none waiting runs it at the speed found (1
  *   if that was 0); a reply holds it until sent;
  * - Turned off, it puts back the speed it found, exactly, 0 included;
- * - A speed it did not set is the clock taken back: off, nothing put back.
+ * - A speed it did not set is the clock taken back: off, nothing put back;
+ * - A speed it could not set leaves the clock's speed unknown: the next step sets
+ *   it again, and leaving puts back the speed found.
  */
 export function stepReadingClock(
   state: ReadingClock,
@@ -100,5 +107,10 @@ export function stepReadingClock(
       return event.speed === undefined || event.speed === state.expected
         ? { state }
         : { state: READING_OFF, takenBack: true };
+    case "failed":
+      // Only the speed it wants now; an older one was superseded anyway.
+      return event.speed === state.expected
+        ? { state: { ...state, expected: undefined } }
+        : { state };
   }
 }

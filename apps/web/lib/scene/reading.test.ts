@@ -29,6 +29,10 @@ const waiting = (count: number): ReadingClockEvent => ({
   waiting: count,
 });
 const leave: ReadingClockEvent = { type: "leave" };
+const failed = (speed: number): ReadingClockEvent => ({
+  type: "failed",
+  speed,
+});
 
 describe("reading mode's clock", () => {
   it.each<[string, ReadingClockEvent[], number[]]>([
@@ -91,6 +95,21 @@ describe("reading mode's clock", () => {
       [1, 0],
     ],
     ["off twice: once", [enter(10), waiting(1), leave, leave], [0, 10]],
+    [
+      "a resume that failed: set again on the next step",
+      [enter(10), waiting(1), waiting(0), failed(10), waiting(0)],
+      [0, 10, 10],
+    ],
+    [
+      "a resume that failed: off puts back the speed found",
+      [enter(10), waiting(1), waiting(0), failed(10), leave],
+      [0, 10, 10],
+    ],
+    [
+      "a pause that failed after the resume was asked for: nothing to redo",
+      [enter(10), waiting(1), waiting(0), failed(0), waiting(0), leave],
+      [0, 10],
+    ],
     [
       "its own speeds are its own",
       [enter(10), waiting(1), { type: "speed", speed: 0 }],
