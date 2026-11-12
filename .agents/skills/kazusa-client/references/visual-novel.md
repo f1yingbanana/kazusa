@@ -1,7 +1,7 @@
 # Visual Novel Mode for Huddles (the Scene view)
 
 Status (2026-11-12): the prototype (M0) is built, along with the line as it is
-said (§6.2), full screen, the backlog and reading mode; faces (§6.3) and outfits
+said (§6.2), full screen, the backlog, reading mode and faces (§6.3); outfits
 (§6.4) are not. §4.1 says what was built where it differs from the sketches, and
 §13 logs every change of mind. This document began as an answer to the
 preliminary research report "Real-Time Visual Novel Stage and Text Rendering
@@ -533,7 +533,7 @@ Change: the speaking event carries the line.
 // TypingStreamEvent, when mode is "speaking" and isTyping is true
 speech?: {
   text: string;
-  face?: { name: string; v: string }; // §6.3
+  face?: { name: string }; // §6.3
   from: number; // sim time
   until: number;
 }
@@ -551,6 +551,27 @@ speech?: {
 - It is what makes reading mode possible (§7), and the hook for voice later.
 
 ### 6.3 Face (M1)
+
+Built (2026-11-12) as described below, with these differences:
+
+- The delivery freezes `face: { name, seen? }`, not `{ name, v }`. The client
+  finds the name in the portrait set it already fetched, whose URLs carry their
+  versions, so a replaced picture also shows on older lines, as with stickers.
+- `seen` is what listeners read, `kazusa-deliveries#face` (`({look})`) filled
+  with the look text of the sticker with that name, else the mood word. It is
+  decided before the line is said (`sayFaces` in `messaging/faces.ts`), so a
+  replayed send matches: only a face that differs from the speaker's previous
+  one in that chat, or the one before it in the same call, gets it. The previous
+  face is kept in memory (`Messaging.shownFace`) and forgotten when they leave;
+  after a restart the first face a speaker shows is read again.
+- In usual clothes the picture's name is the mood. A mood only an outfit has
+  shows the neutral picture (`pickPortrait`), and listeners still read the mood.
+- The director keeps each member's face in `SceneState.moods`: from the speaking
+  event as a line starts, else from the message as it lands (an action, an older
+  Gateway), seeded from history and from a line already being said when the
+  scene opens, worn by a figure as it walks in, dropped when they leave. In
+  reading mode the face changes as its line starts, not when the reader advances
+  onto it.
 
 The character chooses the face, in the `send_message` call they are already
 making, and everyone present sees it.
@@ -595,9 +616,8 @@ the other, and `face` follows the rule already there:
 **Resolving it.** With the outfit the character has on (§6.4; usual clothes
 until that exists), the look is `<outfit>-<mood>`. If that outfit has no such
 mood, the figure keeps the outfit and shows its neutral face; listeners still
-read the mood. The resolved name and version are frozen on the delivery
-(`face: { name, v }`, exactly like `sticker`), so an old line shows the outfit
-of its moment.
+read the mood. The resolved name is frozen on the delivery (`face: { name }`, as
+`sticker` is), so an old line shows the outfit of its moment.
 
 **What everyone reads.** People see faces, so listeners do too:
 
@@ -902,7 +922,9 @@ One pull request per item (the project's rule), each usable alone.
 
 5. Speech carried on the speaking event (§6.2); the reveal. Built.
 6. `face` on spoken bubbles (§6.3): schema, delivery, what listeners read, the
-   two skills' wording, the client field. **M2. Clothes.**
+   skills' wording, the client field. Built.
+
+**M2. Clothes.**
 
 7. The status system's first slice, `outfit`
    ([status](../../kazusa/references/status.md) §5), and the scene reading it.
@@ -948,6 +970,13 @@ One pull request per item (the project's rule), each usable alone.
    [status](../../kazusa/references/status.md) §6.
 
 ## 13. Decision log
+
+- **A face's words are frozen only when it changes, decided at send**
+  (2026-11-12, building §6.3). The name goes on every line that carries a face,
+  so the figure is right however the scene was opened; what listeners read
+  (`seen`) is set before the line is said, against the speaker's last face
+  there, so the retained plan and a replay agree. Comparing when each listener
+  is notified would need the order of deliveries at read time.
 
 - **`face` is on `send_message`, the one tool that says anything** (2026-11-11,
   second review). `talk` opens or joins a face-to-face conversation and returns
