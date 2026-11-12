@@ -3,10 +3,12 @@ import {
   BUST_EYES_Y,
   BUST_FLOOR_Y,
   BUST_HEIGHT,
+  BUST_HEIGHT_SHARE,
   FIGURE_HEIGHT,
   FLOOR_Y,
   NARROW_SLOTS,
   REFERENCE_PX,
+  TYPICAL_EYES_PX,
   WIDE_SLOTS,
   columnLeft,
   figureColumns,
@@ -111,14 +113,31 @@ describe("standing a figure", () => {
     expect(stood.atPercent).toBeCloseTo(FLOOR_Y * 100);
   });
 
-  it("frames the one-slot scene by the eyes, whoever is shown", () => {
-    const short = standFigure({ eyes: 0.25, scale: 0.8 }, 683, "bust");
-    const tall = standFigure({ eyes: 0.15, scale: 1.17 }, 683, "bust");
-    expect([short.rowPercent, tall.rowPercent]).toEqual([25, 15]);
-    expect(short.atPercent).toBe(BUST_EYES_Y * 100);
-    expect(tall.atPercent).toBe(BUST_EYES_Y * 100);
+  it("frames the one-slot scene by the eyes, keeping a little of the height", () => {
+    const SCENE = 683;
+    // A picture a reference tall, standing on its bottom edge, whose eyes are
+    // `eyesPx` above it at scale 1: where they land, in scene heights.
+    const eyesAt = (eyesPx: number, scale = 1): number => {
+      const eyes = 1 - eyesPx / REFERENCE_PX;
+      const stood = standFigure({ eyes, scale }, SCENE, "bust");
+      const own = (REFERENCE_PX * stood.zoom) / SCENE;
+      return stood.atPercent / 100 - (stood.rowPercent / 100 - eyes) * own;
+    };
+    expect(eyesAt(TYPICAL_EYES_PX)).toBeCloseTo(BUST_EYES_Y);
+    // The same character from a picture that shows them half as large.
+    expect(eyesAt(TYPICAL_EYES_PX / 2, 2)).toBeCloseTo(BUST_EYES_Y);
+    // 180 cm and 128 cm at the importer's 8.11 px per cm.
+    const tall = eyesAt(8.11 * 180);
+    const short = eyesAt(8.11 * 128);
+    expect(tall).toBeLessThan(BUST_EYES_Y);
+    expect(short).toBeGreaterThan(BUST_EYES_Y);
+    // A share of what the wide scene would show, and the tall one's head
+    // still in the frame.
+    const whole = ((8.11 * (180 - 128)) / REFERENCE_PX) * BUST_HEIGHT;
+    expect(short - tall).toBeCloseTo(BUST_HEIGHT_SHARE * whole);
+    expect(tall).toBeGreaterThan(0.2);
     // Without eyes, the floor line, as before.
-    expect(standFigure({ floor: 0.9 }, 683, "bust")).toMatchObject({
+    expect(standFigure({ floor: 0.9 }, SCENE, "bust")).toMatchObject({
       rowPercent: 90,
       atPercent: BUST_FLOOR_Y * 100,
     });
