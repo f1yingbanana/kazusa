@@ -4,6 +4,7 @@ import type {
   TypingStreamEvent,
 } from "@kazusa/client";
 import { figureColumns, type SlotCount } from "./layout";
+import { revealFraction } from "./reveal";
 import type { Figure, Look, SceneLine, SceneState, Spoken } from "./state";
 
 /** Earlier lines shown as echoes above the panel; older ones are dropped. */
@@ -94,11 +95,12 @@ export type SceneEvent =
    */
   | { readonly type: "advance"; readonly at: number }
   /**
-   * Show the next line `ahead` now, whatever its turn. In reading mode with
-   * nothing waiting, the next line to arrive is shown the moment it does
-   * (`wanted`), and whoever is speaking shows in the panel meanwhile.
+   * Show the next line `ahead` now, whatever its turn. In reading mode, a panel
+   * line still being typed out at `sim` (the sim time now) is shown whole
+   * first; with nothing waiting, the next line to arrive is shown the moment it
+   * does (`wanted`).
    */
-  | { readonly type: "show-next"; readonly at: number }
+  | { readonly type: "show-next"; readonly at: number; readonly sim?: number }
   /** Show everything `ahead` now: "Jump to live". */
   | { readonly type: "jump"; readonly at: number }
   /**
@@ -142,6 +144,7 @@ function toLine(message: ChatMessage): SceneLine {
     speakerName: message.senderName,
     kind,
     text: message.text,
+    ...(message.face ? { face: message.face.name } : {}),
     cutOff: kind === "speech" && isCutOff(message.text),
   };
 }
@@ -474,9 +477,13 @@ function withTyping(
         )
       : state;
   if (typing.mode !== "speaking") return state;
-  let next = speak(state, id);
-  // Their face changes as the line starts.
-  if (typing.speech?.face) next = wear(next, id, typing.speech.face.name);
+  // Their turn and face come as the line starts; in reading mode, when the
+  // reader gets to it (`show`).
+  let next = state;
+  if (!state.reading) {
+    next = speak(state, id);
+    if (typing.speech?.face) next = wear(next, id, typing.speech.face.name);
+  }
   next = state.speakers.includes(id)
     ? next
     : { ...next, speakers: [...state.speakers, id] };
@@ -495,6 +502,7 @@ function withTyping(
       mapSaid(next, id, (line) => ({
         ...line,
         text: spoken.text,
+        ...(spoken.face ? { face: spoken.face.name } : {}),
         said: { from: spoken.from, until: spoken.until },
       })),
       at,
@@ -527,6 +535,7 @@ function beingSaid(speakerId: string, spoken: Spoken): SceneLine {
     speakerName: spoken.name,
     kind: "speech",
     text: spoken.text,
+    ...(spoken.face ? { face: spoken.face.name } : {}),
     said: { from: spoken.from, until: spoken.until },
     cutOff: false,
   };
@@ -661,15 +670,38 @@ function present(state: SceneState, at?: number): SceneState {
     : next;
 }
 
-function show(state: SceneState, at: number, whole = false): SceneState {
+/**
+ * The next line waiting goes on screen. In reading mode that is the reader
+ * getting to it: its speaker takes their turn and shows its face now, not when
+ * it arrived.
+ */
+function show(state: SceneState, at: number): SceneState {
   const [head, ...ahead] = state.ahead;
   if (!head) return state;
-  const shown: SceneLine = {
-    ...head,
-    shownAt: at,
-    ...(whole && isBeingSaid(head) ? { whole: true } : {}),
+  const next: SceneState = {
+    ...place(state, { ...head, shownAt: at }, at),
+    ahead,
+    wanted: false,
   };
-  return { ...place(state, shown, at), ahead, wanted: false };
+  if (!state.reading || head.speakerId === state.playerId) return next;
+  const turned = speak(next, head.speakerId);
+  return head.face === undefined
+    ? turned
+    : wear(turned, head.speakerId, head.face);
+}
+
+/** Whether `line` is still being typed out at sim time `sim`. */
+function stillTyped(
+  line: SceneLine | undefined,
+  sim: number | undefined,
+): boolean {
+  return (
+    line !== undefined &&
+    sim !== undefined &&
+    isBeingSaid(line) &&
+    !line.whole &&
+    revealFraction(line, sim) < 1
+  );
 }
 
 /** Everything waiting goes on screen, in order. */
@@ -715,9 +747,12 @@ function withMessage(
   const id = message.senderId;
   if (id !== state.playerId) {
     // The line is out: they take a turn, and stop speaking; with no speaking
-    // event before it (an action, an older Gateway), its face changes now.
-    next = speak(next, id);
-    if (message.face) next = wear(next, id, message.face.name);
+    // event before it (an action, an older Gateway), its face changes now. In
+    // reading mode both wait for the reader (`show`).
+    if (!state.reading) {
+      next = speak(next, id);
+      if (message.face) next = wear(next, id, message.face.name);
+    }
     if (next.speakers.includes(id))
       next = {
         ...next,
@@ -761,6 +796,13 @@ function withHistory(
     .sort((a, b) => a.sequence - b.sequence);
   if (!fresh.length)
     return sequence === state.sequence ? state : { ...state, sequence };
+  // Reading mode: they wait for the reader like any line, turns and faces too.
+  if (state.reading)
+    return {
+      ...state,
+      sequence,
+      ahead: [...state.ahead, ...fresh.slice(-HISTORY_MESSAGES).map(toLine)],
+    };
   let turn = state.turn;
   const spoke = { ...state.spoke };
   const faces: Record<string, string> = {};
@@ -775,14 +817,13 @@ function withHistory(
     (scene, [id, mood]) => wear(scene, id, mood),
     { ...state, sequence, turn, spoke },
   );
-  // Behind lines still waiting (or for the reader), history waits too, in
-  // order; else it goes straight on screen, unpaced.
-  const placed =
-    state.ahead.length || state.reading
-      ? { ...next, ahead: [...state.ahead, ...lines] }
-      : present(
-          lines.reduce((scene, line) => place(scene, line, undefined), next),
-        );
+  // Behind lines still waiting, history waits too, in order; else it goes
+  // straight on screen, unpaced.
+  const placed = state.ahead.length
+    ? { ...next, ahead: [...state.ahead, ...lines] }
+    : present(
+        lines.reduce((scene, line) => place(scene, line, undefined), next),
+      );
   // As if the lines had come live: the newest one's author, if a member who
   // can be drawn, is shown (the one figure, or in place of whoever spoke
   // longest ago).
@@ -960,8 +1001,12 @@ export function direct(state: SceneState, event: SceneEvent): SceneState {
     case "advance":
       return advance(state, event.at);
     case "show-next":
+      // Still being typed out: the reader has it whole first, and asks again
+      // for the next.
+      if (state.reading && state.line && stillTyped(state.line, event.sim))
+        return { ...state, line: { ...state.line, whole: true } };
       return state.ahead.length
-        ? present(show(state, event.at, state.reading), event.at)
+        ? present(show(state, event.at), event.at)
         : state.reading && !state.wanted
           ? present({ ...state, wanted: true }, event.at)
           : state;
@@ -971,10 +1016,12 @@ export function direct(state: SceneState, event: SceneEvent): SceneState {
         : state;
     case "reading":
       if (event.on === state.reading) return state;
+      // Off: what waited is shown as the reader would have got to it, in
+      // order, turns and faces too.
       return event.on
         ? { ...state, reading: true }
         : present(
-            flush({ ...state, reading: false, wanted: false }, event.at),
+            { ...flush(state, event.at), reading: false, wanted: false },
             event.at,
           );
     case "fade": {

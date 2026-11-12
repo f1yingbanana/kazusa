@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useClockActions } from "@/hooks/use-clock";
+import { readSimNow, useClockActions } from "@/hooks/use-clock";
 import { useClockStore } from "@/lib/live/clock-state";
 import {
   applySceneEvent,
@@ -206,7 +206,10 @@ export interface ReadingMode {
   readonly available: boolean;
   readonly on: boolean;
   readonly toggle: () => void;
-  /** Show the next waiting line, or the next to arrive. */
+  /**
+   * Show the next waiting line, or the next to arrive; a line still being typed
+   * out is shown whole first.
+   */
   readonly advance: () => void;
   /** Whether an advance would do anything now (the pointer says so). */
   readonly canAdvance: boolean;
@@ -266,7 +269,12 @@ export function useReadingMode(
 
   const toggle = useCallback(() => setWantedOn((current) => !current), []);
   const advance = useCallback(
-    () => applySceneEvent(chatId, { type: "show-next", at: Date.now() }),
+    () =>
+      applySceneEvent(chatId, {
+        type: "show-next",
+        at: Date.now(),
+        sim: readSimNow(),
+      }),
     [chatId],
   );
   const beforeSend = useCallback(() => {

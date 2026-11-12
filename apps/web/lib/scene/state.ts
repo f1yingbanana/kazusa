@@ -50,8 +50,13 @@ export interface SceneLine {
    */
   readonly said?: { readonly from: number; readonly until: number };
   /**
-   * Shown whole before it was said through: the reader (reading mode) advanced
-   * onto a line already started. Its commit still replaces it (a cut shortens
+   * The face it is said or done with (§6.3), when it carries one. Its speaker
+   * shows it as the line starts; in reading mode, as the reader gets to it.
+   */
+  readonly face?: string;
+  /**
+   * Shown whole before it was said through: the reader (reading mode) clicked
+   * while it was being typed out. Its commit still replaces it (a cut shortens
    * it).
    */
   readonly whole?: boolean;
@@ -73,6 +78,8 @@ export interface SceneLine {
 export interface Spoken {
   readonly name: string;
   readonly text: string;
+  /** The line's face, as the speaking event carries it. */
+  readonly face?: { readonly name: string };
   readonly from: number;
   readonly until: number;
 }
@@ -134,7 +141,8 @@ export interface SceneState {
   /**
    * The mood each member shows (§6.3): the face of their latest line that
    * carried one, kept until their next, and forgotten when they leave. A figure
-   * wears it, from the moment it walks in.
+   * wears it, from the moment it walks in. In reading mode it is the face of
+   * the latest line the reader has got to.
    */
   readonly moods: Readonly<Record<string, string>>;
   /**

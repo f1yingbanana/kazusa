@@ -849,7 +849,7 @@ describe("reading mode", () => {
     expect(state.wanted).toBe(false);
   });
 
-  it("takes a line that has started as ready; shown whole on an advance, its commit snaps it, cut or not", () => {
+  it("takes a line that has started as ready; an advance types it out, its commit snaps it, cut or not", () => {
     let state = run(scene({ members: [PLAYER, "a", "b"] }), [
       said(msg("a", "Shown."), 0),
       reading(true),
@@ -861,10 +861,10 @@ describe("reading mode", () => {
       "b:~Long enough to be cut off later",
     ]);
     state = direct(state, next(1_200));
-    // The reader has it whole at once.
+    // Typed out from where its saying has got to, like a line that came live.
     expect(shown(state)).toEqual([
       "a:Shown.",
-      "b:~!Long enough to be cut off later",
+      "b:~Long enough to be cut off later",
     ]);
     // Someone cut in before it was said through: it shortens to what was
     // heard, in its place.
@@ -881,6 +881,47 @@ describe("reading mode", () => {
       speaking("b", false, 500),
     ]);
     expect(waiting.ahead).toEqual([]);
+  });
+
+  it("shows a line still being typed out whole on a click, and asks for the next on the one after", () => {
+    // Said across sim 1,000..4,000: typed out by 3,100 (`REVEAL_SHARE`).
+    const typed = (sim: number): SceneEvent => ({
+      type: "show-next",
+      at: 0,
+      sim,
+    });
+    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+      reading(true),
+      saying("b", "Typed out as it is said", 1_000, 4_000),
+      saying("b", "Typed out as it is said", 1_000, 4_000),
+      typed(1_000),
+    ]);
+    expect(shown(state)).toEqual(["b:~Typed out as it is said"]);
+    // Mid-way: the click completes it and asks for nothing.
+    state = direct(state, typed(2_000));
+    expect(shown(state)).toEqual(["b:~!Typed out as it is said"]);
+    expect(state.wanted).toBe(false);
+    // Whole already: the next click asks for the next line.
+    state = direct(state, typed(2_100));
+    expect(state.wanted).toBe(true);
+    // Typed out by itself: the first click asks.
+    const through = run(scene({ members: [PLAYER, "a", "b"] }), [
+      reading(true),
+      saying("b", "Typed out as it is said", 1_000, 4_000),
+      typed(1_000),
+      typed(3_200),
+    ]);
+    expect(through.line?.whole).toBeUndefined();
+    expect(through.wanted).toBe(true);
+    // Its commit replaces it, whole or cut.
+    const landed = direct(state, said(msg("b", "Typed out as—"), 0));
+    expect(shown(landed)).toEqual(["b:Typed out as—"]);
+    expect(landed.line?.whole).toBeUndefined();
+    // Outside reading mode a line being typed out is left alone.
+    const live = run(scene({ members: [PLAYER, "a", "b"] }), [
+      saying("b", "Typed out as it is said", 1_000, 4_000),
+    ]);
+    expect(direct(live, typed(2_000))).toBe(live);
   });
 
   it("asked for with nothing waiting, shows a line being said live the moment it starts", () => {
@@ -1066,6 +1107,73 @@ describe("faces", () => {
       presence: "entering",
       look: { mood: "happy" },
     });
+  });
+
+  it("in reading mode, changes a face when the reader gets to its line, not when it starts or lands", () => {
+    const on: SceneEvent = { type: "reading", on: true, at: 0 };
+    const next: SceneEvent = { type: "show-next", at: 0 };
+    let state = run(scene({ members: [PLAYER, "a", "b"] }), [
+      sayingWith("a", "No.", "annoyed"),
+      said(msg("a", "No.", { face: { name: "annoyed" } })),
+      on,
+      // Two bubbles of one send, then someone acting with a face.
+      sayingWith("a", "Fine.", "happy"),
+      said(msg("a", "Fine.", { face: { name: "happy" } })),
+      sayingWith("a", "Whatever.", "sad"),
+      said(msg("b", "looks up", { type: "action", face: { name: "smug" } })),
+    ]);
+    expect(state.ahead.map(text)).toEqual([
+      "a:Fine.",
+      "a:~Whatever.",
+      "b:looks up",
+    ]);
+    expect([mood(state, "a"), mood(state, "b")]).toEqual([
+      "annoyed",
+      undefined,
+    ]);
+    expect(state.moods).toEqual({ a: "annoyed" });
+    state = direct(state, next);
+    expect(mood(state, "a")).toBe("happy");
+    state = direct(state, next);
+    expect([mood(state, "a"), mood(state, "b")]).toEqual(["sad", undefined]);
+    state = direct(state, next);
+    expect(mood(state, "b")).toBe("smug");
+    // Asked for before it came: the line shows at once, with its face.
+    state = run(state, [next, sayingWith("b", "Oh.", "surprised")]);
+    expect(mood(state, "b")).toBe("surprised");
+  });
+
+  it("in reading mode, shows what waited with its faces, in order, when it ends or the player replies", () => {
+    const waiting = run(scene({ members: [PLAYER, "a", "b"] }), [
+      { type: "reading", on: true, at: 0 },
+      said(msg("a", "No.", { face: { name: "annoyed" } })),
+      said(msg("a", "Fine.", { face: { name: "happy" } })),
+      {
+        type: "history",
+        messages: [msg("b", "Hm.", { face: { name: "sad" } })],
+      },
+    ]);
+    expect(waiting.moods).toEqual({});
+    const off = direct(waiting, { type: "reading", on: false, at: 0 });
+    expect(off.moods).toEqual({ a: "happy", b: "sad" });
+    expect(off.reading).toBe(false);
+    const replied = direct(waiting, said(msg(PLAYER, "ok")));
+    expect(replied.moods).toEqual({ a: "happy", b: "sad" });
+  });
+
+  it("in reading mode, gives a place to whoever the reader has got to, not whoever spoke since", () => {
+    let state = run(
+      scene({ members: [PLAYER, "a", "b"], slots: NARROW_SLOTS }),
+      [
+        said(msg("a", "First.")),
+        { type: "reading", on: true, at: 0 },
+        sayingWith("b", "Second.", "happy"),
+      ],
+    );
+    expect(lineup(state)).toEqual(["a@0"]);
+    state = direct(state, { type: "show-next", at: 0 });
+    expect(lineup(state)).toEqual(["b@0"]);
+    expect(mood(state, "b")).toBe("happy");
   });
 
   it("never gives the player a face", () => {

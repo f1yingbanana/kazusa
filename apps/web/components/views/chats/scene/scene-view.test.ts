@@ -1586,7 +1586,8 @@ describe("reading mode", () => {
         },
       }),
     );
-    // His line starts: ready at once, and shown whole when asked for.
+    // His line starts: ready at once, typed out when asked for, and whole on
+    // a click meanwhile.
     const now = Date.now();
     act(() =>
       stream().emit({
@@ -1600,15 +1601,70 @@ describe("reading mode", () => {
       }),
     );
     expect(corner()).toBe("ready");
-    fireEvent.keyDown(document.body, { key: "ArrowRight" });
-    expect(
+    const heard = () =>
       screen.getByRole("log").querySelector("[data-saying] [aria-hidden]")
-        ?.textContent,
-    ).toBe("And here.");
+        ?.textContent;
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(heard()).toBe("");
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(heard()).toBe("And here.");
     // Asked for the next while its saying runs on: he is not "speaking" a
     // line the reader has; what is true is that he is thinking.
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
     expect(words()).toBe("Bob is thinking");
+  });
+
+  it("types out each bubble of one send and changes the face only when its line is reached", async () => {
+    const { container } = await reading();
+    await waitFor(() => expect(figureIds(container)).toContain("alice"));
+    await screen.findByRole("img", { name: "Alice" });
+    const picture = () =>
+      figure(container, "alice")?.querySelector("img")?.getAttribute("src");
+    const heard = () =>
+      screen.getByRole("log").querySelector("[data-saying] [aria-hidden]")
+        ?.textContent;
+    const now = DAY + 12 * HOUR;
+    const bubble = (text: string, face: string) =>
+      act(() =>
+        stream().emit({
+          type: "typing",
+          chatId: "huddle",
+          senderId: "alice",
+          senderName: "Alice",
+          isTyping: true,
+          mode: "speaking",
+          speech: { text, face: { name: face }, from: now, until: now + HOUR },
+        }),
+      );
+    const lands = (text: string, face: string) =>
+      act(() =>
+        stream().emit({
+          type: "message",
+          chatId: "huddle",
+          message: { ...message("alice", text), face: { name: face } },
+        }),
+      );
+    // The first bubble, asked for before it came.
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    bubble("Finally!", "happy");
+    expect(picture()).toBe("/p/alice-happy");
+    lands("Finally!", "happy");
+    // The second starts while the first is still being read: it waits, and so
+    // does its face.
+    bubble("Wait, no.", "neutral");
+    expect(corner()).toBe("ready");
+    expect(picture()).toBe("/p/alice-happy");
+    lands("Wait, no.", "neutral");
+    expect(picture()).toBe("/p/alice-happy");
+    expect(lines()).toEqual(["Alice: Finally!"]);
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(picture()).toBe("/p/alice-neutral");
+    // A third, reached while it is being said: typed out, not shown whole.
+    bubble("Never mind.", "happy");
+    expect(picture()).toBe("/p/alice-neutral");
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(picture()).toBe("/p/alice-happy");
+    expect(heard()).not.toBe("Never mind.");
   });
 
   it("starts a paused world at 1x, and pauses it again when turned off", async () => {

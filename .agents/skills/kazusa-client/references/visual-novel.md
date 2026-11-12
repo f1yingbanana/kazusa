@@ -570,8 +570,9 @@ Built (2026-11-12) as described below, with these differences:
   event as a line starts, else from the message as it lands (an action, an older
   Gateway), seeded from history and from a line already being said when the
   scene opens, worn by a figure as it walks in, dropped when they leave. In
-  reading mode the face changes as its line starts, not when the reader advances
-  onto it.
+  reading mode a line's face, and its speaker's turn (who is drawn when not
+  everyone fits), wait with the line: they change when the reader advances onto
+  it (`show` in the director), so the picture never runs ahead of the text.
 
 The character chooses the face, in the `send_message` call they are already
 making, and everyone present sees it.
@@ -677,13 +678,17 @@ everyone.
   or Space, Enter or →. When nothing else waits, the world runs again at the
   speed it had.
 - A line counts as waiting from the moment it starts being said (§6.2), so the
-  next line is usually there when the reader clicks. If someone cuts in on it
-  afterwards, the panel shortens to what was said.
+  next line is usually there when the reader clicks. The world was paused as it
+  started, so it is typed out from its start once the reader has it, the same as
+  a line asked for before it came. If someone cuts in on it afterwards, the
+  panel shortens to what was said.
+- An advance while the panel's line is still being typed out shows that line
+  whole; the next advance moves on.
 - When the reader has asked and nothing waits, the panel says who is thinking or
   speaking, in words, and only what is known: someone whose line is already on
-  screen is not "speaking" (its saying runs on after the reader has it whole),
-  and with nobody speaking or thinking it says "Waiting for someone to speak",
-  never that a line is coming.
+  screen is not "speaking" (its saying runs on after the reader has it), and
+  with nobody speaking or thinking it says "Waiting for someone to speak", never
+  that a line is coming.
 - Turned on with the clock at 0, it starts the world at 1×, since it needs the
   world running to get a line. Turned off, it restores exactly the speed it
   found, 0 included.
@@ -1051,6 +1056,11 @@ One pull request per item (the project's rule), each usable alone.
 - **Reading mode is client-side and simple** (2026-11-12). An Auto / Manual
   rework with quiet detection was built and withdrawn in favour of the first
   logic. The server-side hold and clock jump from the earlier §7 are dropped.
+- **In reading mode the picture waits with the line** (2026-11-13, after use). A
+  face changed as its line started, before the reader had advanced onto it, and
+  a line already started was shown whole on an advance, so only a line asked for
+  in advance was typed out. Now faces and turns change on the advance, every
+  line is typed out, and a click while one is being typed shows it whole.
 - **The lit figure follows the panel's line** (2026-11-12), not speaking events,
   which dimmed a speaker the moment their line finished.
 - **Figures share one scale** (2026-11-12). Sizing by eye position rescaled
