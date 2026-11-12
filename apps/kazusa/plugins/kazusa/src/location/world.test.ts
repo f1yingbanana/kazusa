@@ -143,6 +143,33 @@ describe("the world on disk", () => {
     expect(lintMap(dir)).toEqual([]);
   });
 
+  it("follows a backdrop library made after it started", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kazusa-world-"));
+    roots.push(root);
+    const dir = path.join(root, "shared/wiki");
+    const library = path.join(root, "shared/backdrops");
+    mkdirSync(path.join(dir, "entities/places"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "entities/places/office.md"),
+      place("office", "backdrop: lobby\n"),
+    );
+    const world = sharedWorld(dir, { warn: () => {}, onChange: () => {} });
+    expect(world()?.map.places.get("office")?.backdrop).toBeUndefined();
+
+    // The first import makes the library, then fills it.
+    await vi.waitFor(() => {
+      mkdirSync(path.join(library, "lobby"), { recursive: true });
+      writeFileSync(path.join(library, "lobby/day.webp"), "day");
+      expect(world()?.map.places.get("office")?.backdrop).toBe("lobby");
+    }, SOON);
+    await vi.waitFor(() => {
+      writeFileSync(path.join(library, "lobby/night.webp"), "night");
+      expect(world()?.backdrops.sets.get("lobby")?.files.has("night")).toBe(
+        true,
+      );
+    }, SOON);
+  });
+
   it("loads a map that was broken from the start", () => {
     const { dir, write } = wiki();
     write("places/tavern.md", place("tavern", "parent: nowhere\n"));

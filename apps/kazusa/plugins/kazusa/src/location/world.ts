@@ -213,9 +213,9 @@ function refresh(cell: WorldCell, wikiDir: string): void {
 }
 
 /**
- * Watches the wiki's places and characters, and the backdrop library beside it
- * when there is one at start (a library added later is read on the next page
- * edit or restart).
+ * Watches the wiki's places and characters, and the backdrop library beside it,
+ * from the moment that library appears if it isn't there at start (the first
+ * import usually runs with the Gateway up).
  */
 function watchWiki(cell: WorldCell, wikiDir: string): void {
   let settling: NodeJS.Timeout | undefined;
@@ -228,7 +228,13 @@ function watchWiki(cell: WorldCell, wikiDir: string): void {
     what: string,
     relevant: (file: string) => boolean,
   ): void => {
-    if (!existsSync(dir)) return;
+    if (!existsSync(dir)) {
+      awaitFolder(dir, what, () => {
+        settle();
+        follow(dir, what, relevant);
+      });
+      return;
+    }
     try {
       watch(dir, { recursive: true, persistent: false }, (_event, file) => {
         if (file && !relevant(file)) return;
@@ -240,6 +246,27 @@ function watchWiki(cell: WorldCell, wikiDir: string): void {
       });
     } catch (error: unknown) {
       cell.handlers.warn(`Location: can't watch the ${what}: ${String(error)}`);
+    }
+  };
+  /** Calls `then` once when `dir` appears in its parent, if the parent is there. */
+  const awaitFolder = (dir: string, what: string, then: () => void): void => {
+    const parent = path.dirname(dir);
+    if (!existsSync(parent)) return;
+    try {
+      const watcher = watch(parent, { persistent: false }, (_event, file) => {
+        if (file !== path.basename(dir) || !existsSync(dir)) return;
+        watcher.close();
+        then();
+      }).on("error", () => watcher.close());
+      // Made between the check above and the watch: no event will come.
+      if (existsSync(dir)) {
+        watcher.close();
+        then();
+      }
+    } catch (error: unknown) {
+      cell.handlers.warn(
+        `Location: can't wait for the ${what} folder: ${String(error)}`,
+      );
     }
   };
   follow(wikiDir, "map", (file) =>
