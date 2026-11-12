@@ -190,11 +190,20 @@ export async function politeGet(
 const safe = (name) => name.replace(/[/\\:*?"<>|]/g, "_");
 
 /**
- * `.cache/art/<this>`: the wiki's host. A wiki's file names are unique, so one
- * folder per wiki means a file shared by two sets or plans, or a renamed set,
- * is never fetched twice.
+ * `.cache/art/<this>`: the wiki's host, and its path past the script folder
+ * (`/w`) when it has one, as a language wiki under another's host does
+ * (`x.fandom.com/ja` → `x.fandom.com_ja`). A wiki's file names are unique, so
+ * one folder per wiki means a file shared by two sets or plans, or a renamed
+ * set, is never fetched twice.
  */
-export const cacheKey = (plan) => safe(new URL(plan.wiki).host);
+export const cacheKey = (plan) => {
+  const url = new URL(plan.wiki);
+  const where = url.pathname
+    .replace(/\/(api\.php)?$/, "")
+    .replace(/\/w$/, "")
+    .replace(/^\//, "");
+  return safe(where ? `${url.host}/${where}` : url.host);
+};
 
 /**
  * A set's originals, from the cache or else the wiki, in the plan's order.
@@ -760,7 +769,16 @@ export async function alignBox(sources, box, targets) {
         .raw()
         .toBuffer({ resolveWithObject: true }),
     );
-  const { width, height } = raws[0].info;
+  // Every picture must hold the box, and a set can mix canvases: past a
+  // shorter one's edge, its crop would have no size.
+  const width = Math.min(...raws.map(({ info }) => info.width));
+  const height = Math.min(...raws.map(({ info }) => info.height));
+  const side = Math.min(box[2], width, height);
+  box = [
+    Math.min(Math.max(box[0], 0), width - side),
+    Math.min(Math.max(box[1], 0), height - side),
+    side,
+  ];
   const limit = Math.max(2, Math.round(box[2] / 10));
   const allowed = ([left, top, side]) =>
     left >= 0 &&

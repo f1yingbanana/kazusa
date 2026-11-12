@@ -138,6 +138,16 @@ describe("portraits stage", () => {
   it("keeps the originals in the cache, one folder per wiki", () => {
     const host = new URL(wiki.url).host.replace(":", "_");
     expect(cacheKey(read(plan))).toBe(host);
+    // A wiki at its host's root or script folder keeps the host's folder; one
+    // under another wiki's host has its own.
+    for (const [wiki, key] of [
+      ["https://a.example/w", "a.example"],
+      ["https://a.example/w/", "a.example"],
+      ["https://a.example/", "a.example"],
+      ["https://a.example/ja", "a.example_ja"],
+      ["https://a.example/ja/w/api.php", "a.example_ja"],
+    ])
+      expect(cacheKey({ wiki })).toBe(key);
     expect(readdirSync(path.join(cache, host)).sort()).toEqual(
       MOODS.map(file).sort(),
     );
@@ -633,6 +643,28 @@ describe("alignBox", () => {
     for (const source of sources.slice(0, 2))
       targets.push(await signature(await stickerOf(source, truth)));
     expect(await alignBox(sources, found, targets)).toEqual(truth);
+  });
+
+  it("keeps the box inside a shorter picture of the set", async () => {
+    const sources = [];
+    for (const mood of ["neutral", "happy", "surprised"])
+      sources.push((await drawCharacter({ expression: mood })).png);
+    const found = await faceBox(sources);
+    const targets = [];
+    for (const source of sources.slice(0, 2))
+      targets.push(await signature(await stickerOf(source, found)));
+    // Another canvas, cut off above where the box starts.
+    const { width } = await sharp(sources[2]).metadata();
+    const short = found[1] - 4;
+    sources[2] = await sharp(sources[2])
+      .extract({ left: 0, top: 0, width, height: short })
+      .png()
+      .toBuffer();
+    const [left, top, side] = await alignBox(sources, found, targets);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(left + side).toBeLessThanOrEqual(width);
+    expect(top + side).toBeLessThanOrEqual(short);
   });
 });
 
