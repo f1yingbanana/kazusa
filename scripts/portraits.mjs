@@ -11,7 +11,11 @@
  *   (`--scale`, 0.8; other canvases in proportion, so sizes stay as drawn), and
  *   writes `<dir>/<set>/<n>.webp`. It names each picture by cutting the sticker
  *   `stickers.mjs stage` would have cut from it and matching that against
- *   `<workspace>/stickers/`. `<dir>/stage.json` reports every match;
+ *   `<workspace>/stickers/`. Where the stickers were cut is found from what
+ *   changes between pictures, settled to the pixel when stickers are left over,
+ *   and searched for over the whole picture when nothing matches. A set whose
+ *   pictures are far from their stickers outside the face is flagged: the
+ *   series may be another outfit's. `<dir>/stage.json` reports every match;
  *   `matched.png` and `unmatched.png` per set show them. The plan is the
  *   sticker plan: `{ id?, wiki, crop?, sets: [{ id, files, box? }] }`.
  * - `place <dir>/stage.json` writes each picture that has a `name` (a match, or
@@ -95,6 +99,22 @@ export const DEFAULTS = {
   minAdvantage: 0.3,
   /** The largest common difference taken off a set (see `commonOffset`). */
   maxOffset: 8,
+  /**
+   * A picture left without a name, and a little too far from its nearest
+   * sticker for `maxDistance`, is still that sticker within this distance when
+   * no picture has it, no other left-over picture is as near to it, and it is
+   * this clearly not any other sticker (`lateAdvantage`, against
+   * `minAdvantage`).
+   */
+  lateDistance: 7.2,
+  lateAdvantage: 0.5,
+  /**
+   * How far a set's pictures may be from the stickers they were named after,
+   * clothes and all (the matching looks at the face only, with the set's common
+   * difference taken off), before the set is flagged as perhaps another
+   * outfit's. Scenery behind the figure does it too.
+   */
+  maxApart: 8,
 };
 /** Matching works on 128 px stickers, lightly blurred against resampling. */
 const FINE = 128;
@@ -629,6 +649,99 @@ export async function searchBox(sources, box, targets) {
 }
 
 /**
+ * Where the stickers were cut, searched over the whole picture: every square
+ * from a tenth to nine tenths of the picture's shorter side, anywhere on it.
+ * For a set whose box from differences is nowhere near the face (a prop that
+ * changes between pictures, a face that hardly does), which `searchBox` can't
+ * reach. Each size is tried on the first picture, shrunk so the square is 32
+ * px, against the stickers' mean (one outfit's stickers are the same head); the
+ * best few sizes are then judged as `searchBox` judges, on up to four pictures.
+ * Returns a box in `sources`' pixels for `alignBox` to finish, or nothing
+ * without stickers or pictures.
+ */
+export async function findBox(sources, targets) {
+  if (targets.length === 0 || sources.length === 0) return undefined;
+  const wanted = targets.map(coarseOf);
+  const mean = new Float32Array(COARSE * COARSE * 4);
+  for (const target of wanted)
+    for (let i = 0; i < mean.length; i++) mean[i] += target[i] / wanted.length;
+  const picked = [];
+  const step = Math.max(1, Math.floor(sources.length / 4));
+  for (let at = 0; at < sources.length && picked.length < 4; at += step)
+    picked.push(sources[at]);
+  const meta = await sharp(sources[0]).metadata();
+  const shrink = async (source, k) => {
+    const width = Math.max(1, Math.round(meta.width * k));
+    const height = Math.max(1, Math.round(meta.height * k));
+    const data = await sharp(source)
+      .ensureAlpha()
+      .resize(width, height, { fit: "fill" })
+      .raw()
+      .toBuffer();
+    const pre = new Float32Array(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++)
+        pre[i + c] = (data[i + c] * data[i + 3]) / 255;
+      pre[i + 3] = data[i + 3];
+    }
+    return { data: pre, width, height };
+  };
+  // A 32 px square of a shrunk picture against a sticker, given up once it is
+  // past `limit`; past the canvas is transparent.
+  const distance = ({ data, width, height }, left, top, target, limit) => {
+    let sum = 0;
+    for (let y = 0; y < COARSE && sum < limit; y++)
+      for (let x = 0; x < COARSE; x++) {
+        const at = (y * COARSE + x) * 4;
+        const sx = left + x;
+        const sy = top + y;
+        const inside = sx >= 0 && sy >= 0 && sx < width && sy < height;
+        const from = (sy * width + sx) * 4;
+        for (let c = 0; c < 4; c++)
+          sum += Math.abs((inside ? data[from + c] : 0) - target[at + c]);
+      }
+    return sum;
+  };
+  const shorter = Math.min(meta.width, meta.height);
+  const over = COARSE / 4;
+  const places = [];
+  for (let side = shorter * 0.1; side <= shorter * 0.9; side *= 1.06) {
+    const k = COARSE / side;
+    const picture = await shrink(picked[0], k);
+    let best;
+    for (let top = -over; top <= picture.height - COARSE + over; top += 2)
+      for (let left = -over; left <= picture.width - COARSE + over; left += 2) {
+        const sum = distance(picture, left, top, mean, best?.sum ?? Infinity);
+        if (!best || sum < best.sum) best = { sum, left, top };
+      }
+    if (best) places.push({ ...best, k });
+  }
+  places.sort((a, b) => a.sum - b.sum);
+  let best;
+  for (const place of places.slice(0, 5)) {
+    let total = 0;
+    for (const source of picked) {
+      const picture = await shrink(source, place.k);
+      let nearest = Infinity;
+      for (const target of wanted)
+        nearest = Math.min(
+          nearest,
+          distance(picture, place.left, place.top, target, nearest),
+        );
+      total += nearest;
+    }
+    if (!best || total < best.total) best = { ...place, total };
+  }
+  if (!best) return undefined;
+  const side = Math.min(Math.round(COARSE / best.k), meta.width, meta.height);
+  return [
+    Math.min(Math.max(Math.round(best.left / best.k), 0), meta.width - side),
+    Math.min(Math.max(Math.round(best.top / best.k), 0), meta.height - side),
+    side,
+  ];
+}
+
+/**
  * `box` moved and resized to where the set's pictures best fit `targets`, the
  * stickers' signatures. The wiki's thumbnailer and ours differ, so the box
  * found again can be a few pixels off the one the stickers were cut with, and
@@ -716,6 +829,68 @@ const round = (value, places = 1) =>
   value === undefined ? undefined : Number(value.toFixed(places));
 
 /**
+ * `box` moved or resized a pixel at a time to where the pictures' would-be
+ * stickers best fit `targets`, the stickers' fine signatures. The matching
+ * looks closer than `alignBox` does: a sticker cut near full size shows one
+ * pixel's difference at every edge. Judged on up to four pictures, within
+ * `reach` px of `box`.
+ */
+export async function settleBox(sources, box, targets, reach = 3) {
+  if (targets.length === 0) return box;
+  const picked = [];
+  const every = Math.max(1, Math.floor(sources.length / 4));
+  for (let at = 0; at < sources.length && picked.length < 4; at += every)
+    picked.push(sources[at]);
+  const { width, height } = await sharp(picked[0]).metadata();
+  const allowed = (candidate) =>
+    candidate[0] >= 0 &&
+    candidate[1] >= 0 &&
+    candidate[0] + candidate[2] <= width &&
+    candidate[1] + candidate[2] <= height &&
+    candidate.every((value, index) => Math.abs(value - box[index]) <= reach);
+  const seen = new Map();
+  const fit = async (candidate) => {
+    const key = candidate.join();
+    if (!seen.has(key)) {
+      let total = 0;
+      for (const source of picked) {
+        const own = await fineSignature(await stickerOf(source, candidate));
+        total += Math.min(
+          ...targets.map((target) => meanDistance(own, target)),
+        );
+      }
+      seen.set(key, total);
+    }
+    return seen.get(key);
+  };
+  let best = box;
+  let bestFit = await fit(box);
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const [dx, dy, ds] of [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [-1, -1, 2],
+      [1, 1, -2],
+      [0, 0, 1],
+      [0, 0, -1],
+    ]) {
+      const candidate = [best[0] + dx, best[1] + dy, best[2] + ds];
+      if (!allowed(candidate)) continue;
+      const candidateFit = await fit(candidate);
+      if (candidateFit < bestFit) {
+        best = candidate;
+        bestFit = candidateFit;
+        moved = true;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * What a set's pictures have in common against their nearest stickers: per
  * channel, the median over pictures of picture minus nearest sticker. When the
  * stickers were cut from another copy of the same pictures (another wiki,
@@ -777,6 +952,10 @@ function medianOffset(pictures, stickers, nearest) {
  *   keeps it (judged where the pictures differ), or the nearest when the others
  *   are its twins (`duplicate`: the same look twice on the wiki); else none
  *   does (`conflict`).
+ * - Last, a picture left without a name takes its nearest sticker's when that is
+ *   a little too far (`lateDistance`) but no picture has it, no other left-over
+ *   picture wants it, and it is clearly no other (`lateAdvantage`). Such a
+ *   match is marked `late`.
  *
  * Returns `{ results, offset }`, `offset` being the mean taken off, or 0.
  */
@@ -948,6 +1127,46 @@ export function matchPictures(
           also: also.length ? also : undefined,
         };
       }
+  // What is left over: see `lateDistance`.
+  const taken = new Set(
+    results.flatMap((result) =>
+      result.match ? [result.match, ...(result.also ?? [])] : [],
+    ),
+  );
+  const wanting = new Map();
+  for (const [index, result] of results.entries()) {
+    const best = names.indexOf(result.nearest);
+    if (
+      result.status !== "unmatched" ||
+      best < 0 ||
+      taken.has(result.nearest) ||
+      !(result.distance <= rule.lateDistance) ||
+      !(result.worst <= rule.maxWorst) ||
+      twinsOf(best).length > 0
+    )
+      continue;
+    let least = Infinity;
+    for (const other of stickers.keys())
+      if (other !== best)
+        least = Math.min(
+          least,
+          advantage(corrected[index], stickers[best], stickers[other]) ??
+            -Infinity,
+        );
+    if (!(least >= rule.lateAdvantage)) continue;
+    wanting.set(best, [...(wanting.get(best) ?? []), { index, least }]);
+  }
+  for (const [best, pictures] of wanting) {
+    if (pictures.length !== 1) continue;
+    const [{ index, least }] = pictures;
+    results[index] = {
+      ...results[index],
+      status: "matched",
+      match: names[best],
+      advantage: Number.isFinite(least) ? round(least, 2) : null,
+      late: true,
+    };
+  }
   return { results, offset: round(size === Infinity ? 0 : size, 2) };
 }
 
@@ -1033,6 +1252,8 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     maxWorst: opts.maxWorst,
     minAdvantage: opts.minAdvantage,
     maxOffset: opts.maxOffset,
+    lateDistance: opts.lateDistance,
+    lateAdvantage: opts.lateAdvantage,
   };
   const height = opts.height ?? plan.height;
   const report = {
@@ -1077,7 +1298,41 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     const targets = candidates.map((index) => stickers.signatures[index]);
     // A box from the plan is where to look; one found from differences is
     // only a start for a wide search.
-    const stickerBox =
+    // What each of `from` is, were the stickers cut from them at `box`.
+    const namedAt = async (from, box) => {
+      const wouldBe = [];
+      for (const source of from) wouldBe.push(await stickerOf(source, box));
+      const own = [];
+      const ownFull = [];
+      for (const sticker of wouldBe) {
+        own.push(await fineSignature(sticker));
+        ownFull.push(await fullSignature(sticker));
+      }
+      const { results, offset } = matchPictures(
+        own,
+        candidates.map((index) => stickers.fine[index]),
+        candidates.map((index) => stickers.names[index]),
+        rule,
+        {
+          pictures: ownFull,
+          stickers: candidates.map((index) => stickers.full[index]),
+        },
+      );
+      // How far the named pictures are from their stickers as they are.
+      const gaps = [];
+      for (const [index, { match }] of results.entries())
+        if (match)
+          gaps.push(
+            meanDistance(
+              await signature(wouldBe[index]),
+              stickers.signatures[stickers.names.indexOf(match)],
+            ),
+          );
+      gaps.sort((a, b) => a - b);
+      const apart = gaps.length ? round(gaps[gaps.length >> 1], 1) : undefined;
+      return { wouldBe, names: results, offset, apart };
+    };
+    let stickerBox =
       face && crop.box
         ? await alignBox(
             sources,
@@ -1085,25 +1340,62 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
             targets,
           )
         : undefined;
-    const wouldBe = [];
-    for (const source of sources)
-      wouldBe.push(await stickerOf(source, stickerBox));
-    const own = [];
-    const ownFull = [];
-    for (const sticker of wouldBe) {
-      own.push(await fineSignature(sticker));
-      ownFull.push(await fullSignature(sticker));
+    let named = await namedAt(sources, stickerBox);
+    const count = ({ names }) => names.filter((name) => name.match).length;
+    const fineTargets = candidates.map((index) => stickers.fine[index]);
+    // Stickers are left over: the box may be a pixel off where they were cut,
+    // which is enough to hide a match. Kept only if it names more.
+    if (stickerBox && count(named) < targets.length) {
+      const settled = await settleBox(sources, stickerBox, fineTargets);
+      const again = await namedAt(sources, settled);
+      if (count(again) > count(named)) {
+        stickerBox = settled;
+        named = again;
+      }
     }
-    const { results: names, offset } = matchPictures(
-      own,
-      candidates.map((index) => stickers.fine[index]),
-      candidates.map((index) => stickers.names[index]),
-      rule,
-      {
-        pictures: ownFull,
-        stickers: candidates.map((index) => stickers.full[index]),
-      },
-    );
+    // No picture is any sticker: the box is nowhere near where they were cut,
+    // so look over the whole picture, and keep that only if it names some. A
+    // transparent margin lets the box reach past the canvas, as one cut from a
+    // wider upload of the same picture does.
+    if (stickerBox && count(named) === 0) {
+      const { width, height } = await sharp(sources[0]).metadata();
+      const margin = Math.round(Math.min(width, height) / 4);
+      const wider = [];
+      for (const source of sources)
+        wider.push(
+          await sharp(source)
+            .ensureAlpha()
+            .extend({
+              top: margin,
+              left: margin,
+              right: margin,
+              background: { r: 0, g: 0, b: 0, alpha: 0 },
+            })
+            .png({ compressionLevel: 1 })
+            .toBuffer(),
+        );
+      const anywhere = await findBox(wider, targets);
+      const box =
+        anywhere &&
+        (await settleBox(
+          wider,
+          await alignBox(wider, anywhere, targets),
+          fineTargets,
+        ));
+      const again = box && (await namedAt(wider, box));
+      if (again && count(again) > 0) {
+        console.log(
+          `${set.id}: found the stickers' box over the whole picture`,
+        );
+        stickerBox = [box[0] - margin, box[1] - margin, box[2]];
+        named = again;
+      }
+    }
+    const { wouldBe, names, offset, apart } = named;
+    if (apart > opts.maxApart)
+      console.warn(
+        `${set.id}: its pictures are ${apart} from the stickers they were named after; check that the series is this outfit's`,
+      );
 
     // One box and scale for the whole set, from pictures of the first's size.
     const first = await sharp(buffers[0]).metadata();
@@ -1131,11 +1423,17 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
     const features =
       crop.features ??
       (face && sources.length > 1 ? await faceFeatures(sources) : undefined);
-    const eyeY = features
+    const middle = stickerBox ? stickerBox[1] + stickerBox[2] / 2 : undefined;
+    const seen = features
       ? features.ys[0] + EYE_AT * (features.ys[1] - features.ys[0])
-      : stickerBox
-        ? stickerBox[1] + stickerBox[2] / 2
-        : undefined;
+      : undefined;
+    // What changes between pictures can be far from the face (a prop, a
+    // hand); eyes found outside the stickers' box aren't eyes.
+    const eyeY =
+      seen !== undefined &&
+      (!stickerBox || Math.abs(seen - middle) <= stickerBox[2] / 2)
+        ? seen
+        : middle;
     const eyeline =
       eyeY === undefined
         ? undefined
@@ -1236,6 +1534,7 @@ export async function stagePortraits(planFile, workspace, dir, options = {}) {
       id: set.id,
       outfit,
       offset,
+      ...(apart === undefined ? {} : { apart }),
       ...(stickerBox
         ? {
             faceBox: inSource(crop.box),

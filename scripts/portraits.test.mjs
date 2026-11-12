@@ -16,6 +16,8 @@ import {
   alignBox,
   cacheKey,
   centreOf,
+  findBox,
+  fineSignature,
   floorOf,
   heightScale,
   matchPictures,
@@ -24,6 +26,7 @@ import {
   outputSize,
   searchBox,
   setScale,
+  settleBox,
   placePortraits,
   politeGet,
   stagePortraits,
@@ -239,6 +242,28 @@ describe("portraits stage", () => {
       outputSize({ width: 1000, height: 10_000 }, 0.8, 4000),
     ).toMatchObject({ size: [400, 4000], capped: true });
   });
+
+  it("names a set whose box is nowhere near the face", async () => {
+    // As when what changes between pictures is a prop, far from the face.
+    const far = path.join(root, "far.json");
+    writeFileSync(
+      far,
+      JSON.stringify({
+        ...read(plan),
+        sets: [{ id: "casual", files: MOODS.map(file), box: [80, 1300, 260] }],
+      }),
+    );
+    const found = await stagePortraits(
+      far,
+      workspace,
+      path.join(root, "staged-far"),
+      options(cache),
+    );
+    const named = (from) => from.sets[0].portraits.map(({ name }) => name);
+    expect(named(found)).toEqual(named(report));
+    expect(named(found).filter(Boolean).length).toBeGreaterThan(2);
+    expect(found.sets[0].centre).toBeCloseTo(report.sets[0].centre, 2);
+  }, 60_000);
 
   it("writes every portrait at the set's size as WebP", async () => {
     const [set] = report.sets;
@@ -633,6 +658,46 @@ describe("searchBox", () => {
   });
 });
 
+describe("settleBox", () => {
+  it("moves a box the last pixels to where the stickers were cut", async () => {
+    const sources = [];
+    for (const mood of ["neutral", "happy", "surprised"])
+      sources.push((await drawCharacter({ expression: mood })).png);
+    const truth = await faceBox(sources);
+    const targets = [];
+    for (const source of sources)
+      targets.push(await fineSignature(await stickerOf(source, truth)));
+    const near = [truth[0] + 2, truth[1] - 1, truth[2] + 1];
+    expect(await settleBox(sources, near, targets)).toEqual(truth);
+  });
+});
+
+describe("findBox", () => {
+  it("finds the stickers' box with nothing to start from", async () => {
+    const sources = [];
+    for (const mood of ["neutral", "happy", "surprised"])
+      sources.push((await drawCharacter({ expression: mood })).png);
+    const face = await faceBox(sources);
+    const truth = [
+      face[0] - Math.round(face[2] * 0.3),
+      face[1] - Math.round(face[2] * 0.1),
+      Math.round(face[2] * 1.5),
+    ];
+    const targets = [];
+    for (const source of sources)
+      targets.push(await signature(await stickerOf(source, truth)));
+    const anywhere = await findBox(sources, targets);
+    const refined = await alignBox(sources, anywhere, targets);
+    for (const [index, value] of refined.entries())
+      expect(Math.abs(value - truth[index])).toBeLessThanOrEqual(2);
+  });
+
+  it("finds nothing without stickers", async () => {
+    const { png } = await drawCharacter({ expression: "neutral" });
+    expect(await findBox([png], [])).toBeUndefined();
+  });
+});
+
 describe("matchPictures", () => {
   const SIDE = 128;
   /** A grey fine signature with squares (`[x, y, size, value]`) drawn on. */
@@ -692,6 +757,30 @@ describe("matchPictures", () => {
       names,
     );
     expect(result).toMatchObject({ status: "unmatched", match: null });
+  });
+
+  it("names a left-over picture a little too far from the one sticker left", () => {
+    // Its eyes are off by more than `maxDistance` allows, as a thin line is
+    // after another resampling.
+    const worn = face(...eyes(12), [60, 90, 12, 0]);
+    const { results } = matchPictures(
+      [stickers[0], stickers[1], worn],
+      stickers,
+      names,
+    );
+    expect(results[2].distance).toBeGreaterThan(DEFAULTS.maxDistance);
+    expect(results[2]).toMatchObject({
+      status: "matched",
+      match: "talking",
+      late: true,
+    });
+    // A sticker a picture already is stays that picture's.
+    const { results: taken } = matchPictures(
+      [stickers[0], stickers[2], worn],
+      stickers,
+      names,
+    );
+    expect(taken[2]).toMatchObject({ status: "unmatched", match: null });
   });
 
   it("calls a picture between two looks ambiguous", () => {
