@@ -346,9 +346,6 @@ peer_id: bob
 name: Bob Moreno
 relation_type: close_friend
 summary: "Music student at Oak Hill Dorm and fellow composer."
-familiarity: 75
-affinity: 62
-trust: 70
 last_interaction_iso: "2026-10-19T19:45:00Z"
 relationships:
   - targetId: entity.character.bob
@@ -410,7 +407,6 @@ Characters own and update their own subjective Personal Wiki:
 2. **Social Evolution & Reflection**: During conversations or during nightly
    sleep reflection, agents update the card:
    - Adjust `summary` and `relation_type` as their dynamic evolves.
-   - Re-calibrate `affinity`, `trust`, and `familiarity`.
    - Update `## Quick Impression` to reflect current sentiment and open
      conversational threads.
    - Append date-stamped summaries to `## Interaction Log`.
