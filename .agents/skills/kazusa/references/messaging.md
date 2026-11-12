@@ -435,17 +435,18 @@ audiences, ledger copies and notifications are unchanged per bubble.
 - **Typing indicator.** Set only while a bubble is being typed or said, in that
   bubble's chat, with `mode: "typing" | "speaking"`; the send, or anything that
   stops it, clears it. A line said aloud carries itself on its speaking event,
-  as it starts: `speech: { text, from, until }` (sim time, `until` = `from` +
-  its `composingMs`), so clients can show it as it is said; a typed message
-  never does, and the stop never does. Nothing else changes: the message still
-  commits when the line has been said, and is heard then; a cut-off still
-  commits `cutOff(text, fraction)`. `composingMs`, `cutOff`, `heardOf` and
-  `sayingOf` live in `@kazusa/client` (`speech.ts`), shared with the client's
-  reveal. A send emits its message before the stop that clears its indicator, so
-  a client can tell a line that landed from one that was dropped. Reading a
-  message or thinking about a reply sets nothing: read receipts and the brain's
-  status show those. A character's indicator has no expiry; a player's lapses
-  after 8 s unless the composer renews it.
+  as it starts: `speech: { text, face?, from, until }` (sim time, `until` =
+  `from` + its `composingMs`; `face` as under Faces), so clients can show it as
+  it is said; a typed message never does, and the stop never does. Nothing else
+  changes: the message still commits when the line has been said, at `until`
+  (the time taken to send the event counts toward the wait), and is heard then;
+  a cut-off still commits `cutOff(text, fraction)`. `composingMs`, `cutOff`,
+  `heardOf` and `sayingOf` live in `@kazusa/client` (`speech.ts`), shared with
+  the client's reveal. A send emits its message before the stop that clears its
+  indicator, so a client can tell a line that landed from one that was dropped.
+  Reading a message or thinking about a reply sets nothing: read receipts and
+  the brain's status show those. A character's indicator has no expiry; a
+  player's lapses after 8 s unless the composer renews it.
 - **Face to face** (a huddle), every spoken line also waits for the huddle's
   floor; actions never do. A steer that stops a line mid-way commits what was
   heard of it, ending in "—"; a text stopped while being typed is never sent.
@@ -551,7 +552,9 @@ places a labelled set into a workspace:
   and `stickers.json`.
 - `scripts/portraits.mjs` imports the same pictures whole into `portraits/`,
   keeping originals in `.cache/art/`. It names each one by matching the sticker
-  `stage` would cut from it against the existing stickers.
+  `stage` would cut from it against the existing stickers, and `place` writes
+  `portraits.json` (see
+  [visual novel](../../kazusa-client/references/visual-novel.md) §8).
 
 ## Faces
 
@@ -566,6 +569,9 @@ decision ([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
   the same from turn to turn, so the schema stays in the cached prefix. A mood
   they don't have is dropped (`.catch`) and the line is still said. In a text
   chat the face is dropped, as an action is.
+- **Wording.** `kazusa-tools#send_message.messages.face` describes the field,
+  and `in-person` ("Your face is seen") asks for a face on the first line in a
+  conversation and on each line where it changes, none while it stays the same.
 - **Frozen at send** (`sayFaces`): the bubble becomes `face: { name, seen? }`.
   `name` is the picture, `<mood>` in the usual clothes until outfits exist.
   `seen` is what everyone reads of it, `kazusa-deliveries#face` filled with the

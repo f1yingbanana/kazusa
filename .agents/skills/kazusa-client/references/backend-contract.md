@@ -146,15 +146,18 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
   (`immutable`, `nosniff`).
 - `CharacterSummary.portraitUrl`: the portrait the figure rests in (in the usual
   clothes: `neutral`, else `calm`, `content` or `happy`, else the first), found
-  with a `stat` or two per character, never a listing. Absent when no picture is
-  in the usual clothes: that character isn't drawn.
+  with up to three `stat`s per character (the folder, `stickers/stickers.json`
+  for its outfits, the picture), never a listing unless one of the first two
+  changed. Absent when no picture is in the usual clothes: that character isn't
+  drawn.
 - `GET /kazusa/places` adds `Place.backdrop` (the place's own set, else the
   nearest area's), `backdrops` (every set in the library with a picture:
   `{ files: { name, url, state?, time }[], states? }`) and `times` (the world's
   times of day from `scene.times`, sorted). The client picks the picture for the
   sim time; the server pushes nothing as time passes. SSE `places` also fires
-  when the library changes. A `backdrop` naming no set is a `wiki_lint` problem
-  and the place uses its area's.
+  when the library changes, or first appears while the Gateway runs. A
+  `backdrop` naming no set is a `wiki_lint` problem and the place uses its
+  area's.
 
 ### Built: profile
 
@@ -431,7 +434,7 @@ projection provides them, or implement a second client storage layer for them.
 | `location`                   | Built: `GET /kazusa/locations` (closed-form `LocationRecord`s, homes included); SSE `location` (`{ characterId, record }`, one per record write); `location.noticed` journal events (observer's `:tasks` ledger, plus SSE `journal`); trips in `task.started` payloads (`where`, `from`, `arriveAt`, `usualMinutes`); in-person conversations are chats of type `huddle` (`chat:huddle:<id>`), many per place; `POST /kazusa/move` (`MovePayload` → `MoveResponse`) moves the player straight to a place; `SendPayload.aloud` speaks face to face | Client wiring (in-person thread style) SSE `places` means the map changed on disk: refetch `GET /kazusa/places`. |
 | `desires`                    | Built: `/kazusa/desires`, SSE `desires`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | —                                                                                                                |
 | `models`                     | Built: `GET /kazusa/models`, `POST /kazusa/model`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                |
-| `scene`                      | Built: art read model only (`/kazusa/portraits`, `/kazusa/portrait`, `/kazusa/backdrop`, place backdrops and times on `/kazusa/places`); always live                                                                                                                                                                                                                                                                                                                                                                                              | Client state and renderer                                                                                        |
+| `scene`                      | Built: art read model only (`/kazusa/portraits`, `/kazusa/portrait`, `/kazusa/backdrop`, place backdrops and times on `/kazusa/places`); always live. A line's `face` and the line being said (`speech` on the speaking event) are `chats`/`observe` fields (`kazusa/references/client.md`)                                                                                                                                                                                                                                                       | Client state and renderer                                                                                        |
 | `relationships`, `attention` | Schema only / drafted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | See the roadmap                                                                                                  |
 
 Until a domain is live, its panels show an honest unavailable state (D10).

@@ -1276,20 +1276,30 @@ connect these modules in process.
   the figure rests in, is in the usual clothes: `neutral`, else `calm`,
   `content` or `happy`, else the first; none (not drawn) when every picture is
   of an outfit. `GET /kazusa/portraits?id=`, `GET /kazusa/portrait` (served like
-  stickers), `CharacterSummary.portraitUrl` (a `stat` or two per character; the
-  folder is listed again only when its mtime changes).
+  stickers), `CharacterSummary.portraitUrl` (one `stat` for a character without
+  portraits, up to three with them: the folder, `stickers/stickers.json` and the
+  picture; the folder is listed again only when its mtime or that file's
+  changes).
 - **Backdrops** (`backdrops.ts`): a shared library, `shared/backdrops/<set>/`
   beside the World Wiki, pictures named `[<state>-]<time>` (a state only when
   the set's `backdrops.json` declares it). Location reads the library with the
   map (`World.backdrops`): a place's `backdrop` must name a set with a picture,
   `backdropOf` resolves it up the `parent` chain, the library's changes reload
-  the map and send SSE `places`. `GET /kazusa/places` carries `backdrops` and
+  the map and send SSE `places` (a library made while the Gateway runs is
+  watched from when it appears). `GET /kazusa/places` carries `backdrops` and
   `times`; `GET /kazusa/backdrop` serves one picture.
+- A line's **face** is Messaging's (`messaging/faces.ts`): `send_message` offers
+  the moods of the usual-clothes portraits
+  ([messaging](references/messaging.md), Faces).
 - `scene.times` (`config.ts`): the world's times of day,
   `{ name, from: "HH:MM" }` in sim time (UTC), sorted, unique; default day
   06:00, dusk 17:00, night 19:00.
 - Names everywhere follow `PICTURE_NAME` (`src/pictures.ts`, shared with
   stickers): lowercase words joined by `-`. Raster only; capability `scene`.
+- Importers: `scripts/portraits.mjs` (`stage`, `place`) and
+  `scripts/backdrops.mjs` (`list`, `stage`, `place`, `assign`, `check`). Design,
+  art layout and the import:
+  [visual novel](../kazusa-client/references/visual-novel.md) §6 and §8.
 
 ## 4. Engineering & Zero-Build Conventions
 
@@ -1507,7 +1517,7 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/context_engine.md` — Read when modifying context assembly, session
   naming, memory layers, budgets, or future chat producers.
 - `references/messaging.md` — Read when implementing `send_message`, sender
-  attribution, direct/group ledger writes, or stickers.
+  attribution, direct/group ledger writes, stickers, or faces.
 - `references/client.md` — Read when reviewing or building `apps/web`, human
   chat APIs, authentication, live updates, or end-to-end messaging tests. The
   client's overall architecture (shell, views, registries, read-model routes,

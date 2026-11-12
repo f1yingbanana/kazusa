@@ -333,6 +333,10 @@ Scene state is shared client state, so it follows the client's Zustand rules
   persisted preferences store in `lib/state/`. `chats.as` stays in the URL.
 - Art manifests are resources, so they are SWR, not Zustand.
 
+The sketch below is the first plan, kept for its shape; the built types
+(`SceneLine` with `whole`, `shownAt` and `face`; `SceneState` with one `line`,
+`echoes`, `reading`, `wanted`, `moods` and more) are in `lib/scene/state.ts`.
+
 ```ts
 /** A look by its set-name parts. No outfit means usual clothes. */
 interface Look {
@@ -406,8 +410,9 @@ time of day (renderers read `useSimNow`).
   empty, or its line belongs to the player or to someone who is not drawn,
   nobody is dimmed. Nobody changes size or position for speaking.
 - **One scale.** Every portrait is drawn at its natural pixel size times one
-  factor for the whole scene, standing on one floor line. Nothing is fitted to a
-  box (§8.1).
+  factor for the whole scene, times its own `placement.scale` (next point),
+  standing on one floor line. Nothing is fitted to a box (§8.1). Built
+  differently from the first plan, which had no per-picture scale.
 - **Centred and stood on the figure, not the picture.** The point put on a
   column's centre is the figure's own (`placement.centre`, the middle of the
   face), and the row put on the floor line is where it stands
@@ -415,7 +420,8 @@ time of day (renderers read `useSimNow`).
   below the shoes moves neither. Each outfit's `scale` draws the character as
   tall as they are (§8.1).
 - **Face.** A figure keeps the mood of its last line that carried a `face`
-  (§6.3). It returns to neutral when the person leaves the huddle.
+  (§6.3). It returns to the set's resting `default` (§8.1) when the person
+  leaves the huddle.
 - **Lines.** The panel holds one line. The line it replaces becomes an echo; at
   most two echoes show. When two people speak at once, the line that started
   most recently takes the panel and the other lands in the echoes.
@@ -445,12 +451,21 @@ model → rig → portrait. With none of them the person is not drawn.
 ### 5.5 Where it lives in the client
 
 - `components/views/chats/scene/`: `scene-view.tsx`, `dom-renderer.tsx`,
-  `dialogue-box.tsx`, `figure.tsx`, `reading-controls.tsx`.
-- `lib/scene/`: `state.ts`, `director.ts`, `pick.ts`, `layout.ts`, tests beside
-  each (tables of events in, states out).
+  `backdrop.tsx`, `figure.tsx`, `dialogue-box.tsx`, `said-text.ts`,
+  `echoes.tsx`, `backlog.tsx`, `scene-switch.tsx`, `use-chat-rendering.ts`,
+  `use-reading-mode.ts`, `use-scene-fullscreen.ts` and
+  `fullscreen-controls.tsx`. The reading-mode toggle sits in `chat-header.tsx`
+  and the full-screen cluster; there is no `reading-controls.tsx`.
+- `lib/scene/`: `state.ts`, `director.ts`, `pick.ts`, `layout.ts`, `reveal.ts`,
+  `reading.ts`, `rendering.ts`, `fullscreen.ts`, tests beside each (tables of
+  events in, states out).
 - `lib/live/scene-state.ts`: the store and its actions.
-- `chats/search-params.ts`: `chats.as` (`scene` | `list`), default `scene` for a
-  huddle when the `scene` domain is live, `history: "replace"`.
+- `chats/search-params.ts`: `chats.as` (`scene` | `list`), `history: "replace"`.
+  A sent huddle follows the link, else the viewer's remembered choice
+  (`huddleRendering`, default `scene`), with or without art (`chatRendering` in
+  `lib/scene/rendering.ts`); text chats and draft huddles are always the list.
+  Built differently from the first plan, which also required the `scene` domain
+  to be live.
 - `chat-view.tsx` and `observed-chat-view.tsx` pick `MessageList` or `SceneView`
   for `chat.type === "huddle"`. No shell change and no new registry entry: this
   is inside an existing stage view.
@@ -486,9 +501,10 @@ proxy allowlist and access policy (`observe`, like stickers).
   (`location/map.ts`). The read model resolves it up the `parent` chain, so a
   room without one uses its building's and 720 places need a few dozen sets.
   `Place.backdrop?: string`.
-- `PlacesResponse.backdrops`: `Record<set, { files: Record<name, url> }>`, and
-  the world's `times` (§8.2). The client picks the file; the server pushes
-  nothing as time passes.
+- `PlacesResponse.backdrops`:
+  `Record<set, { files: { name, url, state?, time }[], states? }>` (`states`:
+  each declared state word and what it means), and the world's `times` (§8.2).
+  The client picks the file; the server pushes nothing as time passes.
 - `GET /kazusa/backdrop?set=&name=&v=`: one picture from the world's
   `shared/backdrops/<set>/`.
 - A `backdrop` that names no set is a `problems` entry for `wiki_lint`, never a
@@ -564,8 +580,10 @@ Built (2026-11-12) as described below, with these differences:
   one in that chat, or the one before it in the same call, gets it. The previous
   face is kept in memory (`Messaging.shownFace`) and forgotten when they leave;
   after a restart the first face a speaker shows is read again.
-- In usual clothes the picture's name is the mood. A mood only an outfit has
-  shows the neutral picture (`pickPortrait`), and listeners still read the mood.
+- In usual clothes the picture's name is the mood. A mood the usual clothes have
+  no picture for shows the set's resting `default` (`pickPortrait`), and
+  listeners still read the mood. A mood only an outfit has can't be sent: the
+  field offers usual-clothes moods only.
 - The director keeps each member's face in `SceneState.moods`: from the speaking
   event as a line starts, else from the message as it lands (an action, an older
   Gateway), seeded from history and from a line already being said when the
@@ -573,8 +591,8 @@ Built (2026-11-12) as described below, with these differences:
   reading mode a line's face, and its speaker's turn (who is drawn when not
   everyone fits), wait with the line: they change when the reader advances onto
   it (`show` in the director), so the picture never runs ahead of the text.
-  Someone who left while their line waited stays gone: the reader gets the
-  line, not its speaker back.
+  Someone who left while their line waited stays gone: the reader gets the line,
+  not its speaker back.
 
 The character chooses the face, in the `send_message` call they are already
 making, and everyone present sees it.
@@ -601,15 +619,20 @@ the other, and `face` follows the rule already there:
 { "text": "I said no.", "face": "annoyed" }
 ```
 
-- The value is a mood from the character's own set: the distinct moods across
-  all their looks (the part of each sticker name after the outfit). About 20
-  words for the largest imported sets, against about 80 full names.
+- The value is a mood from the character's own set: the distinct moods of their
+  portraits in usual clothes (`faceMoods`), the only clothes worn until §6.4.
+  About 20 words for the largest imported sets, against about 80 full names.
+  Built differently from the first plan (every look's mood, from the stickers):
+  a mood with no usual-clothes picture would change nothing on screen.
 - The list does not depend on what they are wearing or how they feel, so the
   tool definition never changes with state and stays in the cached prefix.
-- A character with no looks has no `face` field at all, as with stickers.
-- It applies from that bubble on. Most lines carry none. The wording
-  (`kazusa-tools#send_message.messages.face`) follows the sticker's: set it when
-  your face changes, not on every line. `in-person` gains two sentences.
+- A character with no portraits in usual clothes (no `default`, so not drawn)
+  has no `face` field at all, as with stickers.
+- It applies from that bubble on. The wording
+  (`kazusa-tools#send_message.messages.face`) asks for a face on the first line
+  in a conversation and on each line where it changes, none while it stays the
+  same; `in-person` has a bullet, "Your face is seen", with an example. Built
+  differently from the first wording, which said most lines need none.
 - An unknown mood is dropped silently and the line is said. It never fails the
   call: a refused `send_message` costs a whole retry.
 - Face to face only. In a text chat it is dropped, as actions are; a phone has
@@ -618,9 +641,10 @@ the other, and `face` follows the rule already there:
 
 **Resolving it.** With the outfit the character has on (§6.4; usual clothes
 until that exists), the look is `<outfit>-<mood>`. If that outfit has no such
-mood, the figure keeps the outfit and shows its neutral face; listeners still
-read the mood. The resolved name is frozen on the delivery (`face: { name }`, as
-`sticker` is), so an old line shows the outfit of its moment.
+mood, the figure keeps the outfit and shows its neutral face (else its first);
+in usual clothes, the set's resting `default`. Listeners still read the mood.
+The resolved name is frozen on the delivery (`face: { name }`, as `sticker` is),
+so an old line shows the outfit of its moment.
 
 **What everyone reads.** People see faces, so listeners do too:
 
@@ -686,8 +710,8 @@ everyone.
   panel shortens to what was said.
 - An advance while the panel's line is still being typed out shows that line
   whole; the next advance moves on. A line being said that the reader gets to
-  while others still wait shows whole at once: the world stays paused for
-  them, so it could not be typed out.
+  while others still wait shows whole at once: the world stays paused for them,
+  so it could not be typed out.
 - When the reader has asked and nothing waits, the panel says who is thinking or
   speaking, in words, and only what is known: someone whose line is already on
   screen is not "speaking" (its saying runs on after the reader has it), and
@@ -695,14 +719,19 @@ everyone.
   that a line is coming.
 - Turned on with the clock at 0, it starts the world at 1×, since it needs the
   world running to get a line. Turned off, it restores exactly the speed it
-  found, 0 included. A speed it could not set is tried again two seconds
-  later, and turned off meanwhile it still restores the speed found.
+  found, 0 included. A speed it could not set is tried again two seconds later,
+  and turned off meanwhile it still restores the speed found.
 - It turns itself off, showing everything that waited, when the rendering
   switches to the transcript, the chat is left, the huddle ends, or the speed is
   changed elsewhere (then nothing is set back). Back from the browser's
   back-forward cache it is off: leaving the page already restored the speed.
 - Replying shows what waited first, then sends. Nobody clicks through their own
-  line: once it shows, what comes next shows as it arrives, as if asked for.
+  line: once it shows, the next line shows as it arrives, as if asked for. A
+  reply sent in an earlier reading session doesn't hold this one. A reply that
+  fails in the scene gets a "Show" action on its toast, opening the backlog,
+  where it can be retried.
+- A line that arrives by a history read (the chat's messages fetched again)
+  answers a click made before it came, as a live one does.
 - View state: never saved, never in the URL. Opening a chat cannot pause the
   world.
 
@@ -736,9 +765,10 @@ workspaces/<id>/
   (0.8) relative to a 1,920-high source canvas, so a sprite drawn on a taller or
   shorter canvas comes out the same size as the rest, and it never trims the
   canvas bottom, which is the floor every figure stands on. The renderer draws
-  each picture at its natural size times one scene-wide factor. Sizing figures
-  by eye position was tried and dropped: it enlarged short characters and gave
-  one character's outfits different head sizes.
+  each picture at its natural size times one scene-wide factor and the picture's
+  own `scale` (below). Sizing figures by eye position was tried and dropped: it
+  enlarged short characters and gave one character's outfits different head
+  sizes.
 - **Placement is per outfit**, in `portraits.json`:
   `"placement": { "": { "centre": 0.52, "eyes": 0.17, "scale": 0.93 }, "gym": { "centre": 0.48, "floor": 0.95, "eyes": 0.15, "scale": 0.98, "offset": [0, -20] } }`.
   Keys are an outfit's word (`""` for pictures without one) or one picture's

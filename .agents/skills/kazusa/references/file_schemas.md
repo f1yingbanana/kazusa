@@ -189,8 +189,9 @@ the simulation.
 
 - **Location**: `shared/wiki/entities/places/<place_id>.md`
 - **Purpose**: Shared, objective physical setting facts and the map's topology.
-  Read once by `src/location/` at registration (a canon edit needs a Gateway
-  restart) and validated as one connected graph.
+  Read by `src/location/`, which a file watcher keeps current (no restart); a
+  broken page or edge is left out and listed by `wiki_lint`
+  ([location](location.md) §4.1).
 - **Topology**: `parent` makes a tree of areas; every place, area or not, is
   somewhere to stand (an area means its open space). Each child links to its
   parent by walking `entry_minutes`. `connections` add two-way edges between any
@@ -209,6 +210,7 @@ summary:
   "Sunlit room that smells of vanilla; long table, oven, a fridge of milk
   cartons."
 entry_minutes: 1
+backdrop: club-room
 connections:
   - to: trinity_dorm
     ways:

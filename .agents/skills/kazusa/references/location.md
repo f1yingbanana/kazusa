@@ -112,7 +112,8 @@ deferred (§5).
   `in-person` skill, added last only when the character is in a huddle or has
   noticed someone here, explains huddles, offers speaking aloud and texting as
   equal choices (a convention hall is a fine place to text "where are you?"),
-  and gestures in asterisks that change nothing by themselves.
+  gestures in asterisks that change nothing by themselves, and the `face` a line
+  can carry ([messaging](messaging.md), Faces).
 
 ## 4. Mechanics
 
@@ -125,18 +126,20 @@ declared once, `ways` with the usual one first; `walk` reads as on foot),
 optional `backdrop` (the Scene view's picture set in `shared/backdrops/`,
 inherited by the places inside; one naming no set is reported and ignored). The
 body is the full description: whose a place is, how it is kept, how busy it
-gets. Character cards carry `home`. A file watcher keeps them current, so a new
-place needs no reload. Nothing broken stops the map loading: an unparseable
-page, a bad or duplicate connection or a duplicate id is left out, an unknown
-parent or a cycle puts the place at top level, an unknown home is dropped, and a
-map in separate parts loads with no route between them; `wiki_lint` lists each.
-After any change, whoever stood or was travelling somewhere now gone is put at
-the nearest area above it, and a renamed place carries its people, trips and
-huddles. Renaming and removing a place through the wiki
-(`POST /kazusa/wiki/rename`, `/wiki/delete`) or ARONA's `map_rename_place` and
-`map_remove_place` also rewrite every page and card naming it. A world without
-places disables Location. The local working set has 22 places (school, dorm with
-a room per character, Church Street, SCHALE); the wiki lives in `worlds/<id>/`.
+gets. Character cards carry `home`. A file watcher keeps them and the backdrop
+library current (a library made after start from when it appears), so a new
+place or set needs no reload. Nothing broken stops the map loading: an
+unparseable page, a bad or duplicate connection or a duplicate id is left out,
+an unknown parent or a cycle puts the place at top level, an unknown home is
+dropped, and a map in separate parts loads with no route between them;
+`wiki_lint` lists each. After any change, whoever stood or was travelling
+somewhere now gone is put at the nearest area above it, and a renamed place
+carries its people, trips and huddles. Renaming and removing a place through the
+wiki (`POST /kazusa/wiki/rename`, `/wiki/delete`) or ARONA's `map_rename_place`
+and `map_remove_place` also rewrite every page and card naming it. A world
+without places disables Location. The local working set has 22 places (school,
+dorm with a room per character, Church Street, SCHALE); the wiki lives in
+`worlds/<id>/`.
 
 ### 4.2 Position and travel
 
