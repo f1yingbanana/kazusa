@@ -10,7 +10,12 @@ import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import type { DecisionContextAssembler } from "../context-engine/decision-context.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
-import { Perception, type PerceptionDeps } from "./perception.ts";
+import {
+  noBrainOutage,
+  Perception,
+  type BrainOutage,
+  type PerceptionDeps,
+} from "./perception.ts";
 import {
   PERCEPTION_CONFIG,
   type AttentionDecision,
@@ -39,6 +44,13 @@ const SLOTS = Symbol.for("kazusa.brain.slots.v2");
 function sharedBrainSlots(): BrainSlots {
   const scope = globalThis as { [SLOTS]?: BrainSlots };
   return (scope[SLOTS] ??= new BrainSlots());
+}
+
+// One count of failing brain runs, whichever registration hears of them.
+const OUTAGE = Symbol.for("kazusa.perception.outage");
+function sharedBrainOutage(): BrainOutage {
+  const scope = globalThis as { [OUTAGE]?: BrainOutage };
+  return (scope[OUTAGE] ??= noBrainOutage());
 }
 
 function sharedPerceptionQueue(): KeyedAsyncQueue {
@@ -113,6 +125,7 @@ export function registerPerception(
     onDecision,
     serial: sharedPerceptionQueue(),
     slots: sharedBrainSlots(),
+    outage: sharedBrainOutage(),
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
     ...(deps.realtime ? { realtime: deps.realtime } : {}),

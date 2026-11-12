@@ -187,6 +187,36 @@ function steerCustody(): Map<string, AbortController> {
   return (scope[CUSTODY] ??= new Map<string, AbortController>());
 }
 
+/**
+ * Brain runs that failed one after another, whoever they were; a run that gets
+ * through clears it. Once `OUTAGE_AFTER` have, the cause is most likely the
+ * provider or the network, and one more character waking is one more run
+ * failing, which OpenClaw retries for about 100 s. Live, an outage of 3 h
+ * failed 436 runs for 33 characters. So idle check-ins stop, and the character
+ * who failed last tries again alone, less and less often. Deadlines and
+ * messages are still handed over, so each character can fail once more.
+ */
+export interface BrainOutage {
+  /** Failed runs in a row. */
+  failures: number;
+  /** The last failed run, which every registration may report. */
+  runId?: string;
+  /** Who tries again while the others wait: whoever failed last. */
+  probe?: string;
+  /** Real time before which nobody is checked in on. */
+  nextProbeAt: number;
+  /** The wait before the try after next; it doubles up to a limit. */
+  waitMs: number;
+}
+
+export function noBrainOutage(): BrainOutage {
+  return { failures: 0, nextProbeAt: 0, waitMs: 0 };
+}
+
+const OUTAGE_AFTER = 3;
+const OUTAGE_FIRST_WAIT_MS = 60_000;
+const OUTAGE_MAX_WAIT_MS = 15 * 60_000;
+
 /** At is real time: this reports on the host, not the world. */
 export interface BrainFailure {
   readonly error: string;
@@ -288,6 +318,8 @@ export interface PerceptionDeps {
   ) => Promise<void>;
   /** Shared by every registration in the process; absent: this one's own. */
   readonly slots?: BrainSlots;
+  /** Shared by every registration in the process; absent: this one's own. */
+  readonly outage?: BrainOutage;
   readonly evaluateDecision?: DecisionRuntimeV1["evaluate"];
   readonly assembleDecisionContext?: DecisionContextAssembler;
   /**
@@ -392,6 +424,7 @@ function formatDeliveryMessage(
 export class Perception {
   private readonly serial: KeyedAsyncQueue;
   private readonly slots: BrainSlots;
+  private readonly outage: BrainOutage;
   private readonly api?: OpenClawPluginApi;
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
@@ -417,6 +450,7 @@ export class Perception {
     this.api = deps.api;
     this.serial = deps.serial ?? new KeyedAsyncQueue();
     this.slots = deps.slots ?? new BrainSlots();
+    this.outage = deps.outage ?? noBrainOutage();
     this.text =
       deps.text ?? (this.api ? pluginSkillText(this.api) : bundledSkillText());
 
@@ -605,6 +639,30 @@ export class Perception {
   }
 
   async idleWake(agentId: string): Promise<void> {
+    const outage = this.outage;
+    if (outage.failures < OUTAGE_AFTER) {
+      await this.checkIn(agentId);
+      return;
+    }
+    // Runs keep failing: nobody new is woken into that, and one tries again.
+    const now = Date.now();
+    if (now < outage.nextProbeAt) return;
+    outage.nextProbeAt = now + outage.waitMs;
+    outage.waitMs = Math.min(outage.waitMs * 2, OUTAGE_MAX_WAIT_MS);
+    // Whoever failed last may be offstage by now, or back at an activity.
+    const { probe } = outage;
+    if (
+      probe &&
+      probe !== agentId &&
+      ((await this.deps.onstage?.(probe)) ?? true) &&
+      (await this.checkIn(probe))
+    )
+      return;
+    await this.checkIn(agentId);
+  }
+
+  /** An idle check-in, unless the activity is still running: whether sent. */
+  private async checkIn(agentId: string): Promise<boolean> {
     const task = await this.taskStore.lookup(agentId);
     const simNow = this.deps.clock.time();
     if (
@@ -612,7 +670,7 @@ export class Perception {
       Number.isFinite(Date.parse(task.endAt)) &&
       Date.parse(task.endAt) > simNow
     ) {
-      return;
+      return false;
     }
     // One check-in waits at a time: asking again only retries the one there,
     // which picks the queue back up after a failed run.
@@ -630,6 +688,7 @@ export class Perception {
       timestamp: waiting?.timestamp ?? simNow,
     };
     await this.receive(agentId, stimulus);
+    return true;
   }
 
   /**
@@ -693,6 +752,7 @@ export class Perception {
 
   /** Records why a run failed, or with nothing, that one got through. */
   async noteRunOutcome(agentId: string, failure?: BrainFailure): Promise<void> {
+    this.noteOutage(agentId, failure);
     let queued = 0;
     let brain: "idle" | "thinking" = "idle";
     let changed = false;
@@ -709,6 +769,30 @@ export class Perception {
       false,
     );
     if (changed) this.notifyBrainState(agentId, brain, queued);
+  }
+
+  private noteOutage(agentId: string, failure?: BrainFailure): void {
+    const outage = this.outage;
+    if (!failure) {
+      if (outage.failures >= OUTAGE_AFTER)
+        this.api?.logger.info(
+          `Perception: a brain run got through after ${outage.failures} failed in a row; idle check-ins resume.`,
+        );
+      delete outage.runId;
+      delete outage.probe;
+      Object.assign(outage, noBrainOutage());
+      return;
+    }
+    if (outage.runId === failure.runId) return;
+    outage.runId = failure.runId;
+    outage.failures += 1;
+    outage.probe = agentId;
+    if (outage.failures !== OUTAGE_AFTER) return;
+    outage.nextProbeAt = Date.now() + OUTAGE_FIRST_WAIT_MS;
+    outage.waitMs = OUTAGE_FIRST_WAIT_MS * 2;
+    this.api?.logger.warn(
+      `Perception: ${OUTAGE_AFTER} brain runs failed in a row (${failure.error}); idle check-ins wait, and one character at a time tries again until a run gets through.`,
+    );
   }
 
   async started(agentId: string, runId: string): Promise<void> {

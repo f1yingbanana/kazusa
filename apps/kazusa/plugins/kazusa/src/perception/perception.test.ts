@@ -3287,3 +3287,77 @@ describe("Conversation coverage review", () => {
     }
   });
 });
+
+describe("Brain runs that keep failing", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const failed = (
+    h: ReturnType<typeof setup>,
+    agentId: string,
+    runId: string,
+  ): Promise<void> =>
+    h.router.noteRunOutcome(agentId, {
+      error: "Connection error.",
+      at: Date.now(),
+      runId,
+    });
+  const checkedInOn = (h: ReturnType<typeof setup>): string[] =>
+    h.deliveries.map((delivery) => delivery.agentId);
+
+  it("stops checking in on everyone, and lets the one who failed last try again", async () => {
+    // Live: with the network down for 3 h, two characters a minute were woken
+    // into runs that could only fail, 436 of them (2026-11-12).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await h.router.idleWake("dave");
+    expect(checkedInOn(h)).toEqual(["dave"]);
+    await failed(h, "carol", "run-3");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["dave"]);
+    // A minute on, one try, by whoever failed last and not by someone new.
+    vi.advanceTimersByTime(60_000);
+    await h.router.idleWake("erin");
+    await h.router.idleWake("frank");
+    expect(checkedInOn(h)).toEqual(["dave", "carol"]);
+    // The next try waits twice as long.
+    vi.advanceTimersByTime(119_000);
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["dave", "carol"]);
+  });
+
+  it("checks in on everyone again once a run gets through", async () => {
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await failed(h, "carol", "run-3");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual([]);
+    await h.router.noteRunOutcome("bob");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["erin"]);
+  });
+
+  it("counts a failed run once, however many registrations report it", async () => {
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "alice", "run-1");
+    await failed(h, "alice", "run-1");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["erin"]);
+  });
+
+  it("tries with whoever is offered when the one who failed last is offstage", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const h = setup({ onstage: async (id) => id !== "carol" });
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await failed(h, "carol", "run-3");
+    vi.advanceTimersByTime(60_000);
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["erin"]);
+  });
+});
