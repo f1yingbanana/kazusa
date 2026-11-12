@@ -1,14 +1,41 @@
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import { registerCharactersHttp } from "./http.ts";
+import { loadCharacterData, registerCharactersHttp } from "./http.ts";
 import { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   CharactersResponseSchema,
   CharacterDetailResponseSchema,
 } from "@kazusa/client";
+
+describe("loadCharacterData", () => {
+  it("gives the default portrait's URL beside the avatar, when there is one", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "kazusa-character-"));
+    const api = {
+      config: {},
+      runtime: {
+        agent: {
+          resolveAgentIdentity: vi.fn(() => undefined),
+          resolveAgentWorkspaceDir: vi.fn(() => workspace),
+        },
+      },
+    } as unknown as OpenClawPluginApi;
+    expect(await loadCharacterData(api, "aris")).not.toHaveProperty(
+      "portraitUrl",
+    );
+    await mkdir(path.join(workspace, "portraits"));
+    for (const file of ["angry.webp", "neutral.webp"])
+      await writeFile(path.join(workspace, "portraits", file), file);
+    expect((await loadCharacterData(api, "aris")).portraitUrl).toMatch(
+      /^\/kazusa\/portrait\?id=aris&name=neutral&v=\w+$/,
+    );
+  });
+});
 
 describe("registerCharactersHttp", () => {
   it("registers GET /kazusa/characters and GET /kazusa/character routes", async () => {

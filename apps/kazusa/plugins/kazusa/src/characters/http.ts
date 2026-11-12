@@ -23,6 +23,7 @@ import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { TaskmanService } from "../taskman/register.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { localAvatarUrl, registerAvatarHttp } from "./avatar.ts";
+import { defaultPortraitUrl } from "../scene/portraits.ts";
 import type { Stage } from "../stage/stage.ts";
 import {
   createRouteRegistrar,
@@ -65,6 +66,7 @@ export async function loadCharacterData(
 ): Promise<{
   name: string;
   avatarUrl?: string;
+  portraitUrl?: string;
   occupation?: string;
   affiliation?: string;
   aliases: string[];
@@ -123,6 +125,12 @@ export async function loadCharacterData(
   // 3. An avatar image in the workspace beats the World Wiki card's URL
   if (!avatarUrl) avatarUrl = await localAvatarUrl(api, agentId, config);
 
+  // 3b. The default portrait: a stat or two, never a listing per request
+  const portraitUrl = defaultPortraitUrl(
+    agentId,
+    api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
+  );
+
   // 4. Fallback / augment with World Wiki card if present
   try {
     const cwd = process.cwd();
@@ -153,6 +161,7 @@ export async function loadCharacterData(
   return {
     name,
     avatarUrl,
+    ...(portraitUrl === undefined ? {} : { portraitUrl }),
     occupation,
     affiliation,
     aliases: [...aliasSet],
@@ -271,6 +280,7 @@ export function registerCharactersHttp(
           kind: "agent",
           isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
           avatarUrl: data.avatarUrl,
+          portraitUrl: data.portraitUrl,
           occupation: data.occupation,
           affiliation: data.affiliation,
           aliases: data.aliases,
@@ -351,6 +361,7 @@ export function registerCharactersHttp(
       kind: "agent",
       isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
       avatarUrl: data.avatarUrl,
+      portraitUrl: data.portraitUrl,
       occupation: data.occupation,
       affiliation: data.affiliation,
       aliases: data.aliases,

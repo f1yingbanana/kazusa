@@ -230,11 +230,13 @@ apps/kazusa/
 │       ├── decisions/                  # `kazusa/jev`: Jev through OpenRouter or TypeSafe, as picked
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       ├── stickers/                   # Per-character sticker sets, GET /kazusa/sticker
+│       ├── scene/                      # Scene art: portraits, backdrop sets, scene.times, GET /kazusa/portraits|portrait|backdrop
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
 ├── worlds/                             # Read-only templates: base.json, <id>/{package.json,shared,workspaces}
 └── world/                              # Git-ignored live world copied by the setup guide; the Gateway's cwd
     ├── openclaw.json                   # Written last by the guide; its existence means setup is done
+    ├── shared/backdrops/<set>/         # <[state-]time>.webp + backdrops.json, named by places' `backdrop`
     ├── shared/wiki/                    # WORLD WIKI (objective truth)
     │   ├── INDEX.md                    # Front page for humans and the system agent; not a page
     │   ├── entities/{places,characters}/<id>.md
@@ -244,6 +246,7 @@ apps/kazusa/
     │   ├── SOUL.md | IDENTITY.md | MEMORY.md
     │   ├── memory/YYYY-MM-DD.md
     │   ├── stickers/                   # <[outfit-]mood>.webp + stickers.json (references/messaging.md)
+    │   ├── portraits/                  # Whole figures under the stickers' names + portraits.json
     │   └── wiki/                       # PERSONAL WIKI (subjective beliefs)
     │       ├── entities/{characters,places}/<id>.md
     │       ├── concepts/<id>.md | syntheses/ | reports/
@@ -928,22 +931,22 @@ connect these modules in process.
   model was unavailable or gave an unusable answer), model `choice`,
   `latencyScore` and delay. Only the decisions the player would want to see are
   kept (`PerceptionDecisionRecord`): texts left unread (`IGNORE`) or set aside
-  until an activity ends (`DEFER`; with no activity running they are taken in
-  at the next turn, and not kept), the player's words unheard in person, and a
+  until an activity ends (`DEFER`; with no activity running they are taken in at
+  the next turn, and not kept), the player's words unheard in person, and a
   conversation in person they stopped following. The record says what it was
-  about (per line: message id, chat id, sender, a 100-character excerpt, and
-  the `count` of a burst read as one), the `outcome`, and the activity the
-  lines now wait for (type, description, end), looked up after the judgment. Lines others say in person are not kept:
-  in the lab they were nine in ten decisions (23,264 in one sim-day for 51
-  characters, 7.3 MB), almost all overheard and not caught; about 1.5% of
-  decisions are kept. A kept decision goes to:
+  about (per line: message id, chat id, sender, a 100-character excerpt, and the
+  `count` of a burst read as one), the `outcome`, and the activity the lines now
+  wait for (type, description, end), looked up after the judgment. Lines others
+  say in person are not kept: in the lab they were nine in ten decisions (23,264
+  in one sim-day for 51 characters, 7.3 MB), almost all overheard and not
+  caught; about 1.5% of decisions are kept. A kept decision goes to:
   - one row in `<stateDir>/kazusa/decisions.sqlite` (`decision-database.ts`),
-    uncapped and restart-safe, a synchronous insert. The timeline reads only
-    its window, by index, through `perception.decisions(window)`. Until 2026-11
-    every decision shared the `"perception"` keyed namespace with the inbox;
-    the first start moves the inbox records out (`perception/stores.ts`) and
-    empties it, dropping the old decisions, which say neither what they were
-    about nor what the character was doing.
+    uncapped and restart-safe, a synchronous insert. The timeline reads only its
+    window, by index, through `perception.decisions(window)`. Until 2026-11
+    every decision shared the `"perception"` keyed namespace with the inbox; the
+    first start moves the inbox records out (`perception/stores.ts`) and empties
+    it, dropping the old decisions, which say neither what they were about nor
+    what the character was doing.
   - an `attention.decided` SSE journal event (`onDecision` in
     `perception/register.ts`, which sees every decision and calls `onAwoken`,
     sleep's wake, for those acted on).
@@ -1089,39 +1092,40 @@ connect these modules in process.
   (`shared/wiki/entities/places/<id>.md`): `place_id`, `name`, `aliases`,
   `summary`, `parent`, `entry_minutes`, `connections` (two-way, declared once;
   `ways`, the first is usual), optional `map` (`{ plane?, x, y }`, drawn by the
-  client, written by `POST /kazusa/places/positions`, never read by routing);
-  the body is the full description. A tree through `parent`; every place is
-  somewhere to stand. `sharedWorld` (`world.ts`): one watcher per process keeps
-  the map current, so a new place or `home` needs no reload and SSE `places`
-  tells clients to refetch. **Nothing broken stops the map loading** (`buildMap`
-  never throws; `loadWorld` only when no place page parses at all, which keeps
-  the map in use): a page that doesn't parse, a connection to nowhere or
-  declared on both pages, a duplicate id or an unknown home is left out, an
-  unknown parent or a cycle puts the place at top level, a map in separate parts
-  loads (no route between parts: travel there is refused in-world, travel lists
-  skip it), and each is a `problems` entry `wiki_lint` reports per page. Live,
-  keeping the last good map on any problem meant one bad line hid a whole edit
-  with only a log line to say why. **Nobody is left nowhere** (`repair` in
-  `register.ts`, on every change that alters a page the map reads, and once at
-  `gateway_start` for changes made while stopped): a renamed place carries its
-  people, trips and huddles (Messaging's `renamePlace`); someone at or
-  travelling through a place that's gone is `place()`d at the nearest surviving
-  area above it on the previous map, else home, else the first place, while a
-  trip whose way ahead still exists goes on without the places already passed
-  (`relocation`, `landing` in `location.ts`). One page of two with the same
-  `place_id` removes only itself. A rename is an edited `place_id` on the same
-  file (the watcher compares `files`) or one announced with `expectRename`.
-  `PlaceEdits` (`location.pages`, `pages.ts`) does it properly: `rename` moves
-  the page and rewrites `place_id`, `parent`, `home`, `to`, `entity.place.<id>`
-  and `[[id]]` links in every world page and each character's wiki, card file
-  included; `remove` trashes the page (`<state>/kazusa/wiki-trash/<stamp>/`),
-  moves what was in it up a level, drops connections to it, moves homes there
-  up, and unlinks links; characters' cards stay. Exposed as
-  `POST /kazusa/wiki/rename` and `/wiki/delete` (any page; a registered
-  character's world card is refused), saving a world place page with a new
-  `place_id` (a rename), and ARONA's `map_rename_place`/`map_remove_place`. A
-  world without places disables Location. `visibleFrom` = parent, children,
-  siblings, connection ends.
+  client, written by `POST /kazusa/places/positions`, never read by routing),
+  optional `backdrop` (a set in `shared/backdrops/`, inherited down the tree;
+  one naming no set is a problem and the place uses its area's, §3.8); the body
+  is the full description. A tree through `parent`; every place is somewhere to
+  stand. `sharedWorld` (`world.ts`): one watcher per process keeps the map
+  current, so a new place or `home` needs no reload and SSE `places` tells
+  clients to refetch. **Nothing broken stops the map loading** (`buildMap` never
+  throws; `loadWorld` only when no place page parses at all, which keeps the map
+  in use): a page that doesn't parse, a connection to nowhere or declared on
+  both pages, a duplicate id or an unknown home is left out, an unknown parent
+  or a cycle puts the place at top level, a map in separate parts loads (no
+  route between parts: travel there is refused in-world, travel lists skip it),
+  and each is a `problems` entry `wiki_lint` reports per page. Live, keeping the
+  last good map on any problem meant one bad line hid a whole edit with only a
+  log line to say why. **Nobody is left nowhere** (`repair` in `register.ts`, on
+  every change that alters a page the map reads, and once at `gateway_start` for
+  changes made while stopped): a renamed place carries its people, trips and
+  huddles (Messaging's `renamePlace`); someone at or travelling through a place
+  that's gone is `place()`d at the nearest surviving area above it on the
+  previous map, else home, else the first place, while a trip whose way ahead
+  still exists goes on without the places already passed (`relocation`,
+  `landing` in `location.ts`). One page of two with the same `place_id` removes
+  only itself. A rename is an edited `place_id` on the same file (the watcher
+  compares `files`) or one announced with `expectRename`. `PlaceEdits`
+  (`location.pages`, `pages.ts`) does it properly: `rename` moves the page and
+  rewrites `place_id`, `parent`, `home`, `to`, `entity.place.<id>` and `[[id]]`
+  links in every world page and each character's wiki, card file included;
+  `remove` trashes the page (`<state>/kazusa/wiki-trash/<stamp>/`), moves what
+  was in it up a level, drops connections to it, moves homes there up, and
+  unlinks links; characters' cards stay. Exposed as `POST /kazusa/wiki/rename`
+  and `/wiki/delete` (any page; a registered character's world card is refused),
+  saving a world place page with a new `place_id` (a rename), and ARONA's
+  `map_rename_place`/`map_remove_place`. A world without places disables
+  Location. `visibleFrom` = parent, children, siblings, connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's
   cards, `workspaces/<id>/wiki/entities/places/<place_id>.md`. **Visit loop**:
   with no card, **Where you are** shows the whole description; starting the next
@@ -1255,6 +1259,47 @@ connect these modules in process.
   them while paused: live, four All on for 143 characters held 7,208.
 - `POST /kazusa/character/stage` `{ ids, onstage }` (one group per request);
   `CharacterStatus.onstage` and `offstageSince`; capability `stage`.
+
+### 3.8 `src/scene/` — Scene Art
+
+- The art the client's Scene view (a huddle drawn as a visual novel) needs. No
+  model or decision call, nothing characters read, and the server never picks a
+  picture for the time of day: the client does, from sim time.
+- **Portraits** (`portraits.ts`): `workspaces/<id>/portraits/<name>.<raster>`,
+  whole figures named like the stickers (`[<outfit>-]<mood>`; the first word is
+  an outfit only when `stickers/stickers.json` declares it), plus optional
+  `portraits.json` (`size`, `eyeline`, and `placement` by outfit word, `""` for
+  none, or by picture name: `centre`, `floor` and `eyes` (where the figure is
+  across the picture, where it stands and where its eyes are down it, each 0–1)
+  and `scale`, which draws the character as tall as they are, all written by the
+  importer, and a hand-set `offset`; a bad field is ignored). The default, what
+  the figure rests in, is in the usual clothes: `neutral`, else `calm`,
+  `content` or `happy`, else the first; none (not drawn) when every picture is
+  of an outfit. `GET /kazusa/portraits?id=`, `GET /kazusa/portrait` (served like
+  stickers), `CharacterSummary.portraitUrl` (one `stat` for a character without
+  portraits, up to three with them: the folder, `stickers/stickers.json` and the
+  picture; the folder is listed again only when its mtime or that file's
+  changes).
+- **Backdrops** (`backdrops.ts`): a shared library, `shared/backdrops/<set>/`
+  beside the World Wiki, pictures named `[<state>-]<time>` (a state only when
+  the set's `backdrops.json` declares it). Location reads the library with the
+  map (`World.backdrops`): a place's `backdrop` must name a set with a picture,
+  `backdropOf` resolves it up the `parent` chain, the library's changes reload
+  the map and send SSE `places` (a library made while the Gateway runs is
+  watched from when it appears). `GET /kazusa/places` carries `backdrops` and
+  `times`; `GET /kazusa/backdrop` serves one picture.
+- A line's **face** is Messaging's (`messaging/faces.ts`): `send_message` offers
+  the moods of the usual-clothes portraits
+  ([messaging](references/messaging.md), Faces).
+- `scene.times` (`config.ts`): the world's times of day,
+  `{ name, from: "HH:MM" }` in sim time (UTC), sorted, unique; default day
+  06:00, dusk 17:00, night 19:00.
+- Names everywhere follow `PICTURE_NAME` (`src/pictures.ts`, shared with
+  stickers): lowercase words joined by `-`. Raster only; capability `scene`.
+- Importers: `scripts/portraits.mjs` (`stage`, `place`) and
+  `scripts/backdrops.mjs` (`list`, `stage`, `place`, `assign`, `check`). Design,
+  art layout and the import:
+  [visual novel](../kazusa-client/references/visual-novel.md) §6 and §8.
 
 ## 4. Engineering & Zero-Build Conventions
 
@@ -1472,7 +1517,7 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/context_engine.md` — Read when modifying context assembly, session
   naming, memory layers, budgets, or future chat producers.
 - `references/messaging.md` — Read when implementing `send_message`, sender
-  attribution, direct/group ledger writes, or stickers.
+  attribution, direct/group ledger writes, stickers, or faces.
 - `references/client.md` — Read when reviewing or building `apps/web`, human
   chat APIs, authentication, live updates, or end-to-end messaging tests. The
   client's overall architecture (shell, views, registries, read-model routes,
@@ -1497,3 +1542,8 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.
+- `references/status.md` — Design, not built: named values and states on
+  characters, places and pairs (an outfit, a relationship value, a place's
+  condition) that code and characters both change, without new model calls. Read
+  before adding any per-character or per-place state that another module will
+  read; `outfit` is the first slice, for the client's Scene view and stickers.

@@ -15,6 +15,7 @@ import { chatTitle } from "@/lib/source/chats/display";
 import { observedChatsKey } from "@/lib/source/observe/http";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import { useSources } from "@/lib/source/provider";
+import { applySceneEvent, syncSceneMembers } from "@/lib/live/scene-state";
 import {
   appendCachedMessage,
   chatsKey,
@@ -35,11 +36,15 @@ export function sortChats<T extends ChatInfo>(chats: T[]) {
   );
 }
 
-/** The player's raw chat list, shared with setup polling and SSE updates. */
+/**
+ * The player's raw chat list, shared with setup polling and SSE updates. Each
+ * accepted read (SSE `chats` refetches it) gives open scenes their members.
+ */
 export function useChatsResource() {
   return useSWR<ChatsResponse, Error, ReturnType<typeof chatsKey>>(
     chatsKey(),
     fetchChats,
+    { onSuccess: ({ chats }) => syncSceneMembers(chats) },
   );
 }
 
@@ -83,7 +88,23 @@ export function usePagedMessages<T extends MessagesResponse>(
     useSWRInfinite<T, Error, ReturnType<typeof messagesKeyGetter>>(
       getKey,
       ([, id, before]) => fetchPage(id, before),
-      { revalidateFirstPage: true, revalidateOnFocus: false },
+      {
+        revalidateFirstPage: true,
+        revalidateOnFocus: false,
+        // The latest page seeds an open scene with what it hasn't seen. Here,
+        // not in the fetcher: SWR stores the pages right after this, so a
+        // scene opening meanwhile reads them from the cache instead.
+        onSuccess: (pages) => {
+          const chatId = getKey(0, null)?.[1];
+          const latest = pages[0];
+          if (chatId && latest)
+            applySceneEvent(chatId, {
+              type: "history",
+              messages: latest.messages,
+              at: Date.now(),
+            });
+        },
+      },
     );
 
   const messages = useMemo(() => {
@@ -149,6 +170,7 @@ export function useChatActions() {
   }
 
   function commitSentMessage(chatId: string, message: ChatMessage) {
+    applySceneEvent(chatId, { type: "message", message, at: Date.now() });
     void appendCachedMessage(mutate, chatId, message);
     void mutate(
       chatsKey(),

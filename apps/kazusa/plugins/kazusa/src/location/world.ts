@@ -5,6 +5,11 @@ import { z, ZodError } from "zod";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import type { LintFinding } from "../memory/lint.ts";
 import {
+  backdropsBeside,
+  readBackdrops,
+  type BackdropLibrary,
+} from "../scene/backdrops.ts";
+import {
   buildMap,
   parsePlace,
   type MapProblem,
@@ -20,7 +25,9 @@ export interface World {
   readonly files: ReadonlyMap<string, string>;
   /** The map's own, and pages and homes it had to leave out. */
   readonly problems: readonly MapProblem[];
-  /** Changes with any page the map reads, and only then. */
+  /** The backdrop sets places can name (`shared/backdrops/`). */
+  readonly backdrops: BackdropLibrary;
+  /** Changes with any page or backdrop the map reads, and only then. */
   readonly version: string;
 }
 
@@ -37,11 +44,14 @@ const markdownFiles = (dir: string): string[] =>
     : [];
 
 /**
- * Reads the World Wiki. Returns `undefined` for a world without places. A
- * broken page never stops the rest loading: it is left out and named in
- * `problems`.
+ * Reads the World Wiki, and the backdrop library its places name. Returns
+ * `undefined` for a world without places. A broken page never stops the rest
+ * loading: it is left out and named in `problems`.
  */
-export function loadWorld(wikiDir: string): World | undefined {
+export function loadWorld(
+  wikiDir: string,
+  backdropsDir = backdropsBeside(wikiDir),
+): World | undefined {
   const placesDir = path.join(wikiDir, "entities", "places");
   const problems: MapProblem[] = [];
   const files = new Map<string, string>();
@@ -70,7 +80,9 @@ export function loadWorld(wikiDir: string): World | undefined {
       `No place page loads:\n- ${problems.map(({ place, message }) => `${place}: ${message}`).join("\n- ")}`,
     );
   if (places.length === 0) return undefined;
-  const map = buildMap(places);
+  const backdrops = readBackdrops(backdropsDir);
+  version.update(`${backdropsDir}\0${backdrops.key}\0`);
+  const map = buildMap(places, new Set(backdrops.sets.keys()));
   problems.push(...map.problems);
   const homes = new Map<string, string>();
   const charactersDir = path.join(wikiDir, "entities", "characters");
@@ -92,7 +104,14 @@ export function loadWorld(wikiDir: string): World | undefined {
     }
     homes.set(id, data.home);
   }
-  return { map, homes, files, problems, version: version.digest("hex") };
+  return {
+    map,
+    homes,
+    files,
+    problems,
+    backdrops,
+    version: version.digest("hex"),
+  };
 }
 
 /** What's wrong with the map on disk, for `wiki_lint`. */
@@ -193,22 +212,67 @@ function refresh(cell: WorldCell, wikiDir: string): void {
     cell.handlers.onChange({ before, after: cell.world, renames });
 }
 
+/**
+ * Watches the wiki's places and characters, and the backdrop library beside it,
+ * from the moment that library appears if it isn't there at start (the first
+ * import usually runs with the Gateway up).
+ */
 function watchWiki(cell: WorldCell, wikiDir: string): void {
-  if (!existsSync(wikiDir)) return;
   let settling: NodeJS.Timeout | undefined;
-  try {
-    watch(wikiDir, { recursive: true, persistent: false }, (_event, file) => {
-      if (file && !/^entities[\\/](places|characters)[\\/]/.test(file)) return;
-      clearTimeout(settling);
-      settling = setTimeout(() => refresh(cell, wikiDir), SETTLE_MS);
-    }).on("error", (error) => {
+  const settle = (): void => {
+    clearTimeout(settling);
+    settling = setTimeout(() => refresh(cell, wikiDir), SETTLE_MS);
+  };
+  const follow = (
+    dir: string,
+    what: string,
+    relevant: (file: string) => boolean,
+  ): void => {
+    if (!existsSync(dir)) {
+      awaitFolder(dir, what, () => {
+        settle();
+        follow(dir, what, relevant);
+      });
+      return;
+    }
+    try {
+      watch(dir, { recursive: true, persistent: false }, (_event, file) => {
+        if (file && !relevant(file)) return;
+        settle();
+      }).on("error", (error) => {
+        cell.handlers.warn(
+          `Location: stopped watching the ${what}: ${String(error)}`,
+        );
+      });
+    } catch (error: unknown) {
+      cell.handlers.warn(`Location: can't watch the ${what}: ${String(error)}`);
+    }
+  };
+  /** Calls `then` once when `dir` appears in its parent, if the parent is there. */
+  const awaitFolder = (dir: string, what: string, then: () => void): void => {
+    const parent = path.dirname(dir);
+    if (!existsSync(parent)) return;
+    try {
+      const watcher = watch(parent, { persistent: false }, (_event, file) => {
+        if (file !== path.basename(dir) || !existsSync(dir)) return;
+        watcher.close();
+        then();
+      }).on("error", () => watcher.close());
+      // Made between the check above and the watch: no event will come.
+      if (existsSync(dir)) {
+        watcher.close();
+        then();
+      }
+    } catch (error: unknown) {
       cell.handlers.warn(
-        `Location: stopped watching the map: ${String(error)}`,
+        `Location: can't wait for the ${what} folder: ${String(error)}`,
       );
-    });
-  } catch (error: unknown) {
-    cell.handlers.warn(`Location: can't watch the map: ${String(error)}`);
-  }
+    }
+  };
+  follow(wikiDir, "map", (file) =>
+    /^entities[\\/](places|characters)[\\/]/.test(file),
+  );
+  follow(backdropsBeside(wikiDir), "backdrops", () => true);
 }
 
 export interface SharedWorld {

@@ -189,8 +189,9 @@ the simulation.
 
 - **Location**: `shared/wiki/entities/places/<place_id>.md`
 - **Purpose**: Shared, objective physical setting facts and the map's topology.
-  Read once by `src/location/` at registration (a canon edit needs a Gateway
-  restart) and validated as one connected graph.
+  Read by `src/location/`, which a file watcher keeps current (no restart); a
+  broken page or edge is left out and listed by `wiki_lint`
+  ([location](location.md) §4.1).
 - **Topology**: `parent` makes a tree of areas; every place, area or not, is
   somewhere to stand (an area means its open space). Each child links to its
   parent by walking `entry_minutes`. `connections` add two-way edges between any
@@ -209,6 +210,7 @@ summary:
   "Sunlit room that smells of vanilla; long table, oven, a fridge of milk
   cartons."
 entry_minutes: 1
+backdrop: club-room
 connections:
   - to: trinity_dorm
     ways:
@@ -246,6 +248,10 @@ After-School Sweets Club.
   Coordinates are a fraction of the map; each `plane` is its own map, and a
   place without one takes its parent's. A bad value is ignored. Arranging the
   map in the client rewrites this line. Routes and travel times never read it.
+- `backdrop` (optional): the backdrop set (`shared/backdrops/<set>/`) the
+  client's Scene view draws behind conversations here. A place without one uses
+  its area's. A value naming no set with a picture is listed by `wiki_lint` and
+  ignored, so the area's applies.
 - `status` and opening hours are not yet part of the schema.
 
 ### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)
@@ -342,9 +348,6 @@ peer_id: bob
 name: Bob Moreno
 relation_type: close_friend
 summary: "Music student at Oak Hill Dorm and fellow composer."
-familiarity: 75
-affinity: 62
-trust: 70
 last_interaction_iso: "2026-10-19T19:45:00Z"
 relationships:
   - targetId: entity.character.bob
@@ -384,8 +387,14 @@ talkative, though he procrastinates on assignments.
   directly to build the **Eager Compact Contact Roster** in the prompt:
   `- <name> (@<peer_id>, <relation_type>): <summary> [chat:direct:<peer_id>]`.
 - `familiarity` (number 0..100): Quantitative depth of shared history.
-- `affinity` (number 0..100): Emotional warmth / liking.
-- `trust` (number 0..100): Perceived reliability and honesty.
+  deprecated: computed from use in the retained `"familiarity"` store
+  ([memory](memory.md)), never written in a card.
+- `affinity` (number 0..100): Emotional warmth / liking. deprecated:
+  relationship numbers do not live in card frontmatter (`memory/page.ts` reports
+  them as a problem); they will be pair attributes, see [status](status.md) §4.
+- `trust` (number 0..100): Perceived reliability and honesty. deprecated:
+  relationship numbers do not live in card frontmatter (`memory/page.ts` reports
+  them as a problem); they will be pair attributes, see [status](status.md) §4.
 - `last_interaction_iso` (ISO 8601 string): Timestamp of latest interaction.
 
 ### Agent Personal Wiki Maintenance Contract
@@ -400,7 +409,6 @@ Characters own and update their own subjective Personal Wiki:
 2. **Social Evolution & Reflection**: During conversations or during nightly
    sleep reflection, agents update the card:
    - Adjust `summary` and `relation_type` as their dynamic evolves.
-   - Re-calibrate `affinity`, `trust`, and `familiarity`.
    - Update `## Quick Impression` to reflect current sentiment and open
      conversational threads.
    - Append date-stamped summaries to `## Interaction Log`.

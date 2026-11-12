@@ -32,17 +32,20 @@ export function useClockActions() {
   const { resolved } = useSources();
   const { canManage } = useAccess();
 
+  /** Resolves whether the clock took the action. */
   const apply = useCallback(
-    async (action: ClockActionPayload) => {
-      if (!canManage || resolved.clock !== "live") return;
+    async (action: ClockActionPayload): Promise<boolean> => {
+      if (!canManage || resolved.clock !== "live") return false;
       try {
         const result = await executeClockAction(action);
         setClock({
           clock: result.clock,
           offset: useClockStore.getState().clock?.offset ?? 0,
         });
+        return true;
       } catch (error) {
         console.error("Failed to execute clock action:", error);
+        return false;
       }
     },
     [canManage, resolved.clock],

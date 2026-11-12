@@ -11,6 +11,8 @@ import {
   clientMessage,
 } from "./messaging.ts";
 import type { ChatConversation, SendMessageParams } from "./conversations.ts";
+import { heardOf } from "./composing.ts";
+import type { TypingStreamEvent } from "@kazusa/client";
 import { stimulusKey } from "../stimulus.ts";
 import { mirroredStore } from "./message-store.fake.ts";
 import type { MessageStore } from "./message-database.ts";
@@ -2581,6 +2583,112 @@ describe("the floor", () => {
     expect(await h.messaging.getTyping()).toEqual([]);
   });
 
+  it("sends a line said aloud with its speaking event, replayed while said and gone after", async () => {
+    const { h, say, speaking } = await table();
+    const emitted: { typing: TypingStreamEvent }[] = [];
+    const order: string[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing") emitted.push(event);
+      if (event.type === "message") order.push("message");
+      else if (event.type === "typing")
+        order.push(event.typing.isTyping ? "speaking" : "stopped");
+    });
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    const start = emitted.find((event) => event.typing.isTyping)?.typing;
+    // The text and its sim-time window, as it starts: 19 letters, 1,583 ms.
+    expect(start).toMatchObject({
+      senderId: "alice",
+      mode: "speaking",
+      speech: {
+        text: "one two three four five",
+        from: NOW,
+        until: NOW + 1_583,
+      },
+    });
+    // A reconnecting client is told it again, window and all.
+    expect(await h.messaging.getTyping("bob")).toMatchObject([
+      { senderId: "alice", speech: start?.speech },
+    ]);
+    h.setNow(NOW + 1_583);
+    await said;
+    // Said: stopped without the line, and no longer replayed.
+    const stop = emitted.findLast((event) => !event.typing.isTyping)?.typing;
+    expect(stop).toMatchObject({ senderId: "alice", isTyping: false });
+    expect(stop).not.toHaveProperty("speech");
+    expect(await h.messaging.getTyping()).toEqual([]);
+    // The line lands before its saying stops: stopped first, a client would
+    // take a line that was never said off the screen, then show it again.
+    expect(order).toEqual(["speaking", "message", "stopped"]);
+  });
+
+  it("ends a line said aloud at the end of its window, however long its start took", async () => {
+    const { h, say, speaking } = await table();
+    h.messaging.onEvent((event) => {
+      // Time goes on while the line waits its turn to start.
+      if (event.type === "typing" && event.typing.isTyping)
+        h.setNow(NOW + 1_000);
+    });
+    const said = say("alice", ["one two three four five"]);
+    await speaking("alice");
+    h.setNow(NOW + 1_583);
+    const done = await Promise.race([
+      said.then(() => "said"),
+      new Promise((resolve) => setTimeout(resolve, 1_000, "still saying")),
+    ]);
+    expect(done).toBe("said");
+  });
+
+  it("commits what was heard of a line cut off, the event having carried the whole line", async () => {
+    const { h, say, lines, speaking } = await table();
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing" && event.typing.isTyping)
+        emitted.push(event.typing);
+    });
+    const alice = say("alice", [
+      "one two three four five six seven eight nine ten",
+    ]);
+    await speaking("alice");
+    const { speech: line } = emitted[0] ?? {};
+    h.setNow(NOW + 2_000);
+    h.messaging.interrupt("alice");
+    await alice;
+    const cut = lines().at(-1)?.slice("alice: ".length) ?? "";
+    // What the server keeps is what a client revealing the line by the same
+    // rule had shown by then, and a dash.
+    expect(cut).toBe(
+      `${heardOf(line?.text ?? "", (2_000 - 0) / ((line?.until ?? 0) - (line?.from ?? 0)))}—`,
+    );
+    expect(cut).toBe("one two three four five six—");
+  });
+
+  it("never sends typed text with a typing event", async () => {
+    const h = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new AbortController().signal,
+    );
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing") emitted.push(event.typing);
+    });
+    const result = h.messaging.speak("alice", "ALICE", {
+      requestId: "secret",
+      members: ["bob"],
+      messages: ["Secret plan"],
+    });
+    await vi.waitFor(() => expect(emitted.length).toBeGreaterThan(0));
+    expect(emitted[0]).toMatchObject({ mode: "typing", isTyping: true });
+    expect(emitted[0]).not.toHaveProperty("speech");
+    await h.finishBubble();
+    await result;
+  });
+
   it("says a line at the speaker's judged pace", async () => {
     const { h, say, speaking, started } = await table(async () => ({
       floor: "NEXT",
@@ -2627,5 +2735,83 @@ describe("the floor", () => {
       unsaid: ["one two three four five"],
     });
     expect(lines()).toEqual(["alice: Hi"]);
+  });
+
+  it("shows a line's face as it starts, keeps it on the message, and puts what is seen of it before the line", async () => {
+    const { h, speaking, started } = await table();
+    const sessionKey = `chat:huddle:${started.chatId.slice("huddle:".length)}`;
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing" && event.typing.isTyping)
+        emitted.push(event.typing);
+    });
+    expect(h.messaging.shownFace("alice", sessionKey)).toBeUndefined();
+    const said = h.messaging.speak("alice", "ALICE", {
+      requestId: "face",
+      sessionKey,
+      messages: [
+        {
+          text: "I said no.",
+          face: { name: "annoyed", seen: "(annoyed, a flat stare)" },
+        },
+      ],
+    });
+    await speaking("alice");
+    // The figure can change face as the line starts.
+    expect(emitted[0]?.speech).toMatchObject({
+      text: "I said no.",
+      face: { name: "annoyed" },
+    });
+    expect(emitted[0]?.speech?.face).not.toHaveProperty("seen");
+    h.setNow(NOW + 60_000);
+    expect(await said).toMatchObject({
+      status: "delivered",
+      said: ["I said no."],
+    });
+    const first = [...h.retained.values()].find(
+      (delivery) => delivery.params.text === "I said no.",
+    )!;
+    expect(first.params.face).toEqual({
+      name: "annoyed",
+      seen: "(annoyed, a flat stare)",
+    });
+    expect(clientMessage(first)).toMatchObject({
+      text: "I said no.",
+      face: { name: "annoyed" },
+    });
+    // Listeners read what they see of the face before the line.
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({ text: "(annoyed, a flat stare) I said no." }),
+      ),
+    );
+    expect(h.messaging.shownFace("alice", sessionKey)).toBe("annoyed");
+    // Someone who leaves takes their face with them.
+    await h.messaging.tuneOut("carol", sessionKey);
+    expect(h.messaging.shownFace("carol", sessionKey)).toBeUndefined();
+    expect(h.messaging.shownFace("alice", sessionKey)).toBe("annoyed");
+  });
+
+  it("drops a face in a text chat, as it does an action", async () => {
+    const h = setup();
+    expect(
+      await h.messaging.speak("alice", "ALICE", {
+        requestId: "texted",
+        sessionKey: "chat:direct:bob",
+        messages: [
+          { text: "No.", face: { name: "annoyed", seen: "(annoyed)" } },
+        ],
+      }),
+    ).toMatchObject({ status: "delivered" });
+    const [texted] = [...h.retained.values()];
+    expect(texted.params).not.toHaveProperty("face");
+    expect(clientMessage(texted)).not.toHaveProperty("face");
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({ text: "No." }),
+      ),
+    );
   });
 });

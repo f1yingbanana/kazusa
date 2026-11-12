@@ -31,6 +31,7 @@ import {
   LIST_CHATS,
   SPEECH_REQUEST,
   bubbleOf,
+  heardAs,
   readAs,
   MANAGE_CHAT,
   PARTICIPANT_ID,
@@ -46,6 +47,7 @@ import {
   type ChatKind,
   type ChatSummary,
   type ManageChatParams,
+  type FaceRef,
   type SendMessageParams,
   type SpeechParams,
 } from "./conversations.ts";
@@ -229,6 +231,9 @@ export function clientMessage(
           },
         }
       : {}),
+    ...(delivery.params.face
+      ? { face: { name: delivery.params.face.name } }
+      : {}),
     timestamp: delivery.timestamp,
     ...(createdAt === undefined ? {} : { createdAt }),
     ...(receipts.length ? { receipts } : {}),
@@ -342,6 +347,11 @@ export interface MessagingState {
   readonly streams: Set<(event: MessagingEvent) => void>;
   /** Who is speaking in each huddle, and who waits to. */
   readonly floors: Floors;
+  /**
+   * The face each member last said a line with, by `chatId:participantId`, so a
+   * face is read only when it changes; forgotten when they leave.
+   */
+  readonly faces: Map<string, string>;
   initialized: boolean;
   sequence: number;
 }
@@ -357,6 +367,7 @@ export function createMessagingState(): MessagingState {
     typing: new Map(),
     streams: new Set(),
     floors: new Floors(),
+    faces: new Map(),
     initialized: false,
     sequence: 0,
   };
@@ -493,6 +504,8 @@ export class Messaging {
     sessionKey: string,
     composing: Medium | false,
     assertInvocationCurrent?: () => void,
+    /** The line being said aloud and its sim-time window; never typed text. */
+    speech?: TypingStreamEvent["speech"],
   ): Promise<void> {
     await this.serial.enqueue("messages", async () => {
       await this.init();
@@ -509,6 +522,7 @@ export class Messaging {
         ...(composing && isUser(participantId)
           ? { expiresAt: Date.now() + 8000 }
           : {}),
+        ...(composing === "speaking" && speech ? { speech } : {}),
       };
       if (composing) this.typing.set(key, event);
       else this.typing.delete(key);
@@ -518,6 +532,15 @@ export class Messaging {
 
   /** Stop showing someone typing: in one chat, or everywhere. */
   clearTyping(participantId: string, chatId?: string): void {
+    for (const stop of this.stopTyping(participantId, chatId)) stop();
+  }
+
+  /**
+   * Forgets that someone is typing, at once, and returns what tells the clients
+   * so: a message that ends it goes out before they are told.
+   */
+  private stopTyping(participantId: string, chatId?: string): (() => void)[] {
+    const stops: (() => void)[] = [];
     for (const [key, event] of this.typing) {
       if (
         event.senderId !== participantId ||
@@ -525,12 +548,18 @@ export class Messaging {
       )
         continue;
       this.typing.delete(key);
-      this.emit({
-        type: "typing",
-        typing: { ...event, isTyping: false },
-        audience: this.chats.get(event.chatId)?.members ?? [],
-      });
+      // Stopped: the line, if any, is no longer being said.
+      const { speech: _speech, ...stopped } = event;
+      const audience = this.chats.get(event.chatId)?.members ?? [];
+      stops.push(() =>
+        this.emit({
+          type: "typing",
+          typing: { ...stopped, isTyping: false },
+          audience,
+        }),
+      );
     }
+    return stops;
   }
 
   getComposingChats(participantId: string): string[] {
@@ -606,13 +635,29 @@ export class Messaging {
       JSON.stringify(previous.members) !== JSON.stringify(chat.members)
     ) {
       for (const member of previous?.members ?? [])
-        if (!chat.members.includes(member)) this.clearTyping(member, chat.id);
+        if (!chat.members.includes(member)) {
+          this.clearTyping(member, chat.id);
+          this.shared.faces.delete(`${chat.id}:${member}`);
+        }
       this.emit({
         type: "chats",
         audience: [...new Set([...(previous?.members ?? []), ...chat.members])],
       });
     }
     this.scheduleRetry();
+  }
+
+  /**
+   * The face `agentId` last said a line with in the chat at `sessionKey`, while
+   * they are still in it; `undefined` for none, or for a chat they aren't in.
+   */
+  shownFace(agentId: string, sessionKey: string): string | undefined {
+    try {
+      const chat = this.requireChat(agentId, sessionKey);
+      return this.shared.faces.get(`${chat.id}:${agentId}`);
+    } catch {
+      return undefined;
+    }
   }
 
   /** Require current membership without disclosing another character's chats. */
@@ -1335,8 +1380,13 @@ export class Messaging {
     // survives the invoking turn and can be completed by the plugin service.
     await this.save(delivery, assertInvocationCurrent);
     this.rememberDelivery(delivery);
-    this.clearTyping(sender, delivery.chatId);
+    if (params.face)
+      this.shared.faces.set(`${chat.id}:${sender}`, params.face.name);
+    // The message first, then that they stopped: a line said aloud that stops
+    // with no message was never said, and a client takes it off the screen.
+    const stops = this.stopTyping(sender, delivery.chatId);
     this.emit({ type: "message", delivery });
+    for (const stop of stops) stop();
     return delivery;
   }
 
@@ -1526,14 +1576,17 @@ export class Messaging {
     // Actions are seen only where the speaker is; in a text chat they are
     // dropped, so a model that adds one by habit changes nothing there.
     // Stickers are the other way round: a phone thing, dropped face to face.
+    // A face is seen only where the speaker is, as actions are.
     // The original index keeps each bubble's identity stable across replays.
     const inPlace =
       target.aloud === true ||
       Boolean(target.sessionKey?.match(/(?:^|:)chat:huddle:/));
     const bubbles = messages.flatMap((bubble, at) => {
-      const typed = bubbleOf(bubble);
+      const { face, ...typed } = bubbleOf(bubble);
+      const kept: typeof typed & { readonly face?: FaceRef } =
+        face && inPlace ? { ...typed, face } : typed;
       const pieces =
-        typed.type === (inPlace ? "sticker" : "action") ? [] : [typed];
+        typed.type === (inPlace ? "sticker" : "action") ? [] : [kept];
       // Message type is authoritative; Markdown never changes speech into actions.
       return pieces.map((piece, part) => ({
         index: part === 0 ? String(at) : `${at}.${part}`,
@@ -1579,6 +1632,7 @@ export class Messaging {
           readonly medium: Medium;
           readonly text: string;
           readonly index: string;
+          readonly face?: FaceRef;
           readonly startedAt: number;
           readonly ms: number;
         }
@@ -1617,13 +1671,14 @@ export class Messaging {
        * its chat. Resolving a target again could open a second new group.
        */
       let address: typeof target = target;
-      for (const { index, text, type, sticker } of bubbles) {
+      for (const { index, text, type, sticker, face } of bubbles) {
         const first = sent[0];
         const to = (where: typeof target): SendMessageParams => ({
           ...where,
           text,
           ...(type === "speech" ? {} : { type }),
           ...(sticker ? { sticker } : {}),
+          ...(face ? { face } : {}),
           requestId: messagingId([requestId, index]),
         });
         let bubble = to(address);
@@ -1706,23 +1761,40 @@ export class Messaging {
             medium,
             text,
             index,
+            ...(face ? { face } : {}),
             startedAt: this.deps.clock.now().simTime,
             ms,
           };
           speech.composing = medium;
+          // Said aloud, the line goes out with its time as it starts: it is
+          // heard as it is said. Typed text stays unseen until it is sent.
           await this.setTyping(
             sender,
             senderName,
             sessionKey,
             medium,
             assertInvocationCurrent,
+            medium === "speaking" && !sticker
+              ? {
+                  text,
+                  ...(face ? { face: { name: face.name } } : {}),
+                  from: saying.startedAt,
+                  until: saying.startedAt + saying.ms,
+                }
+              : undefined,
           );
           // A paused world holds the bubble; a stopping Gateway lets the rest
-          // go at once rather than wait on a frozen clock.
-          paced = await sleepSim(this.deps.clock, ms, signal, {
-            release: released,
-            hurry,
-          });
+          // go at once rather than wait on a frozen clock. It ends when the
+          // line was said to: the wait for the queue above is part of it.
+          paced = await sleepSim(
+            this.deps.clock,
+            Math.max(0, saying.startedAt + ms - this.deps.clock.now().simTime),
+            signal,
+            {
+              release: released,
+              hurry,
+            },
+          );
         }
         signal.throwIfAborted();
         sent.push(
@@ -1764,6 +1836,7 @@ export class Messaging {
                 {
                   sessionKey: saying.sessionKey,
                   text: heard,
+                  ...(saying.face ? { face: saying.face } : {}),
                   requestId: messagingId([requestId, saying.index, "cut"]),
                 },
                 assertInvocationCurrent,
@@ -2245,7 +2318,7 @@ export class Messaging {
         sessionKey: copy.sessionKey,
         sender: delivery.sender,
         senderName: delivery.senderName,
-        text: readAs(delivery.params),
+        text: heardAs(delivery.params),
         timestamp: delivery.timestamp,
       });
       await this.serial.enqueue("messages", async () => {

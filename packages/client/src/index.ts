@@ -1,5 +1,6 @@
 import { z } from "zod";
 export * from "./access.ts";
+export * from "./speech.ts";
 
 /* ========================================================================== */
 /* Core Entities & Wire Schemas                                               */
@@ -16,6 +17,10 @@ export type Agent = z.infer<typeof AgentSchema>;
 /** `huddle`: a face-to-face conversation at a place; it ends when all leave. */
 export const ChatTypeSchema = z.enum(["direct", "group", "huddle"]);
 export type ChatType = z.infer<typeof ChatTypeSchema>;
+
+/** A line's face (§6.3): a portrait's name in the speaker's set. */
+export const FaceSchema = z.object({ name: z.string() });
+export type Face = z.infer<typeof FaceSchema>;
 
 export const ChatMessageSchema = z.object({
   id: z.string(),
@@ -35,6 +40,13 @@ export const ChatMessageSchema = z.object({
   type: z.enum(["speech", "action", "sticker"]).optional(),
   /** Stickers only: its name in the sender's set and where to load it. */
   sticker: z.object({ name: z.string(), url: z.string() }).optional(),
+  /**
+   * Face to face only: the face the line was said or done with, a picture's
+   * name in the sender's portrait set (`[<outfit>-]<mood>`), frozen when it was
+   * sent. The figure keeps it until their next line with one; a name the set
+   * lacks shows that outfit's neutral face.
+   */
+  face: FaceSchema.optional(),
   timestamp: z.number(),
   /**
    * The stored record's real time, for lining it up with a brain trace. Only
@@ -205,6 +217,22 @@ export const TypingStreamEventSchema = z.object({
   mode: z.enum(["typing", "speaking"]),
   /** A person's own signal lapses unless renewed; a character's is cleared. */
   expiresAt: z.number().optional(),
+  /**
+   * The line being said and when (sim-time ms), present only while a line is
+   * said aloud (`mode: "speaking"`, `isTyping: true`): clients reveal it across
+   * `from..until` (`sayingOf`). The message still commits once it has been
+   * said; a cut-off commits what was heard (`cutOff`). Never on a typed
+   * message. `face`, the line's (as its message will carry it), so the figure
+   * shows it as the line starts.
+   */
+  speech: z
+    .object({
+      text: z.string(),
+      face: FaceSchema.optional(),
+      from: z.number(),
+      until: z.number(),
+    })
+    .optional(),
 });
 export type TypingStreamEvent = z.infer<typeof TypingStreamEventSchema>;
 
@@ -270,6 +298,7 @@ export const DomainSchema = z.enum([
   "brain",
   "usage",
   "context",
+  "scene",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -1057,6 +1086,11 @@ export const CharacterSummarySchema = z.object({
   kind: CharacterKindSchema,
   isSystemAgent: z.boolean().optional(),
   avatarUrl: z.string().optional(),
+  /**
+   * The portrait the figure rests in (`GET /kazusa/portrait`), as `default` of
+   * the portraits. Absent for a character who isn't drawn.
+   */
+  portraitUrl: z.string().optional(),
   occupation: z.string().optional(),
   affiliation: z.string().optional(),
   aliases: z.array(z.string()),
@@ -1216,12 +1250,60 @@ export const PlaceSchema = z.object({
       y: z.number(),
     })
     .optional(),
+  /**
+   * The backdrop set it is drawn in front of, a key of
+   * `PlacesResponse.backdrops`: its own `backdrop`, else the nearest area's
+   * above it. Absent when none up the chain names a set that exists.
+   */
+  backdrop: z.string().optional(),
   bodyMarkdown: z.string(),
 });
 export type Place = z.infer<typeof PlaceSchema>;
 
-/** Places in tree order: each area, then its places by name. */
-export const PlacesResponseSchema = z.object({ places: z.array(PlaceSchema) });
+/**
+ * One picture of a backdrop set, named `[<state>-]<time>`. The first word is a
+ * state only when the set declares it (`states`).
+ */
+export const BackdropFileSchema = z.object({
+  name: z.string(),
+  /** `GET /kazusa/backdrop`; versioned, so cacheable forever. */
+  url: z.string(),
+  state: z.string().optional(),
+  /** The rest of the name: a time of day, by convention one of `times`. */
+  time: z.string(),
+});
+export type BackdropFile = z.infer<typeof BackdropFileSchema>;
+
+/** A backdrop set (`shared/backdrops/<set>/`) with at least one picture. */
+export const BackdropSetSchema = z.object({
+  /** Sorted by file name. */
+  files: z.array(BackdropFileSchema),
+  /** State word → what it means, for states some picture shows. */
+  states: z.record(z.string(), z.string()).optional(),
+});
+export type BackdropSet = z.infer<typeof BackdropSetSchema>;
+
+/**
+ * A time of day, from `from` (`HH:MM`, sim time, UTC) until the next one's; the
+ * last runs past midnight to the first.
+ */
+export const TimeOfDaySchema = z.object({
+  name: z.string(),
+  from: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
+});
+export type TimeOfDay = z.infer<typeof TimeOfDaySchema>;
+
+/**
+ * Places in tree order: each area, then its places by name. The server picks no
+ * backdrop picture: the client picks from `backdrops` and `times` by sim time.
+ */
+export const PlacesResponseSchema = z.object({
+  places: z.array(PlaceSchema),
+  /** Every set in the world's library that has a picture, by name. */
+  backdrops: z.record(z.string(), BackdropSetSchema),
+  /** The world's times of day, sorted by `from`; never empty. */
+  times: z.array(TimeOfDaySchema).min(1),
+});
 export type PlacesResponse = z.infer<typeof PlacesResponseSchema>;
 
 /**
@@ -1290,6 +1372,99 @@ export type MovePayload = z.infer<typeof MovePayloadSchema>;
 
 export const MoveResponseSchema = z.object({ record: LocationRecordSchema });
 export type MoveResponse = z.infer<typeof MoveResponseSchema>;
+
+/* ========================================================================== */
+/* Read model: scene art (GET /kazusa/portraits|portrait|backdrop)            */
+/* ========================================================================== */
+
+/**
+ * GET /kazusa/portraits?id=: a character's portrait set. 400 without `id`, 404
+ * for an id not on the roster; a character without portraits has an empty set.
+ */
+export const PortraitsQuerySchema = z.object({ id: z.string().min(1) });
+export type PortraitsQuery = z.infer<typeof PortraitsQuerySchema>;
+
+/**
+ * One whole-figure picture, named `[<outfit>-]<mood>` like the sticker of the
+ * same look. The first word is an outfit only when the character's
+ * `stickers/stickers.json` declares it.
+ */
+export const PortraitSchema = z.object({
+  name: z.string(),
+  /** `GET /kazusa/portrait`; versioned, so cacheable forever. */
+  url: z.string(),
+  outfit: z.string().optional(),
+  /** The rest of the name, dashes kept. */
+  mood: z.string(),
+  /** How to stand it in a scene, where `portraits.json` says. */
+  placement: z
+    .object({
+      /**
+       * Where the figure is across the picture: 0 its left edge, 1 its right. A
+       * scene puts this point on the figure's column. Absent: the middle.
+       */
+      centre: z.number().optional(),
+      /**
+       * Where the figure stands down the picture: 0 its top edge, 1 its bottom.
+       * A scene puts this row on its floor. Absent: the bottom edge.
+       */
+      floor: z.number().optional(),
+      /**
+       * Where its eyes are down the picture, the same way: what a close framing
+       * (one figure, from the chest up) is placed by.
+       */
+      eyes: z.number().optional(),
+      /** Drawn this many times its size, about that point. Absent: 1. */
+      scale: z.number().optional(),
+      /** Moved `[right, down]`, in the picture's own pixels. Absent: none. */
+      offset: z.tuple([z.number(), z.number()]).optional(),
+    })
+    .optional(),
+});
+export type PortraitPlacement = NonNullable<
+  z.infer<typeof PortraitSchema>["placement"]
+>;
+export type Portrait = z.infer<typeof PortraitSchema>;
+
+export const PortraitsResponseSchema = z.object({
+  /** Sorted by file name. */
+  portraits: z.array(PortraitSchema),
+  /**
+   * What the figure rests in: a picture in the usual clothes, `neutral` if
+   * there is one, else `calm`, `content` or `happy`, else the first. Absent
+   * when no picture is in the usual clothes, and the figure isn't drawn.
+   */
+  default: z.string().optional(),
+  /** `[width, height]` the pictures are drawn at, in pixels. */
+  size: z.tuple([z.number(), z.number()]).optional(),
+  /** The eyes' height as a fraction of the picture's, from the top (0–1). */
+  eyeline: z.number().optional(),
+});
+export type PortraitsResponse = z.infer<typeof PortraitsResponseSchema>;
+
+/**
+ * GET /kazusa/portrait?id=&name=&v=: one portrait's picture (image bytes, not
+ * JSON), served like stickers. `v` only keys the cache. 404 for anything not in
+ * a roster character's set.
+ */
+export const PortraitQuerySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  v: z.string().optional(),
+});
+export type PortraitQuery = z.infer<typeof PortraitQuerySchema>;
+
+/**
+ * GET /kazusa/backdrop?set=&name=&v=: one backdrop's picture (image bytes, not
+ * JSON) from the world's `shared/backdrops/<set>/`. `v` only keys the cache.
+ * 404 for anything not in the library.
+ */
+export const BackdropQuerySchema = z.object({
+  set: z.string().min(1),
+  name: z.string().min(1),
+  v: z.string().optional(),
+});
+export type BackdropQuery = z.infer<typeof BackdropQuerySchema>;
 
 /* ========================================================================== */
 /* Read model: world journal (PROPOSED — src/journal/, GET /kazusa/timeline)  */

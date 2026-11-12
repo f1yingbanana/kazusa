@@ -1,6 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
-import { STICKER_NAME } from "../stickers/stickers.ts";
+import { PICTURE_NAME } from "../pictures.ts";
 
 export const AGENT_ID = z
   .string()
@@ -62,7 +62,7 @@ export type MessageType = z.infer<typeof DELIVERED_TYPE>;
 
 /** A sent sticker: its name in the sender's set and that file's version. */
 export const STICKER_REF = z.strictObject({
-  name: STICKER_NAME,
+  name: PICTURE_NAME,
   v: z
     .string()
     .regex(/^[a-z0-9]+$/)
@@ -70,13 +70,23 @@ export const STICKER_REF = z.strictObject({
 });
 export type StickerRef = z.infer<typeof STICKER_REF>;
 
-const BUBBLE = z.union([
-  TEXT(4_000),
-  z.strictObject({
-    text: TEXT(4_000),
-    type: MESSAGE_TYPE.optional(),
-  }),
-]);
+/**
+ * The face a line was said with, face to face only (§6.3): the picture's name
+ * in the speaker's portrait set, and what everyone reads of it, frozen when it
+ * is sent and only when it changed from that speaker's previous face.
+ */
+export const FACE_REF = z.strictObject({
+  name: PICTURE_NAME,
+  seen: z.string().trim().min(1).max(4_000).optional(),
+});
+export type FaceRef = z.infer<typeof FACE_REF>;
+
+const TEXT_BUBBLE = z.strictObject({
+  text: TEXT(4_000),
+  type: MESSAGE_TYPE.optional(),
+});
+/** A bubble as the speaker sends it, its face (if any) already resolved. */
+const SAID_BUBBLE = TEXT_BUBBLE.extend({ face: FACE_REF.optional() });
 /** A sticker as delivered: what everyone reads, frozen when it is sent. */
 const STICKER_BUBBLE = z.strictObject({
   text: TEXT(4_000),
@@ -87,7 +97,11 @@ const STICKER_BUBBLE = z.strictObject({
  * One bubble as a plain string (speech), with its type, or a sticker resolved
  * from the sender's set.
  */
-export type Bubble = z.infer<typeof BUBBLE> | z.infer<typeof STICKER_BUBBLE>;
+export type Bubble =
+  | string
+  | z.infer<typeof TEXT_BUBBLE>
+  | z.infer<typeof SAID_BUBBLE>
+  | z.infer<typeof STICKER_BUBBLE>;
 
 /** Absolute ceiling; the tool offers `messaging.maxBubbles`. */
 const MAX_BUBBLES = 32;
@@ -95,22 +109,35 @@ const MAX_BUBBLES = 32;
 /**
  * The `send_message` tool's arguments, with at most `maxBubbles` bubbles. A
  * character with stickers may also pick one of `stickers` by name; `about` is
- * that field's description. It only ever says something somewhere: a chat is
- * started by `create_group` or `talk`, so the address is always required (an
- * optional one was left out on 41% of follow-up sends, 2026-11-05).
+ * that field's description. A character with portraits may give a line one of
+ * its `moods` as its `face`; one it doesn't have is dropped, never refused. It
+ * only ever says something somewhere: a chat is started by `create_group` or
+ * `talk`, so the address is always required (an optional one was left out on
+ * 41% of follow-up sends, 2026-11-05).
  */
 export const sendMessageSchema = (
   maxBubbles: number,
   stickers: readonly string[] = [],
   about = "",
+  moods: readonly string[] = [],
 ) => {
   const [first, ...rest] = stickers;
-  const bubble = first
-    ? z.union([
-        ...BUBBLE.options,
-        z.strictObject({ sticker: z.enum([first, ...rest]).describe(about) }),
-      ])
-    : BUBBLE;
+  const [mood, ...more] = moods;
+  const text = mood
+    ? TEXT_BUBBLE.extend({
+        face: z
+          .enum([mood, ...more])
+          .optional()
+          .catch(undefined),
+      })
+    : TEXT_BUBBLE;
+  const bubble = z.union([
+    TEXT(4_000),
+    text,
+    ...(first
+      ? [z.strictObject({ sticker: z.enum([first, ...rest]).describe(about) })]
+      : []),
+  ]);
   return z.strictObject({
     sessionKey: CHAT_SESSION,
     messages: z.array(bubble).min(1).max(maxBubbles),
@@ -119,21 +146,26 @@ export const sendMessageSchema = (
 /** A paced multi-bubble send; the host adapter supplies its identity. */
 export const SPEECH_REQUEST = CHAT_TARGET.extend({
   messages: z
-    .array(z.union([...BUBBLE.options, STICKER_BUBBLE]))
+    .array(z.union([TEXT(4_000), SAID_BUBBLE, STICKER_BUBBLE]))
     .min(1)
     .max(MAX_BUBBLES),
   requestId: z.string().trim().min(1).max(128),
 }).refine(...HAS_TARGET);
 
-/** A bubble's words and type, and its sticker if it is one. */
+/** A bubble's words and type, its sticker if it is one, and its face. */
 export function bubbleOf(bubble: Bubble): {
   readonly text: string;
   readonly type: MessageType;
   readonly sticker?: StickerRef;
+  readonly face?: FaceRef;
 } {
   if (typeof bubble === "string") return { text: bubble, type: "speech" };
   if (bubble.type === "sticker") return bubble;
-  return { text: bubble.text, type: bubble.type ?? "speech" };
+  return {
+    text: bubble.text,
+    type: bubble.type ?? "speech",
+    ...("face" in bubble && bubble.face ? { face: bubble.face } : {}),
+  };
 }
 
 /** Explicit action or sticker marker in recalled text; speech is the default. */
@@ -144,6 +176,20 @@ export function readAs(params: {
   return params.type === "action" || params.type === "sticker"
     ? `[type=${params.type}] ${params.text}`
     : params.text;
+}
+/**
+ * A line as its listeners read it: `readAs`, after what they see of the
+ * speaker's face when it changed.
+ */
+export function heardAs(params: {
+  readonly text: string;
+  readonly type?: MessageType;
+  readonly face?: FaceRef;
+}): string {
+  const seen = params.face?.seen;
+  return readAs(
+    seen === undefined ? params : { ...params, text: `${seen} ${params.text}` },
+  );
 }
 export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
 
@@ -162,10 +208,14 @@ export const DELIVERY_REQUEST = MESSAGE.refine(...HAS_TARGET);
 export const DELIVERY = MESSAGE.extend({
   type: DELIVERED_TYPE.optional(),
   sticker: STICKER_REF.optional(),
+  face: FACE_REF.optional(),
 })
   .refine(...HAS_TARGET)
   .refine((params) => (params.type === "sticker") === Boolean(params.sticker), {
     message: "A sticker message carries its sticker, and only it does.",
+  })
+  .refine((params) => params.type !== "sticker" || !params.face, {
+    message: "A sticker has no face of its own.",
   });
 export type SendMessageParams = z.infer<typeof DELIVERY>;
 

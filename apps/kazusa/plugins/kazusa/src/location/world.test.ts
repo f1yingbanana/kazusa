@@ -103,6 +103,73 @@ describe("the world on disk", () => {
     expect(lintMap(dir)[0]?.message).toContain("home nowhere isn't on the map");
   });
 
+  it("reports a backdrop naming no set, and reloads when the library changes", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kazusa-world-"));
+    roots.push(root);
+    const dir = path.join(root, "shared/wiki");
+    const library = path.join(root, "shared/backdrops");
+    mkdirSync(path.join(dir, "entities/places"), { recursive: true });
+    mkdirSync(path.join(library, "street"), { recursive: true });
+    writeFileSync(path.join(library, "street/day.webp"), "day");
+    writeFileSync(
+      path.join(dir, "entities/places/office.md"),
+      place("office", "backdrop: lobby\n"),
+    );
+    writeFileSync(
+      path.join(dir, "entities/places/street.md"),
+      place("street", "backdrop: street\n" + connected),
+    );
+    expect(lintMap(dir)).toEqual([
+      {
+        level: "error",
+        page: "world/office",
+        message: expect.stringContaining("backdrop lobby isn't a set"),
+      },
+    ]);
+    const onChange = vi.fn();
+    const world = sharedWorld(dir, { warn: () => {}, onChange });
+    expect(world()?.map.places.get("office")?.backdrop).toBeUndefined();
+    expect(world()?.map.places.get("street")?.backdrop).toBe("street");
+    onChange.mockClear();
+
+    // The set arrives: the map takes it without a page edit.
+    await vi.waitFor(() => {
+      mkdirSync(path.join(library, "lobby"), { recursive: true });
+      writeFileSync(path.join(library, "lobby/night.webp"), "night");
+      expect(world()?.map.places.get("office")?.backdrop).toBe("lobby");
+    }, SOON);
+    expect(onChange).toHaveBeenCalled();
+    expect(world()?.backdrops.sets.get("lobby")?.files.has("night")).toBe(true);
+    expect(lintMap(dir)).toEqual([]);
+  });
+
+  it("follows a backdrop library made after it started", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kazusa-world-"));
+    roots.push(root);
+    const dir = path.join(root, "shared/wiki");
+    const library = path.join(root, "shared/backdrops");
+    mkdirSync(path.join(dir, "entities/places"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "entities/places/office.md"),
+      place("office", "backdrop: lobby\n"),
+    );
+    const world = sharedWorld(dir, { warn: () => {}, onChange: () => {} });
+    expect(world()?.map.places.get("office")?.backdrop).toBeUndefined();
+
+    // The first import makes the library, then fills it.
+    await vi.waitFor(() => {
+      mkdirSync(path.join(library, "lobby"), { recursive: true });
+      writeFileSync(path.join(library, "lobby/day.webp"), "day");
+      expect(world()?.map.places.get("office")?.backdrop).toBe("lobby");
+    }, SOON);
+    await vi.waitFor(() => {
+      writeFileSync(path.join(library, "lobby/night.webp"), "night");
+      expect(world()?.backdrops.sets.get("lobby")?.files.has("night")).toBe(
+        true,
+      );
+    }, SOON);
+  });
+
   it("loads a map that was broken from the start", () => {
     const { dir, write } = wiki();
     write("places/tavern.md", place("tavern", "parent: nowhere\n"));
