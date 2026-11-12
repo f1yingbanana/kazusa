@@ -27,13 +27,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const SIZE = 256;
-const AGENT = "kazusa-stickers/1.0 (character sticker import)";
+export const AGENT = "kazusa-stickers/1.0 (character sticker import)";
 /** Source width for face crops: plenty for a 256 px face, a third the bytes. */
-const FACE_SOURCE_WIDTH = 1200;
-const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const FACE_SOURCE_WIDTH = 1200;
+export const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 async function fetchRetry(url, init = {}, tries = 4) {
   for (let attempt = 1; ; attempt++) {
@@ -55,8 +56,11 @@ async function fetchRetry(url, init = {}, tries = 4) {
   }
 }
 
-/** File title → original size and a download URL, at most `width` wide. */
-async function imageInfo(wiki, files, width) {
+/**
+ * File title → original size and a download URL, at most `width` wide.
+ * `get(url)` fetches; it defaults to this script's own retrying fetch.
+ */
+export async function imageInfo(wiki, files, width, get = fetchRetry) {
   const info = new Map();
   for (let at = 0; at < files.length; at += 40) {
     const titles = files.slice(at, at + 40).map((file) => `File:${file}`);
@@ -70,7 +74,7 @@ async function imageInfo(wiki, files, width) {
       formatversion: "2",
     });
     const data = await (
-      await fetchRetry(`${wiki.replace(/\/$/, "")}/api.php?${query}`)
+      await get(`${wiki.replace(/\/$/, "")}/api.php?${query}`)
     ).json();
     const normalized = new Map(
       (data.query?.normalized ?? []).map(({ from, to }) => [to, from]),
@@ -91,16 +95,21 @@ async function imageInfo(wiki, files, width) {
 }
 
 /** Fandom serves WebP by default; `format=original` asks for the PNG. */
+export const originalFormat = (url) =>
+  `${url}${url.includes("?") ? "&" : "?"}format=original`;
+
 async function download(url) {
-  const withFormat = `${url}${url.includes("?") ? "&" : "?"}format=original`;
-  return Buffer.from(await (await fetchRetry(withFormat)).arrayBuffer());
+  return Buffer.from(
+    await (await fetchRetry(originalFormat(url))).arrayBuffer(),
+  );
 }
 
 /**
- * The square around where a set's pictures differ: the eyes, mouth and blush of
- * expression portraits. Widened to the whole head, and kept on the canvas.
+ * Where a set's pictures differ: the rows `ys` and columns `xs` spanned by the
+ * eyes, mouth and blush of expression portraits, in the first picture's pixels,
+ * or undefined when nothing differs.
  */
-async function faceBox(buffers) {
+export async function faceFeatures(buffers) {
   const first = await sharp(buffers[0])
     .ensureAlpha()
     .raw()
@@ -146,6 +155,14 @@ async function faceBox(buffers) {
   const ys = span(rows);
   const xs = span(cols);
   if (!ys || !xs) return undefined;
+  return { xs, ys, width, height };
+}
+
+/**
+ * The square around a set's features (`faceFeatures`), widened to the whole
+ * head and kept on the canvas.
+ */
+export function boxAround({ xs, ys, width, height }) {
   const featureWidth = xs[1] - xs[0];
   const featureHeight = ys[1] - ys[0];
   // Eyes to mouth is about half a head's width; the head sits a little above.
@@ -162,7 +179,13 @@ async function faceBox(buffers) {
   ];
 }
 
-const toSticker = (image) =>
+/** The square around where a set's pictures differ. */
+export async function faceBox(buffers) {
+  const features = await faceFeatures(buffers);
+  return features && boxAround(features);
+}
+
+export const toSticker = (image) =>
   image
     .resize(SIZE, SIZE, {
       fit: "contain",
@@ -172,12 +195,51 @@ const toSticker = (image) =>
     .toBuffer();
 
 /**
+ * How `stage` crops a set of downloaded pictures. For `face`, `box` (in the
+ * source's own pixels, `sourceWidth` wide) is scaled to the downloads, or found
+ * with `faceBox` when the set has two or more pictures; `features` is what
+ * `faceFeatures` found, if it ran. `scale` is download / source width.
+ */
+export async function cropOfSet(buffers, { face, box, sourceWidth }) {
+  if (!face) return { box, scale: 1 };
+  // A box is in the source's own pixels; the download may be smaller.
+  const { width } = await sharp(buffers[0]).metadata();
+  const scale = width / sourceWidth;
+  if (box) return { box: box.map((value) => Math.round(value * scale)), scale };
+  const features = buffers.length > 1 ? await faceFeatures(buffers) : undefined;
+  return { box: features && boxAround(features), scale, features };
+}
+
+/**
+ * One downloaded picture as `stage` stickers it: the square `box` (download
+ * pixels) cut out, or with no box the whole picture trimmed.
+ */
+export async function stickerOf(buffer, box) {
+  let image = sharp(buffer).ensureAlpha();
+  if (box) {
+    const meta = await sharp(buffer).metadata();
+    const side = Math.min(box[2], meta.width - box[0], meta.height - box[1]);
+    image = image.extract({
+      left: box[0],
+      top: box[1],
+      width: side,
+      height: side,
+    });
+  } else image = sharp(await image.trim().toBuffer());
+  return toSticker(image);
+}
+
+/**
  * Cells on a checkerboard, so transparency and crop edges show, captioned with
  * their number or `captions`.
  */
-async function contactSheet(files, out, captions) {
+export async function contactSheet(
+  files,
+  out,
+  captions,
+  columns = Math.min(5, files.length),
+) {
   const cell = 176;
-  const columns = Math.min(5, files.length);
   const rows = Math.ceil(files.length / columns);
   const checker = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${columns * cell}" height="${rows * cell}">
@@ -211,7 +273,7 @@ async function contactSheet(files, out, captions) {
   await sharp(checker).composite(layers).png().toFile(out);
 }
 
-async function stage(planFile, dir) {
+export async function stage(planFile, dir) {
   const plan = JSON.parse(readFileSync(planFile, "utf8"));
   const face = plan.crop !== "whole";
   const staged = { wiki: plan.wiki, crop: face ? "face" : "whole", sets: [] };
@@ -232,39 +294,17 @@ async function stage(planFile, dir) {
     if (files.length === 0) continue;
     const buffers = [];
     for (const file of files) buffers.push(await download(info.get(file).url));
-    let box = set.box;
-    let scale = 1;
-    if (face) {
-      // A box is in the source's own pixels; the download may be smaller.
-      const { width } = await sharp(buffers[0]).metadata();
-      scale = width / info.get(files[0]).width;
-      box = box
-        ? box.map((value) => Math.round(value * scale))
-        : buffers.length > 1
-          ? await faceBox(buffers)
-          : undefined;
-      if (!box)
-        console.warn(`${set.id}: no differences to find a face; give a box`);
-    }
+    const { box, scale } = await cropOfSet(buffers, {
+      face,
+      box: set.box,
+      sourceWidth: info.get(files[0]).width,
+    });
+    if (face && !box)
+      console.warn(`${set.id}: no differences to find a face; give a box`);
     const written = [];
     for (const [index, buffer] of buffers.entries()) {
-      let image = sharp(buffer).ensureAlpha();
-      if (face && box) {
-        const meta = await sharp(buffer).metadata();
-        const side = Math.min(
-          box[2],
-          meta.width - box[0],
-          meta.height - box[1],
-        );
-        image = image.extract({
-          left: box[0],
-          top: box[1],
-          width: side,
-          height: side,
-        });
-      } else image = sharp(await image.trim().toBuffer());
       const file = path.join(out, `${index + 1}.webp`);
-      writeFileSync(file, await toSticker(image));
+      writeFileSync(file, await stickerOf(buffer, face && box));
       written.push(file);
     }
     await contactSheet(written, path.join(out, "sheet.png"));
@@ -309,7 +349,7 @@ async function stage(planFile, dir) {
   );
 }
 
-function place(labelsFile) {
+export function place(labelsFile) {
   const labels = JSON.parse(readFileSync(labelsFile, "utf8"));
   const outfits = labels.outfits ?? {};
   for (const word of Object.keys(outfits))
@@ -347,7 +387,7 @@ function place(labelsFile) {
 }
 
 /** A placed set's pictures captioned with their names, for checking labels. */
-async function sheet(stickersDir, out) {
+export async function sheet(stickersDir, out) {
   const files = readdirSync(stickersDir)
     .filter((file) => /\.(webp|png|gif|jpe?g|avif)$/.test(file))
     .sort();
@@ -358,14 +398,16 @@ async function sheet(stickersDir, out) {
   );
 }
 
-const [command, ...rest] = process.argv.slice(2);
-if (command === "stage" && rest.length === 2) await stage(rest[0], rest[1]);
-else if (command === "place" && rest.length === 1) place(rest[0]);
-else if (command === "sheet" && rest.length === 2)
-  await sheet(rest[0], rest[1]);
-else {
-  console.error(
-    "Usage: stickers.mjs stage <plan.json> <dir> | place <labels.json> | sheet <stickers dir> <out.png>",
-  );
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [command, ...rest] = process.argv.slice(2);
+  if (command === "stage" && rest.length === 2) await stage(rest[0], rest[1]);
+  else if (command === "place" && rest.length === 1) place(rest[0]);
+  else if (command === "sheet" && rest.length === 2)
+    await sheet(rest[0], rest[1]);
+  else {
+    console.error(
+      "Usage: stickers.mjs stage <plan.json> <dir> | place <labels.json> | sheet <stickers dir> <out.png>",
+    );
+    process.exit(1);
+  }
 }
