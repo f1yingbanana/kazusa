@@ -613,6 +613,65 @@ describe("the scene", () => {
     expect(figure(container, "alice")?.dataset.lit).toBe("false");
   });
 
+  it("changes a figure's face as its line starts, keeps it, and shows the neutral one for a face it has no picture of", async () => {
+    const { container } = renderWith(
+      chatView(huddle([PLAYER, "alice", "bob"])),
+    );
+    await waitFor(() => expect(figureIds(container)).toEqual(["alice"]));
+    const picture = () =>
+      figure(container, "alice")?.querySelector("img")?.getAttribute("src");
+    await screen.findByRole("img", { name: "Alice" });
+    expect(picture()).toBe("/p/alice-neutral");
+    const now = DAY + 12 * HOUR;
+    act(() =>
+      stream().emit({
+        type: "typing",
+        chatId: "huddle",
+        senderId: "alice",
+        senderName: "Alice",
+        isTyping: true,
+        mode: "speaking",
+        speech: {
+          text: "Finally!",
+          face: { name: "happy" },
+          from: now,
+          until: now + 1_000,
+        },
+      }),
+    );
+    // Smiling as she starts to say it, on the same figure.
+    expect(screen.getByRole("img", { name: "Alice, happy" })).toBe(
+      figure(container, "alice")?.querySelector("img"),
+    );
+    expect(picture()).toBe("/p/alice-happy");
+    // Her next line without a face keeps it.
+    act(() =>
+      stream().emit({
+        type: "message",
+        chatId: "huddle",
+        message: { ...message("alice", "Finally!"), face: { name: "happy" } },
+      }),
+    );
+    act(() =>
+      stream().emit({
+        type: "message",
+        chatId: "huddle",
+        message: message("alice", "shrugs.", "action"),
+      }),
+    );
+    expect(picture()).toBe("/p/alice-happy");
+    // A face her set has no picture of: her neutral one.
+    act(() =>
+      stream().emit({
+        type: "message",
+        chatId: "huddle",
+        message: { ...message("alice", "Hmph."), face: { name: "annoyed" } },
+      }),
+    );
+    expect(picture()).toBe("/p/alice-neutral");
+    expect(screen.getByRole("img", { name: "Alice" })).toBeTruthy();
+  });
+
   it("shows the lines of someone without portraits under their name, drawing nobody for them", async () => {
     const { container } = renderWith(
       chatView(huddle([PLAYER, "alice", "bob"])),

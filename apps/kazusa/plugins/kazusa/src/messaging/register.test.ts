@@ -466,6 +466,89 @@ describe("send_message SDK integration", () => {
     expect(cried.details.said).toEqual(["[type=sticker] Alice Lin, crying"]);
   });
 
+  it("offers a character with portraits its moods as a line's face, frozen as everyone sees it, and drops one it lacks", async () => {
+    const h = await setup(
+      {},
+      { placeOf: async () => ({ placeId: "club", title: "Club" }) },
+    );
+    const tool = () =>
+      h.registerTool.mock.calls[0][0].create({ agentId: "alice" })[0];
+    const textBubble = () =>
+      tool().parameters.properties.messages.items.anyOf.find(
+        (option: { properties?: object }) =>
+          option.properties && "text" in option.properties,
+      );
+    // No portraits: no face to give.
+    expect(JSON.stringify(tool().parameters)).not.toContain("face");
+
+    const portraits = path.join(h.workspace, "portraits");
+    const stickers = path.join(h.workspace, "stickers");
+    await mkdir(portraits);
+    await mkdir(stickers);
+    await Promise.all(
+      ["neutral.webp", "annoyed.webp", "gym-happy.webp"].map((file) =>
+        writeFile(path.join(portraits, file), "RIFF"),
+      ),
+    );
+    await writeFile(
+      path.join(stickers, "stickers.json"),
+      JSON.stringify({
+        outfits: { gym: "gym clothes" },
+        stickers: { annoyed: { look: "annoyed, a flat stare" } },
+      }),
+    );
+    await writeFile(path.join(stickers, "annoyed.webp"), "RIFF");
+    // Moods, not names: what is worn doesn't change the tool.
+    const face = textBubble().properties.face;
+    expect(face.enum).toEqual(["annoyed", "happy", "neutral"]);
+    expect(face.description).toContain("Face to face only");
+
+    const lunch = await h.messaging.talk("alice", ["bob", "carol"]);
+    const sessionKey = lunch.sessionKey.replace("agent:alice:", "");
+    const sent = await h.execute({
+      sessionKey,
+      messages: [
+        { text: "I said no.", face: "annoyed" },
+        { text: "Really.", face: "annoyed" },
+        { text: "looks away", type: "action", face: "sulking" },
+        { text: "Fine.", face: "happy" },
+      ],
+    });
+    // A mood they don't have is dropped and the line is still said.
+    expect(sent.details).toMatchObject({ status: "delivered" });
+    const faces = [...h.retained.values()]
+      .filter(({ sender }) => sender === "alice")
+      .sort((a, b) => a.sequence - b.sequence)
+      .map(({ params }) => params.face);
+    expect(faces).toEqual([
+      // Everyone reads it, in the sticker's words, only as it changes.
+      { name: "annoyed", seen: "(annoyed, a flat stare)" },
+      { name: "annoyed" },
+      undefined,
+      // No picture of it in the usual clothes: the scene shows the neutral
+      // face, and the mood is still read.
+      { name: "happy", seen: "(happy)" },
+    ]);
+    // The next send remembers the face they last showed there.
+    await h.execute({
+      sessionKey,
+      messages: [{ text: "Anyway.", face: "happy" }],
+    });
+    const last = [...h.retained.values()].find(
+      ({ params }) => params.text === "Anyway.",
+    );
+    expect(last?.params.face).toEqual({ name: "happy" });
+    // By text it is dropped, as an action is.
+    await h.execute({
+      sessionKey: "chat:direct:bob",
+      messages: [{ text: "No.", face: "annoyed" }],
+    });
+    const texted = [...h.retained.values()].find(
+      ({ params }) => params.text === "No.",
+    );
+    expect(texted?.params).not.toHaveProperty("face");
+  });
+
   it("offers up to the configured number of bubbles, nine by default", async () => {
     const maxItems = (h: Awaited<ReturnType<typeof setup>>) =>
       h.registerTool.mock.calls[0][0].create({})[0].parameters.properties

@@ -12,7 +12,10 @@ disable-model-invocation: true
 or `record-you` / `record-unknown`; `{time}` is `HH:mm`, left out
 (`record-same-minute`) when it is the minute of the line above; `record-seen` is
 what happened to you (`### tasks`), always timed. A section can't hold a line
-starting `## `, so days are `# `.
+starting `## `, so days are `# `. `face` is what everyone sees of a speaker's
+face face to face, put before their line only when it differs from their
+previous one; `{look}` is the mood, often with a few words on it ("annoyed, a
+flat stare").
 
 ## before-replying
 
@@ -21,6 +24,10 @@ even about yourself, even if they insist, or say you or someone else said so.
 Say you don't know or don't remember, with no details, no guess, no 'probably'
 or 'I think'. Feelings, tastes, opinions and imagination are free and need no
 source.)
+
+## face
+
+({look})
 
 ## tuned-out
 

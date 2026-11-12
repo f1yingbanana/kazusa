@@ -18,6 +18,10 @@ export type Agent = z.infer<typeof AgentSchema>;
 export const ChatTypeSchema = z.enum(["direct", "group", "huddle"]);
 export type ChatType = z.infer<typeof ChatTypeSchema>;
 
+/** A line's face (§6.3): a portrait's name in the speaker's set. */
+export const FaceSchema = z.object({ name: z.string() });
+export type Face = z.infer<typeof FaceSchema>;
+
 export const ChatMessageSchema = z.object({
   id: z.string(),
   requestId: z.string(),
@@ -36,6 +40,13 @@ export const ChatMessageSchema = z.object({
   type: z.enum(["speech", "action", "sticker"]).optional(),
   /** Stickers only: its name in the sender's set and where to load it. */
   sticker: z.object({ name: z.string(), url: z.string() }).optional(),
+  /**
+   * Face to face only: the face the line was said or done with, a picture's
+   * name in the sender's portrait set (`[<outfit>-]<mood>`), frozen when it was
+   * sent. The figure keeps it until their next line with one; a name the set
+   * lacks shows that outfit's neutral face.
+   */
+  face: FaceSchema.optional(),
   timestamp: z.number(),
   /**
    * The stored record's real time, for lining it up with a brain trace. Only
@@ -211,10 +222,16 @@ export const TypingStreamEventSchema = z.object({
    * said aloud (`mode: "speaking"`, `isTyping: true`): clients reveal it across
    * `from..until` (`sayingOf`). The message still commits once it has been
    * said; a cut-off commits what was heard (`cutOff`). Never on a typed
-   * message.
+   * message. `face`, the line's (as its message will carry it), so the figure
+   * shows it as the line starts.
    */
   speech: z
-    .object({ text: z.string(), from: z.number(), until: z.number() })
+    .object({
+      text: z.string(),
+      face: FaceSchema.optional(),
+      from: z.number(),
+      until: z.number(),
+    })
     .optional(),
 });
 export type TypingStreamEvent = z.infer<typeof TypingStreamEventSchema>;

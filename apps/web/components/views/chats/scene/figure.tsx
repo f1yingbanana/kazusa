@@ -47,10 +47,12 @@ function layer(
  * is the pictures' own. It stands with its feet on the scene's floor line and
  * its centre on its column's, each outfit at the scale that draws the character
  * as tall as they are (`standFigure`; `portraits.json` says where and how
- * large). Only people with portraits are figures. `lit`: the speaker of the
- * panel's line, at full brightness while the others are dimmed (`undefined`:
- * nobody dimmed); nobody changes size or place for it. Walking in and out ends
- * in `settle`; a change of column slides.
+ * large). Its face is the mood of its look (a line's face, §6.3), else, or
+ * where the outfit has no picture of that mood, its neutral one. Only people
+ * with portraits are figures. `lit`: the speaker of the panel's line, at full
+ * brightness while the others are dimmed (`undefined`: nobody dimmed); nobody
+ * changes size or place for it. Walking in and out ends in `settle`; a change
+ * of column slides.
  */
 export function SceneFigure({
   chatId,
@@ -103,7 +105,8 @@ export function SceneFigure({
   // Each form is its own element (`key`): the empty stand-in turned into the
   // portrait would carry the walk's timing into `top` and `height`.
   if (set && portrait && broken !== portrait.url) {
-    const mood = figure.look.mood;
+    // The face drawn: a mood the outfit lacks shows its neutral one.
+    const mood = portrait.mood;
     const stood = sceneHeight
       ? standFigure(portrait.placement, sceneHeight, framing)
       : undefined;

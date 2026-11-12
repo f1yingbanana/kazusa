@@ -31,6 +31,7 @@ import {
   LIST_CHATS,
   SPEECH_REQUEST,
   bubbleOf,
+  heardAs,
   readAs,
   MANAGE_CHAT,
   PARTICIPANT_ID,
@@ -46,6 +47,7 @@ import {
   type ChatKind,
   type ChatSummary,
   type ManageChatParams,
+  type FaceRef,
   type SendMessageParams,
   type SpeechParams,
 } from "./conversations.ts";
@@ -229,6 +231,9 @@ export function clientMessage(
           },
         }
       : {}),
+    ...(delivery.params.face
+      ? { face: { name: delivery.params.face.name } }
+      : {}),
     timestamp: delivery.timestamp,
     ...(createdAt === undefined ? {} : { createdAt }),
     ...(receipts.length ? { receipts } : {}),
@@ -342,6 +347,11 @@ export interface MessagingState {
   readonly streams: Set<(event: MessagingEvent) => void>;
   /** Who is speaking in each huddle, and who waits to. */
   readonly floors: Floors;
+  /**
+   * The face each member last said a line with, by `chatId:participantId`, so a
+   * face is read only when it changes; forgotten when they leave.
+   */
+  readonly faces: Map<string, string>;
   initialized: boolean;
   sequence: number;
 }
@@ -357,6 +367,7 @@ export function createMessagingState(): MessagingState {
     typing: new Map(),
     streams: new Set(),
     floors: new Floors(),
+    faces: new Map(),
     initialized: false,
     sequence: 0,
   };
@@ -624,13 +635,29 @@ export class Messaging {
       JSON.stringify(previous.members) !== JSON.stringify(chat.members)
     ) {
       for (const member of previous?.members ?? [])
-        if (!chat.members.includes(member)) this.clearTyping(member, chat.id);
+        if (!chat.members.includes(member)) {
+          this.clearTyping(member, chat.id);
+          this.shared.faces.delete(`${chat.id}:${member}`);
+        }
       this.emit({
         type: "chats",
         audience: [...new Set([...(previous?.members ?? []), ...chat.members])],
       });
     }
     this.scheduleRetry();
+  }
+
+  /**
+   * The face `agentId` last said a line with in the chat at `sessionKey`, while
+   * they are still in it; `undefined` for none, or for a chat they aren't in.
+   */
+  shownFace(agentId: string, sessionKey: string): string | undefined {
+    try {
+      const chat = this.requireChat(agentId, sessionKey);
+      return this.shared.faces.get(`${chat.id}:${agentId}`);
+    } catch {
+      return undefined;
+    }
   }
 
   /** Require current membership without disclosing another character's chats. */
@@ -1353,6 +1380,8 @@ export class Messaging {
     // survives the invoking turn and can be completed by the plugin service.
     await this.save(delivery, assertInvocationCurrent);
     this.rememberDelivery(delivery);
+    if (params.face)
+      this.shared.faces.set(`${chat.id}:${sender}`, params.face.name);
     // The message first, then that they stopped: a line said aloud that stops
     // with no message was never said, and a client takes it off the screen.
     const stops = this.stopTyping(sender, delivery.chatId);
@@ -1547,14 +1576,17 @@ export class Messaging {
     // Actions are seen only where the speaker is; in a text chat they are
     // dropped, so a model that adds one by habit changes nothing there.
     // Stickers are the other way round: a phone thing, dropped face to face.
+    // A face is seen only where the speaker is, as actions are.
     // The original index keeps each bubble's identity stable across replays.
     const inPlace =
       target.aloud === true ||
       Boolean(target.sessionKey?.match(/(?:^|:)chat:huddle:/));
     const bubbles = messages.flatMap((bubble, at) => {
-      const typed = bubbleOf(bubble);
+      const { face, ...typed } = bubbleOf(bubble);
+      const kept: typeof typed & { readonly face?: FaceRef } =
+        face && inPlace ? { ...typed, face } : typed;
       const pieces =
-        typed.type === (inPlace ? "sticker" : "action") ? [] : [typed];
+        typed.type === (inPlace ? "sticker" : "action") ? [] : [kept];
       // Message type is authoritative; Markdown never changes speech into actions.
       return pieces.map((piece, part) => ({
         index: part === 0 ? String(at) : `${at}.${part}`,
@@ -1600,6 +1632,7 @@ export class Messaging {
           readonly medium: Medium;
           readonly text: string;
           readonly index: string;
+          readonly face?: FaceRef;
           readonly startedAt: number;
           readonly ms: number;
         }
@@ -1638,13 +1671,14 @@ export class Messaging {
        * its chat. Resolving a target again could open a second new group.
        */
       let address: typeof target = target;
-      for (const { index, text, type, sticker } of bubbles) {
+      for (const { index, text, type, sticker, face } of bubbles) {
         const first = sent[0];
         const to = (where: typeof target): SendMessageParams => ({
           ...where,
           text,
           ...(type === "speech" ? {} : { type }),
           ...(sticker ? { sticker } : {}),
+          ...(face ? { face } : {}),
           requestId: messagingId([requestId, index]),
         });
         let bubble = to(address);
@@ -1727,6 +1761,7 @@ export class Messaging {
             medium,
             text,
             index,
+            ...(face ? { face } : {}),
             startedAt: this.deps.clock.now().simTime,
             ms,
           };
@@ -1742,6 +1777,7 @@ export class Messaging {
             medium === "speaking" && !sticker
               ? {
                   text,
+                  ...(face ? { face: { name: face.name } } : {}),
                   from: saying.startedAt,
                   until: saying.startedAt + saying.ms,
                 }
@@ -1794,6 +1830,7 @@ export class Messaging {
                 {
                   sessionKey: saying.sessionKey,
                   text: heard,
+                  ...(saying.face ? { face: saying.face } : {}),
                   requestId: messagingId([requestId, saying.index, "cut"]),
                 },
                 assertInvocationCurrent,
@@ -2275,7 +2312,7 @@ export class Messaging {
         sessionKey: copy.sessionKey,
         sender: delivery.sender,
         senderName: delivery.senderName,
-        text: readAs(delivery.params),
+        text: heardAs(delivery.params),
         timestamp: delivery.timestamp,
       });
       await this.serial.enqueue("messages", async () => {

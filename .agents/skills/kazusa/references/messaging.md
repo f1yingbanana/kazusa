@@ -550,6 +550,33 @@ places a labelled set into a workspace:
 - Labelling is by eye from the staged contact sheet. `place` writes the files
   and `stickers.json`.
 
+## Faces
+
+Face to face, a line or an action can carry the face it is said or done with:
+`{ "text": "I said no.", "face": "annoyed" }`. Unlike a sticker it is part of
+the line, not a message of its own, so it adds no stimulus and no attention
+decision ([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
+
+- **The field.** Only a character with portraits has it: an `enum` of the
+  distinct moods across their pictures (`faceMoods` in `messaging/faces.ts`,
+  from `readPortraits`), the same whatever they wear, so the schema stays in the
+  cached prefix. A mood they don't have is dropped (`.catch`) and the line is
+  still said. In a text chat the face is dropped, as an action is.
+- **Frozen at send** (`sayFaces`): the bubble becomes `face: { name, seen? }`.
+  `name` is the picture, `<mood>` in the usual clothes until outfits exist.
+  `seen` is what everyone reads of it, `kazusa-deliveries#face` filled with the
+  look of the sticker of that name, else the mood word; it is set only when the
+  face differs from the speaker's previous one in that chat, or the one before
+  it in the same call.
+- **The previous face** is `Messaging.shownFace`: kept in memory per chat and
+  speaker as messages are accepted, and forgotten when they leave. After a
+  restart the first face a speaker shows is read again.
+- **What everyone reads.** `heardAs` puts `seen` before the line, after any
+  `[type=action]`: `(annoyed, a flat stare) I said no.` Stimuli and ledgers read
+  that; `said` and the journal preview do not.
+- **Client.** `ChatMessage.face: { name }`, and the speaking event's
+  `speech.face`, so a figure changes face as the line starts.
+
 See [context assembly](context_engine.md) for the shared simulated-time window
 and [Perception](perception.md) for attention admission. The always-loaded
 `context-conventions` agent skill teaches discovery, both send forms, group

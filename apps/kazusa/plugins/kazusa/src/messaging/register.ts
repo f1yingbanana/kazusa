@@ -25,6 +25,8 @@ import { resolveStateDir } from "../state-dir.ts";
 import { openMessageDatabase, type MessageStore } from "./message-database.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
 import { readStickers, stickerText } from "../stickers/stickers.ts";
+import { readPortraits } from "../scene/portraits.ts";
+import { faceMoods, sayFaces } from "./faces.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
@@ -45,7 +47,7 @@ import {
   chatAddress,
   MANAGE_CHAT,
   isUser,
-  readAs,
+  heardAs,
   sendMessageSchema,
   type ChatConversation,
   type ChatSummary,
@@ -307,7 +309,7 @@ export function registerMessaging(
           // identity only for user-role rows, so assistant rows read back as
           // unattributed.
           role: "user",
-          content: [{ type: "text", text: readAs(delivery.params) }],
+          content: [{ type: "text", text: heardAs(delivery.params) }],
           timestamp: delivery.timestamp,
           idempotencyKey: `kazusa:message:${delivery.id}:${copy.agentId}`,
           __openclaw: {
@@ -489,6 +491,15 @@ export function registerMessaging(
           api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
         )
       : undefined;
+  /** The faces a character can give a line: their portraits' moods. */
+  const moodsOf = (agentId: string | undefined) =>
+    agentId
+      ? faceMoods(
+          readPortraits(
+            api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
+          ),
+        )
+      : [];
 
   api.registerTool(
     {
@@ -520,6 +531,7 @@ export function registerMessaging(
                 skillContext,
               )
             : "",
+          moodsOf(context.agentId),
         );
         return [
           {
@@ -539,8 +551,15 @@ export function registerMessaging(
                 );
               const params = sendMessage.parse(input);
               const senderName = await characterName(api, config, agentId);
+              // A face too: everyone reads it, in a few words, as it changes.
+              const faced = sayFaces(
+                params.messages,
+                stickersOf(agentId),
+                messaging.shownFace(agentId, params.sessionKey),
+                (look) => text("kazusa-deliveries#face", { look }, { agentId }),
+              );
               // A sticker is sent as what everyone reads, frozen now.
-              const messages = params.messages.map((bubble) => {
+              const messages = faced.map((bubble) => {
                 if (typeof bubble === "string" || !("sticker" in bubble))
                   return bubble;
                 const sticker = stickersOf(agentId)?.stickers.get(

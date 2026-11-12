@@ -132,6 +132,12 @@ export interface SceneState {
    */
   readonly wanted: boolean;
   /**
+   * The mood each member shows (§6.3): the face of their latest line that
+   * carried one, kept until their next, and forgotten when they leave. A figure
+   * wears it, from the moment it walks in.
+   */
+  readonly moods: Readonly<Record<string, string>>;
+  /**
    * The turn each member last spoke or acted on: a counter, not a time. Whoever
    * did so longest ago gives up their place first; the one-slot scene shows
    * whoever did so last.

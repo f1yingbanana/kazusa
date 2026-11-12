@@ -2719,4 +2719,82 @@ describe("the floor", () => {
     });
     expect(lines()).toEqual(["alice: Hi"]);
   });
+
+  it("shows a line's face as it starts, keeps it on the message, and puts what is seen of it before the line", async () => {
+    const { h, speaking, started } = await table();
+    const sessionKey = `chat:huddle:${started.chatId.slice("huddle:".length)}`;
+    const emitted: TypingStreamEvent[] = [];
+    h.messaging.onEvent((event) => {
+      if (event.type === "typing" && event.typing.isTyping)
+        emitted.push(event.typing);
+    });
+    expect(h.messaging.shownFace("alice", sessionKey)).toBeUndefined();
+    const said = h.messaging.speak("alice", "ALICE", {
+      requestId: "face",
+      sessionKey,
+      messages: [
+        {
+          text: "I said no.",
+          face: { name: "annoyed", seen: "(annoyed, a flat stare)" },
+        },
+      ],
+    });
+    await speaking("alice");
+    // The figure can change face as the line starts.
+    expect(emitted[0]?.speech).toMatchObject({
+      text: "I said no.",
+      face: { name: "annoyed" },
+    });
+    expect(emitted[0]?.speech?.face).not.toHaveProperty("seen");
+    h.setNow(NOW + 60_000);
+    expect(await said).toMatchObject({
+      status: "delivered",
+      said: ["I said no."],
+    });
+    const first = [...h.retained.values()].find(
+      (delivery) => delivery.params.text === "I said no.",
+    )!;
+    expect(first.params.face).toEqual({
+      name: "annoyed",
+      seen: "(annoyed, a flat stare)",
+    });
+    expect(clientMessage(first)).toMatchObject({
+      text: "I said no.",
+      face: { name: "annoyed" },
+    });
+    // Listeners read what they see of the face before the line.
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({ text: "(annoyed, a flat stare) I said no." }),
+      ),
+    );
+    expect(h.messaging.shownFace("alice", sessionKey)).toBe("annoyed");
+    // Someone who leaves takes their face with them.
+    await h.messaging.tuneOut("carol", sessionKey);
+    expect(h.messaging.shownFace("carol", sessionKey)).toBeUndefined();
+    expect(h.messaging.shownFace("alice", sessionKey)).toBe("annoyed");
+  });
+
+  it("drops a face in a text chat, as it does an action", async () => {
+    const h = setup();
+    expect(
+      await h.messaging.speak("alice", "ALICE", {
+        requestId: "texted",
+        sessionKey: "chat:direct:bob",
+        messages: [
+          { text: "No.", face: { name: "annoyed", seen: "(annoyed)" } },
+        ],
+      }),
+    ).toMatchObject({ status: "delivered" });
+    const [texted] = [...h.retained.values()];
+    expect(texted.params).not.toHaveProperty("face");
+    expect(clientMessage(texted)).not.toHaveProperty("face");
+    await vi.waitFor(() =>
+      expect(h.receive).toHaveBeenCalledWith(
+        "bob",
+        expect.objectContaining({ text: "No." }),
+      ),
+    );
+  });
 });

@@ -200,11 +200,19 @@ function update(
     : { ...state, figures: replace(state.figures, id, next) };
 }
 
-function enter(id: string, column: number): Figure {
+/** `look` with `mood` on its face; no mood, neutral. */
+function wearing(look: Look, mood: string | undefined): Look {
+  if (look.mood === mood) return look;
+  if (mood !== undefined) return { ...look, mood };
+  const { mood: _neutral, ...rest } = look;
+  return rest;
+}
+
+function enter(id: string, column: number, mood?: string): Figure {
   return {
     id,
     column,
-    look: NEUTRAL,
+    look: wearing(NEUTRAL, mood),
     presence: "entering",
   };
 }
@@ -221,7 +229,7 @@ function leave(figure: Figure): Figure {
 
 type Cast = Pick<
   SceneState,
-  "playerId" | "drawable" | "slots" | "spoke" | "speakers"
+  "playerId" | "drawable" | "slots" | "spoke" | "speakers" | "moods"
 >;
 
 function canDraw(state: Cast, id: string): boolean {
@@ -319,15 +327,24 @@ function claim(
     order.splice(at, 0, id);
     const column = figureColumns(order.length, state.slots)[at] ?? 0;
     const figure: Figure = current
-      ? { ...current, presence: "entering" }
-      : enter(id, column);
+      ? {
+          ...current,
+          look: wearing(current.look, state.moods[id]),
+          presence: "entering",
+        }
+      : enter(id, column, state.moods[id]);
     return arrange([...rest, figure], order, state.slots);
   }
   const out = victim(rest, state, swap);
   if (!out) return figures;
   const figure: Figure = current
-    ? { ...current, column: out.column, presence: "entering" }
-    : enter(id, out.column);
+    ? {
+        ...current,
+        column: out.column,
+        look: wearing(current.look, state.moods[id]),
+        presence: "entering",
+      }
+    : enter(id, out.column, state.moods[id]);
   return [...replace(rest, out.id, leave(out)), figure];
 }
 
@@ -375,6 +392,23 @@ function speak(state: SceneState, id: string): SceneState {
   };
 }
 
+/**
+ * `id` shows `mood` from now on (a line's face, §6.3), their figure too while
+ * it holds its place. With outfits not yet worn (§6.4), a face's picture name
+ * is its mood.
+ */
+function wear(state: SceneState, id: string, mood: string): SceneState {
+  if (id === state.playerId) return state;
+  const next =
+    state.moods[id] === mood
+      ? state
+      : { ...state, moods: { ...state.moods, [id]: mood } };
+  return update(next, id, (figure) => {
+    const look = wearing(figure.look, mood);
+    return holds(figure) && look !== figure.look ? { ...figure, look } : figure;
+  });
+}
+
 function withMembers(
   state: SceneState,
   members: readonly string[],
@@ -398,6 +432,8 @@ function withMembers(
         speakers:
           speakers.length === state.speakers.length ? state.speakers : speakers,
         saying: only(state.saying, (id) => keep.has(id)),
+        // Someone who leaves takes their face with them.
+        moods: only(state.moods, (id) => keep.has(id)),
       },
       fill(closeUp(left, state.slots), here, state),
     ),
@@ -439,6 +475,8 @@ function withTyping(
       : state;
   if (typing.mode !== "speaking") return state;
   let next = speak(state, id);
+  // Their face changes as the line starts.
+  if (typing.speech?.face) next = wear(next, id, typing.speech.face.name);
   next = state.speakers.includes(id)
     ? next
     : { ...next, speakers: [...state.speakers, id] };
@@ -466,14 +504,14 @@ function withTyping(
   return present(next, at);
 }
 
-/** `saying` without those `keep` refuses; the same object when nobody goes. */
-function only(
-  saying: SceneState["saying"],
+/** `byId` without those `keep` refuses; the same object when nobody goes. */
+function only<T>(
+  byId: Readonly<Record<string, T>>,
   keep: (id: string) => boolean,
-): SceneState["saying"] {
-  const ids = Object.keys(saying);
-  if (ids.every(keep)) return saying;
-  return Object.fromEntries(Object.entries(saying).filter(([id]) => keep(id)));
+): Readonly<Record<string, T>> {
+  const ids = Object.keys(byId);
+  if (ids.every(keep)) return byId;
+  return Object.fromEntries(Object.entries(byId).filter(([id]) => keep(id)));
 }
 
 /* Lines ------------------------------------------------------------------- */
@@ -676,8 +714,10 @@ function withMessage(
   let next: SceneState = { ...state, sequence };
   const id = message.senderId;
   if (id !== state.playerId) {
-    // The line is out: they take a turn, and stop speaking.
+    // The line is out: they take a turn, and stop speaking; with no speaking
+    // event before it (an action, an older Gateway), its face changes now.
     next = speak(next, id);
+    if (message.face) next = wear(next, id, message.face.name);
     if (next.speakers.includes(id))
       next = {
         ...next,
@@ -723,15 +763,18 @@ function withHistory(
     return sequence === state.sequence ? state : { ...state, sequence };
   let turn = state.turn;
   const spoke = { ...state.spoke };
+  const faces: Record<string, string> = {};
   for (const message of fresh)
-    if (message.senderId !== state.playerId) spoke[message.senderId] = ++turn;
+    if (message.senderId !== state.playerId) {
+      spoke[message.senderId] = ++turn;
+      if (message.face) faces[message.senderId] = message.face.name;
+    }
   const lines = fresh.slice(-HISTORY_MESSAGES).map(toLine);
-  const next: SceneState = {
-    ...state,
-    sequence,
-    turn,
-    spoke,
-  };
+  // Each shows the face of their latest line that carried one.
+  const next: SceneState = Object.entries(faces).reduce(
+    (scene, [id, mood]) => wear(scene, id, mood),
+    { ...state, sequence, turn, spoke },
+  );
   // Behind lines still waiting (or for the reader), history waits too, in
   // order; else it goes straight on screen, unpaced.
   const placed =
@@ -816,6 +859,7 @@ export function createScene(seed: SceneSeed): SceneState {
       saying: {},
       reading: false,
       wanted: false,
+      moods: {},
       spoke: {},
       turn: 0,
       sequence: Number.NEGATIVE_INFINITY,
@@ -834,10 +878,20 @@ export function createScene(seed: SceneSeed): SceneState {
   const members = [...new Set([...seed.members, ...speakers])].filter(
     (id) => id !== seed.playerId,
   );
+  // Opened mid-line: the face that line is said with.
+  const moods = { ...state.moods };
+  for (const speaker of seed.speaking ?? [])
+    if (
+      speaker.mode === "speaking" &&
+      speaker.speech?.face &&
+      speaker.senderId !== seed.playerId
+    )
+      moods[speaker.senderId] = speaker.speech.face.name;
   return {
     ...state,
     turn,
     spoke,
+    moods,
     members,
     speakers: [...new Set(speakers)],
     // Opened mid-line: it shows, revealed from where it has got to, as soon
@@ -859,10 +913,9 @@ export function createScene(seed: SceneSeed): SceneState {
           : [],
       ),
     ),
-    figures: fill([], members, { ...state, spoke }).map((figure): Figure => ({
-      ...figure,
-      presence: "here",
-    })),
+    figures: fill([], members, { ...state, spoke, moods }).map(
+      (figure): Figure => ({ ...figure, presence: "here" }),
+    ),
   };
 }
 

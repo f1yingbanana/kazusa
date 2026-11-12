@@ -979,6 +979,104 @@ describe("figures settle and change look", () => {
   });
 });
 
+describe("faces", () => {
+  /** A speaking event whose line carries a face. */
+  const sayingWith = (senderId: string, line: string, face: string) => ({
+    type: "typing" as const,
+    typing: {
+      senderId,
+      isTyping: true,
+      mode: "speaking" as const,
+      speech: { text: line, face: { name: face }, from: 0, until: 1000 },
+    },
+    at: 0,
+  });
+  const mood = (state: SceneState, id: string) =>
+    state.figures.find((figure) => figure.id === id)?.look.mood;
+
+  it("changes a figure's face as its line starts being said, keeping it until their next line that carries one", () => {
+    let state = scene({ members: [PLAYER, "a", "b"] });
+    state = direct(state, sayingWith("a", "I said no.", "annoyed"));
+    expect(mood(state, "a")).toBe("annoyed");
+    expect(mood(state, "b")).toBeUndefined();
+    // Landing with the same face changes nothing about the figure.
+    const figures = state.figures;
+    state = direct(
+      state,
+      said(msg("a", "I said no.", { face: { name: "annoyed" } })),
+    );
+    expect(state.figures.find((f) => f.id === "a")).toBe(
+      figures.find((f) => f.id === "a"),
+    );
+    // A line without one keeps it.
+    state = direct(state, said(msg("a", "Really.")));
+    expect(mood(state, "a")).toBe("annoyed");
+    state = direct(state, sayingWith("a", "Fine.", "happy"));
+    expect(mood(state, "a")).toBe("happy");
+  });
+
+  it("changes it as the line lands when nothing was said first: an action, or an older Gateway", () => {
+    let state = scene({ members: [PLAYER, "a"] });
+    state = direct(
+      state,
+      said(msg("a", "looks away", { type: "action", face: { name: "sad" } })),
+    );
+    expect(mood(state, "a")).toBe("sad");
+    expect(state.moods).toEqual({ a: "sad" });
+  });
+
+  it("takes a face away with someone who leaves; they come back neutral", () => {
+    let state = scene({ members: [PLAYER, "a", "b"] });
+    state = direct(state, sayingWith("a", "Bye.", "happy"));
+    state = direct(state, members("b"));
+    expect(state.figures.find((f) => f.id === "a")?.look).toEqual({});
+    expect(state.moods).toEqual({});
+    state = run(state, [{ type: "settle", id: "a" }, members("a", "b")]);
+    expect(mood(state, "a")).toBeUndefined();
+  });
+
+  it("opens on each member's latest face, and a figure walks in wearing its own", () => {
+    const opened = scene({
+      members: [PLAYER, "a", "b"],
+      messages: [
+        msg("a", "No.", { face: { name: "annoyed" } }),
+        msg("a", "Really."),
+        msg("b", "Hm.", { face: { name: "sad" } }),
+      ],
+      speaking: [
+        {
+          senderId: "b",
+          mode: "speaking",
+          speech: {
+            text: "Oh!",
+            face: { name: "surprised" },
+            from: 0,
+            until: 1,
+          },
+        },
+      ],
+    });
+    expect(mood(opened, "a")).toBe("annoyed");
+    expect(mood(opened, "b")).toBe("surprised");
+    // Five drawn; the sixth, speaking with a face, takes a place wearing it.
+    let state = scene({ members: [PLAYER, "a", "b", "c", "d", "e", "f"] });
+    expect(lineup(state)).not.toContain("f@0");
+    state = direct(state, sayingWith("f", "Me too.", "happy"));
+    expect(state.figures.find((f) => f.id === "f")).toMatchObject({
+      presence: "entering",
+      look: { mood: "happy" },
+    });
+  });
+
+  it("never gives the player a face", () => {
+    const state = direct(
+      scene({ members: [PLAYER, "a"] }),
+      said(msg(PLAYER, "hi", { face: { name: "happy" } })),
+    );
+    expect(state.moods).toEqual({});
+  });
+});
+
 describe("references", () => {
   it("keeps figures when only lines change, and other figures when one changes", () => {
     let state = scene({ members: [PLAYER, "a", "b"] });

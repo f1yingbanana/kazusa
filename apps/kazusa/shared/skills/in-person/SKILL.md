@@ -55,5 +55,8 @@ someone you know is somewhere in the crowd, a text can make more sense.
   call are neither seen nor heard. Delivered action bubbles do not change
   activity or location: eating, leaving, or going somewhere together still uses
   `start_task`. In a text chat action bubbles are dropped.
+- **Your face is seen.** Where `send_message` offers a `face`, give a line or an
+  action the mood you show only when your expression changes, and it stays until
+  you show another; nobody sees it by text.
 - Ignoring someone who talks to you face to face is a choice they see. You see
   what people are doing (their activity), not why; describe only what you do.
