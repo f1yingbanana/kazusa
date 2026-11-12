@@ -408,10 +408,12 @@ time of day (renderers read `useSimNow`).
 - **One scale.** Every portrait is drawn at its natural pixel size times one
   factor for the whole scene, standing on one floor line. Nothing is fitted to a
   box (§8.1).
-- **Centred on the figure, not the picture.** The point put on a column's centre
-  is the figure's own (`placement.centre`, the middle of the face), so a wing,
-  weapon or bag out to one side does not push the body off its column. One
-  outfit's pictures can also be scaled and moved by hand (§8.1).
+- **Centred and stood on the figure, not the picture.** The point put on a
+  column's centre is the figure's own (`placement.centre`, the middle of the
+  face), and the row put on the floor line is where it stands
+  (`placement.floor`), so a wing, weapon or bag that reaches out to one side or
+  below the shoes moves neither. Each outfit's `scale` draws the character as
+  tall as they are (§8.1).
 - **Face.** A figure keeps the mood of its last line that carried a `face`
   (§6.3). It returns to neutral when the person leaves the huddle.
 - **Lines.** The panel holds one line. The line it replaces becomes an echo; at
@@ -693,33 +695,47 @@ workspaces/<id>/
   by eye position was tried and dropped: it enlarged short characters and gave
   one character's outfits different head sizes.
 - **Placement is per outfit**, in `portraits.json`:
-  `"placement": { "": { "centre": 0.52, "scale": 0.93 }, "gym": { "centre": 0.48, "scale": 0.85, "offset": [0, -20] } }`.
+  `"placement": { "": { "centre": 0.52, "eyes": 0.17, "scale": 0.93 }, "gym": { "centre": 0.48, "floor": 0.95, "eyes": 0.15, "scale": 0.98, "offset": [0, -20] } }`.
   Keys are an outfit's word (`""` for pictures without one) or one picture's
   name, which wins.
   - `centre` is where the figure is across the picture (0 left edge, 1 right;
     the middle when absent): the importer writes the middle of the face the
-    stickers were cut from. Measuring where the feet are from the picture's
-    bottom rows was tried and dropped: a wing tip, a bike wheel or one toe is
-    often all that reaches them.
+    stickers were cut from. Taking the middle of the picture's bottom rows was
+    tried and dropped: a wing tip, a bike wheel or one toe is often all that
+    reaches them.
+  - `floor` is where the figure stands down the picture (0 top edge, 1 bottom;
+    the bottom edge when absent). The canvas bottom is usually the floor, but a
+    wing, a weapon or a bike's wheel can reach lower than the shoes, and the
+    figure then floats above everyone else's feet. The importer looks for the
+    lowest row with enough solid picture just above it, within reach of the
+    figure's centre, so a tip or a strand doesn't count (52 of this cast's 357
+    outfits stand above the bottom edge, most by 1–2%, the largest by 28%).
+  - `eyes` is where the eyes are down the picture, the same way.
   - `scale` (1 when absent) draws the character as tall as they are. The source
     art fills its canvas from halo to shoes whoever it shows, so its pixels say
     nothing about height. The importer takes the character's height (the plan's
-    `height`, or `--height`) and where the eyes are in the picture: while
-    standing, the eyes are at one fraction of anyone's height, whatever the
-    arms, wings, weapon or halo do, so
-    `scale = 8.11 px/cm × height ÷ eye height in the picture`. For this cast
-    that is 0.81 (128 cm) to 1.17 (180 cm), median 1.
+    `height`, or `--height`): while standing, the eyes are at one fraction of
+    anyone's height, whatever the arms, wings, weapon or halo do, so
+    `scale = 8.11 px/cm × height ÷ the pixels from floor to eyes`. For this cast
+    that is 0.83 (128 cm) to 1.23, median 1.
   - The rule is wrong for a figure that isn't standing (seated, kneeling, lying,
     crouched): its eyes are low for another reason. Those are set by hand, to
     the value that makes the head as large as in the character's standing
-    outfits (19 of this cast's 357 outfits; the world repository lists them in
-    `art-sources/portraits/_scales-by-hand.json`). The importer keeps a `scale`
-    or `offset` it finds, so a correction outlives a re-import.
+    outfits (20 of this cast's outfits; the world repository lists them in
+    `art-sources/portraits/_scales-by-hand.json`). The importer keeps a `scale`,
+    `floor` or `offset` it finds, so a correction outlives a re-import.
   - `offset` is `[right, down]` in the picture's own pixels, by hand.
   - Sizing by face size across characters was tried twice (the sticker's box,
     and the area where expressions differ) and dropped: both vary too much
     between characters. Within one character they agree well enough to check one
     outfit against the others.
+- **What the scene does with it** (`standFigure`): `centre` goes on the column's
+  centre and `floor` on the scene's floor line, at `scale` times the scene's own
+  factor. `FIGURE_HEIGHT` is that factor's one knob, the size of the whole cast:
+  it is below 1 so that the tallest characters' heads stay in the scene, and no
+  figure is ever shrunk on its own to fit. In the one-slot scene (an upright
+  phone) the `eyes` go to one height instead, so a short, a tall and a seated
+  character's faces are framed alike.
 - `size` and `eyeline` are still written, from the `neutral` set, but nothing
   reads them.
 - The default portrait is `neutral`, else the first by name. A character with no
@@ -976,6 +992,10 @@ One pull request per item (the project's rule), each usable alone.
   from the character's height and the eye height in the picture, set by hand for
   the few poses that aren't standing. Matching face sizes across characters was
   tried and made sizes worse.
+- **Figures stand on their feet** (2026-11-12), not on the picture's bottom
+  edge: a wing, weapon or wheel that reaches lower left some of them floating.
+- **One number sizes the whole cast** (2026-11-12): `FIGURE_HEIGHT`. Making the
+  tallest fit is never done by shrinking individual figures.
 - **No "…"** (2026-11-12): with the line delivered as it starts, a line being
   said is the typewriter.
 
