@@ -5,6 +5,7 @@ import type {
   DecisionRuntimeV1,
   ProviderFailureReason,
 } from "openclaw/plugin-sdk/decisions";
+import { deadlineSignal } from "../deadline.ts";
 
 /**
  * Jev, called directly rather than through `api.runtime.decisions`. OpenClaw's
@@ -88,21 +89,23 @@ export function directDecisions(
       return { status: "unavailable", reason: "credentials-unavailable" };
     const budget = Math.min(options.timeoutMs, MAX_BUDGET_MS);
     const deadlineAt = performance.now() + budget;
-    const deadline = AbortSignal.timeout(budget);
-    const late = () => deadline.aborted || performance.now() >= deadlineAt;
+    const deadline = deadlineSignal(budget, [options.signal]);
+    const late = () => deadline.timedOut() || performance.now() >= deadlineAt;
     let outcome: Awaited<ReturnType<DecisionProviderV1["evaluate"]>>;
     try {
       outcome = await provider.evaluate(batch, {
         // Jev reads its route per call; the host's model ref is not used.
         model: "jev",
         ...(options.agentId ? { agentId: options.agentId } : {}),
-        signal: AbortSignal.any([options.signal, deadline]),
+        signal: deadline.signal,
         deadlineMonotonicMs: deadlineAt,
       });
     } catch (error) {
       options.signal.throwIfAborted();
       if (late()) return { status: "unavailable", reason: "deadline" };
       throw error;
+    } finally {
+      deadline.dispose();
     }
     // A slow answer is not a sick provider: the host does not count it either.
     if (outcome.status === "unavailable" && late())

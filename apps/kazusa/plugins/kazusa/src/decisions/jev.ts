@@ -13,6 +13,7 @@ import {
 } from "../models/config.ts";
 import { modelSelection } from "../models/selection.ts";
 import { authProfileKeys, providerKeyConfigured } from "../providers/keys.ts";
+import { deadlineSignal } from "../deadline.ts";
 
 /**
  * Jev, as the one decision model OpenClaw is configured with: `kazusa/jev`.
@@ -295,6 +296,7 @@ export function createJevProvider(deps: JevDeps): DecisionProviderV1 {
         ]),
       );
       let response: JevResponse;
+      const deadline = deadlineSignal(Math.ceil(remaining), [context.signal]);
       try {
         response = await deps.post({
           url: route.url,
@@ -304,10 +306,7 @@ export function createJevProvider(deps: JevDeps): DecisionProviderV1 {
             state: batch.state,
             questions,
           }),
-          signal: AbortSignal.any([
-            context.signal,
-            AbortSignal.timeout(Math.ceil(remaining)),
-          ]),
+          signal: deadline.signal,
           beforeRequest: () => {
             if (context.isAdmissible && !context.isAdmissible())
               throw new Error("No longer admitted.");
@@ -316,6 +315,8 @@ export function createJevProvider(deps: JevDeps): DecisionProviderV1 {
       } catch {
         context.signal.throwIfAborted();
         return { status: "unavailable", reason: "transport" };
+      } finally {
+        deadline.dispose();
       }
       context.signal.throwIfAborted();
       if (response.status < 200 || response.status >= 300)
