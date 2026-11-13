@@ -868,7 +868,7 @@ export const ContextSettingsSchema = z.object({
   /** How far back records reach, in sim hours. */
   shortTermHours: z
     .number()
-    .min(24)
+    .min(1)
     .max(24 * 30),
   /** Records' share of a turn; `"unlimited"` takes what the maximum leaves. */
   ledgerMaxTokens: z.union([z.number().int().min(0), z.literal("unlimited")]),

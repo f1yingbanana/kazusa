@@ -29,10 +29,11 @@ or require starting the same task again. Decide as this person would, mid-task:
 
 If you were cut off mid-message, the `send_message` result shows how many of
 your bubbles were said, then what stopped you; the rest stayed unsaid. React to
-that first, and send the rest again only if it still fits. If more messages
-arrive while you react, fold them into what you are doing without repeating
-speech or tool calls that already succeeded. Record any plan or promise the
-conversation creates with `remember`, as described in your conventions.
+that first. The moment has moved on: usually let the rest go, and say it only if
+it is still new and still fits. If more messages arrive while you react, fold
+them into what you are doing without repeating speech or tool calls that already
+succeeded. Record any plan or promise the conversation creates with `remember`,
+as described in your conventions.
 
 Make any chosen reply and activity change through their tools before concluding.
 Nobody sees or hears ordinary brain output, including dialogue or action

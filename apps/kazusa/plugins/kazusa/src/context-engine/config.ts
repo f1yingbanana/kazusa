@@ -4,7 +4,7 @@ const allowance = (value: number) =>
   z.number().int().min(0).max(32_000).default(value);
 
 export const CONTEXT_ENGINE_CONFIG = z.strictObject({
-  shortTermHours: z.number().min(24).default(24),
+  shortTermHours: z.number().min(1).default(24),
   /**
    * Past records in a turn; `recall` is for anything older. `"unlimited"` gives
    * them whatever `maxContextTokens` leaves.

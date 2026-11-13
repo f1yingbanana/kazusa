@@ -172,7 +172,7 @@ function worthKeeping(
 }
 
 /** `shared/skills/perception/SKILL.md` `metadata.rubricVersion`. */
-const RUBRIC_VERSION = "13";
+const RUBRIC_VERSION = "16";
 
 const PACE_ANCHORS = z.array(z.looseObject({ pace: z.number().positive() }));
 

@@ -662,12 +662,18 @@ connect these modules in process.
   holds while it still fits, and when outgrown the block is cut back to
   `ledgerTrimTo` (0.75) of the budget, so it holds again. Measured on a
   simulated week at 64k-128k, this moves the start about 5 times a day instead
-  of every waking hour (stateless variants moved it twice as often). Each day
-  once, chats by stream, people by id (names collide), a time only when the
-  minute changes, all worded in `kazusa-deliveries`. A new day appends its own
-  line, so midnight breaks nothing. `MEMORY.md` stays in the host's cached
-  prefix: it changes on a few turns in a hundred (`remember` for oneself,
-  sleep), and after the records it would be paid every turn.
+  of every waking hour (stateless variants moved it twice as often). Each chat
+  (and `tasks`) whole under its address, never interleaved, the one with the
+  latest record last; a line for each day within it, people by id (names
+  collide), a time only when the minute changes, all worded in
+  `kazusa-deliveries`. Interleaved by time, a conversation lay scattered through
+  a day of every chat and characters (GLM-5.3-flash, live 2026-11-13) restated
+  what they had said there minutes before. Grouped, the chat being talked in is
+  usually last, beside the delivery that names it, and stays last turn after
+  turn, so everything above it keeps the cache; talking in another chat moves
+  that one to the end. `MEMORY.md` stays in the host's cached prefix: it changes
+  on a few turns in a hundred (`remember` for oneself, sleep), and after the
+  records it would be paid every turn.
 - **Maximum context and settings**: the host's `tokenBudget` is the model's
   whole window (`contextTokens` on the brain session entry: 1,048,576 for
   GLM-5.3-flash; OpenClaw's only cap is per model in `openclaw.json`, which
@@ -781,13 +787,13 @@ connect these modules in process.
   `[sticker=laughing]` a sticker. The tool has no other fields
   ([messaging](references/messaging.md)). Stored plain with `type: "action"` for
   the client. System lines are actions. `messaging.maxBubbles` (default 9) caps
-  a send. `manage_chat` only `leave`s a huddle
-  (`*steps back from the conversation*`, still at the place); speaking to one
-  you are not at fails in-world. Humans have no brain or native agent session.
-  Shared acceptance fans human messages out to agent members before Perception.
-  The `apps/web` prototype and Gateway HTTP adapter still need
-  contract/authentication alignment. Native WebChat group posting is
-  unsupported. Raw session tools remain denied via
+  a send; the guidance never names that number (GLM fills any number it reads).
+  `manage_chat` only `leave`s a huddle (`*steps back from the conversation*`,
+  still at the place); speaking to one you are not at fails in-world. Humans
+  have no brain or native agent session. Shared acceptance fans human messages
+  out to agent members before Perception. The `apps/web` prototype and Gateway
+  HTTP adapter still need contract/authentication alignment. Native WebChat
+  group posting is unsupported. Raw session tools remain denied via
   `tools.deny: ["group:sessions", "message"]` (see Character Tool Surface in
   §4). See [messaging](references/messaging.md) for canonical storage and
   [the client reference](references/client.md) for UI requirements, current gaps

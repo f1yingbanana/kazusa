@@ -848,6 +848,15 @@ One `DecisionBatch` carries every question; this adds no Jev latency.
 | Busy  | `attention_allocation`: `STEER`, `QUEUE_NEXT`, `DEFER`, `IGNORE` | —                                     |
 | Both  | —                                                                | `still_following` (see below)         |
 
+- **Silence first.** The rubric (version 16) asks first whether the character
+  would stay silent, and lists `IGNORE` before the other choices: silence is the
+  default. Lines that only confirm, accept or acknowledge ("ok", "deal", "see
+  you then", a sticker), report status nobody asked for ("on my way"), restate a
+  known plan, keep score or record, or carry on a point already answered or a
+  joke already landed are `IGNORE`, in direct chats too. The lines are still in
+  their records; only the turn is saved. Live (2026-11-13), the brain model
+  almost never chose silence once woken, and a prompt alone didn't change that;
+  the gate already runs on every line, so this costs no call.
 - `IGNORE` is final for that stimulus: it leaves the inbox and never reaches the
   brain, so it is not read and not in "Chats awaiting your reply" (read
   receipts, `markRead`). Nothing remembers it: the same stimulus arriving again

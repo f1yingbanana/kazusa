@@ -426,6 +426,14 @@ function ledgerRecords(
  * Renders records as a character reads them, every line from
  * `kazusa-deliveries` (`text`, read once: rendering runs many times while
  * fitting a budget). People are their ids: names collide, ids don't.
+ *
+ * Grouped by where they happened, each chat (and `tasks`) whole and in order,
+ * the one with the latest record last: interleaved by time, a conversation's
+ * lines lay scattered through a day of every other chat, and characters said
+ * again what they had said there minutes before. The chat being talked in is
+ * usually the latest, so it sits last, by the delivery naming it, and stays
+ * last turn after turn: everything above it is unchanged, which keeps the
+ * provider's cache. Each group dates its first line and every new day.
  */
 function ledgerRenderer(
   text: (section: string) => string,
@@ -440,46 +448,52 @@ function ledgerRenderer(
     unknown: text("record-unknown"),
   };
   return (records) => {
+    // Records come oldest first, so a group's place is its last record's.
+    const streams = new Map<string, LedgerRecord[]>();
+    for (const record of records) {
+      const stream = streams.get(record.sessionKey) ?? [];
+      stream.push(record);
+      // Re-inserted, so the map's order is each group's latest record.
+      streams.delete(record.sessionKey);
+      streams.set(record.sessionKey, stream);
+    }
     const lines: string[] = [];
-    let day = "";
-    let stream = "";
-    let minute = "";
-    for (const { sessionKey, message, timestamp } of records) {
+    for (const [sessionKey, stream] of streams) {
       const header = formatSessionHeader(sessionKey);
-      const at = formatSimTime(timestamp);
-      const date = at.slice(0, 14);
-      const time = at.slice(15);
-      if (date !== day) {
-        lines.push(fill(format.day, { date }));
-        day = date;
-        stream = "";
+      lines.push(fill(format.chat, { chat: header }));
+      let day = "";
+      let minute = "";
+      for (const { message, timestamp } of stream) {
+        const at = formatSimTime(timestamp);
+        const date = at.slice(0, 14);
+        const time = at.slice(15);
+        if (date !== day) {
+          lines.push(fill(format.day, { date }));
+          day = date;
+        }
+        const words = message.text?.trim() ?? "";
+        if (header === "tasks")
+          lines.push(fill(format.seen, { time, text: words }));
+        else {
+          // The catalog projects __openclaw.senderIdentity into
+          // sender.identity. Roles, dialogue, display names and peer keys are
+          // never author evidence.
+          const sender = message.sender?.identity.id;
+          const who = !sender
+            ? format.unknown
+            : sender === sessionKey.split(":")[1]
+              ? format.you
+              : sender;
+          lines.push(
+            fill(at === minute ? format.sameMinute : format.record, {
+              who,
+              time,
+              text: words,
+            }),
+          );
+        }
+        minute = at;
       }
-      if (header !== stream) {
-        lines.push(fill(format.chat, { chat: header }));
-        stream = header;
-      }
-      const words = message.text?.trim() ?? "";
-      if (header === "tasks")
-        lines.push(fill(format.seen, { time, text: words }));
-      else {
-        // The catalog projects __openclaw.senderIdentity into sender.identity.
-        // Roles, dialogue, display names and peer keys are never author
-        // evidence.
-        const sender = message.sender?.identity.id;
-        const who = !sender
-          ? format.unknown
-          : sender === sessionKey.split(":")[1]
-            ? format.you
-            : sender;
-        lines.push(
-          fill(at === minute ? format.sameMinute : format.record, {
-            who,
-            time,
-            text: words,
-          }),
-        );
-      }
-      minute = at;
     }
     return lines.join("\n");
   };

@@ -173,13 +173,13 @@ describe("Context assembly", () => {
     const text = JSON.stringify(result.messages);
     expect(text).toContain("[bob 12:00] Hello Alice");
     expect(text).toContain("[you] Hello Bob");
-    expect(text).toContain("[carol] Hello everyone");
+    expect(text).toContain("[carol 12:00] Hello everyone");
     expect(text).toContain("[bob] Welcome");
     expect(text).toContain("[bob] Role is not identity");
     expect(text).toContain("[you] Metadata identifies self");
   });
 
-  it("dates each day once, names people by id, and times a line when its minute changes", async () => {
+  it("keeps each chat whole, the latest last, dating its days and timing a line when its minute changes", async () => {
     const result = await assemble({
       sessionsContext: {
         "agent:alice:chat:direct:bob": [
@@ -195,16 +195,15 @@ describe("Context assembly", () => {
       content: [
         "[Thu 2026-10-22 00:00] What you remember of the last while",
         "",
-        "# Thu 2026-10-22",
-        "### chat:direct:bob",
-        "[bob 23:00] Night",
-        "# Fri 2026-10-23",
-        "### chat:direct:bob",
-        "[bob 11:58] Morning",
-        "[bob] Still there?",
         "### tasks",
+        "# Fri 2026-10-23",
         "[11:59] You see Bob.",
         "### chat:direct:bob",
+        "# Thu 2026-10-22",
+        "[bob 23:00] Night",
+        "# Fri 2026-10-23",
+        "[bob 11:58] Morning",
+        "[bob] Still there?",
         "[you 12:00] Here",
       ].join("\n"),
     });
@@ -353,7 +352,7 @@ describe("Context assembly", () => {
     });
     const text = JSON.stringify(result.messages);
     expect(text).toContain("[carol 12:00] bob: A quotation");
-    expect(text).toContain("[bob] [speaker:alice] A quotation");
+    expect(text).toContain("[bob 12:00] [speaker:alice] A quotation");
     expect(text).not.toContain("Display name, not identity");
   });
 
@@ -371,7 +370,7 @@ describe("Context assembly", () => {
     });
     const text = JSON.stringify(result.messages);
     expect(text).toContain("[unknown 12:00] [speaker:bob] Legacy message");
-    expect(text).toContain("[unknown] carol: Legacy message");
+    expect(text).toContain("[unknown 12:00] carol: Legacy message");
     expect(text).toContain("[unknown] Outgoing without projected metadata");
   });
 

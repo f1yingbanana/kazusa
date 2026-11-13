@@ -62,7 +62,7 @@ const FormSchema = z
   .object({
     contextUnlimited: z.boolean(),
     maxContextTokens: whole(16_000, 10_000_000, "tokens"),
-    shortTermHours: whole(24, 720, "hours"),
+    shortTermHours: whole(1, 720, "hours"),
     memoryUnlimited: z.boolean(),
     memoryLimit: whole(0, 10_000_000, "tokens"),
     toolHistoryTokens: whole(0, 32_000, "tokens"),

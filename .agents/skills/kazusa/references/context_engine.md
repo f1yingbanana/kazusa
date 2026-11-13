@@ -104,10 +104,9 @@ simulation timestamp contract applies to the character's experience/chat
 ledgers, not a global rewrite of every OpenClaw-generated message.
 
 At assembly, capture one simulation instant. Include only records with
-`now - shortTermHours * 3_600_000 <= timestamp <= now`. Default/minimum is 24
-simulated hours; configure more if desired. Pausing the world freezes this
-window; an explicit clock advance moves it. Gateway downtime does not advance
-the saved simulation clock.
+`now - shortTermHours * 3_600_000 <= timestamp <= now`. Default is 24 simulated
+hours, at least 1. Pausing the world freezes this window; an explicit clock
+advance moves it. Gateway downtime does not advance the saved simulation clock.
 
 Each selected record displays its compact simulation timestamp in UTC format
 `ddd YYYY-MM-DD HH:mm` (e.g. `Fri 2026-10-23 08:00`). Dropping ISO seconds, `T`,
@@ -341,6 +340,22 @@ reads everything above it, as opening the chat would. This is how a character
 notices a conversation they read but forgot to answer. The `context-conventions`
 skill says the list is not a demand: a closed conversation or a deliberate
 silence needs nothing.
+
+## Records grouped by chat
+
+"What you remember of the last while" keeps each chat, and `### tasks`, whole
+under its address, never interleaved by time, and orders them by their latest
+record, so the chat being talked in is usually last, beside the delivery whose
+`(chat:...)` labels name it. Each group dates its first line and every new day;
+a time shows only when the minute changes within the group (`ledgerRenderer`).
+
+Why: interleaved by time, a busy character's 30k tokens of records scattered a
+conversation through a day of every other chat, and the delivery showed only the
+new lines. Live (2026-11-13, GLM-5.3-flash), characters kept restating demands
+and plans they had made minutes earlier in the same conversation. The cache
+holds: while one conversation goes on, it stays last and everything above it is
+unchanged; a new record elsewhere moves that chat to the end, re-reading from
+where it was.
 
 ## Transcript envelope & speaker attribution
 

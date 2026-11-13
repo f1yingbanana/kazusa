@@ -257,7 +257,7 @@
           "shortTermHours": {
             "default": 24,
             "type": "number",
-            "minimum": 24
+            "minimum": 1
           },
           "decisionMaxTokens": {
             "default": 8000,

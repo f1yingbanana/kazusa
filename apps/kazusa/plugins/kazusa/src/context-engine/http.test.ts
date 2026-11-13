@@ -133,7 +133,7 @@ describe("context settings routes", () => {
     expect(
       (
         await call("/kazusa/context/settings/save", {
-          overrides: { shortTermHours: 2 },
+          overrides: { shortTermHours: 0.5 },
         })
       ).status,
     ).toBe(400);
