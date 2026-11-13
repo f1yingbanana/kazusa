@@ -1,9 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { authorName } from "@kazusa/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { readWorldPackage, worldCredit } from "./package.ts";
+import {
+  availableUpdate,
+  compareVersions,
+  readWorldPackage,
+  worldCredit,
+} from "./package.ts";
 
 const KAZUSA = { systemAgent: "arona" };
 
@@ -64,5 +69,54 @@ describe("authorName", () => {
     );
     expect(authorName("<ada@example.com>")).toBeUndefined();
     expect(authorName(undefined)).toBeUndefined();
+  });
+});
+
+describe("compareVersions", () => {
+  it("orders by number, not by text", () => {
+    expect(compareVersions("0.10.0", "0.9.2")).toBeGreaterThan(0);
+    expect(compareVersions("0.3.0", "0.4.0")).toBeLessThan(0);
+    expect(compareVersions("v1.0", "1.0.0")).toBe(0);
+    expect(compareVersions("1.2.0-beta", "1.2.0")).toBe(0);
+  });
+});
+
+describe("availableUpdate", () => {
+  let root: string | undefined;
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = undefined;
+  });
+  /** `apps/kazusa` as Kazusa lays it out: the live world and its template. */
+  const layout = (live: string, template?: string) => {
+    root = mkdtempSync(path.join(tmpdir(), "world-update-"));
+    const put = (dir: string, version: string) => {
+      mkdirSync(path.join(root!, dir), { recursive: true });
+      writeFileSync(
+        path.join(root!, dir, "package.json"),
+        JSON.stringify({
+          name: "demo",
+          version,
+          kazusa: { ...KAZUSA, template: "demo" },
+        }),
+      );
+    };
+    put("world", live);
+    if (template) put("worlds/demo", template);
+    return path.join(root, "world");
+  };
+
+  it("offers a newer template, and who brings it in", () => {
+    expect(availableUpdate(layout("0.3.0", "0.4.0"))).toEqual({
+      version: "0.4.0",
+      current: "0.3.0",
+      systemAgent: "arona",
+    });
+  });
+
+  it("offers nothing when the template is the same, older or not downloaded", () => {
+    expect(availableUpdate(layout("0.4.0", "0.4.0"))).toBeUndefined();
+    expect(availableUpdate(layout("0.4.0", "0.3.0"))).toBeUndefined();
+    expect(availableUpdate(layout("0.4.0"))).toBeUndefined();
   });
 });

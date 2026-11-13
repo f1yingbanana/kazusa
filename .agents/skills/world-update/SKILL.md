@@ -10,9 +10,11 @@ description:
 # Updating the World
 
 This world is a copy of a template in `../worlds/<id>/`. When the template's
-creator releases a new version, the user's copy doesn't change by itself.
-Updating merges the creator's new version into this world without losing what
-play wrote: what characters remember, the notes on their cards, the people
+creator releases a new version, Kazusa downloads it into `../worlds/<id>/` the
+next time it starts, and the client tells the user it's out (Settings → Updates,
+with a button that asks you to bring it in). The user's copy doesn't change by
+itself. Updating merges the creator's new version into this world without losing
+what play wrote: what characters remember, the notes on their cards, the people
 they've met, the user's own edits and map layout.
 
 `world_update` does the mechanical work across thousands of files. Your job is
@@ -20,12 +22,19 @@ the judgment: explaining the update, settling the choices with the user,
 resolving what doesn't merge, and checking the result. Never edit the template
 in `../worlds/` (it's the creator's), and never edit `.template/` by hand.
 
+Read this whole skill at the start of every update, even if you've done one
+before: each version brings different changes and needs its own choices, and
+working from memory of the last one goes wrong.
+
 ## Keep a job file
 
 An update spans several runs: you pause to ask the user things, and every run
 starts knowing only your files and the recent chat. Keep
 `workspaces/<your id>/projects/world-update.md` from the first check to the end,
-and read it first in every run:
+and read it first in every run. Each update gets a new one: if the file is about
+an earlier update (another version in its title, or marked done), rename it to
+`world-update-<its date>.md` and start fresh. Choices from an earlier update
+don't carry over; ask again if this update needs them.
 
 ```markdown
 # World update to <template> (<date>)
@@ -121,28 +130,51 @@ Ask the user once how characters should experience the update:
    `../worlds/<id>/shared/wiki/INDEX.md`, to see how the world has changed in
    the creator's words.
 2. Run `world_update` with `action: "check"`. It changes nothing.
+   - It refuses when the template isn't downloaded (a world made before
+     templates were repositories has none until Kazusa next starts): ask the
+     user to restart Kazusa and tell you once its terminal says the template was
+     downloaded. A new release with pictures can take a few minutes.
+   - `version` is this world's version and the downloaded template's. If they
+     are the same and `counts` is empty, there is nothing to update: say so.
    - `bestAttempt: true`: this world has no record of the version it was made
      from. Tell the user plainly that the update is a best attempt that can go
      badly, worst of all if this world was never really a copy of this template;
      `overlap` is the share of pages they have in common, and below about 0.5
      they probably aren't the same world. Only go on if they accept.
    - `counts` shows files added, updated, merged and removed, and how many are
-     conflicts or orphans.
+     conflicts or orphans. `areas` says what kind of files they are, which is
+     what to tell the user: `workspaces/*/portraits` are how characters are
+     drawn in scenes, `workspaces/*/stickers` their stickers, `shared/backdrops`
+     the scenes' backgrounds, `shared/wiki/...` world pages, and
+     `workspaces/*/wiki/...` or `MEMORY.md` what characters know. Pictures are
+     files, not pages or new content to read. When pages are only `updated`,
+     compare one with its template copy to say what changed (a new field such as
+     `backdrop:`, a rewrite).
+   - `renames` lists only the renames this world hasn't taken yet.
    - `newCharacters` are people the new version adds; `removedCharacters`,
      people it no longer has (this world keeps them).
-   - `arrangedPlaces`: places with a map position the user arranged.
-3. **Pause for the user's choices**, all in one message: what the update brings
-   and what it keeps, then only the questions you don't already have answers to:
+   - `arrangedPlaces`: places with a map position the user arranged;
+     `arrangedPlacesTheCreatorMoved`, how many of them the creator positioned
+     differently.
+   - `ask` lists the choices this update needs from the user, and `next` says
+     what to do. An empty `ask` (only files added or updated, nothing removed,
+     renamed or contested) needs no framing or layout question: if the user
+     asked for this update, tell them what it brings and go on to apply in the
+     same turn. If they didn't ask, ask whether to.
+3. **Pause for the user's choices** in `ask`, all in one message: what the
+   update brings and what it keeps, then only the questions you don't already
+   have answers to for this update:
    - **Framing:** retcon, in-world or mixed (above).
-   - **Layout** (only if `arrangedPlaces` is more than 0): `keep` their arranged
-     positions, or `reset` to the creator's. A rebuilt map can leave an old
-     arrangement looking odd; they can re-arrange in the client later.
+   - **Layout** (only if `ask` has it): `keep` their arranged positions, or
+     `reset` to the creator's. A rebuilt map can leave an old arrangement
+     looking odd; they can re-arrange in the client later.
    - **Who moves** (`rehome`): `stale` moves only characters standing at, or
      travelling through, a place that no longer exists; `all` sends everyone
      home, right when the update changed where people live.
    - **Best attempt**, if it is one.
 
-   Save the job file, then end your turn and wait.
+   Save the job file, then end your turn and wait. A question is a stop: never
+   call `apply` in the turn you asked, however sure the answer seems.
 
 ## 2. Apply
 
@@ -166,8 +198,10 @@ content belongs and apply the framing:
 - **A character's page or `MEMORY.md`:** her words win. Keep her version, and
   bring in a fact from the creator only as the framing says: retcon, adjust her
   page so she always knew it; in-world, leave it for her to discover.
-- **A file that isn't Markdown** (an image, `stickers.json`): this world's copy
-  stays unless the user wants the creator's.
+- **A file that isn't Markdown** (an image, `stickers.json`, `portraits.json`):
+  this world's copy stays unless the user wants the creator's. New pictures the
+  creator added (stickers, portraits, backdrops) are simply added, and need no
+  framing: they are how people and places look, not something that happened.
 - **`orphaned`**, with a reason. `the creator removed it; it changed here`: a
   character's card for a place that still exists can stay.
   `its place no longer exists`: find where it belongs (below).
@@ -208,6 +242,13 @@ they answer, record it, apply it and carry on.
 
 ## 4. Finish
 
+Only once every conflict and orphan is resolved (or waiting on the user, with
+your proposal in the job file): finishing records the new version as the base,
+and what's left unresolved is easy to forget afterwards. An orphan from before
+this update (`its place was already gone before this update`) is resolved the
+same way. Never leave two of a character's cards with the same `place_id`: merge
+hers into the existing one and delete the orphan.
+
 1. `world_update` with `action: "finish"` and the chosen `rehome`. It refuses
    while the map doesn't load, listing the problems. Fix them (usually a place
    whose `parent` or connection points at something gone), then finish again.
@@ -225,9 +266,10 @@ they answer, record it, apply it and carry on.
    first. To register, follow `world-building`, and do it last.
 4. Restore the clock to the speed you noted, only when the user wants time to
    run again.
-5. Tell the user what changed and what was kept: what you resolved and how, the
-   choices they made, where the backup is, and that `world_update` `undo` can
-   put the files back (positions finishing moved stay put). Mark the job file
+5. Always end by telling the user what changed and what was kept: what you
+   resolved and how, the choices they made, where the backup is, and that
+   `world_update` `undo` can put the files back (positions finishing moved stay
+   put). An update the user hears nothing about looks stuck. Mark the job file
    done.
 
 ## Undoing

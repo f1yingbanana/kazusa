@@ -95,7 +95,16 @@ Rules:
   template by `kazusa.template`, carries `kazusa.renames`, and replaces the live
   `package.json` with the template's (keeping `kazusa.template`), so the live
   `version` becomes the release it took. `apply` backs it up with `shared/`,
-  `workspaces/` and the base; `undo` restores it.
+  `workspaces/` and the base; `undo` restores it. It refuses a template folder
+  with no `package.json` (an empty or missing clone would read as the creator
+  deleting everything). `check` reports both versions.
+- **Telling the player** (`availableUpdate` in `src/world/package.ts`):
+  `GET /kazusa/world` carries `world.update`
+  (`{ version, current, systemAgent }`) when the template clone's `version` is
+  newer than the live one's, by number. The client announces it once per version
+  (a toast) and keeps it in Settings → Updates, both with a button that messages
+  the system agent asking for the update, which starts the `world-update` skill.
+  So a creator's release reaches players only if its `version` goes up.
 - **Templates** (`scripts/world-repo.mjs`): `apps/kazusa/world-sources.json`
   (`[{ id, provider, url }]`; `git` now, OpenRP later) lists the worlds on
   offer. The setup guide lists them without downloading any (`list`: a shallow
@@ -109,7 +118,20 @@ Rules:
   and fast-forwards each to `origin/main`, unless it's on another branch,
   changed or ahead: then it says so and leaves it (a creator edits, commits and
   pushes from there). A folder from before repositories is moved to
-  `apps/kazusa/.worlds-before-repositories/`, then cloned. Unreachable (offline,
+  `apps/kazusa/.worlds-before-repositories/`, then cloned. The live world's
+  template is cloned on start if it has no clone (a world set up before
+  templates were repositories: a git copy of Kazusa deleted the folder it was
+  copied from, an installer's copy left it as it was). Clones are made in
+  `worlds/.<id>.cloning` and moved in whole, so nothing reads half a template.
+  `scripts/dev.mjs` runs all this in the background, since a release with art
+  can be a gigabyte; `npm run gateway` waits for it. While a clone or fetch
+  downloads, `worlds/.<id>.download.json`
+  (`{ id, kind: clone|update, stage, percent, startedAt, updatedAt }`, from
+  git's `--progress` via simple-git: receiving is 0–85%, resolving 85–92%,
+  writing files 92–100%) is rewritten a few times a second and removed at the
+  end; `GET /setup/world` serves the live ones (not written to for 2 minutes
+  means dead) with the live world's template id, and the setup guide and
+  Settings → Updates poll it for their progress bars. Unreachable (offline,
   gone): it keeps what it has. Updates keep the clones: `worlds/` holds nothing
   else and is wholly git-ignored (the shared config is `apps/kazusa/base.json`,
   the list `apps/kazusa/world-sources.json`), no release carries it, and the
@@ -126,12 +148,15 @@ Rules:
   `package.json` or a legacy `world.json`, doesn't count), else at a root commit
   of `.template/`'s text, else (no snapshot) left unborn for the first save.
   Only the branch and the index move, never a world file, and a rooted `play` is
-  never moved again. Every start rewrites `.git/info/exclude` (only
-  `package.json`, `openclaw.json`, `shared/`, `workspaces/`) and
-  `.git/info/attributes`, the repo config (`core.autocrlf false`, no signing, a
-  local identity) and `upstream`: the world's own `repository` (npm's field, in
-  `WorldPackageSchema`), else its source's URL. Nothing is committed. Without
-  git it says so and the world plays untracked.
+  never moved again, with one exception: a parentless `… as imported` root that
+  nothing was built on (one commit, no other branch or save) moves to the
+  published commit its snapshot matches once the template's clone appears. Every
+  start rewrites `.git/info/exclude` (only `package.json`, `openclaw.json`,
+  `shared/`, `workspaces/`) and `.git/info/attributes`, the repo config
+  (`core.autocrlf false`, no signing, a local identity) and `upstream`: the
+  world's own `repository` (npm's field, in `WorldPackageSchema`), else its
+  source's URL. Nothing is committed. Without git it says so and the world plays
+  untracked.
 - **Git** (`findGit`): `git/` beside the app, GitHub Desktop's portable build
   (`dugite-native`, pinned with its sha256 in `scripts/package.mjs`, Git
   Credential Manager and Git LFS stripped: they are most of it and nothing uses

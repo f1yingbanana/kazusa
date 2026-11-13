@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
 import {
   adoptWorldRepo,
   cloneWorld,
+  downloadFile,
+  downloadTracker,
   listWorlds,
   PLAY,
   SOURCES,
@@ -182,6 +184,25 @@ describe("syncWorlds", () => {
     expect(await syncWorlds(root)).toEqual(kept);
   });
 
+  it("downloads the template of a world made before templates were repositories", async () => {
+    const { root, source, clone } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    // What Kazusa's own update left of the folder it was copied from.
+    put(path.join(clone, "shared/wiki/.DS_Store"), "");
+    expect(await syncWorlds(root)).toEqual([
+      expect.stringMatching(/^Set the old demo template aside in /),
+      "Downloaded Demo's template, so this world can take its updates.",
+    ]);
+    expect(git(clone, "rev-parse", "HEAD")).toBe(
+      git(source, "rev-parse", "HEAD"),
+    );
+    expect(readdirSync(path.join(root, WORLDS))).toEqual(["demo"]);
+    expect(
+      readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
+    ).toBe("Played.\n");
+    expect(await syncWorlds(root)).toEqual([]);
+  });
+
   it("keeps what it has when a world can't be reached", async () => {
     const { root, source, clone } = kazusa();
     await cloneWorld(root, "demo");
@@ -267,6 +288,33 @@ describe("adoptWorldRepo", () => {
     expect(git(live, "rev-parse", PLAY)).toBe(rooted);
   });
 
+  it("moves an untouched snapshot root to the published commit once the template is downloaded", async () => {
+    const { root, source } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    const [first] = await adoptWorldRepo(root);
+    expect(first).toMatch(/matches no published version/);
+    await syncWorlds(root);
+    expect(await adoptWorldRepo(root)).toEqual([
+      `Demo's history now starts at its published 0.1.0 (${git(source, "rev-parse", "--short=7", "v0.1.0^{commit}")}).`,
+    ]);
+    expect(git(live, "rev-parse", PLAY)).toBe(
+      git(source, "rev-parse", "v0.1.0^{commit}"),
+    );
+    expect(git(live, "diff", "--cached", "--name-only", PLAY)).toBe("");
+    expect(await adoptWorldRepo(root)).toEqual([]);
+  });
+
+  it("keeps a snapshot root that was saved on", async () => {
+    const { root, source } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    await adoptWorldRepo(root);
+    git(live, "commit", "--quiet", "--allow-empty", "-m", "Save");
+    const saved = git(live, "rev-parse", PLAY);
+    await syncWorlds(root);
+    expect(await adoptWorldRepo(root)).toEqual([]);
+    expect(git(live, "rev-parse", PLAY)).toBe(saved);
+  });
+
   it("roots a world whose template was never published at its snapshot", async () => {
     const { root, source } = kazusa();
     await cloneWorld(root, "demo");
@@ -306,5 +354,39 @@ describe("adoptWorldRepo", () => {
   it("does nothing before setup has made a world", async () => {
     const { root } = kazusa();
     expect(await adoptWorldRepo(root)).toEqual([]);
+  });
+});
+
+describe("downloadTracker", () => {
+  it("reports one bar across git's stages, never going back, and clears when done", () => {
+    const { root } = kazusa();
+    mkdirSync(path.join(root, WORLDS), { recursive: true });
+    const tracker = downloadTracker(root, "demo", "update");
+    const read = () =>
+      JSON.parse(readFileSync(downloadFile(root, "demo"), "utf8"));
+    tracker.progress({ stage: "remote:", progress: 100 });
+    expect(read()).toMatchObject({ stage: "preparing", percent: 0 });
+    tracker.progress({ stage: "receiving", progress: 100 });
+    expect(read()).toMatchObject({ stage: "receiving", percent: 85 });
+    tracker.progress({ stage: "resolving", progress: 100 });
+    expect(read()).toMatchObject({ id: "demo", kind: "update", percent: 92 });
+    tracker.progress({ stage: "updating", progress: 100 });
+    expect(read().percent).toBe(100);
+    tracker.done();
+    expect(existsSync(downloadFile(root, "demo"))).toBe(false);
+    expect(readdirSync(path.join(root, WORLDS))).toEqual([]);
+  });
+
+  it("leaves nothing behind after a clone over git's transport", async () => {
+    const { root, source } = kazusa();
+    put(
+      path.join(root, SOURCES),
+      JSON.stringify({
+        worlds: [{ id: "demo", provider: "git", url: `file://${source}` }],
+      }),
+    );
+    await cloneWorld(root, "demo");
+    expect(existsSync(downloadFile(root, "demo"))).toBe(false);
+    expect(readdirSync(path.join(root, WORLDS))).toEqual(["demo"]);
   });
 });

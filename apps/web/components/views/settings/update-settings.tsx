@@ -7,12 +7,17 @@ import {
   CircleAlertIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
+import { useWorldDownloads } from "@/hooks/use-world-downloads";
+import { useWorldUpdate } from "@/hooks/use-world-update";
+import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
+import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -149,8 +154,112 @@ function Progress({ phase }: { phase: UpdatePhase }) {
   );
 }
 
-/** This copy's version, and updating it to the latest release or to `main`. */
+/** Kazusa's version, then the world's. */
 export function UpdateSettings() {
+  return (
+    <>
+      <KazusaVersion />
+      <WorldVersion />
+    </>
+  );
+}
+
+/**
+ * The world's version, and a newer one of its template when Kazusa has
+ * downloaded it. The system agent brings it in, so updating means asking them.
+ */
+function WorldVersion() {
+  const { world, worldResource } = useSources();
+  const { update, admin, canAsk, asking, ask } = useWorldUpdate();
+  const progress = useWorldDownloads(true, 1000);
+  const download = progress?.downloads.find(({ id }) => id === progress.live);
+  const credit = world?.package;
+
+  // When a download ends, the version it brought shows at once.
+  const downloading = Boolean(download);
+  const [wasDownloading, setWasDownloading] = useState(downloading);
+  if (wasDownloading !== downloading) {
+    setWasDownloading(downloading);
+    if (!downloading) void worldResource.mutate();
+  }
+
+  if (!credit) return null;
+
+  async function handleAsk() {
+    try {
+      await ask();
+    } catch (failure) {
+      toast.error(`Couldn't message ${admin}`, {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="World"
+      description={`New versions of ${credit.name} download when Kazusa starts. ${admin} brings them into your world, keeping everything that happened in it.`}
+    >
+      <ul className="flex flex-col divide-y rounded-lg border bg-card">
+        <VersionRow
+          label="Your world"
+          version={credit.version ?? "Unknown"}
+          action={
+            update || download ? null : (
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                <CheckIcon className="size-3.5" />
+                Up to date
+              </span>
+            )
+          }
+        />
+        {update ? (
+          <VersionRow
+            label="Latest version"
+            version={update.version}
+            note={
+              canAsk
+                ? `${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
+                : `Ask the world's owner to have ${admin} update it.`
+            }
+            action={
+              canAsk ? (
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  disabled={asking}
+                  onClick={() => void handleAsk()}
+                >
+                  {asking ? <Spinner /> : null}
+                  Ask {admin}
+                </Button>
+              ) : null
+            }
+          />
+        ) : null}
+      </ul>
+      {download ? (
+        <div className="flex flex-col gap-1.5">
+          <DownloadProgress
+            title={
+              download.kind === "update"
+                ? `the newest ${credit.name}`
+                : credit.name
+            }
+            download={download}
+          />
+          <p className="text-xs text-pretty text-muted-foreground">
+            {admin} can update your world once it’s done. Your world plays as
+            usual meanwhile.
+          </p>
+        </div>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+/** This copy's version, and updating it to the latest release or to `main`. */
+function KazusaVersion() {
   const { status, error, checking, phase, check, update } = useUpdate();
   const busy = phase !== null || !!status?.blocked;
 

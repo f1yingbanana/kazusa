@@ -62,7 +62,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "updates",
     label: "Updates",
-    description: "This version, and updating it",
+    description: "Kazusa's version and your world's, and updating them",
     icon: CircleArrowUpIcon,
     order: 30,
     requiresPermission: "manage",

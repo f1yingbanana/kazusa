@@ -142,12 +142,30 @@ export interface Change {
   readonly copyFromTemplate?: boolean;
   /** Why an orphan needs judgment. */
   readonly reason?: string;
+  /** An orphan play left before this update: nothing the creator did now. */
+  readonly beforeThisUpdate?: boolean;
+}
+
+/** How many files of one kind an update touches, by outcome. */
+export interface Area {
+  /**
+   * The kind of file: `shared/backdrops`, `shared/wiki/entities/places`, or a
+   * folder every character has, with `*` for the character's id.
+   */
+  readonly area: string;
+  readonly counts: Readonly<Partial<Record<Outcome, number>>>;
+  /** For an area inside workspaces: how many characters it touches. */
+  readonly characters?: number;
 }
 
 export interface Plan {
   readonly template: string;
   readonly hasBase: boolean;
   readonly renames: Readonly<Record<string, string>>;
+  /** The renames this world still has the old ids of; the rest were applied. */
+  readonly pendingRenames: Readonly<Record<string, string>>;
+  /** What the update changes, by kind of file, biggest first. */
+  readonly areas: readonly Area[];
   readonly changes: readonly Change[];
   /** Personal pages where the character's own version won without asking. */
   readonly keptTheirs: number;
@@ -155,6 +173,11 @@ export interface Plan {
   readonly removedCharacters: readonly string[];
   /** World places with a position the user arranged, kept or reset. */
   readonly arranged: number;
+  /**
+   * Arranged places the creator moved: only these make `layout` a real choice,
+   * since a kept position otherwise matches nothing the creator did.
+   */
+  readonly arrangedMoved: number;
   /**
    * No base: what play wrote is guessed from its marks, so this can go badly,
    * worst of all if this world was never really a copy of the template.
@@ -167,6 +190,47 @@ export interface Plan {
    * or the user's own.
    */
   readonly notInTemplate: readonly string[];
+}
+
+/**
+ * The kind of file a path is, for telling the user what an update brings: the
+ * folder it's in, with a character's id as a star and a wiki's entity type
+ * kept.
+ */
+export function areaOf(file: string): { area: string; character?: string } {
+  const parts = file.split("/");
+  const character = parts[0] === "workspaces" ? parts[1] : undefined;
+  const prefix = character ? ["workspaces", "*"] : parts.slice(0, 1);
+  const rest = parts.slice(prefix.length);
+  if (!rest.length) return { area: file };
+  const keep = rest[0] === "wiki" ? (rest[1] === "entities" ? 3 : 2) : 1;
+  const area = [...prefix, ...rest.slice(0, Math.min(keep, rest.length))].join(
+    "/",
+  );
+  return character ? { area, character } : { area };
+}
+
+function areasOf(changes: readonly Change[]): Area[] {
+  const byArea = new Map<
+    string,
+    { counts: Partial<Record<Outcome, number>>; characters: Set<string> }
+  >();
+  for (const { path: file, outcome } of changes) {
+    const { area, character } = areaOf(file);
+    const entry = byArea.get(area) ?? { counts: {}, characters: new Set() };
+    entry.counts[outcome] = (entry.counts[outcome] ?? 0) + 1;
+    if (character) entry.characters.add(character);
+    byArea.set(area, entry);
+  }
+  const total = (counts: Partial<Record<Outcome, number>>) =>
+    Object.values(counts).reduce((sum, n) => sum + (n ?? 0), 0);
+  return [...byArea]
+    .map(([area, { counts, characters }]) => ({
+      area,
+      counts,
+      ...(characters.size ? { characters: characters.size } : {}),
+    }))
+    .sort((a, b) => total(b.counts) - total(a.counts));
 }
 
 const ownerOf = (file: string): MergePolicy["owner"] =>
@@ -268,6 +332,9 @@ export function planUpdate(
   const changes: Change[] = [];
   let keptTheirs = 0;
   let arranged = 0;
+  let arrangedMoved = 0;
+  const mapLine = (text: string | undefined) =>
+    text === undefined ? undefined : (/^map:.*$/m.exec(text)?.[0] ?? null);
   for (const file of all) {
     const inL = liveFiles.has(file);
     const inT = templateFiles.has(file);
@@ -337,8 +404,10 @@ export function planUpdate(
         : bestAttempt
           ? standIn(l, policy.owner)
           : undefined;
-      if (PLACE.test(file) && /^map:/m.test(l) && !(b && /^map:/m.test(b)))
+      if (PLACE.test(file) && /^map:/m.test(l) && !(b && /^map:/m.test(b))) {
         arranged++;
+        if (mapLine(t) !== mapLine(b)) arrangedMoved++;
+      }
       if (sameMarkdown(l, t) && !from.from) continue;
       const merged = mergeMarkdown(b, t, l, policy);
       keptTheirs += merged.keptTheirs;
@@ -411,12 +480,28 @@ export function planUpdate(
         ? {
             path: file,
             outcome: "orphaned",
-            reason: "its place no longer exists",
+            ...(baseFiles.has(`shared/wiki/entities/places/${card}.md`)
+              ? { reason: "its place no longer exists" }
+              : {
+                  reason: "its place was already gone before this update",
+                  beforeThisUpdate: true,
+                }),
             ...from,
           }
         : { path: file, outcome: "forgotten", ...from },
     );
   }
+
+  const pendingRenames = Object.fromEntries(
+    Object.entries(renames).filter(([from]) =>
+      [...liveFiles.values()].some(
+        (file) => renamedPath(file, { [from]: renames[from] }) !== file,
+      ),
+    ),
+  );
+  const finalChanges = [...planned.values()].sort((a, b) =>
+    a.path.localeCompare(b.path),
+  );
 
   const characters = (files: Iterable<string>) =>
     new Set(
@@ -434,13 +519,16 @@ export function planUpdate(
     overlap: overlapOf(liveFiles.keys(), templateFiles),
     notInTemplate,
     renames,
-    changes: [...planned.values()].sort((a, b) => a.path.localeCompare(b.path)),
+    pendingRenames,
+    areas: areasOf(finalChanges),
+    changes: finalChanges,
     keptTheirs,
     newCharacters: [...after].filter((who) => !before.has(who)),
     removedCharacters: [...base].filter(
       (who) => !after.has(who) && before.has(who),
     ),
     arranged,
+    arrangedMoved,
   };
 }
 

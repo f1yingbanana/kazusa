@@ -29,6 +29,7 @@ import { SectionRail, SectionTabs } from "./section-nav";
 import { Stage } from "./stage";
 import { StatusBar } from "./status-bar";
 import { TopBar } from "./top-bar";
+import { WorldUpdateNotice } from "./world-update-notice";
 
 export function Shell() {
   useEffect(syncPreferences, []);
@@ -147,6 +148,7 @@ function Layout() {
       </Sheet>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <WorldUpdateNotice />
     </div>
   );
 }

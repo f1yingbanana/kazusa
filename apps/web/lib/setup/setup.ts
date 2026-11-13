@@ -214,6 +214,24 @@ export interface WorldOption {
   readonly defaultCast: readonly string[];
 }
 
+/**
+ * A template downloading: `worlds/.<id>.download.json`, which
+ * `scripts/world-repo.mjs` rewrites a few times a second. `clone` is a first
+ * download (setup, or a world from before templates were repositories),
+ * `update` a new version of one already here.
+ */
+export const WorldDownloadSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["clone", "update"]),
+  stage: z.string(),
+  percent: z.number().min(0).max(100),
+  startedAt: z.number(),
+  updatedAt: z.number(),
+});
+export type WorldDownload = z.infer<typeof WorldDownloadSchema>;
+/** Git can go quiet for a while before the server starts sending. */
+const DOWNLOAD_STALE_MS = 2 * 60_000;
+
 /** A world on offer: `scripts/world-repo.mjs list` gives one per source. */
 export type ListedWorld =
   | {
@@ -655,12 +673,51 @@ export function createSetup(
     await writeConfig(request);
   }
 
+  /**
+   * Templates downloading now, from the files `scripts/world-repo.mjs` keeps
+   * beside their clones, and which template the live world came from. A file
+   * not written to for a while was left by a download that died.
+   */
+  async function downloads(): Promise<{
+    readonly downloads: readonly WorldDownload[];
+    readonly live: string | null;
+  }> {
+    const names = existsSync(worldsDir) ? await readdir(worldsDir) : [];
+    const found = await Promise.all(
+      names
+        .filter((name) => /^\.[^/]+\.download\.json$/.test(name))
+        .map(async (name) => {
+          const parsed = WorldDownloadSchema.safeParse(
+            JSON.parse(
+              await readFile(path.join(worldsDir, name), "utf8").catch(
+                () => "null",
+              ),
+            ),
+          );
+          return parsed.success &&
+            Date.now() - parsed.data.updatedAt < DOWNLOAD_STALE_MS
+            ? parsed.data
+            : undefined;
+        }),
+    );
+    const live = existsSync(markerFile)
+      ? (WorldPackageSchema.safeParse(
+          JSON.parse(await readFile(markerFile, "utf8").catch(() => "null")),
+        ).data?.kazusa.template ?? null)
+      : null;
+    return {
+      downloads: found.filter((entry) => entry !== undefined),
+      live,
+    };
+  }
+
   return {
     /** Cheap: no catalog, subprocess or network, unlike `status()`. */
     configured: () => existsSync(configFile),
     status,
     prepare,
     apply,
+    downloads,
     files: { config: configFile, env: envFile },
   };
 }

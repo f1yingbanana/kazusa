@@ -335,6 +335,18 @@ export const WorldMetaSchema = z.object({
       homepage: z.string().optional(),
     })
     .optional(),
+  /**
+   * A newer version of the template this world was made from, downloaded and
+   * not yet brought in. The system agent brings it in (`world_update`) when
+   * asked, so the client offers to ask them.
+   */
+  update: z
+    .object({
+      version: z.string(),
+      current: z.string().optional(),
+      systemAgent: z.string(),
+    })
+    .optional(),
 });
 export type WorldMeta = z.infer<typeof WorldMetaSchema>;
 

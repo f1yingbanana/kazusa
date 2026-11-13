@@ -10,7 +10,7 @@ import {
 } from "@kazusa/client";
 import { z } from "zod";
 import type { Clock } from "./clock.ts";
-import { worldCredit } from "../world/package.ts";
+import { availableUpdate, worldCredit } from "../world/package.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
@@ -84,6 +84,7 @@ export function registerClockHttp(
             ?.accent,
           // Read on each request, so editing the file needs no restart.
           package: worldCredit(options?.worldDir ?? process.cwd()),
+          update: availableUpdate(options?.worldDir ?? process.cwd()),
         };
 
     const capabilities: Partial<Record<Domain, Capability>> =

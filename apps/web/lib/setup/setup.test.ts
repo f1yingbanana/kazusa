@@ -431,6 +431,40 @@ describe("setup", () => {
     });
   });
 
+  it("reports the downloads running now and the live world's template", async () => {
+    const setup = createSetupHere(app);
+    expect(await setup.downloads()).toEqual({ downloads: [], live: null });
+    const now = Date.now();
+    const download = {
+      id: "demo",
+      kind: "update",
+      stage: "receiving",
+      percent: 42,
+      startedAt: now - 10_000,
+      updatedAt: now,
+    };
+    write(
+      path.join(app, "worlds/.demo.download.json"),
+      JSON.stringify(download),
+    );
+    // Left by a download that died: not written to for minutes.
+    write(
+      path.join(app, "worlds/.old.download.json"),
+      JSON.stringify({ ...download, id: "old", updatedAt: now - 10 * 60_000 }),
+    );
+    write(
+      path.join(app, "world/package.json"),
+      JSON.stringify({
+        name: "demo",
+        kazusa: { systemAgent: "a", template: "demo" },
+      }),
+    );
+    expect(await setup.downloads()).toEqual({
+      downloads: [download],
+      live: "demo",
+    });
+  });
+
   it("refuses a world that does not exist", async () => {
     await expect(
       createSetupHere(app).apply({ world: "../../etc", cast: [] }),

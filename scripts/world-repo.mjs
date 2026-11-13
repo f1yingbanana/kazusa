@@ -122,17 +122,87 @@ export function findGit(root, platform = process.platform) {
   return { binary: "git", env, unsafe: {} };
 }
 
-function gitIn(git, dir, extraEnv = {}) {
+function gitIn(git, dir, extraEnv = {}, progress = undefined) {
   const ours = { ...git.env, ...extraEnv };
   return simpleGit({
     baseDir: dir,
     binary: git.binary,
     unsafe: git.unsafe,
     allowEnvironment: Object.keys(ours).filter((key) => GUARDED_ENV.test(key)),
+    ...(progress ? { progress } : {}),
   }).env({ ...baseEnv(), ...ours });
 }
 
+/**
+ * Where a template's download reports how far it has got, beside its clone: the
+ * setup guide and Settings show it as a progress bar. Only there while a
+ * download runs; the frontend ignores one that stopped being written to.
+ */
+export const downloadFile = (root, id) =>
+  path.join(root, WORLDS, `.${id}.download.json`);
+
+/**
+ * How much of a download each of git's stages is (`--progress`, parsed by
+ * simple-git): receiving the objects is most of it, then resolving their deltas
+ * and writing the files out. The server's own counting and compressing come
+ * first and count as nothing.
+ */
+const STAGE_SHARE = {
+  receiving: [0, 85],
+  resolving: [85, 92],
+  updating: [92, 100],
+  checking: [92, 100],
+};
+const WRITE_EVERY_MS = 250;
+
+/** A simple-git progress handler that keeps `downloadFile` up to date. */
+export function downloadTracker(root, id, kind) {
+  const file = downloadFile(root, id);
+  const startedAt = Date.now();
+  let written = 0;
+  let percent = 0;
+  const write = (stage) => {
+    written = Date.now();
+    const temp = `${file}.${process.pid}.tmp`;
+    writeFileSync(
+      temp,
+      JSON.stringify({
+        id,
+        kind,
+        stage,
+        percent,
+        startedAt,
+        updatedAt: written,
+      }),
+    );
+    renameSync(temp, file);
+  };
+  return {
+    progress({ stage, progress }) {
+      const share = STAGE_SHARE[stage];
+      const next = share
+        ? Math.round(share[0] + ((share[1] - share[0]) * progress) / 100)
+        : percent;
+      // Stages restart at 0; the bar never goes back.
+      percent = Math.max(percent, next);
+      if (Date.now() - written >= WRITE_EVERY_MS || progress === 100)
+        write(share ? stage : "preparing");
+    },
+    done() {
+      rmSync(file, { force: true });
+    },
+  };
+}
+
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
+
+/** Git's error without the progress lines `--progress` puts before it. */
+const gitError = (error) =>
+  error.message
+    .split(/[\r\n]+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/\d+%|^Cloning into /.test(line))
+    .join(" ") || error.message.trim();
 
 /** Git's id for a file's bytes, without asking git. */
 const blobId = (data) =>
@@ -221,15 +291,38 @@ export async function cloneWorld(root, id) {
       `Set the old ${id} template aside in ${path.relative(root, aside)}.`,
     );
   }
-  // `worlds/` holds only clones, so the first one makes it.
+  // `worlds/` holds only clones, so the first one makes it. Cloned beside and
+  // moved in when complete: a world update must never read half a template.
   mkdirSync(path.join(root, WORLDS), { recursive: true });
-  await gitIn(git, path.join(root, WORLDS)).raw([
-    "clone",
-    "--quiet",
-    source.url,
-    id,
-  ]);
+  const partial = `.${id}.cloning`;
+  rmSync(path.join(root, WORLDS, partial), { recursive: true, force: true });
+  const tracker = downloadTracker(root, id, "clone");
+  try {
+    await gitIn(git, path.join(root, WORLDS), {}, tracker.progress).raw([
+      "clone",
+      "--progress",
+      source.url,
+      partial,
+    ]);
+    renameSync(path.join(root, WORLDS, partial), dir);
+  } catch (error) {
+    throw new Error(gitError(error));
+  } finally {
+    tracker.done();
+  }
   return lines;
+}
+
+/** The template the live world was made from, by its `package.json`. */
+function liveTemplate(root) {
+  const manifest = path.join(root, WORLD, "package.json");
+  if (!existsSync(manifest)) return undefined;
+  try {
+    const pkg = readJson(manifest);
+    return { id: pkg.kazusa?.template, title: pkg.displayName ?? pkg.name };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -240,19 +333,41 @@ export async function cloneWorld(root, id) {
 export async function syncWorlds(root) {
   const git = findGit(root);
   if (!git) return [];
+  const lines = [];
+  // The world in play needs its template's clone for updates. One made before
+  // templates were repositories has none: Kazusa's own update deleted the
+  // folder it was copied from, or left it as it was then.
+  const live = liveTemplate(root);
+  if (
+    live?.id &&
+    readSources(root).some(({ id }) => id === live.id) &&
+    !existsSync(path.join(root, WORLDS, live.id, ".git"))
+  )
+    try {
+      lines.push(...(await cloneWorld(root, live.id)));
+      lines.push(
+        `Downloaded ${live.title}'s template, so this world can take its updates.`,
+      );
+    } catch (error) {
+      lines.push(
+        `Couldn't download ${live.title}'s template: ${error.message.trim()}`,
+      );
+    }
   // All at once: each is mostly waiting on the network.
   const results = await Promise.all(
     readSources(root)
       .filter(({ id }) => existsSync(path.join(root, WORLDS, id, ".git")))
-      .map(({ id }) => syncWorld(git, path.join(root, WORLDS, id), id)),
+      .map(({ id }) => syncWorld(git, root, id)),
   );
-  return results.flat();
+  return [...lines, ...results.flat()];
 }
 
-async function syncWorld(git, dir, id) {
+async function syncWorld(git, root, id) {
+  const dir = path.join(root, WORLDS, id);
+  const tracker = downloadTracker(root, id, "update");
   try {
-    const repo = gitIn(git, dir);
-    await repo.raw(["fetch", "--quiet", "--prune", "--tags", "--force"]);
+    const repo = gitIn(git, dir, {}, tracker.progress);
+    await repo.raw(["fetch", "--progress", "--prune", "--tags", "--force"]);
     const branch = (await repo.raw(["branch", "--show-current"])).trim();
     const changed = (await repo.raw(["status", "--porcelain"])).trim();
     const ahead = (
@@ -260,10 +375,12 @@ async function syncWorld(git, dir, id) {
     ).trim();
     if (branch !== "main" || changed || ahead !== "0")
       return [`Kept your work in worlds/${id}; it isn't updated.`];
-    await repo.raw(["merge", "--quiet", "--ff-only", "origin/main"]);
+    await repo.raw(["merge", "--progress", "--ff-only", "origin/main"]);
     return [];
   } catch (error) {
-    return [`Couldn't update the ${id} world: ${error.message.trim()}`];
+    return [`Couldn't update the ${id} world: ${gitError(error)}`];
+  } finally {
+    tracker.done();
   }
 }
 
@@ -364,6 +481,48 @@ async function snapshotCommit(git, world, snapshot, title) {
   }
 }
 
+/** How a published root reads: its version tag, else "version". */
+async function releaseName(repo, commit) {
+  const [tag] = (await repo.raw(["tag", "--points-at", commit]))
+    .split("\n")
+    .filter(Boolean);
+  return tag ? tag.replace(/^v/, "") : "version";
+}
+
+/**
+ * A world rooted at a snapshot commit because its template had no clone yet
+ * (made before templates were repositories) moves to the published commit its
+ * snapshot matches, once the clone is there. Only while nothing was built on
+ * that root: one commit, no other branch or save.
+ */
+async function reroot(repo, world, rooted, title) {
+  const [, ...parents] = (
+    await repo.raw(["rev-list", "--parents", "-n1", rooted])
+  )
+    .trim()
+    .split(" ");
+  const subject = (await repo.raw(["log", "-1", "--format=%s", rooted])).trim();
+  if (parents.length || !subject.endsWith(" as imported")) return [];
+  const refs = (await repo.raw(["for-each-ref", "--format=%(refname)"]))
+    .split("\n")
+    .filter(Boolean)
+    .filter(
+      (ref) =>
+        ref !== `refs/heads/${PLAY}` &&
+        !ref.startsWith(`refs/remotes/${UPSTREAM}/`) &&
+        !ref.startsWith("refs/tags/"),
+    );
+  if (refs.length) return [];
+  const snapshot = snapshotOf(world);
+  const published = snapshot && (await publishedMatch(repo, snapshot));
+  if (!published) return [];
+  await repo.raw(["update-ref", `refs/heads/${PLAY}`, published, rooted]);
+  await repo.raw(["read-tree", published]);
+  return [
+    `${title}'s history now starts at its published ${await releaseName(repo, published)} (${published.slice(0, 7)}).`,
+  ];
+}
+
 /**
  * Makes `world/` a repository on its first start and keeps it set up on every
  * later one. A world's history starts at the published commit whose files and
@@ -435,7 +594,10 @@ export async function adoptWorldRepo(root) {
     .raw(["rev-parse", "--verify", "--quiet", `refs/heads/${PLAY}`])
     .then((value) => value.trim())
     .catch(() => "");
-  if (rooted) return lines;
+  if (rooted) {
+    if (hasRemote) lines.push(...(await reroot(repo, world, rooted, title)));
+    return lines;
+  }
   const snapshot = snapshotOf(world);
   if (!snapshot) {
     if (fresh)
@@ -450,12 +612,9 @@ export async function adoptWorldRepo(root) {
   const base = published ?? (await snapshotCommit(git, world, snapshot, title));
   await repo.raw(["update-ref", `refs/heads/${PLAY}`, base]);
   await repo.raw(["read-tree", base]);
-  const [tag] = (await repo.raw(["tag", "--points-at", base]))
-    .split("\n")
-    .filter(Boolean);
   lines.push(
     published
-      ? `${title}'s history starts at its published ${tag ? tag.replace(/^v/, "") : "version"} (${base.slice(0, 7)}).`
+      ? `${title}'s history starts at its published ${await releaseName(repo, base)} (${base.slice(0, 7)}).`
       : `${title}'s template matches no published version, so its history starts at the template as imported (${base.slice(0, 7)}).`,
   );
   return lines;

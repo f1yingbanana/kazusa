@@ -11,6 +11,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   applyUpdate,
+  areaOf,
   finishUpdate,
   planUpdate,
   readReport,
@@ -133,6 +134,17 @@ describe("world update", () => {
     const { live, v2 } = setup();
     const plan = planUpdate(live, v2, { layout: "keep" });
     expect(plan.hasBase).toBe(true);
+    expect(plan.pendingRenames).toEqual({ old_market: "market" });
+    expect(plan.areas[0]).toMatchObject({
+      area: "shared/wiki/entities/places",
+    });
+    expect(
+      plan.areas.find(({ area }) => area === "workspaces/*/MEMORY.md"),
+    ).toEqual({
+      area: "workspaces/*/MEMORY.md",
+      counts: { merged: 1 },
+      characters: 1,
+    });
     applyUpdate(live, v2, plan, "keep");
 
     const hub = get(live, "shared/wiki/entities/places/hub.md");
@@ -282,5 +294,36 @@ describe("world update", () => {
       "conflict",
     );
     expect(plan.notInTemplate).toContain("shared/wiki/entities/places/gone.md");
+  });
+});
+
+describe("pending renames", () => {
+  it("lists only the renames this world hasn't taken yet", () => {
+    const { live, v2 } = setup();
+    applyUpdate(live, v2, planUpdate(live, v2, { layout: "keep" }), "keep");
+    finishUpdate(live, v2, "demo");
+    const again = planUpdate(live, v2, { layout: "keep" });
+    expect(again.renames).toEqual({ old_market: "market" });
+    expect(again.pendingRenames).toEqual({});
+  });
+});
+
+describe("areaOf", () => {
+  it("names a file's kind, with a character's id as a star", () => {
+    expect(areaOf("shared/backdrops/gym/day.webp")).toEqual({
+      area: "shared/backdrops",
+    });
+    expect(areaOf("workspaces/ami/portraits/happy.webp")).toEqual({
+      area: "workspaces/*/portraits",
+      character: "ami",
+    });
+    expect(areaOf("shared/wiki/entities/places/gym.md").area).toBe(
+      "shared/wiki/entities/places",
+    );
+    expect(areaOf("workspaces/ami/wiki/days/2026-11-02.md").area).toBe(
+      "workspaces/*/wiki/days",
+    );
+    expect(areaOf("workspaces/ami/SOUL.md").area).toBe("workspaces/*/SOUL.md");
+    expect(areaOf("package.json").area).toBe("package.json");
   });
 });
