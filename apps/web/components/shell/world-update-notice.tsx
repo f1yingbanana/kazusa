@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSources } from "@/lib/source/provider";
 import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
-import { useWorldUpdate } from "@/hooks/use-world-update";
+import { useWorldCheck, useWorldUpdate } from "@/hooks/use-world-update";
 
 /** The version last announced, so each one is announced once per browser. */
 const SEEN_KEY = "kazusa.world-update.seen";
@@ -32,8 +32,9 @@ function markSeen(version: string) {
 export function WorldUpdateNotice() {
   const { world } = useSources();
   const { update, admin, known, canAsk, ask } = useWorldUpdate();
-  // A template downloading in the background as Kazusa starts: announce its
-  // version once it's done, without a reload.
+  // New versions download as Kazusa starts and hourly after: announce one
+  // once it's in, without a reload.
+  useWorldCheck();
   useLiveTemplateDownload(canAsk, 5000);
   const version = update?.version;
   const name = world?.package?.name ?? "Your world";

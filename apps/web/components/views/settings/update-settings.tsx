@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
 import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
-import { useWorldUpdate } from "@/hooks/use-world-update";
+import { useWorldCheck, useWorldUpdate } from "@/hooks/use-world-update";
 import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
 import { useSources } from "@/lib/source/provider";
@@ -172,6 +172,7 @@ function WorldVersion() {
   const { world, worldResource } = useSources();
   const { update, admin, canAsk, asking, ask } = useWorldUpdate();
   const download = useLiveTemplateDownload(true, 1000);
+  const checker = useWorldCheck();
   const credit = world?.package;
 
   // An update brought in since the page loaded no longer shows as new.
@@ -180,6 +181,21 @@ function WorldVersion() {
   }, []);
 
   if (!credit) return null;
+
+  async function handleCheck() {
+    try {
+      await checker.check();
+    } catch (failure) {
+      toast.error("Couldn't check for a new version", {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    }
+  }
+
+  const checkNote =
+    checker.result?.held === "updating"
+      ? `Checking waits until ${admin} finishes updating your world.`
+      : checker.result?.lines?.join(" ") || undefined;
 
   async function handleAsk() {
     try {
@@ -194,14 +210,33 @@ function WorldVersion() {
   return (
     <SettingsSection
       title="World"
-      description={`New versions of ${credit.name} download when Kazusa starts. ${admin} brings them into your world, keeping everything that happened in it.`}
+      description={`New versions of ${credit.name} download when Kazusa starts and every hour after. ${admin} brings them into your world, keeping everything that happened in it.`}
+      action={
+        checker.enabled ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            disabled={checker.checking || Boolean(download)}
+            onClick={() => void handleCheck()}
+          >
+            <RefreshCwIcon
+              className={cn(
+                checker.checking && "animate-spin motion-reduce:animate-none",
+              )}
+            />
+            Check again
+          </Button>
+        ) : null
+      }
     >
       <ul className="flex flex-col divide-y rounded-lg border bg-card">
         <VersionRow
           label="Your world"
           version={credit.version ?? "Unknown"}
+          note={update || download ? undefined : checkNote}
           action={
-            update || download ? null : (
+            update || download || checkNote ? null : (
               <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                 <CheckIcon className="size-3.5" />
                 Up to date

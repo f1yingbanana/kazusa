@@ -104,7 +104,17 @@ Rules:
   newer than the live one's, by number. The client announces it once per version
   (a toast) and keeps it in Settings → Updates, both with a button that messages
   the system agent asking for the update, which starts the `world-update` skill.
-  So a creator's release reaches players only if its `version` goes up.
+  So a creator's release reaches players only if its `version` goes up. While
+  Kazusa runs, the client checks hourly, like Kazusa's own releases
+  (`useWorldCheck`, mounted with the notice; Settings → Updates has Check
+  again): `GET /update/world` (local owner, cached 2 minutes, answers within 10
+  s or says it's still checking) runs `world-repo.mjs check` (`checkLiveWorld`),
+  the same fetch and fast-forward as a start, for the live world's template
+  only. It holds off while that template is downloading, and while
+  `world_update` is between `apply` and `finish` (the report's `stage` is
+  `applied`), so the template stays the one applied. `moved` says something came
+  down, and the client fetches the world's metadata again; a long download does
+  that when its progress file goes away.
 - **Templates** (`scripts/world-repo.mjs`): `apps/kazusa/world-sources.json`
   (`[{ id, provider, url }]`; `git` now, OpenRP later) lists the worlds on
   offer. The setup guide lists them without downloading any (`list`: a shallow
@@ -128,15 +138,18 @@ Rules:
   downloads, `worlds/.<id>.download.json`
   (`{ id, kind: clone|update, stage, percent, startedAt, updatedAt }`, from
   git's `--progress` via simple-git: receiving is 0–85%, resolving 85–92%,
-  writing files 92–100%) is rewritten a few times a second and removed at the
-  end; `GET /setup/world` serves the live ones (not written to for 2 minutes
-  means dead) with the live world's template id, and the setup guide and
-  Settings → Updates poll it for their progress bars. Unreachable (offline,
-  gone): it keeps what it has. Updates keep the clones: `worlds/` holds nothing
-  else and is wholly git-ignored (the shared config is `apps/kazusa/base.json`,
-  the list `apps/kazusa/world-sources.json`), no release carries it, and the
-  installer and the Mac launcher leave it, and uninstalling removes them. Tests
-  that check every template (`location/map.test.ts`,
+  writing files 92–100%) is rewritten a few times a second, appears 2 s in
+  regardless and is rewritten every 30 s while git is quiet, and is removed at
+  the end (a fast-forward writes it first, and setup's `prepare` waits while
+  it's there, so an import never copies half of one release); `GET /setup/world`
+  serves the live ones (not written to for 2 minutes means dead) with the live
+  world's template id, and the setup guide and Settings → Updates poll it for
+  their progress bars. Unreachable (offline, gone): it keeps what it has.
+  Updates keep the clones: `worlds/` holds nothing else and is wholly
+  git-ignored (the shared config is `apps/kazusa/base.json`, the list
+  `apps/kazusa/world-sources.json`), no release carries it, and the installer
+  and the Mac launcher leave it, and uninstalling removes them. Tests that check
+  every template (`location/map.test.ts`,
   `context-engine/decision-context.test.ts`) check the ones downloaded here.
 - **Repository** (`adoptWorldRepo`, before every Gateway start, from
   `scripts/dev.mjs` and `npm run gateway`): makes `world/` a git repository once

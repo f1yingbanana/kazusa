@@ -14,6 +14,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   adoptWorldRepo,
+  checkLiveWorld,
   cloneWorld,
   downloadFile,
   downloadTracker,
@@ -201,6 +202,38 @@ describe("syncWorlds", () => {
       readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
     ).toBe("Played.\n");
     expect(await syncWorlds(root)).toEqual([]);
+  });
+
+  it("checks the live world's template while Kazusa runs, holding off mid-update", async () => {
+    const { root, source, clone } = kazusa();
+    expect(await checkLiveWorld(root)).toEqual({ checked: false });
+    const live = world(root, source, "v0.1.0");
+    await cloneWorld(root, "demo");
+    expect(await checkLiveWorld(root)).toEqual({
+      checked: true,
+      moved: false,
+      lines: [],
+    });
+    put(
+      path.join(source, "package.json"),
+      JSON.stringify({ version: "0.3.0" }),
+    );
+    git(source, "commit", "--quiet", "-am", "Release 0.3.0");
+    const report = path.join(live, ".state/kazusa/world-update/report.json");
+    put(report, JSON.stringify({ stage: "applied" }));
+    expect(await checkLiveWorld(root)).toEqual({
+      checked: false,
+      held: "updating",
+    });
+    put(report, JSON.stringify({ stage: "finished" }));
+    expect(await checkLiveWorld(root)).toEqual({
+      checked: true,
+      moved: true,
+      lines: [],
+    });
+    expect(git(clone, "rev-parse", "HEAD")).toBe(
+      git(source, "rev-parse", "HEAD"),
+    );
   });
 
   it("keeps what it has when a world can't be reached", async () => {

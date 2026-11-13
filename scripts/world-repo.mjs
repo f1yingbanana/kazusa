@@ -410,6 +410,62 @@ async function syncWorld(git, root, id) {
   }
 }
 
+/** A download's record not written to for this long was left by one that died. */
+const DOWNLOAD_STALE_MS = 2 * 60_000;
+
+/**
+ * Whether the system agent is between applying an update and finishing it
+ * (`world_update`): the template must stay the version it applied.
+ */
+function midUpdate(root) {
+  const report = path.join(
+    root,
+    WORLD,
+    ".state/kazusa/world-update/report.json",
+  );
+  try {
+    return existsSync(report) && readJson(report).stage === "applied";
+  } catch {
+    return false;
+  }
+}
+
+function downloading(root, id) {
+  try {
+    return (
+      Date.now() - readJson(downloadFile(root, id)).updatedAt <
+      DOWNLOAD_STALE_MS
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Brings the live world's template up to date while Kazusa runs, as starting
+ * does, for the client's hourly check and Settings → Updates. Holds off while
+ * it's downloading already, or while an update is half done. `moved` says a new
+ * version (or any new commit) came down.
+ */
+export async function checkLiveWorld(root) {
+  const git = findGit(root);
+  const live = liveTemplate(root);
+  const dir = live?.id ? path.join(root, WORLDS, live.id) : undefined;
+  if (!git || !dir || !existsSync(path.join(dir, ".git")))
+    return { checked: false };
+  if (midUpdate(root)) return { checked: false, held: "updating" };
+  if (downloading(root, live.id))
+    return { checked: false, held: "downloading" };
+  const head = () => gitIn(git, dir).raw(["rev-parse", "HEAD"]);
+  const before = await head();
+  const lines = await syncWorld(git, root, live.id);
+  return {
+    checked: true,
+    moved: (await head()) !== before,
+    lines,
+  };
+}
+
 /** Content, not manifests: `package.json` (once `world.json`) changes alone. */
 const isContent = (file) =>
   file.startsWith("shared/") || file.startsWith("workspaces/");
@@ -654,14 +710,16 @@ export async function adoptWorldRepo(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const [command, id] = process.argv.slice(2);
-  if (command === "list" || command === "clone")
-    // One JSON object for the setup guide, `{ error }` when it fails.
+  if (command === "list" || command === "clone" || command === "check")
+    // One JSON object for the client, `{ error }` when it fails.
     try {
       process.stdout.write(
         JSON.stringify(
           command === "list"
             ? { worlds: await listWorlds(root) }
-            : { lines: await cloneWorld(root, id) },
+            : command === "check"
+              ? await checkLiveWorld(root)
+              : { lines: await cloneWorld(root, id) },
         ),
       );
     } catch (error) {

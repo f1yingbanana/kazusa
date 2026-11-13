@@ -10,12 +10,13 @@ description:
 # Updating the World
 
 This world is a copy of a template in `../worlds/<id>/`. When the template's
-creator releases a new version, Kazusa downloads it into `../worlds/<id>/` the
-next time it starts, and the client tells the user it's out (Settings → Updates,
-with a button that asks you to bring it in). The user's copy doesn't change by
-itself. Updating merges the creator's new version into this world without losing
-what play wrote: what characters remember, the notes on their cards, the people
-they've met, the user's own edits and map layout.
+creator releases a new version, Kazusa downloads it into `../worlds/<id>/` when
+it starts or at its hourly check, and the client tells the user it's out
+(Settings → Updates, with a button that asks you to bring it in). It doesn't
+download a new one between your `apply` and `finish`. The user's copy doesn't
+change by itself. Updating merges the creator's new version into this world
+without losing what play wrote: what characters remember, the notes on their
+cards, the people they've met, the user's own edits and map layout.
 
 `world_update` does the mechanical work across thousands of files. Your job is
 the judgment: explaining the update, settling the choices with the user,
