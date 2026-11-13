@@ -4,7 +4,13 @@ const allowance = (value: number) =>
   z.number().int().min(0).max(32_000).default(value);
 
 export const CONTEXT_ENGINE_CONFIG = z.strictObject({
-  shortTermHours: z.number().min(24).default(24),
+  /**
+   * How far back records reach, in sim hours. 16, not a whole day: live
+   * (GLM-5.3-flash, 2026-11-13), a day of verbatim records was 13-16k tokens a
+   * turn and characters kept copying yesterday's running bits; 16 hours halved
+   * that. Older days come back through memory and `recall`.
+   */
+  shortTermHours: z.number().min(1).default(16),
   /**
    * Past records in a turn; `recall` is for anything older. `"unlimited"` gives
    * them whatever `maxContextTokens` leaves.

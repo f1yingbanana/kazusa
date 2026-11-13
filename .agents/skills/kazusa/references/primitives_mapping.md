@@ -79,7 +79,7 @@ Kazusa's `src/context-engine/` assembles context for `agent:<id>:brain`. It does
 not route or admit input. Perception owns that responsibility before a run
 starts. Brain assembly reads Clock, not the active-task store; the separate
 Perception profile can read the task for urgency. Brain assembly supplies whole
-task/chat records within 24 simulated hours, recent brain continuity, and skill
+task/chat records within 16 simulated hours, recent brain continuity, and skill
 guidance. Records share one remaining budget, then regroup by session.
 Spatial/social steps below are future work; do not mutate simulation state
 during retryable context assembly:

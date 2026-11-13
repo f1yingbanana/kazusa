@@ -63,7 +63,7 @@ function setup(contextEngine: Record<string, unknown> = {}) {
 }
 
 const BUILT_IN = {
-  shortTermHours: 24,
+  shortTermHours: 16,
   ledgerMaxTokens: "unlimited",
   maxContextTokens: 64_000,
   ledgerGridHours: 4,
@@ -133,7 +133,7 @@ describe("context settings routes", () => {
     expect(
       (
         await call("/kazusa/context/settings/save", {
-          overrides: { shortTermHours: 2 },
+          overrides: { shortTermHours: 0.5 },
         })
       ).status,
     ).toBe(400);

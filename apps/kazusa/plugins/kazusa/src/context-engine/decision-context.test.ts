@@ -263,13 +263,14 @@ describe("Bounded decision evidence", () => {
     expect(assemble({ queuedReview: true })).toMatchObject({
       queuedReview: true,
     });
+    // Silence is asked first: it is the default.
     expect(Object.keys(rubric.questions.wake_decision.criteria)).toEqual([
+      "IGNORE",
       "WAKE",
       "DEFER",
-      "IGNORE",
     ]);
     expect(Object.keys(rubric.questions.attention_allocation.criteria)).toEqual(
-      ["STEER", "QUEUE_NEXT", "DEFER", "IGNORE"],
+      ["IGNORE", "STEER", "QUEUE_NEXT", "DEFER"],
     );
     // How they say it is asked on its own: pace always, the floor if taken.
     const speech = {

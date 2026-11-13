@@ -2441,7 +2441,9 @@ describe("Perception Universal Gate with Jev Decision Model", () => {
         "- [`bob` Sat 2026-10-24 12:00] (chat:direct:bob): Can you help me?",
       );
       // The closing reminder is the skill's, as written there.
-      expect(h.deliveries[0].message).toMatch(/\n\n\(If you answer: /);
+      expect(h.deliveries[0].message).toMatch(
+        /\n\n\(Speak only if it adds something new/,
+      );
       // No raw JSON stringification
       expect(h.deliveries[0].message).not.toContain("[kazusa\\u003a");
       expect(h.deliveries[0].message).not.toContain('{"id":');
