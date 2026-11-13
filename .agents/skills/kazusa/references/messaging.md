@@ -144,19 +144,36 @@ conversation in person; each returns the address. A direct chat needs neither:
 `chat:direct:<id>` works on first contact. An optional target was left out on
 41% of follow-up sends, and the either/or rule can't be stated in a tool schema
 (2026-11-05). `messages` holds 1 to `messaging.maxBubbles` (default 9) bubbles,
-each up to 4,000 characters: a string (speech) or
-`{ text, type: "speech" | "action" }`. An action is done, not said, in third
-person without the sender's name; it is kept only in a place conversation (aloud
-or a `chat:huddle:` address) and silently dropped in text chats. The canonical
-message stores the plain text and `type`; agent ledgers, deliveries and
-`said`/`unsaid` read it as `*text*`, and the client gets `type: "action"`. Face
-to face every bubble is split on `*…*` (those segments are actions, the rest
-speech, asterisks stripped), so gestures typed inline or inside an action arrive
-typed; text chats keep speech as typed. System lines (leaving, moving to another
-conversation, `manage_chat` changes) are actions too. Media is future work. The
-human HTTP send keeps a single `text` per request. Absent stored titles are
-`null`, not `undefined`, so retained records satisfy the native JSON state
-contract.
+each a plain string of up to 4,000 characters and nothing else. **What a
+character reads is exactly what it writes**, and one function is the inverse of
+the other (`readAs`/`heardAs` and `written` in `conversations.ts`):
+
+| Written and read      | Is                                                    |
+| :-------------------- | :---------------------------------------------------- |
+| `*sets the bag down*` | an action, face to face; by text, typed as it is      |
+| `[face=annoyed] No.`  | the face a line is said or done with, face to face    |
+| `[sticker=laughing]`  | a sticker of the sender, by text, a bubble of its own |
+
+Characters copy what they read. When an action read as `[type=action] text`
+beside a `type` field, the tag went into the text as well; when a face read as
+`(annoyed, a flat stare)` beside a `face` field, so did the note (2026-11-13,
+live). So there are no fields beside the text, nothing is shown that `written`
+would not take back as the same thing, and a new thing seen of a speaker (an
+outfit, later) is added the same way: one tag, written as read. Only those exact
+forms are read: a bubble that opens and closes with an asterisk, a face tag
+opening a bubble, a bubble that is only a sticker tag (names may use spaces or
+`_` for `-`). A face that is not one of the writer's moods is dropped with its
+tag, and a sticker they don't have is refused. Anything else is speech as typed:
+a bubble that mixes an action or a sticker with words is the model's to get
+right, which the skills demand (an action and a sticker MUST each be an item of
+their own), and code does not split or guess (decided 2026-11-13: no custom
+parsing to rescue a model's mistake). An action is done, not said, in third
+person without the sender's name. The canonical message stores the plain text
+and `type: "action"`, which the client gets. System lines (leaving, moving to
+another conversation, `manage_chat` changes) are actions too. Media is future
+work. The human HTTP send keeps a single `text` per request. Absent stored
+titles are `null`, not `undefined`, so retained records satisfy the native JSON
+state contract.
 
 Direct chat identity is derived from its sorted pair. The adapter generates a
 fresh server-owned UUID for every send, independent of the provider's reusable
@@ -485,13 +502,13 @@ audiences, ledger copies and notifications are unchanged per bubble.
 ## Stickers
 
 A sticker is a picture of the sender from their own sticker set, sent as a
-bubble of its own: `{ "sticker": "maid-laughing" }` beside speech and actions in
-`messages`. In this kind of roleplay it adds imagery to a chat rather than
-copying how often a real person sends one, so the wording asks for good taste: a
-sticker marks a change of mood and doesn't repeat the last one, unless a strong
-feeling deserves the emphasis. That is a hint only. Code never rejects a
-repeated mood or limits how many a send has, and a world overrides the wording
-in its own `kazusa-tools#send_message.messages.sticker`.
+bubble of its own: `[sticker=maid-laughing]` beside speech in `messages`. In
+this kind of roleplay it adds imagery to a chat rather than copying how often a
+real person sends one, so the wording asks for good taste: a sticker marks a
+change of mood and doesn't repeat the last one, unless a strong feeling deserves
+the emphasis. That is a hint only. Code never rejects a repeated mood or limits
+how many a send has, and a world overrides the wording in its own
+`kazusa-tools#send_message.stickers`.
 
 **Files.** `workspaces/<id>/stickers/<name>.<webp|png|gif|jpg|avif>`, raster
 only, about 256 px square with a transparent background. A name is lowercase
@@ -518,19 +535,22 @@ where none fits. Each name is distinct, so there is no `-2`. The optional
   word stands alone. A sticker missing from `stickers` still works.
 
 **Sending.** `src/stickers/` reads a character's set from disk each time its
-tools are built, so an edit applies from the next turn. The set becomes an
-`enum` of names on the sticker bubble, and the outfit list fills the wording's
-`{data}`. A character without stickers has no sticker bubble at all, so nothing
-tempts it. `send_message` resolves the name before pacing: the retained bubble
-is `{ type: "sticker", text, sticker: { name, v } }`, where `text` is what
-everyone reads, frozen at send, and `v` is the file's mtime in base 36.
+tools are built, so an edit applies from the next turn. The names are listed in
+the `messages` description (`kazusa-tools#send_message.stickers`, then
+`#send_message.sticker-outfits`). A character without stickers reads nothing
+about them, so nothing tempts it. `send_message` resolves the name before
+pacing: the retained bubble is
+`{ type: "sticker", text, sticker: { name, v } }`, where `text` describes the
+picture, frozen at send, and `v` is the file's mtime in base 36. A name they
+don't have fails the call.
 
-**What everyone reads.** `text` is `<Name>, <look or mood>[, in <outfit>]`, for
-example "Aris, laughing with eyes squeezed shut, in a black-and-white maid dress
-and headband". Ledgers, notifications and Jev read it as
-`[type=sticker] <text>`. Nobody makes a vision call. Like an action in a text
-chat, a sticker in a huddle or said `aloud` is dropped, because it is a phone
-thing.
+**What everyone reads.** Ledgers, notifications, Jev and `said` read
+`[sticker=<name>]`, the tag as it was written: the name says the mood and the
+outfit. `text` is `<Name>, <look or mood>[, in <outfit>]`, for example "Aris,
+laughing with eyes squeezed shut, in a black-and-white maid dress and headband";
+it is the client's alt text and is not shown to characters, who would write it
+back. Nobody makes a vision call. A sticker in a huddle is dropped, because it
+is a phone thing.
 
 **Client.** `ChatMessage` carries `type: "sticker"`, `text` as alt text and
 `sticker: { name, url }`. The url is
@@ -559,31 +579,32 @@ places a labelled set into a workspace:
 ## Faces
 
 Face to face, a line or an action can carry the face it is said or done with:
-`{ "text": "I said no.", "face": "annoyed" }`. Unlike a sticker it is part of
-the line, not a message of its own, so it adds no stimulus and no attention
-decision ([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
+`[face=annoyed] I said no.` Unlike a sticker it is part of the line, not a
+message of its own, so it adds no stimulus and no attention decision
+([visual novel](../../kazusa-client/references/visual-novel.md) §6.3).
 
-- **The field.** Only a character with portraits has it: an `enum` of the
-  distinct moods of their pictures in the usual clothes (`faceMoods` in
+- **The moods.** Only a character with portraits is told of faces: the distinct
+  moods of their pictures in the usual clothes (`faceMoods` in
   `messaging/faces.ts`, from `readPortraits`; none when the figure isn't drawn),
-  the same from turn to turn, so the schema stays in the cached prefix. A mood
-  they don't have is dropped (`.catch`) and the line is still said. In a text
-  chat the face is dropped, as an action is.
-- **Wording.** `kazusa-tools#send_message.messages.face` describes the field,
+  listed in the `messages` description, the same from turn to turn, so the
+  schema stays in the cached prefix. A tag naming none of them is dropped and
+  the line is still said. In a text chat the face is dropped.
+- **Wording.** `kazusa-tools#send_message.faces` gives the form and the moods,
   and `in-person` ("Your face is seen") asks for a face on the first line in a
   conversation and on each line where it changes, none while it stays the same.
 - **Frozen at send** (`sayFaces`): the bubble becomes `face: { name, seen? }`.
   `name` is the picture, `<mood>` in the usual clothes until outfits exist.
-  `seen` is what everyone reads of it, `kazusa-deliveries#face` filled with the
-  look of the sticker of that name, else the mood word; it is set only when the
-  face differs from the speaker's previous one in that chat, or the one before
-  it in the same call.
+  `seen` is what everyone reads of it, the tag as written (`faceTag`); it is set
+  only when the face differs from the speaker's previous one in that chat, or
+  the one before it in the same call.
 - **The previous face** is `Messaging.shownFace`: kept in memory per chat and
   speaker as messages are accepted, and forgotten when they leave. After a
   restart the first face a speaker shows is read again.
-- **What everyone reads.** `heardAs` puts `seen` before the line, after any
-  `[type=action]`: `(annoyed, a flat stare) I said no.` Stimuli and ledgers read
-  that; `said` and the journal preview do not.
+- **What everyone reads.** `heardAs` puts `seen` before the line, outside an
+  action's asterisks: `[face=annoyed] I said no.`,
+  `[face=annoyed] *looks away*`. Stimuli and ledgers read that; `said` and the
+  journal preview do not. Lines stored before 2026-11-13 keep the older `(look)`
+  note until they leave the records, and are copied as plain text meanwhile.
 - **Client.** `ChatMessage.face: { name }`, and the speaking event's
   `speech.face`, so a figure changes face as the line starts.
 

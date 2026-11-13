@@ -573,13 +573,14 @@ Built (2026-11-12) as described below, with these differences:
 - The delivery freezes `face: { name, seen? }`, not `{ name, v }`. The client
   finds the name in the portrait set it already fetched, whose URLs carry their
   versions, so a replaced picture also shows on older lines, as with stickers.
-- `seen` is what listeners read, `kazusa-deliveries#face` (`({look})`) filled
-  with the look text of the sticker with that name, else the mood word. It is
-  decided before the line is said (`sayFaces` in `messaging/faces.ts`), so a
-  replayed send matches: only a face that differs from the speaker's previous
-  one in that chat, or the one before it in the same call, gets it. The previous
-  face is kept in memory (`Messaging.shownFace`) and forgotten when they leave;
-  after a restart the first face a speaker shows is read again.
+- `seen` is what listeners read: the tag the speaker wrote, `[face=<mood>]`
+  (since 2026-11-13; a field and a described look were both copied into the
+  text, see the messaging reference). It is decided before the line is said
+  (`sayFaces` in `messaging/faces.ts`), so a replayed send matches: only a face
+  that differs from the speaker's previous one in that chat, or the one before
+  it in the same call, gets it. The previous face is kept in memory
+  (`Messaging.shownFace`) and forgotten when they leave; after a restart the
+  first face a speaker shows is read again.
 - In usual clothes the picture's name is the mood. A mood the usual clothes have
   no picture for shows the set's resting `default` (`pickPortrait`), and
   listeners still read the mood. A mood only an outfit has can't be sent: the

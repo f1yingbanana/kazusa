@@ -72,8 +72,8 @@ export type StickerRef = z.infer<typeof STICKER_REF>;
 
 /**
  * The face a line was said with, face to face only (§6.3): the picture's name
- * in the speaker's portrait set, and what everyone reads of it, frozen when it
- * is sent and only when it changed from that speaker's previous face.
+ * in the speaker's portrait set, and what everyone reads of it (`faceTag`), set
+ * only when it changed from that speaker's previous face.
  */
 export const FACE_REF = z.strictObject({
   name: PICTURE_NAME,
@@ -107,42 +107,20 @@ export type Bubble =
 const MAX_BUBBLES = 32;
 
 /**
- * The `send_message` tool's arguments, with at most `maxBubbles` bubbles. A
- * character with stickers may also pick one of `stickers` by name; `about` is
- * that field's description. A character with portraits may give a line one of
- * its `moods` as its `face`; one it doesn't have is dropped, never refused. It
- * only ever says something somewhere: a chat is started by `create_group` or
- * `talk`, so the address is always required (an optional one was left out on
- * 41% of follow-up sends, 2026-11-05).
+ * The `send_message` tool's arguments, with at most `maxBubbles` bubbles, each
+ * plain text. There is nothing else to fill in: an action, a face and a sticker
+ * are written into the text the way every character reads them (`written`,
+ * `readAs`), and `about` says which faces and stickers this character has. A
+ * field beside the text was filled as well as the text (2026-11-13). It only
+ * ever says something somewhere: a chat is started by `create_group` or `talk`,
+ * so the address is always required (an optional one was left out on 41% of
+ * follow-up sends, 2026-11-05).
  */
-export const sendMessageSchema = (
-  maxBubbles: number,
-  stickers: readonly string[] = [],
-  about = "",
-  moods: readonly string[] = [],
-) => {
-  const [first, ...rest] = stickers;
-  const [mood, ...more] = moods;
-  const text = mood
-    ? TEXT_BUBBLE.extend({
-        face: z
-          .enum([mood, ...more])
-          .optional()
-          .catch(undefined),
-      })
-    : TEXT_BUBBLE;
-  const bubble = z.union([
-    TEXT(4_000),
-    text,
-    ...(first
-      ? [z.strictObject({ sticker: z.enum([first, ...rest]).describe(about) })]
-      : []),
-  ]);
-  return z.strictObject({
+export const sendMessageSchema = (maxBubbles: number, about = "") =>
+  z.strictObject({
     sessionKey: CHAT_SESSION,
-    messages: z.array(bubble).min(1).max(maxBubbles),
+    messages: z.array(TEXT(4_000)).min(1).max(maxBubbles).describe(about),
   });
-};
 /** A paced multi-bubble send; the host adapter supplies its identity. */
 export const SPEECH_REQUEST = CHAT_TARGET.extend({
   messages: z
@@ -168,28 +146,94 @@ export function bubbleOf(bubble: Bubble): {
   };
 }
 
-/** Explicit action or sticker marker in recalled text; speech is the default. */
+/**
+ * A bubble that opens and closes with one asterisk: `*sets the bag down*`.
+ * Asterisks inside are part of what is done; `**bold**` is not an action.
+ */
+const ACTION = /^\*(?![\s*])(.+)(?<![\s*])\*$/s;
+/** `[face=annoyed]` at the start of a bubble. */
+const FACE = /^\[face=([^\][]+)\]\s*/;
+/** A bubble that is only `[sticker=maid-happy]`. */
+const STICKER = /^\[sticker=([^\][]+)\]$/;
+
+/** A bubble as a character wrote it: something said or done, or a sticker. */
+export type Written =
+  | {
+      readonly text: string;
+      readonly type?: "action";
+      /** One of the writer's moods. */
+      readonly face?: string;
+    }
+  | { readonly sticker: string };
+
+/**
+ * What a character meant by one bubble of text, the inverse of `readAs` and
+ * `heardAs`, so whatever they read they can write:
+ *
+ * - A bubble that is only `[sticker=<name>]` is a sticker;
+ * - `[face=<mood>]` opening a bubble is the face the line is said with when it is
+ *   one of `moods`, and is not said either way;
+ * - `aloud`, what then opens and closes with an asterisk is an action, whole.
+ *
+ * Only these exact forms, which the skills ask for. Anything else is speech as
+ * typed: a bubble that mixes them is the writer's to get right, not ours to
+ * guess at. A name may be written with spaces or `_` for `-`.
+ */
+export function written(
+  line: string,
+  moods: readonly string[] = [],
+  aloud = true,
+): Written {
+  const name = (value: string): string =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-");
+  const whole = line.trim();
+  const sticker = STICKER.exec(whole)?.[1];
+  if (sticker !== undefined) return { sticker: name(sticker) };
+  const tag = FACE.exec(whole);
+  const text = tag ? whole.slice(tag[0].length) : line;
+  // A face with nothing said or done is not a face shown: as typed.
+  if (!text) return { text: line };
+  const mood = tag?.[1] === undefined ? undefined : name(tag[1]);
+  const action = aloud ? ACTION.exec(text.trim())?.[1] : undefined;
+  return {
+    ...(action === undefined ? { text } : { text: action, type: "action" }),
+    ...(mood !== undefined && moods.includes(mood) ? { face: mood } : {}),
+  };
+}
+
+/**
+ * A line as characters read it, which is exactly how they write one: an action
+ * as `*text*`, a sticker as `[sticker=<name>]`. Characters copy what they read,
+ * so nothing is shown that `written` would not take back as the same thing.
+ */
 export function readAs(params: {
   readonly text: string;
   readonly type?: MessageType;
+  readonly sticker?: StickerRef;
 }): string {
-  return params.type === "action" || params.type === "sticker"
-    ? `[type=${params.type}] ${params.text}`
-    : params.text;
+  if (params.type === "action") return `*${params.text}*`;
+  if (params.type === "sticker")
+    return `[sticker=${params.sticker?.name ?? params.text}]`;
+  return params.text;
 }
+/** A face as it is read and written, before the line it is shown with. */
+export const faceTag = (mood: string): string => `[face=${mood}]`;
 /**
- * A line as its listeners read it: `readAs`, after what they see of the
- * speaker's face when it changed.
+ * A line as its listeners read it: the speaker's face when it changed, then
+ * `readAs`. The face stays outside an action's asterisks.
  */
 export function heardAs(params: {
   readonly text: string;
   readonly type?: MessageType;
+  readonly sticker?: StickerRef;
   readonly face?: FaceRef;
 }): string {
   const seen = params.face?.seen;
-  return readAs(
-    seen === undefined ? params : { ...params, text: `${seen} ${params.text}` },
-  );
+  const line = readAs(params);
+  return seen === undefined ? line : `${seen} ${line}`;
 }
 export type SpeechParams = z.infer<typeof SPEECH_REQUEST>;
 

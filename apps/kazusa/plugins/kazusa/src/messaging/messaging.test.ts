@@ -1952,7 +1952,7 @@ describe("huddles", () => {
       ...params,
     });
 
-  it("does actions face to face, read as done, and drops them in a text chat", async () => {
+  it("does actions face to face, read as done, and sends them as typed in a text chat", async () => {
     const h = setup();
     h.places.set("alice", "club").set("bob", "club");
     const face = await h.messaging.speak("alice", "ALICE", {
@@ -1965,7 +1965,7 @@ describe("huddles", () => {
       ],
     });
     expect(face.said).toEqual([
-      "[type=action] sets the textbook on the desk",
+      "*sets the textbook on the desk*",
       "Here you go.",
     ]);
     const stored = [...h.retained.values()].sort(
@@ -1980,7 +1980,7 @@ describe("huddles", () => {
       expect(h.receive).toHaveBeenCalledWith(
         "bob",
         expect.objectContaining({
-          text: "[type=action] sets the textbook on the desk",
+          text: "*sets the textbook on the desk*",
         }),
       ),
     );
@@ -1989,17 +1989,20 @@ describe("huddles", () => {
       type: "action",
     });
 
-    // By text, an action is not seen: it is dropped, and nothing says so.
+    // By text nothing is seen done: it is sent as typed, asterisks and all.
     const text = await h.messaging.speak("alice", "ALICE", {
       requestId: "text",
       members: ["bob"],
       messages: [{ text: "waves", type: "action" }, "See you!"],
     });
-    expect(text).toMatchObject({ said: ["See you!"], unsaid: [] });
-    expect(h.retained.size).toBe(3);
+    expect(text).toMatchObject({ said: ["*waves*", "See you!"], unsaid: [] });
+    expect(
+      [...h.retained.values()].find(({ params }) => params.text === "*waves*")
+        ?.params,
+    ).not.toHaveProperty("type");
   });
 
-  it("sends stickers by text, read as described, and drops them face to face", async () => {
+  it("sends stickers by text, read as they are written, and drops them face to face", async () => {
     const h = setup();
     const sticker = {
       text: "ALICE, laughing with eyes shut",
@@ -2011,10 +2014,7 @@ describe("huddles", () => {
       members: ["bob"],
       messages: ["That's hilarious", sticker],
     });
-    expect(text.said).toEqual([
-      "That's hilarious",
-      "[type=sticker] ALICE, laughing with eyes shut",
-    ]);
+    expect(text.said).toEqual(["That's hilarious", "[sticker=laughing]"]);
     const stored = [...h.retained.values()].sort(
       (a, b) => a.sequence - b.sequence,
     );
@@ -2026,7 +2026,7 @@ describe("huddles", () => {
       expect(h.receive).toHaveBeenCalledWith(
         "bob",
         expect.objectContaining({
-          text: "[type=sticker] ALICE, laughing with eyes shut",
+          text: "[sticker=laughing]",
         }),
       ),
     );
@@ -2076,7 +2076,7 @@ describe("huddles", () => {
     expect(face.said).toEqual([
       "I *really* mean it",
       "That is **important**!",
-      "[type=action] sets down the book",
+      "*sets down the book*",
     ]);
     const delivered = [...h.retained.values()].filter(
       (message) => message.sender === "alice",
@@ -2144,7 +2144,7 @@ describe("huddles", () => {
       vi.waitFor(() =>
         expect(h.receive).toHaveBeenCalledWith(
           who,
-          expect.objectContaining({ text: `[type=action] ${text}` }),
+          expect.objectContaining({ text: `*${text}*` }),
         ),
       );
     const ab = await aloud(h, "alice", { members: ["bob"], aloud: true }, "ab");
@@ -2241,7 +2241,7 @@ describe("huddles", () => {
       expect(h.receive).toHaveBeenCalledWith(
         "alice",
         expect.objectContaining({
-          text: "[type=action] moves to another conversation",
+          text: "*moves to another conversation*",
         }),
       ),
     );
@@ -2793,7 +2793,7 @@ describe("the floor", () => {
     expect(h.messaging.shownFace("alice", sessionKey)).toBe("annoyed");
   });
 
-  it("drops a face in a text chat, as it does an action", async () => {
+  it("drops a face in a text chat", async () => {
     const h = setup();
     expect(
       await h.messaging.speak("alice", "ALICE", {

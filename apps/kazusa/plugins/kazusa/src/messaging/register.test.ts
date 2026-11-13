@@ -421,49 +421,47 @@ describe("send_message SDK integration", () => {
         stickers: { laughing: { look: "laughing with eyes shut" } },
       }),
     );
-    const options = tool().parameters.properties.messages.items.anyOf;
-    const picker = options.find(
-      (option: { properties?: object }) =>
-        option.properties && "sticker" in option.properties,
-    ).properties.sticker;
-    expect(picker.enum).toEqual(["laughing", "maid-happy"]);
-    expect(picker.description).toContain("maid: a maid dress");
+    // Bubbles are plain text and nothing else; what they have is listed.
+    const messages = () => tool().parameters.properties.messages;
+    expect(messages().items).toEqual({ type: "string" });
+    expect(messages().description).toMatch(
+      /Your\s+stickers:\s+laughing, maid-happy\./,
+    );
+    expect(messages().description).toContain("maid: a maid dress");
 
     const sent = await h.execute({
       sessionKey: "chat:direct:bob",
-      messages: [
-        "So funny",
-        { sticker: "laughing" },
-        { sticker: "maid-happy" },
-      ],
+      messages: ["So funny", "[sticker=laughing]", "[sticker=maid_happy]"],
     });
+    // Written and read the same way.
     expect(sent.details.said).toEqual([
       "So funny",
-      "[type=sticker] Alice Lin, laughing with eyes shut",
-      "[type=sticker] Alice Lin, happy, in a maid dress",
+      "[sticker=laughing]",
+      "[sticker=maid-happy]",
     ]);
     const stored = [...h.retained.values()].find(
       ({ params }) => params.sticker?.name === "maid-happy",
     );
     expect(stored?.params).toMatchObject({
+      text: "Alice Lin, happy, in a maid dress",
       type: "sticker",
       sticker: { name: "maid-happy", v: expect.stringMatching(/^[a-z0-9]+$/) },
     });
     await expect(
       h.execute({
         sessionKey: "chat:direct:bob",
-        messages: [{ sticker: "crying" }],
+        messages: ["[sticker=crying]"],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow('You have no sticker "crying".');
 
     // One added while running is offered and sendable on the next turn.
     await writeFile(path.join(dir, "crying.webp"), "RIFF");
-    expect(JSON.stringify(tool().parameters)).toContain('"crying"');
+    expect(messages().description).toContain("crying");
     const cried = await h.execute({
       sessionKey: "chat:direct:bob",
-      messages: [{ sticker: "crying" }],
+      messages: ["[sticker=crying]"],
     });
-    expect(cried.details.said).toEqual(["[type=sticker] Alice Lin, crying"]);
+    expect(cried.details.said).toEqual(["[sticker=crying]"]);
   });
 
   it("offers a character with portraits its moods as a line's face, frozen as everyone sees it, and drops one it lacks", async () => {
@@ -473,11 +471,6 @@ describe("send_message SDK integration", () => {
     );
     const tool = () =>
       h.registerTool.mock.calls[0][0].create({ agentId: "alice" })[0];
-    const textBubble = () =>
-      tool().parameters.properties.messages.items.anyOf.find(
-        (option: { properties?: object }) =>
-          option.properties && "text" in option.properties,
-      );
     // No portraits: no face to give.
     expect(JSON.stringify(tool().parameters)).not.toContain("face");
 
@@ -504,49 +497,58 @@ describe("send_message SDK integration", () => {
     await writeFile(path.join(stickers, "annoyed.webp"), "RIFF");
     // Moods, not names, of the usual clothes only: nobody wears an outfit
     // yet, so a mood only an outfit has (smug) is not offered.
-    const face = textBubble().properties.face;
-    expect(face.enum).toEqual(["annoyed", "happy", "neutral"]);
-    expect(face.description).toContain("Face to face only");
+    const messages = tool().parameters.properties.messages;
+    expect(messages.items).toEqual({ type: "string" });
+    expect(messages.description).toMatch(
+      /Your\s+moods:\s+annoyed, happy, neutral\./,
+    );
 
     const lunch = await h.messaging.talk("alice", ["bob", "carol"]);
     const sessionKey = lunch.sessionKey.replace("agent:alice:", "");
     const sent = await h.execute({
       sessionKey,
       messages: [
-        { text: "I said no.", face: "annoyed" },
-        { text: "Really.", face: "annoyed" },
-        { text: "looks away", type: "action", face: "sulking" },
-        { text: "Fine.", face: "happy" },
+        "[face=annoyed] I said no.",
+        "[face=annoyed] Really.",
+        "[face=sulking] *looks away*",
+        "[face=happy] Fine.",
       ],
     });
     // A mood they don't have is dropped and the line is still said.
     expect(sent.details).toMatchObject({ status: "delivered" });
-    const faces = [...h.retained.values()]
+    const said = [...h.retained.values()]
       .filter(({ sender }) => sender === "alice")
       .sort((a, b) => a.sequence - b.sequence)
-      .map(({ params }) => params.face);
-    expect(faces).toEqual([
-      // Everyone reads it, in the sticker's words, only as it changes.
-      { name: "annoyed", seen: "(annoyed, a flat stare)" },
+      .map(({ params }) => params);
+    expect(said.map(({ text }) => text)).toEqual([
+      "I said no.",
+      "Really.",
+      "looks away",
+      "Fine.",
+    ]);
+    expect(said.map(({ face }) => face)).toEqual([
+      // Everyone reads it as it was written, only as it changes.
+      { name: "annoyed", seen: "[face=annoyed]" },
       { name: "annoyed" },
       undefined,
       // No picture of it in the usual clothes: the scene shows the neutral
       // face, and the mood is still read.
-      { name: "happy", seen: "(happy)" },
+      { name: "happy", seen: "[face=happy]" },
     ]);
+    expect(said[2]?.type).toBe("action");
     // The next send remembers the face they last showed there.
     await h.execute({
       sessionKey,
-      messages: [{ text: "Anyway.", face: "happy" }],
+      messages: ["[face=happy] Anyway."],
     });
     const last = [...h.retained.values()].find(
       ({ params }) => params.text === "Anyway.",
     );
     expect(last?.params.face).toEqual({ name: "happy" });
-    // By text it is dropped, as an action is.
+    // By text nobody sees a face: the tag is not said, and nothing is kept.
     await h.execute({
       sessionKey: "chat:direct:bob",
-      messages: [{ text: "No.", face: "annoyed" }],
+      messages: ["[face=annoyed] No."],
     });
     const texted = [...h.retained.values()].find(
       ({ params }) => params.text === "No.",

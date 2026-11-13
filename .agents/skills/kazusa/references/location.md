@@ -315,9 +315,9 @@ are in.
 13. **A paused clock freezes the world** (Perception holds, our tools and
     bubbles wait); a stop while paused lets every wait go, so turns finish at
     the paused moment.
-14. **Actions** are typed bubbles, face to face only (dropped in text chats),
-    split from inline `*…*`, stored plain for the client and read as `*text*`;
-    up to `messaging.maxBubbles` (9) per send. One speaker says one thing at a
+14. **Actions** are bubbles written `*like this*`, face to face only (sent as
+    typed in text chats), stored plain for the client and read as `*text*`; up
+    to `messaging.maxBubbles` (9) per send. One speaker says one thing at a
     time: parallel sends queue.
 
 ## 7. Review against the principles
