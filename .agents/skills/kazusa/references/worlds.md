@@ -122,20 +122,17 @@ Rules:
   read, about a second each, all at once; `ListedWorld`, `scriptCatalog` in
   `apps/web/lib/setup/setup.ts`), and clones only the one the player picks into
   `worlds/<id>` (`clone <id>`, from `POST /setup/world`, which answers with its
-  cast; `apply` clones too if it wasn't). Setup and `world_update` read
-  templates there as before. Every start (`syncWorlds`, from `scripts/dev.mjs`
-  before the frontend and from `npm run gateway`) fetches the clones there are
-  and fast-forwards each to `origin/main`, unless it's on another branch,
-  changed or ahead: then it says so and leaves it (a creator edits, commits and
-  pushes from there). A folder from before repositories is moved to
-  `apps/kazusa/.worlds-before-repositories/`, then cloned. The live world's
-  template is cloned on start if it has no clone (a world set up before
-  templates were repositories: a git copy of Kazusa deleted the folder it was
-  copied from, an installer's copy left it as it was). Clones are made in
-  `worlds/.<id>.cloning` and moved in whole, so nothing reads half a template.
-  `scripts/dev.mjs` runs all this in the background, since a release with art
-  can be a gigabyte; `npm run gateway` waits for it. While a clone or fetch
-  downloads, `worlds/.<id>.download.json`
+  cast; `apply` too). Picking one already here brings it up to date first
+  (`fetchWorld`): setup's is the one fetch nobody asks for, and the only
+  template it touches. Nothing fetches at start: a release with art can be a
+  gigabyte. The live world's template comes down only when the player downloads
+  a release (above), cloned then if this world was set up before templates were
+  repositories. A clone on another branch, changed or ahead is left alone and
+  says so (a creator edits, commits and pushes from there). A folder from before
+  repositories is moved to `apps/kazusa/.worlds-before-repositories/`, then
+  cloned. Clones are made in `worlds/.<id>.cloning` and moved in whole, so
+  nothing reads half a template. While a clone or fetch downloads,
+  `worlds/.<id>.download.json`
   (`{ id, kind: clone|update, stage, percent, startedAt, updatedAt }`, from
   git's `--progress` via simple-git: receiving is 0–85%, resolving 85–92%,
   writing files 92–100%) is rewritten a few times a second, appears 2 s in
@@ -144,8 +141,8 @@ Rules:
   it's there, so an import never copies half of one release); `GET /setup/world`
   serves the live ones (not written to for 2 minutes means dead) with the live
   world's template id, and the setup guide and Settings → Updates poll it for
-  their progress bars. Unreachable (offline, gone): it keeps what it has.
-  Updates keep the clones: `worlds/` holds nothing else and is wholly
+  their progress bars. Unreachable (offline, gone): setup goes on with what it
+  has. Updates keep the clones: `worlds/` holds nothing else and is wholly
   git-ignored (the shared config is `apps/kazusa/base.json`, the list
   `apps/kazusa/world-sources.json`), no release carries it, and the installer
   and the Mac launcher leave it, and uninstalling removes them. Tests that check

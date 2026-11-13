@@ -76,7 +76,9 @@ function folderCatalog(
           package: readPackage(source),
         })),
     ],
-    clone: async (id) => {
+    download: async (id) => {
+      // Already here: brought up to date, which a folder needn't be.
+      if (existsSync(path.join(worlds, id))) return;
       const source = remote.get(id);
       if (!source) throw new Error(`No world ${id} is listed.`);
       cloned.push(id);

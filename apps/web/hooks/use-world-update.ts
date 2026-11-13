@@ -33,7 +33,7 @@ export function useWorldUpdate(): {
     ? characters.find(({ id }) => id === update.systemAgent)
     : characters.find(({ isSystemAgent }) => isSystemAgent);
   const admin = character?.name ?? "your admin";
-  const { canManage } = useAccess();
+  const { isOwner, isLocal } = useAccess();
   const { mutate } = useSWRConfig();
   const [, setParams] = useQueryStates({
     view: parseAsString,
@@ -61,37 +61,55 @@ export function useWorldUpdate(): {
     update,
     admin,
     known: Boolean(character),
-    canAsk: canManage,
+    // Whoever may change this machine, as for Kazusa's own updates.
+    canAsk: isOwner && isLocal,
     asking,
     ask,
   };
 }
 
-/** What `GET /update/world` answers: a check of the template's repository. */
+/** What `GET /update/world` answers: the newest release, downloading nothing. */
 export interface WorldCheck {
   /** When it was checked, in real time. */
   readonly at?: number;
   readonly checked?: boolean;
-  /** A new version (or any new commit) came down. */
-  readonly moved?: boolean;
-  /** Problems, such as a template that couldn't be reached. */
-  readonly lines?: readonly string[];
-  /** Not checked: it's downloading already, or an update is half done. */
-  readonly held?: "downloading" | "updating";
-  /** Still going: a new version is downloading, with a progress bar. */
-  readonly checking?: boolean;
+  /** This world's version and the newest release's. */
+  readonly current?: string;
+  readonly latest?: string | null;
+  readonly newer?: boolean;
+  /**
+   * What the newest release changes in this world, by kind of file. No files:
+   * nothing for this game (a new chapter, say). Null: unknown, since this world
+   * matches no release.
+   */
+  readonly changes?: {
+    readonly files: number;
+    readonly areas: readonly { area: string; count: number }[];
+  } | null;
+  /** Bytes to download, on GitHub. */
+  readonly size?: number;
+  /** In the template's clone already, ready for the system agent. */
+  readonly downloaded?: boolean;
+  readonly downloading?: boolean;
+  readonly lastDownload?: { at: number; error?: string };
+}
+
+/** A release the player could download: newer, and with something for them. */
+export function offered(check: WorldCheck | undefined): boolean {
+  return Boolean(
+    check?.newer && check.changes?.files !== 0 && !check.downloaded,
+  );
 }
 
 const WORLD_CHECK_KEY = "update/world";
 /** Like Kazusa's own releases (`useAnnouncedRelease`). */
 const BACKGROUND_CHECK_MS = 60 * 60_000;
+const DOWNLOADING_CHECK_MS = 2_000;
 
 async function fetchWorldCheck(fresh: boolean): Promise<WorldCheck> {
   const response = await fetch(
     fresh ? "/update/world?fresh=1" : "/update/world",
-    {
-      cache: "no-store",
-    },
+    { cache: "no-store" },
   );
   const body = (await response.json().catch(() => ({}))) as WorldCheck & {
     error?: string;
@@ -102,10 +120,10 @@ async function fetchWorldCheck(fresh: boolean): Promise<WorldCheck> {
 }
 
 /**
- * Checks the world's template for a new version while Kazusa runs, as starting
- * does: hourly in the background, or now from Settings. A new version downloads
- * at once, and the world's metadata is fetched again when it's in. Local owner
- * only: the download lands on this machine.
+ * Whether the world in play has a newer release, what it changes and how big it
+ * is, checked hourly like Kazusa's own and nothing downloaded; then the
+ * download, once the player says so. Only for whoever may change this machine
+ * (the local owner): nobody else is asked or told.
  */
 export function useWorldCheck() {
   const { isOwner, isLocal } = useAccess();
@@ -118,9 +136,11 @@ export function useWorldCheck() {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       shouldRetryOnError: false,
-      refreshInterval: BACKGROUND_CHECK_MS,
+      refreshInterval: (latest) =>
+        latest?.downloading ? DOWNLOADING_CHECK_MS : BACKGROUND_CHECK_MS,
+      // Downloaded: the world says so too, and offers the system agent.
       onSuccess: (result) => {
-        if (result.moved) void worldResource.mutate();
+        if (result.downloaded) void worldResource.mutate();
       },
     },
   );
@@ -129,21 +149,29 @@ export function useWorldCheck() {
   async function check() {
     setChecking(true);
     try {
-      const result = await resource.mutate(fetchWorldCheck(true), {
-        revalidate: false,
-      });
-      if (result?.moved) await worldResource.mutate();
+      await resource.mutate(fetchWorldCheck(true), { revalidate: false });
     } finally {
       setChecking(false);
     }
+  }
+
+  async function download() {
+    const response = await fetch("/update/world", { method: "POST" });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(body.error ?? "Couldn't start the download.");
+    }
+    await resource.mutate();
   }
 
   return {
     enabled,
     result: resource.data,
     error: resource.error,
-    /** A check asked for now; a download it starts shows its own progress. */
     checking,
     check,
+    download,
   };
 }

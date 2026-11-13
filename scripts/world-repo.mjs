@@ -5,9 +5,14 @@
  * Templates: `apps/kazusa/world-sources.json` lists the worlds on offer. The
  * setup guide lists them by peeking at each one's `package.json` (`list`) and
  * clones only the one the player picks into `apps/kazusa/worlds/<id>` (`clone
- * <id>`), where setup and `world_update` read templates as before. Every start
- * fetches the clones there are and fast-forwards them when nobody has changed
- * them, so a creator can edit, commit and push from one.
+ * <id>`, which brings one already there up to date), where setup and
+ * `world_update` read templates. Nothing else is fetched unasked: a release can
+ * be a gigabyte. The client checks the world in play for a newer release
+ * (`check`: its tags, then what it changes and its size from GitHub, where
+ * worlds live for now; nothing downloaded) and downloads it into the template's
+ * clone when the player says so (`download`). A clone someone changed,
+ * committed on or switched branch in is left alone, so a creator can edit,
+ * commit and push from one.
  *
  * The live world: `world/` is its own repository, whose history starts at the
  * published commit it was made from, so updates and publishing later have the
@@ -16,9 +21,9 @@
  * here: commits are saves, made with the Gateway stopped.
  *
  * Starting runs from `scripts/dev.mjs` (installed copies too) and from `npm run
- * gateway`; the setup guide runs `list` and `clone`, which print JSON. Git is
- * the one shipped beside Kazusa (`git/`, GitHub Desktop's portable build), else
- * the system's.
+ * gateway`; the client runs `list`, `clone`, `check` and `download`, which
+ * print JSON. Git is the one shipped beside Kazusa (`git/`, GitHub Desktop's
+ * portable build), else the system's.
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -347,43 +352,10 @@ function liveTemplate(root) {
 }
 
 /**
- * Fetches each world cloned here and moves it to what was published, unless
- * someone has work there: a branch other than `main`, changes, or commits not
- * pushed. One that can't be reached (offline, gone) keeps what it had.
+ * Moves a clone to `target` (a release's tag, or `origin/main`), unless someone
+ * has work there: a branch other than `main`, changes, or commits not pushed.
  */
-export async function syncWorlds(root) {
-  const git = findGit(root);
-  if (!git) return [];
-  const lines = [];
-  // The world in play needs its template's clone for updates. One made before
-  // templates were repositories has none: Kazusa's own update deleted the
-  // folder it was copied from, or left it as it was then.
-  const live = liveTemplate(root);
-  if (
-    live?.id &&
-    readSources(root).some(({ id }) => id === live.id) &&
-    !existsSync(path.join(root, WORLDS, live.id, ".git"))
-  )
-    try {
-      lines.push(...(await cloneWorld(root, live.id)));
-      lines.push(
-        `Downloaded ${live.title}'s template, so this world can take its updates.`,
-      );
-    } catch (error) {
-      lines.push(
-        `Couldn't download ${live.title}'s template: ${error.message.trim()}`,
-      );
-    }
-  // All at once: each is mostly waiting on the network.
-  const results = await Promise.all(
-    readSources(root)
-      .filter(({ id }) => existsSync(path.join(root, WORLDS, id, ".git")))
-      .map(({ id }) => syncWorld(git, root, id)),
-  );
-  return [...lines, ...results.flat()];
-}
-
-async function syncWorld(git, root, id) {
+async function syncWorld(git, root, id, target = "origin/main") {
   const dir = path.join(root, WORLDS, id);
   const tracker = downloadTracker(root, id, "update");
   try {
@@ -397,17 +369,31 @@ async function syncWorld(git, root, id) {
     if (branch !== "main" || changed || ahead !== "0")
       return [`Kept your work in worlds/${id}; it isn't updated.`];
     const behind = (
-      await repo.raw(["rev-list", "--count", "HEAD..origin/main"])
+      await repo.raw(["rev-list", "--count", `HEAD..${target}`])
     ).trim();
     if (behind === "0") return [];
     tracker.now();
-    await repo.raw(["merge", "--progress", "--ff-only", "origin/main"]);
+    await repo.raw(["merge", "--progress", "--ff-only", target]);
     return [];
   } catch (error) {
-    return [`Couldn't update the ${id} world: ${gitError(error)}`];
+    throw new Error(`Couldn't update the ${id} world: ${gitError(error)}`);
   } finally {
     tracker.done();
   }
+}
+
+/**
+ * The template a player picked in setup, downloaded or brought up to date: the
+ * one fetch setup needs. Nothing else is fetched unasked.
+ */
+export async function fetchWorld(root, id) {
+  const lines = await cloneWorld(root, id);
+  if (lines.length || !existsSync(path.join(root, WORLDS, id, ".git")))
+    return lines;
+  const git = findGit(root);
+  if (!git) return [];
+  // Unreachable (offline, gone): setup goes on with the version it has.
+  return syncWorld(git, root, id).catch((error) => [error.message]);
 }
 
 /** A download's record not written to for this long was left by one that died. */
@@ -441,29 +427,225 @@ function downloading(root, id) {
   }
 }
 
+/** Dotted numbers, by number; a suffix such as `-beta` is ignored. */
+export function compareVersions(a, b) {
+  const parts = (version) =>
+    version
+      .replace(/^v/, "")
+      .split(/[-+]/)[0]
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const diff = (x[i] ?? 0) - (y[i] ?? 0);
+    if (diff) return Math.sign(diff);
+  }
+  return 0;
+}
+
+/** A release is a tag named for its version (`v0.4.0` or `0.4.0`). */
+const RELEASE_TAG = /^v?\d+(\.\d+)*$/;
+
+/** The releases on a remote, newest first, without downloading anything. */
+async function releases(git, url) {
+  const listed = await gitIn(git, process.cwd()).raw([
+    "ls-remote",
+    "--tags",
+    "--refs",
+    url,
+  ]);
+  return listed
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [sha, ref] = line.split("\t");
+      const tag = ref.replace("refs/tags/", "");
+      return { sha, tag, version: tag.replace(/^v/, "") };
+    })
+    .filter(({ tag }) => RELEASE_TAG.test(tag))
+    .sort((a, b) => compareVersions(b.version, a.version));
+}
+
+/** Where the world in play comes from: its own `repository`, else its source. */
+function worldUrl(root, pkg) {
+  return (
+    (typeof pkg.repository === "string"
+      ? pkg.repository
+      : pkg.repository?.url) ??
+    readSources(root).find((source) => source.id === pkg.kazusa?.template)?.url
+  );
+}
+
+/** A file's kind, with a character's id as a star: `workspaces/*\/portraits`. */
+function areaOf(file) {
+  const parts = file.split("/");
+  return parts[0] === "workspaces"
+    ? `workspaces/*/${parts[2] ?? ""}`
+    : parts.slice(0, 2).join("/");
+}
+
+/** `owner/name` of a world on GitHub. Worlds are all on GitHub for now. */
+function githubRepo(url) {
+  return /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.[1];
+}
+
+/** Every file of a release, `path → { sha, size }`, from GitHub's API. */
+async function githubTree(repo, tag) {
+  const response = await fetch(
+    `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(tag)}?recursive=1`,
+    {
+      headers: { "User-Agent": "kazusa-world-check" },
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+  if (!response.ok)
+    throw new Error(`GitHub answered ${response.status} for ${tag}.`);
+  const tree = await response.json();
+  if (tree.truncated) throw new Error(`${tag} has too many files to list.`);
+  return new Map(
+    tree.tree
+      .filter((entry) => entry.type === "blob")
+      .map((entry) => [entry.path, { sha: entry.sha, size: entry.size ?? 0 }]),
+  );
+}
+
 /**
- * Brings the live world's template up to date while Kazusa runs, as starting
- * does, for the client's hourly check and Settings → Updates. Holds off while
- * it's downloading already, or while an update is half done. `moved` says a new
- * version (or any new commit) came down.
+ * What going from one release's files to another's changes in a world (its
+ * `shared/` and `workspaces/`, by kind), and roughly what downloading it costs:
+ * every file `to` has that `from` lacks, by content. Commits between the two
+ * can add a little more.
+ */
+export function compareReleases(from, to) {
+  const had = new Set([...from.values()].map(({ sha }) => sha));
+  let size = 0;
+  for (const { sha, size: bytes } of to.values())
+    if (!had.has(sha)) {
+      had.add(sha);
+      size += bytes;
+    }
+  const changed = [...new Set([...from.keys(), ...to.keys()])].filter(
+    (file) =>
+      /^(shared|workspaces)\//.test(file) &&
+      from.get(file)?.sha !== to.get(file)?.sha,
+  );
+  const areas = new Map();
+  for (const file of changed)
+    areas.set(areaOf(file), (areas.get(areaOf(file)) ?? 0) + 1);
+  return {
+    changes: {
+      files: changed.length,
+      areas: [...areas]
+        .map(([area, count]) => ({ area, count }))
+        .sort((a, b) => b.count - a.count),
+    },
+    size,
+  };
+}
+
+/**
+ * What the newest release of the world in play would bring, downloading
+ * nothing: its releases from `ls-remote`, then, when one is newer than this
+ * world's, its files and this world's release's from GitHub, for what it
+ * changes and the download's size. A release that changes none of the world's
+ * files has nothing for this game (a new chapter, say). `downloaded` says the
+ * template's clone has it already, ready for the system agent.
  */
 export async function checkLiveWorld(root) {
   const git = findGit(root);
-  const live = liveTemplate(root);
-  const dir = live?.id ? path.join(root, WORLDS, live.id) : undefined;
-  if (!git || !dir || !existsSync(path.join(dir, ".git")))
-    return { checked: false };
-  if (midUpdate(root)) return { checked: false, held: "updating" };
-  if (downloading(root, live.id))
-    return { checked: false, held: "downloading" };
-  const head = () => gitIn(git, dir).raw(["rev-parse", "HEAD"]);
-  const before = await head();
-  const lines = await syncWorld(git, root, live.id);
-  return {
+  const manifest = path.join(root, WORLD, "package.json");
+  if (!git || !existsSync(manifest)) return { checked: false };
+  const pkg = readJson(manifest);
+  const id = pkg.kazusa?.template;
+  const url = worldUrl(root, pkg);
+  if (!id || !url) return { checked: false };
+  const current = pkg.version ?? "0";
+  const all = await releases(git, url);
+  const [latest] = all;
+  if (!latest || compareVersions(latest.version, current) <= 0)
+    return {
+      checked: true,
+      current,
+      latest: latest?.version ?? null,
+      newer: false,
+    };
+  const clone = path.join(root, WORLDS, id);
+  const downloaded =
+    existsSync(path.join(clone, ".git")) &&
+    (await gitIn(git, clone)
+      .raw(["merge-base", "--is-ancestor", latest.sha, "HEAD"])
+      .then(
+        () => true,
+        () => false,
+      ));
+  // This world's own release: without one, what changes is unknown and the
+  // download is the whole release.
+  const base = all.find(
+    ({ version }) => compareVersions(version, current) === 0,
+  );
+  const repo = githubRepo(url);
+  let compared = { changes: null };
+  if (repo)
+    try {
+      const [from, to] = await Promise.all([
+        base ? githubTree(repo, base.tag) : new Map(),
+        githubTree(repo, latest.tag),
+      ]);
+      compared = compareReleases(from, to);
+      if (!base) compared.changes = null;
+    } catch {
+      // Unknown: offered all the same, without what it changes or its size.
+    }
+  const result = {
     checked: true,
-    moved: (await head()) !== before,
-    lines,
+    current,
+    latest: latest.version,
+    newer: true,
+    downloaded,
+    ...compared,
   };
+  if (downloaded) delete result.size;
+  return result;
+}
+
+/**
+ * Downloads the newest release of the world in play into its template's clone
+ * (cloning it first if this world was made before templates were repositories),
+ * when the player asks. Holds off while it's downloading already, and while an
+ * update is half done: the template must stay the version that update applied.
+ */
+export async function downloadLiveWorld(root) {
+  const git = findGit(root);
+  if (!git) throw new Error("git isn't installed.");
+  const live = liveTemplate(root);
+  if (!live?.id) throw new Error("This world wasn't made from a template.");
+  if (midUpdate(root))
+    throw new Error(
+      "An update is half done: the system agent has to finish it first.",
+    );
+  if (downloading(root, live.id))
+    throw new Error("This world's template is downloading already.");
+  const clone = path.join(root, WORLDS, live.id);
+  const had = existsSync(path.join(clone, ".git"));
+  const lines = await cloneWorld(root, live.id);
+  const url = worldUrl(root, readJson(path.join(root, WORLD, "package.json")));
+  const [latest] = url ? await releases(git, url) : [];
+  // A fresh clone is at `main`, which can be ahead of the release.
+  if (!had && latest)
+    await gitIn(git, clone).raw([
+      "reset",
+      "--quiet",
+      "--hard",
+      `refs/tags/${latest.tag}`,
+    ]);
+  lines.push(
+    ...(await syncWorld(
+      git,
+      root,
+      live.id,
+      latest ? `refs/tags/${latest.tag}` : "origin/main",
+    )),
+  );
+  return lines;
 }
 
 /** Content, not manifests: `package.json` (once `world.json`) changes alone. */
@@ -650,11 +832,7 @@ export async function adoptWorldRepo(root) {
 
   // Where the world lives: its own `repository`, else the source it came from.
   const id = pkg.kazusa?.template;
-  const url =
-    (typeof pkg.repository === "string"
-      ? pkg.repository
-      : pkg.repository?.url) ??
-    readSources(root).find((source) => source.id === id)?.url;
+  const url = worldUrl(root, pkg);
   const remotes = (await repo.raw(["remote"])).split("\n");
   if (url)
     await repo.raw(
@@ -710,31 +888,25 @@ export async function adoptWorldRepo(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const [command, id] = process.argv.slice(2);
-  if (command === "list" || command === "clone" || command === "check")
+  const commands = {
+    list: async () => ({ worlds: await listWorlds(root) }),
+    clone: async () => ({ lines: await fetchWorld(root, id) }),
+    check: () => checkLiveWorld(root),
+    download: async () => ({ lines: await downloadLiveWorld(root) }),
+  };
+  if (command in commands)
     // One JSON object for the client, `{ error }` when it fails.
     try {
-      process.stdout.write(
-        JSON.stringify(
-          command === "list"
-            ? { worlds: await listWorlds(root) }
-            : command === "check"
-              ? await checkLiveWorld(root)
-              : { lines: await cloneWorld(root, id) },
-        ),
-      );
+      process.stdout.write(JSON.stringify(await commands[command]()));
     } catch (error) {
       process.exitCode = 1;
       process.stdout.write(JSON.stringify({ error: error.message.trim() }));
     }
   // A world without history, or an old template, still plays.
   else
-    for (const [what, step] of [
-      ["the worlds", syncWorlds],
-      ["this world's history", adoptWorldRepo],
-    ])
-      try {
-        for (const line of await step(root)) console.log(line);
-      } catch (error) {
-        console.warn(`Couldn't set up ${what}: ${error.message}`);
-      }
+    try {
+      for (const line of await adoptWorldRepo(root)) console.log(line);
+    } catch (error) {
+      console.warn(`Couldn't set up this world's history: ${error.message}`);
+    }
 }

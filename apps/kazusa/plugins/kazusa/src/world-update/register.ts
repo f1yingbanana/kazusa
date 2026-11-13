@@ -154,11 +154,11 @@ export function registerWorldUpdate(
       );
     const template = templateDir(live, id);
     // An empty or half-made folder would read as the creator deleting
-    // everything. Kazusa downloads the template on start (worlds made before
-    // templates were repositories have none until then).
+    // everything. The player downloads releases from Settings → Updates
+    // (worlds made before templates were repositories have none until then).
     if (!readWorldPackage(template))
       throw new Error(
-        `The template ${id} isn't downloaded (no ../worlds/${id}/package.json). Kazusa downloads it when it starts: ask the user to restart Kazusa, wait for "Downloaded …'s template" in its terminal, then check again.`,
+        `The template ${id} isn't downloaded (no ../worlds/${id}/package.json). Ask the user to download the new version in Settings → Updates → World (it shows the size first), then check again once it's done.`,
       );
     return { live, template, id };
   };

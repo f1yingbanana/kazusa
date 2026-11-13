@@ -1,12 +1,19 @@
 "use client";
 
+import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { useSources } from "@/lib/source/provider";
+import { settingsParsers } from "@/components/views/settings/search-params";
 import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
-import { useWorldCheck, useWorldUpdate } from "@/hooks/use-world-update";
+import {
+  offered,
+  useWorldCheck,
+  useWorldUpdate,
+} from "@/hooks/use-world-update";
+import { formatBytes } from "@/lib/format";
+import { useSources } from "@/lib/source/provider";
 
-/** The version last announced, so each one is announced once per browser. */
+/** What was last announced, so each is announced once per browser. */
 const SEEN_KEY = "kazusa.world-update.seen";
 
 function seen(): string | null {
@@ -17,32 +24,54 @@ function seen(): string | null {
   }
 }
 
-function markSeen(version: string) {
+function markSeen(what: string) {
   try {
-    window.localStorage.setItem(SEEN_KEY, version);
+    window.localStorage.setItem(SEEN_KEY, what);
   } catch {
     // Announced again next time; harmless.
   }
 }
 
 /**
- * Says once that a new version of the world is out, with a button that asks the
- * system agent to bring it in. Settings → Updates keeps offering it after.
+ * Says once that a new version of the world is out, for whoever may download it
+ * (`useWorldCheck`), with a button to Settings → Updates, where they see what
+ * it changes and how big it is before downloading. Once downloaded, says once
+ * that the system agent can bring it in, with a button that asks them.
  */
 export function WorldUpdateNotice() {
   const { world } = useSources();
   const { update, admin, known, canAsk, ask } = useWorldUpdate();
-  // New versions download as Kazusa starts and hourly after: announce one
-  // once it's in, without a reload.
-  useWorldCheck();
-  useLiveTemplateDownload(canAsk, 5000);
-  const version = update?.version;
+  const { enabled, result } = useWorldCheck();
+  // The download ends: the world says it's ready without a reload.
+  useLiveTemplateDownload(enabled, 5000);
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "settings.tab": settingsParsers["settings.tab"],
+  });
   const name = world?.package?.name ?? "Your world";
+  const out = enabled && offered(result) ? result?.latest : undefined;
+  const ready = canAsk && known ? update?.version : undefined;
 
   useEffect(() => {
-    if (!version || !canAsk || !known || seen() === version) return;
-    markSeen(version);
-    toast(`${name} ${version} is out`, {
+    if (!out || seen() === `out:${out}` || seen() === `ready:${out}`) return;
+    markSeen(`out:${out}`);
+    const size = result?.size;
+    toast(`${name} ${out} is out`, {
+      description: `${size ? `${formatBytes(size)} to download. ` : ""}${admin} can bring it into your world once it’s downloaded, keeping everything that happened in it.`,
+      duration: 20_000,
+      action: {
+        label: "View update",
+        onClick: () =>
+          void setParams({ view: "settings", "settings.tab": "updates" }),
+      },
+    });
+    // Once per version: the names and setters change identity, not meaning.
+  }, [out]);
+
+  useEffect(() => {
+    if (!ready || seen() === `ready:${ready}`) return;
+    markSeen(`ready:${ready}`);
+    toast(`${name} ${ready} is ready`, {
       description: `${admin} can bring it into your world, keeping everything that happened in it.`,
       duration: 20_000,
       action: {
@@ -56,8 +85,7 @@ export function WorldUpdateNotice() {
           ),
       },
     });
-    // Once per version: `ask` and the names change identity, not meaning.
-  }, [version, canAsk, known]);
+  }, [ready]);
 
   return null;
 }

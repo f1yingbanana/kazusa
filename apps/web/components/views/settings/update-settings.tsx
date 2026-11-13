@@ -7,14 +7,19 @@ import {
   CircleAlertIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
 import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
-import { useWorldCheck, useWorldUpdate } from "@/hooks/use-world-update";
+import {
+  offered,
+  useWorldCheck,
+  useWorldUpdate,
+} from "@/hooks/use-world-update";
+import { formatBytes } from "@/lib/format";
 import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
 import { useSources } from "@/lib/source/provider";
@@ -164,16 +169,44 @@ export function UpdateSettings() {
   );
 }
 
+/** What each kind of file a release changes is, to a player. */
+const AREA_NAMES: Record<string, string> = {
+  "workspaces/*/portraits": "portraits",
+  "workspaces/*/stickers": "stickers",
+  "shared/backdrops": "backdrops",
+  "shared/wiki": "world pages",
+};
+
+/** "4,786 portraits, 1,125 backdrops and 321 world pages". */
+function describeChanges(
+  areas: readonly { area: string; count: number }[],
+): string {
+  const counts = new Map<string, number>();
+  for (const { area, count } of areas) {
+    const name = AREA_NAMES[area] ?? "characters’ files";
+    counts.set(name, (counts.get(name) ?? 0) + count);
+  }
+  const parts = [...counts].map(
+    ([name, count]) => `${count.toLocaleString()} ${name}`,
+  );
+  return parts.length > 1
+    ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`
+    : (parts[0] ?? "");
+}
+
 /**
- * The world's version, and a newer one of its template when Kazusa has
- * downloaded it. The system agent brings it in, so updating means asking them.
+ * The world's version and its template's newest release: what it changes and
+ * how big it is, then downloading it once the player says so (it can be a
+ * gigabyte), then asking the system agent to bring it in.
  */
 function WorldVersion() {
   const { world, worldResource } = useSources();
   const { update, admin, canAsk, asking, ask } = useWorldUpdate();
-  const download = useLiveTemplateDownload(true, 1000);
   const checker = useWorldCheck();
+  const download = useLiveTemplateDownload(checker.enabled, 1000);
+  const [starting, setStarting] = useState(false);
   const credit = world?.package;
+  const check = checker.result;
 
   // An update brought in since the page loaded no longer shows as new.
   useEffect(() => {
@@ -192,10 +225,18 @@ function WorldVersion() {
     }
   }
 
-  const checkNote =
-    checker.result?.held === "updating"
-      ? `Checking waits until ${admin} finishes updating your world.`
-      : checker.result?.lines?.join(" ") || undefined;
+  async function handleDownload() {
+    setStarting(true);
+    try {
+      await checker.download();
+    } catch (failure) {
+      toast.error("Couldn't download it", {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    } finally {
+      setStarting(false);
+    }
+  }
 
   async function handleAsk() {
     try {
@@ -207,17 +248,26 @@ function WorldVersion() {
     }
   }
 
+  const downloading = Boolean(download) || check?.downloading === true;
+  const available = !update && offered(check);
+  const failed = check?.lastDownload?.error;
+  const yourNote = checker.error
+    ? checker.error.message
+    : check?.newer && check.changes?.files === 0 && !update
+      ? `${credit.name} ${check.latest} is out, and changes nothing in your world.`
+      : undefined;
+
   return (
     <SettingsSection
       title="World"
-      description={`New versions of ${credit.name} download when Kazusa starts and every hour after. ${admin} brings them into your world, keeping everything that happened in it.`}
+      description={`Kazusa checks for new versions of ${credit.name} every hour and asks before downloading one. ${admin} brings it into your world, keeping everything that happened in it.`}
       action={
         checker.enabled ? (
           <Button
             variant="ghost"
             size="sm"
             className="shrink-0"
-            disabled={checker.checking || Boolean(download)}
+            disabled={checker.checking || downloading}
             onClick={() => void handleCheck()}
           >
             <RefreshCwIcon
@@ -234,9 +284,9 @@ function WorldVersion() {
         <VersionRow
           label="Your world"
           version={credit.version ?? "Unknown"}
-          note={update || download ? undefined : checkNote}
+          note={yourNote}
           action={
-            update || download || checkNote ? null : (
+            update || available || downloading || checker.error ? null : (
               <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                 <CheckIcon className="size-3.5" />
                 Up to date
@@ -244,13 +294,47 @@ function WorldVersion() {
             )
           }
         />
+        {available && check?.latest ? (
+          <VersionRow
+            label="Latest version"
+            version={check.latest}
+            details={
+              check.size ? (
+                <>
+                  <Dot />
+                  <span>{formatBytes(check.size)}</span>
+                </>
+              ) : null
+            }
+            note={
+              failed
+                ? `The download failed: ${failed}`
+                : check.changes
+                  ? `Adds or changes ${describeChanges(check.changes.areas)}. Your world plays as usual while it downloads.`
+                  : "Your world plays as usual while it downloads."
+            }
+            action={
+              downloading ? null : (
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  disabled={starting}
+                  onClick={() => void handleDownload()}
+                >
+                  {starting ? <Spinner /> : null}
+                  Download
+                </Button>
+              )
+            }
+          />
+        ) : null}
         {update ? (
           <VersionRow
             label="Latest version"
             version={update.version}
             note={
               canAsk
-                ? `${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
+                ? `Downloaded. ${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
                 : `Ask the world's owner to have ${admin} update it.`
             }
             action={
@@ -274,7 +358,7 @@ function WorldVersion() {
           <DownloadProgress
             title={
               download.kind === "update"
-                ? `the newest ${credit.name}`
+                ? `${credit.name} ${check?.latest ?? ""}`.trim()
                 : credit.name
             }
             download={download}

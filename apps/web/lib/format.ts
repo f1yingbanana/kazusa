@@ -98,3 +98,17 @@ export function formatCost(usd: number) {
   if (usd === 0) return "$0";
   return `$${usd.toFixed(usd < 1 ? 4 : 2)}`;
 }
+
+const BYTE_UNITS = ["bytes", "KB", "MB", "GB", "TB"] as const;
+
+/** A size as people read it: `1.0 GB`, `35 MB`, in powers of 1000 like disks. */
+export function formatBytes(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1000 && unit < BYTE_UNITS.length - 1) {
+    value /= 1000;
+    unit++;
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1;
+  return `${value.toFixed(digits)} ${BYTE_UNITS[unit]}`;
+}

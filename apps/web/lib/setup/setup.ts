@@ -243,12 +243,12 @@ export type ListedWorld =
 
 /**
  * Which worlds there are and how to get one. `scripts/world-repo.mjs` peeks at
- * each source's `package.json` and clones only the one picked, into
- * `worlds/<id>`.
+ * each source's `package.json` and downloads only the one picked, into
+ * `worlds/<id>`, or brings the copy there up to date (`clone`).
  */
 export interface Catalog {
   readonly list: () => Promise<readonly ListedWorld[]>;
-  readonly clone: (id: string) => Promise<void>;
+  readonly download: (id: string) => Promise<void>;
 }
 
 const ListedSchema = z.object({
@@ -271,7 +271,7 @@ export const scriptCatalog: Catalog = {
     if (!result.ok) throw new Error(result.error);
     return ListedSchema.parse(result.value).worlds;
   },
-  clone: async (id) => {
+  download: async (id) => {
     const result = await runScript("world-repo.mjs", ["clone", id], 0);
     if (!result.ok) throw new Error(result.error);
   },
@@ -464,7 +464,7 @@ export function createSetup(
     };
   }
 
-  // A second request for a world being cloned waits for the same clone.
+  // A second request for a world downloading waits for the same download.
   const cloning = new Map<string, Promise<void>>();
 
   /** A download's record, unless it's missing or was left by one that died. */
@@ -483,22 +483,21 @@ export function createSetup(
   }
 
   /**
-   * Downloads the world the player picked, for its cast. One already here may
-   * be moving to a new release as Kazusa starts: wait for that, so the import
-   * never copies half of one release and half of the next.
+   * Downloads the world the player picked, or brings the copy here up to date,
+   * for its cast. One already downloading (Settings → Updates) is waited for
+   * first, so the import never copies half of one release and half of the
+   * next.
    */
   async function prepare(id: string): Promise<WorldOption> {
-    if (!existsSync(path.join(worldsDir, id, "package.json"))) {
-      const pending = cloning.get(id) ?? catalog.clone(id);
-      cloning.set(id, pending);
-      try {
-        await pending;
-      } finally {
-        cloning.delete(id);
-      }
-    }
     while (await readDownload(`.${id}.download.json`))
       await new Promise((resolve) => setTimeout(resolve, downloadPollMs));
+    const pending = cloning.get(id) ?? catalog.download(id);
+    cloning.set(id, pending);
+    try {
+      await pending;
+    } finally {
+      cloning.delete(id);
+    }
     return worldOption(id);
   }
 

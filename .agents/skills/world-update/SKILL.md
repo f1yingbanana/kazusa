@@ -10,13 +10,15 @@ description:
 # Updating the World
 
 This world is a copy of a template in `../worlds/<id>/`. When the template's
-creator releases a new version, Kazusa downloads it into `../worlds/<id>/` when
-it starts or at its hourly check, and the client tells the user it's out
-(Settings → Updates, with a button that asks you to bring it in). It doesn't
-download a new one between your `apply` and `finish`. The user's copy doesn't
-change by itself. Updating merges the creator's new version into this world
-without losing what play wrote: what characters remember, the notes on their
-cards, the people they've met, the user's own edits and map layout.
+creator releases a new version, Kazusa's client tells the user it's out, with
+what it changes and its size, and downloads it into `../worlds/<id>/` when they
+say so (Settings → Updates → World); then a button there asks you to bring it
+in. A release that changes nothing in this world (a new chapter to start fresh,
+say) isn't offered. Nothing downloads between your `apply` and `finish`. The
+user's copy doesn't change by itself. Updating merges the creator's new version
+into this world without losing what play wrote: what characters remember, the
+notes on their cards, the people they've met, the user's own edits and map
+layout.
 
 `world_update` does the mechanical work across thousands of files. Your job is
 the judgment: explaining the update, settling the choices with the user,
@@ -131,10 +133,9 @@ Ask the user once how characters should experience the update:
    `../worlds/<id>/shared/wiki/INDEX.md`, to see how the world has changed in
    the creator's words.
 2. Run `world_update` with `action: "check"`. It changes nothing.
-   - It refuses when the template isn't downloaded (a world made before
-     templates were repositories has none until Kazusa next starts): ask the
-     user to restart Kazusa and tell you once its terminal says the template was
-     downloaded. A new release with pictures can take a few minutes.
+   - It refuses when the new version isn't downloaded: ask the user to download
+     it in Settings → Updates → World, which shows its size first, and to tell
+     you once it's done. A release with pictures can take a few minutes.
    - `version` is this world's version and the downloaded template's. If they
      are the same and `counts` is empty, there is nothing to update: say so.
    - `bestAttempt: true`: this world has no record of the version it was made

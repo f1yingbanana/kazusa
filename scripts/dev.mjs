@@ -254,20 +254,6 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => stop(0));
 
-// Templates downloaded here (the world in play, usually) are brought up to
-// date in the background: a release with new art can be a gigabyte, and
-// nothing needs it to start. A clone is moved in whole and a fetch is only
-// then fast-forwarded, so setup and a world update never read half of one.
-void (async () => {
-  try {
-    // After the install above: it needs simple-git.
-    const { syncWorlds } = await import("./world-repo.mjs");
-    for (const line of await syncWorlds(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't update the worlds: ${error.message}`);
-  }
-})();
-
 start(
   "web",
   process.execPath,
