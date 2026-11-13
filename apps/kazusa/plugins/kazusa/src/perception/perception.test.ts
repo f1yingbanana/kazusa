@@ -3287,3 +3287,81 @@ describe("Conversation coverage review", () => {
     }
   });
 });
+
+describe("Brain runs that keep failing", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const failed = (
+    h: ReturnType<typeof setup>,
+    agentId: string,
+    runId: string,
+  ): Promise<void> =>
+    h.router.noteRunOutcome(agentId, {
+      error: "Connection error.",
+      at: Date.now(),
+      runId,
+    });
+  const checkedInOn = (h: ReturnType<typeof setup>): string[] =>
+    h.deliveries.map((delivery) => delivery.agentId);
+
+  it("stops checking in on everyone, and lets one at a time try again", async () => {
+    // Live: with the network down for 3 h, two characters a minute were woken
+    // into runs that could only fail, 436 of them (2026-11-12).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await h.router.idleWake("dave");
+    expect(checkedInOn(h)).toEqual(["dave"]);
+    await failed(h, "carol", "run-3");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["dave"]);
+    // A minute on, one try, by whoever is next due.
+    vi.advanceTimersByTime(60_000);
+    await h.router.idleWake("erin");
+    await h.router.idleWake("frank");
+    expect(checkedInOn(h)).toEqual(["dave", "erin"]);
+    // The next try waits twice as long.
+    vi.advanceTimersByTime(119_000);
+    await h.router.idleWake("frank");
+    expect(checkedInOn(h)).toEqual(["dave", "erin"]);
+    vi.advanceTimersByTime(1_000);
+    await h.router.idleWake("frank");
+    expect(checkedInOn(h)).toEqual(["dave", "erin", "frank"]);
+  });
+
+  it("checks in on everyone again once a run gets through", async () => {
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await failed(h, "carol", "run-3");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual([]);
+    await h.router.noteRunOutcome("bob");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["erin"]);
+  });
+
+  it("counts a failed run once, however many registrations report it", async () => {
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "alice", "run-1");
+    await failed(h, "alice", "run-1");
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual(["erin"]);
+  });
+
+  it("keeps the count when a run was stopped on purpose", async () => {
+    // A shutdown or a run limit ends a run without saying whether the provider
+    // answers; read as a run that got through, it resumed every check-in.
+    const h = setup();
+    await failed(h, "alice", "run-1");
+    await failed(h, "bob", "run-2");
+    await failed(h, "carol", "run-3");
+    await h.router.noteRunOutcome("bob", undefined, true);
+    await h.router.idleWake("erin");
+    expect(checkedInOn(h)).toEqual([]);
+  });
+});
