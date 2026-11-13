@@ -7,13 +7,13 @@ import {
   CircleAlertIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
-import { useWorldDownloads } from "@/hooks/use-world-downloads";
+import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
 import { useWorldUpdate } from "@/hooks/use-world-update";
 import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
@@ -171,17 +171,13 @@ export function UpdateSettings() {
 function WorldVersion() {
   const { world, worldResource } = useSources();
   const { update, admin, canAsk, asking, ask } = useWorldUpdate();
-  const progress = useWorldDownloads(true, 1000);
-  const download = progress?.downloads.find(({ id }) => id === progress.live);
+  const download = useLiveTemplateDownload(true, 1000);
   const credit = world?.package;
 
-  // When a download ends, the version it brought shows at once.
-  const downloading = Boolean(download);
-  const [wasDownloading, setWasDownloading] = useState(downloading);
-  if (wasDownloading !== downloading) {
-    setWasDownloading(downloading);
-    if (!downloading) void worldResource.mutate();
-  }
+  // An update brought in since the page loaded no longer shows as new.
+  useEffect(() => {
+    void worldResource.mutate();
+  }, []);
 
   if (!credit) return null;
 

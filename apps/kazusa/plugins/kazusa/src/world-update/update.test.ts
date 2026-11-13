@@ -308,6 +308,34 @@ describe("pending renames", () => {
   });
 });
 
+describe("arranged places", () => {
+  it("asks about a position both the user and the creator moved, and follows the creator's elsewhere", () => {
+    const v1 = path.join(root, "v1");
+    const live = path.join(root, "world");
+    const v2 = path.join(root, "worlds", "demo");
+    const at = (x: number) => `\nmap: { x: ${x}, y: ${x} }`;
+    for (const dir of [v1, live])
+      put(dir, "package.json", pkg({ version: "1.0.0" }));
+    put(v1, "shared/wiki/entities/places/hub.md", place("hub", at(0.5)));
+    put(v1, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
+    put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
+    put(live, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
+    writeSnapshot(live, v1, "demo");
+    put(live, "shared/wiki/entities/places/hub.md", place("hub", at(0.1)));
+    put(v2, "package.json", pkg({ version: "2.0.0" }));
+    put(v2, "shared/wiki/entities/places/hub.md", place("hub", at(0.9)));
+    put(v2, "shared/wiki/entities/places/park.md", place("park", at(0.7)));
+    const plan = planUpdate(live, v2, { layout: "keep" });
+    expect(plan.arranged).toBe(1);
+    expect(plan.arrangedMoved).toBe(1);
+    applyUpdate(live, v2, plan, "keep");
+    expect(get(live, "shared/wiki/entities/places/hub.md")).toContain("x: 0.1");
+    expect(get(live, "shared/wiki/entities/places/park.md")).toContain(
+      "x: 0.7",
+    );
+  });
+});
+
 describe("areaOf", () => {
   it("names a file's kind, with a character's id as a star", () => {
     expect(areaOf("shared/backdrops/gym/day.webp")).toEqual({

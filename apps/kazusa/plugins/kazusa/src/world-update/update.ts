@@ -334,7 +334,7 @@ export function planUpdate(
   let arranged = 0;
   let arrangedMoved = 0;
   const mapLine = (text: string | undefined) =>
-    text === undefined ? undefined : (/^map:.*$/m.exec(text)?.[0] ?? null);
+    text === undefined ? null : (/^map:.*$/m.exec(text)?.[0] ?? null);
   for (const file of all) {
     const inL = liveFiles.has(file);
     const inT = templateFiles.has(file);
@@ -404,9 +404,12 @@ export function planUpdate(
         : bestAttempt
           ? standIn(l, policy.owner)
           : undefined;
-      if (PLACE.test(file) && /^map:/m.test(l) && !(b && /^map:/m.test(b))) {
+      // Arranged: the user's position isn't the base's. Moved: the creator's
+      // isn't either, nor the user's, so `layout` picks between them.
+      const [lm, tm, bm] = [mapLine(l), mapLine(t), mapLine(b)];
+      if (PLACE.test(file) && lm && lm !== bm) {
         arranged++;
-        if (mapLine(t) !== mapLine(b)) arrangedMoved++;
+        if (tm !== bm && tm !== lm) arrangedMoved++;
       }
       if (sameMarkdown(l, t) && !from.from) continue;
       const merged = mergeMarkdown(b, t, l, policy);

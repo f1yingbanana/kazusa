@@ -70,7 +70,8 @@ function mergeParts(
     let chosen: Part | undefined;
     if (UNION.has(key)) chosen = union(bp, tp, lp);
     else if (key === "fm:map" && policy.owner === "world")
-      chosen = policy.layout === "reset" ? tp : (lp ?? tp);
+      // A position the user never moved follows the creator's either way.
+      chosen = policy.layout === "reset" || same(lp, bp) ? tp : (lp ?? tp);
     else if (key === "fm:name" && policy.owner === "personal")
       chosen = tp ?? lp;
     else if (same(lp, bp)) chosen = tp;

@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -463,6 +464,30 @@ describe("setup", () => {
       downloads: [download],
       live: "demo",
     });
+  });
+
+  it("waits for a template moving to a new release before using it", async () => {
+    const setup = createSetup(app, store, folderCatalog(app), 5);
+    const record = path.join(app, "worlds/.cast-world.download.json");
+    const now = Date.now();
+    write(
+      record,
+      JSON.stringify({
+        id: "cast-world",
+        kind: "update",
+        stage: "updating",
+        percent: 95,
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    let ready = false;
+    const pending = setup.prepare("cast-world").then(() => (ready = true));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(ready).toBe(false);
+    rmSync(record);
+    await pending;
+    expect(ready).toBe(true);
   });
 
   it("refuses a world that does not exist", async () => {

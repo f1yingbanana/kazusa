@@ -75,6 +75,14 @@ describe("mergeMarkdown", () => {
     ).not.toContain("map:");
   });
 
+  it("follows the creator's move of a position the user never moved", () => {
+    const base = page("name: P\nmap: { x: 0.1, y: 0.2 }", "# P");
+    const template = page("name: P\nmap: { x: 0.8, y: 0.9 }", "# P");
+    expect(mergeMarkdown(base, template, base, world).text).toContain(
+      "map: { x: 0.8, y: 0.9 }",
+    );
+  });
+
   it("unions notes and history line by line", () => {
     const base = "# P\n\n## History\n\n- 2026-01-01 — Built.\n";
     const template =

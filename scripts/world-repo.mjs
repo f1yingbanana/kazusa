@@ -154,6 +154,15 @@ const STAGE_SHARE = {
   checking: [92, 100],
 };
 const WRITE_EVERY_MS = 250;
+/**
+ * Git says nothing while it connects and while the server counts, and can go
+ * quiet mid-download: the file appears after `FIRST_WRITE_MS` regardless (a
+ * fetch with nothing new is over by then) and is rewritten every
+ * `HEARTBEAT_MS`, so a reader never takes a download still running for a dead
+ * one.
+ */
+const FIRST_WRITE_MS = 2000;
+const HEARTBEAT_MS = 30_000;
 
 /** A simple-git progress handler that keeps `downloadFile` up to date. */
 export function downloadTracker(root, id, kind) {
@@ -161,7 +170,10 @@ export function downloadTracker(root, id, kind) {
   const startedAt = Date.now();
   let written = 0;
   let percent = 0;
-  const write = (stage) => {
+  let stage = "preparing";
+  let finished = false;
+  const write = () => {
+    if (finished) return;
     written = Date.now();
     const temp = `${file}.${process.pid}.tmp`;
     writeFileSync(
@@ -177,18 +189,27 @@ export function downloadTracker(root, id, kind) {
     );
     renameSync(temp, file);
   };
+  const first = setTimeout(() => written || write(), FIRST_WRITE_MS);
+  const heartbeat = setInterval(write, HEARTBEAT_MS);
+  first.unref?.();
+  heartbeat.unref?.();
   return {
-    progress({ stage, progress }) {
-      const share = STAGE_SHARE[stage];
+    progress({ stage: reported, progress }) {
+      const share = STAGE_SHARE[reported];
       const next = share
         ? Math.round(share[0] + ((share[1] - share[0]) * progress) / 100)
         : percent;
       // Stages restart at 0; the bar never goes back.
       percent = Math.max(percent, next);
-      if (Date.now() - written >= WRITE_EVERY_MS || progress === 100)
-        write(share ? stage : "preparing");
+      stage = share ? reported : "preparing";
+      if (Date.now() - written >= WRITE_EVERY_MS || progress === 100) write();
     },
+    /** Writes now: the files are about to change, so setup waits from here. */
+    now: write,
     done() {
+      finished = true;
+      clearTimeout(first);
+      clearInterval(heartbeat);
       rmSync(file, { force: true });
     },
   };
@@ -375,6 +396,11 @@ async function syncWorld(git, root, id) {
     ).trim();
     if (branch !== "main" || changed || ahead !== "0")
       return [`Kept your work in worlds/${id}; it isn't updated.`];
+    const behind = (
+      await repo.raw(["rev-list", "--count", "HEAD..origin/main"])
+    ).trim();
+    if (behind === "0") return [];
+    tracker.now();
     await repo.raw(["merge", "--progress", "--ff-only", "origin/main"]);
     return [];
   } catch (error) {
@@ -516,6 +542,11 @@ async function reroot(repo, world, rooted, title) {
   const snapshot = snapshotOf(world);
   const published = snapshot && (await publishedMatch(repo, snapshot));
   if (!published) return [];
+  // Moving the index would lose what's staged; keep it, and the old root.
+  if (
+    (await repo.raw(["diff-index", "--cached", "--name-only", rooted])).trim()
+  )
+    return [];
   await repo.raw(["update-ref", `refs/heads/${PLAY}`, published, rooted]);
   await repo.raw(["read-tree", published]);
   return [

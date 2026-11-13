@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   adoptWorldRepo,
   cloneWorld,
@@ -315,6 +315,21 @@ describe("adoptWorldRepo", () => {
     expect(git(live, "rev-parse", PLAY)).toBe(saved);
   });
 
+  it("keeps a snapshot root while something is staged", async () => {
+    const { root, source } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    await adoptWorldRepo(root);
+    const rooted = git(live, "rev-parse", PLAY);
+    put(path.join(live, "shared/staged.md"), "Staged.\n");
+    git(live, "add", "shared/staged.md");
+    await syncWorlds(root);
+    expect(await adoptWorldRepo(root)).toEqual([]);
+    expect(git(live, "rev-parse", PLAY)).toBe(rooted);
+    expect(git(live, "diff", "--cached", "--name-only")).toBe(
+      "shared/staged.md",
+    );
+  });
+
   it("roots a world whose template was never published at its snapshot", async () => {
     const { root, source } = kazusa();
     await cloneWorld(root, "demo");
@@ -375,6 +390,29 @@ describe("downloadTracker", () => {
     tracker.done();
     expect(existsSync(downloadFile(root, "demo"))).toBe(false);
     expect(readdirSync(path.join(root, WORLDS))).toEqual([]);
+  });
+
+  it("keeps the record fresh while git says nothing, and stops when done", () => {
+    vi.useFakeTimers();
+    try {
+      const { root } = kazusa();
+      mkdirSync(path.join(root, WORLDS), { recursive: true });
+      const file = downloadFile(root, "demo");
+      const tracker = downloadTracker(root, "demo", "clone");
+      expect(existsSync(file)).toBe(false);
+      vi.advanceTimersByTime(2000);
+      const first = JSON.parse(readFileSync(file, "utf8"));
+      expect(first).toMatchObject({ stage: "preparing", percent: 0 });
+      vi.advanceTimersByTime(30_000);
+      expect(JSON.parse(readFileSync(file, "utf8")).updatedAt).toBeGreaterThan(
+        first.updatedAt,
+      );
+      tracker.done();
+      vi.advanceTimersByTime(60_000);
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves nothing behind after a clone over git's transport", async () => {

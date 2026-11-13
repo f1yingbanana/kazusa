@@ -378,6 +378,7 @@ export function createSetup(
   appDir: string,
   keys: KeyStore = sdkKeyStore(appDir),
   catalog: Catalog = scriptCatalog,
+  downloadPollMs = 500,
 ) {
   const worldsDir = path.join(appDir, "worlds");
   const liveDir = path.join(appDir, "world");
@@ -466,7 +467,26 @@ export function createSetup(
   // A second request for a world being cloned waits for the same clone.
   const cloning = new Map<string, Promise<void>>();
 
-  /** Downloads the world the player picked, for its cast. */
+  /** A download's record, unless it's missing or was left by one that died. */
+  async function readDownload(
+    name: string,
+  ): Promise<WorldDownload | undefined> {
+    const parsed = WorldDownloadSchema.safeParse(
+      JSON.parse(
+        await readFile(path.join(worldsDir, name), "utf8").catch(() => "null"),
+      ),
+    );
+    return parsed.success &&
+      Date.now() - parsed.data.updatedAt < DOWNLOAD_STALE_MS
+      ? parsed.data
+      : undefined;
+  }
+
+  /**
+   * Downloads the world the player picked, for its cast. One already here may
+   * be moving to a new release as Kazusa starts: wait for that, so the import
+   * never copies half of one release and half of the next.
+   */
   async function prepare(id: string): Promise<WorldOption> {
     if (!existsSync(path.join(worldsDir, id, "package.json"))) {
       const pending = cloning.get(id) ?? catalog.clone(id);
@@ -477,6 +497,8 @@ export function createSetup(
         cloning.delete(id);
       }
     }
+    while (await readDownload(`.${id}.download.json`))
+      await new Promise((resolve) => setTimeout(resolve, downloadPollMs));
     return worldOption(id);
   }
 
@@ -686,19 +708,7 @@ export function createSetup(
     const found = await Promise.all(
       names
         .filter((name) => /^\.[^/]+\.download\.json$/.test(name))
-        .map(async (name) => {
-          const parsed = WorldDownloadSchema.safeParse(
-            JSON.parse(
-              await readFile(path.join(worldsDir, name), "utf8").catch(
-                () => "null",
-              ),
-            ),
-          );
-          return parsed.success &&
-            Date.now() - parsed.data.updatedAt < DOWNLOAD_STALE_MS
-            ? parsed.data
-            : undefined;
-        }),
+        .map(readDownload),
     );
     const live = existsSync(markerFile)
       ? (WorldPackageSchema.safeParse(
