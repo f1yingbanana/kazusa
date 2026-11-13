@@ -192,17 +192,15 @@ function steerCustody(): Map<string, AbortController> {
  * through clears it. Once `OUTAGE_AFTER` have, the cause is most likely the
  * provider or the network, and one more character waking is one more run
  * failing, which OpenClaw retries for about 100 s. Live, an outage of 3 h
- * failed 436 runs for 33 characters. So idle check-ins stop, and the character
- * who failed last tries again alone, less and less often. Deadlines and
- * messages are still handed over, so each character can fail once more.
+ * failed 436 runs for 33 characters. So idle check-ins wait, and one character
+ * at a time is checked in on, less and less often. Deadlines and messages are
+ * still handed over, so each character can fail once more.
  */
 export interface BrainOutage {
   /** Failed runs in a row. */
   failures: number;
   /** The last failed run, which every registration may report. */
   runId?: string;
-  /** Who tries again while the others wait: whoever failed last. */
-  probe?: string;
   /** Real time before which nobody is checked in on. */
   nextProbeAt: number;
   /** The wait before the try after next; it doubles up to a limit. */
@@ -640,24 +638,16 @@ export class Perception {
 
   async idleWake(agentId: string): Promise<void> {
     const outage = this.outage;
-    if (outage.failures < OUTAGE_AFTER) {
-      await this.checkIn(agentId);
+    if (outage.failures >= OUTAGE_AFTER) {
+      // Runs keep failing: only one character at a time is woken into that,
+      // whoever is next due, so one broken character can't hold the others.
+      const now = Date.now();
+      if (now < outage.nextProbeAt) return;
+      if (!(await this.checkIn(agentId))) return;
+      outage.nextProbeAt = now + outage.waitMs;
+      outage.waitMs = Math.min(outage.waitMs * 2, OUTAGE_MAX_WAIT_MS);
       return;
     }
-    // Runs keep failing: nobody new is woken into that, and one tries again.
-    const now = Date.now();
-    if (now < outage.nextProbeAt) return;
-    outage.nextProbeAt = now + outage.waitMs;
-    outage.waitMs = Math.min(outage.waitMs * 2, OUTAGE_MAX_WAIT_MS);
-    // Whoever failed last may be offstage by now, or back at an activity.
-    const { probe } = outage;
-    if (
-      probe &&
-      probe !== agentId &&
-      ((await this.deps.onstage?.(probe)) ?? true) &&
-      (await this.checkIn(probe))
-    )
-      return;
     await this.checkIn(agentId);
   }
 
@@ -750,9 +740,17 @@ export class Perception {
     };
   }
 
-  /** Records why a run failed, or with nothing, that one got through. */
-  async noteRunOutcome(agentId: string, failure?: BrainFailure): Promise<void> {
-    this.noteOutage(agentId, failure);
+  /**
+   * Records why a run failed, or with nothing, that one got through. A run
+   * `stopped` on purpose (a shutdown, a run limit) says nothing about whether
+   * runs get through, so the count of failing ones stands.
+   */
+  async noteRunOutcome(
+    agentId: string,
+    failure?: BrainFailure,
+    stopped = false,
+  ): Promise<void> {
+    if (!stopped) this.noteOutage(failure);
     let queued = 0;
     let brain: "idle" | "thinking" = "idle";
     let changed = false;
@@ -771,7 +769,7 @@ export class Perception {
     if (changed) this.notifyBrainState(agentId, brain, queued);
   }
 
-  private noteOutage(agentId: string, failure?: BrainFailure): void {
+  private noteOutage(failure?: BrainFailure): void {
     const outage = this.outage;
     if (!failure) {
       if (outage.failures >= OUTAGE_AFTER)
@@ -779,19 +777,17 @@ export class Perception {
           `Perception: a brain run got through after ${outage.failures} failed in a row; idle check-ins resume.`,
         );
       delete outage.runId;
-      delete outage.probe;
       Object.assign(outage, noBrainOutage());
       return;
     }
     if (outage.runId === failure.runId) return;
     outage.runId = failure.runId;
     outage.failures += 1;
-    outage.probe = agentId;
     if (outage.failures !== OUTAGE_AFTER) return;
     outage.nextProbeAt = Date.now() + OUTAGE_FIRST_WAIT_MS;
     outage.waitMs = OUTAGE_FIRST_WAIT_MS * 2;
     this.api?.logger.warn(
-      `Perception: ${OUTAGE_AFTER} brain runs failed in a row (${failure.error}); idle check-ins wait, and one character at a time tries again until a run gets through.`,
+      `Perception: ${OUTAGE_AFTER} brain runs failed in a row (${failure.error}); idle check-ins wait, and one character at a time is checked in on until a run gets through.`,
     );
   }
 

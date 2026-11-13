@@ -382,6 +382,7 @@ export function registerPerception(
           await perception.noteRunOutcome(
             owner.agentId,
             failed ? { error, at: Date.now(), runId: event.runId } : undefined,
+            stoppedOnPurpose,
           );
         } catch (err: unknown) {
           api.logger.warn(`Perception: run outcome not kept: ${String(err)}`);
