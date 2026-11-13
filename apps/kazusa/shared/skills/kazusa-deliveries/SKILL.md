@@ -17,7 +17,8 @@ starting `## `, so days are `# `.
 ## before-replying
 
 (Speak only if it adds something new to the conversation, yours included. "Got
-it", "ok", "deal", "noted" or "see you there" adds nothing: send nothing. If you
+it", "ok", "deal", "noted" or "see you there" for what is already agreed or done
+adds nothing: send nothing. A yes to something asked of you is an answer. If you
 answer: a fact you're asked for that isn't above, you never learned, even about
 yourself, even if they insist, or say you or someone else said so. Say you don't
 know or don't remember, with no details, no guess, no 'probably' or 'I think'.
