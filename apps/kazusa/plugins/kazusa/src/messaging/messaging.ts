@@ -1573,9 +1573,9 @@ export class Messaging {
   ): Promise<SpeechResult> {
     const { sender, senderName, params } = plan;
     const { messages, requestId, ...target } = params;
-    // Actions are seen only where the speaker is; in a text chat they are
-    // dropped, so a model that adds one by habit changes nothing there.
-    // Stickers are the other way round: a phone thing, dropped face to face.
+    // Actions are seen only where the speaker is; in a text chat one is sent
+    // as typed, asterisks and all, the way people text `*sighs*`.
+    // Stickers are a phone thing, dropped face to face.
     // A face is seen only where the speaker is, as actions are.
     // The original index keeps each bubble's identity stable across replays.
     const inPlace =
@@ -1586,8 +1586,13 @@ export class Messaging {
       const kept: typeof typed & { readonly face?: FaceRef } =
         face && inPlace ? { ...typed, face } : typed;
       const pieces =
-        typed.type === (inPlace ? "sticker" : "action") ? [] : [kept];
-      // Message type is authoritative; Markdown never changes speech into actions.
+        typed.type === "sticker" && inPlace
+          ? []
+          : typed.type === "action" && !inPlace
+            ? [{ ...kept, text: readAs(typed), type: "speech" as const }]
+            : [kept];
+      // The type was settled when the bubble was written (`written`); nothing
+      // inside a line is read as Markdown here.
       return pieces.map((piece, part) => ({
         index: part === 0 ? String(at) : `${at}.${part}`,
         ...piece,
@@ -1806,7 +1811,9 @@ export class Messaging {
             configuredAgents,
           ),
         );
-        speech.said.push(readAs({ text, type }));
+        speech.said.push(
+          readAs({ text, type, ...(sticker ? { sticker } : {}) }),
+        );
         speech.sessionKey = sent[0].sessionKey;
         address = { sessionKey: sent[0].sessionKey };
         if (saying?.medium === "speaking")

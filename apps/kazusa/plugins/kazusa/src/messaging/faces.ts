@@ -1,6 +1,5 @@
 import type { PortraitSet } from "../scene/portraits.ts";
-import type { StickerSet } from "../stickers/stickers.ts";
-import type { FaceRef } from "./conversations.ts";
+import { type FaceRef, faceTag } from "./conversations.ts";
 
 /**
  * The moods a character can give a line (§6.3): those of their portraits in the
@@ -25,19 +24,16 @@ export type Faced<B> = B extends { readonly face?: unknown }
   : B;
 
 /**
- * The tool's bubbles with each mood resolved to the face it shows, frozen now.
+ * The written bubbles with each mood resolved to the face it shows, frozen now.
  * The picture is the usual clothes' `<mood>` (outfits come with §6.4); the
  * scene falls back to the neutral face where there is no such picture. `shown`
  * is the face the speaker last said a line with there: only a face that differs
  * from it, or from the one before it in this call, carries what listeners read
- * of it (`seen`, worded by `see` from the look of the sticker with that name,
- * else the mood word).
+ * of it (`seen`, the tag the speaker wrote).
  */
 export function sayFaces<B>(
   bubbles: readonly B[],
-  stickers: StickerSet | undefined,
   shown: string | undefined,
-  see: (look: string) => string,
 ): Faced<B>[] {
   let last = shown;
   return bubbles.map((bubble) => {
@@ -45,9 +41,8 @@ export function sayFaces<B>(
       return bubble as Faced<B>;
     const { face: name, ...rest } = bubble as { face?: unknown };
     if (typeof name !== "string") return rest as Faced<B>;
-    const look =
-      stickers?.stickers.get(name)?.look ?? name.replaceAll("-", " ");
-    const face: FaceRef = name === last ? { name } : { name, seen: see(look) };
+    const face: FaceRef =
+      name === last ? { name } : { name, seen: faceTag(name) };
     last = name;
     return { ...rest, face } as Faced<B>;
   });

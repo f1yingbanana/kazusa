@@ -49,6 +49,7 @@ import {
   isUser,
   heardAs,
   sendMessageSchema,
+  written,
   type ChatConversation,
   type ChatSummary,
 } from "./conversations.ts";
@@ -514,24 +515,47 @@ export function registerMessaging(
           parameters: P,
           values: Readonly<Record<string, number>> = {},
         ) => describeTool(text, { name, parameters }, values, skillContext);
+        // Bubbles are plain text. What this character can write into one, a
+        // face or a sticker of theirs, is the `{data}` of its wording.
         const stickers = stickersOf(context.agentId);
         const outfits = [...(stickers?.outfits ?? [])];
-        // Its names are the schema; the outfits are its wording's `{data}`.
+        const names = [...(stickers?.stickers.keys() ?? [])];
+        const offered = moodsOf(context.agentId);
         const sendMessage = sendMessageSchema(
           messagingConfig.maxBubbles,
-          [...(stickers?.stickers.keys() ?? [])],
-          outfits.length
-            ? text(
-                "kazusa-tools#send_message.sticker-outfits",
-                {
-                  outfits: outfits
-                    .map(([word, worn]) => `${word}: ${worn}`)
-                    .join("; "),
-                },
-                skillContext,
-              )
-            : "",
-          moodsOf(context.agentId),
+          [
+            ...(offered.length
+              ? [
+                  text(
+                    "kazusa-tools#send_message.faces",
+                    { faces: offered.join(", ") },
+                    skillContext,
+                  ),
+                ]
+              : []),
+            ...(names.length
+              ? [
+                  text(
+                    "kazusa-tools#send_message.stickers",
+                    { stickers: names.join(", ") },
+                    skillContext,
+                  ),
+                ]
+              : []),
+            ...(outfits.length
+              ? [
+                  text(
+                    "kazusa-tools#send_message.sticker-outfits",
+                    {
+                      outfits: outfits
+                        .map(([word, worn]) => `${word}: ${worn}`)
+                        .join("; "),
+                    },
+                    skillContext,
+                  ),
+                ]
+              : []),
+          ].join(" "),
         );
         return [
           {
@@ -551,20 +575,19 @@ export function registerMessaging(
                 );
               const params = sendMessage.parse(input);
               const senderName = await characterName(api, config, agentId);
-              // A face too: everyone reads it, in a few words, as it changes.
+              // What each bubble of text means, then its face as everyone
+              // reads it, only as it changes.
+              const moods = moodsOf(agentId);
+              const aloud = /(?:^|:)chat:huddle:/.test(params.sessionKey);
               const faced = sayFaces(
-                params.messages,
-                stickersOf(agentId),
+                params.messages.map((line) => written(line, moods, aloud)),
                 messaging.shownFace(agentId, params.sessionKey),
-                (look) => text("kazusa-deliveries#face", { look }, { agentId }),
               );
-              // A sticker is sent as what everyone reads, frozen now.
+              // A sticker is sent as its description, frozen now.
+              const own = stickersOf(agentId);
               const messages = faced.map((bubble) => {
-                if (typeof bubble === "string" || !("sticker" in bubble))
-                  return bubble;
-                const sticker = stickersOf(agentId)?.stickers.get(
-                  bubble.sticker,
-                );
+                if (!("sticker" in bubble)) return bubble;
+                const sticker = own?.stickers.get(bubble.sticker);
                 if (!sticker)
                   throw new Error(`You have no sticker "${bubble.sticker}".`);
                 return {

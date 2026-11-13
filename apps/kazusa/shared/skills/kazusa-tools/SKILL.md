@@ -84,25 +84,24 @@ The chat's address, e.g. chat:direct:bob or chat:huddle:k3x9p2m0qa.
 
 ## send_message.messages
 
-Your bubbles, in order. By text, each is a short message: a few words or one
-sentence. Aloud, each is a line you say: a sentence or two.
+Your bubbles, in order, each plain text. By text, each is a short message: a few
+words or one sentence. Aloud, each is a line you say: a sentence or two.
+Something you do is always an item of its own, written `*like this*` and nothing
+else: never in the same item as words you say. {data}
 
-## send_message.messages.type
+## send_message.faces
 
-"speech" or "action". Default "speech".
+Face to face, begin a line with `[face=<mood>]` to show that expression as you
+say or do it. It stays until you show another: write one on your first line in a
+conversation and when your expression changes. Your moods: {faces}.
 
-## send_message.messages.sticker
+## send_message.stickers
 
-A sticker of yourself, as a bubble of its own, to show how you feel. Most
-messages need none: send one when your mood shifts, and not the same mood twice
-in a row unless the feeling is strong. {data}
-
-## send_message.messages.face
-
-Face to face only: the expression you show as you say or do this, one of your
-moods. Everyone with you sees it, and it stays until you show another. Give one
-on your first line in a conversation and whenever your expression changes; leave
-it out while it stays the same.
+By text, an item that is only `[sticker=<name>]` sends a sticker of yourself, to
+show how you feel. A sticker is always an item of its own: never in the same
+item as words. Most messages need none: send one when your mood shifts, and not
+the same mood twice in a row unless the feeling is strong. Your stickers:
+{stickers}.
 
 ## send_message.sticker-outfits
 

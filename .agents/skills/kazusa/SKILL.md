@@ -775,16 +775,19 @@ connect these modules in process.
   `*moves to another conversation*`); with fewer than two left it dissolves.
   Every `manage_chat` change is posted to the group in the actor's voice
   (`*adds Natsu to the chat*`), to those going before they go and those coming
-  once in. A bubble may be an **action** (`{ text, type: "action" }`, third
-  person, no name), kept only face to face and dropped silently in text chats;
-  stored plain with its `type` for the client, read by characters as `*text*`.
-  System lines are actions. `messaging.maxBubbles` (default 9) caps a send.
-  `manage_chat` only `leave`s a huddle (`*steps back from the conversation*`,
-  still at the place); speaking to one you are not at fails in-world. Humans
-  have no brain or native agent session. Shared acceptance fans human messages
-  out to agent members before Perception. The `apps/web` prototype and Gateway
-  HTTP adapter still need contract/authentication alignment. Native WebChat
-  group posting is unsupported. Raw session tools remain denied via
+  once in. A bubble is plain text, written exactly as it is read:
+  `*sets the bag down*` is an **action** (third person, no name; only face to
+  face, typed as it is in a text chat), `[face=annoyed]` before a line its face,
+  `[sticker=laughing]` a sticker. The tool has no other fields
+  ([messaging](references/messaging.md)). Stored plain with `type: "action"` for
+  the client. System lines are actions. `messaging.maxBubbles` (default 9) caps
+  a send. `manage_chat` only `leave`s a huddle
+  (`*steps back from the conversation*`, still at the place); speaking to one
+  you are not at fails in-world. Humans have no brain or native agent session.
+  Shared acceptance fans human messages out to agent members before Perception.
+  The `apps/web` prototype and Gateway HTTP adapter still need
+  contract/authentication alignment. Native WebChat group posting is
+  unsupported. Raw session tools remain denied via
   `tools.deny: ["group:sessions", "message"]` (see Character Tool Surface in
   §4). See [messaging](references/messaging.md) for canonical storage and
   [the client reference](references/client.md) for UI requirements, current gaps
