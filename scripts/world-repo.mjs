@@ -569,14 +569,21 @@ export async function checkLiveWorld(root) {
       newer: false,
     };
   const clone = path.join(root, WORLDS, id);
-  const downloaded =
-    existsSync(path.join(clone, ".git")) &&
-    (await gitIn(git, clone)
-      .raw(["merge-base", "--is-ancestor", latest.sha, "HEAD"])
-      .then(
-        () => true,
-        () => false,
-      ));
+  // Not `merge-base --is-ancestor`: simple-git takes its silent "no" (exit
+  // 1) for a yes.
+  const inClone = async () => {
+    const repo = gitIn(git, clone);
+    const commit = (
+      await repo
+        .raw(["rev-parse", "--verify", "--quiet", `${latest.sha}^{commit}`])
+        .catch(() => "")
+    ).trim();
+    const base = commit
+      ? (await repo.raw(["merge-base", commit, "HEAD"]).catch(() => "")).trim()
+      : "";
+    return Boolean(commit) && base === commit;
+  };
+  const downloaded = existsSync(path.join(clone, ".git")) && (await inClone());
   // This world's own release: without one, what changes is unknown and the
   // download is the whole release.
   const base = all.find(

@@ -295,8 +295,19 @@ describe("checkLiveWorld and downloadLiveWorld", () => {
     expect(
       readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
     ).toBe("Played.\n");
-    // A clone at an older release moves to the newest.
+    // A clone at an older release isn't the new one, and moves to it.
     release(source, "0.3.0");
+    expect(await checkLiveWorld(root)).toMatchObject({
+      latest: "0.3.0",
+      downloaded: false,
+    });
+    // Fetched but kept back by a creator's edit: still not downloaded.
+    put(path.join(clone, "shared/wiki/concepts/lore.md"), "Mine.\n");
+    expect(await downloadLiveWorld(root)).toEqual([
+      "Kept your work in worlds/demo; it isn't updated.",
+    ]);
+    expect(await checkLiveWorld(root)).toMatchObject({ downloaded: false });
+    git(clone, "checkout", "--quiet", "--", ".");
     expect(await downloadLiveWorld(root)).toEqual([]);
     expect(git(clone, "rev-parse", "HEAD")).toBe(
       git(source, "rev-parse", "v0.3.0^{commit}"),
