@@ -104,9 +104,11 @@ simulation timestamp contract applies to the character's experience/chat
 ledgers, not a global rewrite of every OpenClaw-generated message.
 
 At assembly, capture one simulation instant. Include only records with
-`now - shortTermHours * 3_600_000 <= timestamp <= now`. Default is 24 simulated
-hours, at least 1. Pausing the world freezes this window; an explicit clock
-advance moves it. Gateway downtime does not advance the saved simulation clock.
+`now - shortTermHours * 3_600_000 <= timestamp <= now`. Default is 16 simulated
+hours, at least 1: a whole day of verbatim records cost 13-16k tokens a turn,
+and characters copied its running bits (2026-11-13); 16 hours halved the tokens.
+Pausing the world freezes this window; an explicit clock advance moves it.
+Gateway downtime does not advance the saved simulation clock.
 
 Each selected record displays its compact simulation timestamp in UTC format
 `ddd YYYY-MM-DD HH:mm` (e.g. `Fri 2026-10-23 08:00`). Dropping ISO seconds, `T`,

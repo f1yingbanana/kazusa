@@ -654,12 +654,12 @@ connect these modules in process.
   runs through last turn's records), then everything that changes per turn: the
   state-selected skills, tool history, the situation (with the clock, never in
   the system prompt), the turn. Nothing before the records may depend on state.
-  Records read from the last 24 simulated hours (configurable upward), floored
-  to a grid of `ledgerGridHours` (4; `ledgerCutoff`) so their start moves once
-  per step. If everything since fits `ledgerMaxTokens` (default `"unlimited"`:
-  whatever is left), all of it shows. Otherwise last turn's start (retained
-  store `"records"`, `{ from }` per character; losing it costs one re-read)
-  holds while it still fits, and when outgrown the block is cut back to
+  Records read from the last 16 simulated hours (configurable, at least 1),
+  floored to a grid of `ledgerGridHours` (4; `ledgerCutoff`) so their start
+  moves once per step. If everything since fits `ledgerMaxTokens` (default
+  `"unlimited"`: whatever is left), all of it shows. Otherwise last turn's start
+  (retained store `"records"`, `{ from }` per character; losing it costs one
+  re-read) holds while it still fits, and when outgrown the block is cut back to
   `ledgerTrimTo` (0.75) of the budget, so it holds again. Measured on a
   simulated week at 64k-128k, this moves the start about 5 times a day instead
   of every waking hour (stateless variants moved it twice as often). Each chat

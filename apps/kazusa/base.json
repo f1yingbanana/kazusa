@@ -123,7 +123,7 @@
           },
           "config": {
             "contextEngine": {
-              "shortTermHours": 24,
+              "shortTermHours": 16,
               "decisionMaxTokens": 8000,
               "decisionShortTermHours": 4,
               "decisionIdentityMaxTokens": 600,

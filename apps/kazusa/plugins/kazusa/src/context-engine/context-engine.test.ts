@@ -375,7 +375,7 @@ describe("Context assembly", () => {
   });
 
   it("excludes undated and out-of-window records, retaining cutoff boundaries", async () => {
-    const cutoff = NOW - 24 * 3_600_000;
+    const cutoff = NOW - 16 * 3_600_000;
     const result = await assemble({
       sessionsContext: {
         "agent:alice:tasks": [
@@ -757,8 +757,8 @@ describe("Context assembly", () => {
     );
   });
 
-  it("defaults to 24 simulated hours, permits more, and rejects removed config", () => {
-    expect(CONTEXT_ENGINE_CONFIG.parse({}).shortTermHours).toBe(24);
+  it("defaults to 16 simulated hours, permits more, and rejects removed config", () => {
+    expect(CONTEXT_ENGINE_CONFIG.parse({}).shortTermHours).toBe(16);
     expect(
       CONTEXT_ENGINE_CONFIG.parse({ shortTermHours: 48 }).shortTermHours,
     ).toBe(48);

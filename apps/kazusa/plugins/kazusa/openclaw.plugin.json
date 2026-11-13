@@ -255,7 +255,7 @@
             "maximum": 32000
           },
           "shortTermHours": {
-            "default": 24,
+            "default": 16,
             "type": "number",
             "minimum": 1
           },
