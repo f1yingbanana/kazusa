@@ -108,7 +108,8 @@ export function worldGit(world: string): Git | undefined {
 
 /**
  * Setup's download: `url` cloned at `tag` (its newest release) into `into`,
- * `play` at that commit, with every world repository's settings.
+ * `play` at that commit, with every world repository's settings. Nothing else
+ * comes down: later releases arrive only through `fetchRelease`.
  */
 export async function cloneRelease(
   bin: GitBinary,
@@ -126,6 +127,10 @@ export async function cloneRelease(
       "http.lowSpeedTime=60",
       "clone",
       "--progress",
+      // The release and its history only: no branch, no other tag, nothing
+      // the creator hasn't released.
+      "--single-branch",
+      "--no-tags",
       ...CONFIG.flatMap(([key, value]) => ["-c", `${key}=${value}`]),
       ...(tag ? ["--branch", tag] : []),
       url,

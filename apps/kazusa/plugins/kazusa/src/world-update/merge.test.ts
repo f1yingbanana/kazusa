@@ -37,6 +37,23 @@ describe("mergeMarkdown", () => {
     expect(merged.text).toContain("## Lately");
   });
 
+  it("keeps a lead only play wrote where play put it", () => {
+    const base = page("place_id: cafe", "# Cafe\n\n## Notes\n\n- Opened.");
+    const template = page(
+      "place_id: cafe",
+      "# Cafe\n\n## Notes\n\n- Opened.\n- Busy now.",
+    );
+    const live = page(
+      "place_id: cafe",
+      "# Cafe\n\nWhere I met Bo.\n\n## Notes\n\n- Opened.",
+    );
+    const { text } = mergeMarkdown(base, template, live, personal);
+    expect(text.indexOf("Where I met Bo.")).toBeLessThan(
+      text.indexOf("## Notes"),
+    );
+    expect(text).toContain("- Busy now.");
+  });
+
   it("reports text both sides changed and keeps the live side", () => {
     const base = page("name: A", "# A\n\nOne.");
     const template = page("name: A", "# A\n\nTwo.");

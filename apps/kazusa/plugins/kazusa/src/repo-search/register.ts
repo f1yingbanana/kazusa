@@ -72,7 +72,7 @@ export function registerRepoSearch(api: OpenClawPluginApi): void {
     name: "grep",
     label: "Grep",
     description:
-      "Search text files for a word or pattern, line by line. Starts in this world; `path` searches elsewhere in the Kazusa repository (`../worlds/<id>` for a template, `.` for this world, never outside the repository). `glob` limits which files (`*.md`, or a path glob where `**` spans folders). `pattern` is a regular expression (`a|b`, `\\bword\\b`), or literal text when it isn't a valid one; case-insensitive unless `ignoreCase` is false. Skips secrets, runtime state and dependencies. Paths come back as your other file tools take them.",
+      "Search text files for a word or pattern, line by line. Starts in this world; `path` searches elsewhere in the Kazusa repository (`.` for this world, `../../..` for Kazusa's own code and guides, never outside the repository). `glob` limits which files (`*.md`, or a path glob where `**` spans folders). `pattern` is a regular expression (`a|b`, `\\bword\\b`), or literal text when it isn't a valid one; case-insensitive unless `ignoreCase` is false. Skips secrets, databases, dependencies and worlds set aside in `old-worlds`. Paths come back as your other file tools take them.",
     parameters: {
       type: "object",
       properties: {

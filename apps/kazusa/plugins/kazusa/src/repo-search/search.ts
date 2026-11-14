@@ -3,8 +3,9 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Never searched: dependencies, history, build output and the client's asset
- * cache. Runtime state in `.state` is searched, but its databases are binary
+ * Never searched: dependencies, history, build output, the client's asset
+ * cache, and worlds an older Kazusa made, set aside whole (copies of every
+ * page). Runtime state in `.state` is searched, but its databases are binary
  * and so skipped.
  */
 const SKIP_DIRS = new Set([
@@ -17,6 +18,7 @@ const SKIP_DIRS = new Set([
   ".turbo",
   ".cache",
   "control-ui-assets",
+  "old-worlds",
 ]);
 /** Never searched: secrets, databases, logs. */
 const SKIP_FILE =

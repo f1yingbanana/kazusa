@@ -119,6 +119,14 @@ export interface LocationService {
   /** Absent for a world without places. */
   readonly taskExtension?: TaskExtension;
   readonly pages: PlaceEdits;
+  /**
+   * Announces places about to be renamed by files moving (`{ old: new }`), so
+   * whoever is there follows to the new id instead of being moved away as if
+   * the place were gone. Returns a cancel for when the move doesn't happen.
+   */
+  readonly expectRenames: (
+    renames: Readonly<Record<string, string>>,
+  ) => () => void;
   /** The stored record, or the participant's home. */
   readonly record: (id: string) => Promise<LocationRecord | undefined>;
   /**
@@ -1214,6 +1222,12 @@ export function registerLocation(
     savePositions: (positions) => writePositions(config.wikiDir, positions),
     ...(taskExtension ? { taskExtension } : {}),
     pages,
+    expectRenames: (renames) => {
+      const cancels = Object.entries(renames).map(([from, to]) =>
+        currentWorld.expectRename(from, to),
+      );
+      return () => cancels.forEach((cancel) => cancel());
+    },
     record,
     participants,
     place,

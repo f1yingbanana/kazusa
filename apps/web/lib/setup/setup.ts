@@ -652,7 +652,18 @@ export function createSetup(
     ]
       .map((part) => String(part).padStart(2, "0"))
       .join("-");
-    await rename(liveDir, path.join(aside, `world-${stamp}`));
+    // On Windows, antivirus and the search indexer hold files for a moment.
+    for (let wait = 100; ; wait *= 2) {
+      try {
+        await rename(liveDir, path.join(aside, `world-${stamp}`));
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (!["EPERM", "EACCES", "EBUSY"].includes(code) || wait > 6400)
+          throw error;
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+    }
     for (const cache of ["worlds", ".worlds-before-repositories"])
       await rm(path.join(appDir, cache), { recursive: true, force: true });
   }

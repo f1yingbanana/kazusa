@@ -197,9 +197,16 @@ changed. For each item, decide where its content belongs and apply the framing:
   this world's copy stays unless the user wants the creator's. New pictures the
   creator added (stickers, portraits, backdrops) are simply added, and need no
   framing: they are how people and places look, not something that happened.
-- **`orphaned`**, with a reason. `the creator removed it; it changed here`: a
-  character's card for a place that still exists can stay.
-  `its place no longer exists`: find where it belongs (below).
+- **`orphaned`**, with a reason:
+  - `the creator removed it; it changed here` on a **world page** (under
+    `shared/`): the creator meant it gone. Carry what play added (notes, history
+    lines, the user's own words) to where it belongs now (below), then delete
+    the page. Keep it only if the user says so: keeping a removed place puts it
+    back on the map.
+  - The same reason on a **character's own file** (her card, her memory): her
+    words stay. A card for a place that still exists stays as it is.
+  - `its place no longer exists`: a card for a place that's gone. Find where it
+    belongs (below).
 - **`keptDeleted`:** deleted here, changed by the creator. Leave them deleted
   unless the user wants them back.
 

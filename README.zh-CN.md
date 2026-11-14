@@ -119,7 +119,11 @@ git clone https://github.com/f1yingbanana/kazusa.git && cd kazusa && npm run dev
 你的世界数据存放在 `apps/kazusa/world/`。需要重新设置的话，只要按 Ctrl +
 C 停止 Kazusa，把那个文件夹删掉即可。重新跑 `npm run dev` 就会初始化。
 
-更新在**设置 > 更新**里。Kazusa会下载新版本并重启，你的现有世界数据不会改变。
+更新在**设置 > 更新**里。Kazusa会下载新版本并重启，你的世界会保留。世界的作者发布新版本时，同一页面也会提示，由
+**ARONA** 把新版本并入你的世界，世界里发生过的一切都会保留。
+
+由旧版 Kazusa 创建的世界（在世界改为直接从作者处下载之前）无法再更新或运行。Kazusa 会提示你开始一个新世界，旧世界会保存在
+`apps/kazusa/old-worlds/` 里。请准备好你的 API 密钥：设置时需要重新填写。
 
 ### 与 **ARONA** 对话
 
@@ -133,9 +137,9 @@ C 停止 Kazusa，把那个文件夹删掉即可。重新跑 `npm run dev` 就�
 从零直接手搓一个完整的世界。如下例生成一个**东方**的世界：
 
 ```
-Create the world of Touhou Project. Examine the level of detail in the world
-examples in apps/kazusa/worlds/: the settings, characters, locations, and memory
-wikis. We need to recreate the same level of detail. Search online for your
+Create the world of Touhou Project. Examine the level of detail in the example
+worlds listed in apps/kazusa/world-sources.json: the settings, characters,
+locations, and memory wikis. We need to recreate the same level of detail. Search online for your
 source of information. Report your progress at each stage.
 ```
 

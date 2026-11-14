@@ -294,6 +294,27 @@ describe("renamed places", () => {
   });
 });
 
+describe("pages that follow a rename", () => {
+  it("rewrites the old id in pages nothing else changes", () => {
+    const { live, v2 } = setup();
+    const stall = (parent: string) => place("stall", `\nparent: ${parent}`);
+    put(
+      path.join(root, "v1"),
+      "shared/wiki/entities/places/stall.md",
+      stall("old_market"),
+    );
+    put(live, "shared/wiki/entities/places/stall.md", stall("old_market"));
+    put(v2, "shared/wiki/entities/places/stall.md", stall("market"));
+    put(live, "workspaces/amy/memory/notes.md", "Met Bo at [[old_market]].\n");
+    const plan = planOf(live, v2);
+    apply(live, v2, plan);
+    expect(get(live, "shared/wiki/entities/places/stall.md")).toContain(
+      "parent: market",
+    );
+    expect(get(live, "workspaces/amy/memory/notes.md")).toContain("[[market]]");
+  });
+});
+
 describe("pending renames", () => {
   it("lists only the renames this world hasn't taken yet", () => {
     const { live, v2 } = setup();

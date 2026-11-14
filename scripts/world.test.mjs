@@ -100,6 +100,12 @@ describe("listWorlds and cloneWorld", () => {
       git(source, "rev-parse", "v0.2.0^{commit}"),
     );
     expect(git(live, "symbolic-ref", "HEAD")).toBe(`refs/heads/${PLAY}`);
+    // The release alone: no other branch or tag, so nothing unreleased is
+    // ever fetched. (A local path's clone links every object; over the network
+    // only the release's history comes down.)
+    expect(git(live, "for-each-ref", "--format=%(refname)")).toBe(
+      ["refs/heads/play", "refs/tags/v0.2.0"].join("\n"),
+    );
     expect(git(live, "config", "core.autocrlf")).toBe("false");
     // The machine's config and runtime state are local.
     put(path.join(live, "openclaw.json"), "{}");

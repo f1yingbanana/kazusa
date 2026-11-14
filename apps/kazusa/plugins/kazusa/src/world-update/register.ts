@@ -292,7 +292,16 @@ export function registerWorldUpdate(
       if (action === "restore") {
         await paused();
         if (!open) throw new Error("No update is open to restore.");
-        restoreWorld(git, open.save, open.to);
+        const back = Object.fromEntries(
+          Object.entries(open.renames).map(([from, to]) => [to, from]),
+        );
+        const cancel = deps.location.expectRenames(back);
+        try {
+          restoreWorld(git, open.save, open.to);
+        } catch (error) {
+          cancel();
+          throw error;
+        }
         finishUpdate(world);
         return textResult({
           restored: true,
@@ -360,7 +369,15 @@ export function registerWorldUpdate(
         version: release.version,
         save,
       });
-      applyUpdate(world, template, plan);
+      // Files moving under a renamed id are a rename, not a place removed:
+      // whoever is there follows it.
+      const cancel = deps.location.expectRenames(plan.pendingRenames);
+      try {
+        applyUpdate(world, template, plan);
+      } catch (error) {
+        cancel();
+        throw error;
+      }
       standOn(git, release.commit);
       return textResult({
         ...planned,

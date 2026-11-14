@@ -126,6 +126,23 @@ export async function listWorlds(root) {
   );
 }
 
+/**
+ * Renames, waiting out a file another program holds for a moment: on Windows,
+ * antivirus and the search indexer open what a clone just wrote.
+ */
+function move(from, to) {
+  for (let wait = 100; ; wait *= 2) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error) {
+      if (!["EPERM", "EACCES", "EBUSY"].includes(error.code) || wait > 6400)
+        throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+    }
+  }
+}
+
 /** What a clone puts in `world/`; everything else there (`.state/`) is kept. */
 const CLONED = [".git", "package.json", "shared", "workspaces"];
 
@@ -158,7 +175,7 @@ export async function cloneWorld(root, id, report) {
   for (const part of CLONED)
     rmSync(path.join(world, part), { recursive: true, force: true });
   for (const part of readdirSync(partial))
-    renameSync(path.join(partial, part), path.join(world, part));
+    move(path.join(partial, part), path.join(world, part));
   rmSync(partial, { recursive: true, force: true });
 }
 

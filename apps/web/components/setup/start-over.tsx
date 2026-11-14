@@ -46,6 +46,10 @@ export function StartOver() {
           <code className="text-foreground">apps/kazusa/old-worlds</code>.
           Nothing in it is deleted.
         </p>
+        <p className="text-muted-foreground">
+          Your API key stays with the old world, so have it ready: setup asks
+          for it again.
+        </p>
         <div>
           <Button onClick={() => void startOver()} disabled={working}>
             {working ? "Setting it aside…" : "Start a new world"}

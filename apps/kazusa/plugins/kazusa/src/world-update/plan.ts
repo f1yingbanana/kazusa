@@ -344,6 +344,15 @@ export function planUpdate(
     );
   }
 
+  // A page nothing else changes still follows a rename: a character's home,
+  // a place's parent, a link in a memory.
+  for (const file of liveFiles.keys()) {
+    if (planned.has(file) || !file.endsWith(".md")) continue;
+    const text = liveText(file);
+    if (text !== read(path.join(live, liveFiles.get(file)!)))
+      planned.set(file, { path: file, outcome: "updated", text });
+  }
+
   const pendingRenames = Object.fromEntries(
     Object.entries(renames).filter(([from]) =>
       [...liveFiles.values()].some(
