@@ -82,14 +82,6 @@ export function jevRoute(
   );
 }
 
-/**
- * TypeSafe's key: a secret reference in Kazusa's own config, declared in the
- * manifest's `secretInputs`, since TypeSafe is no model provider. deprecated:
- * Jev reads the `typesafe:manual` auth profile; only `providers/migrate.ts`
- * reads this, to move a key from worlds made by 0.1.3 and 0.2.0.
- */
-export const TYPESAFE_KEY_PATH = "decisions.typesafeApiKey";
-
 const DEFAULT_INSTRUCTIONS = "Judge this from the state.";
 
 const Probabilities = z.record(z.string(), z.number());

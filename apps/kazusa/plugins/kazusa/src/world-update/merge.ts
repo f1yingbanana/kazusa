@@ -60,17 +60,27 @@ function mergeParts(
   const b = byKey(base);
   const t = byKey(template);
   const l = byKey(live);
-  const keys = [
-    ...template.map(({ key }) => key),
-    ...live.map(({ key }) => key).filter((key) => !t.has(key)),
-  ];
+  // The creator's order, with each part only play has placed after the part
+  // it follows in play's version: a lead a character wrote stays the lead.
+  const keys = template.map(({ key }) => key);
+  let previous: string | undefined;
+  for (const { key } of live) {
+    if (!t.has(key))
+      keys.splice(
+        previous === undefined ? 0 : keys.indexOf(previous) + 1,
+        0,
+        key,
+      );
+    previous = key;
+  }
   const out: Part[] = [];
   for (const key of keys) {
     const [bp, tp, lp] = [b.get(key), t.get(key), l.get(key)];
     let chosen: Part | undefined;
     if (UNION.has(key)) chosen = union(bp, tp, lp);
     else if (key === "fm:map" && policy.owner === "world")
-      chosen = policy.layout === "reset" ? tp : (lp ?? tp);
+      // A position the user never moved follows the creator's either way.
+      chosen = policy.layout === "reset" || same(lp, bp) ? tp : (lp ?? tp);
     else if (key === "fm:name" && policy.owner === "personal")
       chosen = tp ?? lp;
     else if (same(lp, bp)) chosen = tp;

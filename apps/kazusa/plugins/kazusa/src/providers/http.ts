@@ -46,8 +46,7 @@ export function keySource(
   keys: ProviderKeys,
 ): ProviderKeySource {
   // A key written into `openclaw.json` is the user's to change there, and a
-  // store reference there hides a profile from model discovery. The ones
-  // Kazusa once wrote go before the Gateway starts (`scripts/provider-keys.mjs`).
+  // store reference there hides a profile from model discovery.
   if (config.models?.providers?.[entry.id]?.apiKey !== undefined)
     return "config";
   if (keys.has(entry.id)) return "profile";

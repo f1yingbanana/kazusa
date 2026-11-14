@@ -1,15 +1,7 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DatabaseSync } from "node:sqlite";
+import { describe, expect, it } from "vitest";
 import { withJournalSeq } from "../realtime.ts";
 import { replayConversation } from "./message-store.fake.ts";
-import {
-  isDeliverySettled,
-  openMessageDatabase,
-  type MessageStore,
-} from "./message-database.ts";
+import { isDeliverySettled, openMessageDatabase } from "./message-database.ts";
 import { messageJournal, type MessageDelivery } from "./messaging.ts";
 
 const PEOPLE = ["alice", "bob", "carol", "user:sensei"];
@@ -108,12 +100,6 @@ const view = (delivery: MessageDelivery | undefined) => {
 };
 const views = (deliveries: readonly MessageDelivery[]) => deliveries.map(view);
 
-/** Every message in the test chats, oldest first. */
-const everything = (store: MessageStore) =>
-  CHATS.flatMap((chat) => store.page(chat, { limit: 10_000 }).messages)
-    .map(({ value }) => value)
-    .sort((a, b) => a.sequence - b.sequence);
-
 /** The newest `limit` journal rows, as the timeline orders them. */
 const newestRows = (deliveries: readonly MessageDelivery[], limit: number) =>
   deliveries
@@ -123,12 +109,6 @@ const newestRows = (deliveries: readonly MessageDelivery[], limit: number) =>
     .map((row) => row.payload.messageId);
 
 describe("message database", () => {
-  const dirs: string[] = [];
-  afterEach(async () => {
-    await Promise.all(dirs.map((dir) => rm(dir, { recursive: true })));
-    dirs.length = 0;
-  });
-
   it.each([1, 2, 3, 4, 5])(
     "answers each side of a chat as replaying every message does (seed %i)",
     async (seed) => {
@@ -261,58 +241,6 @@ describe("message database", () => {
     },
   );
 
-  it("upgrades a database made before chat history had its own index", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "kazusa-messages-"));
-    dirs.push(dir);
-    const file = path.join(dir, "messages.sqlite");
-    const messages = history(11, 40);
-    // As PR #41 left it: no chat, sender or time columns, no unread table.
-    const old = new DatabaseSync(file);
-    old.exec(`
-      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
-      CREATE TABLE messages (id TEXT PRIMARY KEY, sequence INTEGER NOT NULL,
-        sender_name TEXT NOT NULL, created_at INTEGER NOT NULL,
-        delivery TEXT NOT NULL) STRICT;
-      CREATE INDEX messages_by_sequence ON messages (sequence);
-      CREATE TABLE received (participant TEXT NOT NULL, chat_id TEXT NOT NULL,
-        sequence INTEGER NOT NULL, id TEXT NOT NULL, sender TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        PRIMARY KEY (participant, chat_id, sequence, id)) STRICT, WITHOUT ROWID;
-      CREATE INDEX received_own ON received (participant, chat_id, sequence)
-        WHERE participant = sender;
-    `);
-    const insert = old.prepare("INSERT INTO messages VALUES (?, ?, ?, ?, ?)");
-    const receive = old.prepare(
-      "INSERT INTO received VALUES (?, ?, ?, ?, ?, ?)",
-    );
-    for (const m of messages) {
-      insert.run(m.id, m.sequence, m.senderName, 7, JSON.stringify(m));
-      for (const p of new Set(m.audience))
-        receive.run(p, m.chatId, m.sequence, m.id, m.sender, m.timestamp);
-    }
-    old.close();
-    const store = openMessageDatabase({ path: file });
-    expect(views(everything(store))).toEqual(views(messages));
-    expect(store.unsettled()).toEqual(
-      messages.filter((delivery) => !isDeliverySettled(delivery)),
-    );
-    expect(store.log({ limit: 3 }).map((m) => m.id)).toEqual(
-      newestRows(messages, 3),
-    );
-    const bob = messages.filter(
-      (m) => m.chatId === "group:b" && m.audience.includes("bob"),
-    );
-    const oldest = bob.find((m) =>
-      m.copies.some(
-        (c) =>
-          c.agentId === "bob" && c.readAt === undefined && c.role === "user",
-      ),
-    );
-    expect(views(store.unreadFrom("bob", "group:b"))).toEqual(
-      views(oldest ? bob.filter((m) => m.sequence >= oldest.sequence) : []),
-    );
-  });
-
   it("slims a delivered message, keeping what readers use", async () => {
     const store = openMessageDatabase({ path: ":memory:" });
     const sent = message(1, "alice", "direct:ab", ["alice", "bob"]);
@@ -399,87 +327,5 @@ describe("message database", () => {
       }),
     ).rejects.toThrow("retired");
     expect(await store.lookup(first.id)).toBeUndefined();
-  });
-
-  it("brings the old store's messages across once, then clears it", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "kazusa-messages-"));
-    dirs.push(dir);
-    const file = path.join(dir, "kazusa", "messages.sqlite");
-    const old = history(7, 50);
-    const clear = vi.fn(async () => {});
-    const entries = vi.fn(async () =>
-      old.map((value) => ({ key: value.id, value, createdAt: 42 })),
-    );
-    const legacy = {
-      lookup: async () => undefined,
-      register: async () => {},
-      entries,
-      clear,
-    };
-    const store = openMessageDatabase({ path: file, legacy });
-    await store.ready?.();
-    await store.ready?.();
-    expect(entries).toHaveBeenCalledTimes(1);
-    expect(clear).toHaveBeenCalledTimes(1);
-    expect(views(everything(store))).toEqual(views(old));
-    expect(store.latest(old[0].chatId)?.createdAt).toBe(42);
-    // One database per file in the process, whoever opens it.
-    expect(openMessageDatabase({ path: file })).toBe(store);
-  });
-
-  it("keeps the old store, and tries again, when the copy comes up short", async () => {
-    const [first] = history(9, 1);
-    // Two entries under one key copy as one message: fewer than were read.
-    const entries = vi.fn(async () => [
-      { key: first.id, value: first, createdAt: 1 },
-      { key: first.id, value: first, createdAt: 2 },
-    ]);
-    const clear = vi.fn(async () => {});
-    const store = openMessageDatabase({
-      path: ":memory:",
-      legacy: {
-        lookup: async () => undefined,
-        register: async () => {},
-        entries,
-        clear,
-      },
-    });
-    await expect(store.ready?.()).rejects.toThrow("copied 1 of 2");
-    await expect(store.ready?.()).rejects.toThrow("copied 1 of 2");
-    expect(entries).toHaveBeenCalledTimes(2);
-    expect(clear).not.toHaveBeenCalled();
-    expect(store.lastSequence()).toBe(0);
-  });
-
-  it("clears the old store without copying again after a stop between the two", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "kazusa-messages-"));
-    dirs.push(dir);
-    const file = path.join(dir, "messages.sqlite");
-    const old = history(8, 20);
-    const legacy = (clear: () => Promise<void>) => {
-      const entries = vi.fn(async () =>
-        old.map((value) => ({ key: value.id, value, createdAt: 1 })),
-      );
-      return {
-        lookup: async () => undefined,
-        register: async () => {},
-        entries,
-        clear,
-      };
-    };
-    // The copy commits, then the clear fails (as if the Gateway stopped).
-    const first = legacy(() => Promise.reject(new Error("stopped")));
-    await openMessageDatabase({ path: file, legacy: first }).ready?.();
-    // The next process opens the same file afresh.
-    (globalThis as unknown as Record<symbol, Map<string, unknown>>)[
-      Symbol.for("kazusa.messageDatabases")
-    ].delete(file);
-    const clear = vi.fn(async () => {});
-    const second = legacy(clear);
-    const again = openMessageDatabase({ path: file, legacy: second });
-    await again.ready?.();
-    expect(second.entries).not.toHaveBeenCalled();
-    expect(clear).toHaveBeenCalledTimes(1);
-    expect(everything(again)).toHaveLength(20);
   });
 });

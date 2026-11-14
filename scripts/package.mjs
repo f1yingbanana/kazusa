@@ -74,11 +74,9 @@ const INCLUDED = [
   "package-lock.json",
   "scripts/dev.mjs",
   "scripts/plugin-startup.mjs",
-  "scripts/provider-keys.mjs",
   "scripts/system-agent.mjs",
   "scripts/update.mjs",
-  "scripts/world-package.mjs",
-  "scripts/world-repo.mjs",
+  "scripts/world.mjs",
   "apps/",
   "packages/",
   ".agents/skills/",
@@ -503,11 +501,10 @@ SectionEnd
 Section Uninstall
   !insertmacro WaitUntilStopped
   !insertmacro RemoveAppFiles
-  MessageBox MB_YESNO|MB_ICONQUESTION "Also delete your world and its API keys? This can't be undone." /SD IDNO IDNO keepWorld
+  MessageBox MB_YESNO|MB_ICONQUESTION "Also delete your world, any worlds set aside, and its API keys? This can't be undone." /SD IDNO IDNO keepWorld
   RMDir /r "$INSTDIR\\apps\\kazusa\\world"
+  RMDir /r "$INSTDIR\\apps\\kazusa\\old-worlds"
   keepWorld:
-  RMDir /r "$INSTDIR\\apps\\kazusa\\worlds"
-  RMDir /r "$INSTDIR\\apps\\kazusa\\.worlds-before-repositories"
   Delete "$SMPROGRAMS\\Kazusa.lnk"
   Delete "$DESKTOP\\Kazusa.lnk"
   DeleteRegKey HKCU "${uninstallKey}"
@@ -548,7 +545,7 @@ set -e
 cd "$home"
 if [ -f "$bundle/VERSION" ] && ! cmp -s "$bundle/VERSION" .bundle-version; then
   echo "Setting up Kazusa. This takes a minute, once per version."
-  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /apps/kazusa/worlds/ --exclude /apps/kazusa/.worlds-before-repositories/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
+  rsync -a --delete --exclude /apps/kazusa/world/ --exclude /apps/kazusa/old-worlds/ --exclude /.update/ --exclude /.bundle-version --exclude /Kazusa.command "$bundle/" ./
   xattr -dr com.apple.quarantine . 2>/dev/null || true
   cp "$bundle/VERSION" .bundle-version
 fi

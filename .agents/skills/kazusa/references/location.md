@@ -137,9 +137,11 @@ somewhere now gone is put at the nearest area above it, and a renamed place
 carries its people, trips and huddles. Renaming and removing a place through the
 wiki (`POST /kazusa/wiki/rename`, `/wiki/delete`) or ARONA's `map_rename_place`
 and `map_remove_place` also rewrite every page and card naming it. A world
-without places disables Location. The local working set has 22 places (school,
-dorm with a room per character, Church Street, SCHALE); the wiki lives in
-`worlds/<id>/`.
+update's renames move files, so `world_update` announces them first
+(`expectRenames`): a moved page under a new id is a rename, not a removal. A
+world without places disables Location. The local working set has 22 places
+(school, dorm with a room per character, Church Street, SCHALE); the wiki lives
+in the world's own repository.
 
 ### 4.2 Position and travel
 

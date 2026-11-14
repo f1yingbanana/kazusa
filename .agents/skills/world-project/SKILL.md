@@ -381,9 +381,10 @@ npm run dev
 curl -s -X POST http://127.0.0.1:3000/setup -H 'content-type: application/json' -d '{"world":"starter","cast":[]}'
 ```
 
-If it already exists, that's the user's world, and it isn't in git. Don't delete
-it or build on top of it without asking. Setup does nothing to an existing
-world. The system agent is named by `systemAgent` in the world's template;
+If it already exists, that's the user's world: a clone of its creator's
+repository, with everything play wrote as uncommitted changes. Don't delete it
+or build on top of it without asking. Setup does nothing to an existing world.
+The system agent is named by `kazusa.systemAgent` in the world's `package.json`;
 `starter` uses `arona`.
 
 **The tools are still there.** Call `wiki_lint`, `world_audit`, `map_route`,

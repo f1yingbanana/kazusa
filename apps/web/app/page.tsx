@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { headers } from "next/headers";
 import { parseAuthMode } from "@kazusa/client";
 import { SetupGuide } from "@/components/setup/setup-guide";
+import { StartOver } from "@/components/setup/start-over";
 import { Shell } from "@/components/shell/shell";
 import { setup } from "@/lib/setup/setup";
 import { AuthError, isAllowedHost, resolveViewer } from "@/lib/auth/access";
@@ -24,8 +25,12 @@ export default async function Page() {
   // Only the desktop has a setup step. A hosted frontend learns whether its
   // world is up from its Gateway, so it never touches local setup machinery.
   const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
-  if (mode === "local" && viewer.role === "owner" && !setup.configured())
-    return <SetupGuide status={await setup.status()} />;
+  if (mode === "local" && viewer.role === "owner") {
+    // Kazusa was updated past a world an older version made.
+    if (setup.outdated()) return <StartOver />;
+    if (!setup.configured())
+      return <SetupGuide status={await setup.status()} />;
+  }
   return (
     <Suspense>
       <Shell />

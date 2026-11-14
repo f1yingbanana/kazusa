@@ -11,7 +11,6 @@ import {
   truncateText,
 } from "./decision-context.ts";
 import type { Stimulus } from "../stimulus.ts";
-import { parseSkillMarkdown } from "./skill-loader.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 const message: Stimulus = {
@@ -307,52 +306,6 @@ describe("Bounded decision evidence", () => {
         buildDecisionQuestions("busy_thinking", rubric, false, speech),
       ),
     ).toEqual(["pace"]);
-  });
-
-  it("keeps every world's own rubric at the shipped version, with every question", async () => {
-    // Worlds without phones reword the rubric, which copies all of it; a copy
-    // left at version 7 never asked about the floor, pace or tuning out.
-    const { readFile, readdir } = await import("node:fs/promises");
-    const read = (path: string) =>
-      readFile(new URL(path, import.meta.url), "utf8");
-    const version = (text: string) =>
-      (
-        parseSkillMarkdown(text).frontmatter?.metadata as {
-          rubricVersion?: string;
-        }
-      )?.rubricVersion;
-    const shipped = await read("../../../../shared/skills/perception/SKILL.md");
-    const questions = Object.keys(parsePerceptionSkill(shipped).questions);
-    const worlds = await readdir(
-      new URL("../../../../worlds/", import.meta.url),
-      {
-        withFileTypes: true,
-      },
-    );
-    const rubrics: Record<string, { version?: string; questions: string[] }> =
-      {};
-    for (const world of worlds) {
-      if (!world.isDirectory()) continue;
-      const own = await read(
-        `../../../../worlds/${world.name}/shared/skills/perception/SKILL.md`,
-      ).catch(() => undefined);
-      if (own)
-        rubrics[world.name] = {
-          version: version(own),
-          questions: Object.keys(parsePerceptionSkill(own).questions),
-        };
-    }
-    // Worlds live in their own repositories: only those downloaded here are
-    // checked, and none may be.
-    // Keyed by world, so a failure names the one left behind.
-    expect(rubrics).toEqual(
-      Object.fromEntries(
-        Object.keys(rubrics).map((name) => [
-          name,
-          { version: version(shipped), questions },
-        ]),
-      ),
-    );
   });
 
   it("asks someone quiet in a conversation of three or more whether they still follow it", async () => {

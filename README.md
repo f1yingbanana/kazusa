@@ -148,7 +148,14 @@ Your world lives in `apps/kazusa/world/`. To start afresh, stop Kazusa with
 Ctrl + C and delete that folder. Run `npm run dev` again to reinitialize.
 
 To update, open **Settings > Updates**. Kazusa downloads the latest release and
-restarts, keeping your world data unchanged.
+restarts, keeping your world. When your world's creator releases a new version,
+the same page offers it, and **ARONA** brings it in, keeping everything that
+happened in your world.
+
+A world made by an older Kazusa, from before worlds were downloaded straight
+from their creators, can't be updated or run any more. Kazusa then offers to
+start a new world, and keeps the old one in `apps/kazusa/old-worlds/`. Have your
+API key ready: setup asks for it again.
 
 ### Talk to **ARONA**
 
@@ -163,9 +170,9 @@ You can also ask **ARONA** to create an entire world from scratch. For example,
 to create the world of **Touhou Project**:
 
 ```
-Create the world of Touhou Project. Examine the level of detail in the world
-examples in apps/kazusa/worlds/: the settings, characters, locations, and memory
-wikis. We need to recreate the same level of detail. Search online for your
+Create the world of Touhou Project. Examine the level of detail in the example
+worlds listed in apps/kazusa/world-sources.json: the settings, characters,
+locations, and memory wikis. We need to recreate the same level of detail. Search online for your
 source of information. Report your progress at each stage.
 ```
 

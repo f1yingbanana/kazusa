@@ -1,7 +1,6 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { StateStore } from "../state.ts";
 import type { MessageCopy, MessageDelivery } from "./messaging.ts";
 
 /** A message someone received, as "awaiting your reply" names it. */
@@ -55,8 +54,6 @@ export interface LogWindow {
  * so none grows with all of history.
  */
 export interface MessageStore {
-  /** Runs before the first read, once per process. */
-  readonly ready?: () => Promise<void>;
   /** One message by its stable id, as last saved. */
   lookup(id: string): Promise<MessageDelivery | undefined>;
   /**
@@ -260,10 +257,6 @@ const stored = (row: MessageRow): StoredMessage => ({
  * index rows, one per recipient.
  */
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS meta (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-) STRICT;
 CREATE TABLE IF NOT EXISTS chats (
   n INTEGER PRIMARY KEY,
   chat_id TEXT NOT NULL UNIQUE
@@ -311,20 +304,11 @@ CREATE TABLE IF NOT EXISTS unsettled (
 
 const VERSION = 2;
 
-/** Set once older messages have been brought across. */
-const MIGRATED = "migrated";
-
 const DATABASES = Symbol.for("kazusa.messageDatabases");
 
 export interface MessageDatabaseOptions {
   /** The database file, or `:memory:`. */
   readonly path: string;
-  /**
-   * Where messages were kept before (OpenClaw's `messaging` keyed store). Its
-   * messages are copied in on first use, then it is cleared.
-   */
-  readonly legacy?: StateStore<MessageDelivery> &
-    Partial<{ clear: () => Promise<void> }>;
   /** Real time, for when a message was first saved. */
   readonly now?: () => number;
 }
@@ -355,13 +339,12 @@ export function openMessageDatabase(
 }
 
 /**
- * Opens the file, creates or upgrades its schema, prepares every statement
+ * Opens the file, creates its schema, prepares every statement
  * once, and returns the store over them. Use `openMessageDatabase`, which keeps
  * one per file.
  */
 function createStore({
   path: file,
-  legacy,
   now = Date.now,
 }: MessageDatabaseOptions): MessageStore {
   const db = new DatabaseSync(file);
@@ -386,31 +369,7 @@ function createStore({
     }
   }
 
-  const columns = (table: string): string[] =>
-    (
-      db.prepare(`PRAGMA table_info(${table})`).all() as unknown as {
-        name: string;
-      }[]
-    ).map((column) => column.name);
-
-  // An older layout (#41 and #42 kept each message as one JSON `delivery`)
-  // steps aside, its derived tables go, and the current schema is created. Its
-  // messages are copied across below, once the statements exist.
-  transaction(() => {
-    if (columns("messages").includes("delivery")) {
-      db.exec(`
-        ALTER TABLE messages RENAME TO messages_before_v2;
-        DROP INDEX IF EXISTS messages_by_sequence;
-        DROP INDEX IF EXISTS messages_by_chat;
-        DROP INDEX IF EXISTS messages_by_time;
-        DROP INDEX IF EXISTS messages_by_sender;
-        DROP TABLE IF EXISTS received;
-        DROP TABLE IF EXISTS unread;
-        DROP TABLE IF EXISTS unsettled;
-      `);
-    }
-    db.exec(SCHEMA);
-  });
+  db.exec(SCHEMA);
 
   const MESSAGE = "m.*, c.chat_id";
   const FROM = "messages m JOIN chats c ON c.n = m.chat";
@@ -491,11 +450,6 @@ function createStore({
      WHERE r.participant = ? AND r.chat = ? AND r.sequence >= ?
      ORDER BY r.sequence, m.id`,
   );
-  const readMeta = db.prepare("SELECT value FROM meta WHERE key = ?");
-  const writeMeta = db.prepare(
-    "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-  );
-  const count = db.prepare("SELECT count(*) AS n FROM messages");
 
   /** A chat's number, if any message has been saved in it. */
   const numberOf = (chatId: string): number | undefined =>
@@ -545,62 +499,7 @@ function createStore({
     else markUnsettled.run(n);
   }
 
-  // Bring an older layout's messages across, slimmed, in one transaction.
-  if (
-    (
-      db
-        .prepare(
-          "SELECT count(*) AS n FROM sqlite_master WHERE name = 'messages_before_v2'",
-        )
-        .get() as { n: number }
-    ).n > 0
-  )
-    transaction(() => {
-      for (const row of db
-        .prepare(
-          "SELECT id, created_at, delivery FROM messages_before_v2 ORDER BY sequence, id",
-        )
-        .iterate() as Iterable<{
-        id: string;
-        created_at: number;
-        delivery: string;
-      }>)
-        save(
-          row.id,
-          JSON.parse(row.delivery) as MessageDelivery,
-          row.created_at,
-        );
-      db.exec("DROP TABLE messages_before_v2");
-    });
   db.exec(`PRAGMA user_version = ${VERSION}`);
-
-  let migrating: Promise<void> | undefined;
-  /**
-   * Copies the messages kept in OpenClaw's keyed store before this database,
-   * once (the `migrated` flag records it), then clears that store. Without a
-   * legacy store there is nothing to do.
-   */
-  async function migrate(): Promise<void> {
-    if (!legacy) return;
-    if (readMeta.get(MIGRATED) === undefined) {
-      const entries = await legacy.entries();
-      // A short copy rolls back, flag included, so the next read tries again
-      // and the old store is never cleared.
-      transaction(() => {
-        for (const { key, value, createdAt } of entries)
-          if (!find.get(key)) save(key, value, createdAt);
-        const { n } = count.get() as { n: number };
-        if (n < entries.length)
-          throw new Error(
-            `Kazusa messages: copied ${n} of ${entries.length}; the old store is kept`,
-          );
-        writeMeta.run(MIGRATED, String(entries.length));
-      });
-    }
-    // Also after a stop between the copy and this. A failure leaves the rows
-    // for the next start: they are never read again.
-    await legacy.clear?.().catch(() => undefined);
-  }
 
   /** As OpenClaw's stores do: a failure rejects rather than throws. */
   function settle<T>(run: () => T): Promise<T> {
@@ -686,12 +585,6 @@ function createStore({
   }
 
   return {
-    // A failed copy is tried again by the next read, not remembered.
-    ready: () =>
-      (migrating ??= migrate().catch((error: unknown) => {
-        migrating = undefined;
-        throw error;
-      })),
     lookup: (key) =>
       settle(() => {
         const row = find.get(key) as MessageRow | undefined;

@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { authorName } from "@kazusa/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { readWorldPackage, worldCredit } from "./package.ts";
+import { availableUpdate, readWorldPackage, worldCredit } from "./package.ts";
 
 const KAZUSA = { systemAgent: "arona" };
 
@@ -64,5 +65,57 @@ describe("authorName", () => {
     );
     expect(authorName("<ada@example.com>")).toBeUndefined();
     expect(authorName(undefined)).toBeUndefined();
+  });
+});
+
+describe("availableUpdate", () => {
+  let root: string | undefined;
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = undefined;
+  });
+
+  it("offers the newest release downloaded until the world stands on it", () => {
+    root = mkdtempSync(path.join(tmpdir(), "world-update-"));
+    const live = path.join(root, "apps/kazusa/world");
+    mkdirSync(live, { recursive: true });
+    const git = (...args: string[]) =>
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=Test",
+          "-c",
+          "user.email=test@example.com",
+          "-c",
+          "commit.gpgSign=false",
+          ...args,
+        ],
+        { cwd: live, encoding: "utf8" },
+      ).trim();
+    writeFileSync(
+      path.join(live, "package.json"),
+      JSON.stringify({ name: "demo", kazusa: { ...KAZUSA, template: "demo" } }),
+    );
+    git("init", "--quiet", "--initial-branch=play");
+    git("remote", "add", "origin", "https://github.com/someone/demo-world.git");
+    git("add", "-A");
+    git("commit", "--quiet", "-m", "First");
+    git("tag", "v0.4.0");
+    expect(availableUpdate(live)).toBeUndefined();
+    git("commit", "--quiet", "--allow-empty", "-m", "More lore");
+    git("tag", "-a", "v0.5.0", "-m", "New lore.");
+    const next = git("rev-parse", "HEAD");
+    git("reset", "--quiet", "--hard", "HEAD~1");
+    expect(availableUpdate(live)).toMatchObject({
+      commit: next,
+      version: "0.5.0",
+      notes: "New lore.",
+      url: "https://github.com/someone/demo-world/releases/tag/v0.5.0",
+      systemAgent: "arona",
+    });
+    // Taken: the world stands on it.
+    git("update-ref", "refs/heads/play", next);
+    expect(availableUpdate(live)).toBeUndefined();
   });
 });

@@ -39,8 +39,8 @@ const revisionOf = (entries: SkillEntries, name: string): unknown =>
  * changes; OpenClaw never shows them (`skills.entries.<name>.enabled: false`).
  * The rest are OpenClaw's: it shows each character the world's `shared/skills`
  * and their own workspace's `skills/`, a copy there replacing the world's for
- * them alone. Bundled skills stay hidden (`skills.allowBundled`, set before the
- * Gateway starts).
+ * them alone. Bundled skills stay hidden (`skills.allowBundled`, which setup
+ * writes from `base.json`).
  *
  * Each session keeps a snapshot of its skills, rebuilt from disk whenever
  * anything under `skills` in the config changes, and that config is hot. So

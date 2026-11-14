@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { useSources } from "../source/provider";
+import { useSources, WORLD_KEY } from "../source/provider";
+import { recheckWorld } from "@/hooks/use-world-update";
 import {
   applyTyping,
   clearTyping,
@@ -193,6 +194,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           // A new home moves whoever hasn't gone anywhere yet.
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
+          break;
+        case "world":
+          // An update applied, restored or finished: the version and what's
+          // offered changed.
+          void mutate(WORLD_KEY);
+          recheckWorld({ cache, mutate });
           break;
         case "observed":
           if (data.event.type === "message") handleObservedMessage(data.event);

@@ -49,7 +49,7 @@ interface SourcesValue {
 }
 
 const NO_PLAYER = { id: "", name: "You" };
-const WORLD_KEY = ["kazusa/world"] as const;
+export const WORLD_KEY = ["kazusa/world"] as const;
 const WORLD_CACHE_KEY = unstable_serialize(WORLD_KEY);
 export const CHARACTERS_KEY = ["kazusa/characters"] as const;
 const NOBODY: ReadonlySet<string> = new Set();

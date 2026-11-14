@@ -7,11 +7,12 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { SYSTEM_AGENT_INCLUDE as SCRIPT_INCLUDE } from "../../../../scripts/system-agent.mjs";
 import { execFileSync } from "node:child_process";
 import {
@@ -50,36 +51,46 @@ const readPackage = (dir: string): unknown =>
 function folderCatalog(
   app: string,
   remote = new Map<string, string>(),
+  hold?: Promise<void>,
 ): Catalog & { readonly cloned: string[] } {
   const worlds = path.join(app, "worlds");
-  const cloned: string[] = [];
-  return {
-    cloned,
-    list: async () => [
+  const live = path.join(app, "world");
+  const sources = () =>
+    new Map([
       ...readdirSync(worlds, { withFileTypes: true })
         .filter(
           (entry) =>
             entry.isDirectory() &&
             existsSync(path.join(worlds, entry.name, "package.json")),
         )
-        .map(({ name }) => ({
-          id: name,
-          downloaded: true,
-          package: readPackage(path.join(worlds, name)),
-        })),
-      ...[...remote]
-        .filter(([id]) => !existsSync(path.join(worlds, id)))
-        .map(([id, source]) => ({
-          id,
-          downloaded: false,
-          package: readPackage(source),
-        })),
-    ],
-    clone: async (id) => {
-      const source = remote.get(id);
+        .map(({ name }): [string, string] => [name, path.join(worlds, name)]),
+      ...remote,
+    ]);
+  const cloned: string[] = [];
+  let here: string | undefined;
+  return {
+    cloned,
+    list: async () =>
+      [...sources()].map(([id, source]) => ({
+        id,
+        downloaded: here === id,
+        package: readPackage(here === id ? live : source),
+      })),
+    // As `world.mjs clone` does, without git: the picked world copied
+    // into `world/`, replacing another pick that wasn't set up.
+    download: async (id, onProgress) => {
+      if (here === id) return;
+      const source = sources().get(id);
       if (!source) throw new Error(`No world ${id} is listed.`);
+      if (existsSync(path.join(live, "openclaw.json")))
+        throw new Error("A world is set up already.");
+      onProgress?.({ stage: "receiving", percent: 40 });
+      await hold;
+      for (const part of [".git", "package.json", "shared", "workspaces"])
+        rmSync(path.join(live, part), { recursive: true, force: true });
+      cpSync(source, live, { recursive: true });
       cloned.push(id);
-      cpSync(source, path.join(worlds, id), { recursive: true });
+      here = id;
     },
   };
 }
@@ -196,19 +207,16 @@ describe("setup", () => {
   beforeEach(() => {
     app = fixture();
     store = memoryStore();
-    vi.stubEnv("OPENROUTER_API_KEY", "");
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
   const config = () =>
     JSON.parse(readFileSync(path.join(app, "world/openclaw.json"), "utf8"));
 
-  it("lists worlds with their characters, starting from scratch last", async () => {
-    const status = await createSetupHere(app).status();
+  it("lists worlds, with the picked one's characters, starting from scratch last", async () => {
+    const setup = createSetupHere(app);
+    await setup.prepare("cast-world");
+    const status = await setup.status();
     expect(status).toMatchObject({
       configured: false,
-      imported: null,
       savedKey: null,
     });
     // In config order, labelled and linked from the provider catalog.
@@ -277,7 +285,7 @@ describe("setup", () => {
   });
 
   it("reads groups from the world's anchors, broadest first, skipping groups of one", async () => {
-    const [world] = (await createSetupHere(app).status()).worlds;
+    const world = await createSetupHere(app).prepare("cast-world");
     expect(world?.groups).toEqual([
       { field: "city", groups: [{ name: "Port", ids: ["ann", "bo", "cy"] }] },
       { field: "guild", groups: [{ name: "The Crew", ids: ["ann", "bo"] }] },
@@ -286,7 +294,8 @@ describe("setup", () => {
   });
 
   it("makes a world from the choices, keeping the template untouched", async () => {
-    const setup = createSetupHere(app);
+    const catalog = folderCatalog(app);
+    const setup = createSetupHere(app, catalog);
     await setup.apply({
       world: "cast-world",
       cast: ["ann"],
@@ -339,14 +348,7 @@ describe("setup", () => {
     expect(
       existsSync(path.join(app, "worlds/cast-world/workspaces/admin/.agents")),
     ).toBe(false);
-    // The template as imported, for a later world update to compare against.
-    const manifest = JSON.parse(
-      readFileSync(path.join(app, "world/.template/manifest.json"), "utf8"),
-    );
-    expect(manifest.template).toBe("cast-world");
-    expect(Object.keys(manifest.files)).toContain(
-      "workspaces/admin/IDENTITY.md",
-    );
+    expect(catalog.cloned).toEqual(["cast-world"]);
     expect((await setup.status()).configured).toBe(true);
   });
 
@@ -382,14 +384,9 @@ describe("setup", () => {
     expect(store.entries.size).toBe(0);
   });
 
-  it("moves a key from the old keys file into a profile", async () => {
-    write(path.join(app, "world/.state/.env"), "OPENROUTER_API_KEY=from-env\n");
-    await createSetupHere(app).apply({ world: "starter", cast: [] });
-    expect(store.entries.get("openrouter")).toBe("from-env");
-  });
-
   it("picks up an unfinished run and keeps what is already there", async () => {
     const setup = createSetupHere(app);
+    await setup.prepare("cast-world");
     store.entries.set("openrouter", "first");
     write(
       path.join(app, "world/workspaces/ann/IDENTITY.md"),
@@ -414,21 +411,60 @@ describe("setup", () => {
     );
   });
 
-  it("reports an imported world and a saved key on the next visit", async () => {
+  it("reports a saved key on the next visit", async () => {
     const setup = createSetupHere(app);
     store.entries.set("openrouter", "k");
-    write(
-      path.join(app, "world/package.json"),
-      JSON.stringify({
-        name: "s",
-        kazusa: { systemAgent: "admin", template: "starter" },
-      }),
-    );
     expect(await setup.status()).toMatchObject({
-      imported: "starter",
       savedKey: expect.objectContaining({ id: "openrouter" }),
       configured: false,
     });
+  });
+
+  it("sets an older Kazusa's world aside, never a clone, and starts over", async () => {
+    const setup = createSetupHere(app);
+    // An older Kazusa's world: set up, no clone of its creator's repository.
+    write(path.join(app, "world/openclaw.json"), "{}");
+    write(path.join(app, "world/workspaces/ann/MEMORY.md"), "Played.\n");
+    write(path.join(app, "world/.state/.env"), "OPENCLAW_GATEWAY_TOKEN=t\n");
+    write(path.join(app, "worlds/starter/package.json"), "{}");
+    expect(setup.outdated()).toBe(true);
+    await setup.startOver();
+    expect(existsSync(path.join(app, "world"))).toBe(false);
+    expect(existsSync(path.join(app, "worlds"))).toBe(false);
+    const [aside] = readdirSync(path.join(app, "old-worlds"));
+    expect(
+      readFileSync(
+        path.join(app, "old-worlds", aside, "workspaces/ann/MEMORY.md"),
+        "utf8",
+      ),
+    ).toBe("Played.\n");
+    expect(setup.outdated()).toBe(false);
+    expect(setup.configured()).toBe(false);
+
+    // A clone is this version's: never set aside.
+    write(path.join(app, "world/openclaw.json"), "{}");
+    write(
+      path.join(app, "world/.git/config"),
+      '[remote "origin"]\n\turl = https://example.com/w.git\n',
+    );
+    expect(setup.outdated()).toBe(false);
+    await expect(setup.startOver()).rejects.toThrow("doesn't need replacing");
+  });
+
+  it("says how far the picked world's download has got while it runs", async () => {
+    let release = () => {};
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    const setup = createSetup(app, store, folderCatalog(app, undefined, hold));
+    expect(setup.downloads()).toEqual({ progress: null });
+    const pending = setup.prepare("cast-world");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(setup.downloads().progress).toMatchObject({
+      stage: "receiving",
+      percent: 40,
+    });
+    release();
+    await pending;
+    expect(setup.downloads()).toEqual({ progress: null });
   });
 
   it("refuses a world that does not exist", async () => {

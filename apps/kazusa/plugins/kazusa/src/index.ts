@@ -37,7 +37,6 @@ import { registerMemory } from "./memory/register.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
 import { registerProvidersHttp } from "./providers/http.ts";
-import { registerProviderKeyMigration } from "./providers/migrate.ts";
 import { registerSkills } from "./skills/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
@@ -120,7 +119,6 @@ export default definePluginEntry({
     const stage = registerStage(api);
     const models = registerModels(api);
     registerProvidersHttp(api);
-    registerProviderKeyMigration(api);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
     const contextRef: { current?: ReturnType<typeof registerContextEngine> } =
@@ -153,7 +151,7 @@ export default definePluginEntry({
     placesRef.current = location.pages;
     const scene = registerScene(api, createRouteRegistrar(api));
     registerLocationHttp(api, { location, times: scene.times });
-    registerWorldUpdate(api, { clock, location });
+    registerWorldUpdate(api, { clock, location, broadcaster });
     registerRepoSearch(api);
     // On unless a world turns it off: observing is what the client is for.
     const observer =

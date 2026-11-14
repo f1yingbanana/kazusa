@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -12,7 +18,7 @@ const SYSTEM_AGENT = {
 function repo(entry) {
   const root = mkdtempSync(path.join(tmpdir(), "kazusa-system-agent-"));
   const app = path.join(root, "apps/kazusa");
-  mkdirSync(path.join(app, "worlds"), { recursive: true });
+  mkdirSync(app, { recursive: true });
   writeFileSync(
     path.join(app, "base.json"),
     JSON.stringify({ systemAgent: SYSTEM_AGENT, config: {} }),
@@ -34,29 +40,7 @@ function repo(entry) {
 const read = (file) => JSON.parse(readFileSync(file, "utf8"));
 
 describe("syncSystemAgent", () => {
-  it("moves an older world onto the app's tools and skills", () => {
-    const { root, world } = repo({
-      workspace: "./workspaces/admin",
-      identity: { name: "ADMIN" },
-      cwd: "/world",
-      tools: { allow: ["read"] },
-      skills: ["kazusa"],
-    });
-    expect(syncSystemAgent(root)).toHaveLength(1);
-    const config = read(path.join(world, "openclaw.json"));
-    expect(config.agents.entries.admin).toEqual({
-      $include: SYSTEM_AGENT_INCLUDE,
-      workspace: "./workspaces/admin",
-      identity: { name: "ADMIN" },
-      cwd: "/world",
-    });
-    expect(config.agents.entries.ann).toEqual({
-      workspace: "./workspaces/ann",
-    });
-    expect(read(path.join(world, SYSTEM_AGENT_INCLUDE))).toEqual(SYSTEM_AGENT);
-  });
-
-  it("only rewrites the included file once a world uses it, keeping overrides", () => {
+  it("rewrites the included file, leaving the world's config and overrides alone", () => {
     const entry = {
       $include: SYSTEM_AGENT_INCLUDE,
       workspace: "./workspaces/admin",
@@ -64,7 +48,7 @@ describe("syncSystemAgent", () => {
     };
     const { root, world } = repo(entry);
     const before = readFileSync(path.join(world, "openclaw.json"), "utf8");
-    expect(syncSystemAgent(root)).toEqual([]);
+    syncSystemAgent(root);
     expect(readFileSync(path.join(world, "openclaw.json"), "utf8")).toBe(
       before,
     );
@@ -72,6 +56,8 @@ describe("syncSystemAgent", () => {
   });
 
   it("does nothing before setup has made a world", () => {
-    expect(syncSystemAgent(repo().root)).toEqual([]);
+    const { root, world } = repo();
+    syncSystemAgent(root);
+    expect(existsSync(world)).toBe(false);
   });
 });

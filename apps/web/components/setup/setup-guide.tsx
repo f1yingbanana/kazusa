@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/questionnaire";
 import { Spinner } from "@/components/ui/spinner";
 import type { SetupStatus, WorldOption } from "@/lib/setup/setup";
+import { useSetupDownload } from "@/hooks/use-setup-download";
+import { DownloadProgress } from "./download-progress";
 
 const SLOW_START_MS = 180_000;
 /**
@@ -305,7 +307,7 @@ function Starting({
  * reloading or restarting partway is harmless (`lib/setup/setup.ts`).
  */
 export function SetupGuide({ status }: { status: SetupStatus }) {
-  const [worldId, setWorldId] = useState(status.imported);
+  const [worldId, setWorldId] = useState<string | null>(null);
   const [cast, setCast] = useState<ReadonlySet<string>>(new Set());
   const [now] = useState(() => new Date());
   const [date, setDate] = useState(now);
@@ -323,22 +325,17 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [worlds, setWorlds] = useState(status.worlds);
   const [downloading, setDownloading] = useState(false);
   const [worldError, setWorldError] = useState<string | null>(null);
+  const downloadProgress = useSetupDownload(downloading);
   const world = worlds.find(({ id }) => id === worldId);
   const pickingCast = Boolean(world?.characters.length);
-  const [activeItem, setActiveItem] = useState(
-    !status.imported ? "world" : pickingCast ? "cast" : "keys",
-  );
+  const [activeItem, setActiveItem] = useState("world");
   const items = useMemo(
     () => [
-      ...(status.imported
-        ? []
-        : [
-            {
-              name: "world",
-              required: true,
-              choices: worlds.map(({ id }) => ({ value: id })),
-            },
-          ]),
+      {
+        name: "world",
+        required: true,
+        choices: worlds.map(({ id }) => ({ value: id })),
+      },
       ...(pickingCast ? [{ name: "cast" }, { name: "time" }] : []),
       {
         name: "keys",
@@ -347,7 +344,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
           : { choices: status.providers.map(({ id }) => ({ value: id })) }),
       },
     ],
-    [status.imported, worlds, pickingCast, status.savedKey, status.providers],
+    [worlds, pickingCast, status.savedKey, status.providers],
   );
 
   const chooseWorld = async (option: WorldOption) => {
@@ -442,38 +439,37 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
             >
               <QuestionnaireProgress />
 
-              {status.imported ? null : (
-                <QuestionnaireItem name="world" required>
-                  <QuestionnaireTitle>
-                    Which world do you want?
-                  </QuestionnaireTitle>
-                  <QuestionnaireDescription>
-                    This downloads a world for you to play in. You can change
-                    anything in it later.
-                  </QuestionnaireDescription>
-                  <QuestionnaireChoices>
-                    {worlds.map((option) => (
-                      <QuestionnaireChoice
-                        key={option.id}
-                        value={option.id}
-                        checked={worldId === option.id}
-                        onChange={() => void chooseWorld(option)}
-                      >
-                        <span className="font-medium">{option.title}</span>
-                        <QuestionnaireChoiceDescription>
-                          {option.description}
-                        </QuestionnaireChoiceDescription>
-                      </QuestionnaireChoice>
-                    ))}
-                  </QuestionnaireChoices>
-                  {downloading && world ? (
-                    <p className="text-sm text-muted-foreground">
-                      Downloading {world.title}…
-                    </p>
-                  ) : null}
-                  {worldError ? <FieldError>{worldError}</FieldError> : null}
-                </QuestionnaireItem>
-              )}
+              <QuestionnaireItem name="world" required>
+                <QuestionnaireTitle>
+                  Which world do you want?
+                </QuestionnaireTitle>
+                <QuestionnaireDescription>
+                  This downloads a world for you to play in. You can change
+                  anything in it later.
+                </QuestionnaireDescription>
+                <QuestionnaireChoices>
+                  {worlds.map((option) => (
+                    <QuestionnaireChoice
+                      key={option.id}
+                      value={option.id}
+                      checked={worldId === option.id}
+                      onChange={() => void chooseWorld(option)}
+                    >
+                      <span className="font-medium">{option.title}</span>
+                      <QuestionnaireChoiceDescription>
+                        {option.description}
+                      </QuestionnaireChoiceDescription>
+                    </QuestionnaireChoice>
+                  ))}
+                </QuestionnaireChoices>
+                {downloading && world ? (
+                  <DownloadProgress
+                    title={world.title}
+                    download={downloadProgress}
+                  />
+                ) : null}
+                {worldError ? <FieldError>{worldError}</FieldError> : null}
+              </QuestionnaireItem>
 
               {world && pickingCast ? (
                 <QuestionnaireItem name="cast">

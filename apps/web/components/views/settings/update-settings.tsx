@@ -7,12 +7,23 @@ import {
   CircleAlertIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
+import {
+  offered,
+  reasonOf,
+  useWorldCheck,
+  useWorldUpdate,
+  versionLabel,
+} from "@/hooks/use-world-update";
+import { formatBytes } from "@/lib/format";
+import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
+import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -26,6 +37,31 @@ function ago(date: string) {
 
 function Dot() {
   return <span aria-hidden>·</span>;
+}
+
+/** "· Release notes ↗", to a world release's page; nothing without one. */
+function NotesLink({ url }: { url: string | null | undefined }) {
+  if (!url) return null;
+  return (
+    <>
+      <Dot />
+      <a href={url} target="_blank" rel="noreferrer" className={LINK}>
+        Release notes
+        <ArrowUpRightIcon className="size-3" />
+      </a>
+    </>
+  );
+}
+
+/** "· 3 days ago", for one of the creator's commits; nothing without a date. */
+function CommitDate({ date }: { date: string | null | undefined }) {
+  if (!date) return null;
+  return (
+    <>
+      <Dot />
+      <span>{ago(date)}</span>
+    </>
+  );
 }
 
 function VersionRow({
@@ -149,8 +185,203 @@ function Progress({ phase }: { phase: UpdatePhase }) {
   );
 }
 
-/** This copy's version, and updating it to the latest release or to `main`. */
+/** Kazusa's version, then the world's. */
 export function UpdateSettings() {
+  return (
+    <>
+      <KazusaVersion />
+      <WorldVersion />
+    </>
+  );
+}
+
+/**
+ * The world's version and its newest release: how big it is, then downloading
+ * it once the player says so (it can be a gigabyte) with git's own progress,
+ * then asking the system agent to bring it in.
+ */
+function WorldVersion() {
+  const { world, worldResource } = useSources();
+  const { update, admin, canAsk, asking, ask } = useWorldUpdate();
+  const checker = useWorldCheck();
+  const [starting, setStarting] = useState(false);
+  const credit = world?.package;
+  const check = checker.result;
+
+  // An update brought in since the page loaded no longer shows as new.
+  useEffect(() => {
+    void worldResource.mutate();
+  }, []);
+
+  if (!credit) return null;
+
+  async function handleCheck() {
+    try {
+      await checker.check();
+    } catch (failure) {
+      toast.error("Couldn't check for a new version", {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    }
+  }
+
+  async function handleDownload() {
+    setStarting(true);
+    try {
+      await checker.download();
+    } catch (failure) {
+      toast.error("Couldn't download it", {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function handleAsk() {
+    try {
+      await ask();
+    } catch (failure) {
+      toast.error(`Couldn't message ${admin}`, {
+        description: failure instanceof Error ? failure.message : undefined,
+      });
+    }
+  }
+
+  const downloading = check?.downloading === true;
+  const download = downloading ? check?.progress : undefined;
+  const available = !update && offered(check);
+  const failed = check?.lastDownload?.error;
+  const yourNote = checker.error ? checker.error.message : undefined;
+
+  return (
+    <SettingsSection
+      title="World"
+      description={`Kazusa checks for new versions of ${credit.name} every hour and asks before downloading one. ${admin} brings it into your world, keeping everything that happened in it.`}
+      action={
+        checker.enabled ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            disabled={checker.checking || downloading}
+            onClick={() => void handleCheck()}
+          >
+            <RefreshCwIcon
+              className={cn(
+                checker.checking && "animate-spin motion-reduce:animate-none",
+              )}
+            />
+            Check again
+          </Button>
+        ) : null
+      }
+    >
+      <ul className="flex flex-col divide-y rounded-lg border bg-card">
+        <VersionRow
+          label="Your world"
+          version={
+            check?.current
+              ? versionLabel({
+                  ...check.current,
+                  version: check.current.version ?? credit.version,
+                })
+              : (credit.version ?? null)
+          }
+          note={yourNote}
+          action={
+            update || available || downloading || checker.error ? null : (
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                <CheckIcon className="size-3.5" />
+                Up to date
+              </span>
+            )
+          }
+        />
+        {available && check?.latest ? (
+          <VersionRow
+            label="New version"
+            version={versionLabel(check.latest)}
+            details={
+              <>
+                {check.size ? (
+                  <>
+                    <Dot />
+                    <span>{formatBytes(check.size)}</span>
+                  </>
+                ) : null}
+                <NotesLink url={check.latest.url} />
+              </>
+            }
+            note={
+              failed
+                ? `The download failed: ${failed}`
+                : "Your world plays as usual while it downloads."
+            }
+            action={
+              downloading ? null : (
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  disabled={starting}
+                  onClick={() => void handleDownload()}
+                >
+                  {starting ? <Spinner /> : null}
+                  Download
+                </Button>
+              )
+            }
+          />
+        ) : null}
+        {update ? (
+          <VersionRow
+            label="New version"
+            version={versionLabel(update)}
+            details={
+              <>
+                <CommitDate date={update.date} />
+                <NotesLink url={update.url} />
+              </>
+            }
+            note={
+              canAsk
+                ? `Downloaded${reasonOf(update) ? `: ${reasonOf(update)}` : "."} ${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
+                : `Ask the world's owner to have ${admin} update it.`
+            }
+            action={
+              canAsk ? (
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  disabled={asking}
+                  onClick={() => void handleAsk()}
+                >
+                  {asking ? <Spinner /> : null}
+                  Ask {admin}
+                </Button>
+              ) : null
+            }
+          />
+        ) : null}
+      </ul>
+      {downloading ? (
+        <div className="flex flex-col gap-1.5">
+          <DownloadProgress
+            title={`${credit.name} ${check?.latest?.version ?? ""}`.trim()}
+            download={download}
+          />
+          <p className="text-xs text-pretty text-muted-foreground">
+            {admin} can update your world once it’s done. Your world plays as
+            usual meanwhile.
+          </p>
+        </div>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+/** This copy's version, and updating it to the latest release or to `main`. */
+function KazusaVersion() {
   const { status, error, checking, phase, check, update } = useUpdate();
   const busy = phase !== null || !!status?.blocked;
 

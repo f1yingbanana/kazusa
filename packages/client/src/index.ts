@@ -335,15 +335,34 @@ export const WorldMetaSchema = z.object({
       homepage: z.string().optional(),
     })
     .optional(),
+  /**
+   * The creator's newer release of the world this one was made from, downloaded
+   * into its repository and not yet brought in. The system agent brings it in
+   * (`world_update`) when asked, so the client offers to ask them.
+   */
+  update: z
+    .object({
+      /** The creator's commit, its date and first line. */
+      commit: z.string(),
+      date: z.string(),
+      subject: z.string().optional(),
+      /** The release's version and notes, when it's a release. */
+      version: z.string().optional(),
+      notes: z.string().optional(),
+      /** Where to read about it: the release's page. */
+      url: z.string().optional(),
+      systemAgent: z.string(),
+    })
+    .optional(),
 });
 export type WorldMeta = z.infer<typeof WorldMetaSchema>;
 
 /**
  * A world's `package.json`: what it is, who made it and which version, in npm's
  * own fields, and everything Kazusa needs under `kazusa`, the way tools keep
- * their config in a package. Templates ship one; setup copies it into the live
- * world and adds `kazusa.template`. Not wire data, but the plugin and the setup
- * guide both read it, so it is defined once, here.
+ * their config in a package. Every world ships one at its root. Not wire data,
+ * but the plugin and the setup guide both read it, so it is defined once,
+ * here.
  */
 export const WorldPackageSchema = z.looseObject({
   /** Npm's name: a lowercase slug, and the world's lasting identity. */
@@ -378,8 +397,6 @@ export const WorldPackageSchema = z.looseObject({
     defaultGroup: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
-    /** Only on a live world: the template folder (`worlds/<id>`) it came from. */
-    template: z.string().optional(),
     /** Merged into the plugin's config when the world is set up. */
     config: z.record(z.string(), z.unknown()).default({}),
   }),
@@ -1761,6 +1778,13 @@ export const PlacesStreamEventSchema = z.object({ type: z.literal("places") });
 export type PlacesStreamEvent = z.infer<typeof PlacesStreamEventSchema>;
 
 /**
+ * A world update was applied, restored or finished: the world's version and the
+ * update it offers changed. Refetch `GET /kazusa/world`.
+ */
+export const WorldStreamEventSchema = z.object({ type: z.literal("world") });
+export type WorldStreamEvent = z.infer<typeof WorldStreamEventSchema>;
+
+/**
  * What happens in chats the player isn't in, wrapped so it is never applied as
  * the player's own: a message, someone composing, or a change to the chat
  * list.
@@ -1796,6 +1820,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   DesiresStreamEventSchema,
   LocationStreamEventSchema,
   PlacesStreamEventSchema,
+  WorldStreamEventSchema,
   ObservedStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;

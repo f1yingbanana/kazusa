@@ -77,7 +77,7 @@ try {
   Wait-Until { (Invoke-WebRequest "$Web/" -UseBasicParsing).StatusCode -eq 200 } 'the frontend starts'
   Invoke-RestMethod "$Web/setup" -Method Post -ContentType 'application/json' -Body '{"world":"starter"}' | Out-Null
   Assert ((Get-Item (Join-Path $World 'workspaces\arona\.agents')).LinkType -eq 'Junction') 'setup links the guides'
-  Assert (Test-Path (Join-Path $Folder 'apps\kazusa\worlds\starter\package.json')) 'setup cloned the starter world'
+  Assert (Test-Path (Join-Path $World '.git\config')) 'setup cloned the starter world'
   Wait-Until { (Invoke-WebRequest "$Web/kazusa/world" -UseBasicParsing).StatusCode -eq 200 } 'the Gateway starts'
   # The junction is only half of it: OpenClaw has to follow it when it scans
   # her workspace, and offer what it finds to her.
