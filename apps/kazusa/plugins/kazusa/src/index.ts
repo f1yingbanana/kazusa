@@ -1,4 +1,4 @@
-import { rememberRegistration } from "./background.ts";
+import { inBackground, rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
 import { currentConfig } from "./current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -201,16 +201,17 @@ export default definePluginEntry({
         (await messagingRef.current?.chatFacts(agentId, sessionKeys)) ?? [],
       recollections: memory.recollections,
     });
+    // The wake turn should see the morning's memory, within reason.
+    const onDeadline = async (agentId: string) => {
+      await memory.sleep.settled(agentId);
+      return location.settle(agentId);
+    };
     const perception = registerPerception(api, {
       clock,
       evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
-      // The wake turn should see the morning's memory, within reason.
-      onDeadline: async (agentId) => {
-        await memory.sleep.settled(agentId);
-        return location.settle(agentId);
-      },
+      onDeadline,
       onAwoken: memory.sleep.wake,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
@@ -250,6 +251,26 @@ export default definePluginEntry({
 
     const stopSupervisor = taskman.attachSupervisor(perception);
     api.lifecycle.onDispose?.(stopSupervisor);
+    // When someone's activity ends: the check-in for it.
+    api.lifecycle.onDispose?.(
+      taskman.wakeWith((agentId) => {
+        inBackground(
+          api,
+          async () => {
+            await clock.init();
+            const note = await onDeadline(agentId).catch((error: unknown) => {
+              api.logger.warn(`Perception onDeadline: ${String(error)}`);
+              return undefined;
+            });
+            await perception.deadline(agentId, note);
+          },
+          (error) =>
+            api.logger.warn(
+              `Taskman: waking ${agentId} failed: ${String(error)}`,
+            ),
+        );
+      }),
+    );
 
     registerTimelineHttp(api, {
       clock,
