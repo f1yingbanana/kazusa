@@ -156,14 +156,14 @@ in the world's own repository.
   (`location.travelCategories`) is a trip scaled to the task's duration; any
   other activity elsewhere walks over at the usual pace and asks for a check-in
   at arrival (`checkInAt`), which ends the lease then, so **every arrival is a
-  lease's end and needs only that lease's one cron job**. An activity too short
-  for the usual walk there is refused, naming the walk, before anything is
-  judged: the character chose the duration, so they hear it doesn't fit.
-  Starting something mid-trip stops at the near place; `delay_task` moves a
-  trip's arrival. Whether they get in is the character's to play out on arrival;
-  a place's rules for that (hours, locks) go in its `summary`, the part a known
+  lease's end and needs only that lease's one wake**. An activity too short for
+  the usual walk there is refused, naming the walk, before anything is judged:
+  the character chose the duration, so they hear it doesn't fit. Starting
+  something mid-trip stops at the near place; `delay_task` moves a trip's
+  arrival. Whether they get in is the character's to play out on arrival; a
+  place's rules for that (hours, locks) go in its `summary`, the part a known
   place shows.
-- **Arrival**: Perception's cron handler calls `onDeadline` → `settle`, which
+- **Arrival**: the wake at the lease's end calls `onDeadline` → `settle`, which
   settles the record, raises arrival sightings, and returns the arrival line for
   the check-in.
 
@@ -239,7 +239,7 @@ are in.
   `inCompany`, operator RPC `location.place`, `POST /kazusa/move` (the player),
   `GET /kazusa/places`, `GET /kazusa/locations`.
 - **Taskman** knows no places: extensions `prepare` (validate, maybe
-  `checkInAt`) and `commit(task)` against the final lease; one cron job per
+  `checkInAt`) and `commit(task)` against the final lease; one wake per
   character.
 - **Perception** knows no places: future stimuli are held; `foreseen` ones are
   confirmed by their producer; `:tasks` observations render as "Seen around
@@ -325,11 +325,11 @@ are in.
 ## 7. Review against the principles
 
 **Simple mechanics.** Two tool parameters and one bubble type, no new tools; one
-judgment pattern with one question (`notice`); one cron job per lease;
-Perception extended by two generic rules (a future stimulus has not happened; a
-foreseen one is confirmed by its producer); Taskman by one (an extension can
-bring the check-in forward). The character-facing prompt is constant in the size
-of the world.
+judgment pattern with one question (`notice`); one wake per lease; Perception
+extended by two generic rules (a future stimulus has not happened; a foreseen
+one is confirmed by its producer); Taskman by one (an extension can bring the
+check-in forward). The character-facing prompt is constant in the size of the
+world.
 
 **Complex interactions** that fall out without code of their own: meetups and
 late arrivals, commutes interrupted by a friend, one-way sightings and

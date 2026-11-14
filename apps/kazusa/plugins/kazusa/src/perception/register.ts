@@ -413,10 +413,10 @@ export function registerPerception(
   // Fires right before prompt compilation and generation for an admitted agent turn.
   // WHAT KAZUSA DOES:
   // - Dual purpose:
-  //   1. Cron Triggers (Task Heartbeat): Compares the character's active task lease
-  //      in Taskman against simulated clock time. If the task has expired, calls
-  //      `perception.deadline(agentId)` to enqueue a task completion stimulus and claims the turn.
-  //      `onDeadline` runs first, so a trip has arrived before the character wakes.
+  //   1. Cron runs for a character: claimed silently, and treated as a deadline
+  //      check (`perception.deadline`, after `onDeadline`). Taskman wakes from
+  //      its own timer now; this only answers a world's old `Wake <id>` jobs
+  //      until `cron_reconciled` removes them, and any other cron run.
   //   2. Brain Sessions (Attended Thought Tracking): Captures `event.cleanedBody` via
   //      `perception.attending(owner.agentId, event.cleanedBody)`.
   // DESIGN FIT:

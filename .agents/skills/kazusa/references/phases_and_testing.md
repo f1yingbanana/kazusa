@@ -91,8 +91,9 @@ apps/kazusa/ (or repository root)
 - `plugins/kazusa/src/taskman/`:
   - Task state persistence directly via OpenClaw plugin state
     (`api.runtime.state.openKeyedStore` namespace `"tasks"`).
-  - Dashboard-visible wake automations rebuilt from retained state on
-    `cron_reconciled`; no `setTimeout` scheduler.
+  - Wakes from one in-process timer, rebuilt from retained state on
+    `gateway_start` (`taskman/wakes.ts`). They were dashboard-visible cron jobs
+    until 2026-11; see `primitives_mapping.md` §4.1 for why they moved.
   - Colocated tests in `plugins/kazusa/src/taskman/taskman.test.ts`.
 
 ### Test Specifications
@@ -245,10 +246,10 @@ apps/kazusa/ (or repository root)
     - _Busy_: Evaluates `["STEER", "QUEUE_NEXT", "IGNORE"]` with task-dependent
       hysteresis ($T_{\text{steer}} \in \{0.45, 0.75, 0.90\}$).
   - **In-Process Integration**: Tracks brain state via lifecycle events
-    (`api.agent.events.registerAgentEventSubscription`), wakes idle brain via
-    native cron automations, and steers ongoing turns via native `mode: "steer"`
-    session queue. Completely resolves the OpenClaw 2026.10.5 Gateway RPC
-    blocker.
+    (`api.agent.events.registerAgentEventSubscription`), wakes idle brain at
+    lease ends from Taskman's wake timer, and steers ongoing turns via native
+    `mode: "steer"` session queue. Completely resolves the OpenClaw 2026.10.5
+    Gateway RPC blocker.
   - **Task Deadlines**: Coalesced flag checks active task lease against
     `clock.time()`. Deadlines bypass the decision model and wake
     deterministically.

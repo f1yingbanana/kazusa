@@ -223,7 +223,7 @@ apps/kazusa/
 │       ├── realtime.ts                 # Process-shared SSE broadcaster + journal seq
 │       ├── timeline/                   # GET /kazusa/timeline from ledger metadata
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
-│       ├── taskman/                    # "tasks" leases, :tasks ledger, cron projection, tools
+│       ├── taskman/                    # "tasks" leases, :tasks ledger, wake timer, tools
 │       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs, GET /kazusa/desires
 │       ├── location/                   # World map, "location" store, task `where`, location.* RPCs, GET /kazusa/places|locations
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
@@ -438,8 +438,8 @@ connect these modules in process.
   not start with the Gateway loads its own registry. Anything that must be one
   value per world lives in a process-wide cell on `globalThis` under a
   `Symbol.for("kazusa.*")` key: the clock cell (`clock/register.ts`), the
-  realtime broadcaster and journal sequence (`realtime.ts`), Taskman's cron
-  automation hook (`taskman/register.ts`), the idle supervisor's tick
+  realtime broadcaster and journal sequence (`realtime.ts`), Taskman's wake
+  schedule and wake job (`taskman/register.ts`), the idle supervisor's tick
   (`taskman/supervisor.ts`), Messaging's conversations, active deliveries and
   queue, speech and typing (`messaging/register.ts`), and Perception's
   per-character lock (`perception/register.ts`). Each is injected, so tests get
@@ -489,7 +489,7 @@ connect these modules in process.
 - Every `Clock` built by `registerClock` wraps the same process-wide `ClockCell`
   (time, anchor, speed, init promise, listeners). A speed change or advance from
   any instance is seen by all, and each change notifies every listener (Taskman
-  cron reconciliation, client SSE) exactly once.
+  re-arming its wake timer, client SSE) exactly once.
 
 ### 3.2 `src/taskman/` — Lease State, Ledger & Wake Scheduling
 
@@ -527,11 +527,10 @@ connect these modules in process.
   this for `afterwards` (§3.5), Location for `where` (§3.6). `prepare` may also
   return `checkInAt`: the earliest one brings the lease's end forward (walking
   over checks in on arrival), and every `commit(task)` receives the lease as
-  written. There is exactly one cron job per character; one-shot jobs delete
-  themselves after running, so a job can never reschedule itself. `start_task`,
-  `delay_task` and `send_message` are `catalogMode: "direct-only"`: behind Tool
-  Search their parameter descriptions are invisible and models route calls
-  through a generic `tool_call`.
+  written. There is exactly one wake per character. `start_task`, `delay_task`
+  and `send_message` are `catalogMode: "direct-only"`: behind Tool Search their
+  parameter descriptions are invisible and models route calls through a generic
+  `tool_call`.
 - **In-Character Monologues**: Transitions and delays may include a brief
   in-character `monologue`. Format it as an italic blockquote directly below the
   factual summary inside the same ledger message text rather than extending
@@ -548,33 +547,25 @@ connect these modules in process.
 - **Simulation Timestamps**: Set native ledger `message.timestamp` from the
   clock at the task mutation. Delay entries include the new due time and
   remaining simulated minutes. Keep OpenClaw bookkeeping timestamps real-time.
-- **Cron Automation Projection**: Projects each agent's next wake into OpenClaw
-  automations using `declarationKey = agentId` so normal task transitions
-  atomically upsert a single dashboard-visible one-shot `agentTurn` job.
-  **Design Decision (Ephemeral Isolated Session)**: Taskman configures
-  `sessionTarget: "isolated"` (ephemeral `cron:<jobId>` session) rather than
-  `session:agent:<id>:brain`. In OpenClaw, `withCronSessionPreparation` enforces
-  single-threaded session lane serialization (`beginSessionWorkAdmission` on
-  `resolveSessionLane(sessionKey)`). If a cron job directly targets `:brain`, an
-  active (busy thinking) brain run holds the lane lock, forcing the cron job to
-  block in OpenClaw's lane queue. This locks out `before_agent_reply`,
-  preventing Perception from receiving the deadline stimulus mid-flight and
-  eliminating the possibility of mid-turn steering. By targeting `"isolated"`,
-  the cron job runs in its own uncontended lane, immediately fires
-  `before_agent_reply` on schedule, passes the deadline stimulus to
-  `perception.receive()`, and claims the turn with `{ handled: true }`.
-  Returning `{ handled: true }` silences LLM inference (zero tokens used),
-  avoids writing any prompt/reply to transcripts, and marks the cron run as
-  `status: "ok"` (success) on OpenClaw's dashboard, after which OpenClaw deletes
-  the ephemeral session (`deleteAfterRun: true`).
-- **Cron Ownership**: Other plugins declare cron jobs too (memory-core's
-  dreaming promotion). Taskman only lists, clears or reconciles jobs whose
-  `declarationKey` is a configured character id. Pausing (speed 0) clears those
-  jobs; resuming recomputes each `at` from the lease's remaining sim time.
-- **Cross-Instance Automation**: Only the instance that receives
-  `cron_reconciled` can write jobs, but task tools and cron wakes may run on
-  another instance. The `synchronize` hook and the readiness flag that gates
-  cron runs live in the process-wide `kazusa.taskman.automation` cell.
+- **Wakes (`taskman/wakes.ts`)**: one in-process schedule holds each onstage
+  character's lease end in sim time and arms a single timer for the soonest; a
+  paused clock arms none. Task tools and stage changes move one character's wake
+  (`synchronize`/`reschedule`); a clock edit only re-arms the timer, with no
+  database write. It is rebuilt from the leases on `gateway_start`, so a lease
+  that ended while the Gateway was down wakes its character at once. A wake
+  calls `onDeadline` → `perception.deadline` in the background, the check-in a
+  cron run used to deliver. **Design Decision (no cron)**: wakes were once one
+  OpenClaw cron job per character, visible in the dashboard. Every lease change
+  rewrote OpenClaw's whole job store, Play and Pause rebuilt every job, and each
+  wake ran an isolated agent session that was created and deleted. With 145
+  characters waking together that cost 40% of the Gateway's CPU and stalls of
+  seconds, so the schedule moved in-process (2026-11). Worlds from before keep a
+  `Wake <id>` job per character until `cron_reconciled` removes them; one firing
+  first only repeats a check-in, which `checkedIn` turns away.
+- **Cross-Instance Wakes**: task tools may run on another plugin instance, so
+  the schedule and the wake job live in the process-wide `kazusa.taskman.wakes`
+  cell. The first registration to call `wakeWith` keeps the wake job until it is
+  disposed.
 - In the target design, Perception owns brain admission and selects cognitive
   skill markers. The existing Taskman wake marker is transitional.
 - **Strict Boundary**: Taskman schedules wakes and owns task state/ledgers. It
@@ -991,23 +982,23 @@ connect these modules in process.
     inbound-user tool-authority check. Without it, OpenClaw refused every steer
     into a follow-up turn (`reply_expectation_mismatch`).
 - **Task Deadlines as Stimuli & Attention Floor**: Task deadlines enter
-  Perception as first-class `Stimulus` objects via ephemeral cron interception
-  (`before_agent_reply` claiming with `{ handled: true }`). Because characters
-  are never taskless and the passage of time cannot be undone, task deadlines
-  possess an **attention floor of `QUEUE_NEXT`**. Jev can allocate `STEER` (for
-  urgent hazards) or `QUEUE_NEXT` (for routine completion), but task deadlines
-  can never be dropped into `IGNORE`. When idle, deadlines unconditionally
-  trigger `WAKE`. When a character preempts or transitions tasks early
-  (`start_task`), Taskman atomically replaces the cron projection; any racing
-  stale deadline stimulus is validated against `task.id` and dropped silently. A
-  turn can end without `start_task`/`delay_task` (it failed, or the model chose
-  nothing), leaving the activity overdue: the character is still at it, over
-  time. The idle supervisor (`taskman/supervisor.ts`, every 60 real seconds, two
-  characters a tick) gives an onstage character whose brain is idle and whose
-  activity is over (or missing) an idle check-in, whether or not items are
-  queued: they come along in the same turn. Being a new stimulus, the check-in
-  also clears the `stopped` a failed run left, unless a handoff is still in
-  custody (Restart recovery, below).
+  Perception as first-class `Stimulus` objects from Taskman's wake timer
+  (`perception.deadline`). Because characters are never taskless and the passage
+  of time cannot be undone, task deadlines possess an **attention floor of
+  `QUEUE_NEXT`**. Jev can allocate `STEER` (for urgent hazards) or `QUEUE_NEXT`
+  (for routine completion), but task deadlines can never be dropped into
+  `IGNORE`. When idle, deadlines unconditionally trigger `WAKE`. When a
+  character preempts or transitions tasks early (`start_task`), Taskman moves
+  that character's wake; any racing stale deadline stimulus is validated against
+  `task.id` and dropped silently. A turn can end without
+  `start_task`/`delay_task` (it failed, or the model chose nothing), leaving the
+  activity overdue: the character is still at it, over time. The idle supervisor
+  (`taskman/supervisor.ts`, every 60 real seconds, two characters a tick) gives
+  an onstage character whose brain is idle and whose activity is over (or
+  missing) an idle check-in, whether or not items are queued: they come along in
+  the same turn. Being a new stimulus, the check-in also clears the `stopped` a
+  failed run left, unless a handoff is still in custody (Restart recovery,
+  below).
 - **Restart recovery**: stopping the Gateway mid-turn can make OpenClaw
   tombstone the interrupted `:brain` session (`mainRestartRecovery.tombstone`),
   after which it refuses every later run there. The brain channel clears that
@@ -1185,7 +1176,7 @@ connect these modules in process.
   is all a known place shows. Judged by the model, entry came back `likely` for
   half of all public places (a fifth of moves failed, Airi was shut out of her
   own dorm twice), and the refusal reached the visitor before the walk.
-- **Every arrival is a lease's end**: Perception's cron handler calls
+- **Every arrival is a lease's end**: the wake at a lease's end calls
   `onDeadline` → `location.settle`, which settles the arrival (sightings both
   ways) and returns the arrival line ("You've arrived at … You came here for …")
   that Perception adds to the deadline check-in.
@@ -1453,7 +1444,7 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
     included (~3 s and ~29 MB each; with 146 characters the Gateway ran out of
     heap). The brain channel's `outbound.sendText` exists for the same reason:
     OpenClaw takes a channel from the Gateway's registry only when it can send,
-    and each cron wake looks up its agent's channel. It sends nothing and
+    and any cron run for an agent looks up its channel. It sends nothing and
     answers `outcome: "not_sent"`: a fake success would append OpenClaw's
     restart-recovery notice to the brain transcript, and an error leaves a
     delivery intent to retry.
@@ -1505,7 +1496,7 @@ Load these reference files on demand when working on their specific subsystem:
   (states, drain, task effects, rendering), task lease rules, or encounter
   probability rolls.
 - `references/primitives_mapping.md` — Read when wiring OpenClaw sessions
-  (`:brain`, `:tasks`, `:chat:*`), cron automations, `assemble()` hooks, or
+  (`:brain`, `:tasks`, `:chat:*`), task wakes, `assemble()` hooks, or
   `memory-core` vector indexing.
 - `references/context_engine.md` — Read when modifying context assembly, session
   naming, memory layers, budgets, or future chat producers.

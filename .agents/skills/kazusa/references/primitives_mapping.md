@@ -2,7 +2,7 @@
 
 **Status:** Perception routing below is the accepted target and draft code. Its
 current Gateway adapter is unavailable to local plugins; it is not wired into
-root registration. Taskman still uses its existing cron-to-brain path. See
+root registration. Taskman wakes characters from its own timer. See
 [the runtime blocker](perception.md#current-blocker-openclaw-2026105).
 
 Kazusa is built directly on native **OpenClaw primitives** without creating
@@ -166,20 +166,18 @@ Taskman autonomously owns the lifecycle and wake-up scheduling for active tasks:
 - When an agent calls `start_task(type="...", description="...", duration=45)`,
   Taskman stores the active task lease in plugin state and calculates
   $\text{delayMs} = (\text{duration} \times 60\,000) / \text{speed}$.
-- Taskman projects the lease into a native one-shot OpenClaw `at` automation,
-  keeping the next wake visible in the dashboard without a process-local timer.
-- Each timer is a tool-free headless `script` with explicit `agentId` and
-  `delivery: { mode: "none" }`. Successful completion notifies Perception; it
-  checks the current task before admitting a brain wake, without an LLM
-  classification pass. The task ledger is never an execution session.
-- At startup or scheduler reload, `cron_reconciled` reconciles the projection
-  from retained task state before wakes can run. A normal task transition
-  atomically upserts only its own job using the agent ID as the native cron
-  `declarationKey`. The native reconciliation lifecycle runs before the
-  scheduler fires overdue jobs. No `before_agent_run` gate is needed for
-  headless timers. A single brain session eliminates normal competing task
-  transitions.
-- No LLM polling during the wait; native cron owns timing.
+- Taskman keeps each onstage lease's end in one in-process schedule
+  (`taskman/wakes.ts`) and arms a single timer for the soonest; a paused clock
+  arms none, and a clock edit only re-arms it. At the end, the wake hands
+  Perception the deadline (`perception.deadline`), which checks the current task
+  before admitting a brain wake, without an LLM classification pass. The task
+  ledger is never an execution session.
+- The schedule is rebuilt from retained leases on `gateway_start`. It was once a
+  native one-shot OpenClaw `at` job per character, visible in the dashboard; at
+  145 characters the job-store rewrites, Play/Pause rebuilds and isolated wake
+  sessions cost 40% of the Gateway's CPU (2026-11), so wakes moved in-process.
+  `cron_reconciled` now only removes a world's old `Wake <id>` jobs.
+- No LLM polling during the wait.
 
 ### 4.2 Perception Admission
 
@@ -237,9 +235,8 @@ Kazusa adopts **direct native TypeScript plugins** located under
      `start_task` and `delay_task`. The context engine injects task context from
      the character's task stream when it assembles a turn.
    - **Scope boundary**: Taskman must not acquire location, transit, desires, or
-     social-state responsibilities. It currently owns all Gateway cron jobs; add
-     an explicit job family before a second automation owner is introduced. An
-     event queue is not a task ledger; keep those roles separate.
+     social-state responsibilities. It owns no Gateway cron jobs. An event queue
+     is not a task ledger; keep those roles separate.
    - **Colocated Tests**: `src/clock/clock.test.ts` and
      `src/taskman/taskman.test.ts`.
 
