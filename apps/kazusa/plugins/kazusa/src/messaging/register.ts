@@ -54,6 +54,7 @@ import {
 } from "./conversations.ts";
 import { COMPOSING_RATES } from "./composing.ts";
 import { appendLedgerEntry } from "../ledger.ts";
+import { ledgerChanged } from "../ledger-reads.ts";
 
 /** `plugins.entries.kazusa.config.messaging`. */
 const MESSAGING_CONFIG = z.strictObject({
@@ -294,33 +295,41 @@ export function registerMessaging(
       messaging.assertCurrent();
       if (!copy.sessionId)
         throw new Error("Chat ledger has no session identity.");
-      const appended = await appendSessionTranscriptMessageByIdentityStrict({
-        agentId: copy.agentId,
-        sessionKey: copy.sessionKey,
-        sessionId: copy.sessionId,
-        preparation: { source: messaging.assertCurrent },
-        message: {
-          // Every chat line is an observation attributed by senderIdentity, the
-          // character's own included: the native catalog projects sender
-          // identity only for user-role rows, so assistant rows read back as
-          // unattributed.
-          role: "user",
-          content: [{ type: "text", text: heardAs(delivery.params) }],
-          timestamp: delivery.timestamp,
-          idempotencyKey: `kazusa:message:${delivery.id}:${copy.agentId}`,
-          __openclaw: {
-            senderId: delivery.sender,
-            senderName: delivery.senderName,
-            senderIdentity: {
-              type: "observation",
-              id: delivery.sender,
-              pluginId: "kazusa",
-              accountId: null,
-              senderKind: isUser(delivery.sender) ? "human" : "bot",
+      // Kept reads of this ledger are out of date however the append ends.
+      let appended: Awaited<
+        ReturnType<typeof appendSessionTranscriptMessageByIdentityStrict>
+      >;
+      try {
+        appended = await appendSessionTranscriptMessageByIdentityStrict({
+          agentId: copy.agentId,
+          sessionKey: copy.sessionKey,
+          sessionId: copy.sessionId,
+          preparation: { source: messaging.assertCurrent },
+          message: {
+            // Every chat line is an observation attributed by senderIdentity, the
+            // character's own included: the native catalog projects sender
+            // identity only for user-role rows, so assistant rows read back as
+            // unattributed.
+            role: "user",
+            content: [{ type: "text", text: heardAs(delivery.params) }],
+            timestamp: delivery.timestamp,
+            idempotencyKey: `kazusa:message:${delivery.id}:${copy.agentId}`,
+            __openclaw: {
+              senderId: delivery.sender,
+              senderName: delivery.senderName,
+              senderIdentity: {
+                type: "observation",
+                id: delivery.sender,
+                pluginId: "kazusa",
+                accountId: null,
+                senderKind: isUser(delivery.sender) ? "human" : "bot",
+              },
             },
           },
-        },
-      });
+        });
+      } finally {
+        ledgerChanged(copy.agentId, copy.sessionKey);
+      }
       if (appended.kind !== "result")
         throw new Error(
           `Chat ledger append ${appended.kind}: ${copy.sessionKey}.`,

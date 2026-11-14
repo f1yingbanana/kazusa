@@ -4,8 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
-import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
 import type { Clock } from "../clock/clock.ts";
+import { readLedgerRows } from "../ledger-reads.ts";
 import type { ChatFacts } from "../messaging/messaging.ts";
 import type { MemoryService } from "../memory/register.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
@@ -59,6 +59,9 @@ export async function readCharacterFiles(
   return { identity, soul, memory };
 }
 
+/** Four catalog pages: how far back a decision looks, at most. */
+const DECISION_ROWS = 800;
+
 export function createDecisionContextAssembler(
   api: OpenClawPluginApi,
   deps: {
@@ -101,51 +104,35 @@ export function createDecisionContextAssembler(
         Promise.all(
           keys.slice(0, 32).map(async (sessionKey) => {
             const items: SessionCatalogTranscriptItem[] = [];
-            let cursor: string | undefined;
+            const cutoff = simTime - config.decisionShortTermHours * 3_600_000;
+            request.signal?.throwIfAborted();
             // Catalog pages may contain non-dialogue entries. Follow up to four
-            // pages, stopping at the time cutoff or configured usable-record count.
-            for (let pageIndex = 0; pageIndex < 4; pageIndex++) {
+            // pages, stopping at the time cutoff or configured usable-record
+            // count. Read again only once the ledger has changed.
+            const rows = await readLedgerRows({
+              agentId,
+              sessionKey,
+              storePath,
+              pluginId: api.id,
+              cutoff,
+              maxRows: DECISION_ROWS,
+            }).catch((error: unknown) => {
               request.signal?.throwIfAborted();
-              const page = await readSessionTranscriptCatalogPage({
-                agentId,
-                sessionKey,
-                storePath,
-                pluginId: api.id,
-                sourceDomain: "kazusa",
-                limit: 200,
-                cursor,
-              }).catch((error: unknown) => {
-                request.signal?.throwIfAborted();
-                api.logger.warn(
-                  `Decision context could not read ${sessionKey}: ${String(error)}`,
-                );
-                return { items: [], nextCursor: undefined };
-              });
-              let old = false;
-              for (const item of page.items) {
-                const time = Date.parse(item.timestamp ?? "");
-                if (
-                  time <
-                  simTime - config.decisionShortTermHours * 3_600_000
-                ) {
-                  old = true;
-                  break;
-                }
-                if (
-                  time <= simTime &&
-                  item.text?.trim() &&
-                  (item.type === "userMessage" || item.type === "agentMessage")
-                )
-                  items.push(item);
-                if (items.length >= config.decisionHistoryItems) break;
-              }
+              api.logger.warn(
+                `Decision context could not read ${sessionKey}: ${String(error)}`,
+              );
+              return [];
+            });
+            for (const item of rows.slice(0, DECISION_ROWS)) {
+              const time = Date.parse(item.timestamp ?? "");
+              if (time < cutoff) break;
               if (
-                old ||
-                items.length >= config.decisionHistoryItems ||
-                !page.nextCursor
+                time <= simTime &&
+                item.text?.trim() &&
+                (item.type === "userMessage" || item.type === "agentMessage")
               )
-                break;
-              cursor = page.nextCursor;
+                items.push(item);
+              if (items.length >= config.decisionHistoryItems) break;
             }
             return [sessionKey, items.reverse()] as const;
           }),

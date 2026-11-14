@@ -6,6 +6,7 @@ import {
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cachedStore, resetStateCaches } from "../state.ts";
+import { resetLedgerReads } from "../ledger-reads.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
@@ -25,7 +26,10 @@ const SIM_TIME = Date.parse("2026-10-23T08:00:00Z");
 const workspaces: string[] = [];
 // Context settings are cached in memory, written through; these tests also
 // write them behind the cache.
-beforeEach(resetStateCaches);
+beforeEach(() => {
+  resetStateCaches();
+  resetLedgerReads();
+});
 afterEach(async () => {
   await Promise.all(
     workspaces
