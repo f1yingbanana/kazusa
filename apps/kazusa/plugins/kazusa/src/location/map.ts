@@ -291,8 +291,27 @@ export interface Route {
   readonly minutes: number;
 }
 
+/**
+ * Routes worked out per map: a map is never changed once built (a world edit
+ * builds a new one), and every context build asks for the routes from where a
+ * character is, so each search runs once per place, not once per build.
+ */
+const ROUTES = new WeakMap<WorldMap, Map<string, ReadonlyMap<string, Route>>>();
+
 /** Usual routes from `from` to every place (Dijkstra on usual minutes). */
-export function routesFrom(map: WorldMap, from: string): Map<string, Route> {
+export function routesFrom(
+  map: WorldMap,
+  from: string,
+): ReadonlyMap<string, Route> {
+  let kept = ROUTES.get(map);
+  if (!kept)
+    ROUTES.set(map, (kept = new Map<string, ReadonlyMap<string, Route>>()));
+  let routes = kept.get(from);
+  if (!routes) kept.set(from, (routes = searchRoutes(map, from)));
+  return routes;
+}
+
+function searchRoutes(map: WorldMap, from: string): Map<string, Route> {
   const distance = new Map<string, number>([[from, 0]]);
   const previous = new Map<
     string,
