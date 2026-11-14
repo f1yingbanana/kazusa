@@ -268,12 +268,12 @@ apps/kazusa/
   in `src/world/package.ts` (the credit on `GET /kazusa/world`). Field rules:
   [worlds](references/worlds.md). The setup guide
   (`apps/web/lib/setup/setup.ts`) clones the picked world's newest release into
-  the git-ignored `world/` (`scripts/world-repo.mjs clone`, git shipped in
-  `git/`), which is the Gateway's cwd, so playing never touches the Kazusa repo.
-  **Nothing from an older Kazusa is migrated**: a set-up world that isn't a
-  clone never starts, and the frontend offers Start a new world, which moves it
-  to `old-worlds/` (worlds §3). A new world, or a change to one, goes in its own
-  repository; worlds hold no SQLite.
+  the git-ignored `world/` (`scripts/world.mjs clone`, over `src/world/repo.ts`;
+  git shipped in `git/`), which is the Gateway's cwd, so playing never touches
+  the Kazusa repo. **Nothing from an older Kazusa is migrated**: a set-up world
+  that isn't a clone never starts, and the frontend offers Start a new world,
+  which moves it to `old-worlds/` (worlds §3). A new world, or a change to one,
+  goes in its own repository; worlds hold no SQLite.
 - **Canon, play, checkpoints, saves and updates** (design agreed 2026-11-05,
   repositories, saves and updates redesigned 2026-11-14; worlds as clones and
   updates built for `main`, the rest not: [worlds](references/worlds.md) §2, §4,

@@ -8,7 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -18,7 +18,13 @@ import {
   type ProviderEntry,
 } from "@kazusa/client";
 import { z } from "zod";
-import { runScript, type ScriptProgress } from "../run-script";
+import { isClone } from "../../../kazusa/plugins/kazusa/src/world/repo.ts";
+import {
+  runScript,
+  tracking,
+  type ScriptProgress,
+  type WorldDownload,
+} from "../run-script";
 
 /**
  * Where a world's config includes its system agent's tools from;
@@ -204,28 +210,7 @@ export interface WorldOption {
   readonly defaultCast: readonly string[];
 }
 
-/**
- * A download as git reports it (`--progress`, through
- * `scripts/world-repo.mjs`), kept in memory by whoever runs it, with when it
- * started for a time left.
- */
-export interface WorldDownload {
-  readonly stage: string;
-  readonly percent: number;
-  readonly startedAt: number;
-  readonly updatedAt: number;
-}
-
-/** Turns a script's progress reports into a download's, timed. */
-export function tracking(
-  set: (download: WorldDownload | undefined) => void,
-): (progress: ScriptProgress) => void {
-  const startedAt = Date.now();
-  return ({ stage, percent }) =>
-    set({ stage, percent, startedAt, updatedAt: Date.now() });
-}
-
-/** A world on offer: `scripts/world-repo.mjs list` gives one per source. */
+/** A world on offer: `scripts/world.mjs list` gives one per source. */
 export type ListedWorld =
   | {
       readonly id: string;
@@ -235,8 +220,8 @@ export type ListedWorld =
   | { readonly id: string; readonly error: string };
 
 /**
- * Which worlds there are and how to get one. `scripts/world-repo.mjs` peeks at
- * each source's `package.json` and clones only the one picked, at its newest
+ * Which worlds there are and how to get one. `scripts/world.mjs` peeks at each
+ * source's `package.json` and clones only the one picked, at its newest
  * release, straight into `world/` (`clone`), replacing another pick that wasn't
  * set up.
  */
@@ -264,17 +249,12 @@ const ListedSchema = z.object({
 /** Peeks take about a second each, all at once; a clone, as long as it takes. */
 export const scriptCatalog: Catalog = {
   list: async () => {
-    const result = await runScript("world-repo.mjs", ["list"], 60_000);
+    const result = await runScript("world.mjs", ["list"], 60_000);
     if (!result.ok) throw new Error(result.error);
     return ListedSchema.parse(result.value).worlds;
   },
   download: async (id, onProgress) => {
-    const result = await runScript(
-      "world-repo.mjs",
-      ["clone", id],
-      0,
-      onProgress,
-    );
+    const result = await runScript("world.mjs", ["clone", id], 0, onProgress);
     if (!result.ok) throw new Error(result.error);
   },
 };
@@ -391,7 +371,6 @@ export function createSetup(
     WorldPackageSchema.parse(
       JSON.parse(await readFile(path.join(dir, "package.json"), "utf8")),
     );
-
 
   /** The picked world, cloned into `world/` by `prepare`. */
   async function worldOption(id: string): Promise<WorldOption> {
@@ -548,8 +527,8 @@ export function createSetup(
   }
 
   /**
-   * Into an auth profile. A key already there wins, so finishing an
-   * interrupted run never swaps it.
+   * Into an auth profile. A key already there wins, so finishing an interrupted
+   * run never swaps it.
    */
   async function saveKey(typed: SetupRequest["key"]): Promise<void> {
     if (!typed) return;
@@ -650,18 +629,9 @@ export function createSetup(
 
   /**
    * A world an older Kazusa made: set up, but not a clone of its creator's
-   * repository (`scripts/dev.mjs` asks the same, and won't start it).
+   * repository. `scripts/dev.mjs` won't start it.
    */
-  function outdated(): boolean {
-    if (!existsSync(configFile)) return false;
-    try {
-      return !/^\[remote "origin"\]/m.test(
-        readFileSync(path.join(liveDir, ".git/config"), "utf8"),
-      );
-    } catch {
-      return true;
-    }
-  }
+  const outdated = (): boolean => existsSync(configFile) && !isClone(liveDir);
 
   /**
    * Sets an older Kazusa's world aside in `old-worlds/`, never deleting it, so

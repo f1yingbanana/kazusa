@@ -4,7 +4,7 @@ import { parseAsString, useQueryStates } from "nuqs";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import type { WorldMeta } from "@kazusa/client";
-import type { WorldDownload } from "@/lib/setup/setup";
+import type { WorldDownload } from "@/lib/run-script";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { chatsKey } from "@/lib/source/chats/cache";

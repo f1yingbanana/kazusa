@@ -76,7 +76,7 @@ function folderCatalog(
         downloaded: here === id,
         package: readPackage(here === id ? live : source),
       })),
-    // As `world-repo.mjs clone` does, without git: the picked world copied
+    // As `world.mjs clone` does, without git: the picked world copied
     // into `world/`, replacing another pick that wasn't set up.
     download: async (id, onProgress) => {
       if (here === id) return;

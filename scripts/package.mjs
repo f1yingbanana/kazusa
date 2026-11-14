@@ -76,7 +76,7 @@ const INCLUDED = [
   "scripts/plugin-startup.mjs",
   "scripts/system-agent.mjs",
   "scripts/update.mjs",
-  "scripts/world-repo.mjs",
+  "scripts/world.mjs",
   "apps/",
   "packages/",
   ".agents/skills/",

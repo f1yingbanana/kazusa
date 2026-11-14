@@ -26,6 +26,7 @@ import {
   loadNewPlugins,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
+import { isClone } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
@@ -37,20 +38,6 @@ const UPDATE = updatePaths(ROOT);
 const GATEWAY_PORT = 18789;
 const WEB_PORT = 3000;
 const POLL_MS = 500;
-
-/**
- * Whether `world` is a clone of its creator's repository, as setup makes every
- * world now (`lib/setup/setup.ts` asks the same). An older Kazusa's world isn't.
- */
-function isClone(world) {
-  try {
-    return /^\[remote "origin"\]/m.test(
-      readFileSync(path.join(world, ".git/config"), "utf8"),
-    );
-  } catch {
-    return false;
-  }
-}
 
 // The installer ships a built frontend and its own Node (`scripts/package.mjs`).
 const PACKAGED = process.argv.includes("--packaged");
@@ -167,7 +154,6 @@ clearTrash(ROOT);
 if (
   existsSync(UPDATE.reinstall) ||
   !existsSync(NEXT) ||
-  !existsSync(path.join(ROOT, "node_modules/simple-git")) ||
   !PLUGINS.every((dir) => existsSync(dir))
 ) {
   console.log("Installing dependencies.");

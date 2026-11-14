@@ -1,6 +1,10 @@
 import { requireLocalOwner } from "../../../lib/auth/access";
-import { runScript, type ScriptResult } from "../../../lib/run-script";
-import { tracking, type WorldDownload } from "../../../lib/setup/setup";
+import {
+  runScript,
+  tracking,
+  type ScriptResult,
+  type WorldDownload,
+} from "../../../lib/run-script";
 
 /** A check is one `ls-remote`, and GitHub for a size: a second or two. */
 const CHECK_TTL_MS = 2 * 60_000;
@@ -22,16 +26,16 @@ function state() {
 
 /**
  * Whether the creator released something newer than the world stands on
- * (`scripts/world-repo.mjs check`), nothing downloaded, and how a download is
- * going. Local only, like `/update`: only someone who may change this machine
- * is asked. `?fresh=1` checks again at once.
+ * (`scripts/world.mjs check`), nothing downloaded, and how a download is going.
+ * Local only, like `/update`: only someone who may change this machine is
+ * asked. `?fresh=1` checks again at once.
  */
 export async function GET(request: Request): Promise<Response> {
   const denied = requireLocalOwner(request);
   if (denied) return denied;
   const fresh = new URL(request.url).searchParams.has("fresh");
   if (!checked || fresh || Date.now() - checked.at > CHECK_TTL_MS) {
-    checking ??= runScript("world-repo.mjs", ["check"], 60_000).finally(() => {
+    checking ??= runScript("world.mjs", ["check"], 60_000).finally(() => {
       checking = undefined;
     });
     checked = { at: Date.now(), result: await checking };
@@ -56,7 +60,7 @@ export function POST(request: Request): Response {
       { status: 409 },
     );
   downloading = runScript(
-    "world-repo.mjs",
+    "world.mjs",
     ["download"],
     0,
     tracking((value) => {

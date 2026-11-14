@@ -7,29 +7,27 @@ import { currentConfig } from "../current-config.ts";
 import type { LocationService } from "../location/register.ts";
 import { lintMap, loadWorld } from "../location/world.ts";
 import { readWorldPackage } from "../world/package.ts";
+import { text, type Git } from "../world/git.ts";
 import {
   commitOf,
   downloadedRelease,
-  gitIn,
   PLAY,
   restoreWorld,
   saveRef,
   saveWorld,
   standOn,
-  text,
   versionOf,
-  type Git,
-} from "./git.ts";
+  worldGit,
+} from "../world/repo.ts";
 import {
   applyUpdate,
-  commitTree,
   finishUpdate,
   openReport,
-  planUpdate,
   readReport,
-  type Plan,
   type Report,
-} from "./update.ts";
+} from "./apply.ts";
+import { planUpdate, type Plan } from "./plan.ts";
+import { commitTree } from "./tree.ts";
 
 const ACTIONS = [
   "check",
@@ -78,10 +76,7 @@ function decisions(plan: Plan, counts: Record<string, number>) {
         outcome === "orphaned" && !beforeThisUpdate,
     );
   const layout = plan.arrangedMoved > 0;
-  const ask = [
-    ...(framing ? ["framing"] : []),
-    ...(layout ? ["layout"] : []),
-  ];
+  const ask = [...(framing ? ["framing"] : []), ...(layout ? ["layout"] : [])];
   return {
     ask,
     next: ask.length
@@ -165,7 +160,7 @@ export function registerWorldUpdate(
   });
   const live = () => path.resolve(".");
   const repo = (): Git => {
-    const git = gitIn(live());
+    const git = worldGit(live());
     if (!git)
       throw new Error(
         "This world isn't a git clone, so it can't take updates. If Kazusa says git is missing, the user needs to install it.",

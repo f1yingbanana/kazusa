@@ -1,7 +1,7 @@
 "use client";
 
 import { Progress } from "@/components/ui/progress";
-import type { WorldDownload } from "@/lib/setup/setup";
+import type { WorldDownload } from "@/lib/run-script";
 
 /** Roughly how long is left, once enough has come in to tell. */
 function remaining(download: WorldDownload): string | null {

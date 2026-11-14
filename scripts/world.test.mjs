@@ -11,17 +11,16 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { PLAY } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
 import {
   checkLiveWorld,
   cloneWorld,
   downloadLiveWorld,
   downloadSize,
   listWorlds,
-  PLAY,
   SOURCES,
-} from "./world-repo.mjs";
-
-const WORLD = "apps/kazusa/world";
+  WORLD,
+} from "./world.mjs";
 
 const git = (dir, ...args) =>
   execFileSync(
@@ -66,7 +65,7 @@ function published() {
 
 /** A Kazusa copy whose sources list the published `demo`. */
 function kazusa(source = published()) {
-  const root = mkdtempSync(path.join(tmpdir(), "kazusa-world-repo-"));
+  const root = mkdtempSync(path.join(tmpdir(), "kazusa-world-"));
   put(
     path.join(root, SOURCES),
     JSON.stringify({ worlds: [{ id: "demo", provider: "git", url: source }] }),

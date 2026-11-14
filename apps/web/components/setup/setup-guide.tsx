@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/questionnaire";
 import { Spinner } from "@/components/ui/spinner";
 import type { SetupStatus, WorldOption } from "@/lib/setup/setup";
-import { useSetupDownload } from "@/hooks/use-world-downloads";
+import { useSetupDownload } from "@/hooks/use-setup-download";
 import { DownloadProgress } from "./download-progress";
 
 const SLOW_START_MS = 180_000;

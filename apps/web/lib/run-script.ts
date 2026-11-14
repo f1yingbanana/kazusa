@@ -85,3 +85,24 @@ export function runScript(
     });
   });
 }
+
+/**
+ * A world's download as git reports it (`scripts/world.mjs clone` or
+ * `download`), kept in memory by whoever runs it, with when it started for a
+ * time left.
+ */
+export interface WorldDownload {
+  readonly stage: string;
+  readonly percent: number;
+  readonly startedAt: number;
+  readonly updatedAt: number;
+}
+
+/** Turns a script's progress reports into a download's, timed. */
+export function tracking(
+  set: (download: WorldDownload | undefined) => void,
+): (progress: ScriptProgress) => void {
+  const startedAt = Date.now();
+  return ({ stage, percent }) =>
+    set({ stage, percent, startedAt, updatedAt: Date.now() });
+}

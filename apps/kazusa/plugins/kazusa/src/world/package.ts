@@ -6,12 +6,15 @@ import {
   type WorldMeta,
   type WorldPackage,
 } from "@kazusa/client";
-import { downloadedRelease, gitIn } from "../world-update/git.ts";
+import { downloadedRelease, worldGit } from "./repo.ts";
 
 /** The world's own manifest, beside its `shared/` and `workspaces/`. */
 export const WORLD_PACKAGE = "package.json";
 
-/** The `package.json` in `dir`, parsed; `undefined` when there is none or it doesn't parse. */
+/**
+ * The `package.json` in `dir`, parsed; `undefined` when there is none or it
+ * doesn't parse.
+ */
 export function readWorldPackage(dir: string): WorldPackage | undefined {
   let text: string;
   try {
@@ -50,7 +53,7 @@ export function worldCredit(dir: string): WorldMeta["package"] {
 export function availableUpdate(live: string): WorldMeta["update"] {
   const world = readWorldPackage(live);
   if (!world) return undefined;
-  const git = gitIn(live);
+  const git = worldGit(live);
   const release = git && downloadedRelease(git);
   if (!release) return undefined;
   return {

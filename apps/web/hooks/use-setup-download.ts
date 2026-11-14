@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import type { WorldDownload } from "@/lib/setup/setup";
+import type { WorldDownload } from "@/lib/run-script";
 
 async function fetchProgress(): Promise<WorldDownload | null> {
   const response = await fetch("/setup/world", { cache: "no-store" });

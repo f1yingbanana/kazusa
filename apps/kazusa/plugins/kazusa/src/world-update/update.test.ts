@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -10,314 +11,175 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  applyUpdate,
-  areaOf,
-  planUpdate,
-  folderTree,
-  openReport,
-  readReport,
-} from "./update.ts";
+  commitOf,
+  downloadedRelease,
+  PLAY,
+  restoreWorld,
+  saveRef,
+  saveWorld,
+  standOn,
+  worldGit,
+} from "../world/repo.ts";
+import { applyUpdate } from "./apply.ts";
+import { planUpdate } from "./plan.ts";
+import { commitTree } from "./tree.ts";
 
 let root: string;
-const put = (dir: string, file: string, text: string) => {
-  const full = path.join(dir, file);
+let live: string;
+const run = (...args: string[]) =>
+  execFileSync("git", args, { cwd: live, encoding: "utf8" }).trim();
+const put = (file: string, text: string | Buffer) => {
+  const full = path.join(live, file);
   mkdirSync(path.dirname(full), { recursive: true });
   writeFileSync(full, text);
 };
-const get = (dir: string, file: string) =>
-  readFileSync(path.join(dir, file), "utf8");
-const place = (id: string, extra = "") =>
-  `---\nplace_id: ${id}\nname: ${id}\nsummary: A place.${extra}\n---\n\n# ${id}\n`;
+const get = (file: string) => readFileSync(path.join(live, file), "utf8");
+const place = (id: string, summary: string) =>
+  `---\nplace_id: ${id}\nname: ${id}\nsummary: ${summary}\n---\n\n# ${id}\n`;
 
-/** A world's `package.json`. */
-const pkg = (fields: object, kazusa: object = {}) =>
-  JSON.stringify({
-    name: "demo",
-    ...fields,
-    kazusa: { systemAgent: "amy", ...kazusa },
-  });
-
-/** A template at version 1, a live world copied from it, and version 2. */
-function setup() {
-  const v1 = path.join(root, "v1");
-  const live = path.join(root, "world");
-  const v2 = path.join(root, "worlds", "demo");
-  for (const dir of [v1, live]) {
-    put(dir, "package.json", pkg({ version: "1.0.0" }));
-    put(dir, "shared/wiki/entities/places/hub.md", place("hub"));
-    put(
-      dir,
-      "shared/wiki/entities/places/old_market.md",
-      place("old_market", "\nparent: hub"),
-    );
-    put(
-      dir,
-      "shared/wiki/entities/places/gone.md",
-      place("gone", "\nparent: hub"),
-    );
-    put(
-      dir,
-      "workspaces/amy/MEMORY.md",
-      "# Amy\n\n## Long-Term Goals\n\n- Win.\n",
-    );
-    put(
-      dir,
-      "workspaces/amy/wiki/entities/places/old_market.md",
-      "---\nplace_id: old_market\nname: old_market\nlearned: always known\n---\n\nI shop here.\n",
-    );
-    put(
-      dir,
-      "workspaces/amy/wiki/entities/places/gone.md",
-      "---\nplace_id: gone\nname: gone\n---\n\nFiller.\n",
-    );
-  }
-  put(live, "package.json", pkg({ version: "1.0.0" }));
-  // Play: a note on a card, a layout, a new page, a sleep section.
-  put(
-    live,
-    "workspaces/amy/wiki/entities/places/old_market.md",
-    "---\nplace_id: old_market\nname: old_market\nlearned: always known\nseen: 2026-11-01\n---\n\nI shop here.\n",
+/**
+ * A world as setup leaves it, a clone standing on release 1.0.0 and played on
+ * without committing; then release 2.0.0 downloaded (its tag fetched).
+ */
+function world() {
+  run("init", "--quiet", `--initial-branch=${PLAY}`);
+  run("config", "user.name", "Kazusa");
+  run("config", "user.email", "kazusa@localhost");
+  run("config", "commit.gpgSign", "false");
+  mkdirSync(path.join(live, ".git/info"), { recursive: true });
+  writeFileSync(
+    path.join(live, ".git/info/exclude"),
+    "/*\n!/package.json\n!/shared/\n!/workspaces/\n",
   );
-  put(
-    live,
-    "shared/wiki/entities/places/hub.md",
-    place("hub", "\nmap: { x: 0.5, y: 0.5 }"),
-  );
-  put(
-    live,
-    "workspaces/amy/wiki/entities/characters/bea.md",
-    "---\nname: Bea\n---\n\nA friend.\n",
-  );
-  put(
-    live,
-    "workspaces/amy/MEMORY.md",
-    "# Amy\n\n## Long-Term Goals\n\n- Win.\n\n## Lately\n\nBusy.\n",
-  );
-  // Version 2: a rename, a removal, a rewrite and a new section.
-  put(
-    v2,
-    "package.json",
-    pkg({ version: "2.0.0" }, { renames: { old_market: "market" } }),
-  );
-  put(
-    v2,
-    "shared/wiki/entities/places/hub.md",
-    place("hub").replace("A place.", "The centre."),
-  );
-  put(
-    v2,
-    "shared/wiki/entities/places/market.md",
-    place("market", "\nparent: hub"),
-  );
-  put(
-    v2,
-    "workspaces/amy/MEMORY.md",
-    "# Amy\n\n## Long-Term Goals\n\n- Win.\n\n## My usual week\n\n- Shopping.\n",
-  );
-  put(
-    v2,
-    "workspaces/amy/wiki/entities/places/market.md",
-    "---\nplace_id: market\nname: market\nlearned: always known\n---\n\nI shop here, still.\n",
-  );
-  return { live, v1, v2 };
+  put("package.json", JSON.stringify({ name: "demo", version: "1.0.0" }));
+  put("shared/wiki/entities/places/hub.md", place("hub", "A place."));
+  put("shared/wiki/entities/places/park.md", place("park", "Grass."));
+  put("workspaces/amy/MEMORY.md", "# Amy\n");
+  put("workspaces/amy/stickers/happy2.webp", Buffer.from([9, 9]));
+  run("add", "-A");
+  run("commit", "--quiet", "-m", "Release 1.0.0");
+  run("tag", "-a", "v1.0.0", "-m", "1.0.0");
+  const first = run("rev-parse", "HEAD");
+  // The creator's next release, on the side.
+  put("package.json", JSON.stringify({ name: "demo", version: "2.0.0" }));
+  put("shared/wiki/entities/places/hub.md", place("hub", "The centre."));
+  put("workspaces/amy/portraits/happy.webp", Buffer.from([0, 1, 2, 3]));
+  put("workspaces/amy/stickers/happy[2].webp", Buffer.from([7]));
+  run("rm", "--quiet", "shared/wiki/entities/places/park.md");
+  run("add", "-A");
+  run("commit", "--quiet", "-m", "Release 2.0.0");
+  run("tag", "-a", "v2.0.0", "-m", "2.0.0: the centre moves.\n\nMore.");
+  run("reset", "--quiet", "--hard", first);
+  // Play, uncommitted, and the machine's own files.
+  put("workspaces/amy/MEMORY.md", "# Amy\n\n## Lately\n\nBusy.\n");
+  put("workspaces/amy/wiki/entities/characters/bea.md", "# Bea\n");
+  put("openclaw.json", "{}");
+  return first;
 }
-
-/** Plans the update from `v1` (the base) to `v2`, both folders. */
-const planOf = (live: string, v2: string, v1 = path.join(root, "v1")) =>
-  planUpdate(live, folderTree(v2), folderTree(v1), { layout: "keep" });
-const apply = (
-  live: string,
-  v2: string,
-  planned: ReturnType<typeof planOf>,
-) => {
-  openReport(live, planned, "keep", {
-    from: "v1",
-    to: "v2",
-    version: "2.0.0",
-    save: "refs/saves/before-update-2.0.0",
-  });
-  applyUpdate(live, folderTree(v2), planned);
-};
 
 beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "world-update-"));
+  live = path.join(root, "apps/kazusa/world");
+  mkdirSync(live, { recursive: true });
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-describe("world update", () => {
-  it("merges a new template version and keeps what play wrote", () => {
-    const { live, v2 } = setup();
-    const plan = planOf(live, v2);
-    expect(plan.pendingRenames).toEqual({ old_market: "market" });
-    expect(plan.areas[0]).toMatchObject({
-      area: "shared/wiki/entities/places",
-    });
-    expect(
-      plan.areas.find(({ area }) => area === "workspaces/*/MEMORY.md"),
-    ).toEqual({
-      area: "workspaces/*/MEMORY.md",
-      counts: { merged: 1 },
-      characters: 1,
-    });
-    apply(live, v2, plan);
+/** Every world file as it is on disk, for comparing before and after. */
+const snapshot = () =>
+  run("ls-files", "--cached", "--others", "--exclude-standard")
+    .split("\n")
+    .filter(Boolean)
+    .sort()
+    .map((file) => `${file}\t${readFileSync(path.join(live, file), "hex")}`);
 
-    const hub = get(live, "shared/wiki/entities/places/hub.md");
-    expect(hub).toContain("The centre.");
-    expect(hub).toContain("map: { x: 0.5, y: 0.5 }");
-    expect(
-      existsSync(path.join(live, "shared/wiki/entities/places/gone.md")),
-    ).toBe(false);
-    expect(
-      existsSync(path.join(live, "shared/wiki/entities/places/old_market.md")),
-    ).toBe(false);
-
-    const card = get(live, "workspaces/amy/wiki/entities/places/market.md");
-    expect(card).toContain("place_id: market");
-    expect(card).toContain("seen: 2026-11-01");
-    expect(card).toContain("I shop here, still.");
-    expect(
-      existsSync(
-        path.join(live, "workspaces/amy/wiki/entities/places/gone.md"),
-      ),
-    ).toBe(false);
-    expect(
-      existsSync(
-        path.join(live, "workspaces/amy/wiki/entities/characters/bea.md"),
-      ),
-    ).toBe(true);
-
-    const memory = get(live, "workspaces/amy/MEMORY.md");
-    expect(memory).toContain("## Lately");
-    expect(memory).toContain("## My usual week");
-    expect(JSON.parse(get(live, "package.json"))).toMatchObject({
+describe("a world update over git", () => {
+  it("saves the game, merges the release in, stands the world on it, and can put it all back", () => {
+    const first = world();
+    const git = worldGit(live)!;
+    const release = downloadedRelease(git)!;
+    expect(release).toMatchObject({
       version: "2.0.0",
-      kazusa: { renames: { old_market: "market" } },
+      notes: "2.0.0: the centre moves.\n\nMore.",
+      url: null,
     });
-    expect(readReport(live)?.conflicts).toEqual([]);
-  });
+    const template = commitTree(git, release.commit);
+    const plan = planUpdate(live, template, commitTree(git, first), {
+      layout: "keep",
+    });
+    const before = snapshot();
 
-  it("with the new version as the base, nothing is left to do", () => {
-    const { live, v2 } = setup();
-    apply(live, v2, planOf(live, v2));
-    expect(planOf(live, v2, v2).changes).toEqual([]);
-  });
-
-  it("reports a page both sides rewrote and keeps the live text", () => {
-    const { live, v2 } = setup();
-    put(
-      live,
-      "shared/wiki/entities/places/hub.md",
-      place("hub").replace("# hub", "# hub\n\nThe user's own words."),
+    const save = saveRef(release.version);
+    saveWorld(git, live, save, "Demo before updating to 2.0.0");
+    // Nothing touched: the save is only a copy, on the release it stood on.
+    expect(snapshot()).toEqual(before);
+    expect(run("rev-parse", `${save}^`)).toBe(first);
+    const saved = run("show", "--name-only", "--format=", save);
+    expect(run("ls-tree", "-r", "--name-only", save)).toContain(
+      "workspaces/amy/wiki/entities/characters/bea.md",
     );
-    put(
-      v2,
-      "shared/wiki/entities/places/hub.md",
-      place("hub").replace("# hub", "# hub\n\nThe creator's words."),
-    );
-    const plan = planOf(live, v2);
-    const hub = plan.changes.find(({ path: file }) => file.endsWith("hub.md"));
-    expect(hub?.outcome).toBe("conflict");
-    expect(hub?.conflicts?.map(({ part }) => part)).toContain("lead");
-  });
+    // The machine's config isn't the world's.
+    expect(saved).not.toContain("openclaw.json");
 
-  it("renames only places, never a concept that shared the id", () => {
-    const { live, v2 } = setup();
-    for (const dir of [live, v2])
-      put(
-        dir,
-        "shared/wiki/concepts/old_market.md",
-        "---\ntitle: Old Market\n---\n\n# Old Market\n",
-      );
-    const plan = planOf(live, v2);
-    apply(live, v2, plan);
+    applyUpdate(live, template, plan);
+    standOn(git, release.commit);
+    expect(get("shared/wiki/entities/places/hub.md")).toContain("The centre.");
+    expect(get("workspaces/amy/MEMORY.md")).toContain("Busy.");
     expect(
-      existsSync(path.join(live, "shared/wiki/concepts/old_market.md")),
-    ).toBe(true);
-    expect(existsSync(path.join(live, "shared/wiki/concepts/market.md"))).toBe(
-      false,
-    );
+      readFileSync(path.join(live, "workspaces/amy/portraits/happy.webp")),
+    ).toEqual(Buffer.from([0, 1, 2, 3]));
+    // A name, not a pattern: `happy[2].webp` leaves `happy2.webp` alone.
+    expect(
+      readFileSync(path.join(live, "workspaces/amy/stickers/happy2.webp")),
+    ).toEqual(Buffer.from([9, 9]));
+    expect(
+      existsSync(path.join(live, "shared/wiki/entities/places/park.md")),
+    ).toBe(false);
+    expect(commitOf(git, PLAY)).toBe(release.commit);
+    // What's left as changes is the game again, nothing committed.
+    expect(
+      run("status", "--porcelain")
+        .split("\n")
+        .map((line) => line.trim())
+        .sort(),
+    ).toEqual(["?? workspaces/amy/wiki/", "M workspaces/amy/MEMORY.md"]);
+    expect(downloadedRelease(git)).toBeUndefined();
+
+    // And the save puts the world back exactly as it was.
+    restoreWorld(git, save, release.commit);
+    expect(snapshot()).toEqual(before);
+    expect(commitOf(git, PLAY)).toBe(first);
+    expect(get("openclaw.json")).toBe("{}");
+    expect(downloadedRelease(git)?.version).toBe("2.0.0");
   });
 
-  it("keeps a card in the character's own words when its place is gone", () => {
-    const { live, v2 } = setup();
-    put(
-      live,
-      "workspaces/amy/wiki/entities/places/gone.md",
-      "---\nplace_id: gone\nname: gone\n---\n\nWhere I met Bea.\n",
-    );
-    put(
-      live,
-      "workspaces/amy/wiki/entities/places/hub_stub.md",
-      "---\nplace_id: hub_stub\nname: hub_stub\nseen: 2026-11-01\n---\n",
-    );
-    const plan = planOf(live, v2);
-    const outcome = (file: string) =>
-      plan.changes.find(({ path: p }) => p.endsWith(file))?.outcome;
-    expect(outcome("amy/wiki/entities/places/gone.md")).toBe("orphaned");
-    expect(outcome("places/hub_stub.md")).toBe("forgotten");
-    apply(live, v2, plan);
-    expect(get(live, "workspaces/amy/wiki/entities/places/gone.md")).toContain(
-      "Where I met Bea.",
-    );
-    expect(readReport(live)?.orphaned[0]?.reason).toBe(
-      "its place no longer exists",
-    );
+  it("puts back a world whose update was cut short before `play` moved", () => {
+    const first = world();
+    const git = worldGit(live)!;
+    const release = downloadedRelease(git)!;
+    const before = snapshot();
+    const save = saveRef(release.version);
+    saveWorld(git, live, save, "Before");
+    // Half the release written, `play` never moved.
+    put("shared/wiki/entities/places/hub.md", place("hub", "The centre."));
+    put("workspaces/amy/portraits/happy.webp", Buffer.from([0, 1, 2, 3]));
+    rmSync(path.join(live, "shared/wiki/entities/places/park.md"));
+    restoreWorld(git, save, release.commit);
+    expect(snapshot()).toEqual(before);
+    expect(commitOf(git, PLAY)).toBe(first);
   });
-});
 
-describe("pending renames", () => {
-  it("lists only the renames this world hasn't taken yet", () => {
-    const { live, v2 } = setup();
-    apply(live, v2, planOf(live, v2));
-    const again = planOf(live, v2, v2);
-    expect(again.renames).toEqual({ old_market: "market" });
-    expect(again.pendingRenames).toEqual({});
-  });
-});
-
-describe("arranged places", () => {
-  it("asks about a position both the user and the creator moved, and follows the creator's elsewhere", () => {
-    const v1 = path.join(root, "v1");
-    const live = path.join(root, "world");
-    const v2 = path.join(root, "worlds", "demo");
-    const at = (x: number) => `\nmap: { x: ${x}, y: ${x} }`;
-    for (const dir of [v1, live])
-      put(dir, "package.json", pkg({ version: "1.0.0" }));
-    put(v1, "shared/wiki/entities/places/hub.md", place("hub", at(0.5)));
-    put(v1, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
-    put(live, "package.json", pkg({ version: "1.0.0" }));
-    put(live, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
-    put(live, "shared/wiki/entities/places/hub.md", place("hub", at(0.1)));
-    put(v2, "package.json", pkg({ version: "2.0.0" }));
-    put(v2, "shared/wiki/entities/places/hub.md", place("hub", at(0.9)));
-    put(v2, "shared/wiki/entities/places/park.md", place("park", at(0.7)));
-    const plan = planOf(live, v2);
-    expect(plan.arranged).toBe(1);
-    expect(plan.arrangedMoved).toBe(1);
-    apply(live, v2, plan);
-    expect(get(live, "shared/wiki/entities/places/hub.md")).toContain("x: 0.1");
-    expect(get(live, "shared/wiki/entities/places/park.md")).toContain(
-      "x: 0.7",
-    );
-  });
-});
-
-describe("areaOf", () => {
-  it("names a file's kind, with a character's id as a star", () => {
-    expect(areaOf("shared/backdrops/gym/day.webp")).toEqual({
-      area: "shared/backdrops",
-    });
-    expect(areaOf("workspaces/ami/portraits/happy.webp")).toEqual({
-      area: "workspaces/*/portraits",
-      character: "ami",
-    });
-    expect(areaOf("shared/wiki/entities/places/gym.md").area).toBe(
-      "shared/wiki/entities/places",
-    );
-    expect(areaOf("workspaces/ami/wiki/days/2026-11-02.md").area).toBe(
-      "workspaces/*/wiki/days",
-    );
-    expect(areaOf("workspaces/ami/SOUL.md").area).toBe("workspaces/*/SOUL.md");
-    expect(areaOf("package.json").area).toBe("package.json");
+  it("works on the world's own repository whatever the environment says", () => {
+    world();
+    const elsewhere = path.join(root, "elsewhere");
+    mkdirSync(elsewhere);
+    execFileSync("git", ["init", "--quiet"], { cwd: elsewhere });
+    const before = process.env.GIT_DIR;
+    process.env.GIT_DIR = path.join(elsewhere, ".git");
+    try {
+      expect(downloadedRelease(worldGit(live)!)?.version).toBe("2.0.0");
+    } finally {
+      if (before === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = before;
+    }
   });
 });

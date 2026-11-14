@@ -1,108 +1,27 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { WorldPackageSchema } from "@kazusa/client";
 import { renamedText } from "../location/pages.ts";
 import { WORLD_PACKAGE } from "../world/package.ts";
-import { blobId, copyFiles, filesAt, readBlobs, type Git } from "./git.ts";
-import { parseDoc } from "./parts.ts";
 import {
   mergeMarkdown,
   sameMarkdown,
   type MergePolicy,
   type PartConflict,
 } from "./merge.ts";
+import { parseDoc } from "./parts.ts";
+import { blobId, filesOf, type Tree } from "./tree.ts";
 
 /**
- * Bringing a live world up to date with a newer release of the world it was
- * cloned from (`git.ts`): the release is one side, the world as play left it
- * the other, and the base is the creator's commit the world stood on. Both
- * commits are read straight from git; pictures are copied from git only where
- * the world takes them.
+ * What bringing the live world up to a newer release would do, file by file,
+ * changing nothing: the release is one side, the world as play left it the
+ * other, and the base is the creator's commit the world stood on (`tree.ts`
+ * reads both commits from git). `apply.ts` writes it.
  */
-/** Runtime state, beside the memory index: the update being resolved. */
-const STATE_DIR = path.join(".state", "kazusa", "world-update");
-const REPORT = path.join(STATE_DIR, "report.json");
 
-const PARTS = ["shared", "workspaces"] as const;
 /** The world's manifest: an update brings the creator's, byte for byte. */
 const PACKAGE = WORLD_PACKAGE;
 const LAYOUT_KEYS = ["fm:map"];
-const TEXT = /\.(md|json|txt)$/;
-
-/** World-relative paths of the files an update covers. */
-function filesOf(root: string): string[] {
-  const out: string[] = [];
-  const walk = (relative: string) => {
-    const full = path.join(root, relative);
-    for (const entry of readdirSync(full, { withFileTypes: true })) {
-      const child = path.join(relative, entry.name);
-      if (entry.name === ".DS_Store" || entry.name.endsWith(".tmp")) continue;
-      if (entry.isSymbolicLink()) continue;
-      if (entry.isDirectory()) walk(child);
-      else if (entry.isFile()) out.push(child.split(path.sep).join("/"));
-    }
-  };
-  for (const part of PARTS) if (existsSync(path.join(root, part))) walk(part);
-  if (existsSync(path.join(root, PACKAGE))) out.push(PACKAGE);
-  return out.sort();
-}
-
-/**
- * One side of a merge: which files it has (by blob id), each text file's text,
- * and how to copy its files into the world.
- */
-export interface Tree {
-  readonly ids: ReadonlyMap<string, string>;
-  readonly text: (file: string) => string | undefined;
-  readonly copy: (files: readonly string[], live: string) => void;
-}
-
-/** A folder as one side (tests). */
-export function folderTree(dir: string): Tree {
-  return {
-    ids: new Map(
-      filesOf(dir).map((file) => [
-        file,
-        blobId(readFileSync(path.join(dir, file))),
-      ]),
-    ),
-    text: (file) =>
-      existsSync(path.join(dir, file))
-        ? readFileSync(path.join(dir, file), "utf8")
-        : undefined,
-    copy: (files, live) => {
-      for (const file of files)
-        write(path.join(live, file), readFileSync(path.join(dir, file)));
-    },
-  };
-}
-
-/** A commit as one side: its text read from git in one batch, when first asked. */
-export function commitTree(git: Git, commit: string): Tree {
-  const ids = filesAt(git, commit);
-  let texts: Map<string, Buffer> | undefined;
-  return {
-    ids,
-    text: (file) => {
-      const id = ids.get(file);
-      if (!id) return undefined;
-      texts ??= readBlobs(
-        git,
-        [...ids].filter(([name]) => TEXT.test(name)).map(([, blob]) => blob),
-      );
-      return (texts.get(id) ?? readBlobs(git, [id]).get(id))?.toString("utf8");
-    },
-    copy: (files) => copyFiles(git, commit, files),
-  };
-}
 
 // ------------------------------------------------------------------- renames
 
@@ -243,10 +162,7 @@ export function planUpdate(
   for (const file of filesOf(live))
     liveFiles.set(renamedPath(file, renames), file);
   const baseOriginal = new Map(
-    [...base.ids.keys()].map((file) => [
-      renamedPath(file, renames),
-      file,
-    ]),
+    [...base.ids.keys()].map((file) => [renamedPath(file, renames), file]),
   );
   const baseFiles = new Set(baseOriginal.keys());
   const templateFiles = new Set(template.ids.keys());
@@ -454,128 +370,4 @@ export function planUpdate(
     arranged,
     arrangedMoved,
   };
-}
-
-// --------------------------------------------------------------------- apply
-
-export interface Report {
-  /** The commit the world stood on before, and the release it takes. */
-  readonly from: string;
-  readonly to: string;
-  readonly version: string;
-  /** The save of the world as it was before (`saveRef`). */
-  readonly save: string;
-  readonly layout: MergePolicy["layout"];
-  readonly counts: Readonly<Record<string, number>>;
-  readonly conflicts: readonly {
-    path: string;
-    parts: readonly PartConflict[];
-  }[];
-  readonly orphaned: readonly { path: string; reason: string }[];
-  readonly keptDeleted: readonly string[];
-  readonly newCharacters: readonly string[];
-  readonly removedCharacters: readonly string[];
-  readonly renames: Readonly<Record<string, string>>;
-}
-
-function write(file: string, data: string | Buffer): void {
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, data);
-}
-
-/**
- * The report the system agent resolves from, written before any file changes:
- * an update is open from then until `finishUpdate`, so one cut short is still
- * known (`play` isn't on `to` yet).
- */
-export function openReport(
-  live: string,
-  plan: Plan,
-  layout: MergePolicy["layout"],
-  release: Pick<Report, "from" | "to" | "version" | "save">,
-): Report {
-  const counts: Record<string, number> = {};
-  for (const { outcome } of plan.changes)
-    counts[outcome] = (counts[outcome] ?? 0) + 1;
-  const report: Report = {
-    ...release,
-    layout,
-    counts,
-    conflicts: plan.changes
-      .filter(({ outcome }) => outcome === "conflict")
-      .map(({ path: file, conflicts }) => ({
-        path: file,
-        parts: conflicts ?? [],
-      })),
-    orphaned: plan.changes
-      .filter(({ outcome }) => outcome === "orphaned")
-      .map(({ path: file, reason }) => ({ path: file, reason: reason ?? "" })),
-    keptDeleted: plan.changes
-      .filter(({ outcome }) => outcome === "kept-deleted")
-      .map(({ path: file }) => file),
-    newCharacters: plan.newCharacters,
-    removedCharacters: plan.removedCharacters,
-    renames: plan.renames,
-  };
-  mkdirSync(path.join(live, STATE_DIR), { recursive: true });
-  writeFileSync(
-    path.join(live, REPORT),
-    `${JSON.stringify(report, null, 1)}\n`,
-  );
-  return report;
-}
-
-/**
- * Writes the plan into the world's files: every new file first, then what
- * goes, so nothing is ever only in the save.
- */
-export function applyUpdate(live: string, template: Tree, plan: Plan): void {
-  const kept = new Set(
-    plan.changes
-      .filter(({ outcome }) => outcome !== "removed" && outcome !== "forgotten")
-      .map(({ path: file }) => file),
-  );
-  // An orphan the creator renamed moves to its new name as it is.
-  for (const change of plan.changes)
-    if (
-      change.from &&
-      kept.has(change.path) &&
-      !change.copyFromTemplate &&
-      change.text === undefined
-    ) {
-      mkdirSync(path.dirname(path.join(live, change.path)), {
-        recursive: true,
-      });
-      renameSync(path.join(live, change.from), path.join(live, change.path));
-    }
-  template.copy(
-    plan.changes
-      .filter(({ copyFromTemplate }) => copyFromTemplate)
-      .map(({ path: file }) => file),
-    live,
-  );
-  for (const change of plan.changes)
-    if (!change.copyFromTemplate && change.text !== undefined)
-      write(path.join(live, change.path), change.text);
-  for (const change of plan.changes) {
-    if (change.from && !kept.has(change.from))
-      rmSync(path.join(live, change.from), { force: true });
-    if (!kept.has(change.path))
-      rmSync(path.join(live, change.path), { force: true });
-  }
-}
-
-/** The update being resolved, if one is. */
-export function readReport(live: string): Report | undefined {
-  const file = path.join(live, REPORT);
-  if (!existsSync(file)) return undefined;
-  return JSON.parse(readFileSync(file, "utf8")) as Report;
-}
-
-/** Closes the update: nothing is left to resolve. */
-export function finishUpdate(live: string): Report {
-  const report = readReport(live);
-  if (!report) throw new Error("No update to finish.");
-  rmSync(path.join(live, REPORT), { force: true });
-  return report;
 }

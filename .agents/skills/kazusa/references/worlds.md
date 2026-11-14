@@ -1,10 +1,8 @@
 # World Packages and Versioning
 
-Status (2026-11-14): §1–§3 built (`WorldPackageSchema` in `@kazusa/client`,
-`src/world/package.ts`, `src/world-update/`, `apps/web/lib/setup/`,
-`scripts/world-repo.mjs`); §4 is the agreed design, built through step 1 of its
-roadmap (§4.8). Read this before changing a world's `package.json`, how a world
-is set up or updated, or anything about versions, forks, history or saves.
+Status (2026-11-14): §1–§3 built; §4 is the agreed design, built through step 1
+of its roadmap (§4.8). Read this before changing a world's `package.json`, how a
+world is set up or updated, or anything about versions, forks, history or saves.
 
 Goal: a world is a thing people make, share, fork and keep playing. It should
 carry who made it and which version it is, take its creator's later releases
@@ -83,8 +81,24 @@ Rules:
 What's built today: §4.5–§4.7 is the design it follows (a world is a git clone;
 an update saves the world, merges the release in and moves `play`).
 
-- **Setup** (`apps/web/lib/setup/setup.ts`, `world-repo.mjs list` and `clone`):
-  lists the worlds in `apps/kazusa/world-sources.json` by peeking at each one's
+Where it lives, by layer:
+
+| Layer                   | Files                                                               | What                                                                                                                                                                                                   |
+| :---------------------- | :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Git                     | `src/world/git.ts`                                                  | The one way to run git: which binary (`findGit`), its environment, pinned to a repository (`repoGit`) or none (`plainGit`), and long commands with their progress (`streamGit`).                       |
+| The world's repository  | `src/world/repo.ts`                                                 | `play`, releases (newest on the remote, downloaded here, the world's version), `isClone`, clone and fetch of a release, saves (`saveWorld`, `restoreWorld`, `standOn`).                                |
+| The manifest            | `src/world/package.ts`                                              | `package.json`, the credit and the Ready signal.                                                                                                                                                       |
+| The update              | `src/world-update/`                                                 | `tree.ts` reads a commit or folder as one side, `plan.ts` decides file by file (`merge.ts`, `parts.ts` per page), `apply.ts` writes it and keeps the report, `register.ts` is the system agent's tool. |
+| The frontend's commands | `scripts/world.mjs`                                                 | `list`, `clone`, `check`, `download`, each its own process through `runScript`, importing `src/world/` as it is (Node runs TypeScript).                                                                |
+| The frontend            | `apps/web/lib/setup/`, `app/update/world/`, `app/setup/start-over/` | Setup, the check and download, Start a new world.                                                                                                                                                      |
+
+`git.ts` and `repo.ts` import only Node's own modules, so the plugin,
+`scripts/world.mjs`, `scripts/dev.mjs` and the frontend all use them directly:
+there is one definition of each thing (downloaded, a release, a clone). Keep
+them that way: a plain Node script can't import a package's TypeScript.
+
+- **Setup** (`apps/web/lib/setup/setup.ts`, `world.mjs list` and `clone`): lists
+  the worlds in `apps/kazusa/world-sources.json` by peeking at each one's
   `package.json` (a shallow clone with no file contents, about a second each),
   and on a pick clones that world's newest release into `world/` (`cloneWorld`:
   cloned beside as `world.cloning`, then its `.git`, `package.json`, `shared/`
@@ -99,20 +113,21 @@ an update saves the world, merges the release in and moves `play`).
   `WorldMeta.package`): read on each request, so editing the file needs no
   restart. The client's screenshot card credits `displayName`, `author` and
   `homepage` at its foot.
-- **Checking** (`world-repo.mjs check`, `checkLiveWorld`, through
+- **Checking** (`world.mjs check`, `checkLiveWorld`, through
   `GET /update/world`, cached 2 minutes): hourly in the client (`useWorldCheck`,
   mounted with the notice) and from Settings → Updates → World's Check again,
   only for the local owner. `ls-remote --tags` gives the newest version tag;
-  it's new unless `play` is on it or has it. Downloaded means its tag is here,
-  as the Ready signal reads it: then its notes, the tag's message. Not
-  downloaded: its size from GitHub's file lists of `play` and the release
-  (display only, absent when GitHub can't say) and a link to its release page.
-- **Downloading** (`POST /update/world`, `world-repo.mjs download`,
-  `downloadLiveWorld`), once the player says so: `git fetch` of the release's
-  tag only, with a minimum-speed limit, git's progress kept in memory and served
-  with the check. Nothing in the world changes.
+  it's new unless `play` is on it or has it. Downloaded means its tag is here
+  and names its commit (`isDownloaded`, the one test of it): then its notes, the
+  tag's message. Not downloaded: its size from GitHub's file lists of `play` and
+  the release (display only, absent when GitHub can't say) and a link to its
+  release page.
+- **Downloading** (`POST /update/world`, `world.mjs download`, `fetchRelease`),
+  once the player says so: `git fetch` of the release's tag only, with a
+  minimum-speed limit, git's progress kept in memory and served with the check.
+  Nothing in the world changes.
 - **Ready** (`availableUpdate` in `src/world/package.ts`, `downloadedRelease` in
-  `src/world-update/git.ts`, on each request): `GET /kazusa/world` carries
+  `src/world/repo.ts`, on each request): `GET /kazusa/world` carries
   `world.update` (`{ commit, date, version, notes, url, systemAgent }`) while
   the highest local version tag isn't in `play`'s history. The client announces
   it once and Settings offers Ask <system agent>.
@@ -145,13 +160,12 @@ an update saves the world, merges the release in and moves `play`).
   (`dugite-native`, pinned with its sha256 in `scripts/package.mjs`, Git
   Credential Manager and Git LFS stripped: they are most of it and nothing uses
   them), else the system's. On macOS without the developer tools, `/usr/bin/git`
-  only offers to install them, so that counts as none. simple-git guards the
-  environment: our variables (`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`,
-  `GIT_CONFIG_NOSYSTEM`) are named in `allowEnvironment`, the shipped binary and
-  exec path allowed through `unsafe`, and every inherited `GIT_*`, `EDITOR`,
-  `PAGER` and the like dropped. The plugin runs the same git directly
-  (`world-update/git.ts`), pinned to the world's repository with `GIT_DIR` and
-  `GIT_WORK_TREE`.
+  only offers to install them, so that counts as none. Every inherited `GIT_*`,
+  `EDITOR`, `PAGER` and the like is dropped and no system-wide config is read;
+  commands on the world are pinned to its repository with `GIT_DIR` and
+  `GIT_WORK_TREE`, so a half-made `world/.git` fails rather than finding an
+  enclosing repository. Progress is git's own `--progress` output, parsed in
+  `streamGit`.
 
 ## 3. Worlds an older Kazusa made
 
