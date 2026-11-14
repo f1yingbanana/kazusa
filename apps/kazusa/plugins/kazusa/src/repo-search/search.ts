@@ -4,12 +4,14 @@ import path from "node:path";
 
 /**
  * Never searched: dependencies, history and build output; the client's asset
- * cache and update backups (copies of the world); and a world's update base, a
- * copy of every page, unless asked for by `path`. Runtime state in `.state` is
- * searched, but its databases are binary and so skipped.
+ * cache and update backups (copies of the world); and a world update's text of
+ * both versions (`world-update`, and `.template` from before), copies of every
+ * page, unless asked for by `path`. Runtime state in `.state` is searched, but
+ * its databases are binary and so skipped.
  */
 const SKIP_DIRS = new Set([
   ".template",
+  "world-update",
   "node_modules",
   ".git",
   "dist",

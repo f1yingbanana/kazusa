@@ -1,14 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { authorName } from "@kazusa/client";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  availableUpdate,
-  compareVersions,
-  readWorldPackage,
-  worldCredit,
-} from "./package.ts";
+import { availableUpdate, readWorldPackage, worldCredit } from "./package.ts";
 
 const KAZUSA = { systemAgent: "arona" };
 
@@ -72,51 +68,54 @@ describe("authorName", () => {
   });
 });
 
-describe("compareVersions", () => {
-  it("orders by number, not by text", () => {
-    expect(compareVersions("0.10.0", "0.9.2")).toBeGreaterThan(0);
-    expect(compareVersions("0.3.0", "0.4.0")).toBeLessThan(0);
-    expect(compareVersions("v1.0", "1.0.0")).toBe(0);
-    expect(compareVersions("1.2.0-beta", "1.2.0")).toBe(0);
-  });
-});
-
 describe("availableUpdate", () => {
   let root: string | undefined;
   afterEach(() => {
     if (root) rmSync(root, { recursive: true, force: true });
     root = undefined;
   });
-  /** `apps/kazusa` as Kazusa lays it out: the live world and its template. */
-  const layout = (live: string, template?: string) => {
-    root = mkdtempSync(path.join(tmpdir(), "world-update-"));
-    const put = (dir: string, version: string) => {
-      mkdirSync(path.join(root!, dir), { recursive: true });
-      writeFileSync(
-        path.join(root!, dir, "package.json"),
-        JSON.stringify({
-          name: "demo",
-          version,
-          kazusa: { ...KAZUSA, template: "demo" },
-        }),
-      );
-    };
-    put("world", live);
-    if (template) put("worlds/demo", template);
-    return path.join(root, "world");
-  };
 
-  it("offers a newer template, and who brings it in", () => {
-    expect(availableUpdate(layout("0.3.0", "0.4.0"))).toEqual({
-      version: "0.4.0",
-      current: "0.3.0",
+  it("offers the newest release downloaded until the world stands on it", () => {
+    root = mkdtempSync(path.join(tmpdir(), "world-update-"));
+    const live = path.join(root, "apps/kazusa/world");
+    mkdirSync(live, { recursive: true });
+    const git = (...args: string[]) =>
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=Test",
+          "-c",
+          "user.email=test@example.com",
+          "-c",
+          "commit.gpgSign=false",
+          ...args,
+        ],
+        { cwd: live, encoding: "utf8" },
+      ).trim();
+    writeFileSync(
+      path.join(live, "package.json"),
+      JSON.stringify({ name: "demo", kazusa: { ...KAZUSA, template: "demo" } }),
+    );
+    git("init", "--quiet", "--initial-branch=play");
+    git("remote", "add", "origin", "https://github.com/someone/demo-world.git");
+    git("add", "-A");
+    git("commit", "--quiet", "-m", "First");
+    git("tag", "v0.4.0");
+    expect(availableUpdate(live)).toBeUndefined();
+    git("commit", "--quiet", "--allow-empty", "-m", "More lore");
+    git("tag", "-a", "v0.5.0", "-m", "New lore.");
+    const next = git("rev-parse", "HEAD");
+    git("reset", "--quiet", "--hard", "HEAD~1");
+    expect(availableUpdate(live)).toMatchObject({
+      commit: next,
+      version: "0.5.0",
+      notes: "New lore.",
+      url: "https://github.com/someone/demo-world/releases/tag/v0.5.0",
       systemAgent: "arona",
     });
-  });
-
-  it("offers nothing when the template is the same, older or not downloaded", () => {
-    expect(availableUpdate(layout("0.4.0", "0.4.0"))).toBeUndefined();
-    expect(availableUpdate(layout("0.4.0", "0.3.0"))).toBeUndefined();
-    expect(availableUpdate(layout("0.4.0"))).toBeUndefined();
+    // Taken: the world stands on it.
+    git("update-ref", "refs/heads/play", next);
+    expect(availableUpdate(live)).toBeUndefined();
   });
 });

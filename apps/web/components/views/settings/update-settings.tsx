@@ -13,11 +13,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdate, type UpdatePhase } from "@/hooks/use-update";
-import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
 import {
   offered,
+  reasonOf,
   useWorldCheck,
   useWorldUpdate,
+  versionLabel,
 } from "@/hooks/use-world-update";
 import { formatBytes } from "@/lib/format";
 import { DownloadProgress } from "@/components/setup/download-progress";
@@ -36,6 +37,31 @@ function ago(date: string) {
 
 function Dot() {
   return <span aria-hidden>·</span>;
+}
+
+/** "· Release notes ↗", to a world release's page; nothing without one. */
+function NotesLink({ url }: { url: string | null | undefined }) {
+  if (!url) return null;
+  return (
+    <>
+      <Dot />
+      <a href={url} target="_blank" rel="noreferrer" className={LINK}>
+        Release notes
+        <ArrowUpRightIcon className="size-3" />
+      </a>
+    </>
+  );
+}
+
+/** "· 3 days ago", for one of the creator's commits; nothing without a date. */
+function CommitDate({ date }: { date: string | null | undefined }) {
+  if (!date) return null;
+  return (
+    <>
+      <Dot />
+      <span>{ago(date)}</span>
+    </>
+  );
 }
 
 function VersionRow({
@@ -169,41 +195,15 @@ export function UpdateSettings() {
   );
 }
 
-/** What each kind of file a release changes is, to a player. */
-const AREA_NAMES: Record<string, string> = {
-  "workspaces/*/portraits": "portraits",
-  "workspaces/*/stickers": "stickers",
-  "shared/backdrops": "backdrops",
-  "shared/wiki": "world pages",
-};
-
-/** "4,786 portraits, 1,125 backdrops and 321 world pages". */
-function describeChanges(
-  areas: readonly { area: string; count: number }[],
-): string {
-  const counts = new Map<string, number>();
-  for (const { area, count } of areas) {
-    const name = AREA_NAMES[area] ?? "characters’ files";
-    counts.set(name, (counts.get(name) ?? 0) + count);
-  }
-  const parts = [...counts].map(
-    ([name, count]) => `${count.toLocaleString()} ${name}`,
-  );
-  return parts.length > 1
-    ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`
-    : (parts[0] ?? "");
-}
-
 /**
- * The world's version and its template's newest release: what it changes and
- * how big it is, then downloading it once the player says so (it can be a
- * gigabyte), then asking the system agent to bring it in.
+ * The world's version and its newest release: how big it is, then downloading
+ * it once the player says so (it can be a gigabyte) with git's own progress,
+ * then asking the system agent to bring it in.
  */
 function WorldVersion() {
   const { world, worldResource } = useSources();
   const { update, admin, canAsk, asking, ask } = useWorldUpdate();
   const checker = useWorldCheck();
-  const download = useLiveTemplateDownload(checker.enabled, 1000);
   const [starting, setStarting] = useState(false);
   const credit = world?.package;
   const check = checker.result;
@@ -248,14 +248,11 @@ function WorldVersion() {
     }
   }
 
-  const downloading = Boolean(download) || check?.downloading === true;
+  const downloading = check?.downloading === true;
+  const download = downloading ? check?.progress : undefined;
   const available = !update && offered(check);
   const failed = check?.lastDownload?.error;
-  const yourNote = checker.error
-    ? checker.error.message
-    : check?.newer && check.changes?.files === 0 && !update
-      ? `${credit.name} ${check.latest} is out, and changes nothing in your world.`
-      : undefined;
+  const yourNote = checker.error ? checker.error.message : undefined;
 
   return (
     <SettingsSection
@@ -283,7 +280,14 @@ function WorldVersion() {
       <ul className="flex flex-col divide-y rounded-lg border bg-card">
         <VersionRow
           label="Your world"
-          version={credit.version ?? "Unknown"}
+          version={
+            check?.current
+              ? versionLabel({
+                  ...check.current,
+                  version: check.current.version ?? credit.version,
+                })
+              : (credit.version ?? null)
+          }
           note={yourNote}
           action={
             update || available || downloading || checker.error ? null : (
@@ -296,22 +300,23 @@ function WorldVersion() {
         />
         {available && check?.latest ? (
           <VersionRow
-            label="Latest version"
-            version={check.latest}
+            label="New version"
+            version={versionLabel(check.latest)}
             details={
-              check.size ? (
-                <>
-                  <Dot />
-                  <span>{formatBytes(check.size)}</span>
-                </>
-              ) : null
+              <>
+                {check.size ? (
+                  <>
+                    <Dot />
+                    <span>{formatBytes(check.size)}</span>
+                  </>
+                ) : null}
+                <NotesLink url={check.latest.url} />
+              </>
             }
             note={
               failed
                 ? `The download failed: ${failed}`
-                : check.changes
-                  ? `Adds or changes ${describeChanges(check.changes.areas)}. Your world plays as usual while it downloads.`
-                  : "Your world plays as usual while it downloads."
+                : "Your world plays as usual while it downloads."
             }
             action={
               downloading ? null : (
@@ -330,11 +335,17 @@ function WorldVersion() {
         ) : null}
         {update ? (
           <VersionRow
-            label="Latest version"
-            version={update.version}
+            label="New version"
+            version={versionLabel(update)}
+            details={
+              <>
+                <CommitDate date={update.date} />
+                <NotesLink url={update.url} />
+              </>
+            }
             note={
               canAsk
-                ? `Downloaded. ${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
+                ? `Downloaded${reasonOf(update) ? `: ${reasonOf(update)}` : "."} ${admin} will ask a few questions first, such as whether the changes happened in the story or were always so.`
                 : `Ask the world's owner to have ${admin} update it.`
             }
             action={
@@ -353,14 +364,10 @@ function WorldVersion() {
           />
         ) : null}
       </ul>
-      {download ? (
+      {downloading ? (
         <div className="flex flex-col gap-1.5">
           <DownloadProgress
-            title={
-              download.kind === "update"
-                ? `${credit.name} ${check?.latest ?? ""}`.trim()
-                : credit.name
-            }
+            title={`${credit.name} ${check?.latest?.version ?? ""}`.trim()}
             download={download}
           />
           <p className="text-xs text-pretty text-muted-foreground">

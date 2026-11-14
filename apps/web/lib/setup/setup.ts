@@ -1,5 +1,4 @@
 import {
-  cp,
   mkdir,
   readdir,
   readFile,
@@ -19,8 +18,7 @@ import {
   type ProviderEntry,
 } from "@kazusa/client";
 import { z } from "zod";
-import { runScript } from "../run-script";
-import { writeTemplateSnapshot } from "./template-snapshot";
+import { runScript, type ScriptProgress } from "../run-script";
 
 /**
  * Where a world's config includes its system agent's tools from;
@@ -215,22 +213,25 @@ export interface WorldOption {
 }
 
 /**
- * A template downloading: `worlds/.<id>.download.json`, which
- * `scripts/world-repo.mjs` rewrites a few times a second. `clone` is a first
- * download (setup, or a world from before templates were repositories),
- * `update` a new version of one already here.
+ * A download as git reports it (`--progress`, through
+ * `scripts/world-repo.mjs`), kept in memory by whoever runs it, with when it
+ * started for a time left.
  */
-export const WorldDownloadSchema = z.object({
-  id: z.string(),
-  kind: z.enum(["clone", "update"]),
-  stage: z.string(),
-  percent: z.number().min(0).max(100),
-  startedAt: z.number(),
-  updatedAt: z.number(),
-});
-export type WorldDownload = z.infer<typeof WorldDownloadSchema>;
-/** Git can go quiet for a while before the server starts sending. */
-const DOWNLOAD_STALE_MS = 2 * 60_000;
+export interface WorldDownload {
+  readonly stage: string;
+  readonly percent: number;
+  readonly startedAt: number;
+  readonly updatedAt: number;
+}
+
+/** Turns a script's progress reports into a download's, timed. */
+export function tracking(
+  set: (download: WorldDownload | undefined) => void,
+): (progress: ScriptProgress) => void {
+  const startedAt = Date.now();
+  return ({ stage, percent }) =>
+    set({ stage, percent, startedAt, updatedAt: Date.now() });
+}
 
 /** A world on offer: `scripts/world-repo.mjs list` gives one per source. */
 export type ListedWorld =
@@ -243,12 +244,16 @@ export type ListedWorld =
 
 /**
  * Which worlds there are and how to get one. `scripts/world-repo.mjs` peeks at
- * each source's `package.json` and downloads only the one picked, into
- * `worlds/<id>`, or brings the copy there up to date (`clone`).
+ * each source's `package.json` and clones only the one picked, at its newest
+ * release, straight into `world/` (`clone`), replacing another pick that wasn't
+ * set up.
  */
 export interface Catalog {
   readonly list: () => Promise<readonly ListedWorld[]>;
-  readonly download: (id: string) => Promise<void>;
+  readonly download: (
+    id: string,
+    onProgress?: (progress: ScriptProgress) => void,
+  ) => Promise<void>;
 }
 
 const ListedSchema = z.object({
@@ -271,8 +276,13 @@ export const scriptCatalog: Catalog = {
     if (!result.ok) throw new Error(result.error);
     return ListedSchema.parse(result.value).worlds;
   },
-  download: async (id) => {
-    const result = await runScript("world-repo.mjs", ["clone", id], 0);
+  download: async (id, onProgress) => {
+    const result = await runScript(
+      "world-repo.mjs",
+      ["clone", id],
+      0,
+      onProgress,
+    );
     if (!result.ok) throw new Error(result.error);
   },
 };
@@ -293,8 +303,6 @@ const DEFAULT_ANCHORS = { school: "familiar", club: "intimate" };
 const AnchorsSchema = z.object({
   memory: z.object({ anchors: z.record(z.string(), z.string()) }),
 });
-
-const ignoreDsStore = (source: string) => path.basename(source) !== ".DS_Store";
 
 async function directories(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -378,18 +386,12 @@ export function createSetup(
   appDir: string,
   keys: KeyStore = sdkKeyStore(appDir),
   catalog: Catalog = scriptCatalog,
-  downloadPollMs = 500,
 ) {
-  const worldsDir = path.join(appDir, "worlds");
   const liveDir = path.join(appDir, "world");
   const configFile = path.join(liveDir, "openclaw.json");
   const envFile = path.join(liveDir, ".state/.env");
-  // The world's package.json, written last: a world is imported once it exists.
+  // The world's own manifest; one from before clones names its template.
   const markerFile = path.join(liveDir, "package.json");
-  // What a world had before package.json; `npm run dev` turns it into one, but
-  // a world that still has it is imported all the same, never copied over.
-  const legacyMarker = path.join(liveDir, "world.json");
-  const imported = () => existsSync(markerFile) || existsSync(legacyMarker);
 
   const readWorld = async (dir: string) =>
     WorldPackageSchema.parse(
@@ -399,8 +401,9 @@ export function createSetup(
   const savedEnv = async (): Promise<string> =>
     existsSync(envFile) ? readFile(envFile, "utf8") : "";
 
+  /** The picked world, cloned into `world/` by `prepare`. */
   async function worldOption(id: string): Promise<WorldOption> {
-    const dir = path.join(worldsDir, id);
+    const dir = liveDir;
     const world = await readWorld(dir);
     const workspaces = path.join(dir, "workspaces");
     const ids = (await directories(workspaces)).filter(
@@ -466,32 +469,25 @@ export function createSetup(
 
   // A second request for a world downloading waits for the same download.
   const cloning = new Map<string, Promise<void>>();
-
-  /** A download's record, unless it's missing or was left by one that died. */
-  async function readDownload(
-    name: string,
-  ): Promise<WorldDownload | undefined> {
-    const parsed = WorldDownloadSchema.safeParse(
-      JSON.parse(
-        await readFile(path.join(worldsDir, name), "utf8").catch(() => "null"),
-      ),
-    );
-    return parsed.success &&
-      Date.now() - parsed.data.updatedAt < DOWNLOAD_STALE_MS
-      ? parsed.data
-      : undefined;
-  }
+  let progress: WorldDownload | undefined;
 
   /**
-   * Downloads the world the player picked, or brings the copy here up to date,
-   * for its cast. One already downloading (Settings → Updates) is waited for
-   * first, so the import never copies half of one release and half of the
-   * next.
+   * Downloads the world the player picked straight into `world/`, for its cast:
+   * a clone of its newest release, git's progress kept for the guide.
    */
   async function prepare(id: string): Promise<WorldOption> {
-    while (await readDownload(`.${id}.download.json`))
-      await new Promise((resolve) => setTimeout(resolve, downloadPollMs));
-    const pending = cloning.get(id) ?? catalog.download(id);
+    const pending =
+      cloning.get(id) ??
+      catalog
+        .download(
+          id,
+          tracking((download) => {
+            progress = download;
+          }),
+        )
+        .finally(() => {
+          progress = undefined;
+        });
     cloning.set(id, pending);
     try {
       await pending;
@@ -505,11 +501,13 @@ export function createSetup(
     const worlds = (
       await Promise.all((await catalog.list()).map(listedOption))
     ).filter((option) => option !== undefined);
-    const importedId = existsSync(markerFile)
-      ? (WorldPackageSchema.safeParse(
-          JSON.parse(await readFile(markerFile, "utf8")),
-        ).data?.kazusa.template ?? null)
-      : null;
+    // A world from before clones, copied by a run that didn't finish.
+    const importedId =
+      !existsSync(configFile) && existsSync(markerFile)
+        ? (WorldPackageSchema.safeParse(
+            JSON.parse(await readFile(markerFile, "utf8")),
+          ).data?.kazusa.template ?? null)
+        : null;
     return {
       configured: existsSync(configFile),
       // Starting from scratch reads best as the last choice.
@@ -525,22 +523,13 @@ export function createSetup(
   }
 
   /**
-   * Copies only what's missing. The marker goes last, so a crash just copies
-   * again.
+   * The cloned world made this machine's: the system agent's link to Kazusa's
+   * own guides. Everything else is the clone's.
    */
-  async function importWorld(id: string): Promise<void> {
-    if (imported()) return;
-    const dir = path.join(worldsDir, id);
-    const world = await readWorld(dir);
-    await mkdir(liveDir, { recursive: true });
-    for (const part of ["shared", "workspaces"])
-      await cp(path.join(dir, part), path.join(liveDir, part), {
-        recursive: true,
-        force: false,
-        filter: ignoreDsStore,
-      });
-    // The system agent reads Kazusa's own guides through this link. Only Windows
-    // reads the type: a junction needs no admin rights or Developer Mode.
+  async function importWorld(): Promise<void> {
+    const world = await readWorld(liveDir);
+    // Only Windows reads the type: a junction needs no admin rights or
+    // Developer Mode.
     const link = path.join(
       liveDir,
       "workspaces",
@@ -553,13 +542,6 @@ export function createSetup(
         link,
         "junction",
       );
-    // What a later world update compares against: the template as imported.
-    await writeTemplateSnapshot(liveDir, dir, id);
-    // The template's manifest, saying which template this is a copy of.
-    await writeFile(
-      markerFile,
-      `${JSON.stringify({ ...world, kazusa: { ...world.kazusa, template: id } }, null, 2)}\n`,
-    );
   }
 
   /** A key from before keys moved into profiles: the environment or `.env`. */
@@ -689,35 +671,14 @@ export function createSetup(
     )
       throw new Error(`Unknown provider: ${request.key.provider}`);
     await prepare(request.world);
-    await importWorld(request.world);
+    await importWorld();
     await saveKey(request.key);
     await writeConfig(request);
   }
 
-  /**
-   * Templates downloading now, from the files `scripts/world-repo.mjs` keeps
-   * beside their clones, and which template the live world came from. A file
-   * not written to for a while was left by a download that died.
-   */
-  async function downloads(): Promise<{
-    readonly downloads: readonly WorldDownload[];
-    readonly live: string | null;
-  }> {
-    const names = existsSync(worldsDir) ? await readdir(worldsDir) : [];
-    const found = await Promise.all(
-      names
-        .filter((name) => /^\.[^/]+\.download\.json$/.test(name))
-        .map(readDownload),
-    );
-    const live = existsSync(markerFile)
-      ? (WorldPackageSchema.safeParse(
-          JSON.parse(await readFile(markerFile, "utf8").catch(() => "null")),
-        ).data?.kazusa.template ?? null)
-      : null;
-    return {
-      downloads: found.filter((entry) => entry !== undefined),
-      live,
-    };
+  /** How far the picked world's download has got, while one runs. */
+  function downloads(): { readonly progress: WorldDownload | null } {
+    return { progress: progress ?? null };
   }
 
   return {

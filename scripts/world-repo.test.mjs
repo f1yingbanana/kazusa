@@ -15,16 +15,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   adoptWorldRepo,
   checkLiveWorld,
+  cloneWorld,
   compareReleases,
   downloadLiveWorld,
-  fetchWorld,
-  cloneWorld,
-  downloadFile,
-  downloadTracker,
   listWorlds,
   PLAY,
   SOURCES,
-  WORLDS,
 } from "./world-repo.mjs";
 
 const WORLD = "apps/kazusa/world";
@@ -77,7 +73,7 @@ function kazusa(source = published()) {
     path.join(root, SOURCES),
     JSON.stringify({ worlds: [{ id: "demo", provider: "git", url: source }] }),
   );
-  return { root, source, clone: path.join(root, WORLDS, "demo") };
+  return { root, source, live: path.join(root, WORLD) };
 }
 
 /**
@@ -114,27 +110,84 @@ function world(root, source, commit, { snapshot = true } = {}) {
   return live;
 }
 
+/** A release the creator tags with notes, as Publish will. */
+function release(source, version, file = "shared/wiki/concepts/more.md") {
+  put(path.join(source, file), `${version}\n`);
+  const pkg = JSON.parse(readFileSync(path.join(source, "package.json")));
+  put(path.join(source, "package.json"), JSON.stringify({ ...pkg, version }));
+  git(source, "add", "-A");
+  git(source, "commit", "--quiet", "-m", `Release ${version}`);
+  git(source, "tag", "-a", `v${version}`, "-m", `${version}: more lore.`);
+  return git(source, "rev-parse", "HEAD");
+}
+
 describe("listWorlds and cloneWorld", () => {
-  it("lists a world by its package.json, then clones only the one picked", async () => {
-    const { root, source, clone } = kazusa();
+  it("lists worlds by their package.json, then clones the picked one's newest release into world/", async () => {
+    const { root, source, live } = kazusa();
     const [peeked] = await listWorlds(root);
     expect(peeked).toMatchObject({
       id: "demo",
       downloaded: false,
       package: { name: "demo-world", version: "0.2.0" },
     });
-    expect(existsSync(clone)).toBe(false);
-    expect(await cloneWorld(root, "demo")).toEqual([]);
-    expect(git(clone, "rev-parse", "HEAD")).toBe(
-      git(source, "rev-parse", "HEAD"),
+    git(source, "commit", "--quiet", "--allow-empty", "-m", "Unreleased");
+    const seen = [];
+    expect(await cloneWorld(root, "demo", (p) => seen.push(p))).toEqual([]);
+    expect(git(live, "rev-parse", PLAY)).toBe(
+      git(source, "rev-parse", "v0.2.0^{commit}"),
     );
+    expect(git(live, "symbolic-ref", "HEAD")).toBe(`refs/heads/${PLAY}`);
+    expect(git(live, "config", "core.autocrlf")).toBe("false");
+    // The machine's config and runtime state are local.
+    put(path.join(live, "openclaw.json"), "{}");
+    put(path.join(live, ".state/db.sqlite"), "db");
+    expect(git(live, "status", "--porcelain")).toBe("");
+    expect(existsSync(`${live}.cloning`)).toBe(false);
     const [listed] = await listWorlds(root);
     expect(listed).toMatchObject({ id: "demo", downloaded: true });
-    // Once.
+    // Picked again: already here.
     expect(await cloneWorld(root, "demo")).toEqual([]);
     await expect(cloneWorld(root, "elsewhere")).rejects.toThrow(
       "No world elsewhere is listed.",
     );
+  });
+
+  it("replaces another pick that wasn't set up, never a world that was", async () => {
+    const { root, source, live } = kazusa();
+    await cloneWorld(root, "demo");
+    const other = published();
+    put(
+      path.join(root, SOURCES),
+      JSON.stringify({
+        worlds: [
+          { id: "demo", provider: "git", url: source },
+          { id: "other", provider: "git", url: other },
+        ],
+      }),
+    );
+    await cloneWorld(root, "other");
+    expect(git(live, "remote", "get-url", "origin")).toBe(other);
+    put(path.join(live, "openclaw.json"), "{}");
+    await expect(cloneWorld(root, "demo")).rejects.toThrow(/set up already/);
+  });
+
+  it("keeps what the machine already has in world/, such as an older Kazusa's keys", async () => {
+    const { root, live } = kazusa();
+    put(path.join(live, ".state/.env"), "OPENROUTER_API_KEY=k\n");
+    put(path.join(live, "shared/half-copied.md"), "From a run that died.\n");
+    await cloneWorld(root, "demo");
+    expect(readFileSync(path.join(live, ".state/.env"), "utf8")).toContain(
+      "OPENROUTER_API_KEY",
+    );
+    expect(existsSync(path.join(live, "shared/half-copied.md"))).toBe(false);
+    expect(git(live, "status", "--porcelain")).toBe("");
+  });
+
+  it("leaves nothing when a clone fails", async () => {
+    const { root, live } = kazusa(path.join(tmpdir(), "kazusa-nowhere-world"));
+    await expect(cloneWorld(root, "demo")).rejects.toThrow();
+    expect(existsSync(live)).toBe(false);
+    expect(existsSync(`${live}.cloning`)).toBe(false);
   });
 
   it("says why a world can't be listed", async () => {
@@ -142,88 +195,116 @@ describe("listWorlds and cloneWorld", () => {
     const [listed] = await listWorlds(root);
     expect(listed).toMatchObject({ id: "demo", error: expect.any(String) });
   });
-
-  it("sets a template folder from before repositories aside", async () => {
-    const { root, source, clone } = kazusa();
-    put(path.join(clone, "package.json"), "{}");
-    const [aside] = await cloneWorld(root, "demo");
-    expect(aside).toMatch(/^Set the old demo template aside in /);
-    expect(git(clone, "rev-parse", "HEAD")).toBe(
-      git(source, "rev-parse", "HEAD"),
-    );
-    const [kept] = readdirSync(
-      path.join(root, "apps/kazusa/.worlds-before-repositories"),
-    );
-    expect(kept).toMatch(/^demo-\d+$/);
-  });
-});
-
-/** A release that changes only `file`, outside the world's content or in it. */
-function release(source, version, file = "README.md") {
-  const pkg = JSON.parse(readFileSync(path.join(source, "package.json")));
-  put(path.join(source, "package.json"), JSON.stringify({ ...pkg, version }));
-  put(path.join(source, file), `${version}\n`);
-  git(source, "add", "-A");
-  git(source, "commit", "--quiet", "-m", `Release ${version}`);
-  git(source, "tag", `v${version}`);
-}
-
-describe("fetchWorld", () => {
-  it("brings the template picked in setup up to date", async () => {
-    const { root, source, clone } = kazusa();
-    expect(await fetchWorld(root, "demo")).toEqual([]);
-    put(path.join(source, "shared/wiki/concepts/more.md"), "More.\n");
-    git(source, "add", "-A");
-    git(source, "commit", "--quiet", "-m", "More");
-    expect(await fetchWorld(root, "demo")).toEqual([]);
-    expect(git(clone, "rev-parse", "HEAD")).toBe(
-      git(source, "rev-parse", "HEAD"),
-    );
-  });
-
-  it("keeps a creator's work in a clone", async () => {
-    const { root, source, clone } = kazusa();
-    await cloneWorld(root, "demo");
-    put(path.join(clone, "shared/wiki/concepts/lore.md"), "Mine.\n");
-    git(source, "commit", "--quiet", "--allow-empty", "-m", "Upstream");
-    const kept = ["Kept your work in worlds/demo; it isn't updated."];
-    expect(await fetchWorld(root, "demo")).toEqual(kept);
-    expect(
-      readFileSync(path.join(clone, "shared/wiki/concepts/lore.md"), "utf8"),
-    ).toBe("Mine.\n");
-    git(clone, "commit", "--quiet", "-am", "Edit");
-    expect(await fetchWorld(root, "demo")).toEqual(kept);
-  });
-
-  it("keeps what it has when a world can't be reached", async () => {
-    const { root, source, clone } = kazusa();
-    await cloneWorld(root, "demo");
-    git(clone, "remote", "set-url", "origin", `${source}-gone`);
-    const [line] = await fetchWorld(root, "demo");
-    expect(line).toMatch(/^Couldn't update the demo world: /);
-    expect(git(clone, "rev-parse", "HEAD")).toBe(
-      git(source, "rev-parse", "HEAD"),
-    );
-  });
 });
 
 describe("checkLiveWorld and downloadLiveWorld", () => {
-  it("finds a newer release, downloading nothing", async () => {
-    const { root, source, clone } = kazusa();
+  it("finds a newer release without fetching it, then fetches only its tag", async () => {
+    const { root, source, live } = kazusa();
     expect(await checkLiveWorld(root)).toEqual({ checked: false });
-    world(root, source, "v0.1.0");
-    // Off GitHub, what it changes and its size are unknown.
+    await cloneWorld(root, "demo");
+    const here = git(live, "rev-parse", PLAY);
+    expect(await checkLiveWorld(root)).toMatchObject({
+      current: { commit: here, version: "0.2.0" },
+      latest: { version: "0.2.0" },
+      newer: false,
+    });
+    const next = release(source, "0.3.0");
+    git(source, "commit", "--quiet", "--allow-empty", "-m", "Unreleased");
+    // Off GitHub: no size, no page.
     expect(await checkLiveWorld(root)).toEqual({
       checked: true,
-      current: "0.1.0",
-      latest: "0.2.0",
+      current: { commit: here, version: "0.2.0" },
+      latest: { commit: next, version: "0.3.0", url: null },
       newer: true,
       downloaded: false,
-      changes: null,
     });
-    expect(existsSync(clone)).toBe(false);
+    const seen = [];
+    expect(await downloadLiveWorld(root, (p) => seen.push(p))).toEqual([]);
+    expect(git(live, "rev-parse", "v0.3.0^{commit}")).toBe(next);
+    // Only the release: not the work pushed after it, and the world unmoved.
+    expect(() =>
+      git(live, "cat-file", "-e", git(source, "rev-parse", "HEAD")),
+    ).toThrow();
+    expect(git(live, "rev-parse", PLAY)).toBe(here);
+    expect(await checkLiveWorld(root)).toMatchObject({
+      latest: { version: "0.3.0", notes: "0.3.0: more lore." },
+      newer: true,
+      downloaded: true,
+    });
+    // Taken, as `world_update` leaves it.
+    git(live, "update-ref", `refs/heads/${PLAY}`, next);
+    expect(await checkLiveWorld(root)).toMatchObject({
+      current: { commit: next, version: "0.3.0" },
+      newer: false,
+    });
   });
 
+  it("moves a world from before clones onto the commit its snapshot matches, touching no file", async () => {
+    const { root, source } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    expect(await adoptWorldRepo(root)).toEqual([
+      "This world's history is on: its next update finds where it came from.",
+    ]);
+    expect(git(live, "remote", "get-url", "origin")).toBe(source);
+    // No history yet: versions decide.
+    expect(await checkLiveWorld(root)).toMatchObject({
+      current: { commit: null, version: "0.1.0" },
+      latest: { version: "0.2.0" },
+      newer: true,
+    });
+    const published = git(source, "rev-parse", "v0.1.0^{commit}");
+    expect(await downloadLiveWorld(root)).toEqual([
+      `This world now stands on the creator's commit it was made from (${published.slice(0, 7)}).`,
+    ]);
+    expect(git(live, "rev-parse", PLAY)).toBe(published);
+    expect(existsSync(path.join(live, ".template"))).toBe(false);
+    expect(
+      readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
+    ).toBe("Played.\n");
+  });
+
+  it("moves a world rooted at an older release onto the one an earlier update took", async () => {
+    const { root, source } = kazusa();
+    // Rooted at 0.1.0, then updated to 0.2.0 by copying files: its snapshot
+    // says 0.2.0.
+    const live = world(root, source, "v0.2.0");
+    await adoptWorldRepo(root);
+    git(live, "fetch", "--quiet", source, "refs/tags/v0.1.0:refs/tags/v0.1.0");
+    git(live, "update-ref", `refs/heads/${PLAY}`, "v0.1.0^{commit}");
+    release(source, "0.3.0");
+    await downloadLiveWorld(root);
+    expect(git(live, "rev-parse", PLAY)).toBe(
+      git(source, "rev-parse", "v0.2.0^{commit}"),
+    );
+  });
+
+  it("keeps a world whose snapshot matches nothing on its own root", async () => {
+    const { root, source } = kazusa();
+    const live = world(root, source, "v0.1.0");
+    put(path.join(live, ".template/shared/wiki/concepts/lore.md"), "Edited.\n");
+    await adoptWorldRepo(root);
+    expect(await downloadLiveWorld(root)).toEqual([]);
+    expect(() => git(live, "rev-parse", "--verify", PLAY)).toThrow();
+    // Nothing else says where it came from: kept for a best attempt.
+    expect(existsSync(path.join(live, ".template"))).toBe(true);
+  });
+
+  it("drops the remote and refs an older Kazusa kept, touching no file", async () => {
+    const { root, source, live } = kazusa();
+    await cloneWorld(root, "demo");
+    git(live, "remote", "add", "upstream", source);
+    git(live, "update-ref", "refs/kazusa/taken", PLAY);
+    put(path.join(live, "workspaces/ami/MEMORY.md"), "Played.\n");
+    expect(await adoptWorldRepo(root)).toEqual([]);
+    expect(git(live, "remote")).toBe("origin");
+    expect(git(live, "for-each-ref", "refs/kazusa/")).toBe("");
+    expect(
+      readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
+    ).toBe("Played.\n");
+  });
+});
+
+describe("compareReleases", () => {
   it("says what a release changes in a world and what downloading it costs", () => {
     const tree = (files) =>
       new Map(
@@ -261,270 +342,5 @@ describe("checkLiveWorld and downloadLiveWorld", () => {
       // The same picture twice is downloaded once.
       size: 11 + 120 + 5000,
     });
-  });
-
-  it("says nothing is newer when this world has the latest release", async () => {
-    const { root, source } = kazusa();
-    world(root, source, "v0.2.0");
-    expect(await checkLiveWorld(root)).toEqual({
-      checked: true,
-      current: "0.2.0",
-      latest: "0.2.0",
-      newer: false,
-    });
-  });
-
-  it("downloads the newest release when asked, not what's after it, and holds off mid-update", async () => {
-    const { root, source, clone } = kazusa();
-    const live = world(root, source, "v0.1.0");
-    // What Kazusa's own update left of the folder it was copied from.
-    put(path.join(clone, "shared/wiki/.DS_Store"), "");
-    git(source, "commit", "--quiet", "--allow-empty", "-m", "Unreleased");
-    const report = path.join(live, ".state/kazusa/world-update/report.json");
-    put(report, JSON.stringify({ stage: "applied" }));
-    await expect(downloadLiveWorld(root)).rejects.toThrow(/half done/);
-    put(report, JSON.stringify({ stage: "finished" }));
-    const [aside] = await downloadLiveWorld(root);
-    expect(aside).toMatch(/^Set the old demo template aside in /);
-    const released = git(source, "rev-parse", "v0.2.0^{commit}");
-    expect(git(clone, "rev-parse", "HEAD")).toBe(released);
-    expect(await checkLiveWorld(root)).toMatchObject({
-      latest: "0.2.0",
-      downloaded: true,
-    });
-    expect(
-      readFileSync(path.join(live, "workspaces/ami/MEMORY.md"), "utf8"),
-    ).toBe("Played.\n");
-    // A clone at an older release isn't the new one, and moves to it.
-    release(source, "0.3.0");
-    expect(await checkLiveWorld(root)).toMatchObject({
-      latest: "0.3.0",
-      downloaded: false,
-    });
-    // Fetched but kept back by a creator's edit: still not downloaded.
-    put(path.join(clone, "shared/wiki/concepts/lore.md"), "Mine.\n");
-    expect(await downloadLiveWorld(root)).toEqual([
-      "Kept your work in worlds/demo; it isn't updated.",
-    ]);
-    expect(await checkLiveWorld(root)).toMatchObject({ downloaded: false });
-    git(clone, "checkout", "--quiet", "--", ".");
-    expect(await downloadLiveWorld(root)).toEqual([]);
-    expect(git(clone, "rev-parse", "HEAD")).toBe(
-      git(source, "rev-parse", "v0.3.0^{commit}"),
-    );
-  });
-});
-
-describe("adoptWorldRepo", () => {
-  it("roots a world at the published commit its snapshot matches, touching no file", async () => {
-    const { root, source } = kazusa();
-    await cloneWorld(root, "demo");
-    const live = world(root, source, "v0.1.0");
-    const memory = readFileSync(path.join(live, "workspaces/ami/MEMORY.md"));
-    // The system agent's link to the app's skills is the machine's, not the world's.
-    mkdirSync(path.join(root, ".agents/skills/kazusa"), { recursive: true });
-    put(path.join(root, ".agents/skills/kazusa/SKILL.md"), "Guide.");
-    symlinkSync(
-      path.join(root, ".agents"),
-      path.join(live, "workspaces/ami/.agents"),
-      "junction",
-    );
-    const lines = await adoptWorldRepo(root);
-    expect(git(live, "rev-parse", PLAY)).toBe(
-      git(source, "rev-parse", "v0.1.0^{commit}"),
-    );
-    expect(lines).toEqual([
-      `Demo's history starts at its published 0.1.0 (${git(live, "rev-parse", "--short=7", PLAY)}).`,
-    ]);
-    expect(readFileSync(path.join(live, "workspaces/ami/MEMORY.md"))).toEqual(
-      memory,
-    );
-    // Play shows as changes; the machine's files and the snapshot don't.
-    expect(
-      git(live, "status", "--porcelain")
-        .split("\n")
-        .map((line) => line.trim())
-        .sort(),
-    ).toEqual([
-      "?? openclaw.json",
-      "?? workspaces/ami/MEMORY.md",
-      "M package.json",
-    ]);
-    // Updates come from the source, as the world names no repository.
-    expect(git(live, "remote", "get-url", "upstream")).toBe(source);
-    expect(git(live, "config", "core.autocrlf")).toBe("false");
-  });
-
-  it("follows the world's own repository", async () => {
-    const { root, source } = kazusa();
-    await cloneWorld(root, "demo");
-    const live = world(root, source, "v0.2.0");
-    const pkg = JSON.parse(
-      readFileSync(path.join(live, "package.json"), "utf8"),
-    );
-    put(
-      path.join(live, "package.json"),
-      JSON.stringify({
-        ...pkg,
-        repository: { type: "git", url: "https://example.com/demo.git" },
-      }),
-    );
-    await adoptWorldRepo(root);
-    expect(git(live, "remote", "get-url", "upstream")).toBe(
-      "https://example.com/demo.git",
-    );
-    expect(git(live, "rev-parse", PLAY)).toBe(
-      git(source, "rev-parse", "v0.2.0^{commit}"),
-    );
-  });
-
-  it("keeps its root on later starts", async () => {
-    const { root, source } = kazusa();
-    await cloneWorld(root, "demo");
-    const live = world(root, source, "v0.1.0");
-    await adoptWorldRepo(root);
-    const rooted = git(live, "rev-parse", PLAY);
-    expect(await adoptWorldRepo(root)).toEqual([]);
-    expect(git(live, "rev-parse", PLAY)).toBe(rooted);
-  });
-
-  it("moves an untouched snapshot root to the published commit once the template is downloaded", async () => {
-    const { root, source } = kazusa();
-    const live = world(root, source, "v0.1.0");
-    const [first] = await adoptWorldRepo(root);
-    expect(first).toMatch(/matches no published version/);
-    await downloadLiveWorld(root);
-    expect(await adoptWorldRepo(root)).toEqual([
-      `Demo's history now starts at its published 0.1.0 (${git(source, "rev-parse", "--short=7", "v0.1.0^{commit}")}).`,
-    ]);
-    expect(git(live, "rev-parse", PLAY)).toBe(
-      git(source, "rev-parse", "v0.1.0^{commit}"),
-    );
-    expect(git(live, "diff", "--cached", "--name-only", PLAY)).toBe("");
-    expect(await adoptWorldRepo(root)).toEqual([]);
-  });
-
-  it("keeps a snapshot root that was saved on", async () => {
-    const { root, source } = kazusa();
-    const live = world(root, source, "v0.1.0");
-    await adoptWorldRepo(root);
-    git(live, "commit", "--quiet", "--allow-empty", "-m", "Save");
-    const saved = git(live, "rev-parse", PLAY);
-    await downloadLiveWorld(root);
-    expect(await adoptWorldRepo(root)).toEqual([]);
-    expect(git(live, "rev-parse", PLAY)).toBe(saved);
-  });
-
-  it("keeps a snapshot root while something is staged", async () => {
-    const { root, source } = kazusa();
-    const live = world(root, source, "v0.1.0");
-    await adoptWorldRepo(root);
-    const rooted = git(live, "rev-parse", PLAY);
-    put(path.join(live, "shared/staged.md"), "Staged.\n");
-    git(live, "add", "shared/staged.md");
-    await downloadLiveWorld(root);
-    expect(await adoptWorldRepo(root)).toEqual([]);
-    expect(git(live, "rev-parse", PLAY)).toBe(rooted);
-    expect(git(live, "diff", "--cached", "--name-only")).toBe(
-      "shared/staged.md",
-    );
-  });
-
-  it("roots a world whose template was never published at its snapshot", async () => {
-    const { root, source } = kazusa();
-    await cloneWorld(root, "demo");
-    const live = world(root, source, "v0.2.0");
-    put(path.join(live, ".template/shared/wiki/concepts/lore.md"), "Edited.\n");
-    const [line] = await adoptWorldRepo(root);
-    expect(line).toMatch(/matches no published version/);
-    expect(git(live, "log", "--format=%s", PLAY)).toBe("Demo as imported");
-    expect(git(live, "show", `${PLAY}:shared/wiki/concepts/lore.md`)).toBe(
-      "Edited.",
-    );
-    // Binary files aren't in a snapshot.
-    expect(
-      git(live, "ls-tree", "-r", "--name-only", PLAY).split("\n"),
-    ).not.toContain("workspaces/ami/stickers/happy.webp");
-  });
-
-  it("roots at the snapshot when the template's clone is missing", async () => {
-    const { root, source } = kazusa();
-    const live = world(root, source, "v0.2.0");
-    const [line] = await adoptWorldRepo(root);
-    expect(line).toMatch(/matches no published version/);
-    expect(git(live, "remote", "get-url", "upstream")).toBe(source);
-  });
-
-  it("leaves a world from before snapshots unrooted, and says so once", async () => {
-    const { root, source } = kazusa();
-    await cloneWorld(root, "demo");
-    const live = world(root, source, "v0.2.0", { snapshot: false });
-    const [line] = await adoptWorldRepo(root);
-    expect(line).toMatch(/starts at its first save/);
-    expect(existsSync(path.join(live, ".git"))).toBe(true);
-    expect(() => git(live, "rev-parse", "--verify", "--quiet", PLAY)).toThrow();
-    expect(await adoptWorldRepo(root)).toEqual([]);
-  });
-
-  it("does nothing before setup has made a world", async () => {
-    const { root } = kazusa();
-    expect(await adoptWorldRepo(root)).toEqual([]);
-  });
-});
-
-describe("downloadTracker", () => {
-  it("reports one bar across git's stages, never going back, and clears when done", () => {
-    const { root } = kazusa();
-    mkdirSync(path.join(root, WORLDS), { recursive: true });
-    const tracker = downloadTracker(root, "demo", "update");
-    const read = () =>
-      JSON.parse(readFileSync(downloadFile(root, "demo"), "utf8"));
-    tracker.progress({ stage: "remote:", progress: 100 });
-    expect(read()).toMatchObject({ stage: "preparing", percent: 0 });
-    tracker.progress({ stage: "receiving", progress: 100 });
-    expect(read()).toMatchObject({ stage: "receiving", percent: 85 });
-    tracker.progress({ stage: "resolving", progress: 100 });
-    expect(read()).toMatchObject({ id: "demo", kind: "update", percent: 92 });
-    tracker.progress({ stage: "updating", progress: 100 });
-    expect(read().percent).toBe(100);
-    tracker.done();
-    expect(existsSync(downloadFile(root, "demo"))).toBe(false);
-    expect(readdirSync(path.join(root, WORLDS))).toEqual([]);
-  });
-
-  it("keeps the record fresh while git says nothing, and stops when done", () => {
-    vi.useFakeTimers();
-    try {
-      const { root } = kazusa();
-      mkdirSync(path.join(root, WORLDS), { recursive: true });
-      const file = downloadFile(root, "demo");
-      const tracker = downloadTracker(root, "demo", "clone");
-      expect(existsSync(file)).toBe(false);
-      vi.advanceTimersByTime(2000);
-      const first = JSON.parse(readFileSync(file, "utf8"));
-      expect(first).toMatchObject({ stage: "preparing", percent: 0 });
-      vi.advanceTimersByTime(30_000);
-      expect(JSON.parse(readFileSync(file, "utf8")).updatedAt).toBeGreaterThan(
-        first.updatedAt,
-      );
-      tracker.done();
-      vi.advanceTimersByTime(60_000);
-      expect(existsSync(file)).toBe(false);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("leaves nothing behind after a clone over git's transport", async () => {
-    const { root, source } = kazusa();
-    put(
-      path.join(root, SOURCES),
-      JSON.stringify({
-        worlds: [{ id: "demo", provider: "git", url: `file://${source}` }],
-      }),
-    );
-    await cloneWorld(root, "demo");
-    expect(existsSync(downloadFile(root, "demo"))).toBe(false);
-    expect(readdirSync(path.join(root, WORLDS))).toEqual(["demo"]);
   });
 });

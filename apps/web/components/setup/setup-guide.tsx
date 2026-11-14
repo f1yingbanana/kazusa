@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/questionnaire";
 import { Spinner } from "@/components/ui/spinner";
 import type { SetupStatus, WorldOption } from "@/lib/setup/setup";
-import { useWorldDownloads } from "@/hooks/use-world-downloads";
+import { useSetupDownload } from "@/hooks/use-world-downloads";
 import { DownloadProgress } from "./download-progress";
 
 const SLOW_START_MS = 180_000;
@@ -325,7 +325,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
   const [worlds, setWorlds] = useState(status.worlds);
   const [downloading, setDownloading] = useState(false);
   const [worldError, setWorldError] = useState<string | null>(null);
-  const downloadProgress = useWorldDownloads(downloading);
+  const downloadProgress = useSetupDownload(downloading);
   const world = worlds.find(({ id }) => id === worldId);
   const pickingCast = Boolean(world?.characters.length);
   const [activeItem, setActiveItem] = useState(
@@ -472,9 +472,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                   {downloading && world ? (
                     <DownloadProgress
                       title={world.title}
-                      download={downloadProgress?.downloads.find(
-                        ({ id }) => id === world.id,
-                      )}
+                      download={downloadProgress}
                     />
                   ) : null}
                   {worldError ? <FieldError>{worldError}</FieldError> : null}

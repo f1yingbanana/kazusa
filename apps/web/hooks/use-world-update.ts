@@ -4,6 +4,7 @@ import { parseAsString, useQueryStates } from "nuqs";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import type { WorldMeta } from "@kazusa/client";
+import type { WorldDownload } from "@/lib/setup/setup";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { chatsKey } from "@/lib/source/chats/cache";
@@ -48,7 +49,7 @@ export function useWorldUpdate(): {
       await sendMessage({
         requestId: crypto.randomUUID(),
         members: [update.systemAgent],
-        text: `${world?.package?.name ?? "The world"} ${update.version} is out. Could you update our world to it?`,
+        text: `${world?.package?.name ?? "Our world"} ${update.version ?? "has a new version"}${update.version ? " is" : ","} downloaded. Could you update our world to it?`,
       });
       await mutate(chatsKey());
       await setParams({ view: "chats", "chats.dm": update.systemAgent });
@@ -68,43 +69,70 @@ export function useWorldUpdate(): {
   };
 }
 
-/** What `GET /update/world` answers: the newest release, downloading nothing. */
+/** A version of the world, as the client shows it. */
+export interface WorldCommit {
+  /** Null for a world from before it was a clone, until its first update. */
+  readonly commit: string | null;
+  /** The release's version (its tag); null when it isn't on one. */
+  readonly version?: string | null;
+  /** The creator's notes for it (its tag's message), once it's downloaded. */
+  readonly notes?: string | null;
+  readonly date?: string | null;
+  /** The release's page, for its notes in full. */
+  readonly url?: string | null;
+}
+
+/** What to call a version: its number, else its commit's short id. */
+export function versionLabel(version: {
+  readonly commit?: string | null;
+  readonly version?: string | null;
+}): string {
+  return version.version ?? version.commit?.slice(0, 7) ?? "Unknown";
+}
+
+/** The first line of a release's notes: the reason to take it. */
+export function reasonOf(version: {
+  readonly notes?: string | null;
+}): string | null {
+  const line =
+    version.notes
+      ?.split("\n")
+      .map((text) => text.replace(/^[#*\-\s]+/, "").trim())
+      .find(Boolean) ?? null;
+  // A sentence, so it reads before the next one.
+  return line && !/[.!?…]$/.test(line) ? `${line}.` : line;
+}
+
+/**
+ * What `GET /update/world` answers: the release the world stands on, the newest
+ * one, and how a download is going.
+ */
 export interface WorldCheck {
   /** When it was checked, in real time. */
   readonly at?: number;
   readonly checked?: boolean;
-  /** This world's version and the newest release's. */
-  readonly current?: string;
-  readonly latest?: string | null;
+  readonly current?: WorldCommit | null;
+  readonly latest?: WorldCommit | null;
   readonly newer?: boolean;
-  /**
-   * What the newest release changes in this world, by kind of file. No files:
-   * nothing for this game (a new chapter, say). Null: unknown, since this world
-   * matches no release.
-   */
-  readonly changes?: {
-    readonly files: number;
-    readonly areas: readonly { area: string; count: number }[];
-  } | null;
-  /** Bytes to download, on GitHub. */
+  /** Bytes to download, from GitHub; absent when it can't say. */
   readonly size?: number;
-  /** In the template's clone already, ready for the system agent. */
+  /** Fetched already, ready for the system agent. */
   readonly downloaded?: boolean;
   readonly downloading?: boolean;
+  /** Git's own progress while it downloads. */
+  readonly progress?: WorldDownload;
   readonly lastDownload?: { at: number; error?: string };
 }
 
-/** A release the player could download: newer, and with something for them. */
+/** A new version the player could download. */
 export function offered(check: WorldCheck | undefined): boolean {
-  return Boolean(
-    check?.newer && check.changes?.files !== 0 && !check.downloaded,
-  );
+  return Boolean(check?.newer && !check.downloaded);
 }
 
 const WORLD_CHECK_KEY = "update/world";
 /** Like Kazusa's own releases (`useAnnouncedRelease`). */
 const BACKGROUND_CHECK_MS = 60 * 60_000;
-const DOWNLOADING_CHECK_MS = 2_000;
+const DOWNLOADING_CHECK_MS = 1_000;
 
 async function fetchWorldCheck(fresh: boolean): Promise<WorldCheck> {
   const response = await fetch(

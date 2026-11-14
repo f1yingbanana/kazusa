@@ -6,6 +6,7 @@ import {
   type WorldMeta,
   type WorldPackage,
 } from "@kazusa/client";
+import { downloadedRelease, gitIn } from "../world-update/git.ts";
 
 /** The world's own manifest, beside its `shared/` and `workspaces/`. */
 export const WORLD_PACKAGE = "package.json";
@@ -45,43 +46,23 @@ export function worldCredit(dir: string): WorldMeta["package"] {
   };
 }
 
-/** Where a live world's template is downloaded: `worlds/<id>` beside it. */
-export function templateDir(live: string, id: string): string {
-  return path.resolve(live, "..", "worlds", id);
-}
-
 /**
- * Orders two versions by their numbers (`0.10.0` after `0.9.2`): positive when
- * `a` is newer. Anything after the numbers (`-beta`, `+build`) is ignored.
- */
-export function compareVersions(a: string, b: string): number {
-  const parts = (version: string) =>
-    (/^v?(\d+(?:\.\d+)*)/.exec(version.trim())?.[1] ?? "0")
-      .split(".")
-      .map(Number);
-  const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const diff = (x[i] ?? 0) - (y[i] ?? 0);
-    if (diff) return diff;
-  }
-  return 0;
-}
-
-/**
- * The newer version of this world's template, when its clone has one: Kazusa
- * fetches the clone on every start, and `world_update` brings it in. Read on
- * each request; two small files.
+ * The release downloaded (Settings → Updates → World) that the world hasn't
+ * taken: `world_update` brings it in. Read from the world's repository on each
+ * request.
  */
 export function availableUpdate(live: string): WorldMeta["update"] {
   const world = readWorldPackage(live);
-  const id = world?.kazusa.template;
-  if (!world || !id) return undefined;
-  const version = readWorldPackage(templateDir(live, id))?.version;
-  if (!version || compareVersions(version, world.version ?? "0") <= 0)
-    return undefined;
+  if (!world) return undefined;
+  const git = gitIn(live);
+  const release = git && downloadedRelease(git);
+  if (!release) return undefined;
   return {
-    version,
-    ...(world.version ? { current: world.version } : {}),
+    commit: release.commit,
+    ...(release.date ? { date: release.date } : { date: "" }),
+    version: release.version,
+    ...(release.notes ? { notes: release.notes } : {}),
+    ...(release.url ? { url: release.url } : {}),
     systemAgent: world.kazusa.systemAgent,
   };
 }

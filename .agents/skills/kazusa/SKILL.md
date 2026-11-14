@@ -271,62 +271,54 @@ apps/kazusa/
   `src/world/package.ts` (the credit on `GET /kazusa/world`). `npm run dev`
   gives a world from before it one (`scripts/world-package.mjs`: the template
   its old `world.json` named, else the one whose player id it has). Field rules
-  and migration: [worlds](references/worlds.md). Before the Gateway starts,
-  `scripts/world-repo.mjs` makes `world/` a git repository rooted at the
-  published commit its `.template/` matches, with `upstream` its `repository`
-  (git shipped in `git/`), committing nothing. The setup guide
-  (`apps/web/lib/setup/setup.ts`) copies one to the git-ignored `world/`, which
-  is the Gateway's cwd, so playing never touches the repo. A new world, or a
-  change to one, goes in its template; templates hold no SQLite.
-- **Canon, play, checkpoints and saves** (design agreed 2026-11-05, not built;
-  [worlds](references/worlds.md) §4). Creators make worlds, playtest, cut
-  checkpoints (chapter starts) and publish; players pick a start, play, save
-  privately and take updates. Truth is timeless canon (from the beginning,
-  `main`), story canon (from a checkpoint on) or play (one playthrough), using
-  memory's retcon/event rules (undated vs dated, `always known` vs dated notes).
-  Personal wikis and `MEMORY.md` can be canon: a checkpoint promotes every mind
-  at that moment. Defaults for sorting a change: creator or ARONA undated →
-  timeless, dated → story, characters' writes → play; the creator confirms in a
-  Publish review, which also raises the version. Everything pushed is text:
-  checkpoints consolidate memory first and carry a `scene.json`; SQLite (keys,
-  100s of MB, one OpenClaw schema) never leaves the machine. Each world is a
-  repository: `main` and `v*` tags, and one `checkpoint/<id>` line of versions
-  per chapter, story order being a list on `main`, never parents; which worlds
-  exist comes from providers (`apps/kazusa/world-sources.json`: git now, OpenRP
-  later). Publish merges the published tip into the playthrough first, builds
-  fresh commits from the exported parts (`git commit-tree`), appends and pushes
-  only those, then links the playthrough to them (`merge -s ours`); the remote
-  never holds a large file or anything deleted. Playthroughs are local branches
-  of text commits. Saves and loads run only with the Gateway stopped, by whoever
-  owns it (`scripts/dev.mjs`, later the cloud host), never on a timer or per
-  turn: a save is a commit on its own ref (`refs/saves/*`) holding the text and
-  the SQLite, so deleting one frees its databases; loading goes on from the
-  save's text parent. Git is simple-git over a real `git`.
-- **World updates** (`src/world-update/`, the system agent's `world_update` tool
-  and `world-update` skill): bring a live world up to a newer version of its
-  template. The base is `world/.template/`, the template as imported or last
-  updated (text verbatim, every file hashed in `manifest.json`), written by
-  setup (`apps/web/lib/setup/template-snapshot.ts`) and by `finish`. Pages merge
-  three-way per part (each frontmatter key, the lead, each `##` section): a
-  side's unchanged part yields to the other's change; `## Notes` and
+  and migration: [worlds](references/worlds.md). The setup guide
+  (`apps/web/lib/setup/setup.ts`) clones the picked world's newest release into
+  the git-ignored `world/` (`scripts/world-repo.mjs clone`), which is the
+  Gateway's cwd, so playing never touches the Kazusa repo; before each Gateway
+  start the same script keeps `world/`'s repository set up (git shipped in
+  `git/`), committing nothing. A new world, or a change to one, goes in its own
+  repository; worlds hold no SQLite.
+- **Canon, play, checkpoints, saves and updates** (design agreed 2026-11-05,
+  repositories, saves and updates redesigned 2026-11-14; worlds as clones and
+  updates built for `main`, the rest not: [worlds](references/worlds.md) §2, §4,
+  status in §4.10). Creators make worlds, playtest, cut checkpoints (chapter
+  starts) and release; players pick a start, play, and take updates. Truth is
+  timeless canon (from the beginning, `main`), story canon (from a checkpoint
+  on) or play (one playthrough), using memory's retcon/event rules. Everything
+  pushed is text; SQLite never leaves the machine. **A world is a plain git
+  clone, and git's own pieces do the work**: the remote has `main`, releases as
+  annotated version tags on it (notes in the tag's message), and
+  `checkpoint/<id>` branches the creator rebases onto each release. Setup
+  `git clone`s the newest release; `play` points at the creator's commit the
+  world stands on and **the game is the uncommitted changes on top**, so an
+  update's base is simply `HEAD`. Checking is `ls-remote` (a newer tag than
+  `git describe`; the size alone from GitHub's API, display only), the download
+  a `git fetch` of that tag once the player says so, with git's own progress as
+  the bar, and the update (`world_update`, the system agent) is
+  `git pull --rebase --autostash` in effect, with the page-by-page merge doing
+  the pop: keep the game in git's stash (the recovery point; no undo), merge the
+  release in with `HEAD` as base, move `play` to the release, resolve, finish.
+  No refs, snapshot, cache, lock or progress files of our own. The clone tracks
+  only the creator's files; `openclaw.json` and `.state/` are ignored locally.
+  Saves come later: a commit on `refs/saves/*` whose parent is `HEAD`, holding
+  the world plus `openclaw.json` and the databases (added explicitly), made with
+  the Gateway stopped; loading moves `play` back to the save's release, and
+  "undo an update" becomes loading its autosave.
+- **World update merge rules** (`src/world-update/merge.ts`, `update.ts`): pages
+  merge three-way per part (each frontmatter key, the lead, each `##` section):
+  a side's unchanged part yields to the other's change; `## Notes` and
   `## History` union by line; a character's own fields win on her pages, and a
-  card's `name` follows the world; `map` follows the user's `layout` choice;
-  both-changed parts keep the live side and are reported. A card for a place
-  gone everywhere is dropped if it holds nothing the character wrote, otherwise
-  orphaned for the system agent to re-home. With no base (a world from before
-  snapshots), `check` reports `bestAttempt`: a stand-in base is the live page
-  minus play's marks (visit stamps, notes, history, sleep's sections, the
-  layout), so untouched pages take the creator's version and a played-on
-  character page reports its differences; nothing is removed, and `apply` needs
-  `bestAttempt: true`, the user's consent. `kazusa.renames` in the template's
-  `package.json` (`{ old_id: new_id }`) carry place and concept ids, with every
-  card and position. `apply` needs a paused clock and backs up `shared/`,
-  `workspaces/`, `package.json` and the base to
-  `.state/kazusa/world-update/backups/<stamp>/` (last 3 kept); `finish` refuses
-  a map that doesn't load, re-places characters stranded on a missing place (or
-  everyone, with `rehome: all`) through `place()`, and records the new base;
-  `undo` restores the files. `openclaw.json` is never touched: new characters
-  are reported for registering.
+  card's `name` follows the world; `map` follows the user's `layout` choice
+  where both moved it; both-changed parts keep the live side and are reported. A
+  card for a place gone everywhere is dropped if it holds nothing the character
+  wrote, otherwise orphaned for the system agent to re-home. With no base,
+  `check` reports `bestAttempt`: a stand-in base is the live page minus play's
+  marks; nothing is removed, and `apply` needs `bestAttempt: true`, the user's
+  consent. `kazusa.renames` in the creator's `package.json` carry place and
+  concept ids, with every card and position. `apply` needs a paused clock;
+  `finish` refuses a map that doesn't load and re-places characters stranded on
+  a missing place (or everyone, with `rehome: all`). `openclaw.json` is never
+  touched: new characters are reported for registering.
 - **Repo search and the repository boundary** (`src/repo-search/`): the system
   agent's `grep` searches text files line by line for a regular expression
   (literal text when the pattern isn't valid), read-only, inside the repository

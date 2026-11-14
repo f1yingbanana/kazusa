@@ -9,21 +9,19 @@ description:
 
 # Updating the World
 
-This world is a copy of a template in `../worlds/<id>/`. When the template's
-creator releases a new version, Kazusa's client tells the user it's out, with
-what it changes and its size, and downloads it into `../worlds/<id>/` when they
-say so (Settings → Updates → World); then a button there asks you to bring it
-in. A release that changes nothing in this world (a new chapter to start fresh,
-say) isn't offered. Nothing downloads between your `apply` and `finish`. The
-user's copy doesn't change by itself. Updating merges the creator's new version
-into this world without losing what play wrote: what characters remember, the
-notes on their cards, the people they've met, the user's own edits and map
-layout.
+This world is a git clone of its creator's repository. It stands on one of the
+creator's releases, and everything play wrote (memories, notes on cards, new
+pages, the user's edits) is the uncommitted changes on top. When the creator
+releases a new version, Kazusa's client tells the user and, when they say so,
+downloads it (Settings → Updates → World); then a button there asks you to bring
+it in. Updating merges the new release into this world without losing what play
+wrote: what characters remember, the notes on their cards, the people they've
+met, the user's own edits and map layout.
 
 `world_update` does the mechanical work across thousands of files. Your job is
 the judgment: explaining the update, settling the choices with the user,
-resolving what doesn't merge, and checking the result. Never edit the template
-in `../worlds/` (it's the creator's), and never edit `.template/` by hand.
+resolving what doesn't merge, and checking the result. `show` reads any file as
+the new release has it, or as this world's old version had it.
 
 Read this whole skill at the start of every update, even if you've done one
 before: each version brings different changes and needs its own choices, and
@@ -67,9 +65,9 @@ choice, "just keep mine"), use it and don't ask again.
 
 ## How the merge decides
 
-`.template/` holds the template as it was when this world was made or last
-updated. That record is the **base**. For every page, part by part (each
-frontmatter field, the lead, each `##` section):
+The **base** is the creator's commit this world last took: the one it was made
+from, or the one the last update brought in. The world records it. For every
+page, part by part (each frontmatter field, the lead, each `##` section):
 
 - Changed only by the creator: the creator's version.
 - Changed only here: this world's version.
@@ -129,15 +127,19 @@ Ask the user once how characters should experience the update:
 
 ## 1. Look before touching anything
 
-1. Read your job file if it exists, then `shared/wiki/INDEX.md` here and
-   `../worlds/<id>/shared/wiki/INDEX.md`, to see how the world has changed in
+1. Read your job file if it exists, then run `world_update` with
+   `action: "check"`. It changes nothing.
+2. Read `shared/wiki/INDEX.md` here, and the new release's with `world_update`
+   `show` (`path: "shared/wiki/INDEX.md"`), to see how the world has changed in
    the creator's words.
-2. Run `world_update` with `action: "check"`. It changes nothing.
+3. Look at the check:
    - It refuses when the new version isn't downloaded: ask the user to download
      it in Settings → Updates → World, which shows its size first, and to tell
-     you once it's done. A release with pictures can take a few minutes.
-   - `version` is this world's version and the downloaded template's. If they
-     are the same and `counts` is empty, there is nothing to update: say so.
+     you once it's done. A release with pictures can take a few minutes. -
+     `version` is this world's version (`world`) and the downloaded release's
+     (`template`), and `notes`, the creator's release notes: use them to tell
+     the user what the update is for. `upToDate: true`: nothing to update, say
+     so.
    - `bestAttempt: true`: this world has no record of the version it was made
      from. Tell the user plainly that the update is a best attempt that can go
      badly, worst of all if this world was never really a copy of this template;
@@ -150,8 +152,8 @@ Ask the user once how characters should experience the update:
      the scenes' backgrounds, `shared/wiki/...` world pages, and
      `workspaces/*/wiki/...` or `MEMORY.md` what characters know. Pictures are
      files, not pages or new content to read. When pages are only `updated`,
-     compare one with its template copy to say what changed (a new field such as
-     `backdrop:`, a rewrite).
+     compare one with the new release's (`show`) to say what changed (a new
+     field such as `backdrop:`, a rewrite).
    - `renames` lists only the renames this world hasn't taken yet.
    - `newCharacters` are people the new version adds; `removedCharacters`,
      people it no longer has (this world keeps them).
@@ -163,7 +165,7 @@ Ask the user once how characters should experience the update:
      renamed or contested) needs no framing or layout question: if the user
      asked for this update, tell them what it brings and go on to apply in the
      same turn. If they didn't ask, ask whether to.
-3. **Pause for the user's choices** in `ask`, all in one message: what the
+4. **Pause for the user's choices** in `ask`, all in one message: what the
    update brings and what it keeps, then only the questions you don't already
    have answers to for this update:
    - **Framing:** retcon, in-world or mixed (above).
@@ -184,15 +186,17 @@ Ask the user once how characters should experience the update:
    `world_update` refuses to apply while time runs. It stays paused until the
    end.
 2. `world_update` with `action: "apply"`, the chosen `layout`, and
-   `bestAttempt: true` only if the user accepted it. It backs up the world's
-   files first and reports the backup.
+   `bestAttempt: true` only if the user accepted it. It first keeps the world as
+   it is in git's stash, then merges the release in. There is no undo; the stash
+   is only a recovery point for someone who knows git.
 
 ## 3. Resolve, then ask what only the user can say
 
-`world_update` `action: "conflicts"` lists each file with its three versions:
-`live` (this world, a path from here), `template` and `base`. Read them; the
-base shows what each side actually changed. For each item, decide where its
-content belongs and apply the framing:
+`world_update` `action: "conflicts"` lists each file and the parts both sides
+changed. Read the file here, and its other versions with `show`
+(`version: "new"` for the release, `"old"` for what this world stood on before):
+the old one shows what each side actually changed. For each item, decide where
+its content belongs and apply the framing:
 
 - **A world page:** the creator's facts are the new truth. If this world's
   change was the user's own edit (a description they asked for, a detail they
@@ -217,10 +221,10 @@ content belongs and apply the framing:
 Only for the items reported:
 
 1. The old page's name, aliases and summary tell you what it was. `grep` for its
-   id and name at once (`old_id|Old Name`), here and in the template
-   (`path: "../worlds/<id>"`): a successor's `aliases` often keep the old name,
-   and pages that link to it show where it went. The template's `INDEX.md` and
-   `look_up` help with what it was for.
+   id and name at once (`old_id|Old Name`) here: after `apply` this world is the
+   new release, so a successor's `aliases` often keep the old name, and pages
+   that link to it show where it went. The old version of a page (`show`,
+   `version: "old"`) and `look_up` help with what it was for.
 2. Read the likely successors before deciding.
 3. Carry the character's words to the successor: if she already has a card for
    it, add what she wrote there (her lead if that card's is empty, or her lines
@@ -245,16 +249,16 @@ they answer, record it, apply it and carry on.
 ## 4. Finish
 
 Only once every conflict and orphan is resolved (or waiting on the user, with
-your proposal in the job file): finishing records the new version as the base,
-and what's left unresolved is easy to forget afterwards. An orphan from before
-this update (`its place was already gone before this update`) is resolved the
-same way. Never leave two of a character's cards with the same `place_id`: merge
-hers into the existing one and delete the orphan.
+your proposal in the job file): finishing closes the update, and what's left
+unresolved is easy to forget afterwards. An orphan from before this update
+(`its place was already gone before this update`) is resolved the same way.
+Never leave two of a character's cards with the same `place_id`: merge hers into
+the existing one and delete the orphan.
 
 1. `world_update` with `action: "finish"` and the chosen `rehome`. It refuses
    while the map doesn't load, listing the problems. Fix them (usually a place
    whose `parent` or connection points at something gone), then finish again.
-   Finishing moves stranded characters and records the new version as the base.
+   Finishing moves stranded characters and closes the update.
 2. Check the result:
    - `wiki_lint` with no agent: zero errors.
    - `world_audit`: does everyone still have places and people? Every name in
@@ -269,13 +273,10 @@ hers into the existing one and delete the orphan.
 4. Restore the clock to the speed you noted, only when the user wants time to
    run again.
 5. Always end by telling the user what changed and what was kept: what you
-   resolved and how, the choices they made, where the backup is, and that
-   `world_update` `undo` can put the files back (positions finishing moved stay
-   put). An update the user hears nothing about looks stuck. Mark the job file
-   done.
+   resolved and how, and the choices they made. An update the user hears nothing
+   about looks stuck. Mark the job file done.
 
-## Undoing
-
-`world_update` with `action: "undo"`, with the clock paused, restores every file
-from the last backup, including the base. Characters moved by finishing stay
-where they are; move them with their own tasks or ask the user.
+There's no undo: get it right before `finish`. If something went badly wrong,
+tell the user plainly; the world as it was before `apply` is in git's stash
+(`git stash list` in `apps/kazusa/world/`), for someone who knows git to put
+back.

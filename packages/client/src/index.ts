@@ -336,14 +336,21 @@ export const WorldMetaSchema = z.object({
     })
     .optional(),
   /**
-   * A newer version of the template this world was made from, downloaded and
-   * not yet brought in. The system agent brings it in (`world_update`) when
-   * asked, so the client offers to ask them.
+   * The creator's newer release of the world this one was made from, downloaded
+   * into its repository and not yet brought in. The system agent brings it in
+   * (`world_update`) when asked, so the client offers to ask them.
    */
   update: z
     .object({
-      version: z.string(),
-      current: z.string().optional(),
+      /** The creator's commit, its date and first line. */
+      commit: z.string(),
+      date: z.string(),
+      subject: z.string().optional(),
+      /** The release's version and notes, when it's a release. */
+      version: z.string().optional(),
+      notes: z.string().optional(),
+      /** Where to read about it: the release's page. */
+      url: z.string().optional(),
       systemAgent: z.string(),
     })
     .optional(),

@@ -4,11 +4,12 @@ import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { settingsParsers } from "@/components/views/settings/search-params";
-import { useLiveTemplateDownload } from "@/hooks/use-world-downloads";
 import {
   offered,
+  reasonOf,
   useWorldCheck,
   useWorldUpdate,
+  versionLabel,
 } from "@/hooks/use-world-update";
 import { formatBytes } from "@/lib/format";
 import { useSources } from "@/lib/source/provider";
@@ -42,37 +43,53 @@ export function WorldUpdateNotice() {
   const { world } = useSources();
   const { update, admin, known, canAsk, ask } = useWorldUpdate();
   const { enabled, result } = useWorldCheck();
-  // The download ends: the world says it's ready without a reload.
-  useLiveTemplateDownload(enabled, 5000);
   const [, setParams] = useQueryStates({
     view: parseAsString,
     "settings.tab": settingsParsers["settings.tab"],
   });
   const name = world?.package?.name ?? "Your world";
-  const out = enabled && offered(result) ? result?.latest : undefined;
-  const ready = canAsk && known ? update?.version : undefined;
+  const out = enabled && offered(result) ? result?.latest?.commit : undefined;
+  const ready = canAsk && known ? update?.commit : undefined;
 
   useEffect(() => {
     if (!out || seen() === `out:${out}` || seen() === `ready:${out}`) return;
     markSeen(`out:${out}`);
     const size = result?.size;
-    toast(`${name} ${out} is out`, {
-      description: `${size ? `${formatBytes(size)} to download. ` : ""}${admin} can bring it into your world once it’s downloaded, keeping everything that happened in it.`,
-      duration: 20_000,
-      action: {
-        label: "View update",
-        onClick: () =>
-          void setParams({ view: "settings", "settings.tab": "updates" }),
+    const latest = result?.latest;
+    const reason = latest ? reasonOf(latest) : null;
+    toast(
+      latest?.version
+        ? `${name} ${latest.version} is out`
+        : `A new version of ${name} is out`,
+      {
+        description: [
+          reason,
+          size ? `${formatBytes(size)} to download.` : null,
+          `${admin} can bring it into your world once it’s downloaded, keeping everything that happened in it.`,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        duration: 20_000,
+        action: {
+          label: "View update",
+          onClick: () =>
+            void setParams({ view: "settings", "settings.tab": "updates" }),
+        },
       },
-    });
+    );
     // Once per version: the names and setters change identity, not meaning.
   }, [out]);
 
   useEffect(() => {
     if (!ready || seen() === `ready:${ready}`) return;
     markSeen(`ready:${ready}`);
-    toast(`${name} ${ready} is ready`, {
-      description: `${admin} can bring it into your world, keeping everything that happened in it.`,
+    toast(`${name} ${update ? versionLabel(update) : ""} is downloaded`, {
+      description: [
+        update ? reasonOf(update) : null,
+        `${admin} can bring it into your world, keeping everything that happened in it.`,
+      ]
+        .filter(Boolean)
+        .join(" "),
       duration: 20_000,
       action: {
         label: `Ask ${admin}`,

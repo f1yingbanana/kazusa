@@ -6,24 +6,36 @@ import type { Clock } from "../clock/clock.ts";
 import { currentConfig } from "../current-config.ts";
 import type { LocationService } from "../location/register.ts";
 import { lintMap, loadWorld } from "../location/world.ts";
-import { readWorldPackage, templateDir } from "../world/package.ts";
+import { readWorldPackage } from "../world/package.ts";
+import {
+  commitOf,
+  downloadedRelease,
+  gitIn,
+  keepInStash,
+  PLAY,
+  standOn,
+  text,
+  versionOf,
+  type Git,
+} from "./git.ts";
 import {
   applyUpdate,
-  BASE_DIR,
+  commitTree,
   finishUpdate,
   planUpdate,
   readReport,
   templateIdOf,
-  undoUpdate,
   type Plan,
   type Report,
 } from "./update.ts";
 
 const PARAMS = z.object({
-  action: z.enum(["check", "apply", "conflicts", "finish", "undo"]),
+  action: z.enum(["check", "apply", "conflicts", "show", "finish"]),
   layout: z.enum(["keep", "reset"]).default("keep"),
   rehome: z.enum(["stale", "all"]).default("stale"),
   bestAttempt: z.boolean().default(false),
+  path: z.string().optional(),
+  version: z.enum(["new", "old"]).default("new"),
 });
 
 /** Keeps a tool result readable: long lists are cut and say so. */
@@ -31,12 +43,12 @@ const capped = <T>(list: readonly T[], limit = 40) =>
   list.length > limit
     ? [...list.slice(0, limit), `…and ${list.length - limit} more`]
     : list;
-const short = (text: string | undefined, limit = 400) =>
-  text === undefined
+const short = (value: string | undefined, limit = 400) =>
+  value === undefined
     ? undefined
-    : text.length > limit
-      ? `${text.slice(0, limit)}…`
-      : text;
+    : value.length > limit
+      ? `${value.slice(0, limit)}…`
+      : value;
 
 /**
  * Which of the user's choices this update really needs, so the system agent
@@ -70,7 +82,14 @@ function decisions(plan: Plan, counts: Record<string, number>) {
   };
 }
 
-function summary(plan: Plan, live: string, template: string) {
+function summary(
+  plan: Plan,
+  versions: {
+    readonly world?: string;
+    readonly template: string;
+    readonly notes?: string;
+  },
+) {
   const counts: Record<string, number> = {};
   for (const { outcome } of plan.changes)
     counts[outcome] = (counts[outcome] ?? 0) + 1;
@@ -80,16 +99,13 @@ function summary(plan: Plan, live: string, template: string) {
       .map(({ path: file }) => file);
   return {
     template: plan.template,
-    version: {
-      world: readWorldPackage(live)?.version ?? null,
-      template: readWorldPackage(template)?.version ?? null,
-    },
+    version: versions,
     hasBase: plan.hasBase,
     ...(plan.bestAttempt
       ? {
           bestAttempt: true,
           warning:
-            "No record of the version this world was made from: what play wrote is guessed from its marks. Best attempt only; it can go badly, above all if this world was never really a copy of this template.",
+            "No record of the version this world was made from: what play wrote is guessed from its marks. Best attempt only; nothing is removed, and the world as it is now is kept in git's stash first.",
           overlap: plan.overlap,
           notInTemplate: capped(plan.notInTemplate),
         }
@@ -114,13 +130,10 @@ function summary(plan: Plan, live: string, template: string) {
   };
 }
 
-function conflictView(report: Report, template: string) {
+function conflictView(report: Report) {
   return {
-    backup: report.backup,
     files: report.conflicts.map(({ path: file, parts }) => ({
-      live: file,
-      template: path.join(template, file),
-      base: path.join(BASE_DIR, file),
+      path: file,
       parts: parts.map((part) => ({
         part: part.part,
         base: short(part.base),
@@ -130,12 +143,20 @@ function conflictView(report: Report, template: string) {
     })),
     orphaned: report.orphaned,
     keptDeleted: report.keptDeleted,
+    note: "Read a file's other versions in full with `show` (`version`: new or old).",
   };
 }
 
+/** "0.4.0" or "c8d1a1d, 2026-11-13": a commit as the user would know it. */
+function label(git: Git, commit: string, version?: string): string {
+  if (version) return version;
+  const date = text(git, ["log", "-1", "--format=%cI", commit]).slice(0, 10);
+  return `${commit.slice(0, 7)}, ${date}`;
+}
+
 /**
- * `world_update`: brings the live world up to date with a newer version of its
- * template. Administrative, allowlisted for the system agent only.
+ * `world_update`: brings the live world up to the release the player
+ * downloaded. Administrative, allowlisted for the system agent only.
  */
 export function registerWorldUpdate(
   api: OpenClawPluginApi,
@@ -145,22 +166,14 @@ export function registerWorldUpdate(
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }],
     details: value,
   });
-  const paths = () => {
-    const live = path.resolve(".");
-    const id = templateIdOf(live);
-    if (!id)
+  const live = () => path.resolve(".");
+  const repo = (): Git => {
+    const git = gitIn(live());
+    if (!git)
       throw new Error(
-        "This isn't a world made from a template: its package.json names no kazusa.template.",
+        "This world has no history, so it can't take updates. Ask the user to restart Kazusa, which sets it up; if it says git is missing, they need to install it.",
       );
-    const template = templateDir(live, id);
-    // An empty or half-made folder would read as the creator deleting
-    // everything. The player downloads releases from Settings → Updates
-    // (worlds made before templates were repositories have none until then).
-    if (!readWorldPackage(template))
-      throw new Error(
-        `The template ${id} isn't downloaded (no ../worlds/${id}/package.json). Ask the user to download the new version in Settings → Updates → World (it shows the size first), then check again once it's done.`,
-      );
-    return { live, template, id };
+    return git;
   };
   const paused = async () => {
     await deps.clock.init();
@@ -172,7 +185,7 @@ export function registerWorldUpdate(
 
   /** Re-places whoever stands at, or is travelling through, a place that's gone. */
   const repairPositions = async (rehome: "stale" | "all") => {
-    const fresh = loadWorld(path.join(paths().live, "shared", "wiki"));
+    const fresh = loadWorld(path.join(path.resolve("."), "shared", "wiki"));
     if (!fresh) return { moved: [] };
     // The watcher reloads the map a moment after writes land.
     for (
@@ -216,69 +229,121 @@ export function registerWorldUpdate(
     name: "world_update",
     label: "World Update",
     description:
-      "Bring this world up to date with a newer version of the template it came from. Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do); `apply` (clock paused) backs everything up and merges, keeping what play wrote; `conflicts` lists what both sides changed; `finish` checks the map, moves anyone left somewhere that no longer exists and records the new version; `undo` restores the backup. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home. `bestAttempt`: apply to a world with no record of its original version, once the user accepts the risk.",
+      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) keeps the world as it is in git's stash, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it or as the world's old version had it (`version`: new or old); `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. There is no undo; the stash is the recovery point. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home. `bestAttempt`: apply to a world with no record of where it came from, once the user accepts the risk.",
     parameters: {
       type: "object",
       properties: {
         action: {
           type: "string",
-          enum: ["check", "apply", "conflicts", "finish", "undo"],
+          enum: ["check", "apply", "conflicts", "show", "finish"],
         },
         layout: { type: "string", enum: ["keep", "reset"] },
         rehome: { type: "string", enum: ["stale", "all"] },
         bestAttempt: { type: "boolean" },
+        path: { type: "string" },
+        version: { type: "string", enum: ["new", "old"] },
       },
       required: ["action"],
       additionalProperties: false,
     },
     async execute(_id: string, input: unknown) {
-      const { action, layout, rehome, bestAttempt } = PARAMS.parse(input);
-      const { live, template, id } = paths();
-      if (action === "check")
-        return textResult(
-          summary(planUpdate(live, template, { layout }), live, template),
-        );
-      if (action === "conflicts") {
-        const report = readReport(live);
-        if (!report) return textResult({ note: "No update has been applied." });
-        return textResult(conflictView(report, template));
+      const params = PARAMS.parse(input);
+      const { action, layout, rehome, bestAttempt } = params;
+      const world = live();
+      const git = repo();
+      const open = readReport(world);
+      const release = downloadedRelease(git);
+      if (action === "show") {
+        if (!params.path) throw new Error("`show` needs a `path`.");
+        const commit =
+          params.version === "old"
+            ? (open?.from ?? commitOf(git, PLAY))
+            : (open?.to ?? release?.commit);
+        if (!commit)
+          return textResult({
+            note: `There's no ${params.version} version to show.`,
+          });
+        try {
+          return textResult({
+            path: params.path,
+            version: params.version,
+            text: git(["show", `${commit}:${params.path}`]).toString("utf8"),
+          });
+        } catch {
+          return textResult({
+            path: params.path,
+            note: `The ${params.version} version has no such file.`,
+          });
+        }
       }
-      await paused();
-      if (action === "apply") {
-        const pending = readReport(live);
-        if (pending?.stage === "applied")
-          throw new Error(
-            "An applied update is waiting: `finish` it or `undo` it first.",
-          );
-        const plan = planUpdate(live, template, { layout });
-        if (plan.bestAttempt && !bestAttempt)
-          throw new Error(
-            "This world has no record of the version it was made from. Warn the user that this is a best attempt that can go badly, and apply with `bestAttempt: true` only once they agree.",
-          );
-        // Before applying, which brings in the template's version.
-        const planned = summary(plan, live, template);
-        const report = applyUpdate(live, template, plan, layout);
-        return textResult({
-          ...planned,
-          backup: report.backup,
-          next: "Resolve every conflict and orphan (`conflicts` lists them) before `finish`, then check the result and tell the user what changed.",
-        });
+      if (action === "conflicts") {
+        if (!open) return textResult({ note: "No update is open." });
+        return textResult(conflictView(open));
       }
       if (action === "finish") {
-        const problems = lintMap(path.join(live, "shared", "wiki"));
+        await paused();
+        if (!open) throw new Error("No update is open to finish.");
+        const problems = lintMap(path.join(world, "shared", "wiki"));
         if (problems.length) return textResult({ finished: false, problems });
         const positions = await repairPositions(rehome);
-        const report = finishUpdate(live, template, id);
+        const report = finishUpdate(world);
         const registered = new Set(listAgentIds(currentConfig(api)));
         return textResult({
           finished: true,
+          version: report.version ?? report.to.slice(0, 7),
           ...positions,
           unregistered: report.newCharacters.filter(
             (who) => !registered.has(who),
           ),
         });
       }
-      return textResult({ restored: undoUpdate(live) });
+      if (open)
+        throw new Error(
+          "An update is open: resolve what `conflicts` lists, then `finish` it.",
+        );
+      if (!release)
+        return textResult({
+          upToDate: true,
+          version: {
+            world: versionOf(git) ?? readWorldPackage(world)?.version,
+          },
+          note: "No newer release is downloaded. If the user expects one, they can download it in Settings → Updates → World.",
+        });
+      const base = commitOf(git, PLAY);
+      const template = commitTree(git, release.commit);
+      const baseTree = base ? commitTree(git, base) : undefined;
+      const versions = {
+        ...(base ? { world: label(git, base, versionOf(git)) } : {}),
+        template: label(git, release.commit, release.version),
+        ...(release.notes ? { notes: release.notes } : {}),
+      };
+      const plan = planUpdate(world, template, baseTree, { layout });
+      if (action === "check") return textResult(summary(plan, versions));
+      await paused();
+      if (plan.bestAttempt && !bestAttempt)
+        throw new Error(
+          "This world has no record of the version it was made from. Warn the user that this is a best attempt that can go badly, and apply with `bestAttempt: true` only once they agree.",
+        );
+      const planned = summary(plan, versions);
+      const title =
+        readWorldPackage(world)?.displayName ?? templateIdOf(world) ?? "World";
+      keepInStash(
+        git,
+        world,
+        `${title} before updating to ${release.version}`,
+        release.commit,
+      );
+      applyUpdate(world, template, plan, layout, {
+        ...(base ? { from: base } : {}),
+        to: release.commit,
+        version: release.version,
+      });
+      standOn(git, release.commit);
+      return textResult({
+        ...planned,
+        kept: "The world as it was is in git's stash (`git stash list`), if anything ever needs putting back.",
+        next: "Resolve every conflict and orphan (`conflicts` lists them) before `finish`, then check the result and tell the user what changed.",
+      });
     },
   });
 }

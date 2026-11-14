@@ -1,27 +1,30 @@
 import { requireLocalOwner } from "../../../lib/auth/access";
 import { runScript, type ScriptResult } from "../../../lib/run-script";
+import { tracking, type WorldDownload } from "../../../lib/setup/setup";
 
-/** A check lists tags and peeks at file lists: a second or two, nothing big. */
+/** A check is one `ls-remote`, and GitHub for a size: a second or two. */
 const CHECK_TTL_MS = 2 * 60_000;
 
 let checked: { at: number; result: ScriptResult } | undefined;
 let checking: Promise<ScriptResult> | undefined;
-/** The download the player asked for, and how the last one ended. */
+/** The download the player asked for, how far it has got, how it ended. */
 let downloading: Promise<void> | undefined;
-let downloaded: { at: number; error?: string; lines?: unknown } | undefined;
+let progress: WorldDownload | undefined;
+let downloaded: { at: number; error?: string } | undefined;
 
 function state() {
   return {
     downloading: Boolean(downloading),
+    ...(progress ? { progress } : {}),
     ...(downloaded ? { lastDownload: downloaded } : {}),
   };
 }
 
 /**
- * Whether the world in play has a newer release, what it changes and how big it
- * is (`scripts/world-repo.mjs check`), downloading nothing. Local only, like
- * `/update`: only someone who may change this machine is asked. `?fresh=1`
- * checks again at once.
+ * Whether the creator released something newer than the world stands on
+ * (`scripts/world-repo.mjs check`), nothing downloaded, and how a download is
+ * going. Local only, like `/update`: only someone who may change this machine
+ * is asked. `?fresh=1` checks again at once.
  */
 export async function GET(request: Request): Promise<Response> {
   const denied = requireLocalOwner(request);
@@ -40,11 +43,11 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 /**
- * Downloads the newest release into the template's clone, once the player has
- * said so: it can be a gigabyte. Answers at once; the download's progress is
- * `GET /setup/world`'s, and how it ended is the next `GET`'s.
+ * Downloads the newest release (`git fetch` of its tag), once the player has
+ * said so: it can be a gigabyte. Answers at once; `GET` says how it's going,
+ * from git's own progress, and how it ended.
  */
-export async function POST(request: Request): Promise<Response> {
+export function POST(request: Request): Response {
   const denied = requireLocalOwner(request);
   if (denied) return denied;
   if (downloading)
@@ -52,12 +55,20 @@ export async function POST(request: Request): Promise<Response> {
       { error: "This world's new version is downloading already." },
       { status: 409 },
     );
-  downloading = runScript("world-repo.mjs", ["download"], 0).then((result) => {
+  downloading = runScript(
+    "world-repo.mjs",
+    ["download"],
+    0,
+    tracking((value) => {
+      progress = value;
+    }),
+  ).then((result) => {
     downloaded = result.ok
-      ? { at: Date.now(), lines: result.value.lines }
+      ? { at: Date.now() }
       : { at: Date.now(), error: result.error };
     // What's downloaded changed: the next check says so.
     checked = undefined;
+    progress = undefined;
     downloading = undefined;
   });
   return Response.json({ started: true }, { status: 202 });

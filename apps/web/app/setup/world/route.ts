@@ -4,14 +4,11 @@ import { setup } from "../../../lib/setup/setup";
 
 const PrepareSchema = z.object({ id: z.string().trim().min(1) });
 
-/**
- * How far the templates downloading now have got, for the setup guide and
- * Settings → Updates, and which one the live world came from.
- */
-export async function GET(request: Request): Promise<Response> {
+/** How far the picked world's download has got, for the setup guide's bar. */
+export function GET(request: Request): Response {
   const denied = requireLocalOwner(request);
   if (denied) return denied;
-  return Response.json(await setup.downloads());
+  return Response.json(setup.downloads());
 }
 
 /**

@@ -51,38 +51,46 @@ const readPackage = (dir: string): unknown =>
 function folderCatalog(
   app: string,
   remote = new Map<string, string>(),
+  hold?: Promise<void>,
 ): Catalog & { readonly cloned: string[] } {
   const worlds = path.join(app, "worlds");
-  const cloned: string[] = [];
-  return {
-    cloned,
-    list: async () => [
+  const live = path.join(app, "world");
+  const sources = () =>
+    new Map([
       ...readdirSync(worlds, { withFileTypes: true })
         .filter(
           (entry) =>
             entry.isDirectory() &&
             existsSync(path.join(worlds, entry.name, "package.json")),
         )
-        .map(({ name }) => ({
-          id: name,
-          downloaded: true,
-          package: readPackage(path.join(worlds, name)),
-        })),
-      ...[...remote]
-        .filter(([id]) => !existsSync(path.join(worlds, id)))
-        .map(([id, source]) => ({
-          id,
-          downloaded: false,
-          package: readPackage(source),
-        })),
-    ],
-    download: async (id) => {
-      // Already here: brought up to date, which a folder needn't be.
-      if (existsSync(path.join(worlds, id))) return;
-      const source = remote.get(id);
+        .map(({ name }): [string, string] => [name, path.join(worlds, name)]),
+      ...remote,
+    ]);
+  const cloned: string[] = [];
+  let here: string | undefined;
+  return {
+    cloned,
+    list: async () =>
+      [...sources()].map(([id, source]) => ({
+        id,
+        downloaded: here === id,
+        package: readPackage(here === id ? live : source),
+      })),
+    // As `world-repo.mjs clone` does, without git: the picked world copied
+    // into `world/`, replacing another pick that wasn't set up.
+    download: async (id, onProgress) => {
+      if (here === id) return;
+      const source = sources().get(id);
       if (!source) throw new Error(`No world ${id} is listed.`);
+      if (existsSync(path.join(live, "openclaw.json")))
+        throw new Error("A world is set up already.");
+      onProgress?.({ stage: "receiving", percent: 40 });
+      await hold;
+      for (const part of [".git", "package.json", "shared", "workspaces"])
+        rmSync(path.join(live, part), { recursive: true, force: true });
+      cpSync(source, live, { recursive: true });
       cloned.push(id);
-      cpSync(source, path.join(worlds, id), { recursive: true });
+      here = id;
     },
   };
 }
@@ -207,8 +215,10 @@ describe("setup", () => {
   const config = () =>
     JSON.parse(readFileSync(path.join(app, "world/openclaw.json"), "utf8"));
 
-  it("lists worlds with their characters, starting from scratch last", async () => {
-    const status = await createSetupHere(app).status();
+  it("lists worlds, with the picked one's characters, starting from scratch last", async () => {
+    const setup = createSetupHere(app);
+    await setup.prepare("cast-world");
+    const status = await setup.status();
     expect(status).toMatchObject({
       configured: false,
       imported: null,
@@ -280,7 +290,7 @@ describe("setup", () => {
   });
 
   it("reads groups from the world's anchors, broadest first, skipping groups of one", async () => {
-    const [world] = (await createSetupHere(app).status()).worlds;
+    const world = await createSetupHere(app).prepare("cast-world");
     expect(world?.groups).toEqual([
       { field: "city", groups: [{ name: "Port", ids: ["ann", "bo", "cy"] }] },
       { field: "guild", groups: [{ name: "The Crew", ids: ["ann", "bo"] }] },
@@ -289,7 +299,8 @@ describe("setup", () => {
   });
 
   it("makes a world from the choices, keeping the template untouched", async () => {
-    const setup = createSetupHere(app);
+    const catalog = folderCatalog(app);
+    const setup = createSetupHere(app, catalog);
     await setup.apply({
       world: "cast-world",
       cast: ["ann"],
@@ -342,14 +353,9 @@ describe("setup", () => {
     expect(
       existsSync(path.join(app, "worlds/cast-world/workspaces/admin/.agents")),
     ).toBe(false);
-    // The template as imported, for a later world update to compare against.
-    const manifest = JSON.parse(
-      readFileSync(path.join(app, "world/.template/manifest.json"), "utf8"),
-    );
-    expect(manifest.template).toBe("cast-world");
-    expect(Object.keys(manifest.files)).toContain(
-      "workspaces/admin/IDENTITY.md",
-    );
+    // A clone of the release: no snapshot beside it.
+    expect(catalog.cloned).toEqual(["cast-world"]);
+    expect(existsSync(path.join(app, "world/.template"))).toBe(false);
     expect((await setup.status()).configured).toBe(true);
   });
 
@@ -393,6 +399,7 @@ describe("setup", () => {
 
   it("picks up an unfinished run and keeps what is already there", async () => {
     const setup = createSetupHere(app);
+    await setup.prepare("cast-world");
     store.entries.set("openrouter", "first");
     write(
       path.join(app, "world/workspaces/ann/IDENTITY.md"),
@@ -434,62 +441,20 @@ describe("setup", () => {
     });
   });
 
-  it("reports the downloads running now and the live world's template", async () => {
-    const setup = createSetupHere(app);
-    expect(await setup.downloads()).toEqual({ downloads: [], live: null });
-    const now = Date.now();
-    const download = {
-      id: "demo",
-      kind: "update",
+  it("says how far the picked world's download has got while it runs", async () => {
+    let release = () => {};
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    const setup = createSetup(app, store, folderCatalog(app, undefined, hold));
+    expect(setup.downloads()).toEqual({ progress: null });
+    const pending = setup.prepare("cast-world");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(setup.downloads().progress).toMatchObject({
       stage: "receiving",
-      percent: 42,
-      startedAt: now - 10_000,
-      updatedAt: now,
-    };
-    write(
-      path.join(app, "worlds/.demo.download.json"),
-      JSON.stringify(download),
-    );
-    // Left by a download that died: not written to for minutes.
-    write(
-      path.join(app, "worlds/.old.download.json"),
-      JSON.stringify({ ...download, id: "old", updatedAt: now - 10 * 60_000 }),
-    );
-    write(
-      path.join(app, "world/package.json"),
-      JSON.stringify({
-        name: "demo",
-        kazusa: { systemAgent: "a", template: "demo" },
-      }),
-    );
-    expect(await setup.downloads()).toEqual({
-      downloads: [download],
-      live: "demo",
+      percent: 40,
     });
-  });
-
-  it("waits for a template moving to a new release before using it", async () => {
-    const setup = createSetup(app, store, folderCatalog(app), 5);
-    const record = path.join(app, "worlds/.cast-world.download.json");
-    const now = Date.now();
-    write(
-      record,
-      JSON.stringify({
-        id: "cast-world",
-        kind: "update",
-        stage: "updating",
-        percent: 95,
-        startedAt: now,
-        updatedAt: now,
-      }),
-    );
-    let ready = false;
-    const pending = setup.prepare("cast-world").then(() => (ready = true));
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(ready).toBe(false);
-    rmSync(record);
+    release();
     await pending;
-    expect(ready).toBe(true);
+    expect(setup.downloads()).toEqual({ progress: null });
   });
 
   it("refuses a world that does not exist", async () => {

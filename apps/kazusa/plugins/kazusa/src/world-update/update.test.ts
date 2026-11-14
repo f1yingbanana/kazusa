@@ -12,11 +12,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   applyUpdate,
   areaOf,
-  finishUpdate,
   planUpdate,
+  folderTree,
   readReport,
-  undoUpdate,
-  writeSnapshot,
+  type Tree,
 } from "./update.ts";
 
 let root: string;
@@ -73,7 +72,6 @@ function setup() {
     );
   }
   put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
-  writeSnapshot(live, v1, "demo");
   // Play: a note on a card, a layout, a new page, a sleep section.
   put(
     live,
@@ -121,8 +119,20 @@ function setup() {
     "workspaces/amy/wiki/entities/places/market.md",
     "---\nplace_id: market\nname: market\nlearned: always known\n---\n\nI shop here, still.\n",
   );
-  return { live, v2 };
+  return { live, v1, v2 };
 }
+
+/** Plans the update from `v1` (the base) to `v2`, both folders. */
+const planOf = (
+  live: string,
+  v2: string,
+  v1: string | undefined = path.join(root, "v1"),
+) =>
+  planUpdate(live, folderTree(v2), v1 ? folderTree(v1) : undefined, {
+    layout: "keep",
+  });
+const apply = (live: string, v2: string, planned: ReturnType<typeof planOf>) =>
+  applyUpdate(live, folderTree(v2), planned, "keep", { to: "v2" });
 
 beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "world-update-"));
@@ -132,7 +142,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 describe("world update", () => {
   it("merges a new template version and keeps what play wrote", () => {
     const { live, v2 } = setup();
-    const plan = planUpdate(live, v2, { layout: "keep" });
+    const plan = planOf(live, v2);
     expect(plan.hasBase).toBe(true);
     expect(plan.pendingRenames).toEqual({ old_market: "market" });
     expect(plan.areas[0]).toMatchObject({
@@ -145,7 +155,7 @@ describe("world update", () => {
       counts: { merged: 1 },
       characters: 1,
     });
-    applyUpdate(live, v2, plan, "keep");
+    apply(live, v2, plan);
 
     const hub = get(live, "shared/wiki/entities/places/hub.md");
     expect(hub).toContain("The centre.");
@@ -182,23 +192,10 @@ describe("world update", () => {
     expect(readReport(live)?.conflicts).toEqual([]);
   });
 
-  it("finishing makes the new version the base, so nothing is left to do", () => {
+  it("with the new version as the base, nothing is left to do", () => {
     const { live, v2 } = setup();
-    applyUpdate(live, v2, planUpdate(live, v2, { layout: "keep" }), "keep");
-    finishUpdate(live, v2, "demo");
-    expect(planUpdate(live, v2, { layout: "keep" }).changes).toEqual([]);
-  });
-
-  it("undo puts every file back", () => {
-    const { live, v2 } = setup();
-    const before = get(live, "shared/wiki/entities/places/hub.md");
-    applyUpdate(live, v2, planUpdate(live, v2, { layout: "keep" }), "keep");
-    undoUpdate(live);
-    expect(get(live, "shared/wiki/entities/places/hub.md")).toBe(before);
-    expect(
-      existsSync(path.join(live, "shared/wiki/entities/places/gone.md")),
-    ).toBe(true);
-    expect(readReport(live)).toBeUndefined();
+    apply(live, v2, planOf(live, v2));
+    expect(planOf(live, v2, v2).changes).toEqual([]);
   });
 
   it("reports a page both sides rewrote and keeps the live text", () => {
@@ -213,7 +210,7 @@ describe("world update", () => {
       "shared/wiki/entities/places/hub.md",
       place("hub").replace("# hub", "# hub\n\nThe creator's words."),
     );
-    const plan = planUpdate(live, v2, { layout: "keep" });
+    const plan = planOf(live, v2);
     const hub = plan.changes.find(({ path: file }) => file.endsWith("hub.md"));
     expect(hub?.outcome).toBe("conflict");
     expect(hub?.conflicts?.map(({ part }) => part)).toContain("lead");
@@ -227,8 +224,8 @@ describe("world update", () => {
         "shared/wiki/concepts/old_market.md",
         "---\ntitle: Old Market\n---\n\n# Old Market\n",
       );
-    const plan = planUpdate(live, v2, { layout: "keep" });
-    applyUpdate(live, v2, plan, "keep");
+    const plan = planOf(live, v2);
+    apply(live, v2, plan);
     expect(
       existsSync(path.join(live, "shared/wiki/concepts/old_market.md")),
     ).toBe(true);
@@ -249,12 +246,12 @@ describe("world update", () => {
       "workspaces/amy/wiki/entities/places/hub_stub.md",
       "---\nplace_id: hub_stub\nname: hub_stub\nseen: 2026-11-01\n---\n",
     );
-    const plan = planUpdate(live, v2, { layout: "keep" });
+    const plan = planOf(live, v2);
     const outcome = (file: string) =>
       plan.changes.find(({ path: p }) => p.endsWith(file))?.outcome;
     expect(outcome("amy/wiki/entities/places/gone.md")).toBe("orphaned");
     expect(outcome("places/hub_stub.md")).toBe("forgotten");
-    applyUpdate(live, v2, plan, "keep");
+    apply(live, v2, plan);
     expect(get(live, "workspaces/amy/wiki/entities/places/gone.md")).toContain(
       "Where I met Bea.",
     );
@@ -265,7 +262,6 @@ describe("world update", () => {
 
   it("without a base, takes the creator's version only where play left no mark", () => {
     const { live, v2 } = setup();
-    rmSync(path.join(live, ".template"), { recursive: true, force: true });
     put(
       v2,
       "workspaces/amy/wiki/entities/places/hub.md",
@@ -281,7 +277,9 @@ describe("world update", () => {
       "workspaces/amy/wiki/entities/places/market.md",
       "---\nplace_id: market\nname: market\n---\n\nNew words.\n",
     );
-    const plan = planUpdate(live, v2, { layout: "keep" });
+    const plan = planUpdate(live, folderTree(v2), undefined, {
+      layout: "keep",
+    });
     expect(plan.bestAttempt).toBe(true);
     const outcome = (file: string) =>
       plan.changes.find(({ path: p }) => p === file)?.outcome;
@@ -300,9 +298,8 @@ describe("world update", () => {
 describe("pending renames", () => {
   it("lists only the renames this world hasn't taken yet", () => {
     const { live, v2 } = setup();
-    applyUpdate(live, v2, planUpdate(live, v2, { layout: "keep" }), "keep");
-    finishUpdate(live, v2, "demo");
-    const again = planUpdate(live, v2, { layout: "keep" });
+    apply(live, v2, planOf(live, v2));
+    const again = planOf(live, v2, v2);
     expect(again.renames).toEqual({ old_market: "market" });
     expect(again.pendingRenames).toEqual({});
   });
@@ -320,15 +317,14 @@ describe("arranged places", () => {
     put(v1, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
     put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
     put(live, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
-    writeSnapshot(live, v1, "demo");
     put(live, "shared/wiki/entities/places/hub.md", place("hub", at(0.1)));
     put(v2, "package.json", pkg({ version: "2.0.0" }));
     put(v2, "shared/wiki/entities/places/hub.md", place("hub", at(0.9)));
     put(v2, "shared/wiki/entities/places/park.md", place("park", at(0.7)));
-    const plan = planUpdate(live, v2, { layout: "keep" });
+    const plan = planOf(live, v2);
     expect(plan.arranged).toBe(1);
     expect(plan.arrangedMoved).toBe(1);
-    applyUpdate(live, v2, plan, "keep");
+    apply(live, v2, plan);
     expect(get(live, "shared/wiki/entities/places/hub.md")).toContain("x: 0.1");
     expect(get(live, "shared/wiki/entities/places/park.md")).toContain(
       "x: 0.7",
