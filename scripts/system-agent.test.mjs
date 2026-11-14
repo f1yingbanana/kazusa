@@ -1,8 +1,10 @@
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -123,6 +125,39 @@ describe("syncSystemAgentSkills", () => {
     expect(existsSync(agents)).toBe(false);
     syncSystemAgentSkills(root);
     expect(skill(agents)).toBe("v2\n");
+  });
+
+  it("leaves no spares behind", () => {
+    const { root, agents } = world();
+    syncSystemAgentSkills(root);
+    syncSystemAgentSkills(root);
+    expect(readdirSync(path.dirname(agents))).toEqual([".agents"]);
+  });
+
+  // An unreadable guide fails the copy; root and Windows read it anyway.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "keeps the last copy when a new one can't be made",
+    () => {
+      const { root, agents } = world();
+      syncSystemAgentSkills(root);
+      chmodSync(
+        path.join(root, ".agents/skills/world-building/SKILL.md"),
+        0o000,
+      );
+      expect(() => syncSystemAgentSkills(root)).toThrow();
+      expect(skill(agents)).toBe("v2\n");
+      expect(readdirSync(path.dirname(agents))).toEqual([".agents"]);
+    },
+  );
+
+  it("refuses a workspace that is Kazusa itself, keeping its guides", () => {
+    const { root, world: dir } = world();
+    const configFile = path.join(dir, "openclaw.json");
+    const config = JSON.parse(readFileSync(configFile, "utf8"));
+    config.agents.entries.admin.workspace = path.relative(dir, root);
+    writeFileSync(configFile, JSON.stringify(config));
+    expect(() => syncSystemAgentSkills(root)).toThrow(/overlaps/);
+    expect(skill(path.join(root, ".agents"))).toBe("v2\n");
   });
 
   it("does nothing before setup has made a world", () => {
