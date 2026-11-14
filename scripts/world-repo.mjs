@@ -11,11 +11,8 @@
  * - `check`: whether the creator released something newer than the commit the
  *   world stands on (`ls-remote`; the size alone from GitHub), nothing
  *   fetched.
- * - `download`: `git fetch` of that release, once the player says so; a world
- *   from before it was a clone is moved onto the published commit its
- *   `.template/` matches. The system agent's `world_update` merges it.
- * - No command: before the Gateway starts, keeps `world/`'s repository set up
- *   (made, for a world from before repositories), touching no file.
+ * - `download`: `git fetch` of that release's tag, once the player says so. The
+ *   system agent's `world_update` merges it.
  *
  * `clone` and `download` print git's progress as JSON lines
  * (`{"progress":{stage,percent}}`); every command ends with one JSON object, `{
@@ -23,7 +20,6 @@
  * the system's.
  */
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -45,13 +41,11 @@ export const WORLD = "apps/kazusa/world";
 /** The playthrough: points at the creator's commit the world stands on. */
 export const PLAY = "play";
 const ORIGIN = "origin";
-/** Files compared as text: what a `.template/` snapshot kept. */
-const TEXT = /\.(md|json|txt)$/;
 /**
  * What the clone tracks: the creator's files. `openclaw.json` (this machine's
  * config) and `.state/` (databases) are local; a save adds them explicitly.
  */
-const EXCLUDE = `# Written by scripts/world-repo.mjs on every start.
+const EXCLUDE = `# Written by scripts/world-repo.mjs when the world was cloned.
 /*
 !/package.json
 !/shared/
@@ -172,22 +166,6 @@ const gitError = (error) =>
     .filter((line) => line && !/\d+%|^Cloning into /.test(line))
     .join(" ") || error.message.trim();
 
-/** Git's id for a file's bytes, without asking git. */
-const blobId = (data) =>
-  createHash("sha1").update(`blob ${data.length}\0`).update(data).digest("hex");
-
-/** `path → id` for every file in a commit. */
-async function treeOf(repo, commit) {
-  const files = new Map();
-  for (const line of (
-    await repo.raw(["ls-tree", "-r", "--full-tree", commit])
-  ).split("\n")) {
-    const match = /^\d+ blob ([0-9a-f]+)\t(.+)$/.exec(line);
-    if (match) files.set(match[2], match[1]);
-  }
-  return files;
-}
-
 /** `[{ id, provider, url }]`: the worlds this copy offers. */
 export function readSources(root) {
   const file = path.join(root, SOURCES);
@@ -245,40 +223,9 @@ export async function listWorlds(root) {
   );
 }
 
-/** Where the world in play comes from: its own `repository`, else its source. */
-function worldUrl(root, pkg) {
-  return (
-    (typeof pkg.repository === "string"
-      ? pkg.repository
-      : pkg.repository?.url) ??
-    readSources(root).find((source) => source.id === pkg.kazusa?.template)?.url
-  );
-}
-
-/** A file's kind, with a character's id as a star: `workspaces/*\/portraits`. */
-function areaOf(file) {
-  const parts = file.split("/");
-  return parts[0] === "workspaces"
-    ? `workspaces/*/${parts[2] ?? ""}`
-    : parts.slice(0, 2).join("/");
-}
-
 /** `owner/name` of a world on GitHub. Worlds are all on GitHub for now. */
 function githubRepo(url) {
   return /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.[1];
-}
-
-/** GitHub's API, for a world there (all of them, for now). */
-async function github(repo, endpoint) {
-  const response = await fetch(
-    `https://api.github.com/repos/${repo}${endpoint}`,
-    {
-      headers: { "User-Agent": "kazusa-world-check" },
-      signal: AbortSignal.timeout(20_000),
-    },
-  );
-  if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
-  return response.json();
 }
 
 /** Every file of a commit, `path → { sha, size }`, from GitHub's API. */
@@ -302,12 +249,10 @@ async function githubTree(repo, commit) {
 }
 
 /**
- * What going from one commit's files to another's changes in a world (its
- * `shared/` and `workspaces/`, by kind), and roughly what downloading it costs:
- * every file `to` has that `from` lacks, by content. Commits between the two
- * can add a little more.
+ * Roughly what downloading `to` costs from `from`: every file `to` has that
+ * `from` lacks, by content. Commits between the two can add a little more.
  */
-export function compareReleases(from, to) {
+export function downloadSize(from, to) {
   const had = new Set([...from.values()].map(({ sha }) => sha));
   let size = 0;
   for (const { sha, size: bytes } of to.values())
@@ -315,23 +260,7 @@ export function compareReleases(from, to) {
       had.add(sha);
       size += bytes;
     }
-  const changed = [...new Set([...from.keys(), ...to.keys()])].filter(
-    (file) =>
-      /^(shared|workspaces)\//.test(file) &&
-      from.get(file)?.sha !== to.get(file)?.sha,
-  );
-  const areas = new Map();
-  for (const file of changed)
-    areas.set(areaOf(file), (areas.get(areaOf(file)) ?? 0) + 1);
-  return {
-    changes: {
-      files: changed.length,
-      areas: [...areas]
-        .map(([area, count]) => ({ area, count }))
-        .sort((a, b) => b.count - a.count),
-    },
-    size,
-  };
+  return size;
 }
 
 /** Dotted numbers, by number; a suffix such as `-beta` is ignored. */
@@ -352,49 +281,6 @@ export function compareVersions(a, b) {
 
 /** A release is a tag named for its version (`v0.4.0` or `0.4.0`). */
 const RELEASE_TAG = /^v?\d+(\.\d+)*$/;
-
-/** Content, not manifests: `package.json` (once `world.json`) changes alone. */
-const isContent = (file) =>
-  file.startsWith("shared/") || file.startsWith("workspaces/");
-
-/** The template as `.template/` recorded it: its content paths, text as bytes. */
-function snapshotOf(world) {
-  const dir = path.join(world, ".template");
-  const file = path.join(dir, "manifest.json");
-  if (!existsSync(file)) return undefined;
-  const all = Object.keys(readJson(file).files ?? {});
-  const text = new Map();
-  for (const relative of all.filter((entry) => TEXT.test(entry))) {
-    const source = path.join(dir, relative);
-    if (existsSync(source)) text.set(relative, readFileSync(source));
-  }
-  return { paths: all.filter(isContent), text };
-}
-
-/**
- * The newest published commit with exactly the snapshot's content: the same
- * files, the same text. Newest, because commits that differ only in their
- * manifest are the same world, and the newest is closest to the live one.
- */
-async function publishedMatch(repo, snapshot, release) {
-  const ids = new Map(
-    [...snapshot.text]
-      .filter(([file]) => isContent(file))
-      .map(([file, data]) => [file, blobId(data)]),
-  );
-  const commits = (await repo.raw(["rev-list", release]).catch(() => ""))
-    .split("\n")
-    .filter(Boolean);
-  for (const commit of commits) {
-    const files = new Map(
-      [...(await treeOf(repo, commit))].filter(([file]) => isContent(file)),
-    );
-    if (files.size !== snapshot.paths.length) continue;
-    if (!snapshot.paths.every((file) => files.has(file))) continue;
-    if ([...ids].every(([file, id]) => files.get(file) === id)) return commit;
-  }
-  return undefined;
-}
 
 /**
  * A simple-git progress handler that turns git's stages into one bar and hands
@@ -428,15 +314,7 @@ async function clonedSource(git, root) {
 }
 
 /** Whether `world/` is a world that's been set up: setup finished writing it. */
-function setUp(world) {
-  if (existsSync(path.join(world, "openclaw.json"))) return true;
-  if (existsSync(path.join(world, "world.json"))) return true;
-  try {
-    return Boolean(readJson(path.join(world, "package.json")).kazusa?.template);
-  } catch {
-    return false;
-  }
-}
+const setUp = (world) => existsSync(path.join(world, "openclaw.json"));
 
 /** Every world repository's settings, exclude rules and attributes. */
 async function configure(repo, world) {
@@ -518,7 +396,7 @@ export async function cloneWorld(root, id, report) {
   const git = findGit(root);
   if (!git) throw new Error("git isn't installed.");
   const world = path.join(root, WORLD);
-  if ((await clonedSource(git, root)) === source.url) return [];
+  if ((await clonedSource(git, root)) === source.url) return;
   if (existsSync(world) && setUp(world))
     throw new Error("A world is set up already.");
   const release = await newestRelease(git, source.url);
@@ -548,7 +426,6 @@ export async function cloneWorld(root, id, report) {
   for (const part of readdirSync(partial))
     renameSync(path.join(partial, part), path.join(world, part));
   rmSync(partial, { recursive: true, force: true });
-  return [];
 }
 
 /** A world's version: the release tag its `play` is on, else its manifest's. */
@@ -568,10 +445,10 @@ async function versionOf(repo, world) {
 /**
  * Whether the creator released something newer than the commit the world stands
  * on, nothing fetched: the newest release by `ls-remote`, new unless it's
- * `play`'s commit or in its history (a world without history compares
- * versions). `downloaded`: its tag is fetched already, ready for the system
- * agent, with its notes (the tag's message). Not downloaded: its size from
- * GitHub's file lists, display only, absent when GitHub can't say.
+ * `play`'s commit or in its history. `downloaded`: its tag is fetched already,
+ * ready for the system agent, with its notes (the tag's message). Not
+ * downloaded: its size from GitHub's file lists, display only, absent when
+ * GitHub can't say.
  */
 export async function checkLiveWorld(root) {
   const git = findGit(root);
@@ -581,24 +458,24 @@ export async function checkLiveWorld(root) {
   const url = await clonedSource(git, root);
   if (!url) return { checked: false };
   const head = await commitOf(repo, PLAY);
-  const current = {
-    commit: head ?? null,
-    version: await versionOf(repo, world),
-  };
+  if (!head) return { checked: false };
+  const current = { commit: head, version: await versionOf(repo, world) };
   const release = await newestRelease(git, url);
   if (!release) return { checked: true, current, latest: null, newer: false };
-  const have = Boolean(await commitOf(repo, release.commit));
-  const newer = head
-    ? release.commit !== head &&
-      !(have && (await isAncestor(repo, release.commit, head)))
-    : !current.version || compareVersions(release.version, current.version) > 0;
+  const newer =
+    release.commit !== head &&
+    !(
+      (await commitOf(repo, release.commit)) &&
+      (await isAncestor(repo, release.commit, head))
+    );
   const latest = {
     commit: release.commit,
     version: release.version,
     url: releaseUrl(url, release.tag) ?? null,
   };
   if (!newer) return { checked: true, current, latest, newer: false };
-  if (have) {
+  // Downloaded means its tag is here, as the system agent reads it.
+  if ((await commitOf(repo, `refs/tags/${release.tag}`)) === release.commit) {
     const [notes, date] = (
       await repo
         .raw([
@@ -626,10 +503,10 @@ export async function checkLiveWorld(root) {
   if (github)
     try {
       const [from, to] = await Promise.all([
-        head ? githubTree(github, head).catch(() => new Map()) : new Map(),
+        githubTree(github, head).catch(() => new Map()),
         githubTree(github, release.commit),
       ]);
-      size = compareReleases(from, to).size;
+      size = downloadSize(from, to);
     } catch {
       // Shown without its size.
     }
@@ -645,17 +522,14 @@ export async function checkLiveWorld(root) {
 
 /**
  * Downloads the newest release (its tag, nothing else), once the player says
- * so. A world from before it was a clone is then moved onto the published
- * commit its `.template/` snapshot matches, as long as nothing of its own was
- * ever committed (nothing is, until saves): only `play` and the index move,
- * never a file. The snapshot and old update backups then go.
+ * so. Nothing in the world changes: `world_update` takes it from there.
  */
 export async function downloadLiveWorld(root, report) {
   const git = findGit(root);
   if (!git) throw new Error("git isn't installed.");
   const world = path.join(root, WORLD);
   const url = await clonedSource(git, root);
-  if (!url) throw new Error("This world has no history yet: restart Kazusa.");
+  if (!url) throw new Error("This world isn't a clone, so it can't download.");
   const release = await newestRelease(git, url);
   if (!release) throw new Error("The creator hasn't released anything yet.");
   try {
@@ -670,82 +544,6 @@ export async function downloadLiveWorld(root, report) {
   } catch (error) {
     throw new Error(`Couldn't download it: ${gitError(error)}`);
   }
-  const lines = [];
-  const snapshot = snapshotOf(world);
-  if (snapshot) {
-    const repo = gitIn(git, world);
-    const match = await publishedMatch(repo, snapshot, release.commit);
-    const head = await commitOf(repo, PLAY);
-    const own = head
-      ? (await repo.raw(["log", "--format=%ae", head])).includes(
-          "kazusa@localhost",
-        ) &&
-        !(await repo.raw(["log", "-1", "--format=%s", head]))
-          .trim()
-          .endsWith(" as imported")
-      : false;
-    if (match && match !== head && !own) {
-      await repo.raw(["update-ref", `refs/heads/${PLAY}`, match]);
-      await repo.raw(["read-tree", match]);
-      lines.push(
-        `This world now stands on the creator's commit it was made from (${match.slice(0, 7)}).`,
-      );
-    }
-    if (match || head)
-      rmSync(path.join(world, ".template"), { recursive: true, force: true });
-    rmSync(path.join(world, ".state/kazusa/world-update/backups"), {
-      recursive: true,
-      force: true,
-    });
-  }
-  return lines;
-}
-
-/**
- * Before the Gateway starts: `world/`'s repository set up, made for a world
- * from before repositories (no commit: its first update finds its base), and
- * `origin` pointing where the world lives. No file is touched, nothing
- * fetched.
- */
-export async function adoptWorldRepo(root) {
-  const world = path.join(root, WORLD);
-  const manifest = path.join(world, "package.json");
-  if (!existsSync(manifest)) return [];
-  const git = findGit(root);
-  if (!git)
-    return [
-      process.platform === "darwin"
-        ? "This world's history is off: git isn't installed. Install the developer tools (xcode-select --install) to turn it on."
-        : "This world's history is off: git isn't installed.",
-    ];
-  const lines = [];
-  if (!existsSync(path.join(world, ".git"))) {
-    await gitIn(git, world).raw(["init", `--initial-branch=${PLAY}`]);
-    lines.push(
-      "This world's history is on: its next update finds where it came from.",
-    );
-  }
-  const repo = gitIn(git, world);
-  await configure(repo, world);
-  const url = worldUrl(root, readJson(manifest));
-  const remotes = (await repo.raw(["remote"])).split("\n");
-  if (url)
-    await repo.raw(
-      remotes.includes(ORIGIN)
-        ? ["remote", "set-url", ORIGIN, url]
-        : ["remote", "add", ORIGIN, url],
-    );
-  // Before worlds were clones the remote was `upstream`, and Kazusa kept refs
-  // of its own; neither is used now.
-  if (remotes.includes("upstream"))
-    await repo.raw(["remote", "remove", "upstream"]);
-  for (const ref of (
-    await repo.raw(["for-each-ref", "--format=%(refname)", "refs/kazusa/"])
-  )
-    .split("\n")
-    .filter(Boolean))
-    await repo.raw(["update-ref", "-d", ref]);
-  return lines;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -755,9 +553,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.stdout.write(`${JSON.stringify({ progress: value })}\n`);
   const commands = {
     list: async () => ({ worlds: await listWorlds(root) }),
-    clone: async () => ({ lines: await cloneWorld(root, id, progress) }),
+    clone: async () => (await cloneWorld(root, id, progress), {}),
     check: () => checkLiveWorld(root),
-    download: async () => ({ lines: await downloadLiveWorld(root, progress) }),
+    download: async () => (await downloadLiveWorld(root, progress), {}),
   };
   if (command in commands)
     try {
@@ -768,10 +566,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         `${JSON.stringify({ error: error.message.trim() })}\n`,
       );
     }
-  else
-    try {
-      for (const line of await adoptWorldRepo(root)) console.log(line);
-    } catch (error) {
-      console.warn(`Couldn't set up this world's history: ${error.message}`);
-    }
+  else {
+    console.error(`Unknown command: ${command ?? "(none)"}`);
+    process.exitCode = 2;
+  }
 }

@@ -360,9 +360,9 @@ export type WorldMeta = z.infer<typeof WorldMetaSchema>;
 /**
  * A world's `package.json`: what it is, who made it and which version, in npm's
  * own fields, and everything Kazusa needs under `kazusa`, the way tools keep
- * their config in a package. Templates ship one; setup copies it into the live
- * world and adds `kazusa.template`. Not wire data, but the plugin and the setup
- * guide both read it, so it is defined once, here.
+ * their config in a package. Every world ships one at its root. Not wire data,
+ * but the plugin and the setup guide both read it, so it is defined once,
+ * here.
  */
 export const WorldPackageSchema = z.looseObject({
   /** Npm's name: a lowercase slug, and the world's lasting identity. */
@@ -397,8 +397,6 @@ export const WorldPackageSchema = z.looseObject({
     defaultGroup: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
-    /** Only on a live world: the template folder (`worlds/<id>`) it came from. */
-    template: z.string().optional(),
     /** Merged into the plugin's config when the world is set up. */
     config: z.record(z.string(), z.unknown()).default({}),
   }),

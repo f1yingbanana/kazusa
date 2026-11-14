@@ -14,8 +14,8 @@ import {
   areaOf,
   planUpdate,
   folderTree,
+  openReport,
   readReport,
-  type Tree,
 } from "./update.ts";
 
 let root: string;
@@ -71,7 +71,7 @@ function setup() {
       "---\nplace_id: gone\nname: gone\n---\n\nFiller.\n",
     );
   }
-  put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
+  put(live, "package.json", pkg({ version: "1.0.0" }));
   // Play: a note on a card, a layout, a new page, a sleep section.
   put(
     live,
@@ -123,16 +123,21 @@ function setup() {
 }
 
 /** Plans the update from `v1` (the base) to `v2`, both folders. */
-const planOf = (
+const planOf = (live: string, v2: string, v1 = path.join(root, "v1")) =>
+  planUpdate(live, folderTree(v2), folderTree(v1), { layout: "keep" });
+const apply = (
   live: string,
   v2: string,
-  v1: string | undefined = path.join(root, "v1"),
-) =>
-  planUpdate(live, folderTree(v2), v1 ? folderTree(v1) : undefined, {
-    layout: "keep",
+  planned: ReturnType<typeof planOf>,
+) => {
+  openReport(live, planned, "keep", {
+    from: "v1",
+    to: "v2",
+    version: "2.0.0",
+    save: "refs/saves/before-update-2.0.0",
   });
-const apply = (live: string, v2: string, planned: ReturnType<typeof planOf>) =>
-  applyUpdate(live, folderTree(v2), planned, "keep", { to: "v2" });
+  applyUpdate(live, folderTree(v2), planned);
+};
 
 beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "world-update-"));
@@ -143,7 +148,6 @@ describe("world update", () => {
   it("merges a new template version and keeps what play wrote", () => {
     const { live, v2 } = setup();
     const plan = planOf(live, v2);
-    expect(plan.hasBase).toBe(true);
     expect(plan.pendingRenames).toEqual({ old_market: "market" });
     expect(plan.areas[0]).toMatchObject({
       area: "shared/wiki/entities/places",
@@ -187,7 +191,7 @@ describe("world update", () => {
     expect(memory).toContain("## My usual week");
     expect(JSON.parse(get(live, "package.json"))).toMatchObject({
       version: "2.0.0",
-      kazusa: { template: "demo", renames: { old_market: "market" } },
+      kazusa: { renames: { old_market: "market" } },
     });
     expect(readReport(live)?.conflicts).toEqual([]);
   });
@@ -259,40 +263,6 @@ describe("world update", () => {
       "its place no longer exists",
     );
   });
-
-  it("without a base, takes the creator's version only where play left no mark", () => {
-    const { live, v2 } = setup();
-    put(
-      v2,
-      "workspaces/amy/wiki/entities/places/hub.md",
-      "---\nplace_id: hub\nname: hub\n---\n\nThe centre of town.\n",
-    );
-    put(
-      live,
-      "workspaces/amy/wiki/entities/places/hub.md",
-      "---\nplace_id: hub\nname: hub\n---\n\nA place.\n",
-    );
-    put(
-      v2,
-      "workspaces/amy/wiki/entities/places/market.md",
-      "---\nplace_id: market\nname: market\n---\n\nNew words.\n",
-    );
-    const plan = planUpdate(live, folderTree(v2), undefined, {
-      layout: "keep",
-    });
-    expect(plan.bestAttempt).toBe(true);
-    const outcome = (file: string) =>
-      plan.changes.find(({ path: p }) => p === file)?.outcome;
-    // Untouched by play: the creator's.
-    expect(outcome("workspaces/amy/wiki/entities/places/hub.md")).toBe(
-      "updated",
-    );
-    // Stamped by a visit: her words stay, and it is asked about.
-    expect(outcome("workspaces/amy/wiki/entities/places/market.md")).toBe(
-      "conflict",
-    );
-    expect(plan.notInTemplate).toContain("shared/wiki/entities/places/gone.md");
-  });
 });
 
 describe("pending renames", () => {
@@ -315,7 +285,7 @@ describe("arranged places", () => {
       put(dir, "package.json", pkg({ version: "1.0.0" }));
     put(v1, "shared/wiki/entities/places/hub.md", place("hub", at(0.5)));
     put(v1, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
-    put(live, "package.json", pkg({ version: "1.0.0" }, { template: "demo" }));
+    put(live, "package.json", pkg({ version: "1.0.0" }));
     put(live, "shared/wiki/entities/places/park.md", place("park", at(0.3)));
     put(live, "shared/wiki/entities/places/hub.md", place("hub", at(0.1)));
     put(v2, "package.json", pkg({ version: "2.0.0" }));

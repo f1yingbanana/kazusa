@@ -34,7 +34,6 @@ import {
   createMessagingState,
   messageJournal,
   type MessagingState,
-  type MessageDelivery,
   type MessagingDeps,
   type OutboxPlan,
   type SpeechResult,
@@ -248,10 +247,6 @@ export function registerMessaging(
       deps.messages ??
       openMessageDatabase({
         path: path.join(resolveStateDir(), "kazusa", "messages.sqlite"),
-        legacy: api.runtime.state.openKeyedStore<MessageDelivery>({
-          namespace: "messaging",
-          retention: "retained",
-        }),
       }),
     conversations: api.runtime.state.openKeyedStore<ChatConversation>({
       namespace: "chats",

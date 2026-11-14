@@ -640,33 +640,6 @@
             "description": "Characters onstage from the start even when defaultOnstage is false."
           }
         }
-      },
-      "decisions": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Jev decisions, routed to the provider picked in Settings → Models. deprecated: only held TypeSafe's key, which is now the typesafe:manual auth profile; kept so worlds from 0.1.3 and 0.2.0 still validate until scripts/provider-keys.mjs drops it.",
-        "properties": {
-          "typesafeApiKey": {
-            "type": "object",
-            "required": ["source", "provider", "id"],
-            "properties": {
-              "source": {
-                "type": "string",
-                "enum": ["env", "store", "file", "exec"]
-              },
-              "provider": {
-                "type": "string",
-                "minLength": 1
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "additionalProperties": false,
-            "description": "A secret reference to TypeSafe's key, for Jev through TypeSafe. deprecated: keys are auth profiles now; providers/migrate.ts copies this key into typesafe:manual, then scripts/provider-keys.mjs drops this before the next Gateway start."
-          }
-        }
       }
     }
   },
@@ -715,16 +688,5 @@
       "grep"
     ],
     "gatewayMethodDispatch": ["authenticated-request"]
-  },
-  "configContracts": {
-    "secretInputs": {
-      "paths": [
-        {
-          "path": "decisions.typesafeApiKey",
-          "expected": "string",
-          "ownerKind": "capability"
-        }
-      ]
-    }
   }
 }

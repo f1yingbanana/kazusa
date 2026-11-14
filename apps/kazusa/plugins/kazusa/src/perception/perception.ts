@@ -1009,20 +1009,6 @@ export class Perception {
 
   private async save(agentId: string, state: PerceptionState): Promise<void> {
     this.assertCurrent();
-    // Records from before 2026-11 carry up to 2,000 stimulus keys (about
-    // 130 KB) that nothing reads any more; the next save leaves them out.
-    const legacy = state as PerceptionState & {
-      processedIds?: unknown;
-      ignoredIds?: unknown;
-    };
-    if (Array.isArray(legacy.processedIds) && state.checkedIn === undefined) {
-      // The check-in for a task that has already ended may be among them.
-      const task = await this.taskStore.lookup(agentId);
-      const key = task?.id && stimulusKey(checkIn(agentId, task));
-      if (key && legacy.processedIds.includes(key)) state.checkedIn = key;
-    }
-    delete legacy.processedIds;
-    delete legacy.ignoredIds;
     await this.store.register(agentId, state, {
       assertCurrent: () => this.assertCurrent(),
     });

@@ -11,8 +11,10 @@ import {
   commitOf,
   downloadedRelease,
   gitIn,
-  keepInStash,
   PLAY,
+  restoreWorld,
+  saveRef,
+  saveWorld,
   standOn,
   text,
   versionOf,
@@ -22,18 +24,26 @@ import {
   applyUpdate,
   commitTree,
   finishUpdate,
+  openReport,
   planUpdate,
   readReport,
-  templateIdOf,
   type Plan,
   type Report,
 } from "./update.ts";
 
+const ACTIONS = [
+  "check",
+  "apply",
+  "conflicts",
+  "show",
+  "restore",
+  "finish",
+] as const;
+
 const PARAMS = z.object({
-  action: z.enum(["check", "apply", "conflicts", "show", "finish"]),
+  action: z.enum(ACTIONS),
   layout: z.enum(["keep", "reset"]).default("keep"),
   rehome: z.enum(["stale", "all"]).default("stale"),
-  bestAttempt: z.boolean().default(false),
   path: z.string().optional(),
   version: z.enum(["new", "old"]).default("new"),
 });
@@ -57,7 +67,6 @@ const short = (value: string | undefined, limit = 400) =>
  */
 function decisions(plan: Plan, counts: Record<string, number>) {
   const framing =
-    plan.bestAttempt ||
     Object.keys(plan.pendingRenames).length > 0 ||
     plan.newCharacters.length > 0 ||
     plan.removedCharacters.length > 0 ||
@@ -70,7 +79,6 @@ function decisions(plan: Plan, counts: Record<string, number>) {
     );
   const layout = plan.arrangedMoved > 0;
   const ask = [
-    ...(plan.bestAttempt ? ["best attempt"] : []),
     ...(framing ? ["framing"] : []),
     ...(layout ? ["layout"] : []),
   ];
@@ -98,18 +106,7 @@ function summary(
       .filter((change) => change.outcome === outcome)
       .map(({ path: file }) => file);
   return {
-    template: plan.template,
     version: versions,
-    hasBase: plan.hasBase,
-    ...(plan.bestAttempt
-      ? {
-          bestAttempt: true,
-          warning:
-            "No record of the version this world was made from: what play wrote is guessed from its marks. Best attempt only; nothing is removed, and the world as it is now is kept in git's stash first.",
-          overlap: plan.overlap,
-          notInTemplate: capped(plan.notInTemplate),
-        }
-      : {}),
     counts,
     areas: plan.areas,
     keptTheirs: plan.keptTheirs,
@@ -171,7 +168,7 @@ export function registerWorldUpdate(
     const git = gitIn(live());
     if (!git)
       throw new Error(
-        "This world has no history, so it can't take updates. Ask the user to restart Kazusa, which sets it up; if it says git is missing, they need to install it.",
+        "This world isn't a git clone, so it can't take updates. If Kazusa says git is missing, the user needs to install it.",
       );
     return git;
   };
@@ -229,17 +226,13 @@ export function registerWorldUpdate(
     name: "world_update",
     label: "World Update",
     description:
-      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) keeps the world as it is in git's stash, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it or as the world's old version had it (`version`: new or old); `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. There is no undo; the stash is the recovery point. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home. `bestAttempt`: apply to a world with no record of where it came from, once the user accepts the risk.",
+      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) saves the world as it is, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it or as the world's old version had it (`version`: new or old); `restore` (clock paused) puts the world back exactly as that save kept it and closes the update, for an `apply` cut short or an update the user wants abandoned; `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. Once finished there is no undo. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home.",
     parameters: {
       type: "object",
       properties: {
-        action: {
-          type: "string",
-          enum: ["check", "apply", "conflicts", "show", "finish"],
-        },
+        action: { type: "string", enum: [...ACTIONS] },
         layout: { type: "string", enum: ["keep", "reset"] },
         rehome: { type: "string", enum: ["stale", "all"] },
-        bestAttempt: { type: "boolean" },
         path: { type: "string" },
         version: { type: "string", enum: ["new", "old"] },
       },
@@ -248,10 +241,14 @@ export function registerWorldUpdate(
     },
     async execute(_id: string, input: unknown) {
       const params = PARAMS.parse(input);
-      const { action, layout, rehome, bestAttempt } = params;
+      const { action, layout, rehome } = params;
       const world = live();
       const git = repo();
       const open = readReport(world);
+      // `apply` moves `play` last: short of that, it was cut off part way.
+      const cutShort = open && commitOf(git, PLAY) !== open.to;
+      const restoreFirst =
+        "The last `apply` was cut short, so the world is half updated. `restore` it, then `check` and `apply` again.";
       const release = downloadedRelease(git);
       if (action === "show") {
         if (!params.path) throw new Error("`show` needs a `path`.");
@@ -278,11 +275,24 @@ export function registerWorldUpdate(
       }
       if (action === "conflicts") {
         if (!open) return textResult({ note: "No update is open." });
+        if (cutShort) throw new Error(restoreFirst);
         return textResult(conflictView(open));
+      }
+      if (action === "restore") {
+        await paused();
+        if (!open) throw new Error("No update is open to restore.");
+        restoreWorld(git, open.save, open.to);
+        finishUpdate(world);
+        return textResult({
+          restored: true,
+          version: label(git, open.from, versionOf(git)),
+          next: "The world is exactly as it was before this update. If the user still wants it, `check` and `apply` again.",
+        });
       }
       if (action === "finish") {
         await paused();
         if (!open) throw new Error("No update is open to finish.");
+        if (cutShort) throw new Error(restoreFirst);
         const problems = lintMap(path.join(world, "shared", "wiki"));
         if (problems.length) return textResult({ finished: false, problems });
         const positions = await repairPositions(rehome);
@@ -290,59 +300,59 @@ export function registerWorldUpdate(
         const registered = new Set(listAgentIds(currentConfig(api)));
         return textResult({
           finished: true,
-          version: report.version ?? report.to.slice(0, 7),
+          version: report.version,
           ...positions,
           unregistered: report.newCharacters.filter(
             (who) => !registered.has(who),
           ),
         });
       }
+      if (cutShort) throw new Error(restoreFirst);
       if (open)
         throw new Error(
-          "An update is open: resolve what `conflicts` lists, then `finish` it.",
+          "An update is open: resolve what `conflicts` lists, then `finish` it (or `restore` to abandon it).",
         );
+      const base = commitOf(git, PLAY);
+      if (!base)
+        throw new Error("This world isn't standing on a release of its own.");
       if (!release)
         return textResult({
           upToDate: true,
-          version: {
-            world: versionOf(git) ?? readWorldPackage(world)?.version,
-          },
+          version: { world: label(git, base, versionOf(git)) },
           note: "No newer release is downloaded. If the user expects one, they can download it in Settings → Updates → World.",
         });
-      const base = commitOf(git, PLAY);
       const template = commitTree(git, release.commit);
-      const baseTree = base ? commitTree(git, base) : undefined;
       const versions = {
-        ...(base ? { world: label(git, base, versionOf(git)) } : {}),
+        world: label(git, base, versionOf(git)),
         template: label(git, release.commit, release.version),
         ...(release.notes ? { notes: release.notes } : {}),
       };
-      const plan = planUpdate(world, template, baseTree, { layout });
+      const plan = planUpdate(world, template, commitTree(git, base), {
+        layout,
+      });
       if (action === "check") return textResult(summary(plan, versions));
       await paused();
-      if (plan.bestAttempt && !bestAttempt)
-        throw new Error(
-          "This world has no record of the version it was made from. Warn the user that this is a best attempt that can go badly, and apply with `bestAttempt: true` only once they agree.",
-        );
       const planned = summary(plan, versions);
-      const title =
-        readWorldPackage(world)?.displayName ?? templateIdOf(world) ?? "World";
-      keepInStash(
+      const pkg = readWorldPackage(world);
+      const save = saveRef(release.version);
+      saveWorld(
         git,
         world,
-        `${title} before updating to ${release.version}`,
-        release.commit,
+        save,
+        `${pkg?.displayName ?? pkg?.name ?? "World"} before updating to ${release.version}`,
       );
-      applyUpdate(world, template, plan, layout, {
-        ...(base ? { from: base } : {}),
+      openReport(world, plan, layout, {
+        from: base,
         to: release.commit,
         version: release.version,
+        save,
       });
+      applyUpdate(world, template, plan);
       standOn(git, release.commit);
       return textResult({
         ...planned,
-        kept: "The world as it was is in git's stash (`git stash list`), if anything ever needs putting back.",
-        next: "Resolve every conflict and orphan (`conflicts` lists them) before `finish`, then check the result and tell the user what changed.",
+        saved: save,
+        next: "Resolve every conflict and orphan (`conflicts` lists them) before `finish`, then check the result and tell the user what changed. If anything went wrong, `restore` puts the world back as it was.",
       });
     },
   });

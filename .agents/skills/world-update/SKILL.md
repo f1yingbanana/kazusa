@@ -43,7 +43,7 @@ don't carry over; ask again if this update needs them.
 ## The user's choices
 
 - Framing: retcon / in-world / mixed (with what they said, in their words)
-- Layout: keep / reset. Who moves: stale / all. Best attempt accepted: yes / no
+- Layout: keep / reset. Who moves: stale / all
 
 ## Reasons the user gave
 
@@ -83,13 +83,6 @@ Place ids the creator renamed (`kazusa.renames` in the template's
 `package.json`) follow, with every card and position that used them. A card for
 a place that no longer exists is **forgotten** if it holds nothing the character
 wrote (a bare visit stamp), and **orphaned** if it does.
-
-**Without a base** (`bestAttempt: true` in the check), the merge guesses what
-play wrote from its marks: visit stamps, notes, history, sleep's sections, the
-map layout. A page with none of them takes the creator's version; a character's
-page with any of them keeps her text and reports the differences as conflicts.
-Nothing here is removed, and world pages the template lacks are listed as
-`notInTemplate`, because they may be the user's own or may be gone upstream.
 
 ## Pages that don't merge one to one
 
@@ -133,18 +126,13 @@ Ask the user once how characters should experience the update:
    `show` (`path: "shared/wiki/INDEX.md"`), to see how the world has changed in
    the creator's words.
 3. Look at the check:
-   - It refuses when the new version isn't downloaded: ask the user to download
-     it in Settings → Updates → World, which shows its size first, and to tell
-     you once it's done. A release with pictures can take a few minutes. -
-     `version` is this world's version (`world`) and the downloaded release's
+   - `upToDate: true`: no newer version is downloaded. If the user expects one,
+     ask them to download it in Settings → Updates → World, which shows its size
+     first, and to tell you once it's done. A release with pictures can take a
+     few minutes.
+   - `version` is this world's version (`world`) and the downloaded release's
      (`template`), and `notes`, the creator's release notes: use them to tell
-     the user what the update is for. `upToDate: true`: nothing to update, say
-     so.
-   - `bestAttempt: true`: this world has no record of the version it was made
-     from. Tell the user plainly that the update is a best attempt that can go
-     badly, worst of all if this world was never really a copy of this template;
-     `overlap` is the share of pages they have in common, and below about 0.5
-     they probably aren't the same world. Only go on if they accept.
+     the user what the update is for.
    - `counts` shows files added, updated, merged and removed, and how many are
      conflicts or orphans. `areas` says what kind of files they are, which is
      what to tell the user: `workspaces/*/portraits` are how characters are
@@ -175,7 +163,6 @@ Ask the user once how characters should experience the update:
    - **Who moves** (`rehome`): `stale` moves only characters standing at, or
      travelling through, a place that no longer exists; `all` sends everyone
      home, right when the update changed where people live.
-   - **Best attempt**, if it is one.
 
    Save the job file, then end your turn and wait. A question is a stop: never
    call `apply` in the turn you asked, however sure the answer seems.
@@ -185,10 +172,9 @@ Ask the user once how characters should experience the update:
 1. Pause the clock: `clock_now` to note the speed, then `clock_set_speed` 0.
    `world_update` refuses to apply while time runs. It stays paused until the
    end.
-2. `world_update` with `action: "apply"`, the chosen `layout`, and
-   `bestAttempt: true` only if the user accepted it. It first keeps the world as
-   it is in git's stash, then merges the release in. There is no undo; the stash
-   is only a recovery point for someone who knows git.
+2. `world_update` with `action: "apply"` and the chosen `layout`. It first saves
+   the world exactly as it is (`saved` names the save), then merges the release
+   in. Until `finish`, `restore` can put it all back (below).
 
 ## 3. Resolve, then ask what only the user can say
 
@@ -213,8 +199,6 @@ its content belongs and apply the framing:
   `its place no longer exists`: find where it belongs (below).
 - **`keptDeleted`:** deleted here, changed by the creator. Leave them deleted
   unless the user wants them back.
-- **`notInTemplate`** (best attempt only): world pages the template lacks. Keep
-  the user's own; for anything that looks like the creator's old content, ask.
 
 ### Finding where something went
 
@@ -276,7 +260,22 @@ the existing one and delete the orphan.
    resolved and how, and the choices they made. An update the user hears nothing
    about looks stuck. Mark the job file done.
 
-There's no undo: get it right before `finish`. If something went badly wrong,
-tell the user plainly; the world as it was before `apply` is in git's stash
-(`git stash list` in `apps/kazusa/world/`), for someone who knows git to put
-back.
+## If it goes wrong: restore, then carry on
+
+`apply` saves the world before it changes anything, and `world_update`
+`action: "restore"` (clock paused) puts every world file back exactly as that
+save kept it and closes the update. Characters' databases aren't touched, and
+nothing from play is lost: everything since `apply` happened with the clock
+paused.
+
+- **`apply` was cut short** (Kazusa stopped, an error mid-way): every other
+  action then says so. Restore, `check` again, and `apply` again with the same
+  choices from your job file. No need to ask the user again; tell them it was
+  interrupted and redone.
+- **The update went badly** (a resolution you can't make work, the user changed
+  their mind): tell the user what happened and offer to restore. Once they
+  agree, restore, and note in the job file that the update was abandoned and
+  why. They can update again later from a clean start.
+
+Restore only works until `finish`. After that there is no undo, so get it right
+before you finish.

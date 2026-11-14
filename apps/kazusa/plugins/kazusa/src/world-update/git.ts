@@ -7,8 +7,8 @@ import path from "node:path";
  * The live world is a plain git clone of its creator's repository (the kazusa
  * skill's `references/worlds.md` §4.5): `play` points at the creator's commit
  * the world stands on, and the game is the uncommitted changes on top. A world
- * update reads the release it takes and that commit (the base) from git, keeps
- * the game as it was in git's stash, merges, and moves `play` to the release.
+ * update reads the release it takes and that commit (the base) from git, saves
+ * the world as it was, merges, and moves `play` to the release.
  */
 export const PLAY = "play";
 /** A release is a version tag (`v0.4.0` or `0.4.0`). */
@@ -118,7 +118,7 @@ export interface Release {
 }
 
 function releaseUrl(git: Git, tag: string): string | null {
-  let url = "";
+  let url: string;
   try {
     url = text(git, ["remote", "get-url", "origin"]);
   } catch {
@@ -150,7 +150,7 @@ function compareTags(a: string, b: string): number {
  * hasn't taken: the highest local version tag, unless `play` already has it.
  */
 export function downloadedRelease(git: Git): Release | undefined {
-  let listed = "";
+  let listed: string;
   try {
     listed = text(git, [
       "for-each-ref",
@@ -215,7 +215,7 @@ export function filesAt(git: Git, commit: string): Map<string, string> {
     const file = entry.slice(tab + 1);
     if (type !== "blob" || mode === "120000") continue;
     if (file.split("/").includes("..")) continue;
-    if (WORLD_FILE.test(file) && !SKIPPED.test(file)) files.set(file, id!);
+    if (WORLD_FILE.test(file) && !SKIPPED.test(file)) files.set(file, id);
   }
   return files;
 }
@@ -266,21 +266,24 @@ export function copyFiles(
   );
 }
 
+/** Where the world is kept before taking a release: a save (worlds.md §4.6). */
+export const saveRef = (version: string): string =>
+  `refs/saves/before-update-${version}`;
+
 /**
- * Keeps the world as it is in git's stash, before an update changes it: the
- * recovery point (`git stash list`, `git stash apply`), with no file touched.
- * Every world file goes in, untracked ones included, as git's exclude rules
- * say. `onto` is what it's kept against when the world has no history yet (the
- * release it's about to take).
+ * Saves the world as it is under `ref`, before an update changes it: a commit
+ * of every world file (untracked ones included, as git's exclude rules say)
+ * whose parent is the creator's commit `play` stands on. No file is touched.
  */
-export function keepInStash(
+export function saveWorld(
   git: Git,
   live: string,
+  ref: string,
   message: string,
-  onto: string,
 ): string {
-  const head = commitOf(git, PLAY) ?? onto;
-  const index = path.join(live, ".git", "kazusa-stash-index");
+  const head = commitOf(git, PLAY);
+  if (!head) throw new Error("This world isn't standing on a release.");
+  const index = path.join(live, ".git", "kazusa-save-index");
   rmSync(index, { force: true });
   let world: string;
   try {
@@ -290,28 +293,23 @@ export function keepInStash(
   } finally {
     rmSync(index, { force: true });
   }
-  // Git's own stash shape: the world, with `play` and an index commit as
-  // parents, so `git stash` lists, shows and applies it.
-  const indexCommit = text(git, [
-    "commit-tree",
-    `${head}^{tree}`,
-    "-p",
-    head,
-    "-m",
-    `index on ${PLAY}`,
-  ]);
-  const stash = text(git, [
-    "commit-tree",
-    world,
-    "-p",
-    head,
-    "-p",
-    indexCommit,
-    "-m",
-    message,
-  ]);
-  git(["stash", "store", "-m", message, stash]);
-  return stash;
+  const save = text(git, ["commit-tree", world, "-p", head, "-m", message]);
+  git(["update-ref", ref, save]);
+  return save;
+}
+
+/**
+ * Puts the world's files back as `ref` saved them and `play` back on the
+ * commit it stood on then. Files the update brought (`taken`, the release's
+ * commit) that the save lacks go; the databases in `.state/` aren't touched.
+ */
+export function restoreWorld(git: Git, ref: string, taken: string): void {
+  const save = commitOf(git, ref);
+  if (!save) throw new Error(`There's no save ${ref} to restore.`);
+  // From the release's files to the save's: what only the release had goes.
+  git(["read-tree", taken]);
+  git(["read-tree", "-u", "--reset", save]);
+  standOn(git, text(git, ["rev-parse", `${save}^`]));
 }
 
 /**

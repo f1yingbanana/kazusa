@@ -11,11 +11,7 @@ import { downloadedRelease, gitIn } from "../world-update/git.ts";
 /** The world's own manifest, beside its `shared/` and `workspaces/`. */
 export const WORLD_PACKAGE = "package.json";
 
-/**
- * The `package.json` in `dir`, parsed; `undefined` when there is none or it
- * doesn't parse. A world made before worlds had one gets it from `npm run dev`
- * (`scripts/world-package.mjs`) before the Gateway starts.
- */
+/** The `package.json` in `dir`, parsed; `undefined` when there is none or it doesn't parse. */
 export function readWorldPackage(dir: string): WorldPackage | undefined {
   let text: string;
   try {

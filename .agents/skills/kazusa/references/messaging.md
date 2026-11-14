@@ -316,9 +316,7 @@ the unfinished deliveries (`unsettled`). Both small tables are kept by the same
 write as the message. `node:sqlite` is synchronous, so a new query must stay
 indexed: a full read and parse of 10k messages holds the main thread about 26
 ms. One connection per file for the process. The schema is versioned with
-`PRAGMA user_version`; an upgrade runs once at open, and a stop part-way resumes
-on the next open. Messages kept in OpenClaw's `messaging` keyed store before
-this are copied in on first start, checked, and that namespace is cleared.
+`PRAGMA user_version`.
 
 Each native `agent:<id>:chat:*` transcript is that character's private **client
 projection**, retained for context assembly and native session-memory search. It

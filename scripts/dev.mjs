@@ -22,14 +22,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import {
-  allowChatStarters,
   denyImpliedTools,
   loadNewPlugins,
-  scopeCharacterSkills,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
-import { dropStoreKeyRefs } from "./provider-keys.mjs";
-import { adoptWorldPackage } from "./world-package.mjs";
 import { syncSystemAgent } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
@@ -41,6 +37,20 @@ const UPDATE = updatePaths(ROOT);
 const GATEWAY_PORT = 18789;
 const WEB_PORT = 3000;
 const POLL_MS = 500;
+
+/**
+ * Whether `world` is a clone of its creator's repository, as setup makes every
+ * world now (`lib/setup/setup.ts` asks the same). An older Kazusa's world isn't.
+ */
+function isClone(world) {
+  try {
+    return /^\[remote "origin"\]/m.test(
+      readFileSync(path.join(world, ".git/config"), "utf8"),
+    );
+  } catch {
+    return false;
+  }
+}
 
 // The installer ships a built frontend and its own Node (`scripts/package.mjs`).
 const PACKAGED = process.argv.includes("--packaged");
@@ -86,13 +96,12 @@ function requireSupportedNode() {
   );
 }
 
-function gatewayToken() {
+function gatewayToken(token = randomBytes(32).toString("hex")) {
   mkdirSync(path.dirname(ENV_FILE), { recursive: true });
   const saved = existsSync(ENV_FILE)
     ? parseEnv(readFileSync(ENV_FILE, "utf8")).OPENCLAW_GATEWAY_TOKEN
     : undefined;
   if (saved) return saved;
-  const token = randomBytes(32).toString("hex");
   appendFileSync(ENV_FILE, `OPENCLAW_GATEWAY_TOKEN=${token}\n`, {
     mode: 0o600,
   });
@@ -288,30 +297,23 @@ if (!stopping) {
     spawn(opener[0], [...opener.slice(1), url], { stdio: "ignore" });
 }
 
-// The setup guide writes the config last, once the world is complete.
-while (!stopping && !existsSync(CONFIG)) await sleep(POLL_MS);
+// The setup guide writes the config last, once the world is complete. A world
+// an older Kazusa made (not a clone of its creator's repository) doesn't run:
+// the frontend offers to set it aside and start a new one.
+if (existsSync(CONFIG) && !isClone(WORLD))
+  console.log(
+    `\nThis world was made by an older Kazusa, which this version can't run. Open http://localhost:${WEB_PORT} to start a new world.\n`,
+  );
+while (!stopping && !(existsSync(CONFIG) && isClone(WORLD)))
+  await sleep(POLL_MS);
 if (!stopping) {
+  // Starting over sets the old world's `.state/` aside, the token with it; the
+  // frontend already has this one.
+  gatewayToken(token);
   try {
-    for (const line of syncSystemAgent(ROOT)) console.log(line);
+    syncSystemAgent(ROOT);
   } catch (error) {
     console.warn(`Couldn't update the system agent's tools: ${error.message}`);
-  }
-  try {
-    for (const line of dropStoreKeyRefs(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't finish moving provider keys: ${error.message}`);
-  }
-  try {
-    for (const line of adoptWorldPackage(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't give this world a package.json: ${error.message}`);
-  }
-  try {
-    // After the install above: it needs simple-git.
-    const { adoptWorldRepo } = await import("./world-repo.mjs");
-    for (const line of await adoptWorldRepo(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't set up this world's history: ${error.message}`);
   }
   try {
     for (const line of loadNewPlugins(ROOT)) console.log(line);
@@ -319,22 +321,9 @@ if (!stopping) {
     console.warn(`Couldn't add new plugins to this world: ${error.message}`);
   }
   try {
-    for (const line of allowChatStarters(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't let characters start chats: ${error.message}`);
-  }
-  try {
     for (const line of denyImpliedTools(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't settle characters' tool policy: ${error.message}`);
-  }
-  try {
-    // A world from before characters had their own skills lists the world's
-    // in `agents.defaults.skills`, which hides every other skill, the system
-    // agent's included (`world-update`, `world-building`…).
-    for (const line of scopeCharacterSkills(ROOT)) console.log(line);
-  } catch (error) {
-    console.warn(`Couldn't open characters' skills: ${error.message}`);
   }
   try {
     for (const line of startProviderPlugins(ROOT)) console.log(line);

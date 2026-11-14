@@ -3,15 +3,15 @@ import {
   readdir,
   readFile,
   rename,
+  rm,
   symlink,
   writeFile,
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { parseEnv } from "node:util";
 import {
   PROVIDERS,
   WorldPackageSchema,
@@ -25,14 +25,6 @@ import { runScript, type ScriptProgress } from "../run-script";
  * `scripts/system-agent.mjs` rewrites that file before every Gateway start.
  */
 export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
-
-/**
- * First-run setup. `worlds/<id>` are read-only templates; the player's world is
- * a copy in `world/`, so playing never touches the repo. Every step can run
- * again, and `openclaw.json` is written last: its existence means setup is done
- * and is what starts the Gateway (`scripts/dev.mjs`).
- */
-export const OPENROUTER_KEY = "OPENROUTER_API_KEY";
 
 /** A provider the setup guide offers a key for, from the shared catalog. */
 export type SetupProvider = Pick<
@@ -194,7 +186,7 @@ export interface CharacterGroup {
 
 export interface WorldOption {
   readonly id: string;
-  /** Cloned into `worlds/<id>`; until then only its `package.json` is known. */
+  /** Cloned into `world/`; until then only its `package.json` is known. */
   readonly downloaded: boolean;
   readonly title: string;
   readonly description: string;
@@ -290,8 +282,6 @@ export const scriptCatalog: Catalog = {
 export interface SetupStatus {
   readonly configured: boolean;
   readonly worlds: readonly WorldOption[];
-  /** The world already copied by an earlier, unfinished run. */
-  readonly imported: string | null;
   /** The providers offered a key, in order; empty once configured. */
   readonly providers: readonly SetupProvider[];
   /** Whose key an earlier, unfinished run saved. */
@@ -382,6 +372,12 @@ async function characterGroups(
   );
 }
 
+/**
+ * First-run setup. The player's world is a git clone of its creator's
+ * repository in `world/`, so playing never touches Kazusa's own files. Every
+ * step can run again, and `openclaw.json` is written last: its existence means
+ * setup is done and is what starts the Gateway (`scripts/dev.mjs`).
+ */
 export function createSetup(
   appDir: string,
   keys: KeyStore = sdkKeyStore(appDir),
@@ -390,16 +386,12 @@ export function createSetup(
   const liveDir = path.join(appDir, "world");
   const configFile = path.join(liveDir, "openclaw.json");
   const envFile = path.join(liveDir, ".state/.env");
-  // The world's own manifest; one from before clones names its template.
-  const markerFile = path.join(liveDir, "package.json");
 
   const readWorld = async (dir: string) =>
     WorldPackageSchema.parse(
       JSON.parse(await readFile(path.join(dir, "package.json"), "utf8")),
     );
 
-  const savedEnv = async (): Promise<string> =>
-    existsSync(envFile) ? readFile(envFile, "utf8") : "";
 
   /** The picked world, cloned into `world/` by `prepare`. */
   async function worldOption(id: string): Promise<WorldOption> {
@@ -501,20 +493,12 @@ export function createSetup(
     const worlds = (
       await Promise.all((await catalog.list()).map(listedOption))
     ).filter((option) => option !== undefined);
-    // A world from before clones, copied by a run that didn't finish.
-    const importedId =
-      !existsSync(configFile) && existsSync(markerFile)
-        ? (WorldPackageSchema.safeParse(
-            JSON.parse(await readFile(markerFile, "utf8")),
-          ).data?.kazusa.template ?? null)
-        : null;
     return {
       configured: existsSync(configFile),
       // Starting from scratch reads best as the last choice.
       worlds: worlds.toSorted(
         (a, b) => Number(a.id === "starter") - Number(b.id === "starter"),
       ),
-      imported: importedId,
       // Once a world exists its Gateway owns the auth store; setup is over.
       ...(existsSync(configFile)
         ? { providers: [], savedKey: null }
@@ -544,15 +528,6 @@ export function createSetup(
       );
   }
 
-  /** A key from before keys moved into profiles: the environment or `.env`. */
-  async function keyOutsideProfile(): Promise<string | undefined> {
-    return (
-      process.env[OPENROUTER_KEY]?.trim() ||
-      parseEnv(await savedEnv())[OPENROUTER_KEY]?.trim() ||
-      undefined
-    );
-  }
-
   async function readBase() {
     return BaseSchema.parse(
       JSON.parse(await readFile(path.join(appDir, "base.json"), "utf8")),
@@ -566,29 +541,21 @@ export function createSetup(
     return models.providers.flatMap((id) => setupProvider(id) ?? []);
   }
 
-  /** An offered provider's key in a profile, else one from the old keys file. */
+  /** The offered provider whose key an earlier, unfinished run saved. */
   async function savedKey(): Promise<SetupProvider | null> {
     const saved = await keys.saved();
-    return (
-      (await offered()).find(({ id }) => saved.includes(id)) ??
-      ((await keyOutsideProfile())
-        ? (setupProvider("openrouter") ?? null)
-        : null)
-    );
+    return (await offered()).find(({ id }) => saved.includes(id)) ?? null;
   }
 
   /**
-   * Into an auth profile. A key already there wins, as a key already in `.env`
-   * did, so finishing an interrupted run never swaps it.
+   * Into an auth profile. A key already there wins, so finishing an
+   * interrupted run never swaps it.
    */
   async function saveKey(typed: SetupRequest["key"]): Promise<void> {
+    if (!typed) return;
     const saved = await keys.saved();
     if ((await offered()).some(({ id }) => saved.includes(id))) return;
-    const key = typed ?? {
-      provider: "openrouter",
-      value: await keyOutsideProfile(),
-    };
-    if (key.value) await keys.set(key.provider, key.value);
+    await keys.set(typed.provider, typed.value);
   }
 
   async function writeConfig(request: SetupRequest): Promise<void> {
@@ -681,9 +648,40 @@ export function createSetup(
     return { progress: progress ?? null };
   }
 
+  /**
+   * A world an older Kazusa made: set up, but not a clone of its creator's
+   * repository (`scripts/dev.mjs` asks the same, and won't start it).
+   */
+  function outdated(): boolean {
+    if (!existsSync(configFile)) return false;
+    try {
+      return !/^\[remote "origin"\]/m.test(
+        readFileSync(path.join(liveDir, ".git/config"), "utf8"),
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Sets an older Kazusa's world aside in `old-worlds/`, never deleting it, so
+   * setup starts a new one. The template copies that Kazusa kept go.
+   */
+  async function startOver(): Promise<void> {
+    if (!outdated()) throw new Error("This world doesn't need replacing.");
+    const aside = path.join(appDir, "old-worlds");
+    await mkdir(aside, { recursive: true });
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    await rename(liveDir, path.join(aside, `world-${stamp}`));
+    for (const cache of ["worlds", ".worlds-before-repositories"])
+      await rm(path.join(appDir, cache), { recursive: true, force: true });
+  }
+
   return {
     /** Cheap: no catalog, subprocess or network, unlike `status()`. */
     configured: () => existsSync(configFile),
+    outdated,
+    startOver,
     status,
     prepare,
     apply,

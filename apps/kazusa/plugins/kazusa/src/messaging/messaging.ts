@@ -596,8 +596,6 @@ export class Messaging {
   private async init(): Promise<void> {
     this.assertCurrent();
     if (this.initialized) return;
-    await this.deps.store.ready?.();
-    this.assertCurrent();
     await this.deps.clock.init();
     const chats = await this.deps.conversations.entries();
     this.assertCurrent();

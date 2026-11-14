@@ -3,15 +3,16 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { WorldPackageSchema, type WorldPackage } from "@kazusa/client";
+import { WorldPackageSchema } from "@kazusa/client";
 import { renamedText } from "../location/pages.ts";
-import { readWorldPackage, WORLD_PACKAGE } from "../world/package.ts";
+import { WORLD_PACKAGE } from "../world/package.ts";
 import { blobId, copyFiles, filesAt, readBlobs, type Git } from "./git.ts";
-import { parseDoc, renderDoc } from "./parts.ts";
+import { parseDoc } from "./parts.ts";
 import {
   mergeMarkdown,
   sameMarkdown,
@@ -31,10 +32,7 @@ const STATE_DIR = path.join(".state", "kazusa", "world-update");
 const REPORT = path.join(STATE_DIR, "report.json");
 
 const PARTS = ["shared", "workspaces"] as const;
-/**
- * The world's manifest: an update brings the creator's, keeping which world
- * this is a copy of.
- */
+/** The world's manifest: an update brings the creator's, byte for byte. */
 const PACKAGE = WORLD_PACKAGE;
 const LAYOUT_KEYS = ["fm:map"];
 const TEXT = /\.(md|json|txt)$/;
@@ -106,11 +104,6 @@ export function commitTree(git: Git, commit: string): Tree {
   };
 }
 
-/** Which template the live world came from, from its `package.json`. */
-export function templateIdOf(live: string): string | undefined {
-  return readWorldPackage(live)?.kazusa.template;
-}
-
 // ------------------------------------------------------------------- renames
 
 function renamesOf(template: Tree): Record<string, string> {
@@ -171,8 +164,6 @@ export interface Area {
 }
 
 export interface Plan {
-  readonly template: string;
-  readonly hasBase: boolean;
   readonly renames: Readonly<Record<string, string>>;
   /** The renames this world still has the old ids of; the rest were applied. */
   readonly pendingRenames: Readonly<Record<string, string>>;
@@ -190,18 +181,6 @@ export interface Plan {
    * since a kept position otherwise matches nothing the creator did.
    */
   readonly arrangedMoved: number;
-  /**
-   * No base: what play wrote is guessed from its marks, so this can go badly,
-   * worst of all if this world was never really a copy of the template.
-   */
-  readonly bestAttempt: boolean;
-  /** Share of this world's pages the template also has; low means unrelated. */
-  readonly overlap: number;
-  /**
-   * Without a base, pages here the template lacks are kept: removed upstream,
-   * or the user's own.
-   */
-  readonly notInTemplate: readonly string[];
 }
 
 /**
@@ -252,65 +231,19 @@ const CHARACTER = /^shared\/wiki\/entities\/characters\/([^/]+)\.md$/;
 const PLACE = /^shared\/wiki\/entities\/places\/([^/]+)\.md$/;
 const CARD = /^workspaces\/[^/]+\/wiki\/entities\/places\/([^/]+)\.md$/;
 
-/** Keys and sections only play writes: visit stamps, sleep, the map layout. */
-const PLAY_KEYS = new Set([
-  "fm:map",
-  "fm:seen",
-  "fm:first_visited_iso",
-  "fm:relation",
-]);
-const PLAY_SECTION =
-  /^section:(notes|history|lately|plans recorded for .*|what they think of me|open threads|see also|dream)(#\d+)?$/;
-
-/**
- * Without a base, a stand-in for one: the live page minus what play visibly
- * wrote. A page play never touched then takes the creator's version; on a
- * character's page play did touch, any text that differs is a conflict.
- */
-function standIn(text: string, owner: MergePolicy["owner"]): string {
-  const doc = parseDoc(text);
-  const isPlay = (key: string) => PLAY_KEYS.has(key) || PLAY_SECTION.test(key);
-  const played = [...doc.front, ...doc.body].some(({ key }) => isPlay(key));
-  const front = doc.front.filter(
-    ({ key }) =>
-      !isPlay(key) && !(owner === "personal" && played && key === "fm:summary"),
-  );
-  const body = doc.body.filter(
-    ({ key }) =>
-      !isPlay(key) && !(owner === "personal" && played && key !== "title"),
-  );
-  return renderDoc({ front, body });
-}
-
-function overlapOf(
-  live: Iterable<string>,
-  template: ReadonlySet<string>,
-): number {
-  const pages = [...live].filter((file) => file.endsWith(".md"));
-  if (!pages.length) return 1;
-  return (
-    Math.round(
-      (pages.filter((file) => template.has(file)).length / pages.length) * 100,
-    ) / 100
-  );
-}
-
 export function planUpdate(
   live: string,
   template: Tree,
-  base: Tree | undefined,
+  base: Tree,
   options: { readonly layout: MergePolicy["layout"] },
 ): Plan {
-  const id = templateIdOf(live) ?? "template";
-  const bestAttempt = base === undefined;
-  const notInTemplate: string[] = [];
   const renames = renamesOf(template);
 
   const liveFiles = new Map<string, string>();
   for (const file of filesOf(live))
     liveFiles.set(renamedPath(file, renames), file);
   const baseOriginal = new Map(
-    [...(base?.ids.keys() ?? [])].map((file) => [
+    [...base.ids.keys()].map((file) => [
       renamedPath(file, renames),
       file,
     ]),
@@ -327,10 +260,10 @@ export function planUpdate(
   const liveHash = (file: string) =>
     blobId(readFileSync(path.join(live, liveFiles.get(file)!)));
   const baseText = (file: string) => {
-    const text = base!.text(baseOriginal.get(file)!);
+    const text = base.text(baseOriginal.get(file)!);
     return text === undefined ? undefined : renamedText(text, renames);
   };
-  const baseHash = (file: string) => base!.ids.get(baseOriginal.get(file)!);
+  const baseHash = (file: string) => base.ids.get(baseOriginal.get(file)!);
   const templateText = (file: string) => template.text(file) ?? "";
   const templateHash = (file: string) => template.ids.get(file);
 
@@ -349,26 +282,8 @@ export function planUpdate(
     const md = file.endsWith(".md");
     if (file === PACKAGE) {
       if (!inT || !inL) continue;
-      // The creator's, byte for byte, so a clone has nothing left to show as
-      // changed; a world from before clones keeps which template it names.
-      const current = JSON.parse(
-        read(path.join(live, file)),
-      ) as Partial<WorldPackage>;
-      const kept = current.kazusa?.template;
-      const theirs = templateText(file);
-      const next = kept
-        ? `${JSON.stringify(
-            {
-              ...(JSON.parse(theirs) as WorldPackage),
-              kazusa: {
-                ...(JSON.parse(theirs) as WorldPackage).kazusa,
-                template: kept,
-              },
-            },
-            null,
-            2,
-          )}\n`
-        : theirs;
+      // The creator's, byte for byte: nothing of it is play's.
+      const next = templateText(file);
       if (next !== read(path.join(live, file)))
         changes.push({ path: file, outcome: "updated", text: next });
       continue;
@@ -383,8 +298,6 @@ export function planUpdate(
     }
     if (!inT && inL) {
       if (!inB) {
-        if (bestAttempt && !from.from && file.startsWith("shared/"))
-          notInTemplate.push(file);
         if (from.from)
           changes.push({
             path: file,
@@ -416,11 +329,7 @@ export function planUpdate(
     if (md) {
       const t = templateText(file);
       const l = liveText(file);
-      const b = inB
-        ? baseText(file)
-        : bestAttempt
-          ? standIn(l, policy.owner)
-          : undefined;
+      const b = inB ? baseText(file) : undefined;
       // Arranged: the user's position isn't the base's. Moved: the creator's
       // isn't either, nor the user's, so `layout` picks between them.
       const [lm, tm, bm] = [mapLine(l), mapLine(t), mapLine(b)];
@@ -453,7 +362,7 @@ export function planUpdate(
     }
     const [l, t] = [liveHash(file), templateHash(file)];
     if (l === t && !from.from) continue;
-    const b = inB ? baseHash(file) : bestAttempt ? l : undefined;
+    const b = inB ? baseHash(file) : undefined;
     if (l === b)
       changes.push({
         path: file,
@@ -533,11 +442,6 @@ export function planUpdate(
   const after = characters(templateFiles);
   const inBase = characters(baseFiles);
   return {
-    template: id,
-    hasBase: !bestAttempt,
-    bestAttempt,
-    overlap: overlapOf(liveFiles.keys(), templateFiles),
-    notInTemplate,
     renames,
     pendingRenames,
     areas: areasOf(finalChanges),
@@ -555,11 +459,12 @@ export function planUpdate(
 // --------------------------------------------------------------------- apply
 
 export interface Report {
-  readonly template: string;
-  /** The commit the world stood on before, and the release it took. */
-  readonly from?: string;
+  /** The commit the world stood on before, and the release it takes. */
+  readonly from: string;
   readonly to: string;
-  readonly version?: string;
+  readonly version: string;
+  /** The save of the world as it was before (`saveRef`). */
+  readonly save: string;
   readonly layout: MergePolicy["layout"];
   readonly counts: Readonly<Record<string, number>>;
   readonly conflicts: readonly {
@@ -579,39 +484,20 @@ function write(file: string, data: string | Buffer): void {
 }
 
 /**
- * Writes the plan into the world's files, and the report the system agent
- * resolves from: an update stays open until `finishUpdate`.
+ * The report the system agent resolves from, written before any file changes:
+ * an update is open from then until `finishUpdate`, so one cut short is still
+ * known (`play` isn't on `to` yet).
  */
-export function applyUpdate(
+export function openReport(
   live: string,
-  template: Tree,
   plan: Plan,
   layout: MergePolicy["layout"],
-  release: {
-    readonly from?: string;
-    readonly to: string;
-    readonly version?: string;
-  },
+  release: Pick<Report, "from" | "to" | "version" | "save">,
 ): Report {
-  for (const change of plan.changes)
-    if (change.from) rmSync(path.join(live, change.from), { force: true });
-  for (const change of plan.changes)
-    if (change.outcome === "removed" || change.outcome === "forgotten")
-      rmSync(path.join(live, change.path), { force: true });
-  template.copy(
-    plan.changes
-      .filter(({ copyFromTemplate }) => copyFromTemplate)
-      .map(({ path: file }) => file),
-    live,
-  );
-  for (const change of plan.changes)
-    if (!change.copyFromTemplate && change.text !== undefined)
-      write(path.join(live, change.path), change.text);
   const counts: Record<string, number> = {};
   for (const { outcome } of plan.changes)
     counts[outcome] = (counts[outcome] ?? 0) + 1;
   const report: Report = {
-    template: plan.template,
     ...release,
     layout,
     counts,
@@ -639,15 +525,51 @@ export function applyUpdate(
   return report;
 }
 
+/**
+ * Writes the plan into the world's files: every new file first, then what
+ * goes, so nothing is ever only in the save.
+ */
+export function applyUpdate(live: string, template: Tree, plan: Plan): void {
+  const kept = new Set(
+    plan.changes
+      .filter(({ outcome }) => outcome !== "removed" && outcome !== "forgotten")
+      .map(({ path: file }) => file),
+  );
+  // An orphan the creator renamed moves to its new name as it is.
+  for (const change of plan.changes)
+    if (
+      change.from &&
+      kept.has(change.path) &&
+      !change.copyFromTemplate &&
+      change.text === undefined
+    ) {
+      mkdirSync(path.dirname(path.join(live, change.path)), {
+        recursive: true,
+      });
+      renameSync(path.join(live, change.from), path.join(live, change.path));
+    }
+  template.copy(
+    plan.changes
+      .filter(({ copyFromTemplate }) => copyFromTemplate)
+      .map(({ path: file }) => file),
+    live,
+  );
+  for (const change of plan.changes)
+    if (!change.copyFromTemplate && change.text !== undefined)
+      write(path.join(live, change.path), change.text);
+  for (const change of plan.changes) {
+    if (change.from && !kept.has(change.from))
+      rmSync(path.join(live, change.from), { force: true });
+    if (!kept.has(change.path))
+      rmSync(path.join(live, change.path), { force: true });
+  }
+}
+
 /** The update being resolved, if one is. */
 export function readReport(live: string): Report | undefined {
   const file = path.join(live, REPORT);
   if (!existsSync(file)) return undefined;
-  const report = JSON.parse(readFileSync(file, "utf8")) as Report & {
-    stage?: string;
-  };
-  // An older Kazusa's finished update left its report behind.
-  return report.stage === "finished" || !report.to ? undefined : report;
+  return JSON.parse(readFileSync(file, "utf8")) as Report;
 }
 
 /** Closes the update: nothing is left to resolve. */

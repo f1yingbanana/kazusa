@@ -71,8 +71,8 @@ export function useWorldUpdate(): {
 
 /** A version of the world, as the client shows it. */
 export interface WorldCommit {
-  /** Null for a world from before it was a clone, until its first update. */
-  readonly commit: string | null;
+  /** The creator's commit. */
+  readonly commit: string;
   /** The release's version (its tag); null when it isn't on one. */
   readonly version?: string | null;
   /** The creator's notes for it (its tag's message), once it's downloaded. */

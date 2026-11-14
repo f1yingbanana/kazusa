@@ -1,8 +1,7 @@
 import { currentConfig } from "../current-config.ts";
-import {
-  generateSecureUuid,
-  type OpenClawPluginApi,
-  type OpenClawPluginToolContext,
+import type {
+  OpenClawPluginApi,
+  OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/core";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { z } from "zod";
@@ -218,13 +217,7 @@ export function registerTaskman(
     };
 
     const synchronize = async (agentId: string): Promise<void> => {
-      let task = await store.lookup(agentId);
-      // One-time migration of leases retained before task IDs existed. Cron
-      // reconciliation completes before the scheduled deadline is admitted.
-      if (task && !task.id) {
-        task = { ...task, id: generateSecureUuid() };
-        await store.register(agentId, task, { assertCurrent });
-      }
+      const task = await store.lookup(agentId);
       const snapshot = clock.now();
       if (
         !task ||

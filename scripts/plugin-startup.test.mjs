@@ -3,12 +3,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  allowChatStarters,
   denyImpliedTools,
   IMPLIED_TOOLS,
   loadNewPlugins,
-  NO_BUNDLED_SKILLS,
-  scopeCharacterSkills,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
 
@@ -146,43 +143,6 @@ describe("loadNewPlugins", () => {
   });
 });
 
-describe("allowChatStarters", () => {
-  it("lets every list that may send start chats, once", () => {
-    const { root, read } = repo({
-      tools: { alsoAllow: ["start_task", "send_message", "list_chats"] },
-      // Characters are keyed by id, as worlds keep them.
-      agents: {
-        entries: {
-          a: { tools: { alsoAllow: ["send_message", "talk"] } },
-          b: { tools: { alsoAllow: ["recall"] } },
-          c: { workspace: "./workspaces/c" },
-        },
-      },
-    });
-    expect(allowChatStarters(root)).toHaveLength(1);
-    const world = read();
-    expect(world.tools.alsoAllow).toEqual([
-      "start_task",
-      "send_message",
-      "create_group",
-      "talk",
-      "list_chats",
-    ]);
-    expect(world.agents.entries.a.tools.alsoAllow).toEqual([
-      "send_message",
-      "create_group",
-      "talk",
-    ]);
-    expect(world.agents.entries.b.tools.alsoAllow).toEqual(["recall"]);
-    expect(world.agents.entries.c).toEqual({ workspace: "./workspaces/c" });
-    expect(allowChatStarters(root)).toEqual([]);
-  });
-
-  it("does nothing without a world", () => {
-    expect(allowChatStarters(repo().root)).toEqual([]);
-  });
-});
-
 describe("denyImpliedTools", () => {
   const arona = {
     $include: "./.state/kazusa/system-agent.json",
@@ -248,42 +208,5 @@ describe("denyImpliedTools", () => {
 
   it("does nothing before a world exists", () => {
     expect(denyImpliedTools(repo().root)).toEqual([]);
-  });
-});
-
-describe("scopeCharacterSkills", () => {
-  it("drops the world's skill list and hides bundled skills, once", () => {
-    const { root, read } = repo({
-      agents: {
-        defaults: { skills: ["fishing"], workspace: "./workspaces" },
-        entries: { arona: { $include: "./.state/kazusa/system-agent.json" } },
-      },
-      skills: { load: { extraDirs: ["./shared/skills"] } },
-    });
-    expect(scopeCharacterSkills(root)).toHaveLength(1);
-    expect(read()).toEqual({
-      agents: {
-        defaults: { workspace: "./workspaces" },
-        entries: { arona: { $include: "./.state/kazusa/system-agent.json" } },
-      },
-      skills: {
-        load: { extraDirs: ["./shared/skills"] },
-        allowBundled: [NO_BUNDLED_SKILLS],
-      },
-    });
-    expect(scopeCharacterSkills(root)).toEqual([]);
-  });
-
-  it("keeps bundled skills a world chose to allow", () => {
-    const { root, read } = repo({
-      agents: { defaults: {} },
-      skills: { allowBundled: ["weather"] },
-    });
-    expect(scopeCharacterSkills(root)).toEqual([]);
-    expect(read().skills.allowBundled).toEqual(["weather"]);
-  });
-
-  it("does nothing before a world exists", () => {
-    expect(scopeCharacterSkills(repo().root)).toEqual([]);
   });
 });

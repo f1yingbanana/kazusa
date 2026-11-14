@@ -14,8 +14,10 @@ import {
   commitOf,
   downloadedRelease,
   gitIn,
-  keepInStash,
   PLAY,
+  restoreWorld,
+  saveRef,
+  saveWorld,
   standOn,
 } from "./git.ts";
 import { applyUpdate, commitTree, planUpdate } from "./update.ts";
@@ -80,8 +82,16 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+/** Every world file as it is on disk, for comparing before and after. */
+const snapshot = () =>
+  run("ls-files", "--cached", "--others", "--exclude-standard")
+    .split("\n")
+    .filter(Boolean)
+    .sort()
+    .map((file) => `${file}\t${readFileSync(path.join(live, file), "hex")}`);
+
 describe("a world update over git", () => {
-  it("keeps the game in git's stash, merges the release in and stands the world on it", () => {
+  it("saves the game, merges the release in, stands the world on it, and can put it all back", () => {
     const first = world();
     const git = gitIn(live)!;
     const release = downloadedRelease(git)!;
@@ -94,24 +104,21 @@ describe("a world update over git", () => {
     const plan = planUpdate(live, template, commitTree(git, first), {
       layout: "keep",
     });
-    expect(plan.bestAttempt).toBe(false);
+    const before = snapshot();
 
-    keepInStash(git, live, "Demo before updating to 2.0.0", release.commit);
-    // Nothing touched: the stash is only a copy.
-    expect(get("workspaces/amy/MEMORY.md")).toContain("Busy.");
-    expect(run("stash", "list")).toContain("Demo before updating to 2.0.0");
-    expect(
-      run("stash", "show", "--include-untracked", "--name-only"),
-    ).toContain("workspaces/amy/wiki/entities/characters/bea.md");
-    // The machine's config isn't the world's.
-    expect(run("show", "--name-only", "--format=", "stash@{0}")).not.toContain(
-      "openclaw.json",
+    const save = saveRef(release.version);
+    saveWorld(git, live, save, "Demo before updating to 2.0.0");
+    // Nothing touched: the save is only a copy, on the release it stood on.
+    expect(snapshot()).toEqual(before);
+    expect(run("rev-parse", `${save}^`)).toBe(first);
+    const saved = run("show", "--name-only", "--format=", save);
+    expect(run("ls-tree", "-r", "--name-only", save)).toContain(
+      "workspaces/amy/wiki/entities/characters/bea.md",
     );
+    // The machine's config isn't the world's.
+    expect(saved).not.toContain("openclaw.json");
 
-    applyUpdate(live, template, plan, "keep", {
-      from: first,
-      to: release.commit,
-    });
+    applyUpdate(live, template, plan);
     standOn(git, release.commit);
     expect(get("shared/wiki/entities/places/hub.md")).toContain("The centre.");
     expect(get("workspaces/amy/MEMORY.md")).toContain("Busy.");
@@ -134,32 +141,29 @@ describe("a world update over git", () => {
         .sort(),
     ).toEqual(["?? workspaces/amy/wiki/", "M workspaces/amy/MEMORY.md"]);
     expect(downloadedRelease(git)).toBeUndefined();
-    // And the stash puts the world back as it was, if ever needed.
-    run("checkout", "--quiet", "--", ".");
-    run("clean", "-fdq", "--", "workspaces");
-    run("reset", "--quiet", "--hard", first);
-    run("stash", "apply", "--quiet");
-    expect(get("shared/wiki/entities/places/hub.md")).toContain("A place.");
-    expect(get("workspaces/amy/MEMORY.md")).toContain("Busy.");
+
+    // And the save puts the world back exactly as it was.
+    restoreWorld(git, save, release.commit);
+    expect(snapshot()).toEqual(before);
+    expect(commitOf(git, PLAY)).toBe(first);
+    expect(get("openclaw.json")).toBe("{}");
+    expect(downloadedRelease(git)?.version).toBe("2.0.0");
   });
 
-  it("keeps a world without history against the release it's about to take", () => {
-    run("init", "--quiet", `--initial-branch=${PLAY}`);
-    run("config", "user.name", "Kazusa");
-    run("config", "user.email", "kazusa@localhost");
-    put("package.json", "{}");
-    run("add", "-A");
-    run("commit", "--quiet", "-m", "Release");
-    run("tag", "v1.0.0");
-    const release = run("rev-parse", "HEAD");
-    run("update-ref", "-d", `refs/heads/${PLAY}`);
-    put("workspaces/amy/MEMORY.md", "Played.\n");
+  it("puts back a world whose update was cut short before `play` moved", () => {
+    const first = world();
     const git = gitIn(live)!;
-    expect(downloadedRelease(git)?.version).toBe("1.0.0");
-    keepInStash(git, live, "Before", release);
-    standOn(git, release);
-    expect(run("stash", "list")).toContain("Before");
-    expect(get("workspaces/amy/MEMORY.md")).toBe("Played.\n");
+    const release = downloadedRelease(git)!;
+    const before = snapshot();
+    const save = saveRef(release.version);
+    saveWorld(git, live, save, "Before");
+    // Half the release written, `play` never moved.
+    put("shared/wiki/entities/places/hub.md", place("hub", "The centre."));
+    put("workspaces/amy/portraits/happy.webp", Buffer.from([0, 1, 2, 3]));
+    rmSync(path.join(live, "shared/wiki/entities/places/park.md"));
+    restoreWorld(git, save, release.commit);
+    expect(snapshot()).toEqual(before);
+    expect(commitOf(git, PLAY)).toBe(first);
   });
 
   it("works on the world's own repository whatever the environment says", () => {

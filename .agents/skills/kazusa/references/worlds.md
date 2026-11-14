@@ -1,11 +1,10 @@
 # World Packages and Versioning
 
-Status (2026-11-05): §1–§3 built (`WorldPackageSchema` in `@kazusa/client`,
+Status (2026-11-14): §1–§3 built (`WorldPackageSchema` in `@kazusa/client`,
 `src/world/package.ts`, `src/world-update/`, `apps/web/lib/setup/`,
-`scripts/world-package.mjs`, `scripts/world-repo.mjs`); §4 is the agreed design,
-built through step 1 of its roadmap (§4.8). Read this before changing a world's
-`package.json`, how a world is set up or updated, or anything about versions,
-forks, history or saves.
+`scripts/world-repo.mjs`); §4 is the agreed design, built through step 1 of its
+roadmap (§4.8). Read this before changing a world's `package.json`, how a world
+is set up or updated, or anything about versions, forks, history or saves.
 
 Goal: a world is a thing people make, share, fork and keep playing. It should
 carry who made it and which version it is, take its creator's later releases
@@ -36,8 +35,11 @@ npm's own fields say what the world is; everything Kazusa needs sits under one
       "welcome": ["…"],
       "user": { "id": "user:sensei", "name": "Sensei" },
       "world": { "title": "Kivotos" }
-    },
-    "template": "blue-archive"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/f1yingbanana/kazusa-cute-and-funny-world-of-kivotos.git"
   }
 }
 ```
@@ -56,7 +58,6 @@ npm's own fields say what the world is; everything Kazusa needs sits under one
 | `kazusa.defaultGroup` | The group the setup guide picks to start with: a value of one of the world's anchors.                   |
 | `kazusa.renames`      | Place and concept ids the creator renamed, `{ "old_id": "new_id" }`, so copies follow on update.        |
 | `kazusa.config`       | Merged into the plugin's config (`openclaw.json`) once, at setup. Later edits here don't reach a world. |
-| `kazusa.template`     | Live worlds only: the template (`worlds/<id>`, its id in `world-sources.json`) the world is a copy of.  |
 | `repository`          | Npm's: where the world lives and its updates come from (`{ type: "git", url }`).                        |
 
 Rules:
@@ -65,25 +66,22 @@ Rules:
   definition; the plugin and the setup guide both parse with it. Add a field
   there first. Unknown keys are kept (`looseObject`), so a world can carry
   fields an older Kazusa doesn't know.
-- **Identity is `name`, not the folder.** Folders are where a template happens
-  to be installed; `name` is what a world _is_. Today `kazusa.template` links a
-  copy to its template by folder; once templates are repos (§4.5) the link is
-  npm's `repository` field and `name`.
+- **Identity is `name`, not the folder.** `name` is what a world _is_; the
+  repository a live world was cloned from (its `origin`) is where its updates
+  come from.
 - **Raise `version` with every template release** (Publish does, §4.7), or
   copies can't tell they are behind. Patch for fixes to pages, minor for new
   characters or places, major when a copy needs the system admin's help to take
   it (renames, removals).
 - **Credit comes from the live world's own file.** A fork that wants its own
-  credit changes `name`, `displayName` and `author`; `kazusa.template` still
-  says where it came from.
+  credit changes `name`, `displayName` and `author`.
 - **No runtime state.** The manifest describes the world as authored. Clock,
   positions, memories and sessions live in stores and `.state/`.
 
 ## 2. Lifecycle today
 
-What's built today, being replaced: §4.5–§4.7 is the agreed design (a world is a
-git clone; updates stash, check out the release and merge back), and §4.10 says
-what's kept.
+What's built today: §4.5–§4.7 is the design it follows (a world is a git clone;
+an update saves the world, merges the release in and moves `play`).
 
 - **Setup** (`apps/web/lib/setup/setup.ts`, `world-repo.mjs list` and `clone`):
   lists the worlds in `apps/kazusa/world-sources.json` by peeking at each one's
@@ -105,73 +103,76 @@ what's kept.
   `GET /update/world`, cached 2 minutes): hourly in the client (`useWorldCheck`,
   mounted with the notice) and from Settings → Updates → World's Check again,
   only for the local owner. `ls-remote --tags` gives the newest version tag;
-  it's new unless `play` is on it or has it (a world without history compares
-  versions). Not downloaded: its size from GitHub's file lists of `play` and the
-  release (display only, absent when GitHub can't say) and a link to its release
-  page. Downloaded: its notes, the tag's message.
+  it's new unless `play` is on it or has it. Downloaded means its tag is here,
+  as the Ready signal reads it: then its notes, the tag's message. Not
+  downloaded: its size from GitHub's file lists of `play` and the release
+  (display only, absent when GitHub can't say) and a link to its release page.
 - **Downloading** (`POST /update/world`, `world-repo.mjs download`,
   `downloadLiveWorld`), once the player says so: `git fetch` of the release's
   tag only, with a minimum-speed limit, git's progress kept in memory and served
-  with the check. A world from before clones is then moved onto the published
-  commit its `.template/` matches (only `play` and the index move; never when it
-  has commits of its own), and the snapshot and old update backups go.
+  with the check. Nothing in the world changes.
 - **Ready** (`availableUpdate` in `src/world/package.ts`, `downloadedRelease` in
   `src/world-update/git.ts`, on each request): `GET /kazusa/world` carries
   `world.update` (`{ commit, date, version, notes, url, systemAgent }`) while
   the highest local version tag isn't in `play`'s history. The client announces
   it once and Settings offers Ask <system agent>.
 - **Updating** (`src/world-update/`, the system agent's `world_update`: `check`,
-  `apply`, `conflicts`, `show`, `finish`; no undo). The release and the base
-  (`play`'s commit; none for a world without history: a best attempt, which
-  never removes anything) are read straight from git (`commitTree`, text in one
-  `cat-file --batch`). `apply`, clock paused: keeps the world as it is in git's
-  stash (`keepInStash`: a temporary index, every world file, stored with
-  `git stash store`, no file touched), writes the page-by-page merge into the
-  files (pictures with `git restore --source`, paths literal), moves `play` to
-  the release with the index there (`standOn`), and writes
-  `.state/kazusa/world-update/report.json` (conflicts, orphans, the commits from
-  and to). `show` reads a file at either commit. `finish` checks the map,
-  re-homes and deletes the report. The live `package.json` becomes the creator's
-  as is (a world from before clones keeps its `kazusa.template`); renames come
-  from it.
-- **Repository** (`adoptWorldRepo`, before every Gateway start, from
-  `scripts/dev.mjs` and `npm run gateway`; nothing fetched, no file touched):
-  makes `world/` a repository for a world from before them (`git init`, no
-  commit: its first update finds its base), sets the config every world
-  repository has (§4.5), `.git/info/exclude` (only `package.json`, `shared/`,
-  `workspaces/`) and `.git/info/attributes`, points `origin` at the world's
-  `repository` or its source, and drops an older Kazusa's `upstream` remote and
-  `refs/kazusa/*`.
+  `apply`, `conflicts`, `show`, `restore`, `finish`). The release and the base
+  (`play`'s commit) are read straight from git (`commitTree`, text in one
+  `cat-file --batch`). `apply`, clock paused, in this order:
+  1. Saves the world (`saveWorld`): a commit of every world file through a
+     temporary index, parent `play`'s commit, at
+     `refs/saves/before-update-<version>` (§4.6's autosave). No file touched.
+  2. Writes `.state/kazusa/world-update/report.json` (conflicts, orphans, the
+     commits from and to, the save): the update is open from here on.
+  3. Writes the page-by-page merge into the files (pictures with
+     `git restore --source`, paths literal): new files first, then what goes, so
+     nothing is ever only in the save.
+  4. Moves `play` to the release with the index there (`standOn`). Last, so an
+     open report with `play` not on `to` means `apply` was cut short: every
+     action but `show` and `restore` then refuses.
+
+  `restore` puts the save's files back (`read-tree -u --reset` from the
+  release's index, so what only the release brought goes) and `play` on the
+  save's parent, and closes the report. `show` reads a file at either commit.
+  `finish` checks the map, re-homes and deletes the report; the save stays. The
+  live `package.json` becomes the creator's as is; renames come from it.
+
+- **Repository**: setup's clone sets the config every world repository has
+  (§4.5), `.git/info/exclude` (only `package.json`, `shared/`, `workspaces/`)
+  and `.git/info/attributes`, once. Nothing runs on it at startup.
 - **Git** (`findGit`): `git/` beside the app, GitHub Desktop's portable build
   (`dugite-native`, pinned with its sha256 in `scripts/package.mjs`, Git
   Credential Manager and Git LFS stripped: they are most of it and nothing uses
   them), else the system's. On macOS without the developer tools, `/usr/bin/git`
   only offers to install them, so that counts as none. simple-git guards the
   environment: our variables (`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`,
-  `GIT_CONFIG_NOSYSTEM`, `GIT_INDEX_FILE`, author dates) are named in
-  `allowEnvironment`, the shipped binary and exec path allowed through `unsafe`,
-  and every inherited `GIT_*`, `EDITOR`, `PAGER` and the like dropped.
+  `GIT_CONFIG_NOSYSTEM`) are named in `allowEnvironment`, the shipped binary and
+  exec path allowed through `unsafe`, and every inherited `GIT_*`, `EDITOR`,
+  `PAGER` and the like dropped. The plugin runs the same git directly
+  (`world-update/git.ts`), pinned to the world's repository with `GIT_DIR` and
+  `GIT_WORK_TREE`.
 
-## 3. Bringing existing worlds along
+## 3. Worlds an older Kazusa made
 
-Worlds made before `package.json` have a `world.json` (the template's, plus
-`id`) or, older still, nothing saying where they came from.
-`scripts/world-package.mjs` runs before every Gateway start, from
-`scripts/dev.mjs` (installed copies start through it with `--packaged`) and from
-`npm run gateway`, and is in the release package's file list. It:
+Not brought along. The release that made worlds clones dropped every migration
+for anything older: no world, config or state from before it is upgraded. A
+world that is set up (`openclaw.json`) but not a clone of its creator's
+repository (no `origin` in `.git/config`) is an older Kazusa's:
 
-1. Leaves a world alone whose `package.json` already has `kazusa.template`
-   (removing a stale `world.json` beside it).
-2. Otherwise finds the template: the `id` its `world.json` recorded, else the
-   one template whose `kazusa.config.user.id` equals the world's player id in
-   `openclaw.json`. The player's id is fixed when a world is made and each
-   template has its own, so it identifies the template when nothing else does.
-3. Writes the template's `package.json` with `kazusa.template`, and removes
-   `world.json`. A world it can't place is left as it is: no credit, and
-   `world_update` says it isn't a template world.
-
-Keep this until no supported release can produce a world without `package.json`;
-then delete the script and the legacy marker in setup.
+- `scripts/dev.mjs` doesn't start the Gateway for it, and says to open the
+  frontend.
+- The frontend shows Start a new world (`components/setup/start-over.tsx`,
+  `POST /setup/start-over`, `startOver` in `lib/setup/setup.ts`): the whole
+  `world/` folder, `.state/` included, moves to `old-worlds/world-<time>/`,
+  never deleted, and the template copies that Kazusa kept (`worlds/`,
+  `.worlds-before-repositories/`) go. Setup then runs as on a new install, and
+  `dev.mjs` writes the Gateway's token back into the new `.state/.env` before
+  starting it.
+- An in-app update from an older Kazusa lands here: its updater keeps `world/`
+  and swaps the rest, and the page that asked for it reloads into this screen.
+  The macOS app's `rsync` and the Windows uninstaller keep `old-worlds/` with
+  the world.
 
 ## 4. Design: canon, play, checkpoints and saves
 
@@ -308,12 +309,12 @@ can't be cleaned.
 - **What the clone tracks**: the creator's files only, `package.json`, `shared/`
   and `workspaces/`. `openclaw.json` (this machine's config, which the Gateway
   is reading) and `.state/` (the databases and runtime files) are local and
-  ignored in `.git/info/exclude`: an update's stash must not take the config
-  from under a running Gateway or stash hundreds of MB of SQLite, and
-  `git status` stays fast. Saves still hold them: a save adds them to its own
-  tree explicitly (§4.6). Publishing never can: it builds commits only from the
-  exported parts (below), so nothing local reaches the creator's repository
-  whatever git tracks here.
+  ignored in `.git/info/exclude`: an update's save must not take the config from
+  under a running Gateway or copy hundreds of MB of SQLite, and `git status`
+  stays fast. Saves still hold them: a save adds them to its own tree explicitly
+  (§4.6). Publishing never can: it builds commits only from the exported parts
+  (below), so nothing local reaches the creator's repository whatever git tracks
+  here.
 - **Repository config, set when it's cloned**: `core.autocrlf=false` (a CRLF
   page would differ from every base), `core.longpaths=true`,
   `fetch.fsckObjects=true`, no signing, a local identity.
@@ -369,9 +370,10 @@ the developer tools). Without git, a world can't be set up or updated.
 
 ### 4.6 Saves and loading (later)
 
-Not built, and nothing below is written yet: there are no saves, so updates
-merge into the working changes with no undo (§4.7). When saves come, they fit
-the clone model without changing it.
+Not built, apart from one: an update saves the world's files first, at
+`refs/saves/before-update-<version>` (§4.7), and `world_update restore` loads it
+until the update is finished. When saves come, they fit the clone model without
+changing it.
 
 - **A save is a commit off to the side** on its own ref (`refs/saves/<name>`,
   `refs/saves/auto-<n>`): its **parent is `HEAD`**, the creator's commit the
@@ -451,9 +453,9 @@ Agreed 2026-11-14.
 - **Updating** (`world_update`, the system agent, clock paused) is
   `git pull --rebase --autostash` in effect, with our page merge doing the
   "pop":
-  1. Keep the game in git's stash (a temporary index of every world file, stored
-     with `git stash store`; no file touched). That's the recovery point
-     (`git stash list`); no undo is offered.
+  1. Save the world: a commit of every world file (a temporary index; no file
+     touched), parent `HEAD`, at `refs/saves/before-update-<version>`. That's
+     the recovery point; `restore` loads it until `finish`.
   2. Merge **page by page** (`merge.ts`: each frontmatter key, the lead, each
      `##` section; `## Notes` and `## History` union; a character's own fields
      win on her pages), base = `HEAD`, theirs = the release, ours = the files,
@@ -465,8 +467,9 @@ Agreed 2026-11-14.
      the game again.
   4. The system agent resolves conflicts and orphans in the world's files
      (`show` reads either version of a file), then `finish`: the map must load,
-     and stranded characters are re-homed. No commits. A crash at any step
-     leaves the stash, so nothing is lost.
+     and stranded characters are re-homed. Nothing committed on `play`. A crash
+     at any step leaves the save; `play` moving last tells an interrupted
+     `apply` apart, and `restore` then puts everything back to apply again.
 - **The base is `HEAD`**, so a creator rebasing a checkpoint stack doesn't
   matter: the old `HEAD` is exactly the commit the files were built on, and it's
   in the world's own repository even after the remote drops it.
@@ -476,16 +479,8 @@ Agreed 2026-11-14.
   their release and are never rebased (§4.6).
 - **A release that changes no world file** (only the checkpoint list, say) moves
   `HEAD` with nothing to merge.
-- **Best attempt**, for a world with no known base: the merge guesses play's
-  marks (visit stamps, notes, history, sleep's sections, the layout) and **never
-  removes anything**: pages the release lacks are kept and listed. The stash
-  holds the whole game first.
-- **Migrating existing worlds** happens at their first update, best effort,
-  nothing at start: once the release is fetched, the base is the published
-  commit the world's `.template/` matches, else `HEAD` if it's a creator's
-  commit, else none (a best attempt). `.template/` and old update backups are
-  deleted afterwards. A world without a repository gets one (`git init`,
-  `origin` from its `repository` or its source) when it first checks.
+- **No migration**: worlds an older Kazusa made aren't updated; their players
+  start a new world (§3).
 - **Later or sibling checkpoints** are never merged into a game in progress
   (another week); they're offered as "start it fresh", a new playthrough from
   the checkpoint (§4.6), the current one kept.
@@ -496,7 +491,7 @@ Agreed 2026-11-14.
 ### 4.8 Roadmap
 
 1. **Worlds as clones, updates over git** (§4.5, §4.7): setup clones; check,
-   download and update as above; migration at first update.
+   download and update as above; older worlds start again.
 2. **Saves and loading, locally** (§4.6): the Gateway-only restart on request,
    saves on their own refs, autosave on stop and before updates, Settings →
    Saves, load.
@@ -513,15 +508,15 @@ Agreed 2026-11-14.
 ### 4.10 Status
 
 Built 2026-11-14 (PR #70) for `main` only: setup clones, checking, downloading
-with git's progress, the update (stash, merge, move `play`), migration of worlds
-from before clones at their first download, and the release notes link (§2). One
-difference from §4.7's wording: an update doesn't check out the release; it
-writes the merge into the files and moves `play` and the index to the release,
-which leaves the same result without rewriting every file.
+with git's progress, the update (save, merge, move `play`, `restore` until
+`finish`), Start a new world for an older Kazusa's world (§3), and the release
+notes link (§2). One difference from §4.7's wording: an update doesn't check out
+the release; it writes the merge into the files and moves `play` and the index
+to the release, which leaves the same result without rewriting every file.
 
 **Later**: checkpoint branches and a playthrough's followed line, "start it
-fresh", saves (§4.6, which bring undo), publishing, the disk savings, and worlds
-off GitHub (no size shown).
+fresh", saves (§4.6, which bring undo after `finish`), publishing, the disk
+savings, and worlds off GitHub (no size shown).
 
 ## 5. Known edges
 

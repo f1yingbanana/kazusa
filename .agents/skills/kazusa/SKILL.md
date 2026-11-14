@@ -250,33 +250,29 @@ apps/kazusa/
     │   └── wiki/                       # PERSONAL WIKI (subjective beliefs)
     │       ├── entities/{characters,places}/<id>.md
     │       ├── concepts/<id>.md | syntheses/ | reports/
-    └── .state/                         # SQLite backing for keyed stores; .env holds provider keys and the Gateway token
+    └── .state/                         # SQLite backing for keyed stores; .env holds the Gateway token
 
 ```
 
 ### Worlds, Setup and Providers
 
-- **Templates and the live world**: `worlds/<id>/` are templates, each a clone
-  of a world's own repository listed in `apps/kazusa/world-sources.json`: setup
-  lists them by `package.json` alone and clones only the one picked, and every
-  start fast-forwards the clones there are (`package.json`, `shared/wiki`,
-  `workspaces`, optionally `shared/skills`); `apps/kazusa/base.json` is the
+- **Worlds and the live world**: each world is its own repository, listed in
+  `apps/kazusa/world-sources.json`; setup lists them by `package.json` alone (a
+  shallow peek) and clones only the one picked; `apps/kazusa/base.json` is the
   config every world shares. A world's `package.json` is npm's (`name` a lasting
-  slug, `displayName`, semver `version` raised with each template release,
-  `author`, `homepage`, `private: true`) with Kazusa's under `kazusa`: `title`
-  (the setup guide's label, else `displayName`), `systemAgent`, `defaultGroup`,
-  `renames`, and `config` (merged into the plugin's config at setup); the live
-  copy adds `kazusa.template`, the template's folder. Schema:
-  `WorldPackageSchema` in `@kazusa/client`; the plugin reads it in
-  `src/world/package.ts` (the credit on `GET /kazusa/world`). `npm run dev`
-  gives a world from before it one (`scripts/world-package.mjs`: the template
-  its old `world.json` named, else the one whose player id it has). Field rules
-  and migration: [worlds](references/worlds.md). The setup guide
+  slug, `displayName`, semver `version` raised with each release, `author`,
+  `homepage`, `repository`, `private: true`) with Kazusa's under `kazusa`:
+  `title` (the setup guide's label, else `displayName`), `systemAgent`,
+  `defaultGroup`, `renames`, and `config` (merged into the plugin's config at
+  setup). Schema: `WorldPackageSchema` in `@kazusa/client`; the plugin reads it
+  in `src/world/package.ts` (the credit on `GET /kazusa/world`). Field rules:
+  [worlds](references/worlds.md). The setup guide
   (`apps/web/lib/setup/setup.ts`) clones the picked world's newest release into
-  the git-ignored `world/` (`scripts/world-repo.mjs clone`), which is the
-  Gateway's cwd, so playing never touches the Kazusa repo; before each Gateway
-  start the same script keeps `world/`'s repository set up (git shipped in
-  `git/`), committing nothing. A new world, or a change to one, goes in its own
+  the git-ignored `world/` (`scripts/world-repo.mjs clone`, git shipped in
+  `git/`), which is the Gateway's cwd, so playing never touches the Kazusa repo.
+  **Nothing from an older Kazusa is migrated**: a set-up world that isn't a
+  clone never starts, and the frontend offers Start a new world, which moves it
+  to `old-worlds/` (worlds §3). A new world, or a change to one, goes in its own
   repository; worlds hold no SQLite.
 - **Canon, play, checkpoints, saves and updates** (design agreed 2026-11-05,
   repositories, saves and updates redesigned 2026-11-14; worlds as clones and
@@ -296,14 +292,15 @@ apps/kazusa/
   a `git fetch` of that tag once the player says so, with git's own progress as
   the bar, and the update (`world_update`, the system agent) is
   `git pull --rebase --autostash` in effect, with the page-by-page merge doing
-  the pop: keep the game in git's stash (the recovery point; no undo), merge the
-  release in with `HEAD` as base, move `play` to the release, resolve, finish.
-  No refs, snapshot, cache, lock or progress files of our own. The clone tracks
-  only the creator's files; `openclaw.json` and `.state/` are ignored locally.
-  Saves come later: a commit on `refs/saves/*` whose parent is `HEAD`, holding
-  the world plus `openclaw.json` and the databases (added explicitly), made with
-  the Gateway stopped; loading moves `play` back to the save's release, and
-  "undo an update" becomes loading its autosave.
+  the pop: save the world at `refs/saves/before-update-<version>` (`restore`
+  loads it until `finish`), merge the release in with `HEAD` as base, move
+  `play` to the release last, resolve, finish. No snapshot, cache, lock or
+  progress files of our own. The clone tracks only the creator's files;
+  `openclaw.json` and `.state/` are ignored locally. Saves come later: a commit
+  on `refs/saves/*` whose parent is `HEAD`, holding the world plus
+  `openclaw.json` and the databases (added explicitly), made with the Gateway
+  stopped; loading moves `play` back to the save's release, and "undo an update"
+  becomes loading its autosave.
 - **World update merge rules** (`src/world-update/merge.ts`, `update.ts`): pages
   merge three-way per part (each frontmatter key, the lead, each `##` section):
   a side's unchanged part yields to the other's change; `## Notes` and
@@ -311,14 +308,12 @@ apps/kazusa/
   card's `name` follows the world; `map` follows the user's `layout` choice
   where both moved it; both-changed parts keep the live side and are reported. A
   card for a place gone everywhere is dropped if it holds nothing the character
-  wrote, otherwise orphaned for the system agent to re-home. With no base,
-  `check` reports `bestAttempt`: a stand-in base is the live page minus play's
-  marks; nothing is removed, and `apply` needs `bestAttempt: true`, the user's
-  consent. `kazusa.renames` in the creator's `package.json` carry place and
-  concept ids, with every card and position. `apply` needs a paused clock;
-  `finish` refuses a map that doesn't load and re-places characters stranded on
-  a missing place (or everyone, with `rehome: all`). `openclaw.json` is never
-  touched: new characters are reported for registering.
+  wrote, otherwise orphaned for the system agent to re-home. `kazusa.renames` in
+  the creator's `package.json` carry place and concept ids, with every card and
+  position. `apply` needs a paused clock; `finish` refuses a map that doesn't
+  load and re-places characters stranded on a missing place (or everyone, with
+  `rehome: all`). `openclaw.json` is never touched: new characters are reported
+  for registering.
 - **Repo search and the repository boundary** (`src/repo-search/`): the system
   agent's `grep` searches text files line by line for a regular expression
   (literal text when the pattern isn't valid), read-only, inside the repository
@@ -326,9 +321,8 @@ apps/kazusa/
   relative to the Gateway's cwd, the live world, so results feed `read` and
   `edit`; the default is the live world. It skips secrets (`.env*`, keys),
   dependencies, build output, databases and binaries (so `.state` yields only
-  its text files: game state itself is SQLite), the client asset cache, update
-  backups, files over 2 MB, and the update base `.template/` unless `path`
-  points into it. OpenClaw's own file tools (`read`, `write`, `edit`, `ls`,
+  its text files: game state itself is SQLite), the client asset cache and files
+  over 2 MB. OpenClaw's own file tools (`read`, `write`, `edit`, `ls`,
   `view_image`, `apply_patch`) otherwise reach anywhere the Gateway can, so a
   `before_tool_call` guard holds every agent to the same boundary: paths resolve
   against the agent's `cwd` (else its workspace) and through links, and anything
@@ -358,19 +352,13 @@ apps/kazusa/
   `models.providers.<id>.apiKey`), which reloads every plugin. A key written
   into `openclaw.json` by hand reports as `config` and can't be changed from
   Settings. TypeSafe has no plugin; Jev reads its `typesafe:manual` profile with
-  `resolveApiKeyForProvider`. `apps/kazusa/base.json` has no key references.
-  Worlds made by 0.1.3 and 0.2.0 had store references: `providers/migrate.ts`
-  copies each stored key into a profile at `gateway_start` (`secrets.resolve`),
-  and `scripts/provider-keys.mjs` drops a reference whose profile exists (or
-  whose entry is gone) before the next Gateway start, then soft-deletes its
-  store entry. Those two files, the manifest's `decisions.typesafeApiKey` schema
-  and `TYPESAFE_KEY_PATH` are marked deprecated; remove them all together once
-  no such world is left. The setup guide offers the providers in Kazusa's
-  `models.providers` (`apps/kazusa/base.json`; labels and key links from the
-  shared catalog, `PROVIDERS` in `@kazusa/client`) and saves the picked one's
-  key as its profile through the SDK in a child Node process before the Gateway
-  exists. It writes no model: the plugin works out the starting model from the
-  keys there are. OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
+  `resolveApiKeyForProvider`. `apps/kazusa/base.json` has no key references. The
+  setup guide offers the providers in Kazusa's `models.providers`
+  (`apps/kazusa/base.json`; labels and key links from the shared catalog,
+  `PROVIDERS` in `@kazusa/client`) and saves the picked one's key as its profile
+  through the SDK in a child Node process before the Gateway exists. It writes
+  no model: the plugin works out the starting model from the keys there are.
+  OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
   `@openrp-ai/openclaw-provider` (from the openrp repo), a dependency of
   `apps/kazusa` loaded by path from `base.json` like the official
   `@openclaw/*-provider` packages.
@@ -943,11 +931,8 @@ connect these modules in process.
   caught; about 1.5% of decisions are kept. A kept decision goes to:
   - one row in `<stateDir>/kazusa/decisions.sqlite` (`decision-database.ts`),
     uncapped and restart-safe, a synchronous insert. The timeline reads only its
-    window, by index, through `perception.decisions(window)`. Until 2026-11
-    every decision shared the `"perception"` keyed namespace with the inbox; the
-    first start moves the inbox records out (`perception/stores.ts`) and empties
-    it, dropping the old decisions, which say neither what they were about nor
-    what the character was doing.
+    window, by index, through `perception.decisions(window)`. The inbox has its
+    own keyed namespace, `"inbox"` (`perception/stores.ts`).
   - an `attention.decided` SSE journal event (`onDecision` in
     `perception/register.ts`, which sees every decision and calls `onAwoken`,
     sleep's wake, for those acted on).
@@ -1330,40 +1315,40 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   skills are `skills.entries.<name>.enabled: false` (Kazusa reads them itself),
   and OpenClaw's bundled ones are hidden by
   `skills.allowBundled: ["kazusa:no-bundled-skills"]`, a name no skill has,
-  since OpenClaw reads an empty list as "all" (`NO_BUNDLED_SKILLS`,
-  `scripts/plugin-startup.mjs`, which also moves a world from before this onto
-  it). Repo skills (`kazusa`, `typescript`, `world-building`, …) reach only
-  ARONA, as her own: her workspace's `.agents` is a symlink to the repo's.
-  OpenClaw keeps each session's skills as a snapshot and rebuilds it whenever
-  anything under `skills` in the config changes (hot config). So `src/skills/`
-  gives each skill characters can read a revision in its entry
-  (`config.kazusaRevision`, a hash of where its copies are and their names and
-  descriptions): a new one is what makes every character's next turn see a skill
-  added, removed, copied or redescribed. It does this on `gateway_start`,
-  through `refresh_skills`, and within a second of an edit: one recursive
-  watcher per process (`skills/watch.ts`) over the world's `shared/skills`, the
-  workspaces' skill folders and Kazusa's defaults. OpenClaw's own
-  `skills.load.watch` stays `false` (one watcher per workspace ran out with a
-  large cast). Bodies are read when a skill is opened, so an edit to one needs
-  nothing. Our loaders cache files until `clearSkillCaches()`, which the watcher
-  calls. The repo's `.agents/skills` reach ARONA through her workspace symlink,
-  not `extraDirs`. `tools.deny` keeps `group:sessions`, `message`, and `gateway`
-  (the updater included in `minimal`). `tools.exec.applyPatch.enabled: false`
-  prevents implicit patch access from `write`; ARONA explicitly enables it in
-  her native exec override. `tools.toolSearch: false`: with a dozen tools, Tool
-  Search's three control tools cost more than they save, and models route calls
-  through its generic `tool_call`. `tools.codeMode.enabled: false` for the same
-  reason: models whose catalog prefers code mode (GLM-5.3-flash) otherwise get
-  every tool behind one `exec`, and live Airi looped
-  `exec("return \"NO_REPLY\"")` for five minutes, holding a Gateway stop open.
-  `clock_*` stay registered for operators but are not allowed for characters.
-  Everything a roleplaying character must not reach is excluded by omission:
-  shell, web, browser, UI, nodes/computer, Gateway/plugin management, media
-  generation, goals, `ask_user`, and `session_status` (whose presence also adds
-  a "use `session_status` for the exact time" line to the system prompt). A
-  deployment widens the surface in its own `openclaw.json` (global profile plus
-  `alsoAllow`, or a per-agent profile/allowlist); a tool from a new plugin is
-  unavailable until allowed there.
+  since OpenClaw reads an empty list as "all" (set by setup from
+  `apps/kazusa/base.json`). Repo skills (`kazusa`, `typescript`,
+  `world-building`, …) reach only ARONA, as her own: her workspace's `.agents`
+  is a symlink to the repo's. OpenClaw keeps each session's skills as a snapshot
+  and rebuilds it whenever anything under `skills` in the config changes (hot
+  config). So `src/skills/` gives each skill characters can read a revision in
+  its entry (`config.kazusaRevision`, a hash of where its copies are and their
+  names and descriptions): a new one is what makes every character's next turn
+  see a skill added, removed, copied or redescribed. It does this on
+  `gateway_start`, through `refresh_skills`, and within a second of an edit: one
+  recursive watcher per process (`skills/watch.ts`) over the world's
+  `shared/skills`, the workspaces' skill folders and Kazusa's defaults.
+  OpenClaw's own `skills.load.watch` stays `false` (one watcher per workspace
+  ran out with a large cast). Bodies are read when a skill is opened, so an edit
+  to one needs nothing. Our loaders cache files until `clearSkillCaches()`,
+  which the watcher calls. The repo's `.agents/skills` reach ARONA through her
+  workspace symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`,
+  `message`, and `gateway` (the updater included in `minimal`).
+  `tools.exec.applyPatch.enabled: false` prevents implicit patch access from
+  `write`; ARONA explicitly enables it in her native exec override.
+  `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
+  tools cost more than they save, and models route calls through its generic
+  `tool_call`. `tools.codeMode.enabled: false` for the same reason: models whose
+  catalog prefers code mode (GLM-5.3-flash) otherwise get every tool behind one
+  `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for five minutes,
+  holding a Gateway stop open. `clock_*` stay registered for operators but are
+  not allowed for characters. Everything a roleplaying character must not reach
+  is excluded by omission: shell, web, browser, UI, nodes/computer,
+  Gateway/plugin management, media generation, goals, `ask_user`, and
+  `session_status` (whose presence also adds a "use `session_status` for the
+  exact time" line to the system prompt). A deployment widens the surface in its
+  own `openclaw.json` (global profile plus `alsoAllow`, or a per-agent
+  profile/allowlist); a tool from a new plugin is unavailable until allowed
+  there.
 - **System console**: this deployment selects ARONA with native
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
@@ -1372,12 +1357,11 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   `$include`s from `world/.state/kazusa/system-agent.json`, rewritten by
   `scripts/system-agent.mjs` before every Gateway start (`npm run dev` and
   `npm run gateway`). Her entry in `openclaw.json` keeps only workspace, name
-  and `cwd`; keys beside the include override it. The same script moves a world
-  set up before this onto the include, dropping the copy setup made. Her
-  allowlist names the `kazusa` plugin, so every Kazusa tool, including any added
-  later, is hers with no config change, plus the file and web built-ins.
-  Characters stay on `minimal` with an explicit `alsoAllow`, so a new tool
-  reaches none of them unless it is listed there. Her runs have their own limits
+  and `cwd`; keys beside the include override it. Her allowlist names the
+  `kazusa` plugin, so every Kazusa tool, including any added later, is hers with
+  no config change, plus the file and web built-ins. Characters stay on
+  `minimal` with an explicit `alsoAllow`, so a new tool reaches none of them
+  unless it is listed there. Her runs have their own limits
   (`perception.systemAgent`). For every character, near the limits only
   `send_message`, `talk`, `create_group` and `continue_work` still run, so a run
   can report before it ends, and `start_task` and `delay_task`, so it can always
@@ -1454,15 +1438,16 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
     explicit hook policy, and Kazusa's model pick lives in its own store. So
     `apps/kazusa/base.json` gives every provider plugin
     `hooks.allowPromptInjection: true` (the default behaviour; it only changes
-    startup), and `scripts/plugin-startup.mjs` adds it to existing worlds before
-    the Gateway starts. The same script first loads and allows, by its manifest
-    id, any plugin path in `base.json` a world made before it lacks. Without it
-    each character's first turn reloads every plugin, a whole Kazusa included
-    (~3 s and ~29 MB each; with 146 characters the Gateway ran out of heap). The
-    brain channel's `outbound.sendText` exists for the same reason: OpenClaw
-    takes a channel from the Gateway's registry only when it can send, and each
-    cron wake looks up its agent's channel. It sends nothing and answers
-    `outcome: "not_sent"`: a fake success would append OpenClaw's
+    startup). A world's `openclaw.json` is written once, at setup, so
+    `scripts/plugin-startup.mjs` brings it in step with a later Kazusa before
+    the Gateway starts: it loads and allows, by its manifest id, any plugin path
+    `base.json` gained since, and gives a provider added since that policy.
+    Without it each character's first turn reloads every plugin, a whole Kazusa
+    included (~3 s and ~29 MB each; with 146 characters the Gateway ran out of
+    heap). The brain channel's `outbound.sendText` exists for the same reason:
+    OpenClaw takes a channel from the Gateway's registry only when it can send,
+    and each cron wake looks up its agent's channel. It sends nothing and
+    answers `outcome: "not_sent"`: a fake success would append OpenClaw's
     restart-recovery notice to the brain transcript, and an error leaves a
     delivery intent to retry.
   - Inside an agent run, write another session's transcript only with the strict

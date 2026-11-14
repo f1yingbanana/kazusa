@@ -975,45 +975,6 @@ describe("Attention regression cases", () => {
     expect(h.deliveries).toHaveLength(2);
   });
 
-  it("keeps a check-in an older record took in, when it drops its lists", async () => {
-    const h = setupWake();
-    const endAt = new Date(NOW).toISOString();
-    h.tasks.set("alice", {
-      id: "task-1",
-      type: "studying" as const,
-      description: "Physics",
-      duration: 60,
-      startedAt: new Date(NOW - 3_600_000).toISOString(),
-      endAt,
-    });
-    h.states.set("alice", {
-      pending: [],
-      processedIds: [
-        "a",
-        stimulusKey({
-          sessionKey: "agent:alice:tasks",
-          id: `task-deadline:task-1:${endAt}`,
-        }),
-      ],
-    } as never);
-    await h.router.drain("alice");
-    expect(h.snapshot()).not.toHaveProperty("processedIds");
-    await h.router.deadline("alice");
-    expect(h.deliveries).toEqual([]);
-  });
-
-  it("leaves out the stimulus key lists older records carry on their next save", async () => {
-    const h = setupWake();
-    h.states.set("alice", {
-      pending: [],
-      processedIds: ["a", "b"],
-      ignoredIds: ["b"],
-    } as never);
-    await h.router.drain("alice");
-    expect(h.snapshot()).not.toHaveProperty("processedIds");
-    expect(h.snapshot()).not.toHaveProperty("ignoredIds");
-  });
-
   it("rechecks task identity after evaluation even when replacement has identical times", async () => {
     const h = setup();
     const task = {
