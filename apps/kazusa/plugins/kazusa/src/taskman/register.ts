@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { untilRunning } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
+import { openTaskStore } from "./store.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
@@ -105,10 +106,7 @@ export function registerTaskman(
     extensions.flatMap((extension) =>
       extension.required.filter((name) => name in extension[tool]),
     );
-  const store = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  const store = openTaskStore(api);
   const taskChangeListeners = new Set<
     (agentId: string, task: ActiveTask) => void
   >();

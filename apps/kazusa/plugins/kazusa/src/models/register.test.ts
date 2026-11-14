@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import { resetStateCaches } from "../state.ts";
 import { registerModels } from "./register.ts";
 import type { ModelSelection } from "./selection.ts";
 
@@ -48,6 +49,7 @@ function setup(
   return Object.assign(hooks.before_model_resolve, { hooks, logger });
 }
 
+beforeEach(resetStateCaches);
 describe("registerModels", () => {
   it("runs brain turns on the picked model", async () => {
     const hook = setup({ model: "openrouter/anthropic/claude-opus" });

@@ -48,6 +48,27 @@ describe("cachedStore", () => {
     });
   });
 
+  it("with copies, keeps an edit that was never saved out of later reads", async () => {
+    const values = new Map<string, { pending: string[] }>([
+      ["alice", { pending: ["hi"] }],
+    ]);
+    const store: StateStore<{ pending: string[] }> = {
+      lookup: async (key) => values.get(key),
+      register: async (key, value) => {
+        values.set(key, value);
+      },
+      entries: async () => [],
+    };
+    const cached = cachedStore("test-copies", store, { copies: true });
+    const read = await cached.lookup("alice");
+    read?.pending.push("unsaved");
+    expect(await cached.lookup("alice")).toEqual({ pending: ["hi"] });
+    const next = { pending: ["hi", "saved"] };
+    await cached.register("alice", next);
+    next.pending.push("after saving");
+    expect(await cached.lookup("alice")).toEqual({ pending: ["hi", "saved"] });
+  });
+
   it("shares one cache per store between registrations", async () => {
     const { store } = nativeStore();
     const first = cachedStore("test-shared", store);

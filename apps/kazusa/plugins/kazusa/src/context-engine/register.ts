@@ -21,11 +21,11 @@ import {
 import { readBrainTurns } from "../perception/brain-trace.ts";
 import { currentBrainRun } from "../perception/run-limits.ts";
 import { pluginSkillLoader } from "./skill-loader.ts";
-import type { ActiveTask } from "../taskman/types.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
 import { pluginSkillText } from "../skill-text.ts";
 import type { MemoryPrefetch } from "../memory/register.ts";
 import { brainRequest, type RetrievalRequest } from "../memory/retrieve.ts";
+import { openTaskStore } from "../taskman/store.ts";
 
 interface ContextEngineDeps {
   readonly clock: Clock;
@@ -241,10 +241,7 @@ function createContextEngine(
     api.pluginConfig?.contextEngine ?? {},
   );
   const skillLoader = pluginSkillLoader(api);
-  const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  const tasks = openTaskStore(api);
   const settings = contextSettings(api);
   // Where each character's records started last turn, so the start holds and
   // the provider keeps them cached. Losing it costs one re-read.

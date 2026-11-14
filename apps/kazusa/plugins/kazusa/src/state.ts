@@ -73,7 +73,9 @@ export function stateCacheStats(): StateCacheStats[] {
  * returns for the same namespace, and none may expire (`ttlMs`): a cached copy
  * would outlive it. At most `limit` keys stay in memory, the least recently
  * used leaving first; `warn` hears once if a store fills up, which a cast-sized
- * store never should.
+ * store never should. With `copies`, every read gets its own copy and a write
+ * keeps one, for callers that change a record in place before saving it: an
+ * edit that is never saved must not show up in the next read.
  */
 export function cachedStore<T>(
   namespace: string,
@@ -81,11 +83,14 @@ export function cachedStore<T>(
   {
     limit = CACHE_LIMIT,
     warn,
+    copies = false,
   }: {
     readonly limit?: number;
     readonly warn?: (message: string) => void;
+    readonly copies?: boolean;
   } = {},
 ): StateStore<T> {
+  const copy = <V>(value: V): V => (copies ? structuredClone(value) : value);
   const caches = sharedCaches();
   let cache = caches.get(namespace);
   if (!cache) {
@@ -122,21 +127,22 @@ export function cachedStore<T>(
         state.hits += 1;
         const value = values.get(key) as T | undefined;
         remember(key, value);
-        return value;
+        return copy(value);
       }
       state.misses += 1;
       const value = await store.lookup(key);
       // A write that landed during this read is newer.
       if (!values.has(key)) remember(key, value);
-      return values.get(key) as T | undefined;
+      return copy(values.get(key) as T | undefined);
     },
     register: async (key, value, options) => {
       if (options?.ttlMs !== undefined)
         throw new Error(
           `Kazusa state cache "${namespace}" can't hold entries that expire.`,
         );
+      const kept = copy(value);
       await store.register(key, value, options);
-      remember(key, value);
+      remember(key, kept);
     },
   };
 }

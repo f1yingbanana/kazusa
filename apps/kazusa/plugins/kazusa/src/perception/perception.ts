@@ -53,6 +53,7 @@ import {
   type Stimulus,
 } from "./types.ts";
 import { BrainSlots } from "./brain-slots.ts";
+import { openTaskStore } from "../taskman/store.ts";
 import {
   bundledSkillText,
   pluginSkillText,
@@ -472,10 +473,7 @@ export class Perception {
     if (this.deps.tasks) {
       this.taskStore = this.deps.tasks;
     } else if (this.api) {
-      this.taskStore = this.api.runtime.state.openKeyedStore<ActiveTask>({
-        namespace: "tasks",
-        retention: "retained",
-      });
+      this.taskStore = openTaskStore(this.api);
     } else {
       throw new Error("Perception requires an api or a tasks dependency.");
     }

@@ -3,7 +3,7 @@ import {
   KeyedAsyncQueue,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-import type { StateStore } from "../state.ts";
+import { cachedStore, type StateStore } from "../state.ts";
 
 /**
  * Every model choice, sparse, for the world or one agent: chat model and
@@ -79,11 +79,23 @@ export function createModelSelection(
 
 /** The one retained store, from any module. Never read it during registration. */
 export function modelSelection(api: OpenClawPluginApi): ModelSelectionStore {
-  return createModelSelection(
+  return createModelSelection(openModelStore(api));
+}
+
+/**
+ * The world's and each character's model picks, kept in memory: read for every
+ * turn, decision and embedding, written only through a store from here.
+ */
+export function openModelStore(
+  api: OpenClawPluginApi,
+): StateStore<ModelSelection> {
+  return cachedStore(
+    "models",
     api.runtime.state.openKeyedStore<ModelSelection>({
       namespace: "models",
       retention: "retained",
     }),
+    { copies: true },
   );
 }
 

@@ -15,8 +15,8 @@ import { modelsConfig } from "./config.ts";
 import { catalogModels, registerModelsHttp } from "./http.ts";
 import {
   createModelSelection,
+  openModelStore,
   splitModelRef,
-  type ModelSelection,
   type ModelSelectionStore,
 } from "./selection.ts";
 import { createStartingModel, startingModel } from "./starting.ts";
@@ -54,10 +54,7 @@ export function registerModels(
     readonly call?: (method: string, params: unknown) => Promise<unknown>;
   } = {},
 ): Models {
-  const store = api.runtime.state.openKeyedStore<ModelSelection>({
-    namespace: "models",
-    retention: "retained",
-  });
+  const store = openModelStore(api);
   const selection = createModelSelection(store);
   const config = modelsConfig(api.pluginConfig);
   const starting = createStartingModel(store, config);

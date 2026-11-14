@@ -5,7 +5,7 @@ import {
   readVisibleSessionTranscriptMessageEntries,
 } from "openclaw/plugin-sdk/session-transcript-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetStateCaches } from "../state.ts";
+import { cachedStore, resetStateCaches } from "../state.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { Clock } from "../clock/clock.ts";
 import { registerContextEngine } from "./register.ts";
@@ -602,8 +602,9 @@ describe("A turn's builds", () => {
     expect(memory).toHaveBeenCalledTimes(1);
     expect(pastTurns).toHaveBeenCalledTimes(1);
     expect(sessionEntry).toHaveBeenCalledTimes(1);
-    // What a tool call can change is read for every build.
-    expect(lookupTask).toHaveBeenCalledTimes(3);
+    // What a tool call can change is read for every build: the task from
+    // memory once loaded, since Taskman writes it through the same cache.
+    expect(lookupTask).toHaveBeenCalledTimes(1);
     expect(readHistory.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(second).toEqual(first);
 
@@ -636,8 +637,14 @@ describe("A turn's builds", () => {
     });
     reused.lookupTask.mockImplementation(async () => current);
     await reused.engine.assemble({ ...brain(), tokenBudget: 995_000 });
-    // A tool call starts an activity; the next build has less room.
+    // A tool call starts an activity, through Taskman's store; the next build
+    // has less room.
     current = task;
+    await cachedStore<ActiveTask>("tasks", {
+      lookup: async () => current,
+      register: async () => {},
+      entries: async () => [],
+    }).register("alice", task);
     const later = await reused.engine.assemble({
       ...brain(),
       tokenBudget: 990_000,

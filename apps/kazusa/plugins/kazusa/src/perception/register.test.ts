@@ -1,5 +1,6 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetStateCaches } from "../state.ts";
 import { requestContinuation, takeContinuation } from "./continue.ts";
 import { registerPerception } from "./register.ts";
 
@@ -128,6 +129,7 @@ function setup(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetStateCaches();
 });
 
 describe("Perception host integration", () => {
