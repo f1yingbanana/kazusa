@@ -45,6 +45,24 @@ describe("stage", () => {
     await expect(stage.set("user:sensei", false, T0)).rejects.toThrow();
   });
 
+  it("reads a whole cast a few records at a time, keeping its order", async () => {
+    const store = memoryStore();
+    let reading = 0;
+    let most = 0;
+    const lookup = store.lookup;
+    store.lookup = async (key) => {
+      most = Math.max(most, ++reading);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      reading -= 1;
+      return lookup(key);
+    };
+    const stage = createStage(store, { defaultOnstage: true, cast: [] });
+    const cast = Array.from({ length: 145 }, (_, index) => `c${index}`);
+    await store.register("c7", { onstage: false, since: T0 });
+    expect(await stage.onstage(cast)).toEqual(cast.filter((id) => id !== "c7"));
+    expect(most).toBe(16);
+  });
+
   it("knows who was present at a moment around the last change", async () => {
     const stage = createStage(memoryStore(), {
       defaultOnstage: true,

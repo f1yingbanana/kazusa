@@ -42,6 +42,9 @@ export interface Stage {
   lookup(id: string): Promise<StageRecord | undefined>;
 }
 
+/** Records read at once when looking over many characters. */
+const READS_AT_ONCE = 16;
+
 /** Players are always present: they have no brain to switch off. */
 const isUser = (id: string): boolean => id.startsWith("user:");
 
@@ -61,7 +64,16 @@ export function createStage(store: StageStore, config: StageConfig): Stage {
       return record.onstage ? at >= record.since : at < record.since;
     },
     async onstage(ids) {
-      const flags = await Promise.all(ids.map(isOnstage));
+      // A few at a time: the first look at a whole cast reads every record,
+      // and 145 reads at once filled one of OpenClaw's SQLite workers, which
+      // agent databases share, just as the Gateway started.
+      const flags: boolean[] = [];
+      for (let at = 0; at < ids.length; at += READS_AT_ONCE)
+        flags.push(
+          ...(await Promise.all(
+            ids.slice(at, at + READS_AT_ONCE).map(isOnstage),
+          )),
+        );
       return ids.filter((_, index) => flags[index]);
     },
     async set(id, onstage, at) {

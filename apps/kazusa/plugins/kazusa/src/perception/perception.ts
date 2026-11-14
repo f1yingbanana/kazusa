@@ -86,6 +86,64 @@ const keysOf = (item: PendingItem): string[] => [
   ...(item.burstKeys ?? []),
 ];
 
+/**
+ * How many characters start-up and resume work on at once. Plugin state and
+ * every agent database share OpenClaw's few SQLite workers, each taking 128
+ * requests in flight; past that a request waits, and after 10 s it fails. On a
+ * 145-character world, the whole cast at once filled one of them.
+ */
+const AT_ONCE = 16;
+
+/**
+ * Retries of a brain OpenClaw's database admission refused: 15 s, then 30 s,
+ * then each minute.
+ */
+const REFUSAL_RETRY_MS = 15_000;
+const REFUSAL_RETRY_MAX_MS = 60_000;
+
+/**
+ * OpenClaw refused the character's agent database: it is still being prepared
+ * after an unclean stop or an update, or it was refused for this boot. Either
+ * way the brain never got the input, so there is nothing to reconcile.
+ */
+export function isDatabaseRefusal(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  const visit = (value: unknown): boolean => {
+    if (!(value instanceof Error) || seen.has(value)) return false;
+    seen.add(value);
+    if (value.name === "AgentDatabaseAdmissionError") return true;
+    if (visit(value.cause)) return true;
+    return value instanceof AggregateError && value.errors.some(visit);
+  };
+  return visit(error);
+}
+
+/**
+ * Runs `run` on every item, `limit` at a time; one failing doesn't stop the
+ * rest.
+ */
+async function eachAtOnce<T>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T) => Promise<void>,
+  onError: (error: unknown) => void,
+): Promise<void> {
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const item = items[next++];
+      try {
+        await run(item);
+      } catch (error) {
+        onError(error);
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+}
+
 const LATENCY_ANCHORS = z.array(z.looseObject({ minutes: z.number().min(0) }));
 
 /** One live conversation in person, as opposed to a chat on the phone. */
@@ -434,6 +492,14 @@ export class Perception {
   private readonly debounceTimers = new Map<string, () => void>();
   private readonly debounceReadyAt = new Map<string, number>();
   private readonly readinessTimers = new Map<string, NodeJS.Timeout>();
+  /**
+   * Characters whose database OpenClaw refused, and the next wait before trying
+   * again.
+   */
+  private readonly refusalRetries = new Map<
+    string,
+    { timer?: NodeJS.Timeout; delayMs: number }
+  >();
   private speech?: SpeechSource;
   private conversations?: ConversationSource;
   private readonly readListeners = new Set<
@@ -930,60 +996,123 @@ export class Perception {
   async recover(): Promise<void> {
     const entries = await this.store.entries();
     const read: PerceptionDelivery[] = [];
-    await Promise.all(
-      entries.map(({ key: agentId }) =>
-        this.change(
+    // A few characters at a time, while OpenClaw is still preparing agent
+    // databases on the same SQLite workers; one failing leaves the rest.
+    await eachAtOnce(
+      entries,
+      AT_ONCE,
+      async ({ key: agentId }) => {
+        let refused: unknown;
+        await this.change(
           agentId,
           async (state) => {
             // Sightings kept from before going offstage never happen
             // (`forgetForeseen`).
             if (this.deps.onstage && !(await this.deps.onstage(agentId)))
               state.pending = state.pending.filter((item) => !item.foreseen);
-            const adopted = this.deps.adopted;
-            if (state.deliveries?.length && adopted) {
-              for (const delivery of state.deliveries) {
-                let done: boolean;
-                try {
-                  done = await adopted(delivery);
-                } catch (error) {
-                  this.warn(error);
-                  continue;
-                }
-                if (done) {
-                  read.push(delivery);
-                  const keys = new Set(delivery.keys);
-                  state.pending = state.pending.filter(
-                    (item) => !keys.has(stimulusKey(item)),
-                  );
-                }
-                state.deliveries = state.deliveries?.filter(
-                  (item) => item.id !== delivery.id,
-                );
-              }
-              if (!state.deliveries?.length) {
-                delete state.deliveries;
-                state.stopped = false;
-              }
-            }
-            if (state.deliveries?.length) {
-              // The previous process may have handed this exact input to the
-              // host before saving its receipt. Keep it for reconciliation, not
-              // an automatic duplicate turn with potentially repeated tools.
-              state.stopped = true;
-              this.warn(
-                `Unconfirmed brain handoff retained for ${agentId}: ${state.deliveries.map((delivery) => delivery.id).join(", ")}`,
-              );
-            }
+            refused = await this.settleHandoffs(agentId, state, read);
             delete state.brainRun;
             delete state.brainContext;
             // Whatever a send handed back before the restart waits again.
             delete state.carried;
           },
           true,
-        ),
-      ),
+        );
+        if (refused !== undefined) this.retryAfterRefusal(agentId, refused);
+      },
+      (error) => this.warn(error),
     );
     for (const delivery of read) await this.notifyRead(delivery);
+  }
+
+  /**
+   * Reconciles the handoffs left from before a restart. Returns the refusal
+   * when OpenClaw can't open the character's database yet: their transcript
+   * can't be read, so the handoff stays quarantined until a retry can.
+   */
+  private async settleHandoffs(
+    agentId: string,
+    state: PerceptionState,
+    read: PerceptionDelivery[],
+  ): Promise<unknown> {
+    let refused: unknown;
+    const adopted = this.deps.adopted;
+    if (state.deliveries?.length && adopted) {
+      for (const delivery of state.deliveries) {
+        let done: boolean;
+        try {
+          done = await adopted(delivery);
+        } catch (error) {
+          if (isDatabaseRefusal(error)) refused = error;
+          else this.warn(error);
+          continue;
+        }
+        if (done) {
+          read.push(delivery);
+          const keys = new Set(delivery.keys);
+          state.pending = state.pending.filter(
+            (item) => !keys.has(stimulusKey(item)),
+          );
+        }
+        state.deliveries = state.deliveries?.filter(
+          (item) => item.id !== delivery.id,
+        );
+      }
+      if (!state.deliveries?.length) {
+        delete state.deliveries;
+        state.stopped = false;
+      }
+    }
+    if (state.deliveries?.length) {
+      // The previous process may have handed this exact input to the
+      // host before saving its receipt. Keep it for reconciliation, not
+      // an automatic duplicate turn with potentially repeated tools.
+      state.stopped = true;
+      if (refused === undefined)
+        this.warn(
+          `Unconfirmed brain handoff retained for ${agentId}: ${state.deliveries.map((delivery) => delivery.id).join(", ")}`,
+        );
+    }
+    return refused;
+  }
+
+  /**
+   * OpenClaw refused this character's database. While it is still preparing it
+   * (minutes after an unclean stop or an update), try again later instead of
+   * keeping them stopped for the whole boot: leftover handoffs are reconciled
+   * first, then whatever waits is handed over.
+   */
+  private retryAfterRefusal(agentId: string, error: unknown): void {
+    if (this.lifetime.signal.aborted) return;
+    const retry = this.refusalRetries.get(agentId);
+    if (retry?.timer) return;
+    const delayMs = retry
+      ? Math.min(retry.delayMs * 2, REFUSAL_RETRY_MAX_MS)
+      : REFUSAL_RETRY_MS;
+    if (!retry)
+      this.warn(
+        `${agentId}'s database isn't open to them yet, trying again from ${delayMs / 1000} s: ${String(error).split("\n")[0]}`,
+      );
+    const entry: { timer?: NodeJS.Timeout; delayMs: number } = { delayMs };
+    entry.timer = setTimeout(() => {
+      entry.timer = undefined;
+      inBackground(
+        this.deps.api,
+        async () => {
+          const read: PerceptionDelivery[] = [];
+          let refused: unknown;
+          await this.change(agentId, async (state) => {
+            if (state.deliveries?.length && state.stopped)
+              refused = await this.settleHandoffs(agentId, state, read);
+          });
+          for (const delivery of read) await this.notifyRead(delivery);
+          if (refused !== undefined) this.retryAfterRefusal(agentId, refused);
+        },
+        (failure) => this.warn(failure),
+      );
+    }, delayMs);
+    entry.timer.unref();
+    this.refusalRetries.set(agentId, entry);
   }
 
   private async change(
@@ -1042,7 +1171,12 @@ export class Perception {
     const agents = (await this.store.entries())
       .filter(({ value }) => value.pending.length > 0 && !value.stopped)
       .map(({ key }) => key);
-    await Promise.all(agents.map((agentId) => this.drain(agentId)));
+    await eachAtOnce(
+      agents,
+      AT_ONCE,
+      (agentId) => this.drain(agentId),
+      (error) => this.warn(error),
+    );
   }
 
   private batch(items: PendingItem[]): PendingItem[] {
@@ -1938,6 +2072,28 @@ export class Perception {
           resolve();
           return;
         }
+        // Refused before any turn began: the input goes back to waiting and
+        // the character isn't stopped; it is handed over again once OpenClaw
+        // opens their database (after an unclean stop, minutes into a boot).
+        if (!adopted && !failed && isDatabaseRefusal(error)) {
+          failed = true;
+          try {
+            await this.change(
+              delivery.agentId,
+              (state) => {
+                state.deliveries = state.deliveries?.filter(
+                  (item) => item.id !== delivery.id,
+                );
+                if (!state.deliveries?.length) delete state.deliveries;
+              },
+              false,
+            );
+            this.retryAfterRefusal(delivery.agentId, error);
+          } finally {
+            resolve();
+          }
+          return;
+        }
         this.warn(error);
         if (adopted || failed) return;
         failed = true;
@@ -1985,6 +2141,10 @@ export class Perception {
           // its items wait for the next one.
           if (!held && takenBack()) return;
           adopted = true;
+          // Their database is open again: the next refusal starts over at 15 s.
+          const retry = this.refusalRetries.get(delivery.agentId);
+          if (retry && !retry.timer)
+            this.refusalRetries.delete(delivery.agentId);
           resolve();
           await this.notifyRead(delivery);
           // Inputs can arrive while this reservation waits for adoption. Let
@@ -2123,5 +2283,7 @@ export class Perception {
     this.debounceReadyAt.clear();
     for (const timer of this.readinessTimers.values()) clearTimeout(timer);
     this.readinessTimers.clear();
+    for (const retry of this.refusalRetries.values()) clearTimeout(retry.timer);
+    this.refusalRetries.clear();
   }
 }
