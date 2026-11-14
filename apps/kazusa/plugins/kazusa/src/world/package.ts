@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   authorName,
@@ -6,7 +6,7 @@ import {
   type WorldMeta,
   type WorldPackage,
 } from "@kazusa/client";
-import { downloadedRelease, worldGit } from "./repo.ts";
+import { downloadedRelease, PLAY, worldGit } from "./repo.ts";
 
 /** The world's own manifest, beside its `shared/` and `workspaces/`. */
 export const WORLD_PACKAGE = "package.json";
@@ -47,10 +47,65 @@ export function worldCredit(dir: string): WorldMeta["package"] {
 
 /**
  * The release downloaded (Settings → Updates → World) that the world hasn't
- * taken: `world_update` brings it in. Read from the world's repository on each
- * request.
+ * taken: `world_update` brings it in. Working it out runs `git` several times,
+ * synchronously, and every open page asks for `/kazusa/world`, so the answer is
+ * kept until the repository's refs, config or the world's `package.json`
+ * change, or for `RECHECK_MS` at most.
  */
 export function availableUpdate(live: string): WorldMeta["update"] {
+  const kept = keptUpdates();
+  const signature = repositorySignature(live);
+  const last = kept.get(live);
+  if (last && last.signature === signature && Date.now() - last.at < RECHECK_MS)
+    return last.update;
+  const update = readAvailableUpdate(live);
+  kept.set(live, { signature, at: Date.now(), update });
+  return update;
+}
+
+/** The longest a kept answer is used without asking git again. */
+const RECHECK_MS = 5 * 60_000;
+
+const KEPT = Symbol.for("kazusa.world.availableUpdate");
+
+interface KeptUpdate {
+  readonly signature: string;
+  readonly at: number;
+  readonly update: WorldMeta["update"];
+}
+
+/** One per process: OpenClaw can load the plugin more than once. */
+function keptUpdates(): Map<string, KeptUpdate> {
+  const scope = globalThis as { [KEPT]?: Map<string, KeptUpdate> };
+  return (scope[KEPT] ??= new Map<string, KeptUpdate>());
+}
+
+/**
+ * What a downloaded release, the world's own position and the release's address
+ * are read from: a fetch adds tags, an update moves `play`.
+ */
+function repositorySignature(live: string): string {
+  return [
+    WORLD_PACKAGE,
+    ".git/config",
+    ".git/HEAD",
+    ".git/packed-refs",
+    ".git/refs/tags",
+    ".git/refs/heads",
+    `.git/refs/heads/${PLAY}`,
+  ]
+    .map((file) => {
+      try {
+        const stat = statSync(path.join(live, file));
+        return `${stat.mtimeMs}:${stat.size}`;
+      } catch {
+        return "-";
+      }
+    })
+    .join("|");
+}
+
+function readAvailableUpdate(live: string): WorldMeta["update"] {
   const world = readWorldPackage(live);
   if (!world) return undefined;
   const git = worldGit(live);
