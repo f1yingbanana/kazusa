@@ -641,7 +641,17 @@ export function createSetup(
     if (!outdated()) throw new Error("This world doesn't need replacing.");
     const aside = path.join(appDir, "old-worlds");
     await mkdir(aside, { recursive: true });
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    // Local time, as the player would name it: `world-2026-11-14-16-18`.
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      now.getMonth() + 1,
+      now.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+    ]
+      .map((part) => String(part).padStart(2, "0"))
+      .join("-");
     await rename(liveDir, path.join(aside, `world-${stamp}`));
     for (const cache of ["worlds", ".worlds-before-repositories"])
       await rm(path.join(appDir, cache), { recursive: true, force: true });

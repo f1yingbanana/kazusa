@@ -181,6 +181,13 @@ export function planUpdate(
   };
   const baseHash = (file: string) => base.ids.get(baseOriginal.get(file)!);
   const templateText = (file: string) => template.text(file) ?? "";
+  /** A card's `name` follows its place's world page, as the release has it. */
+  const cardNamed = (file: string, text: string) => {
+    const id = CARD.exec(file)?.[1];
+    const page = id && template.text(`shared/wiki/entities/places/${id}.md`);
+    const name = page && /^name:.*$/m.exec(page)?.[0];
+    return name ? text.replace(/^name:.*$/m, name) : text;
+  };
   const templateHash = (file: string) => template.ids.get(file);
 
   const changes: Change[] = [];
@@ -219,7 +226,7 @@ export function planUpdate(
             path: file,
             outcome: "updated",
             ...from,
-            text: liveText(file),
+            text: cardNamed(file, liveText(file)),
           });
         continue;
       }

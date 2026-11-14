@@ -9,7 +9,7 @@ import {
 import path from "node:path";
 import type { MergePolicy, PartConflict } from "./merge.ts";
 import type { Plan } from "./plan.ts";
-import type { Tree } from "./tree.ts";
+import { blobId, type Tree } from "./tree.ts";
 
 /**
  * Writing a planned update into the world, and the report the system agent
@@ -33,6 +33,8 @@ export interface Report {
   readonly conflicts: readonly {
     path: string;
     parts: readonly PartConflict[];
+    /** The file's id as `apply` left it, to tell whether it's been resolved. */
+    written: string;
   }[];
   readonly orphaned: readonly { path: string; reason: string }[];
   readonly keptDeleted: readonly string[];
@@ -66,9 +68,14 @@ export function openReport(
     counts,
     conflicts: plan.changes
       .filter(({ outcome }) => outcome === "conflict")
-      .map(({ path: file, conflicts }) => ({
+      .map(({ path: file, conflicts, text }) => ({
         path: file,
         parts: conflicts ?? [],
+        written: blobId(
+          text === undefined
+            ? readFileSync(path.join(live, file))
+            : Buffer.from(text),
+        ),
       })),
     orphaned: plan.changes
       .filter(({ outcome }) => outcome === "orphaned")

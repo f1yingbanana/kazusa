@@ -31,11 +31,11 @@ working from memory of the last one goes wrong.
 
 An update spans several runs: you pause to ask the user things, and every run
 starts knowing only your files and the recent chat. Keep
-`workspaces/<your id>/projects/world-update.md` from the first check to the end,
-and read it first in every run. Each update gets a new one: if the file is about
-an earlier update (another version in its title, or marked done), rename it to
-`world-update-<its date>.md` and start fresh. Choices from an earlier update
-don't carry over; ask again if this update needs them.
+`workspaces/<your id>/projects/world-update-<version>.md`, named for the version
+you're bringing in (`check`'s `version.template`), from the first check to the
+end, and read it first in every run. Each update has its own file; leave the
+ones from earlier updates as they are. Choices from an earlier update don't
+carry over; ask again if this update needs them.
 
 ```markdown
 # World update to <template> (<date>)
@@ -109,12 +109,14 @@ Ask the user once how characters should experience the update:
   minimally so she always believed it (an edit to a belief means she always
   believed it), but keep memories of things that happened in play, moved to
   wherever the place or person now is.
-- **In-world:** these things happened. Record each structural change as a dated
-  `## History` line (`- <today> — …`, with `· news` if it would be public) on
-  the page it happened to, or on its parent or successor if the page itself is
-  gone. Characters then learn it as they visit or hear the news. Leave their
+- **In-world:** these things happen now. Record each structural change as a
+  `## History` line dated today, the in-world date `clock_now` gives
+  (`- <today> — …`, with `· news` if it would be public), on the page it
+  happened to, or on its parent or successor if the page itself is gone. Never
+  backdate it or say when else it happened ("last week"): that's inventing
+  history. Characters then learn it as they visit or hear the news. Leave their
   beliefs as they are: they find out. Use the user's reason. If they gave none,
-  ask; never make one up.
+  ask with the framing question; never make one up.
 - **Mixed:** the user picks per change ("retcon the map, but the new students
   transferred in"). Record which is which in the job file.
 
@@ -179,10 +181,11 @@ Ask the user once how characters should experience the update:
 ## 3. Resolve, then ask what only the user can say
 
 `world_update` `action: "conflicts"` lists each file and the parts both sides
-changed. Read the file here, and its other versions with `show`
-(`version: "new"` for the release, `"old"` for what this world stood on before):
-the old one shows what each side actually changed. For each item, decide where
-its content belongs and apply the framing:
+changed, as `apply` found them; `editedSinceApply` says whether you've changed
+the file since, and `stillThere` whether an orphan is. Read the file here, and
+its other versions with `show` (`version: "new"` for the release, `"old"` for
+what this world stood on before): the old one shows what each side actually
+changed. For each item, decide where its content belongs and apply the framing:
 
 - **A world page:** the creator's facts are the new truth. If this world's
   change was the user's own edit (a description they asked for, a detail they

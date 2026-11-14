@@ -155,7 +155,13 @@ them that way: a plain Node script can't import a package's TypeScript.
 
 - **Repository**: setup's clone sets the config every world repository has
   (§4.5), `.git/info/exclude` (only `package.json`, `shared/`, `workspaces/`)
-  and `.git/info/attributes`, once. Nothing runs on it at startup.
+  and `.git/info/attributes`, once. Nothing runs on it at startup, OpenClaw
+  included: `base.json` sets `worktreeAcceleration: false`. Without it,
+  OpenClaw's startup "dependency template prewarm" (its sandbox backend defaults
+  to `docker`) finds each agent's workspace inside the world's repository and
+  fetches `origin`'s default branch, a silent download of the creator's
+  unreleased work at every start, then sizes and copies it into
+  `.state/worktree-projections/` (seen with git tracing, 2026-11-14).
 - **Git** (`findGit`): `git/` beside the app, GitHub Desktop's portable build
   (`dugite-native`, pinned with its sha256 in `scripts/package.mjs`, Git
   Credential Manager and Git LFS stripped: they are most of it and nothing uses

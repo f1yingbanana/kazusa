@@ -11,7 +11,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyUpdate, openReport, readReport } from "./apply.ts";
 import { areaOf, planUpdate } from "./plan.ts";
-import { folderTree } from "./tree.ts";
+import { blobId, folderTree } from "./tree.ts";
 
 let root: string;
 const put = (dir: string, file: string, text: string) => {
@@ -213,6 +213,11 @@ describe("world update", () => {
     const hub = plan.changes.find(({ path: file }) => file.endsWith("hub.md"));
     expect(hub?.outcome).toBe("conflict");
     expect(hub?.conflicts?.map(({ part }) => part)).toContain("lead");
+    // The report remembers the file as `apply` left it, so a resolution shows.
+    apply(live, v2, plan);
+    const file = path.join(live, "shared/wiki/entities/places/hub.md");
+    const [conflict] = readReport(live)!.conflicts;
+    expect(conflict?.written).toBe(blobId(readFileSync(file)));
   });
 
   it("renames only places, never a concept that shared the id", () => {
@@ -257,6 +262,35 @@ describe("world update", () => {
     expect(readReport(live)?.orphaned[0]?.reason).toBe(
       "its place no longer exists",
     );
+  });
+});
+
+describe("renamed places", () => {
+  it("gives a card only play has the renamed place's id and its world name", () => {
+    const { live, v2 } = setup();
+    put(
+      v2,
+      "shared/wiki/entities/places/market.md",
+      place("market", "\nparent: hub").replace(
+        "name: market",
+        "name: The Market",
+      ),
+    );
+    put(
+      live,
+      "workspaces/bea/wiki/entities/places/old_market.md",
+      "---\nplace_id: old_market\nname: Old Market\n---\n\nWhere I met Amy.\n",
+    );
+    const change = planOf(live, v2).changes.find(
+      ({ path: file }) =>
+        file === "workspaces/bea/wiki/entities/places/market.md",
+    );
+    expect(change).toMatchObject({
+      outcome: "updated",
+      from: "workspaces/bea/wiki/entities/places/old_market.md",
+    });
+    expect(change?.text).toContain("place_id: market\nname: The Market\n");
+    expect(change?.text).toContain("Where I met Amy.");
   });
 });
 

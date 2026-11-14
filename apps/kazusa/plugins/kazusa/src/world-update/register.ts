@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -27,7 +28,7 @@ import {
   type Report,
 } from "./apply.ts";
 import { planUpdate, type Plan } from "./plan.ts";
-import { commitTree } from "./tree.ts";
+import { blobId, commitTree } from "./tree.ts";
 
 const ACTIONS = [
   "check",
@@ -122,10 +123,22 @@ function summary(
   };
 }
 
-function conflictView(report: Report) {
+/**
+ * What `apply` left to resolve, each file marked by whether it has been edited
+ * since: the parts listed are as they were at `apply`.
+ */
+function conflictView(world: string, report: Report) {
+  const current = (file: string) => {
+    try {
+      return blobId(readFileSync(path.join(world, file)));
+    } catch {
+      return undefined;
+    }
+  };
   return {
-    files: report.conflicts.map(({ path: file, parts }) => ({
+    files: report.conflicts.map(({ path: file, parts, written }) => ({
       path: file,
+      editedSinceApply: current(file) !== written,
       parts: parts.map((part) => ({
         part: part.part,
         base: short(part.base),
@@ -133,9 +146,12 @@ function conflictView(report: Report) {
         live: short(part.live),
       })),
     })),
-    orphaned: report.orphaned,
+    orphaned: report.orphaned.map((orphan) => ({
+      ...orphan,
+      stillThere: current(orphan.path) !== undefined,
+    })),
     keptDeleted: report.keptDeleted,
-    note: "Read a file's other versions in full with `show` (`version`: new or old).",
+    note: "The parts are as `apply` found them; `editedSinceApply` says whether you've changed the file since, `stillThere` whether an orphan is. Read a file's other versions in full with `show` (`version`: new or old).",
   };
 }
 
@@ -271,7 +287,7 @@ export function registerWorldUpdate(
       if (action === "conflicts") {
         if (!open) return textResult({ note: "No update is open." });
         if (cutShort) throw new Error(restoreFirst);
-        return textResult(conflictView(open));
+        return textResult(conflictView(world, open));
       }
       if (action === "restore") {
         await paused();
@@ -296,6 +312,8 @@ export function registerWorldUpdate(
         return textResult({
           finished: true,
           version: report.version,
+          saved: report.save,
+          note: "The update is closed and there's no restore from here. The save stays in the world's history for good; nothing ever closes it.",
           ...positions,
           unregistered: report.newCharacters.filter(
             (who) => !registered.has(who),
