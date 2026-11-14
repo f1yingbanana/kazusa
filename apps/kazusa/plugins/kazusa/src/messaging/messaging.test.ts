@@ -541,6 +541,51 @@ describe("conversation routing and management", () => {
     ]);
   });
 
+  it("lists chats without waiting behind a send, and never shows one half made", async () => {
+    const chats = new Map<string, ChatConversation>();
+    let saving = false;
+    let finishSaving!: () => void;
+    const saved = new Promise<void>((resolve) => (finishSaving = resolve));
+    const h = setup(
+      undefined,
+      undefined,
+      chats,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        conversations: {
+          lookup: async (key) => structuredClone(chats.get(key)),
+          register: async (key, value) => {
+            if (saving) await saved;
+            chats.set(key, structuredClone(value));
+          },
+          entries: async () =>
+            [...chats].map(([key, value]) => ({
+              key,
+              value: structuredClone(value),
+              createdAt: NOW,
+            })),
+        },
+      },
+    );
+    await h.send();
+    // A new group's send holds the queue while its chat is saved.
+    saving = true;
+    const sending = h.send({ requestId: "tea", members: ["bob", "carol"] });
+    const listed = await Promise.race([
+      h.messaging.listChats("bob"),
+      new Promise((resolve) => setTimeout(() => resolve("waited"), 200)),
+    ]);
+    expect(listed).toEqual([
+      expect.objectContaining({ sessionKey: "agent:bob:chat:direct:alice" }),
+    ]);
+    finishSaving();
+    await sending;
+    expect(await h.messaging.listChats("bob")).toHaveLength(2);
+  });
+
   it("discovers only current memberships and resolves group replies without member lists", async () => {
     const h = setup();
     const group = await h.send({
