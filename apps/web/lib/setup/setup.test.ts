@@ -1,7 +1,6 @@
 import {
   cpSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -99,7 +98,6 @@ function folderCatalog(
 function fixture(): string {
   const root = mkdtempSync(path.join(tmpdir(), "kazusa-setup-"));
   const app = path.join(root, "apps/kazusa");
-  mkdirSync(path.join(root, ".agents"));
   write(
     path.join(app, "base.json"),
     JSON.stringify({
@@ -340,14 +338,10 @@ describe("setup", () => {
       primary: "openrouter/z-ai/glm-5.3-flash",
     });
     expect(existsSync(path.join(app, "world/.state/.env"))).toBe(false);
-    expect(
-      lstatSync(
-        path.join(app, "world/workspaces/admin/.agents"),
-      ).isSymbolicLink(),
-    ).toBe(true);
-    expect(
-      existsSync(path.join(app, "worlds/cast-world/workspaces/admin/.agents")),
-    ).toBe(false);
+    // Every start copies the system agent's skills in; setup links nothing.
+    expect(existsSync(path.join(app, "world/workspaces/admin/.agents"))).toBe(
+      false,
+    );
     expect(catalog.cloned).toEqual(["cast-world"]);
     expect((await setup.status()).configured).toBe(true);
   });

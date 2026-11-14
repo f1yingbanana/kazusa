@@ -4,7 +4,6 @@ import {
   readFile,
   rename,
   rm,
-  symlink,
   writeFile,
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
@@ -485,28 +484,6 @@ export function createSetup(
     };
   }
 
-  /**
-   * The cloned world made this machine's: the system agent's link to Kazusa's
-   * own guides. Everything else is the clone's.
-   */
-  async function importWorld(): Promise<void> {
-    const world = await readWorld(liveDir);
-    // Only Windows reads the type: a junction needs no admin rights or
-    // Developer Mode.
-    const link = path.join(
-      liveDir,
-      "workspaces",
-      world.kazusa.systemAgent,
-      ".agents",
-    );
-    if (!existsSync(link))
-      await symlink(
-        path.relative(path.dirname(link), path.join(appDir, "../../.agents")),
-        link,
-        "junction",
-      );
-  }
-
   async function readBase() {
     return BaseSchema.parse(
       JSON.parse(await readFile(path.join(appDir, "base.json"), "utf8")),
@@ -617,8 +594,9 @@ export function createSetup(
     )
       throw new Error(`Unknown provider: ${request.key.provider}`);
     await prepare(request.world);
-    await importWorld();
     await saveKey(request.key);
+    // The world is set up once this exists. The system agent's skills come
+    // with every start that follows (`scripts/system-agent.mjs`).
     await writeConfig(request);
   }
 

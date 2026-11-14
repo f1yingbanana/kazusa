@@ -27,7 +27,7 @@ import {
   startProviderPlugins,
 } from "./plugin-startup.mjs";
 import { isClone } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
-import { syncSystemAgent } from "./system-agent.mjs";
+import { syncSystemAgent, syncSystemAgentSkills } from "./system-agent.mjs";
 import { applyPending, clearTrash, updatePaths } from "./update.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -300,6 +300,11 @@ if (!stopping) {
     syncSystemAgent(ROOT);
   } catch (error) {
     console.warn(`Couldn't update the system agent's tools: ${error.message}`);
+  }
+  try {
+    syncSystemAgentSkills(ROOT);
+  } catch (error) {
+    console.warn(`Couldn't update the system agent's skills: ${error.message}`);
   }
   try {
     for (const line of loadNewPlugins(ROOT)) console.log(line);
