@@ -273,10 +273,11 @@ the existing one and delete the orphan.
 ## If it goes wrong: restore, then carry on
 
 `apply` saves the world before it changes anything, and `world_update`
-`action: "restore"` (clock paused) puts every world file back exactly as that
-save kept it and closes the update. Characters' databases aren't touched, and
-nothing from play is lost: everything since `apply` happened with the clock
-paused.
+`action: "restore"` (clock paused) puts every world file back as that save kept
+it and closes the update. Nothing from play is lost: everything since `apply`
+happened with the clock paused. Characters' databases aren't restored: anyone
+the update moved off a place it removed stays where they were put, though those
+at a renamed place follow it back.
 
 - **`apply` was cut short** (Kazusa stopped, an error mid-way): every other
   action then says so. Restore, `check` again, and `apply` again with the same

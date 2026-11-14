@@ -301,19 +301,25 @@ apps/kazusa/
   `openclaw.json` and the databases (added explicitly), made with the Gateway
   stopped; loading moves `play` back to the save's release, and "undo an update"
   becomes loading its autosave.
-- **World update merge rules** (`src/world-update/merge.ts`, `update.ts`): pages
-  merge three-way per part (each frontmatter key, the lead, each `##` section):
-  a side's unchanged part yields to the other's change; `## Notes` and
-  `## History` union by line; a character's own fields win on her pages, and a
-  card's `name` follows the world; `map` follows the user's `layout` choice
-  where both moved it; both-changed parts keep the live side and are reported. A
-  card for a place gone everywhere is dropped if it holds nothing the character
-  wrote, otherwise orphaned for the system agent to re-home. `kazusa.renames` in
-  the creator's `package.json` carry place and concept ids, with every card and
-  position. `apply` needs a paused clock; `finish` refuses a map that doesn't
-  load and re-places characters stranded on a missing place (or everyone, with
-  `rehome: all`). `openclaw.json` is never touched: new characters are reported
-  for registering.
+- **World update merge rules** (`src/world-update/`: `tree.ts`, `plan.ts`,
+  `merge.ts`, `apply.ts`): pages merge three-way per part (each frontmatter key,
+  the lead, each `##` section, in the creator's order with a part only play has
+  kept after the one it follows): a side's unchanged part yields to the other's
+  change; `## Notes` and `## History` union by line; a character's own fields
+  win on her pages, and a card's `name` follows the world; `map` follows the
+  user's `layout` choice where both moved it; both-changed parts keep the live
+  side and are reported. A card for a place gone everywhere is dropped if it
+  holds nothing the character wrote, otherwise orphaned for the system agent to
+  re-home. `kazusa.renames` in the creator's `package.json` carry place and
+  concept ids, with every card and position. `apply` needs a paused clock;
+  `finish` refuses a map that doesn't load and re-places characters stranded on
+  a missing place (or everyone, with `rehome: all`). A rename reaches every page
+  that names the place, those the merge otherwise leaves alone included (a home,
+  a parent, a link in a memory), and `apply` and `restore` announce renames to
+  the map watcher (`LocationService.expectRenames`) so whoever stands there
+  follows the place rather than being moved off it. `openclaw.json` is never
+  touched: new characters are reported for registering. Every `apply`, `restore`
+  and `finish` sends SSE `world`, so clients refetch the world's version.
 - **Repo search and the repository boundary** (`src/repo-search/`): the system
   agent's `grep` searches text files line by line for a regular expression
   (literal text when the pattern isn't valid), read-only, inside the repository

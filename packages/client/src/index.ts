@@ -1778,6 +1778,13 @@ export const PlacesStreamEventSchema = z.object({ type: z.literal("places") });
 export type PlacesStreamEvent = z.infer<typeof PlacesStreamEventSchema>;
 
 /**
+ * A world update was applied, restored or finished: the world's version and the
+ * update it offers changed. Refetch `GET /kazusa/world`.
+ */
+export const WorldStreamEventSchema = z.object({ type: z.literal("world") });
+export type WorldStreamEvent = z.infer<typeof WorldStreamEventSchema>;
+
+/**
  * What happens in chats the player isn't in, wrapped so it is never applied as
  * the player's own: a message, someone composing, or a change to the chat
  * list.
@@ -1813,6 +1820,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   DesiresStreamEventSchema,
   LocationStreamEventSchema,
   PlacesStreamEventSchema,
+  WorldStreamEventSchema,
   ObservedStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;

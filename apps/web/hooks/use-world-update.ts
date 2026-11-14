@@ -148,6 +148,21 @@ async function fetchWorldCheck(fresh: boolean): Promise<WorldCheck> {
 }
 
 /**
+ * Checks again, past the server's two-minute cache, wherever the check runs
+ * (the local owner's client): after a world update, "Your world" and what's
+ * offered change.
+ */
+export function recheckWorld({
+  cache,
+  mutate,
+}: Pick<ReturnType<typeof useSWRConfig>, "cache" | "mutate">): void {
+  if (cache.get(WORLD_CHECK_KEY) === undefined) return;
+  void mutate(WORLD_CHECK_KEY, fetchWorldCheck(true), {
+    revalidate: false,
+  }).catch(() => undefined);
+}
+
+/**
  * Whether the world in play has a newer release, what it changes and how big it
  * is, checked hourly like Kazusa's own and nothing downloaded; then the
  * download, once the player says so. Only for whoever may change this machine

@@ -151,7 +151,10 @@ them that way: a plain Node script can't import a package's TypeScript.
   release's index, so what only the release brought goes) and `play` on the
   save's parent, and closes the report. `show` reads a file at either commit.
   `finish` checks the map, re-homes and deletes the report; the save stays. The
-  live `package.json` becomes the creator's as is; renames come from it.
+  live `package.json` becomes the creator's as is; renames come from it, reach
+  every page naming the place (merged or not), and are announced to the map
+  watcher before files move so whoever is there follows. `apply`, `restore` and
+  `finish` each send SSE `world`; clients refetch the world and the check.
 
 - **Repository**: setup's clone sets the config every world repository has
   (§4.5), `.git/info/exclude` (only `package.json`, `shared/`, `workspaces/`)

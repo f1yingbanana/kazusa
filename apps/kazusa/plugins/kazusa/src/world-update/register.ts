@@ -5,6 +5,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { currentConfig } from "../current-config.ts";
+import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { LocationService } from "../location/register.ts";
 import { lintMap, loadWorld } from "../location/world.ts";
 import { readWorldPackage } from "../world/package.ts";
@@ -168,7 +169,12 @@ function label(git: Git, commit: string, version?: string): string {
  */
 export function registerWorldUpdate(
   api: OpenClawPluginApi,
-  deps: { readonly clock: Clock; readonly location: LocationService },
+  deps: {
+    readonly clock: Clock;
+    readonly location: LocationService;
+    /** Tells clients the world's version changed. */
+    readonly broadcaster?: KazusaRealtimeBroadcaster;
+  },
 ): void {
   const textResult = (value: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }],
@@ -303,6 +309,7 @@ export function registerWorldUpdate(
           throw error;
         }
         finishUpdate(world);
+        deps.broadcaster?.broadcast({ type: "world" });
         return textResult({
           restored: true,
           version: label(git, open.from, versionOf(git)),
@@ -317,6 +324,7 @@ export function registerWorldUpdate(
         if (problems.length) return textResult({ finished: false, problems });
         const positions = await repairPositions(rehome);
         const report = finishUpdate(world);
+        deps.broadcaster?.broadcast({ type: "world" });
         const registered = new Set(listAgentIds(currentConfig(api)));
         return textResult({
           finished: true,
@@ -379,6 +387,7 @@ export function registerWorldUpdate(
         throw error;
       }
       standOn(git, release.commit);
+      deps.broadcaster?.broadcast({ type: "world" });
       return textResult({
         ...planned,
         saved: save,

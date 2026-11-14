@@ -151,7 +151,7 @@ export default definePluginEntry({
     placesRef.current = location.pages;
     const scene = registerScene(api, createRouteRegistrar(api));
     registerLocationHttp(api, { location, times: scene.times });
-    registerWorldUpdate(api, { clock, location });
+    registerWorldUpdate(api, { clock, location, broadcaster });
     registerRepoSearch(api);
     // On unless a world turns it off: observing is what the client is for.
     const observer =
