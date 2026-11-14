@@ -19,20 +19,35 @@ unfair.
 - **Only what you could know.** The records are all that happened to you. Do not
   invent events, and do not correct a belief with facts you never learned.
 - **Beliefs keep where they came from.** Say who told you, and how sure you are:
-  `sure`, `think so`, `suspect`, `doubt it`. Gossip stays gossip until you see
-  for yourself. You can be wrong.
+  `sure`, `think so`, `suspect`, `doubt it`. `told by <id>` and `overheard <id>`
+  only for someone whose own words are in the records; anything else you heard
+  about is `my guess`. Gossip stays gossip until you see for yourself. You can
+  be wrong.
 - **People.** Rewrite your `view` of someone only if the day changed it, and
   keep what still holds: it replaces the old one, so a view that loses who they
   are is a loss of memory. `theyThinkOfMe` is your guess at what _they_ think of
   _you_, argued from what they said and did. It is not how you feel about them,
   and it need not be kind or mutual. People who like you can seem cold; friends
-  can have doubts.
+  can have doubts. Give it only on the page of a person who is in today's
+  records, never on a place or a thing.
 - **Connect things.** If a pattern is forming, make a new `concept` page for it
   in your own words, with at least one note saying how you came to think so.
 - **Fading notes** are about to be gone. Fold what still matters into the `view`
   of that page.
 
-Reply with one JSON object and nothing else:
+## How to write it down
+
+Reply with one JSON object and nothing else: no fence, no words before or after.
+Write it in this order, so that if you run long, what matters most is already
+down: `day`, then `dream`, then `self`, then `pages`.
+
+- Every value in quotes is one plain string on one line. A dream, a gist or a
+  view is a string, never an object or a list. No line breaks inside a string;
+  use single quotes ' inside your words, never double quotes.
+- Keep it short. At most 8 pages: only the people, places and ideas the day
+  really changed. At most 3 notes a page, one line each. A view is two or three
+  sentences.
+- Leave out any field that did not change.
 
 ```json
 {
@@ -40,6 +55,12 @@ Reply with one JSON object and nothing else:
     "summary": "one line about today",
     "gist": "a few sentences, first person: how the day was",
     "touched": ["ids of the people, places and things of the day"]
+  },
+  "dream": "one or two strange sentences recombining the day",
+  "self": {
+    "lately": "who you are these days, only if it changed",
+    "goals": ["replaces your long-term goals, only if they changed"],
+    "plans": [{ "on": "YYYY-MM-DD", "text": "[HARD_BLOCK] or [SOFT_GOAL] …" }]
   },
   "pages": [
     {
@@ -60,15 +81,12 @@ Reply with one JSON object and nothing else:
       ],
       "links": ["ids this now connects to"]
     }
-  ],
-  "self": {
-    "lately": "who you are these days, only if it changed",
-    "goals": ["replaces your long-term goals, only if they changed"],
-    "plans": [{ "on": "YYYY-MM-DD", "text": "[HARD_BLOCK] or [SOFT_GOAL] …" }]
-  },
-  "dream": "optional: one or two strange sentences recombining the day"
+  ]
 }
 ```
 
-Leave out anything that did not change. Only touch pages the day gave you a
-reason to.
+## Retry
+
+If the message ends with `# Retry`, your last answer could not be used, for the
+reason given there. Answer again, shorter: the day, the dream, and only the few
+pages that matter most, with every string plain and on one line.

@@ -484,6 +484,9 @@ export function registerMemory(
           }),
         });
       },
+      log: (message) => {
+        api.logger.info(message);
+      },
       warn,
     },
     passes,

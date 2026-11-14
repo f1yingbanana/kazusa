@@ -523,7 +523,26 @@ survives.
   stays ignorant of what sleep means.
 - **Runner**: `api.runtime.subagent.complete` with the character's model, one
   tool-free call, no session, no ledger; `:brain` stays free so Perception keeps
-  working.
+  working. It is not an agent run: OpenClaw makes the call once (240 s budget,
+  counted from when its 3-wide `background:plugin:kazusa` lane admits it) with
+  no retry of its own, and the reply must be the whole JSON document.
+- **Retries**: up to 3 calls per night (`SLEEP_ATTEMPTS`), 10 s then 20 s apart,
+  when a reply has no usable `day` or the call fails (timeout, provider error).
+  A retry appends `# Retry` and the last error; the skill says to answer
+  shorter. Nothing is written before a reply is read, so a retry cannot apply
+  twice; a wake or the next task aborts the wait like the call. After the last
+  failure the watermark stands and the next sleep takes the day in again.
+- **Tolerance**: strict `JSON.parse` first, then a lenient reader
+  (`lenient-json.ts`) that keeps every value that arrived whole from a reply cut
+  off at its end, keeps raw line breaks in strings, supplies missing commas. A
+  `dream`, `gist`, `view` and other prose given as an object or list is joined
+  into one string. Each part (day, each page, self, dream) stands alone; only a
+  missing day fails the attempt.
+- **Outcomes**: every pass keeps
+  `{result: applied | failed | interrupted | empty, attempts, errors, repaired, dropped, pages, notes, views, self, dream}`
+  in the `"memory"` store (last 30) and logs one line (info when applied).
+  `node scripts/sleep-report.mjs --world <dir> --since <time>` reads them
+  read-only and checks each applied night's day page and `MEMORY.md` on disk.
 - **Instructions**: `shared/skills/sleep-consolidation/SKILL.md`.
 - **Records**: oldest first up to 8,000 tokens; the watermark moves only as far
   as what was read, so a backlog waits for the next sleep instead of being lost.
@@ -532,7 +551,8 @@ survives.
   entity in the records or rendered that day; ids and summaries of the rest;
   pages over the note cap with their oldest notes marked _fading_. No world text
   beyond what the records show.
-- **Output** (Zod), operations not files:
+- **Output** (Zod), operations not files. The skill asks for `day`, `dream`,
+  `self`, then `pages`, so a reply cut off by length loses pages last:
 
   ```ts
   {

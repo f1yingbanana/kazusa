@@ -100,6 +100,14 @@ Review fixes (2026-10-30): sleep watermark no longer loses a backlog;
   character doesn't sleep.
 - Sleep: fires from a real bedtime; good diary, voice, sourced notes and new
   concept pages. Watch that a rewritten `view` keeps what still holds.
+- Sleep on 2026-11-12 (`venice/xiaomi-mimo-v2-6-flash`, thinking low, 145
+  characters): 81 long sleeps, 62 applied, 2 woken, 17 lost with no retry: 9
+  unreadable JSON (7 cut off or never closed, 1 raw line break), 5 `dream` as an
+  object or list, 3 timeouts at 240 s. Of the 62: day page 62, dream 61,
+  `MEMORY.md` 57, notes 53 (216 in all), an existing view rewritten 24 (44
+  views), new pages 23. Fixed with retries, a lenient reader, prose joined, the
+  skill reordered, and outcomes kept for `scripts/sleep-report.mjs`; not yet run
+  on a real model.
 
 ## Known weak spots
 
