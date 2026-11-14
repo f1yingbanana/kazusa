@@ -40,8 +40,8 @@ export interface SkillCopy {
  * Every skill characters can read and where each copy is: the world's
  * (`skills.load.extraDirs`, every character) and each character's own
  * (`<workspace>/skills` and `.agents/skills`, theirs alone), as OpenClaw finds
- * them, the system agent's included: her `.agents` is the repo's. The engine's
- * own and those hidden from models are left out.
+ * them, the system agent's included: her `.agents` is a copy of the repo's. The
+ * engine's own and those hidden from models are left out.
  */
 export async function characterSkills(
   config: OpenClawConfig,

@@ -402,11 +402,11 @@ The steps or rules, written for someone in this world.
 ## Your own skills and tools
 
 Your skills and tools come with Kazusa and update with it. Your built-in skills
-are in `workspaces/<your id>/.agents/skills/`, a link to Kazusa's own files:
-read them, but never edit them, because the next update replaces them. Your
-entry in `openclaw.json` holds your workspace, name and `cwd`, plus an
-`$include` of `.state/kazusa/system-agent.json`, which Kazusa rewrites every
-time it starts. Never edit that file either.
+are in `workspaces/<your id>/.agents/skills/`, a copy of Kazusa's own files made
+every time it starts: read them, but never edit them, because the next start
+replaces them. Your entry in `openclaw.json` holds your workspace, name and
+`cwd`, plus an `$include` of `.state/kazusa/system-agent.json`, which Kazusa
+rewrites every time it starts. Never edit that file either.
 
 When the user asks you to learn something, or to change or drop a skill or tool,
 put it in the world, where it outlives updates:

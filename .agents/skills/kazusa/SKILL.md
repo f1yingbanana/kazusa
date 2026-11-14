@@ -1324,37 +1324,39 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   since OpenClaw reads an empty list as "all" (set by setup from
   `apps/kazusa/base.json`). Repo skills (`kazusa`, `typescript`,
   `world-building`, …) reach only ARONA, as her own: her workspace's `.agents`
-  is a symlink to the repo's. OpenClaw keeps each session's skills as a snapshot
-  and rebuilds it whenever anything under `skills` in the config changes (hot
-  config). So `src/skills/` gives each skill characters can read a revision in
-  its entry (`config.kazusaRevision`, a hash of where its copies are and their
-  names and descriptions): a new one is what makes every character's next turn
-  see a skill added, removed, copied or redescribed. It does this on
-  `gateway_start`, through `refresh_skills`, and within a second of an edit: one
-  recursive watcher per process (`skills/watch.ts`) over the world's
-  `shared/skills`, the workspaces' skill folders and Kazusa's defaults.
-  OpenClaw's own `skills.load.watch` stays `false` (one watcher per workspace
-  ran out with a large cast). Bodies are read when a skill is opened, so an edit
-  to one needs nothing. Our loaders cache files until `clearSkillCaches()`,
-  which the watcher calls. The repo's `.agents/skills` reach ARONA through her
-  workspace symlink, not `extraDirs`. `tools.deny` keeps `group:sessions`,
-  `message`, and `gateway` (the updater included in `minimal`).
-  `tools.exec.applyPatch.enabled: false` prevents implicit patch access from
-  `write`; ARONA explicitly enables it in her native exec override.
-  `tools.toolSearch: false`: with a dozen tools, Tool Search's three control
-  tools cost more than they save, and models route calls through its generic
-  `tool_call`. `tools.codeMode.enabled: false` for the same reason: models whose
-  catalog prefers code mode (GLM-5.3-flash) otherwise get every tool behind one
-  `exec`, and live Airi looped `exec("return \"NO_REPLY\"")` for five minutes,
-  holding a Gateway stop open. `clock_*` stay registered for operators but are
-  not allowed for characters. Everything a roleplaying character must not reach
-  is excluded by omission: shell, web, browser, UI, nodes/computer,
-  Gateway/plugin management, media generation, goals, `ask_user`, and
-  `session_status` (whose presence also adds a "use `session_status` for the
-  exact time" line to the system prompt). A deployment widens the surface in its
-  own `openclaw.json` (global profile plus `alsoAllow`, or a per-agent
-  profile/allowlist); a tool from a new plugin is unavailable until allowed
-  there.
+  is a copy of the repo's, rewritten by `scripts/system-agent.mjs` before every
+  Gateway start (a link broke when Kazusa's folder moved, and FAT32/exFAT drives
+  can't hold one), so an edit to the repo's reaches her at the next start.
+  OpenClaw keeps each session's skills as a snapshot and rebuilds it whenever
+  anything under `skills` in the config changes (hot config). So `src/skills/`
+  gives each skill characters can read a revision in its entry
+  (`config.kazusaRevision`, a hash of where its copies are and their names and
+  descriptions): a new one is what makes every character's next turn see a skill
+  added, removed, copied or redescribed. It does this on `gateway_start`,
+  through `refresh_skills`, and within a second of an edit: one recursive
+  watcher per process (`skills/watch.ts`) over the world's `shared/skills`, the
+  workspaces' skill folders and Kazusa's defaults. OpenClaw's own
+  `skills.load.watch` stays `false` (one watcher per workspace ran out with a
+  large cast). Bodies are read when a skill is opened, so an edit to one needs
+  nothing. Our loaders cache files until `clearSkillCaches()`, which the watcher
+  calls. The repo's `.agents/skills` reach ARONA through her workspace's copy,
+  not `extraDirs`. `tools.deny` keeps `group:sessions`, `message`, and `gateway`
+  (the updater included in `minimal`). `tools.exec.applyPatch.enabled: false`
+  prevents implicit patch access from `write`; ARONA explicitly enables it in
+  her native exec override. `tools.toolSearch: false`: with a dozen tools, Tool
+  Search's three control tools cost more than they save, and models route calls
+  through its generic `tool_call`. `tools.codeMode.enabled: false` for the same
+  reason: models whose catalog prefers code mode (GLM-5.3-flash) otherwise get
+  every tool behind one `exec`, and live Airi looped
+  `exec("return \"NO_REPLY\"")` for five minutes, holding a Gateway stop open.
+  `clock_*` stay registered for operators but are not allowed for characters.
+  Everything a roleplaying character must not reach is excluded by omission:
+  shell, web, browser, UI, nodes/computer, Gateway/plugin management, media
+  generation, goals, `ask_user`, and `session_status` (whose presence also adds
+  a "use `session_status` for the exact time" line to the system prompt). A
+  deployment widens the surface in its own `openclaw.json` (global profile plus
+  `alsoAllow`, or a per-agent profile/allowlist); a tool from a new plugin is
+  unavailable until allowed there.
 - **System console**: this deployment selects ARONA with native
   `agents.defaults.systemAgent.agentId`. Ordinary characters inherit the common
   global policy and workspace-only file access, without per-agent tool entries.
@@ -1378,17 +1380,16 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
   (`timeoutOverrideSeconds: 0`). Shell execution, code execution and `openclaw`
   delegation are denied; native `cwd` selects `apps/kazusa` for coding while
   identity/memory remain in her character workspace. File tools enforce that
-  coding directory. Its `.agents` workspace symlink exposes these architecture
+  coding directory. Her workspace's `.agents` copy exposes these architecture
   guides without adding a workspace-root `AGENTS.md`. Use native `skills_read`
-  for complete installed guides; ordinary file reads through an escaping symlink
-  remain blocked. Perception admits its input immediately, even paused; her
-  messages go out at once, unpaced, and her message, chat-management and task
-  tools skip the pause wait. Simulation time, task deadlines and ordinary
-  characters remain frozen. Offstage and custody gates still apply. How she
-  works is in her `SOUL.md`; the common jobs (characters, wikis, places) are the
-  `world-building` skill, and whole worlds are `world-project`. Both live in
+  for complete installed guides. Perception admits its input immediately, even
+  paused; her messages go out at once, unpaced, and her message, chat-management
+  and task tools skip the pause wait. Simulation time, task deadlines and
+  ordinary characters remain frozen. Offstage and custody gates still apply. How
+  she works is in her `SOUL.md`; the common jobs (characters, wikis, places) are
+  the `world-building` skill, and whole worlds are `world-project`. Both live in
   `.agents/skills/`, so coding agents working in this repo get them as well as
-  every world's system agent, whose workspace `.agents` links to the repo's.
+  every world's system agent, whose workspace `.agents` is a copy of the repo's.
   Long jobs survive the run limits through a project file and `continue_work`,
   which starts a fresh run once this one ends (`perception/continue.ts`), up to
   `perception.systemAgent.maxContinuations` runs without the user speaking.

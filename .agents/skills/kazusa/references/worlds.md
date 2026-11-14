@@ -104,11 +104,13 @@ them that way: a plain Node script can't import a package's TypeScript.
   cloned beside as `world.cloning`, then its `.git`, `package.json`, `shared/`
   and `workspaces/` moved in, replacing another pick that wasn't set up and
   keeping anything else there, such as `.state/`). The cast is read from the
-  clone. `apply` then links the system agent to Kazusa's guides
-  (`workspaces/<agent>/.agents`) and writes `openclaw.json` (merging
-  `kazusa.config`): the world is set up once that exists. Git's progress comes
-  back as JSON lines (`runScript`'s `onProgress`) and is kept in memory for the
-  guide's bar (`GET /setup/world`).
+  clone. `apply` then writes `openclaw.json` (merging `kazusa.config`): the
+  world is set up once that exists. Kazusa's guides reach the system agent as a
+  copy in `workspaces/<agent>/.agents`, rewritten before every Gateway start
+  (`scripts/system-agent.mjs`), never a link: a link broke when the folder
+  moved, and FAT32/exFAT drives can't hold one. Git's progress comes back as
+  JSON lines (`runScript`'s `onProgress`) and is kept in memory for the guide's
+  bar (`GET /setup/world`).
 - **Credit** (`src/world/package.ts`, `GET /kazusa/world` →
   `WorldMeta.package`): read on each request, so editing the file needs no
   restart. The client's screenshot card credits `displayName`, `author` and

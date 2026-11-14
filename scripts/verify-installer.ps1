@@ -76,11 +76,14 @@ $app = Start-Process -FilePath $shortcut.TargetPath `
 try {
   Wait-Until { (Invoke-WebRequest "$Web/" -UseBasicParsing).StatusCode -eq 200 } 'the frontend starts'
   Invoke-RestMethod "$Web/setup" -Method Post -ContentType 'application/json' -Body '{"world":"starter"}' | Out-Null
-  Assert ((Get-Item (Join-Path $World 'workspaces\arona\.agents')).LinkType -eq 'Junction') 'setup links the guides'
   Assert (Test-Path (Join-Path $World '.git\config')) 'setup cloned the starter world'
   Wait-Until { (Invoke-WebRequest "$Web/kazusa/world" -UseBasicParsing).StatusCode -eq 200 } 'the Gateway starts'
-  # The junction is only half of it: OpenClaw has to follow it when it scans
-  # her workspace, and offer what it finds to her.
+  # Every start copies the guides into her workspace: a folder, never a link.
+  $guides = Get-Item (Join-Path $World 'workspaces\arona\.agents')
+  Assert (-not $guides.LinkType) 'her guides are a copy, not a link'
+  Assert (Test-Path (Join-Path $guides.FullName 'skills\world-building\SKILL.md')) 'starting copies the guides'
+  # The copy is only half of it: OpenClaw has to find it when it scans her
+  # workspace, and offer what it finds to her.
   $env:OPENCLAW_CONFIG_PATH = Join-Path $World 'openclaw.json'
   $env:OPENCLAW_STATE_DIR = Join-Path $World '.state'
   Wait-Until {

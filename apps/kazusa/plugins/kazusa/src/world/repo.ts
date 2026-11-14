@@ -66,7 +66,7 @@ const EXCLUDE = `# Written when the world was cloned.
 !/package.json
 !/shared/
 !/workspaces/
-# The system agent's link to the app's own skills (a junction on Windows).
+# The system agent's copy of the app's own skills, rewritten at every start.
 /workspaces/*/.agents
 .DS_Store
 *.tmp
