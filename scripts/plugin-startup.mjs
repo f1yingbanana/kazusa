@@ -105,13 +105,16 @@ export const CHARACTER_DENIED_TOOLS = [
   ...MEDIA_GENERATION_TOOLS,
 ];
 
-/** A deny this script wrote earlier, short of what it writes now. */
-function isOurShorterDeny(tools) {
+/**
+ * The deny this script wrote before the media tools joined it, exactly. Any
+ * other deny, even a narrower one, is the world's own.
+ */
+function isOurEarlierDeny(tools) {
   return (
     Object.keys(tools).length === 1 &&
     Array.isArray(tools.deny) &&
-    tools.deny.length < CHARACTER_DENIED_TOOLS.length &&
-    tools.deny.every((tool) => CHARACTER_DENIED_TOOLS.includes(tool))
+    tools.deny.length === IMPLIED_TOOLS.length &&
+    IMPLIED_TOOLS.every((tool) => tools.deny.includes(tool))
   );
 }
 
@@ -137,7 +140,7 @@ export function denyImpliedTools(root) {
       id !== system &&
       entry &&
       !entry.$include &&
-      (entry.tools === undefined || isOurShorterDeny(entry.tools)),
+      (entry.tools === undefined || isOurEarlierDeny(entry.tools)),
   );
   if (!characters.length) return [];
   for (const [, entry] of characters)

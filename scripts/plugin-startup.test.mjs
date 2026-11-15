@@ -216,6 +216,9 @@ describe("denyImpliedTools", () => {
           hina: { tools: { deny: [...IMPLIED_TOOLS] } },
           // A narrower deny of the world's own making stays as it is.
           ui: { tools: { deny: ["exec"], alsoAllow: ["read"] } },
+          mari: { tools: { deny: ["exec"] } },
+          // So does a deny holding more than the earlier one.
+          koyuki: { tools: { deny: [...IMPLIED_TOOLS, "image_generate"] } },
         },
       },
     });
@@ -228,6 +231,10 @@ describe("denyImpliedTools", () => {
     expect(read().agents.entries.ui.tools).toEqual({
       deny: ["exec"],
       alsoAllow: ["read"],
+    });
+    expect(read().agents.entries.mari.tools).toEqual({ deny: ["exec"] });
+    expect(read().agents.entries.koyuki.tools).toEqual({
+      deny: [...IMPLIED_TOOLS, "image_generate"],
     });
     expect(denyImpliedTools(root)).toEqual([]);
   });
