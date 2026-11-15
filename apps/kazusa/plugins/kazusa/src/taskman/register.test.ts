@@ -4,6 +4,7 @@ import type { Clock } from "../clock/clock.ts";
 vi.mock("../ledger.ts", () => ({ appendLedgerEntry: vi.fn(async () => {}) }));
 import { appendLedgerEntry } from "../ledger.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { resetStateCaches } from "../state.ts";
 import { registerTaskman, resetTaskWakes } from "./register.ts";
 import type { ActiveTask } from "./types.ts";
 
@@ -157,6 +158,7 @@ describe("taskman wakes", () => {
 
   beforeEach(() => {
     resetTaskWakes();
+    resetStateCaches();
     vi.useFakeTimers();
     vi.setSystemTime(T0);
   });
