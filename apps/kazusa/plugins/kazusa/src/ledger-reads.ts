@@ -1,5 +1,8 @@
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
-import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
+import {
+  appendSessionTranscriptMessageByIdentityStrict,
+  readSessionTranscriptCatalogPage,
+} from "openclaw/plugin-sdk/session-transcript-runtime";
 
 /**
  * Recent rows of a character's ledgers (`agent:<id>:tasks`,
@@ -7,8 +10,8 @@ import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-tr
  * reads each of the character's ledgers back to its cutoff, and OpenClaw serves
  * every catalog page with a synchronous database read on the Gateway's main
  * thread: with 145 characters that was about 1,500 page reads a minute, some
- * taking 0.2-0.6 s. Kazusa is the only writer of these ledgers and says when it
- * appends (`ledgerChanged`), so a ledger is read again only once it has
+ * taking 0.2-0.6 s. Kazusa is the only writer of these ledgers and appends
+ * through `appendToLedger`, so a ledger is read again only once it has
  * changed.
  */
 
@@ -54,11 +57,23 @@ const PAGE = 200;
 const ledgerKey = (agentId: string, sessionKey: string): string =>
   `${agentId}\u0000${sessionKey}`;
 
-/** Call after every append to a ledger, once it is committed. */
+/** Marks a ledger's kept reads out of date. */
 export function ledgerChanged(agentId: string, sessionKey: string): void {
   const { versions } = cell();
   const key = ledgerKey(agentId, sessionKey);
   versions.set(key, (versions.get(key) ?? 0) + 1);
+}
+
+/**
+ * The only way Kazusa appends to a ledger: kept reads are out of date however
+ * it ends.
+ */
+export function appendToLedger(
+  params: Parameters<typeof appendSessionTranscriptMessageByIdentityStrict>[0],
+): ReturnType<typeof appendSessionTranscriptMessageByIdentityStrict> {
+  return appendSessionTranscriptMessageByIdentityStrict(params).finally(() =>
+    ledgerChanged(params.agentId, params.sessionKey),
+  );
 }
 
 const timeOf = (row: Row): number =>

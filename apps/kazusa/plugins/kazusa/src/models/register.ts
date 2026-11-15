@@ -40,8 +40,8 @@ export interface Models extends ModelSelectionStore {
 }
 
 /**
- * Every character turn runs in its `:brain` session (Perception handles cron
- * wakes and everything else without a model call), so that is the one place the
+ * Every character turn runs in its `:brain` session (Perception handles wakes
+ * and everything else without a model call), so that is the one place the
  * selection has to reach. The model is swapped per turn here, and the brain
  * channel also writes it onto the session before each new turn, since OpenClaw
  * checks a steer against the session's model; reasoning has no hook, so it goes

@@ -66,11 +66,6 @@ export function registerPerception(
     readonly clock: Pick<Clock, "time" | "init" | "now" | "onClockChange">;
     readonly assembleDecisionContext?: DecisionContextAssembler;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
-    /**
-     * Settles what a lease's end means elsewhere (a trip arriving) and may
-     * return a line for the check-in ("You've arrived at …").
-     */
-    readonly onDeadline?: (agentId: string) => Promise<string | undefined>;
     /** Confirms a foreseen stimulus when its moment comes. */
     readonly confirm?: PerceptionDeps["confirm"];
     /** Whether a character is simulated; offstage, input waits. */
@@ -413,10 +408,9 @@ export function registerPerception(
   // Fires right before prompt compilation and generation for an admitted agent turn.
   // WHAT KAZUSA DOES:
   // - Dual purpose:
-  //   1. Cron runs for a character: claimed silently, and treated as a deadline
-  //      check (`perception.deadline`, after `onDeadline`). Taskman wakes from
-  //      its own timer now; this only answers a world's old `Wake <id>` jobs
-  //      until `cron_reconciled` removes them, and any other cron run.
+  //   1. Cron runs for a character: claimed silently. Activity ends wake from
+  //      Taskman's own timer; a world's old `Wake <id>` jobs only repeat that
+  //      until `cron_reconciled` removes them.
   //   2. Brain Sessions (Attended Thought Tracking): Captures `event.cleanedBody` via
   //      `perception.attending(owner.agentId, event.cleanedBody)`.
   // DESIGN FIT:
@@ -424,23 +418,7 @@ export function registerPerception(
   // informed interrupt/defer decisions when new stimuli arrive while the brain is busy.
   // =========================================================================
   api.on("before_agent_reply", async (event, ctx) => {
-    if (ctx.trigger === "cron" || ctx.jobId) {
-      try {
-        await deps.clock.init();
-        if (ctx.agentId) {
-          const note = await deps
-            .onDeadline?.(ctx.agentId)
-            .catch((error: unknown) => {
-              api.logger.warn(`Perception onDeadline: ${String(error)}`);
-              return undefined;
-            });
-          await perception.deadline(ctx.agentId, note);
-        }
-      } catch (error) {
-        api.logger.warn(`Perception deadline: ${String(error)}`);
-      }
-      return { handled: true };
-    }
+    if (ctx.trigger === "cron" || ctx.jobId) return { handled: true };
     const owner = parseAgentSessionKey(ctx.sessionKey ?? "");
     if (
       owner?.rest !== "brain" ||

@@ -84,7 +84,8 @@ export function modelSelection(api: OpenClawPluginApi): ModelSelectionStore {
 
 /**
  * The world's and each character's model picks, kept in memory: read for every
- * turn, decision and embedding, written only through a store from here.
+ * turn, decision and embedding, written only through a store from here. Picks
+ * are read-only and replaced whole, so reads share the kept object.
  */
 export function openModelStore(
   api: OpenClawPluginApi,
@@ -95,7 +96,6 @@ export function openModelStore(
       namespace: "models",
       retention: "retained",
     }),
-    { copies: true },
   );
 }
 

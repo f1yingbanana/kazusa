@@ -172,7 +172,7 @@ describe("denyImpliedTools", () => {
       },
     });
     expect(denyImpliedTools(root)).toEqual([
-      "2 characters now deny shell and file tools outright, which they never had.",
+      "2 characters now deny shell, file and media-generation tools, which they never had.",
     ]);
     const world = read();
     const deny = { deny: CHARACTER_DENIED_TOOLS };
@@ -220,7 +220,7 @@ describe("denyImpliedTools", () => {
       },
     });
     expect(denyImpliedTools(root)).toEqual([
-      "1 characters now also deny the media-generation tools OpenClaw built on every turn for them.",
+      "1 characters now deny shell, file and media-generation tools, which they never had.",
     ]);
     expect(read().agents.entries.hina.tools.deny).toEqual(
       CHARACTER_DENIED_TOOLS,

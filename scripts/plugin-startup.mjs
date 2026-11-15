@@ -132,28 +132,19 @@ export function denyImpliedTools(root) {
   if (!existsSync(configFile)) return [];
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   const system = config.agents?.defaults?.systemAgent?.agentId;
-  const plain = Object.entries(config.agents?.entries ?? {}).filter(
-    ([id, entry]) => id !== system && entry && !entry.$include,
+  const characters = Object.entries(config.agents?.entries ?? {}).filter(
+    ([id, entry]) =>
+      id !== system &&
+      entry &&
+      !entry.$include &&
+      (entry.tools === undefined || isOurShorterDeny(entry.tools)),
   );
-  const fresh = plain.filter(([, entry]) => entry.tools === undefined);
-  const dated = plain.filter(
-    ([, entry]) => entry.tools !== undefined && isOurShorterDeny(entry.tools),
-  );
-  if (!fresh.length && !dated.length) return [];
-  for (const [, entry] of [...fresh, ...dated])
+  if (!characters.length) return [];
+  for (const [, entry] of characters)
     entry.tools = { deny: [...CHARACTER_DENIED_TOOLS] };
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   return [
-    ...(fresh.length
-      ? [
-          `${fresh.length} characters now deny shell and file tools outright, which they never had.`,
-        ]
-      : []),
-    ...(dated.length
-      ? [
-          `${dated.length} characters now also deny the media-generation tools OpenClaw built on every turn for them.`,
-        ]
-      : []),
+    `${characters.length} characters now deny shell, file and media-generation tools, which they never had.`,
   ];
 }
 

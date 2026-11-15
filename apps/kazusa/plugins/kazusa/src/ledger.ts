@@ -2,11 +2,8 @@ import {
   generateSecureUuid,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-import {
-  appendSessionTranscriptMessageByIdentityStrict,
-  publishSessionTranscriptUpdateByIdentity,
-} from "openclaw/plugin-sdk/session-transcript-runtime";
-import { ledgerChanged } from "./ledger-reads.ts";
+import { publishSessionTranscriptUpdateByIdentity } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { appendToLedger } from "./ledger-reads.ts";
 import { recordLedgerRows, type LedgerJournalRow } from "./realtime.ts";
 
 /**
@@ -63,25 +60,17 @@ export async function appendLedgerEntry(
   // lenient append inherits that turn's writer claim and OpenClaw refuses it
   // for this other session ("session writer claim changed before transcript
   // persistence"). The strict append fences against this ledger's own session.
-  // Kept reads of this ledger are out of date however the append ends.
-  let appended: Awaited<
-    ReturnType<typeof appendSessionTranscriptMessageByIdentityStrict>
-  >;
-  try {
-    appended = await appendSessionTranscriptMessageByIdentityStrict({
-      ...identity,
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text }],
-        // Character experience uses simulation time. Native entry/envelope
-        // bookkeeping remains wall-clock for OpenClaw's lifecycle machinery.
-        timestamp,
-        ...(metadata ? { __openclaw: { kazusa: metadata } } : {}),
-      },
-    });
-  } finally {
-    ledgerChanged(agentId, sessionKey);
-  }
+  const appended = await appendToLedger({
+    ...identity,
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text }],
+      // Character experience uses simulation time. Native entry/envelope
+      // bookkeeping remains wall-clock for OpenClaw's lifecycle machinery.
+      timestamp,
+      ...(metadata ? { __openclaw: { kazusa: metadata } } : {}),
+    },
+  });
   if (appended.kind !== "result") {
     throw new Error(`Ledger append ${appended.kind}: ${sessionKey}.`);
   }

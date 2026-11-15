@@ -533,7 +533,7 @@ We explicitly choose to store separate subjective transcripts per character:
 
 ---
 
-## 8. Task Deadlines as First-Class Sensory Stimuli & Ephemeral Cron Projection
+## 8. Task Deadlines as First-Class Sensory Stimuli
 
 In earlier drafts, task deadlines were treated as an out-of-band procedural
 boolean (`state.deadline`). That approach had major conceptual and practical
@@ -571,10 +571,9 @@ Taskman keeps every onstage lease end in one in-process schedule and arms a
 single timer for the soonest (`taskman/wakes.ts`). When it fires, the deadline
 goes straight to `perception.deadline(agentId, note)` in the background, so it
 arrives on time even while `:brain` is thinking, and Jev can steer the turn.
-Wakes used to be isolated OpenClaw cron runs claimed in `before_agent_reply`;
-that hook still answers any cron run for a character the same way, which only
-matters for a world's leftover `Wake <id>` jobs until `cron_reconciled` removes
-them.
+Wakes used to be isolated OpenClaw cron runs. `before_agent_reply` still claims
+any cron run for a character silently, without a check-in, until
+`cron_reconciled` removes a world's leftover `Wake <id>` jobs.
 
 ### 8.3 The Cognitive Attention Gate & Attention Floor
 
