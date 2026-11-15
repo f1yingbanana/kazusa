@@ -89,30 +89,71 @@ export function loadNewPlugins(root) {
 export const IMPLIED_TOOLS = ["exec", "process", "read", "write", "edit"];
 
 /**
+ * OpenClaw builds these on every turn whenever some provider can make media,
+ * and the `minimal` profile only hides them afterwards. Characters never get
+ * them; ARONA keeps them.
+ */
+export const MEDIA_GENERATION_TOOLS = [
+  "image_generate",
+  "video_generate",
+  "music_generate",
+];
+
+/** Everything a character's own deny holds. */
+export const CHARACTER_DENIED_TOOLS = [
+  ...IMPLIED_TOOLS,
+  ...MEDIA_GENERATION_TOOLS,
+];
+
+/** A deny this script wrote earlier, short of what it writes now. */
+function isOurShorterDeny(tools) {
+  return (
+    Object.keys(tools).length === 1 &&
+    Array.isArray(tools.deny) &&
+    tools.deny.length < CHARACTER_DENIED_TOOLS.length &&
+    tools.deny.every((tool) => CHARACTER_DENIED_TOOLS.includes(tool))
+  );
+}
+
+/**
  * Characters keep both sections, though neither grants anything to the
  * `minimal` profile now: `fs.workspaceOnly` still holds `view_image` to their
  * workspace, and `exec.applyPatch` keeps `apply_patch` off should `write` ever
  * be allowed. A deny on the character itself is what tells OpenClaw the tools
  * are meant to be missing; a global one would take ARONA's files too. It
  * removes nothing a character has. Every character entry gets it before each
- * start, so one added since the last start gets it at the next. Not the system
- * agent, and not a character with tools of its own: that's the world's call.
+ * start, so one added since the last start gets it at the next, and a deny
+ * written before the media tools joined it is brought up to date. Not the
+ * system agent, and not a character with tools of its own: that's the world's
+ * call.
  */
 export function denyImpliedTools(root) {
   const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
   if (!existsSync(configFile)) return [];
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   const system = config.agents?.defaults?.systemAgent?.agentId;
-  const characters = Object.entries(config.agents?.entries ?? {}).filter(
-    ([id, entry]) =>
-      id !== system && entry && !entry.$include && entry.tools === undefined,
+  const plain = Object.entries(config.agents?.entries ?? {}).filter(
+    ([id, entry]) => id !== system && entry && !entry.$include,
   );
-  if (!characters.length) return [];
-  for (const [, entry] of characters)
-    entry.tools = { deny: [...IMPLIED_TOOLS] };
+  const fresh = plain.filter(([, entry]) => entry.tools === undefined);
+  const dated = plain.filter(
+    ([, entry]) => entry.tools !== undefined && isOurShorterDeny(entry.tools),
+  );
+  if (!fresh.length && !dated.length) return [];
+  for (const [, entry] of [...fresh, ...dated])
+    entry.tools = { deny: [...CHARACTER_DENIED_TOOLS] };
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   return [
-    `${characters.length} characters now deny shell and file tools outright, which they never had.`,
+    ...(fresh.length
+      ? [
+          `${fresh.length} characters now deny shell and file tools outright, which they never had.`,
+        ]
+      : []),
+    ...(dated.length
+      ? [
+          `${dated.length} characters now also deny the media-generation tools OpenClaw built on every turn for them.`,
+        ]
+      : []),
   ];
 }
 
