@@ -546,6 +546,10 @@ describe("conversation routing and management", () => {
     let saving = false;
     let finishSaving!: () => void;
     const saved = new Promise<void>((resolve) => (finishSaving = resolve));
+    let startSaving!: () => void;
+    const savingStarted = new Promise<void>(
+      (resolve) => (startSaving = resolve),
+    );
     const h = setup(
       undefined,
       undefined,
@@ -558,7 +562,10 @@ describe("conversation routing and management", () => {
         conversations: {
           lookup: async (key) => structuredClone(chats.get(key)),
           register: async (key, value) => {
-            if (saving) await saved;
+            if (saving) {
+              startSaving();
+              await saved;
+            }
             chats.set(key, structuredClone(value));
           },
           entries: async () =>
@@ -574,6 +581,7 @@ describe("conversation routing and management", () => {
     // A new group's send holds the queue while its chat is saved.
     saving = true;
     const sending = h.send({ requestId: "tea", members: ["bob", "carol"] });
+    await savingStarted;
     const listed = await Promise.race([
       h.messaging.listChats("bob"),
       new Promise((resolve) => setTimeout(() => resolve("waited"), 200)),
