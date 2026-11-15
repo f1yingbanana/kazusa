@@ -23,6 +23,7 @@ import { registerDecisionModelsHttp } from "./decisions/http.ts";
 import { modelsConfig } from "./models/config.ts";
 import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
+import { beginGatewayLifetime, followGatewayLifetime } from "./shutdown.ts";
 import {
   registerBrainHttp,
   registerBrainTraceHttp,
@@ -64,6 +65,12 @@ export default definePluginEntry({
   description: "Core simulation plugin for Kazusa roleplay agents",
   register(api: OpenClawPluginApi): void {
     rememberRegistration(api);
+    beginGatewayLifetime();
+    // A stop through the host's stdin lifeline sends no process signal; this
+    // is how anything waiting on a paused clock hears of it.
+    api.on("gateway_start", (_event, ctx) =>
+      followGatewayLifetime(ctx.abortSignal),
+    );
     const jev = gatewayJevDeps(api);
     const decisionUsage = createDecisionUsage(
       api.runtime.state.openKeyedStore<DecisionUsageBucket>({
