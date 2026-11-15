@@ -52,19 +52,21 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
  * Wakes at the end of each onstage character's activity, shared by every
  * instance of this plugin in the Gateway process: an agent turn may run task
  * tools on a separately loaded instance, which must reach the same schedule.
- * The first instance to say how to wake someone (`wakeWith`) keeps that job
- * until it is disposed.
+ * The newest instance to say how to wake someone (`wakeWith`) does it; each
+ * stops only its own when disposed.
  */
 interface TaskWakes {
   schedule?: WakeSchedule;
-  wake?: (agentId: string) => void;
+  readonly handlers: ((agentId: string) => void)[];
+  /** Per character, the latest `synchronize` to start: it alone may set. */
+  readonly syncs: Map<string, number>;
 }
 
 const SHARED_TASK_WAKES = Symbol.for("kazusa.taskman.wakes");
 
 function sharedTaskWakes(): TaskWakes {
   const scope = globalThis as { [SHARED_TASK_WAKES]?: TaskWakes };
-  return (scope[SHARED_TASK_WAKES] ??= {});
+  return (scope[SHARED_TASK_WAKES] ??= { handlers: [], syncs: new Map() });
 }
 
 /** Forgets every wake and who does them; each test starts fresh. */
@@ -72,7 +74,8 @@ export function resetTaskWakes(): void {
   const wakes = sharedTaskWakes();
   wakes.schedule?.close();
   wakes.schedule = undefined;
-  wakes.wake = undefined;
+  wakes.handlers.length = 0;
+  wakes.syncs.clear();
 }
 
 export interface TaskmanService {
@@ -138,13 +141,21 @@ export function registerTaskman(
   const wakes = sharedTaskWakes();
   const schedule = (wakes.schedule ??= createWakeSchedule({
     clock,
-    wake: (agentId) => wakes.wake?.(agentId),
+    wake: (agentId) => wakes.handlers.at(-1)?.(agentId),
   }));
 
-  /** One character's wake, from their lease and stage. */
+  /**
+   * One character's wake, from their lease and stage. Calls can overlap (the
+   * start-up pass over every lease, a task tool, a stage change): only the
+   * latest to start sets the wake, so an older read never replaces a newer
+   * end.
+   */
   const synchronize = async (agentId: string): Promise<void> => {
+    const sync = (wakes.syncs.get(agentId) ?? 0) + 1;
+    wakes.syncs.set(agentId, sync);
     const task = await store.lookup(agentId);
     const onstage = !deps.stage || (await deps.stage.isOnstage(agentId));
+    if (wakes.syncs.get(agentId) !== sync) return;
     schedule.set(agentId, task && onstage ? Date.parse(task.endAt) : undefined);
   };
 
@@ -358,10 +369,10 @@ export function registerTaskman(
       await synchronize(agentId);
     },
     wakeWith(wake) {
-      if (wakes.wake) return () => {};
-      wakes.wake = wake;
+      wakes.handlers.push(wake);
       return () => {
-        if (wakes.wake === wake) wakes.wake = undefined;
+        const at = wakes.handlers.lastIndexOf(wake);
+        if (at >= 0) wakes.handlers.splice(at, 1);
       };
     },
   };

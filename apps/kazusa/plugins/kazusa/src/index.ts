@@ -218,7 +218,6 @@ export default definePluginEntry({
       evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
-      onDeadline,
       onAwoken: memory.sleep.wake,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
@@ -259,25 +258,24 @@ export default definePluginEntry({
     const stopSupervisor = taskman.attachSupervisor(perception);
     api.lifecycle.onDispose?.(stopSupervisor);
     // When someone's activity ends: the check-in for it.
-    api.lifecycle.onDispose?.(
-      taskman.wakeWith((agentId) => {
-        inBackground(
-          api,
-          async () => {
-            await clock.init();
-            const note = await onDeadline(agentId).catch((error: unknown) => {
-              api.logger.warn(`Perception onDeadline: ${String(error)}`);
-              return undefined;
-            });
-            await perception.deadline(agentId, note);
-          },
-          (error) =>
-            api.logger.warn(
-              `Taskman: waking ${agentId} failed: ${String(error)}`,
-            ),
-        );
-      }),
-    );
+    const stopWaking = taskman.wakeWith((agentId) => {
+      inBackground(
+        api,
+        async () => {
+          await clock.init();
+          const note = await onDeadline(agentId).catch((error: unknown) => {
+            api.logger.warn(`Perception onDeadline: ${String(error)}`);
+            return undefined;
+          });
+          await perception.deadline(agentId, note);
+        },
+        (error) =>
+          api.logger.warn(
+            `Taskman: waking ${agentId} failed: ${String(error)}`,
+          ),
+      );
+    });
+    api.lifecycle.onDispose?.(stopWaking);
 
     registerTimelineHttp(api, {
       clock,

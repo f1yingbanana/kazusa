@@ -144,16 +144,29 @@ describe("taskman wakes", () => {
       },
     } as unknown as Clock;
     const offstage = new Set<string>();
+    const stage = { gate: undefined as Promise<void> | undefined };
     const taskman = registerTaskman(api, {
       clock,
       stage: {
-        isOnstage: async (id) => !offstage.has(id),
+        isOnstage: async (id) => {
+          await stage.gate;
+          return !offstage.has(id);
+        },
         onstage: async (ids) => ids.filter((id) => !offstage.has(id)),
       },
     });
     const woken: string[] = [];
     taskman.wakeWith((id) => woken.push(id));
-    return { handlers, taskman, woken, offstage, state, listeners };
+    return {
+      handlers,
+      taskman,
+      woken,
+      offstage,
+      state,
+      listeners,
+      tasks,
+      stage,
+    };
   };
 
   beforeEach(() => {
@@ -195,12 +208,39 @@ describe("taskman wakes", () => {
     expect(woken).toEqual(["alice"]);
   });
 
-  it("leaves the first wake job in place, and removes a world's old wake cron jobs", async () => {
-    const { handlers, taskman, woken } = setup();
-    taskman.wakeWith(() => woken.push("second"));
-    await handlers.get("gateway_start")?.({}, {});
+  it("never lets an older read replace a newer end", async () => {
+    const { handlers, taskman, woken, stage } = setup();
+    let open!: () => void;
+    stage.gate = new Promise((resolve) => (open = resolve));
+    // The start-up pass reads the old lease, then waits on the stage...
+    const starting = handlers.get("gateway_start")?.({}, {});
+    await vi.advanceTimersByTimeAsync(0);
+    // ...while a task tool replaces it with one ending two hours later.
+    await taskman.store.register("alice", {
+      ...task,
+      endAt: new Date(T0 + 3 * 3_600_000).toISOString(),
+    });
+    // Its own stage check answers at once, so it sets the new end first.
+    stage.gate = undefined;
+    await taskman.reschedule("alice");
+    open();
+    await starting;
+    await vi.advanceTimersByTimeAsync(2 * 3_600_000);
+    expect(woken).toEqual([]);
     await vi.advanceTimersByTimeAsync(3_600_000);
     expect(woken).toEqual(["alice"]);
+  });
+
+  it("wakes through the newest handler until it stops, and removes a world's old wake cron jobs", async () => {
+    const { handlers, taskman, woken } = setup();
+    const stopSecond = taskman.wakeWith(() => woken.push("second"));
+    await handlers.get("gateway_start")?.({}, {});
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(woken).toEqual(["second"]);
+    stopSecond();
+    await handlers.get("gateway_start")?.({}, {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(woken).toEqual(["second", "alice"]);
 
     const jobs = [
       { id: "1", declarationKey: "alice", name: "Wake alice" },
