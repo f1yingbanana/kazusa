@@ -103,12 +103,30 @@ export function createDecisionContextAssembler(
       await Promise.all([
         Promise.all(
           keys.slice(0, 32).map(async (sessionKey) => {
-            const items: SessionCatalogTranscriptItem[] = [];
             const cutoff = simTime - config.decisionShortTermHours * 3_600_000;
+            // The newest dialogue since the cutoff, newest first.
+            const recent = (
+              rows: readonly SessionCatalogTranscriptItem[],
+            ): SessionCatalogTranscriptItem[] => {
+              const items: SessionCatalogTranscriptItem[] = [];
+              for (const item of rows.slice(0, DECISION_ROWS)) {
+                const time = Date.parse(item.timestamp ?? "");
+                if (time < cutoff) break;
+                if (
+                  time <= simTime &&
+                  item.text?.trim() &&
+                  (item.type === "userMessage" || item.type === "agentMessage")
+                )
+                  items.push(item);
+                if (items.length >= config.decisionHistoryItems) break;
+              }
+              return items;
+            };
             request.signal?.throwIfAborted();
             // Catalog pages may contain non-dialogue entries. Follow up to four
-            // pages, stopping at the time cutoff or configured usable-record
-            // count. Read again only once the ledger has changed.
+            // pages, stopping at the time cutoff or once the rows hold the
+            // configured count of usable records. Read again only once the
+            // ledger has changed.
             const rows = await readLedgerRows({
               agentId,
               sessionKey,
@@ -116,6 +134,8 @@ export function createDecisionContextAssembler(
               pluginId: api.id,
               cutoff,
               maxRows: DECISION_ROWS,
+              enough: (sofar) =>
+                recent(sofar).length >= config.decisionHistoryItems,
             }).catch((error: unknown) => {
               request.signal?.throwIfAborted();
               api.logger.warn(
@@ -123,17 +143,7 @@ export function createDecisionContextAssembler(
               );
               return [];
             });
-            for (const item of rows.slice(0, DECISION_ROWS)) {
-              const time = Date.parse(item.timestamp ?? "");
-              if (time < cutoff) break;
-              if (
-                time <= simTime &&
-                item.text?.trim() &&
-                (item.type === "userMessage" || item.type === "agentMessage")
-              )
-                items.push(item);
-              if (items.length >= config.decisionHistoryItems) break;
-            }
+            const items = recent(rows);
             return [sessionKey, items.reverse()] as const;
           }),
         ),

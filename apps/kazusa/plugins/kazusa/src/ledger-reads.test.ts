@@ -70,6 +70,29 @@ describe("readLedgerRows", () => {
     expect(ledgerReadStats()).toMatchObject({ hits: 2, misses: 2 });
   });
 
+  it("stops once the caller has enough, and reads on for one that needs more", async () => {
+    ledger(800);
+    const enough = (count: number) => (rows: readonly unknown[]) =>
+      rows.length >= count;
+    const read1 = () =>
+      readLedgerRows({
+        agentId: "alice",
+        sessionKey: "agent:alice:tasks",
+        pluginId: "kazusa",
+        cutoff: NOW - 1_000 * HOUR,
+        maxRows: 800,
+        enough: enough(150),
+      });
+    const first = await read1();
+    expect(first).toHaveLength(200);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(await read1()).toBe(first);
+    expect(read).toHaveBeenCalledTimes(1);
+    // Without enough, the kept page answers nothing: read on to maxRows.
+    expect(await rowsFor(NOW - 1_000 * HOUR, 800)).toHaveLength(800);
+    expect(read).toHaveBeenCalledTimes(5);
+  });
+
   it("answers a later cutoff from a longer read, and reads again for an earlier one", async () => {
     ledger(600);
     await rowsFor(NOW - 16 * HOUR);

@@ -79,22 +79,28 @@ export function appendToLedger(
 const timeOf = (row: Row): number =>
   row.timestamp ? Date.parse(row.timestamp) : Number.NaN;
 
+type Enough = (rows: readonly Row[]) => boolean;
+
 /** Whether a kept read answers this one exactly as a fresh read would. */
 function answers(
   entry: Entry,
   cutoff: number,
   maxRows: number | undefined,
+  enough: Enough | undefined,
 ): boolean {
   if (entry.whole) return true;
   if (entry.through !== undefined && cutoff >= entry.through) return true;
-  return maxRows !== undefined && entry.rows.length >= maxRows;
+  if (maxRows !== undefined && entry.rows.length >= maxRows) return true;
+  return enough?.(entry.rows) ?? false;
 }
 
 /**
  * A ledger's rows, newest first, as the catalog pages give them: through the
  * first row older than `cutoff` (rows with no time don't stop it), or the
- * ledger's first row, or at least `maxRows` rows (whole pages). Callers walk
- * them as they walked pages; the rows are shared, so never change them.
+ * ledger's first row, or at least `maxRows` rows, or once `enough` says the
+ * rows so far hold all the caller needs (whole pages, so there may be more).
+ * Callers walk them as they walked pages; the rows are shared, so never change
+ * them.
  */
 export async function readLedgerRows(params: {
   readonly agentId: string;
@@ -103,13 +109,19 @@ export async function readLedgerRows(params: {
   readonly pluginId: string;
   readonly cutoff: number;
   readonly maxRows?: number;
+  readonly enough?: Enough;
 }): Promise<readonly Row[]> {
-  const { agentId, sessionKey, storePath, pluginId, cutoff, maxRows } = params;
+  const { agentId, sessionKey, storePath, pluginId, cutoff, maxRows, enough } =
+    params;
   const state = cell();
   const key = `${ledgerKey(agentId, sessionKey)}\u0000${storePath ?? ""}`;
   const version = state.versions.get(ledgerKey(agentId, sessionKey)) ?? 0;
   const kept = state.entries.get(key);
-  if (kept && kept.version === version && answers(kept, cutoff, maxRows)) {
+  if (
+    kept &&
+    kept.version === version &&
+    answers(kept, cutoff, maxRows, enough)
+  ) {
     state.hits += 1;
     state.entries.delete(key);
     state.entries.set(key, kept);
@@ -143,6 +155,7 @@ export async function readLedgerRows(params: {
       break;
     }
     if (maxRows !== undefined && rows.length >= maxRows) break;
+    if (enough?.(rows)) break;
     cursor = page.nextCursor;
   }
   // An append during the read leaves this entry already out of date.
