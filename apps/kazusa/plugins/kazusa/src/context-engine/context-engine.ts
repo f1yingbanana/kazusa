@@ -1,7 +1,7 @@
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import { buildMemorySystemPromptAddition } from "openclaw/plugin-sdk/core";
 import type { SessionCatalogTranscriptItem } from "openclaw/plugin-sdk/session-catalog";
-import { readSessionTranscriptCatalogPage } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { readLedgerRows } from "../ledger-reads.ts";
 import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
@@ -623,33 +623,23 @@ export async function readSessionStreams(params: {
 
   for (const { sessionKey } of streams) {
     const messages: SessionCatalogTranscriptItem[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await readSessionTranscriptCatalogPage({
-        agentId,
-        sessionKey,
-        storePath,
-        pluginId,
-        sourceDomain: "kazusa",
-        limit: 200, // Native catalog page maximum, not a history cap.
-        cursor,
-      });
-      let reachedCutoff = false;
-      for (const message of page.items) {
-        const timestamp = message.timestamp
-          ? Date.parse(message.timestamp)
-          : Number.NaN;
-        if (Number.isNaN(timestamp)) continue;
-        if (timestamp > now) continue;
-        if (timestamp < cutoff) {
-          reachedCutoff = true;
-          break;
-        }
-        messages.push(message);
-      }
-      if (reachedCutoff || !page.nextCursor) break;
-      cursor = page.nextCursor;
-    } while (cursor);
+    // Read again only once the ledger has changed (`ledger-reads.ts`).
+    const rows = await readLedgerRows({
+      agentId,
+      sessionKey,
+      storePath,
+      pluginId,
+      cutoff,
+    });
+    for (const message of rows) {
+      const timestamp = message.timestamp
+        ? Date.parse(message.timestamp)
+        : Number.NaN;
+      if (Number.isNaN(timestamp)) continue;
+      if (timestamp > now) continue;
+      if (timestamp < cutoff) break;
+      messages.push(message);
+    }
     sessionsContext[sessionKey] = messages.reverse();
   }
   return sessionsContext;

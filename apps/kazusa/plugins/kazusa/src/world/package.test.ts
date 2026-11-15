@@ -114,6 +114,9 @@ describe("availableUpdate", () => {
       url: "https://github.com/someone/demo-world/releases/tag/v0.5.0",
       systemAgent: "arona",
     });
+    // Asked again with nothing changed: the kept answer, without git.
+    const offered = availableUpdate(live);
+    expect(availableUpdate(live)).toBe(offered);
     // Taken: the world stands on it.
     git("update-ref", "refs/heads/play", next);
     expect(availableUpdate(live)).toBeUndefined();

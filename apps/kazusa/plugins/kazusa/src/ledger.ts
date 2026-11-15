@@ -2,10 +2,8 @@ import {
   generateSecureUuid,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-import {
-  appendSessionTranscriptMessageByIdentityStrict,
-  publishSessionTranscriptUpdateByIdentity,
-} from "openclaw/plugin-sdk/session-transcript-runtime";
+import { publishSessionTranscriptUpdateByIdentity } from "openclaw/plugin-sdk/session-transcript-runtime";
+import { appendToLedger } from "./ledger-reads.ts";
 import { recordLedgerRows, type LedgerJournalRow } from "./realtime.ts";
 
 /**
@@ -62,7 +60,7 @@ export async function appendLedgerEntry(
   // lenient append inherits that turn's writer claim and OpenClaw refuses it
   // for this other session ("session writer claim changed before transcript
   // persistence"). The strict append fences against this ledger's own session.
-  const appended = await appendSessionTranscriptMessageByIdentityStrict({
+  const appended = await appendToLedger({
     ...identity,
     message: {
       role: "assistant",

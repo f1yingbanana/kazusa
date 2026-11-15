@@ -9,10 +9,7 @@ import {
   type OpenClawPluginApi,
   type OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/core";
-import {
-  appendSessionTranscriptMessageByIdentityStrict,
-  publishSessionTranscriptUpdateByIdentity,
-} from "openclaw/plugin-sdk/session-transcript-runtime";
+import { publishSessionTranscriptUpdateByIdentity } from "openclaw/plugin-sdk/session-transcript-runtime";
 import YAML from "yaml";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
@@ -54,6 +51,7 @@ import {
 } from "./conversations.ts";
 import { COMPOSING_RATES } from "./composing.ts";
 import { appendLedgerEntry } from "../ledger.ts";
+import { appendToLedger } from "../ledger-reads.ts";
 
 /** `plugins.entries.kazusa.config.messaging`. */
 const MESSAGING_CONFIG = z.strictObject({
@@ -294,7 +292,7 @@ export function registerMessaging(
       messaging.assertCurrent();
       if (!copy.sessionId)
         throw new Error("Chat ledger has no session identity.");
-      const appended = await appendSessionTranscriptMessageByIdentityStrict({
+      const appended = await appendToLedger({
         agentId: copy.agentId,
         sessionKey: copy.sessionKey,
         sessionId: copy.sessionId,

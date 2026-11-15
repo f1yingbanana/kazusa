@@ -15,8 +15,8 @@ import { modelsConfig } from "./config.ts";
 import { catalogModels, registerModelsHttp } from "./http.ts";
 import {
   createModelSelection,
+  openModelStore,
   splitModelRef,
-  type ModelSelection,
   type ModelSelectionStore,
 } from "./selection.ts";
 import { createStartingModel, startingModel } from "./starting.ts";
@@ -40,8 +40,8 @@ export interface Models extends ModelSelectionStore {
 }
 
 /**
- * Every character turn runs in its `:brain` session (Perception handles cron
- * wakes and everything else without a model call), so that is the one place the
+ * Every character turn runs in its `:brain` session (Perception handles wakes
+ * and everything else without a model call), so that is the one place the
  * selection has to reach. The model is swapped per turn here, and the brain
  * channel also writes it onto the session before each new turn, since OpenClaw
  * checks a steer against the session's model; reasoning has no hook, so it goes
@@ -54,10 +54,7 @@ export function registerModels(
     readonly call?: (method: string, params: unknown) => Promise<unknown>;
   } = {},
 ): Models {
-  const store = api.runtime.state.openKeyedStore<ModelSelection>({
-    namespace: "models",
-    retention: "retained",
-  });
+  const store = openModelStore(api);
   const selection = createModelSelection(store);
   const config = modelsConfig(api.pluginConfig);
   const starting = createStartingModel(store, config);

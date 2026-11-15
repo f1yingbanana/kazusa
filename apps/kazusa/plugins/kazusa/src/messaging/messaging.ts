@@ -579,16 +579,14 @@ export class Messaging {
    * observer (no `viewer`) sees all of them.
    */
   async getTyping(viewer?: string): Promise<TypingStreamEvent[]> {
-    return this.serial.enqueue("messages", async () => {
-      await this.init();
-      return [...this.typing.values()].filter((event) => {
-        const members = this.chats.get(event.chatId)?.members ?? [];
-        return (
-          (!event.expiresAt || event.expiresAt > Date.now()) &&
-          (viewer === undefined || members.includes(viewer)) &&
-          members.includes(event.senderId)
-        );
-      });
+    await this.ready();
+    return [...this.typing.values()].filter((event) => {
+      const members = this.chats.get(event.chatId)?.members ?? [];
+      return (
+        (!event.expiresAt || event.expiresAt > Date.now()) &&
+        (viewer === undefined || members.includes(viewer)) &&
+        members.includes(event.senderId)
+      );
     });
   }
 
@@ -833,7 +831,12 @@ export class Messaging {
     return result;
   }
 
-  /** Discover only current memberships, returning caller-owned reply addresses. */
+  /**
+   * Discover only current memberships, returning caller-owned reply addresses.
+   * A read: chats enter memory only once saved (`saveChat`), so it needn't wait
+   * behind queued sends. Live, a full cast's sends held the chat list for 4-36
+   * s.
+   */
   async listChats(
     agentId: string,
     input: { readonly query?: string } = {},
@@ -841,21 +844,19 @@ export class Messaging {
   ): Promise<ChatSummary[]> {
     PARTICIPANT_ID.parse(agentId);
     const { query } = LIST_CHATS.parse(input);
-    return await this.serial.enqueue("messages", async () => {
-      await this.init();
-      assertInvocationCurrent?.();
-      return [...this.chats.values()]
-        .filter((chat) => chat.members.includes(agentId))
-        .map((chat) => chatSummary(chat, agentId))
-        .filter(
-          (chat) =>
-            !query ||
-            [chat.sessionKey, chat.title, ...chat.members]
-              .join(" ")
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-        );
-    });
+    await this.ready();
+    assertInvocationCurrent?.();
+    return [...this.chats.values()]
+      .filter((chat) => chat.members.includes(agentId))
+      .map((chat) => chatSummary(chat, agentId))
+      .filter(
+        (chat) =>
+          !query ||
+          [chat.sessionKey, chat.title, ...chat.members]
+            .join(" ")
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+      );
   }
 
   /**

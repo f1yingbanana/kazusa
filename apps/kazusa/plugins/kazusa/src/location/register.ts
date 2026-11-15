@@ -14,13 +14,14 @@ import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
 import { resolveStateDir } from "../state-dir.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
+import { openTaskStore } from "../taskman/store.ts";
 import { pluginSkillText } from "../skill-text.ts";
 import type { PlacePositions } from "@kazusa/client";
 import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { Stimulus } from "../stimulus.ts";
-import type { ActiveTask, TaskExtension } from "../taskman/types.ts";
+import type { TaskExtension } from "../taskman/types.ts";
 import type { Huddle } from "../messaging/messaging.ts";
 import { crossings } from "./encounters.ts";
 import { clientRecord } from "./http.ts";
@@ -366,10 +367,7 @@ export function registerLocation(
       `Location: no places under ${config.wikiDir}; characters have no positions.`,
     );
   }
-  const tasks = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  const tasks = openTaskStore(api);
   const userConfig = USER.parse(api.pluginConfig?.user ?? {});
   /** The name others know them by, never their id. */
   const displayName = async (id: string): Promise<string> =>

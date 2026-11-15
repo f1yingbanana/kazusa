@@ -533,7 +533,7 @@ We explicitly choose to store separate subjective transcripts per character:
 
 ---
 
-## 8. Task Deadlines as First-Class Sensory Stimuli & Ephemeral Cron Projection
+## 8. Task Deadlines as First-Class Sensory Stimuli
 
 In earlier drafts, task deadlines were treated as an out-of-band procedural
 boolean (`state.deadline`). That approach had major conceptual and practical
@@ -551,8 +551,8 @@ simply an **internal auditory/temporal sensory stimulus (`Stimulus`)**.
 
 ### 8.1 The Stimulus Contract for Deadlines
 
-When Taskman's cron deadline fires, Perception receives it as a first-class
-`Stimulus`:
+When Taskman's wake timer reaches a lease's end, Perception receives the
+deadline as a first-class `Stimulus`:
 
 ```typescript
 const stimulus: Stimulus = {
@@ -565,25 +565,15 @@ const stimulus: Stimulus = {
 await perception.receive(agentId, stimulus);
 ```
 
-### 8.2 Ephemeral Session Architecture (`sessionTarget: "isolated"`)
+### 8.2 Wake Timer, Not Cron
 
-In OpenClaw, `withCronSessionPreparation` enforces single-threaded session lane
-serialization (`beginSessionWorkAdmission` on `resolveSessionLane(sessionKey)`).
-
-- If Taskman scheduled a cron directly targeting `session:agent:<id>:brain`:
-  - When `:brain` is actively executing (busy thinking), the cron job blocks in
-    OpenClaw's lane queue.
-  - `before_agent_reply` cannot fire while `:brain` is in-flight, which would
-    lock out mid-turn steering and delay deadline delivery.
-- By targeting `"isolated"`, the cron job executes in its own uncontended
-  ephemeral lane (`cron:<jobId>`).
-- When the cron fires, `before_agent_reply` intercepts the turn:
-  1. Claims the turn with `{ handled: true }` (silent reply).
-  2. Forwards the deadline stimulus into
-     `perception.receive(agentId, stimulus)`.
-  3. OpenClaw records the cron run as `status: "ok"` (success) on the dashboard
-     without LLM inference or transcript writes, then deletes the ephemeral
-     session (`deleteAfterRun: true`).
+Taskman keeps every onstage lease end in one in-process schedule and arms a
+single timer for the soonest (`taskman/wakes.ts`). When it fires, the deadline
+goes straight to `perception.deadline(agentId, note)` in the background, so it
+arrives on time even while `:brain` is thinking, and Jev can steer the turn.
+Wakes used to be isolated OpenClaw cron runs. `before_agent_reply` still claims
+any cron run for a character silently, without a check-in, until
+`cron_reconciled` removes a world's leftover `Wake <id>` jobs.
 
 ### 8.3 The Cognitive Attention Gate & Attention Floor
 
@@ -612,7 +602,7 @@ taskless**. Therefore, task deadlines possess an **attention floor of
        never be dropped into non-existence**. Any `task-deadline:*` stimulus in
        an `IGNORE` bundle is automatically clamped to **`QUEUE_NEXT`**. This
        completely prevents "zombie characters" (where an agent would be left
-       taskless without a future cron wake).
+       taskless without a future wake).
 
 ### 8.4 Retiring the Alarm: Preemption and Task Transitions
 
@@ -621,13 +611,11 @@ they **cancel the alarm**:
 
 - If during an interruption turn the agent decides to stop studying early and
   help Bob, the agent calls `start_task("helping_bob", 45)`.
-- Calling `start_task` immediately runs `synchronizeAgentAutomation(agentId)`.
-  Because `declarationKey: agentId` is the unique job key, OpenClaw's `cron.add`
-  **atomically replaces** the previous scheduled wake job with the new one. The
-  old alarm is wiped from the scheduler.
-- **Race Condition Defense**: If a millisecond race occurred where an old cron
-  fired just before `cron.add` committed, Perception inspects the stimulus
-  `taskId` against `taskStore.lookup(agentId)`:
+- Calling `start_task` immediately moves the character's wake to the new lease's
+  end: the schedule holds one end per character, so the old alarm is gone.
+- **Race Condition Defense**: If an old wake fired just before the new lease was
+  written, Perception inspects the stimulus `taskId` against
+  `taskStore.lookup(agentId)`:
   ```typescript
   if (currentTask.id !== deadlineTaskId) {
     // Stale timer for a retired/replaced task; discard silently
@@ -652,7 +640,7 @@ interleave naturally in Kazusa:
 - **13:56**: Alice's brain starts an LLM turn on `agent:alice:brain` to reply to
   Bob.
 - **14:00**: While Alice is still generating her response, the reading deadline
-  cron fires.
+  wake fires.
 - **Attention Gate**: Jev evaluates the reading deadline against her active
   thought. Routine reading completion is not an emergency: Jev marks it
   **`QUEUE_NEXT`**.
@@ -685,8 +673,8 @@ interleave naturally in Kazusa:
   need your help carrying her!"_
 - **16:31**: Alice starts an interruption turn. She decides to immediately
   abandon studying: `start_task("helping_clara", 60)`
-- **Task Transition**: `start_task` replaces the active task in SQLite and
-  atomically updates OpenClaw's cron with Clara's deadline (17:31).
+- **Task Transition**: `start_task` replaces the active task and moves Alice's
+  wake to Clara's deadline (17:31).
 - **Outcome**: The 17:00 study alarm is wiped from the scheduler. If a
   sub-second race had caused the 17:00 study timer to pop in transit, Perception
   checks `currentTask.id !== "study_task_id"` and silently discards it. Alice is
@@ -795,8 +783,8 @@ discrete categorical attention decisions directly:
   evaluation, collective salience, consolidated queue draining, and `:brain`
   wake/steer triggering. Chat producers own ledger persistence and sender
   attribution.
-- **Taskman owns**: Lease state (`tasks`), task duration clamping, and cron
-  projection.
+- **Taskman owns**: Lease state (`tasks`), task duration clamping, and the wake
+  at each lease's end.
 - **ContextEngine owns**: Assembling admitted context and stream tails for
   `:brain`. Assembly is strictly read-only and idempotent.
 - **Brain (`agent:<id>:brain`) owns**: Qualitative consciousness, tool execution
@@ -919,7 +907,7 @@ over"), `start_task` ends it ("gave up and checked my phone").
 When the brain is idle and **any** approved item is ready, Perception reserves
 one followup containing **all** approved items: picking up the phone shows
 everything. A fresh `WAKE` with no delay, or an idle deadline, does the same.
-Readiness is reached through existing events (deadline cron → `receive`, brain
+Readiness is reached through existing events (deadline wake → `receive`, brain
 end → `ended`) plus one per-agent timer for the earliest `notBefore`. The timer
 re-checks at most every 30 real seconds, so clock speed changes, pauses, and
 `clock_advance` need no extra subscription. `pending` is retained, so waits

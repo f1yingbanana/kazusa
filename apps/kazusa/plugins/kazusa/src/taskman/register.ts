@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { untilRunning } from "../clock/clock.ts";
 import { shutdownSignal } from "../shutdown.ts";
+import { openTaskStore } from "./store.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
@@ -16,6 +17,7 @@ import type { Perception } from "../perception/perception.ts";
 import type { Stage } from "../stage/stage.ts";
 import { sharedSupervisorCell, startIdleSupervisor } from "./supervisor.ts";
 import { executeDelayTask, executeStartTask } from "./taskman.ts";
+import { createWakeSchedule, type WakeSchedule } from "./wakes.ts";
 import {
   TASK_CATEGORIES,
   type ActiveTask,
@@ -47,21 +49,33 @@ const TASKMAN_CONFIG_SCHEMA = z.object({
 });
 
 /**
- * The cron projection as seen by every instance of this plugin in the Gateway
- * process. Only the instance that received `cron_reconciled` can write jobs,
- * but an agent turn may run task tools and cron wakes on a separately loaded
- * instance, which must still reach it.
+ * Wakes at the end of each onstage character's activity, shared by every
+ * instance of this plugin in the Gateway process: an agent turn may run task
+ * tools on a separately loaded instance, which must reach the same schedule.
+ * The newest instance to say how to wake someone (`wakeWith`) does it; each
+ * stops only its own when disposed.
  */
-interface TaskAutomation {
-  ready: boolean;
-  synchronize?: (agentId: string) => Promise<void>;
+interface TaskWakes {
+  schedule?: WakeSchedule;
+  readonly handlers: ((agentId: string) => void)[];
+  /** Per character, the latest `synchronize` to start: it alone may set. */
+  readonly syncs: Map<string, number>;
 }
 
-const SHARED_TASK_AUTOMATION = Symbol.for("kazusa.taskman.automation");
+const SHARED_TASK_WAKES = Symbol.for("kazusa.taskman.wakes");
 
-function sharedTaskAutomation(): TaskAutomation {
-  const scope = globalThis as { [SHARED_TASK_AUTOMATION]?: TaskAutomation };
-  return (scope[SHARED_TASK_AUTOMATION] ??= { ready: false });
+function sharedTaskWakes(): TaskWakes {
+  const scope = globalThis as { [SHARED_TASK_WAKES]?: TaskWakes };
+  return (scope[SHARED_TASK_WAKES] ??= { handlers: [], syncs: new Map() });
+}
+
+/** Forgets every wake and who does them; each test starts fresh. */
+export function resetTaskWakes(): void {
+  const wakes = sharedTaskWakes();
+  wakes.schedule?.close();
+  wakes.schedule = undefined;
+  wakes.handlers.length = 0;
+  wakes.syncs.clear();
 }
 
 export interface TaskmanService {
@@ -70,11 +84,16 @@ export interface TaskmanService {
     listener: (agentId: string, task: ActiveTask) => void,
   ): () => void;
   attachSupervisor(perception: Perception): () => void;
-  /** Re-projects one character's wake from their lease and stage. */
+  /** Re-reads one character's wake from their lease and stage. */
   reschedule(agentId: string): Promise<void>;
+  /**
+   * What waking someone at the end of their activity does. The first caller in
+   * the process keeps it; returns a disposer.
+   */
+  wakeWith(wake: (agentId: string) => void): () => void;
 }
 
-/** Registers task leases, their visible cron projection, and ledger. */
+/** Registers task leases, the wakes at their ends, and the ledger. */
 export function registerTaskman(
   api: OpenClawPluginApi,
   deps: {
@@ -105,10 +124,7 @@ export function registerTaskman(
     extensions.flatMap((extension) =>
       extension.required.filter((name) => name in extension[tool]),
     );
-  const store = api.runtime.state.openKeyedStore<ActiveTask>({
-    namespace: "tasks",
-    retention: "retained",
-  });
+  const store = openTaskStore(api);
   const taskChangeListeners = new Set<
     (agentId: string, task: ActiveTask) => void
   >();
@@ -122,160 +138,55 @@ export function registerTaskman(
     }
   };
   const config = TASKMAN_CONFIG_SCHEMA.parse(api.pluginConfig?.taskman ?? {});
-  const automation = sharedTaskAutomation();
-  let reconcileAutomations: (() => Promise<void>) | undefined;
+  const wakes = sharedTaskWakes();
+  const schedule = (wakes.schedule ??= createWakeSchedule({
+    clock,
+    wake: (agentId) => wakes.handlers.at(-1)?.(agentId),
+  }));
 
-  // Only explicit clock edits (advance or speed changes) change the mapping
-  // between simulated deadlines and wall-clock run times. Ordinary passage of
-  // real time does not emit this event and therefore does not rebuild jobs.
-  const unsubscribeClockChange = clock.onClockChange(
-    async (): Promise<void> => {
-      await reconcileAutomations?.();
-    },
-  );
+  /**
+   * One character's wake, from their lease and stage. Calls can overlap (the
+   * start-up pass over every lease, a task tool, a stage change): only the
+   * latest to start sets the wake, so an older read never replaces a newer
+   * end.
+   */
+  const synchronize = async (agentId: string): Promise<void> => {
+    const sync = (wakes.syncs.get(agentId) ?? 0) + 1;
+    wakes.syncs.set(agentId, sync);
+    const task = await store.lookup(agentId);
+    const onstage = !deps.stage || (await deps.stage.isOnstage(agentId));
+    if (wakes.syncs.get(agentId) !== sync) return;
+    schedule.set(agentId, task && onstage ? Date.parse(task.endAt) : undefined);
+  };
+
+  // A clock edit (play, pause, a jump) moves every end in wall-clock time;
+  // only the one timer is set again.
+  const unsubscribeClockChange = clock.onClockChange(() => {
+    schedule.rearm();
+  });
   api.lifecycle.onDispose?.(unsubscribeClockChange);
 
-  // Cron is a dashboard-visible projection of retained task state, never the
-  // source of truth. Its reconciliation lifecycle is the only time Taskman
-  // examines the fleet; ordinary task changes upsert one declaration-keyed job.
-  api.on("cron_reconciled", async (event, ctx): Promise<void> => {
-    automation.ready = false;
-    automation.synchronize = undefined;
-    reconcileAutomations = undefined;
+  // Every lease's wake, once the Gateway is up. A lease that ended while it
+  // was down wakes its character at once.
+  api.on("gateway_start", async () => {
     await clock.init();
-    ctx.abortSignal.throwIfAborted();
-    const cron = ctx.getCron?.();
-    if (!cron) return;
-
-    // cron_reconciled is cancelled on reloading the cron scheduler. So recheck
-    // before every subsequent mutation to ensure an old lifecycle cannot delete
-    // or add jobs for the replacement lifecycle.
-    const assertCurrent = (): void => ctx.abortSignal.throwIfAborted();
-
-    const listJobs = async () => {
-      assertCurrent();
-      return await cron.list({ includeDisabled: true });
-    };
-    const removeJob = async (jobId: string): Promise<void> => {
-      assertCurrent();
-      await cron.remove(jobId);
-    };
-
-    // Other plugins declare jobs too (memory-core's dreaming promotion). Taskman
-    // owns exactly the jobs keyed by a configured character.
-    const isTaskmanJob = (declarationKey: string | undefined): boolean =>
-      !!declarationKey && listAgentIds(getConfig()).includes(declarationKey);
-
-    const removeAgentAutomation = async (agentId: string): Promise<void> => {
-      const jobs = await listJobs();
-      for (const job of jobs) {
-        if (job.declarationKey !== agentId) continue;
-        await removeJob(job.id);
-      }
-    };
-
-    const wakeFor = (
-      agentId: string,
-      task: ActiveTask,
-      simulationNow: number,
-      speed: number,
-    ) => {
-      const remaining = Math.max(
-        1,
-        Math.round((new Date(task.endAt).getTime() - simulationNow) / speed),
-      );
-      return {
-        // declarationKey is the native cron identity. cron.add atomically
-        // creates or updates this one character's visible wake job.
-        declarationKey: agentId,
-        agentId,
-        name: `Wake ${agentId}`,
-        description: `Wake ${agentId} when its ${task.type} task ends.`,
-        enabled: true,
-        schedule: {
-          kind: "at" as const,
-          at: new Date(Date.now() + remaining).toISOString(),
-          // Present only for the currently over-strict plugin SDK declaration;
-          // the OpenClaw host discards it for an `at` schedule.
-          expr: "",
-        },
-        // Taskman deadline automation projection:
-        // Uses sessionTarget: "isolated" (ephemeral session) rather than targeting
-        // "session:agent:<id>:brain" directly. OpenClaw serializes runs per session
-        // lane; an isolated session avoids lane contention when :brain is busy,
-        // allowing before_agent_reply to fire immediately and steer in-flight turns.
-        sessionTarget: "isolated" as const,
-        wakeMode: "now" as const,
-        deleteAfterRun: true,
-        payload: {
-          kind: "agentTurn" as const,
-          message: `Scheduled ${task.type} task deadline reached at ${task.endAt}.`,
-        },
-        // The task session is a ledger. A wake is not a chat reply.
-        delivery: { mode: "none" as const },
-      };
-    };
-
-    const synchronize = async (agentId: string): Promise<void> => {
-      const task = await store.lookup(agentId);
-      const snapshot = clock.now();
-      if (
-        !task ||
-        snapshot.speed <= 0 ||
-        (deps.stage && !(await deps.stage.isOnstage(agentId)))
-      ) {
-        await removeAgentAutomation(agentId);
-        return;
-      }
-      assertCurrent();
-      await cron.add(wakeFor(agentId, task, snapshot.simTime, snapshot.speed));
-    };
-
-    const clear = async (): Promise<void> => {
-      const jobs = await listJobs();
-      for (const job of jobs) {
-        if (isTaskmanJob(job.declarationKey)) await removeJob(job.id);
-      }
-    };
-
-    if (!event.enabled) {
-      await clear();
-      return;
-    }
-
-    automation.synchronize = synchronize;
-    reconcileAutomations = async (): Promise<void> => {
-      const tasks = await store.entries();
-      if (clock.now().speed <= 0) {
-        await clear();
-        return;
-      }
-      const activeAgentIds = new Set(tasks.map(({ key }) => key));
-      const jobs = await listJobs();
-      for (const job of jobs) {
-        // A character's job not represented by a retained lease is stale. This
-        // is deliberately lifecycle-only work.
-        if (
-          isTaskmanJob(job.declarationKey) &&
-          !activeAgentIds.has(job.declarationKey!)
-        ) {
-          await removeJob(job.id);
-        }
-      }
-      for (const { key: agentId } of tasks) {
-        await synchronize(agentId);
-      }
-    };
-    automation.ready = true;
-    await reconcileAutomations();
+    for (const { key } of await store.entries()) await synchronize(key);
   });
 
-  // Cron jobs are not allowed to run while Taskman is rebuilding its retained
-  // projection after startup or reload. The brain session serializes all
-  // normal character turns, so no per-run task lookup or repair is required.
-  api.on("before_agent_run", (_event, ctx) => {
-    if (ctx.jobId && !automation.ready) {
-      return { outcome: "block", reason: "kazusa:taskman-initializing" };
+  // Worlds from before wakes moved here kept one cron job per character, named
+  // "Wake <id>". They would only repeat a wake; remove them.
+  api.on("cron_reconciled", async (_event, ctx): Promise<void> => {
+    const cron = ctx.getCron?.();
+    if (!cron) return;
+    const characters = new Set(listAgentIds(getConfig()));
+    for (const job of await cron.list({ includeDisabled: true })) {
+      ctx.abortSignal.throwIfAborted();
+      if (
+        job.declarationKey &&
+        characters.has(job.declarationKey) &&
+        job.name === `Wake ${job.declarationKey}`
+      )
+        await cron.remove(job.id);
     }
   });
 
@@ -355,7 +266,7 @@ export function registerTaskman(
       );
       if (result.success && result.task) {
         const agentId = toolContext?.agentId ?? "main";
-        await automation.synchronize?.(agentId);
+        await synchronize(agentId);
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
@@ -415,7 +326,7 @@ export function registerTaskman(
         result.simTime !== undefined
       ) {
         const agentId = toolContext?.agentId ?? "main";
-        await automation.synchronize?.(agentId);
+        await synchronize(agentId);
         notifyTaskChange(agentId, result.task);
         deps.broadcaster?.broadcast({
           type: "journal",
@@ -455,7 +366,14 @@ export function registerTaskman(
       });
     },
     async reschedule(agentId) {
-      await automation.synchronize?.(agentId);
+      await synchronize(agentId);
+    },
+    wakeWith(wake) {
+      wakes.handlers.push(wake);
+      return () => {
+        const at = wakes.handlers.lastIndexOf(wake);
+        if (at >= 0) wakes.handlers.splice(at, 1);
+      };
     },
   };
 }

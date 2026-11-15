@@ -11,6 +11,7 @@ import {
   renderTravelTimes,
   resolvePlace,
   routeBetween,
+  routesFrom,
   visibleFrom,
   type Place,
 } from "./map.ts";
@@ -184,6 +185,17 @@ Body text.
     const map = buildMap([place("a"), place("b")]);
     expect(() => routeBetween(map, "a", "b")).toThrow("No route");
     expect(renderTravelTimes(map, "a", ["b"])).toBe("");
+  });
+
+  it("searches routes once per map and place, and afresh for a rebuilt map", () => {
+    const map = buildMap(PLACES);
+    const routes = routesFrom(map, "club");
+    expect(routesFrom(map, "club")).toBe(routes);
+    expect(routeBetween(map, "club", "dorm")).toBe(routes.get("dorm"));
+    expect(routesFrom(map, "dorm")).not.toBe(routes);
+    const rebuilt = buildMap(PLACES);
+    expect(routesFrom(rebuilt, "club")).not.toBe(routes);
+    expect(routesFrom(rebuilt, "club")).toEqual(routes);
   });
 
   it("routes through the tree and its connections by the usual way", () => {

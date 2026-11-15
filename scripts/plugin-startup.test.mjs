@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  CHARACTER_DENIED_TOOLS,
   denyImpliedTools,
   IMPLIED_TOOLS,
   loadNewPlugins,
@@ -171,10 +172,10 @@ describe("denyImpliedTools", () => {
       },
     });
     expect(denyImpliedTools(root)).toEqual([
-      "2 characters now deny shell and file tools outright, which they never had.",
+      "2 characters now deny shell, file and media-generation tools, which they never had.",
     ]);
     const world = read();
-    const deny = { deny: ["exec", "process", "read", "write", "edit"] };
+    const deny = { deny: CHARACTER_DENIED_TOOLS };
     expect(world.agents.entries).toEqual({
       arona,
       hina: { workspace: "./workspaces/hina", tools: deny },
@@ -203,7 +204,39 @@ describe("denyImpliedTools", () => {
     world.agents.entries.iroha = { workspace: "./workspaces/iroha" };
     writeFileSync(file, JSON.stringify(world));
     expect(denyImpliedTools(root)).toHaveLength(1);
-    expect(read().agents.entries.iroha.tools.deny).toEqual(IMPLIED_TOOLS);
+    expect(read().agents.entries.iroha.tools.deny).toEqual(
+      CHARACTER_DENIED_TOOLS,
+    );
+  });
+
+  it("brings a deny written before the media tools up to date, and nothing else", () => {
+    const { root, read } = repo({
+      agents: {
+        entries: {
+          hina: { tools: { deny: [...IMPLIED_TOOLS] } },
+          // A narrower deny of the world's own making stays as it is.
+          ui: { tools: { deny: ["exec"], alsoAllow: ["read"] } },
+          mari: { tools: { deny: ["exec"] } },
+          // So does a deny holding more than the earlier one.
+          koyuki: { tools: { deny: [...IMPLIED_TOOLS, "image_generate"] } },
+        },
+      },
+    });
+    expect(denyImpliedTools(root)).toEqual([
+      "1 characters now deny shell, file and media-generation tools, which they never had.",
+    ]);
+    expect(read().agents.entries.hina.tools.deny).toEqual(
+      CHARACTER_DENIED_TOOLS,
+    );
+    expect(read().agents.entries.ui.tools).toEqual({
+      deny: ["exec"],
+      alsoAllow: ["read"],
+    });
+    expect(read().agents.entries.mari.tools).toEqual({ deny: ["exec"] });
+    expect(read().agents.entries.koyuki.tools).toEqual({
+      deny: [...IMPLIED_TOOLS, "image_generate"],
+    });
+    expect(denyImpliedTools(root)).toEqual([]);
   });
 
   it("does nothing before a world exists", () => {

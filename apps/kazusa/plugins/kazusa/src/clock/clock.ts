@@ -25,6 +25,22 @@ export interface ClockOptions {
   readonly cell?: ClockCell;
 }
 
+/**
+ * Made once: building a formatter costs far more than using one, and the clock
+ * is read on nearly every Kazusa operation.
+ */
+const SNAPSHOT_FORMAT = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZone: "UTC",
+});
+
 export class Clock {
   private readonly store: ClockStore;
   private readonly cell: ClockCell;
@@ -87,17 +103,7 @@ export class Clock {
     return {
       simTime,
       speed: this.cell.speed,
-      formatted: new Intl.DateTimeFormat("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-        timeZone: "UTC",
-      }).format(new Date(simTime)),
+      formatted: SNAPSHOT_FORMAT.format(new Date(simTime)),
     };
   }
 

@@ -53,6 +53,7 @@ import {
   type Stimulus,
 } from "./types.ts";
 import { BrainSlots } from "./brain-slots.ts";
+import { openTaskStore } from "../taskman/store.ts";
 import {
   bundledSkillText,
   pluginSkillText,
@@ -241,9 +242,9 @@ export interface PerceptionState {
   carried?: CarriedDelivery[];
   stopped?: boolean;
   /**
-   * The last task check-in taken in (its stimulus key). Any later cron run for
-   * a task that has already ended builds the same check-in again (unpausing
-   * re-arms every lease), and it is not delivered twice.
+   * The last task check-in taken in (its stimulus key). A later wake for a task
+   * that has already ended builds the same check-in again (start-up and stage
+   * changes set every lease's wake again), and it is not delivered twice.
    */
   checkedIn?: string;
   /**
@@ -472,10 +473,7 @@ export class Perception {
     if (this.deps.tasks) {
       this.taskStore = this.deps.tasks;
     } else if (this.api) {
-      this.taskStore = this.api.runtime.state.openKeyedStore<ActiveTask>({
-        namespace: "tasks",
-        retention: "retained",
-      });
+      this.taskStore = openTaskStore(this.api);
     } else {
       throw new Error("Perception requires an api or a tasks dependency.");
     }

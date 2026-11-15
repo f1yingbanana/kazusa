@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type { StateStore } from "../state.ts";
+import { cachedStore, type StateStore } from "../state.ts";
 import { resolveStateDir } from "../state-dir.ts";
 import {
   openDecisionDatabase,
@@ -22,10 +22,17 @@ export interface PerceptionStores {
  * database that won't open fails recording, never attention routing.
  */
 export function openPerceptionStores(api: OpenClawPluginApi): PerceptionStores {
-  const inbox = api.runtime.state.openKeyedStore<PerceptionState>({
-    namespace: INBOX_NAMESPACE,
-    retention: "retained",
-  });
+  // Read on every stimulus, drain, status and decision (about 1,900 times a
+  // minute with 145 characters), written only here. Perception edits a record
+  // in place before saving it, so each read is a copy.
+  const inbox = cachedStore(
+    INBOX_NAMESPACE,
+    api.runtime.state.openKeyedStore<PerceptionState>({
+      namespace: INBOX_NAMESPACE,
+      retention: "retained",
+    }),
+    { copies: true },
+  );
 
   let decisions: DecisionStore | undefined;
   const database = (): DecisionStore =>

@@ -1,14 +1,12 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetStateCaches } from "../state.ts";
 import { requestContinuation, takeContinuation } from "./continue.ts";
 import { registerPerception } from "./register.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
-function setup(
-  onDeadline?: (agentId: string) => Promise<string | undefined>,
-  extra: Partial<Parameters<typeof registerPerception>[1]> = {},
-) {
+function setup(extra: Partial<Parameters<typeof registerPerception>[1]> = {}) {
   const stores = new Map<string, Map<string, unknown>>();
   const on = vi.fn();
   const subscription = vi.fn();
@@ -84,7 +82,6 @@ function setup(
   };
   const perception = registerPerception(api, {
     clock,
-    onDeadline,
     ...extra,
   });
 
@@ -128,6 +125,7 @@ function setup(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetStateCaches();
 });
 
 describe("Perception host integration", () => {
@@ -346,39 +344,16 @@ describe("Perception host integration", () => {
     expect(perception).toBeDefined();
   });
 
-  it("notifies perception of task deadline and claims turn when cron fires before_agent_reply", async () => {
+  it("claims a cron run for a character silently, without a check-in", async () => {
     const h = setup();
-    const beforeAgentReply = h.hook("before_agent_reply");
-    const deadlineSpy = vi.spyOn(h.perception, "deadline");
-
-    const result = await beforeAgentReply(
-      { cleanedBody: "Scheduled task deadline reached" },
+    const deadline = vi.spyOn(h.perception, "deadline");
+    const result = await h.hook("before_agent_reply")(
+      { cleanedBody: "Wake alice" },
       { trigger: "cron", jobId: "cron-job-1", agentId: "alice" },
     );
-
-    expect(deadlineSpy).toHaveBeenCalledWith("alice", undefined);
+    // Activity ends wake from Taskman's own timer.
+    expect(deadline).not.toHaveBeenCalled();
     expect(result).toEqual({ handled: true });
-  });
-
-  it("settles what a deadline means elsewhere before admitting it", async () => {
-    const calls: string[] = [];
-    const h = setup(async (agentId) => {
-      calls.push(`settle ${agentId}`);
-      return "You've arrived at the club.";
-    });
-    vi.spyOn(h.perception, "deadline").mockImplementation(
-      async (agentId, note) => {
-        calls.push(`deadline ${agentId}: ${note}`);
-      },
-    );
-    await h.hook("before_agent_reply")(
-      { cleanedBody: "Scheduled task deadline reached" },
-      { trigger: "cron", jobId: "cron-job-1", agentId: "alice" },
-    );
-    expect(calls).toEqual([
-      "settle alice",
-      "deadline alice: You've arrived at the club.",
-    ]);
   });
 
   it("registers an internal ingress channel whose outbound sends nothing", async () => {
@@ -417,7 +392,7 @@ describe("Perception host integration", () => {
   });
 
   it("uses the same dispatcher for urgent steering and lets the host own fallback", async () => {
-    const h = setup(undefined, {
+    const h = setup({
       assembleDecisionContext: async () => ({
         state: "Fire in the kitchen!",
         questions: {
