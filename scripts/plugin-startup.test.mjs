@@ -7,6 +7,7 @@ import {
   denyImpliedTools,
   IMPLIED_TOOLS,
   loadNewPlugins,
+  skipUnusedStartupWork,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
 
@@ -241,5 +242,34 @@ describe("denyImpliedTools", () => {
 
   it("does nothing before a world exists", () => {
     expect(denyImpliedTools(repo().root)).toEqual([]);
+  });
+});
+
+describe("skipUnusedStartupWork", () => {
+  it("turns both off in a world that has neither setting, once", () => {
+    const { root, read } = repo({ meta: { lastTouchedVersion: "2026.10.5" } });
+    expect(skipUnusedStartupWork(root)).toHaveLength(1);
+    expect(read()).toEqual({
+      meta: {
+        lastTouchedVersion: "2026.10.5",
+        migrations: { webhookListeners: true },
+      },
+      worktreeAcceleration: false,
+    });
+    expect(skipUnusedStartupWork(root)).toEqual([]);
+  });
+
+  it("keeps webhook pins a world recorded", () => {
+    const pins = { telegram: [["a", "b"]] };
+    const { root, read } = repo({
+      meta: { migrations: { webhookListeners: pins } },
+    });
+    skipUnusedStartupWork(root);
+    expect(read().meta.migrations.webhookListeners).toEqual(pins);
+    expect(read().worktreeAcceleration).toBe(false);
+  });
+
+  it("does nothing before a world exists", () => {
+    expect(skipUnusedStartupWork(repo().root)).toEqual([]);
   });
 });

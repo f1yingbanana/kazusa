@@ -411,6 +411,11 @@
         }
       }
     },
-    "worktreeAcceleration": false
+    "worktreeAcceleration": false,
+    "meta": {
+      "migrations": {
+        "webhookListeners": true
+      }
+    }
   }
 }
