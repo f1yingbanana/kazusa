@@ -56,7 +56,8 @@ export function brainRunLimits(
 interface BrainRun {
   readonly agentId: string;
   readonly controller: AbortController;
-  readonly limits: RunLimits;
+  /** Grows once when the run takes on a night's sleep (`roomForSleep`). */
+  limits: RunLimits;
   /** Time spent in model calls that have ended, as the host measured them. */
   thoughtMs: number;
   /** Model calls under way, by call id: when each started. */
@@ -154,6 +155,36 @@ export function beginBrainRun(
       if (!state.models.size) state.dispose();
     },
   };
+}
+
+/**
+ * A run that goes to sleep also goes over the day (`memory/sleep.ts`): a view
+ * or two, a few notes, the day itself. That is more calls than a moment's
+ * reaction, so the run under way gets this much more, once.
+ */
+const SLEEP_ROOM: RunLimits = {
+  maxModelCalls: 8,
+  maxToolCalls: 24,
+  maxThinkingSeconds: 240,
+};
+const SLEPT = Symbol.for("kazusa.brain.run-limit-sleep");
+function sleptRuns(): WeakSet<BrainRun> {
+  const scope = globalThis as { [SLEPT]?: WeakSet<BrainRun> };
+  return (scope[SLEPT] ??= new WeakSet<BrainRun>());
+}
+
+export function roomForSleep(agentId: string): void {
+  const runId = currentBrainRun(agentId);
+  const run = runId ? activeRuns().get(runId) : undefined;
+  if (!run || sleptRuns().has(run)) return;
+  sleptRuns().add(run);
+  run.limits = {
+    maxModelCalls: run.limits.maxModelCalls + SLEEP_ROOM.maxModelCalls,
+    maxToolCalls: run.limits.maxToolCalls + SLEEP_ROOM.maxToolCalls,
+    maxThinkingSeconds:
+      run.limits.maxThinkingSeconds + SLEEP_ROOM.maxThinkingSeconds,
+  };
+  armExpiry(run);
 }
 
 /** The id of a character's brain run under way, from before it starts. */

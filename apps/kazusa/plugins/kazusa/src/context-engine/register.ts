@@ -12,9 +12,7 @@ import { CONTEXT_ENGINE_CONFIG, type ContextEngineConfig } from "./config.ts";
 import { contextSettings, contextSettingsBase } from "./settings.ts";
 import {
   assembleContext,
-  ledgerWindowEnd,
   ledgerCutoff,
-  renderLedgerRecords,
   readSessionStreams,
   type ContextEngine,
 } from "./context-engine.ts";
@@ -22,7 +20,6 @@ import { readBrainTurns } from "../perception/brain-trace.ts";
 import { currentBrainRun } from "../perception/run-limits.ts";
 import { pluginSkillLoader } from "./skill-loader.ts";
 import type { AwaitingReply } from "../messaging/messaging.ts";
-import { pluginSkillText } from "../skill-text.ts";
 import type { MemoryPrefetch } from "../memory/register.ts";
 import { brainRequest, type RetrievalRequest } from "../memory/retrieve.ts";
 import { openTaskStore } from "../taskman/store.ts";
@@ -109,37 +106,16 @@ interface TurnCaches {
  * Wire host lifecycle and session I/O; selection and skill expansion stay in
  * the engine.
  */
-export interface ContextEngineService {
-  /** The oldest of their ledgers since `since` that fit, for sleep. */
-  readonly experiences: (
-    agentId: string,
-    since: number,
-    now: number,
-  ) => Promise<{
-    readonly text: string;
-    readonly speakers: readonly string[];
-    /** Records up to here were read; a backlog waits for the next sleep. */
-    readonly through: number;
-  }>;
-}
-
 export function registerContextEngine(
   api: OpenClawPluginApi,
   deps: ContextEngineDeps,
-): ContextEngineService {
+): void {
   const getConfig = () => currentConfig(api);
   const caches: TurnCaches = { turns: new Map(), windows: new Map() };
   api.registerContextEngine("kazusa", () =>
     createContextEngine(api, deps, getConfig, caches),
   );
-  return {
-    experiences: (agentId, since, now) =>
-      readExperiences(api, getConfig, agentId, since, now),
-  };
 }
-
-/** How much of a day sleep can take in. */
-const SLEEP_RECORD_TOKENS = 8_000;
 
 async function ownLedgers(
   api: OpenClawPluginApi,
@@ -170,62 +146,6 @@ async function ownLedgers(
     );
   });
   return { storePath, streams };
-}
-
-async function readExperiences(
-  api: OpenClawPluginApi,
-  getConfig: () => OpenClawConfig,
-  agentId: string,
-  since: number,
-  now: number,
-): Promise<{
-  readonly text: string;
-  readonly speakers: readonly string[];
-  readonly through: number;
-}> {
-  const { storePath, streams } = await ownLedgers(api, getConfig, agentId);
-  const sessionsContext = await readSessionStreams({
-    agentId,
-    streams,
-    storePath,
-    pluginId: api.id,
-    now,
-    cutoff: since,
-  });
-  const skillText = pluginSkillText(api);
-  // Sized and rendered alike, so the night reads all that fits.
-  const deliveries = (section: string): string =>
-    skillText(`kazusa-deliveries#${section}`, {}, { agentId });
-  const through = ledgerWindowEnd({
-    sessionsContext,
-    since,
-    now,
-    tokenBudget: SLEEP_RECORD_TOKENS,
-    text: deliveries,
-  });
-  const speakers = [
-    ...new Set(
-      Object.values(sessionsContext).flatMap((items) =>
-        items.flatMap((item) =>
-          item.sender && Date.parse(item.timestamp ?? "") <= through
-            ? [item.sender.identity.id]
-            : [],
-        ),
-      ),
-    ),
-  ].filter((id) => id !== agentId);
-  return {
-    speakers,
-    through,
-    text: renderLedgerRecords({
-      sessionsContext,
-      simTime: through,
-      cutoff: since,
-      tokenBudget: Number.POSITIVE_INFINITY,
-      trimTo: 1,
-      text: deliveries,
-    }).text,
-  };
 }
 
 function createContextEngine(

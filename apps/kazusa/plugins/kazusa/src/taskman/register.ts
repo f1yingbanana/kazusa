@@ -293,8 +293,14 @@ export function registerTaskman(
           }),
         });
       }
+      const aside = result.success ? result.aside : undefined;
       return {
-        content: [{ type: "text", text: result.message }],
+        content: [
+          {
+            type: "text",
+            text: aside ? `${result.message}\n\n${aside}` : result.message,
+          },
+        ],
         details: result,
       };
     },

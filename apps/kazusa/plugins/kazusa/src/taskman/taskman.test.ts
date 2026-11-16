@@ -382,6 +382,27 @@ describe("Configurable task categories", () => {
   });
 });
 
+describe("What an extension says with the result alone", () => {
+  it("reaches the result and never the records", async () => {
+    // Going to bed shows the day's pages once; kept, every turn would reread
+    // them.
+    const { context, messages } = makeContext();
+    const result = await executeStartTask(
+      { type: "sleeping", description: "In bed", duration: 480 },
+      {
+        ...context,
+        prepare: async () => [
+          { aside: "Before sleep takes you…", commit: async () => {} },
+        ],
+      },
+    );
+    if (!result.success) throw new Error("Expected a start");
+    expect(result.aside).toBe("Before sleep takes you…");
+    expect(result.message).not.toContain("Before sleep");
+    expect(messages.join("\n")).not.toContain("Before sleep");
+  });
+});
+
 describe("Taskman check-ins", () => {
   it("ends the lease at the earliest check-in an extension asks for", async () => {
     const { context, messages } = makeContext();

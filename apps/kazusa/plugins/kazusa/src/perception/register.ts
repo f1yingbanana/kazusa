@@ -79,8 +79,6 @@ export function registerPerception(
     readonly model?: (agentId: string) => Promise<string | undefined>;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluateDecision?: PerceptionDeps["evaluateDecision"];
-    /** Something woke them, or broke into what they were doing. */
-    readonly onAwoken?: (agentId: string) => void;
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -92,12 +90,6 @@ export function registerPerception(
     decision: AttentionDecision & DecisionTrace,
     record?: PerceptionDecisionRecord,
   ): void => {
-    if (
-      decision.source !== "automatic" &&
-      decision.action !== "DEFER" &&
-      decision.action !== "IGNORE"
-    )
-      deps.onAwoken?.(agentId);
     if (record)
       deps.broadcaster?.broadcast({
         type: "journal",

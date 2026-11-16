@@ -566,50 +566,6 @@ export function renderLedgerRecords(params: {
 }
 
 /**
- * How far oldest-first records fit a budget, measured as they will be rendered:
- * the time to read up to, so whatever doesn't fit stays unread for next time
- * rather than being skipped. Records at one moment stay together. Always moves
- * forward, even if one record alone is over budget.
- */
-export function ledgerWindowEnd(params: {
-  readonly sessionsContext: LedgerStreams;
-  readonly since: number;
-  readonly now: number;
-  readonly tokenBudget: number;
-  /** A `kazusa-deliveries` section, by name, as `renderLedgerRecords` takes. */
-  readonly text: (section: string) => string;
-}): number {
-  const records = ledgerRecords(
-    params.sessionsContext,
-    params.since,
-    params.now,
-  );
-  if (records.length === 0) return params.now;
-  const render = ledgerRenderer(params.text);
-  const fitsTo = (end: number): boolean =>
-    estimateTokens({
-      role: "user",
-      content: render(records.slice(0, end)),
-      timestamp: params.now,
-    }) <= params.tokenBudget;
-  // The most records that fit; adding more only grows the rendering.
-  let low = 1;
-  let high = records.length;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (fitsTo(middle)) low = middle;
-    else high = middle - 1;
-  }
-  let end = low;
-  while (
-    end < records.length &&
-    records[end].timestamp === records[end - 1].timestamp
-  )
-    end++;
-  return end === records.length ? params.now : records[end - 1].timestamp;
-}
-
-/**
  * Read session catalog transcripts for the brain context within the simulation
  * time window.
  */

@@ -18,6 +18,8 @@ interface CommittedExtensions {
   readonly task: ActiveTask;
   /** Extension sentences, each prefixed with a space, or empty. */
   readonly notes: string;
+  /** What extensions say with the result alone, or empty. */
+  readonly aside: string;
   readonly payload: Readonly<Record<string, unknown>>;
 }
 
@@ -67,6 +69,10 @@ async function commitExtensions(
       .filter((note): note is string => !!note)
       .map((note) => ` ${note}`)
       .join(""),
+    aside: prepared
+      .map(({ aside }) => aside?.trim())
+      .filter((aside): aside is string => !!aside)
+      .join("\n\n"),
     payload: reports.reduce<Record<string, unknown>>(
       (all, { payload }) => ({ ...all, ...payload }),
       {},
@@ -156,7 +162,14 @@ export async function executeStartTask(
     timestamp,
     { kind: "task.started", payload },
   );
-  return { success: true, task: lease, message, payload, simTime: timestamp };
+  return {
+    success: true,
+    task: lease,
+    message,
+    ...(extensions.aside ? { aside: extensions.aside } : {}),
+    payload,
+    simTime: timestamp,
+  };
 }
 
 export async function executeDelayTask(

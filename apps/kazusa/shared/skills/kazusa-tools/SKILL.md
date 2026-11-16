@@ -189,6 +189,50 @@ known.
 
 What to look up.
 
+## reflect
+
+As you fall asleep for the night: go over one person, place or thing the day
+changed your mind about, yourself (`me`), or the day itself (`today`), which
+closes it. Give only what changed.
+
+## reflect.about
+
+Who or what, by name or id; `me` for yourself; `today` for the day.
+
+## reflect.view
+
+How you see them now, in the first person. It replaces your old view whole. With
+`me`: who you are these days. With `today`: how the day was, in a few sentences.
+
+## reflect.summary
+
+Them in one line. With `today`: the day in one line.
+
+## reflect.relation
+
+What they are to you, in a few words: close friend, rival, stranger.
+
+## reflect.openThreads
+
+What is unfinished between you. Replaces the old list.
+
+## reflect.theyThinkOfMe
+
+Your guess at what they think of you, and how sure you are.
+
+## reflect.goals
+
+With `me`: what you want in the long run. Replaces the old list.
+
+## reflect.dream
+
+With `today`: one or two strange sentences recombining the day.
+
+## reflect.states
+
+States the night reviews that the day moved, by name, each with its new value:
+toward this person, or your own with `me`.
+
 ## remember
 
 Keep something past today: a plan or promise, someone new, or what changes how

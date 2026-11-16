@@ -78,10 +78,7 @@ beforeEach(() => {
       },
     },
   };
-  registerMemory(api as never, {
-    clock: { time: () => NOW },
-    experiences: async () => ({ text: "", speakers: [], through: NOW }),
-  });
+  registerMemory(api as never, { clock: { time: () => NOW } });
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });

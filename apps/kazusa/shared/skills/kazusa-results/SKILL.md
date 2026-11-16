@@ -81,6 +81,34 @@ Your {name} already is {value}.
 
 {name} is not something you can change yourself.
 
+## reflect-awake
+
+You only go over things like this as you fall asleep for the night.
+
+## reflect-unread
+
+Nothing changed yet. This is how you see {name} now:
+
+{view}
+
+A new view replaces it whole.
+
+## reflect-kept
+
+Kept, about {name}.
+
+## reflect-self
+
+Kept.
+
+## reflect-no-day
+
+The day needs a `view`: how it was, in a few sentences.
+
+## reflect-day
+
+The day is closed.
+
 ## task-finished
 
 Finished {type}. {started}
