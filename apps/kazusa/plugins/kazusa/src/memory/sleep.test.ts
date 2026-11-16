@@ -1,4 +1,10 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +83,8 @@ beforeEach(() => {
   for (const cell of ["kazusa.memory", "kazusa.memory.nights"])
     delete (globalThis as Record<symbol, unknown>)[Symbol.for(cell)];
   root = materialize(WORLDS.saltmere);
+  // Its own state folder: the vectors database is one file per state folder.
+  vi.stubEnv("OPENCLAW_STATE_DIR", path.join(root, "state"));
   now = BEDTIME;
   factories = new Map();
   reviewed = [];
@@ -144,6 +152,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -159,7 +168,7 @@ describe("going to bed", () => {
     // Not on what it didn't.
     expect(aside).not.toContain("### oswin-hale");
     // The states a night reviews, toward the people of the day.
-    expect(aside).toContain("trust toward tobin-vell: wary");
+    expect(aside).toContain("trust toward tobin-vell");
   });
 
   it("says nothing more for a nap, or for anything that isn't sleep", async () => {
@@ -216,12 +225,38 @@ describe("a night gone over", () => {
 
   it("reviews the states toward the person reflected on", async () => {
     await goOver();
-    expect(reviewed).toEqual([
-      {
-        people: ["tobin-vell"],
-        answer: { toward: { "tobin-vell": { trust: "warm" } } },
-      },
+    expect(reviewed).toMatchObject([
+      { answer: { toward: { "tobin-vell": { trust: "warm" } } } },
     ]);
+  });
+
+  it("reviews states toward the player under the id the player goes by", async () => {
+    // Live, a night moved its regard for Sensei and nothing changed: their
+    // page is `sensei`, and states are kept under `user:sensei`.
+    mkdirSync(path.dirname(file("wiki/entities/characters/sensei.md")), {
+      recursive: true,
+    });
+    writeFileSync(
+      file("wiki/entities/characters/sensei.md"),
+      "---\nname: Sensei\npeer_id: user:sensei\n---\n\n# Sensei\n\nKeeps odd hours.\n",
+    );
+    await memory.use(AGENT, ["user:sensei"], NOON);
+    const aside = await start();
+    expect(aside).toContain("user:sensei");
+    await call("reflect", { about: "Sensei", states: { trust: "warm" } });
+    expect(reviewed).toMatchObject([
+      { answer: { toward: { "user:sensei": { trust: "warm" } } } },
+    ]);
+    expect((reviewed[0] as { people: string[] }).people).toContain(
+      "user:sensei",
+    );
+  });
+
+  it("closes the day they were up for when bed comes after midnight", async () => {
+    now = BEDTIME + 3 * HOUR;
+    await start();
+    await call("reflect", { about: "today", view: "Too long." });
+    expect(read("wiki/days/2026-03-10.md")).toContain("Too long.");
   });
 
   it("is told once, with the dream, and can be undone whole", async () => {

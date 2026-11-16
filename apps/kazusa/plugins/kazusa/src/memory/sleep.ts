@@ -170,6 +170,11 @@ export function restoreSleep(
 }
 
 const iso = (at: number): string => new Date(at).toISOString().slice(0, 10);
+/**
+ * The day a night closes is the one they were up for: going to bed after
+ * midnight still ends yesterday.
+ */
+const HALF_DAY_MS = 12 * 3_600_000;
 
 /** One night per character at a time, shared by every registration. */
 export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
@@ -212,6 +217,18 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       );
   };
 
+  /**
+   * The ids a page's person may go by where states are kept: the player's page
+   * is `sensei`, the player `user:sensei`. Whoever keeps states knows which of
+   * them is a person.
+   */
+  const personsOf = (agentId: string, id: string): string[] => {
+    const known =
+      deps.index.personal(agentId).get(id)?.personId ??
+      deps.index.world().pages.get(id)?.personId;
+    return [...new Set([known ?? id, id, `user:${id}`])];
+  };
+
   const lastNight = async (agentId: string): Promise<number> =>
     (await deps.store.lookup(agentId))?.runs[0]?.at ?? 0;
 
@@ -251,7 +268,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         (id) => (personal.get(id) ?? world.pages.get(id))?.kind === "person",
       )
       .slice(0, PEOPLE_REVIEWED)
-      .map((id) => world.pages.get(id)?.personId ?? id);
+      .flatMap((id) => personsOf(agentId, id));
     const states = await deps.states
       ?.text(agentId, people)
       .catch((error: unknown) => {
@@ -278,7 +295,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     id: randomUUID(),
     at,
     since,
-    day: iso(at),
+    day: iso(at - HALF_DAY_MS),
     wakeDay: iso(wakeAt),
     shown: new Set(),
     preimages: {},
@@ -462,8 +479,12 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       if (input.view) night.rewritten.add(id);
     }
     if (input.states && kind === "person") {
-      const person = deps.index.world().pages.get(id)?.personId ?? id;
-      await review(agentId, [person], { toward: { [person]: input.states } });
+      const persons = personsOf(agentId, id);
+      await review(agentId, persons, {
+        toward: Object.fromEntries(
+          persons.map((person) => [person, input.states]),
+        ),
+      });
     }
     return say("reflect-kept", { name });
   };

@@ -191,9 +191,10 @@ What to look up.
 
 ## reflect
 
-As you fall asleep for the night: go over one person, place or thing the day
-changed your mind about, yourself (`me`), or the day itself (`today`), which
-closes it. Give only what changed.
+Only once going to sleep for the night has told you to go over the day, never
+before or alongside it: go over one person, place or thing the day changed your
+mind about, yourself (`me`), or the day itself (`today`), which closes it. Give
+only what changed.
 
 ## reflect.about
 
@@ -230,8 +231,8 @@ With `today`: one or two strange sentences recombining the day.
 
 ## reflect.states
 
-States the night reviews that the day moved, by name, each with its new value:
-toward this person, or your own with `me`.
+Only states you were shown as you went to sleep, and only those the day moved,
+by name, each with its new value: toward this person, or your own with `me`.
 
 ## remember
 
