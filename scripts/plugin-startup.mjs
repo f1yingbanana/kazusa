@@ -151,9 +151,37 @@ export function denyImpliedTools(root) {
   ];
 }
 
+/**
+ * Two start-up jobs a Kazusa world never needs. `base.json` turns both off for
+ * new worlds; older worlds lack the settings, so this adds them. Worktree
+ * templates: a world is a git clone, so OpenClaw takes every character's
+ * workspace for a repository and runs some 250 git commands, a fetch among
+ * them. The webhook listener check is for Telegram, Feishu, Teams and Nextcloud
+ * Talk; unmarked, it makes OpenClaw read and validate the whole config a second
+ * time, about 2 s. A world that already recorded webhook pins keeps them.
+ */
+export function skipUnusedStartupWork(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const migrations = ((config.meta ??= {}).migrations ??= {});
+  if (
+    config.worktreeAcceleration === false &&
+    migrations.webhookListeners !== undefined
+  )
+    return [];
+  config.worktreeAcceleration = false;
+  migrations.webhookListeners ??= true;
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [
+    "This world now skips start-up work only other OpenClaw setups need.",
+  ];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of denyImpliedTools(root)) console.log(line);
+  for (const line of skipUnusedStartupWork(root)) console.log(line);
 }

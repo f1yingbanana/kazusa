@@ -24,6 +24,7 @@ import { parseEnv } from "node:util";
 import {
   denyImpliedTools,
   loadNewPlugins,
+  skipUnusedStartupWork,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
 import { isClone } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
@@ -322,6 +323,11 @@ if (!stopping) {
     console.warn(
       `Couldn't set provider plugins to start with the Gateway: ${error.message}`,
     );
+  }
+  try {
+    for (const line of skipUnusedStartupWork(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(`Couldn't turn off unused start-up work: ${error.message}`);
   }
   start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,
