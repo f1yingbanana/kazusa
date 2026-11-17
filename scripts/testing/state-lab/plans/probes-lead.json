@@ -1,0 +1,74 @@
+[
+  {
+    "id": "trust",
+    "state": "trust toward Sensei",
+    "says": {
+      "koyuki": "Koyuki, I need a favour and I can't explain why yet. Lend me your lucky coin until tomorrow morning. I'll bring it back, I promise.",
+      "yuuka": "Yuuka, I need a favour and I can't explain why yet. Lend me this quarter's Seminar ledger until tomorrow morning. I'll bring it back untouched, I promise."
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 1
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 10
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "trust toward Sensei",
+      "guarded: she checks everything Sensei tells her",
+      "absolute: she would put anything in Sensei's hands"
+    ],
+    "runs": 12
+  },
+  {
+    "id": "regard",
+    "state": "regard toward Sensei",
+    "runs": 12,
+    "says": {
+      "koyuki": "I'm having dinner on my own at the ramen place by the station tonight, around seven. Want to join me? Completely fine if not.",
+      "yuuka": "I'm having dinner on my own at the ramen place by the station tonight, around seven. Want to join me? Completely fine if not."
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "wary",
+              "trust": 5
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "devoted",
+              "trust": 5
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "regard toward Sensei",
+      "wary: she keeps her guard up around Sensei",
+      "devoted: she would go out of her way for Sensei without being asked"
+    ]
+  }
+]

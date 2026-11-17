@@ -193,8 +193,8 @@ What to look up.
 
 Only once going to sleep for the night has told you to go over the day, never
 before or alongside it: go over one person, place or thing the day changed your
-mind about, yourself (`me`), or the day itself (`today`), which closes it. Give
-only what changed.
+mind about, yourself (`me`), or the day itself (`today`). Give only what
+changed.
 
 ## reflect.about
 
@@ -232,7 +232,12 @@ With `today`: one or two strange sentences recombining the day.
 ## reflect.states
 
 Only states you were shown as you went to sleep, and only those the day moved,
-by name, each with its new value: toward this person, or your own with `me`.
+by name, each given the way it says: toward this person, or your own with `me`.
+
+## reflect.new
+
+True only after you were shown the pages you already have and it is none of
+them: this is something you have no page on yet.
 
 ## remember
 
@@ -259,3 +264,8 @@ How sure you are. Defaults to `sure`.
 ## remember.on
 
 With `about: me`: the day a plan happens, YYYY-MM-DD. Defaults to today.
+
+## remember.new
+
+True only after you were shown the pages you already have and it is none of
+them: this is someone or something you have no page on yet.

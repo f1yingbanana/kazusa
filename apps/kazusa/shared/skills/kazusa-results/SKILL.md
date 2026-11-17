@@ -101,13 +101,31 @@ Kept, about {name}.
 
 Kept.
 
+## reflect-states
+
+Now {states}.
+
+## reflect-states-left
+
+Left as they were: {states}.
+
 ## reflect-no-day
 
 The day needs a `view`: how it was, in a few sentences.
 
 ## reflect-day
 
-The day is closed.
+The day is kept.
+
+## page-unknown
+
+Nothing kept yet. You have no page called {name}. These are the closest you
+have:
+
+{pages}
+
+If it is one of them, say it again about that one, by the id in backticks. If it
+is none of them, say it again with `new`: true.
 
 ## task-finished
 

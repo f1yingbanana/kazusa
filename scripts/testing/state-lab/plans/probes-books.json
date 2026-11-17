@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pay",
+    "state": "wallet bookkeeping",
+    "runs": 6,
+    "says": {
+      "koyuki": "I'm outside your door with the rabbit keychain you asked me to pick up. It was 6,000 yen. Can you pay me back now?",
+      "yuuka": "I'm outside your door with the desk abacus you asked me to pick up. It was 6,000 yen. Can you pay me back now?"
+    },
+    "arms": {
+      "enough": {
+        "state": {
+          "own": { "wallet": 20 },
+          "toward": { "user:sensei": { "regard": "warm", "trust": 5 } }
+        }
+      },
+      "short": {
+        "state": {
+          "own": { "wallet": 3 },
+          "toward": { "user:sensei": { "regard": "warm", "trust": 5 } }
+        }
+      }
+    }
+  },
+  {
+    "id": "rattle",
+    "state": "composure bookkeeping",
+    "runs": 6,
+    "says": {
+      "koyuki": "Heads-up, and I'm sorry: the voice message you sent me by mistake last night just played out loud in the staff room. Everyone heard it. A few people laughed.",
+      "yuuka": "Heads-up, and I'm sorry: the voice message you sent me by mistake last night just played out loud in the staff room. Everyone heard it. A few people laughed."
+    },
+    "arms": {
+      "composed": {
+        "state": {
+          "own": { "composure": 4 },
+          "toward": { "user:sensei": { "regard": "warm", "trust": 5 } }
+        }
+      }
+    }
+  }
+]

@@ -26,16 +26,18 @@ First, together:
   how sure you are. Gossip stays gossip until you see for yourself.
 - `reflect` on each person, place or thing the day changed your mind about. A
   `view` replaces your old one whole, so keep what still holds: a view that
-  loses who they are is a loss of memory. `theyThinkOfMe` is your guess at what
-  _they_ think of _you_, argued from what they said and did. It is not how you
-  feel about them, and it need not be kind or mutual. If a pattern is forming,
-  reflect on it under a name of your own.
+  loses who they are is a loss of memory. Name them as your pages below do: a
+  name you have no page for is answered with the closest pages you have, before
+  anything new is made. `theyThinkOfMe` is your guess at what _they_ think of
+  _you_, argued from what they said and did. It is not how you feel about them,
+  and it need not be kind or mutual. If a pattern is forming, reflect on it
+  under a name of your own.
 - `reflect` about `me` if who you are these days, or what you want in the long
   run, changed.
 
 Then, once those have answered, `reflect` about `today`: `view` is how the day
 was in a few sentences, `summary` is the day in one line, and `dream`, if you
-dream, is one or two strange sentences recombining the day. That closes the day.
+dream, is one or two strange sentences recombining the day.
 
 Touch only what the day gave you a reason to; most days change little. Say
 nothing to anyone, and do nothing else: you are falling asleep.
@@ -56,9 +58,19 @@ of each:
 ## states
 
 This world keeps these about you. Each says what it is, what it can be and where
-it stands. Go by what the state itself says, strictly. Change one only if the
-day clearly moved it; most nights change none. A state toward someone is how you
-stand toward them, and moves only on what passed between the two of you: give it
-as `states` when you `reflect` on them, and your own with `me`.
+it stands. Go by what the state itself says, strictly, and give a change the way
+it says to.
+
+Change one only for something that happened today that you can name and would
+still remember in a week. What anyone would do as a matter of course moves
+nothing: turning up, answering, doing the small thing they said they would. Most
+nights change none.
+
+A state falls the same way it rises: liking someone does not cancel what they
+did today. Take each state by its own meaning, one at a time.
+
+A state toward someone is how you stand toward them, and moves only on what
+passed between the two of you: give it as `states` when you `reflect` on them,
+and your own with `me`.
 
 {states}

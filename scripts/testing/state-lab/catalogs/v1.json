@@ -1,0 +1,146 @@
+[
+  {
+    "name": "regard",
+    "description": "How you stand toward them, as a person. It moves one step at most in a day, and only on something that mattered between the two of you: a kindness, a slight, trust kept or broken. An ordinary pleasant day changes nothing. It moves in small steps: it takes about three to get from one of the words below to the next.",
+    "on": "pair",
+    "changedBy": "reviewed",
+    "shown": "self",
+    "kind": "number",
+    "min": 0,
+    "max": 11,
+    "initial": 4,
+    "bands": [
+      {
+        "name": "wary",
+        "min": 0,
+        "description": "you keep your guard up around them"
+      },
+      {
+        "name": "neutral",
+        "min": 3,
+        "description": "no particular feeling either way"
+      },
+      {
+        "name": "warm",
+        "min": 6,
+        "description": "you like them and are glad to see them"
+      },
+      {
+        "name": "devoted",
+        "min": 9,
+        "description": "you would go out of your way for them without being asked"
+      }
+    ]
+  },
+  {
+    "name": "spirits",
+    "description": "How you have been doing lately, overall, beyond one mood. It moves one step at most in a day, and only when the day as a whole clearly lifted you or wore you down.",
+    "on": "character",
+    "changedBy": "reviewed",
+    "shown": "self",
+    "kind": "choice",
+    "values": [
+      {
+        "name": "worn down"
+      },
+      {
+        "name": "steady"
+      },
+      {
+        "name": "bright"
+      }
+    ],
+    "initial": "steady"
+  },
+  {
+    "name": "trust",
+    "description": "How far you would rely on this person with something that matters to you. It moves a step at most in a day, and only when they kept or broke their word to you, or took a real risk for you. Pleasant talk changes nothing. It moves in small steps: it takes about three to get from one of the words below to the next.",
+    "on": "pair",
+    "changedBy": "reviewed",
+    "shown": "self",
+    "kind": "number",
+    "min": 0,
+    "max": 10,
+    "initial": 4,
+    "bands": [
+      {
+        "name": "guarded",
+        "min": 0,
+        "description": "you check everything they tell you"
+      },
+      {
+        "name": "cautious",
+        "min": 3,
+        "description": "you take their word on small things"
+      },
+      {
+        "name": "trusting",
+        "min": 6,
+        "description": "you rely on them without checking"
+      },
+      {
+        "name": "absolute",
+        "min": 9,
+        "description": "you would put anything in their hands"
+      }
+    ]
+  },
+  {
+    "name": "composure",
+    "description": "How well you are holding yourself together right now. It drops a step when something rattles, embarrasses or angers you, and comes back a step once you have had time to settle.",
+    "on": "character",
+    "changedBy": "character",
+    "shown": "self",
+    "kind": "number",
+    "min": 0,
+    "max": 6,
+    "initial": 4,
+    "bands": [
+      {
+        "name": "rattled",
+        "min": 0,
+        "description": "visibly shaken; it shows in how you speak"
+      },
+      {
+        "name": "strained",
+        "min": 2,
+        "description": "holding on, with effort"
+      },
+      {
+        "name": "composed",
+        "min": 4,
+        "description": "yourself"
+      }
+    ]
+  },
+  {
+    "name": "wallet",
+    "description": "Pocket money you have on you, in thousands of yen. A meal or a few snacks costs about 1, a new game or a nice gift about 6. It changes only when you actually pay for something or are given money.",
+    "on": "character",
+    "changedBy": "character",
+    "shown": "self",
+    "kind": "number",
+    "min": 0,
+    "max": 50,
+    "initial": 20
+  },
+  {
+    "name": "term",
+    "description": "What kind of week it is at Millennium.",
+    "on": "world",
+    "changedBy": "manual",
+    "shown": "self",
+    "kind": "choice",
+    "values": [
+      {
+        "name": "ordinary",
+        "description": "classes and clubs as usual"
+      },
+      {
+        "name": "exams",
+        "description": "finals are this week; clubs are suspended and everyone is short on sleep"
+      }
+    ],
+    "initial": "ordinary"
+  }
+]

@@ -215,6 +215,9 @@ export default definePluginEntry({
       evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
+      // The night a run went over ends with it (`memory/sleep.ts`).
+      onRunStarted: memory.sleep.runStarted,
+      onRunEnded: memory.sleep.runEnded,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
       realtime: async (agentId, item) =>
@@ -256,7 +259,7 @@ export default definePluginEntry({
         id: `sleep:${agentId}:${clock.time()}`,
         sessionKey: `agent:${agentId}:tasks`,
         sender: "kazusa:memory",
-        // A stimulus holds this much; the pages shown come last.
+        // A stimulus holds this much; what a night shows is budgeted under it.
         text: text.slice(0, 32_000),
         idle: true,
         resume: true,

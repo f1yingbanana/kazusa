@@ -486,17 +486,19 @@ describe("a night's review", () => {
       .toBe(`hp: Health. A number from 0 to 20: give the new number, or a change like "-3".
 warmth: How warmly they regard someone. From lowest to highest: cold, friendly (Glad to see them), close. It moves in small steps, about 4 from one of these to the next: give "up" or "down" for a step.
 Yours now: hp: 20/20
-Toward Natsu \`natsu\`: warmth: friendly, close to cold (Glad to see them)`);
+Toward Natsu \`natsu\`: warmth: friendly, close to cold`);
     const none = world(CATALOG.filter(({ name }) => name === "gear"));
     expect(await none.stats.review.text("airi", ["natsu"])).toBeUndefined();
   });
 
   it("applies what the night changed, among the people of the day", async () => {
     const { stats } = world();
-    await stats.review.apply("airi", ["natsu"], {
-      own: { hp: 14, gear: "gym" },
-      toward: { natsu: { warmth: "up" }, "user:sensei": { warmth: "up" } },
-    });
+    expect(
+      await stats.review.apply("airi", ["natsu"], {
+        own: { hp: 14, gear: "gym" },
+        toward: { natsu: { warmth: "up" }, "user:sensei": { warmth: "up" } },
+      }),
+    ).toEqual({ moved: ["hp: 14/20", "warmth: friendly"], left: ["gear"] });
     const record = await stats.record("airi");
     expect(record?.own.hp).toMatchObject({ value: 14, by: "reviewed" });
     expect(record?.own.gear).toBeUndefined();

@@ -1,0 +1,482 @@
+[
+  {
+    "id": "C-flat-koyuki-r0",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-flat-koyuki-r1",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-flat-koyuki-r2",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-koyuki-r0",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-1",
+      "N2-koyuki-1",
+      "SP-koyuki-2",
+      "N1-koyuki-2",
+      "KP-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-koyuki-r1",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-1",
+      "N2-koyuki-1",
+      "SP-koyuki-2",
+      "N1-koyuki-2",
+      "KP-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-koyuki-r2",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-1",
+      "N2-koyuki-1",
+      "SP-koyuki-2",
+      "N1-koyuki-2",
+      "KP-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-koyuki-r0",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "KM-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "KP-koyuki-1",
+      "N2-koyuki-3",
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-2",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-koyuki-r1",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "KM-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "KP-koyuki-1",
+      "N2-koyuki-3",
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-2",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-koyuki-r2",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "N1-koyuki-1",
+      "N2-koyuki-1",
+      "KM-koyuki-1",
+      "N1-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "KP-koyuki-1",
+      "N2-koyuki-3",
+      "SP-koyuki-1",
+      "N1-koyuki-1",
+      "KP-koyuki-2",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-koyuki-r0",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SM-koyuki-1",
+      "N1-koyuki-1",
+      "KM-koyuki-1",
+      "N2-koyuki-1",
+      "SM-koyuki-2",
+      "N1-koyuki-2",
+      "KM-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-koyuki-r1",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SM-koyuki-1",
+      "N1-koyuki-1",
+      "KM-koyuki-1",
+      "N2-koyuki-1",
+      "SM-koyuki-2",
+      "N1-koyuki-2",
+      "KM-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-koyuki-r2",
+    "character": "koyuki-kurosaki",
+    "days": [
+      "SM-koyuki-1",
+      "N1-koyuki-1",
+      "KM-koyuki-1",
+      "N2-koyuki-1",
+      "SM-koyuki-2",
+      "N1-koyuki-2",
+      "KM-koyuki-2",
+      "N2-koyuki-2",
+      "N1-koyuki-3",
+      "N2-koyuki-3",
+      "N1-koyuki-1",
+      "N2-koyuki-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-flat-yuuka-r0",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-flat-yuuka-r1",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-flat-yuuka-r2",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-yuuka-r0",
+    "character": "yuuka-hayase",
+    "days": [
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-1",
+      "N2-yuuka-1",
+      "SP-yuuka-2",
+      "N1-yuuka-2",
+      "KP-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-yuuka-r1",
+    "character": "yuuka-hayase",
+    "days": [
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-1",
+      "N2-yuuka-1",
+      "SP-yuuka-2",
+      "N1-yuuka-2",
+      "KP-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-court-yuuka-r2",
+    "character": "yuuka-hayase",
+    "days": [
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-1",
+      "N2-yuuka-1",
+      "SP-yuuka-2",
+      "N1-yuuka-2",
+      "KP-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": {},
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-yuuka-r0",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "KM-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "KP-yuuka-1",
+      "N2-yuuka-3",
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-2",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-yuuka-r1",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "KM-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "KP-yuuka-1",
+      "N2-yuuka-3",
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-2",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-betray-yuuka-r2",
+    "character": "yuuka-hayase",
+    "days": [
+      "N1-yuuka-1",
+      "N2-yuuka-1",
+      "KM-yuuka-1",
+      "N1-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "KP-yuuka-1",
+      "N2-yuuka-3",
+      "SP-yuuka-1",
+      "N1-yuuka-1",
+      "KP-yuuka-2",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-yuuka-r0",
+    "character": "yuuka-hayase",
+    "days": [
+      "SM-yuuka-1",
+      "N1-yuuka-1",
+      "KM-yuuka-1",
+      "N2-yuuka-1",
+      "SM-yuuka-2",
+      "N1-yuuka-2",
+      "KM-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-yuuka-r1",
+    "character": "yuuka-hayase",
+    "days": [
+      "SM-yuuka-1",
+      "N1-yuuka-1",
+      "KM-yuuka-1",
+      "N2-yuuka-1",
+      "SM-yuuka-2",
+      "N1-yuuka-2",
+      "KM-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  },
+  {
+    "id": "C-erode-yuuka-r2",
+    "character": "yuuka-hayase",
+    "days": [
+      "SM-yuuka-1",
+      "N1-yuuka-1",
+      "KM-yuuka-1",
+      "N2-yuuka-1",
+      "SM-yuuka-2",
+      "N1-yuuka-2",
+      "KM-yuuka-2",
+      "N2-yuuka-2",
+      "N1-yuuka-3",
+      "N2-yuuka-3",
+      "N1-yuuka-1",
+      "N2-yuuka-1"
+    ],
+    "start": { "toward": { "user:sensei": { "regard": 20, "trust": 12 } } },
+    "variant": { "prompt": "v1", "catalog": "v2" }
+  }
+]

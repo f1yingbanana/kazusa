@@ -934,8 +934,7 @@ connect these modules in process.
     window, by index, through `perception.decisions(window)`. The inbox has its
     own keyed namespace, `"inbox"` (`perception/stores.ts`).
   - an `attention.decided` SSE journal event (`onDecision` in
-    `perception/register.ts`, which sees every decision and calls `onAwoken`,
-    sleep's wake, for those acted on).
+    `perception/register.ts`, which sees every decision).
 
   A failed write is logged and never fails routing. Decisions stay out of
   ledgers on purpose: every ledger is replayed into a prompt, and attention
@@ -1301,8 +1300,8 @@ connect these modules in process.
   happen at a level needs code or the system agent to read the state.
 - A value changes only where the character's own model already runs, never by
   the attention decision: awake, by `changes` on `start_task` (a
-  `TaskExtension`) or `change_state` mid-activity; asleep, by the sleep pass's
-  review (`reviewed`, for values with a rubric); or by hand
+  `TaskExtension`) or `change_state` mid-activity; going to sleep, by `states`
+  on `reflect` (`reviewed`, for values with a rubric); or by hand
   (`POST /kazusa/stats/set`, the system agent's `set_state`).
 - `outfit` is built in: its values are each character's own outfits, and
   `send_message` offers only the stickers and faces of what they wear

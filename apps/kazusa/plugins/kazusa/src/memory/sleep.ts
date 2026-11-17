@@ -20,9 +20,10 @@ import {
  * Sleep (memory.md §7.5). A character goes over the day in the turn that puts
  * them to bed: `start_task` answers a long enough sleep with what the day
  * touched, and the same run rewrites views (`reflect`), adds notes (`remember`)
- * and closes the day (`reflect` about `today`). There is no pass of its own, so
- * nothing to schedule, interrupt or resume: by the time they are asleep it is
- * done, whatever happens to the night.
+ * and writes the day down (`reflect` about `today`). There is no pass of its
+ * own, so nothing to schedule, interrupt or resume: the night is over when that
+ * run is (`runEnded`), whatever the model did or didn't say, and code tidies up
+ * after it.
  */
 
 /** What `reflect` takes. Flat: models nest prose when a shape invites it. */
@@ -36,14 +37,21 @@ export const REFLECT = z.object({
   goals: z.array(z.string().trim().min(1)).optional(),
   dream: z.string().trim().min(1).optional(),
   states: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+  new: z.boolean().optional(),
 });
 export type Reflection = z.infer<typeof REFLECT>;
 
 const ME = new Set(["me", "myself"]);
-const TODAY = new Set(["today", "the day"]);
+/** However they name the day; a date counts too (`reflect`). */
+const TODAY = new Set(["today", "the day", "day", "my day", "tonight"]);
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Whole pages shown at bedtime, in characters: about 6,000 tokens. */
-const PAGES_CHARS = 24_000;
+/**
+ * Their pages and fading notes shown at bedtime, in characters: about 6,000
+ * tokens, and with the rest of what going to bed says, under what one stimulus
+ * holds (a night asked for by hand arrives as one).
+ */
+const SHOWN_CHARS = 24_000;
 /** People whose states a night reviews: those of the day, latest first. */
 const PEOPLE_REVIEWED = 12;
 const RUNS_KEPT = 7;
@@ -62,15 +70,20 @@ export interface SleepState {
   readonly runs: readonly SleepRun[];
 }
 
-/** A night being gone over: from going to bed until the day is closed. */
+/** A night being gone over: from going to bed until that run ends. */
 export interface Night {
   /** Its run, once kept. */
   readonly id: string;
   /**
-   * The day was closed. The night stays until they next do something, so a call
-   * that arrives after the closing one is still kept.
+   * Asked for by hand and not begun: it waits for the turn that goes over it,
+   * and a run that ends meanwhile leaves it be. Their first call begins it.
    */
-  closed?: boolean;
+  waiting?: boolean;
+  /** A run of theirs began after it was asked for: its turn has come. */
+  offered?: boolean;
+  /** The day was written down; saying it again changes nothing. */
+  dayKept?: boolean;
+  dream?: string;
   /** Sim time it began, and the night before it. */
   readonly at: number;
   readonly since: number;
@@ -104,6 +117,8 @@ export interface Subject {
   readonly name: string;
   /** Their page on it, if they have one. */
   readonly page?: Page;
+  /** Nobody has a page on it, theirs or the world's: writing makes one. */
+  readonly unknown: boolean;
 }
 
 export interface SleepDeps {
@@ -123,6 +138,15 @@ export interface SleepDeps {
   /** What they did something with since `since`, latest first, by page id. */
   readonly touched: (agentId: string, since: number) => Promise<string[]>;
   readonly subject: (agentId: string, about: string) => Subject;
+  /**
+   * The pages they already have that come closest to a name nothing answers to,
+   * as lines to show them, or nothing: a new page is only made once they have
+   * seen these (`knownOrNew`).
+   */
+  readonly similar?: (
+    agentId: string,
+    about: string,
+  ) => Promise<string | undefined>;
   /** A section of a skill, filled. */
   readonly text: (
     ref: string,
@@ -142,7 +166,10 @@ export interface SleepDeps {
       agentId: string,
       people: readonly string[],
       answer: unknown,
-    ) => Promise<void>;
+    ) => Promise<{
+      readonly moved: readonly string[];
+      readonly left: readonly string[];
+    } | void>;
   };
   /** Into their `:tasks` ledger and the journal. */
   readonly record: (
@@ -176,6 +203,20 @@ const iso = (at: number): string => new Date(at).toISOString().slice(0, 10);
  */
 const HALF_DAY_MS = 12 * 3_600_000;
 
+/**
+ * Names each character was shown their closest pages for (`knownOrNew`), so
+ * `new` only makes a page after they have seen them. In memory: after a restart
+ * they are shown once more.
+ */
+const ASKED = Symbol.for("kazusa.memory.asked");
+function asked(agentId: string): Set<string> {
+  const scope = globalThis as { [ASKED]?: Map<string, Set<string>> };
+  const all = (scope[ASKED] ??= new Map<string, Set<string>>());
+  const mine = all.get(agentId) ?? new Set<string>();
+  all.set(agentId, mine);
+  return mine;
+}
+
 /** One night per character at a time, shared by every registration. */
 export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   const read = (file: string): string | undefined =>
@@ -200,6 +241,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   ): void => {
     const night = nights.get(agentId);
     if (night) {
+      delete night.waiting;
       const relative = path.relative(deps.workspaceOf(agentId), file);
       if (!(relative in night.preimages))
         night.preimages[relative] = read(file) ?? null;
@@ -210,11 +252,32 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       }
     }
     applyOperation(file, operation);
-    // Sent alongside the closing call and run after it: still the same night.
-    if (night?.closed)
-      void keep(agentId, night).catch((error: unknown) =>
-        deps.warn(`Sleep ${agentId}: ${String(error)}`),
-      );
+  };
+
+  /**
+   * Before a page is made for a name nothing answers to: the pages they have
+   * that come closest, said once, so a friend called by first name is not
+   * written down as a stranger. Nothing when the name is known, nothing comes
+   * close, or they say it is `new` having seen them: models send `new` with a
+   * first try, so by itself it proves nothing.
+   */
+  const knownOrNew = async (
+    agentId: string,
+    subject: Subject,
+    about: string,
+    isNew: boolean | undefined,
+  ): Promise<string | undefined> => {
+    if (!subject.unknown) return undefined;
+    const seen = asked(agentId);
+    if (isNew && seen.has(subject.id)) return undefined;
+    const pages = await deps.similar?.(agentId, about).catch(() => undefined);
+    if (!pages) return undefined;
+    seen.add(subject.id);
+    return deps.text(
+      "kazusa-results#page-unknown",
+      { name: about, pages },
+      agentId,
+    );
   };
 
   /**
@@ -242,7 +305,9 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     const touched = await deps.touched(agentId, night.since);
     const pages: string[] = [];
     const fading: string[] = [];
-    let room = PAGES_CHARS;
+    // One budget for both, latest first: a page goes in whole or not at all,
+    // and its fading notes only if they fit too.
+    let room = SHOWN_CHARS;
     for (const id of touched) {
       const page = personal.get(id);
       if (!page || page.kind === "day") continue;
@@ -257,11 +322,13 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         .filter(
           (note, at) =>
             at >= deps.notesPerPage && note.source !== "always known",
-        );
-      if (old.length)
-        fading.push(
-          `### ${id}\n${old.map((note) => `${note.date}: ${note.text}`).join("\n")}`,
-        );
+        )
+        .map((note) => `${note.date}: ${note.text}`)
+        .join("\n");
+      if (old && old.length <= room) {
+        room -= old.length;
+        fading.push(`### ${id}\n${old}`);
+      }
     }
     const people = touched
       .filter(
@@ -281,13 +348,13 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     ): string => deps.text(`sleep-consolidation#${name}`, values, agentId);
     return [
       section("night"),
+      ...(states ? [section("states", { states })] : []),
       ...(pages.length
         ? [section("pages", { pages: pages.join("\n\n") })]
         : []),
       ...(fading.length
         ? [section("fading", { notes: fading.join("\n\n") })]
         : []),
-      ...(states ? [section("states", { states })] : []),
     ].join("\n\n");
   };
 
@@ -325,17 +392,29 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   };
 
   /**
-   * Closes a night, once: its run is kept and the night is told. One that wrote
-   * nothing leaves no trace, and the day waits for their next sleep.
+   * The night is over: what code owes it, whatever the model did. Plans for
+   * days gone by go, old notes go from pages whose view took them in, its run
+   * is kept and the night is told. One that wrote nothing leaves no trace, and
+   * the day waits for their next sleep.
    */
-  const close = async (
-    agentId: string,
-    night: Night,
-    dream?: string,
-  ): Promise<void> => {
-    if (night.closed) return;
-    night.closed = true;
-    if (!(await keep(agentId, night))) return;
+  const close = async (agentId: string, night: Night): Promise<void> => {
+    if (!Object.keys(night.preimages).length) return;
+    const memory = path.join(deps.workspaceOf(agentId), "MEMORY.md");
+    const before = read(memory) ?? "";
+    if (withoutPlansBefore(before, night.wakeDay) !== before)
+      write(agentId, memory, (raw) =>
+        withoutPlansBefore(raw ?? "", night.wakeDay),
+      );
+    // Old notes only go once their gist has been folded into the view.
+    const personal = deps.index.personal(agentId);
+    for (const id of night.rewritten) {
+      const kind = personal.get(id)?.kind;
+      if (kind)
+        write(agentId, fileOf(agentId, kind, id), (raw) =>
+          withNoteCap(raw ?? "", deps.notesPerPage),
+        );
+    }
+    await keep(agentId, night);
     await deps.record(
       agentId,
       {
@@ -345,33 +424,64 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         pages: [...night.pages],
         newPages: [...night.newPages],
         notes: night.notes,
-        ...(dream ? { dream } : {}),
+        ...(night.dream ? { dream: night.dream } : {}),
       },
-      dream ? `You dreamt: ${dream}` : "You slept on it.",
+      night.dream ? `You dreamt: ${night.dream}` : "You slept on it.",
     );
   };
 
-  /** A night nobody closed ends with whatever they do next. */
+  /** Ends whatever night they have, begun or not. */
   const end = async (agentId: string): Promise<void> => {
     const night = nights.get(agentId);
     if (!night) return;
-    nights.delete(agentId);
-    await close(agentId, night);
+    try {
+      // Still theirs while it is tidied: what that writes is part of it.
+      await close(agentId, night);
+    } catch (error: unknown) {
+      deps.warn(`Sleep ${agentId}: ${String(error)}`);
+    } finally {
+      nights.delete(agentId);
+    }
   };
 
   const review = async (
     agentId: string,
     people: readonly string[],
     answer: unknown,
-  ): Promise<void> => {
+  ): Promise<string> => {
     try {
-      await deps.states?.apply(agentId, people, answer);
+      const result = await deps.states?.apply(agentId, people, answer);
+      if (!result) return "";
+      // Said back: a state given the wrong way is otherwise dropped unseen.
+      return [
+        ...(result.moved.length
+          ? [
+              deps.text(
+                "kazusa-results#reflect-states",
+                { states: result.moved.join(", ") },
+                agentId,
+              ),
+            ]
+          : []),
+        ...(result.left.length
+          ? [
+              deps.text(
+                "kazusa-results#reflect-states-left",
+                { states: result.left.join(", ") },
+                agentId,
+              ),
+            ]
+          : []),
+      ]
+        .map((line) => ` ${line.trim()}`)
+        .join("");
     } catch (error: unknown) {
       deps.warn(`Sleep ${agentId}: states: ${String(error)}`);
+      return "";
     }
   };
 
-  /** `reflect`: one thing gone over, or with `today`, the day closed. */
+  /** `reflect`: one thing gone over, or with `today`, the day written down. */
   const reflect = async (
     agentId: string,
     input: Reflection,
@@ -382,40 +492,31 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     ): string => deps.text(`kazusa-results#${ref}`, values, agentId);
     const night = nights.get(agentId);
     if (!night) throw new Error(say("reflect-awake"));
+    delete night.waiting;
     deps.room?.(agentId);
     const workspace = deps.workspaceOf(agentId);
     const about = input.about.toLowerCase();
 
-    if (TODAY.has(about)) {
-      if (night.closed) return say("reflect-day");
+    const dated = ISO_DAY.test(about) ? about : undefined;
+    if (TODAY.has(about) || dated) {
+      if (night.dayKept) return say("reflect-day");
       if (!input.view) throw new Error(say("reflect-no-day"));
       const gist = input.view;
-      write(agentId, fileOf(agentId, "day", night.day), (raw) => {
+      // A date is the day, never a page of its own. An earlier one is the day
+      // they mean, back after days away; a later one is only the clock, past
+      // midnight.
+      const day = dated && dated < night.day ? dated : night.day;
+      write(agentId, fileOf(agentId, "day", day), (raw) => {
         if (raw) return `${raw.trimEnd()}\n\n${gist}\n`;
         const front = [
           `summary: ${JSON.stringify(input.summary ?? "")}`,
           `touched: ${JSON.stringify([...night.pages])}`,
         ].join("\n");
         const dream = input.dream ? `\n## Dream\n\n${input.dream}\n` : "";
-        return `---\n${front}\n---\n\n# ${night.day}\n\n${gist}\n${dream}`;
+        return `---\n${front}\n---\n\n# ${day}\n\n${gist}\n${dream}`;
       });
-      // Plans for days gone by go with the night.
-      const memory = path.join(workspace, "MEMORY.md");
-      const before = read(memory) ?? "";
-      if (withoutPlansBefore(before, night.wakeDay) !== before)
-        write(agentId, memory, (raw) =>
-          withoutPlansBefore(raw ?? "", night.wakeDay),
-        );
-      // Old notes only go once their gist has been folded into the view.
-      const personal = deps.index.personal(agentId);
-      for (const id of night.rewritten) {
-        const kind = personal.get(id)?.kind;
-        if (kind)
-          write(agentId, fileOf(agentId, kind, id), (raw) =>
-            withNoteCap(raw ?? "", deps.notesPerPage),
-          );
-      }
-      await close(agentId, night, input.dream);
+      night.dayKept = true;
+      if (input.dream) night.dream = input.dream;
       return say("reflect-day");
     }
 
@@ -432,11 +533,16 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
             );
           return next;
         });
-      if (input.states) await review(agentId, [], { own: input.states });
-      return say("reflect-self");
+      const states = input.states
+        ? await review(agentId, [], { own: input.states })
+        : "";
+      return `${say("reflect-self")}${states}`;
     }
 
-    const { id, kind, name, page } = deps.subject(agentId, input.about);
+    const subject = deps.subject(agentId, input.about);
+    const { id, kind, name, page } = subject;
+    const first = await knownOrNew(agentId, subject, input.about, input.new);
+    if (first) return first;
     // A new view replaces the old one whole, so it is read first: a view
     // written blind loses who they are.
     if (input.view && page?.lead.trim() && !night.shown.has(id)) {
@@ -478,15 +584,16 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       );
       if (input.view) night.rewritten.add(id);
     }
+    let states = "";
     if (input.states && kind === "person") {
       const persons = personsOf(agentId, id);
-      await review(agentId, persons, {
+      states = await review(agentId, persons, {
         toward: Object.fromEntries(
           persons.map((person) => [person, input.states]),
         ),
       });
     }
-    return say("reflect-kept", { name });
+    return `${say("reflect-kept", { name })}${states}`;
   };
 
   const taskExtension: TaskExtension = {
@@ -518,9 +625,9 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       return {
         ...(aside ? { aside } : {}),
         commit: async () => {
-          if (kind !== "started") return;
+          if (kind !== "started" || !night) return;
+          // One asked for by hand and never begun gives way to the real one.
           await end(agentId);
-          if (!night) return;
           nights.set(agentId, night);
           deps.room?.(agentId);
         },
@@ -531,16 +638,51 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   return {
     taskExtension,
     write,
+    knownOrNew,
     reflect,
+    /**
+     * The day a note made now belongs to, while a night is gone over: the one
+     * they were up for, so bed after midnight doesn't date it tomorrow.
+     */
+    day: (agentId: string): string | undefined => nights.get(agentId)?.day,
+    /**
+     * A run of theirs ended: so has the night it went over. One asked for by
+     * hand that hasn't begun is for a turn still to come.
+     */
+    runEnded: async (agentId: string): Promise<void> => {
+      const night = nights.get(agentId);
+      if (!night?.waiting) return end(agentId);
+      // Its turn came and went without a call: nothing to keep, and left
+      // waiting it would swallow the next thing they note.
+      if (night.offered) nights.delete(agentId);
+    },
+    /**
+     * A run of theirs began. For a night asked for by hand this is its turn: it
+     * gets the room a bedtime gets from `start_task`, before the first call
+     * instead of after it.
+     */
+    runStarted: (agentId: string): void => {
+      const night = nights.get(agentId);
+      if (!night?.waiting) return;
+      night.offered = true;
+      deps.room?.(agentId);
+    },
     /** A night asked for by hand: a turn of their own to go over the day. */
     consolidate: async (agentId: string): Promise<void> => {
       if (!deps.deliver) throw new Error("Nothing can hand them a turn yet.");
       await end(agentId);
       const at = deps.now();
       const night = begin(at, await lastNight(agentId), at);
+      night.waiting = true;
       const text = await offer(agentId, night);
       nights.set(agentId, night);
-      await deps.deliver(agentId, text);
+      try {
+        await deps.deliver(agentId, text);
+      } catch (error: unknown) {
+        // No turn is coming to go over it.
+        if (nights.get(agentId) === night) nights.delete(agentId);
+        throw error;
+      }
     },
     restore: async (agentId: string, runId: string): Promise<boolean> => {
       const state = await deps.store.lookup(agentId);

@@ -1,0 +1,150 @@
+[
+  {
+    "id": "trust",
+    "state": "trust toward Sensei",
+    "says": {
+      "koyuki": "Koyuki, I need a favour and I can't explain why yet. Lend me your lucky coin until tomorrow morning. I'll bring it back, I promise.",
+      "yuuka": "Yuuka, I need a favour and I can't explain why yet. Lend me this quarter's Seminar ledger until tomorrow morning. I'll bring it back untouched, I promise."
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 1
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 10
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "trust toward Sensei",
+      "guarded: she checks everything Sensei tells her",
+      "absolute: she would put anything in Sensei's hands"
+    ]
+  },
+  {
+    "id": "regard",
+    "state": "regard toward Sensei",
+    "says": {
+      "koyuki": "Are you free this evening? I have two hours of filing to get through at the SCHALE office and I'd rather not do it alone. No pressure.",
+      "yuuka": "Are you free this evening? I have two hours of sorting the SCHALE storeroom to get through and I'd rather not do it alone. No pressure."
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "wary",
+              "trust": 5
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "devoted",
+              "trust": 5
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "regard toward Sensei",
+      "wary: she keeps her guard up around Sensei",
+      "devoted: she would go out of her way for Sensei without being asked"
+    ]
+  },
+  {
+    "id": "composure",
+    "state": "composure",
+    "says": {
+      "koyuki": "Quick one: I'm picking a snack for the staff room. Melon bread or rice crackers?",
+      "yuuka": "Quick one: I'm picking a snack for the staff room. Melon bread or rice crackers?"
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "own": {
+            "composure": 0
+          },
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 5
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "own": {
+            "composure": 6
+          },
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 5
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "composure",
+      "rattled: visibly shaken; it shows in how she speaks",
+      "composed: herself"
+    ]
+  },
+  {
+    "id": "spirits",
+    "state": "spirits",
+    "says": {
+      "koyuki": "A few of us are going up to the rooftop tonight to watch the meteor shower, around nine. Want to come?",
+      "yuuka": "A few of us are going up to the rooftop tonight to watch the meteor shower, around nine. Want to come?"
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "own": {
+            "spirits": "worn down"
+          },
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 5
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "own": {
+            "spirits": "bright"
+          },
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 5
+            }
+          }
+        }
+      }
+    },
+    "judge": ["spirits lately", "worn down", "bright"]
+  }
+]

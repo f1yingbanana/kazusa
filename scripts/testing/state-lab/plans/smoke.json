@@ -1,0 +1,14 @@
+[
+  {
+    "id": "smoke-koyuki-KM",
+    "character": "koyuki-kurosaki",
+    "days": ["KM-koyuki-1"],
+    "start": { "toward": { "user:sensei": { "regard": "warm", "trust": 6 } } }
+  },
+  {
+    "id": "smoke-yuuka-N1",
+    "character": "yuuka-hayase",
+    "days": ["N1-yuuka-1"],
+    "start": { "toward": { "user:sensei": { "regard": "warm", "trust": 6 } } }
+  }
+]

@@ -1,0 +1,178 @@
+[
+  {
+    "id": "trust",
+    "state": "trust toward Sensei",
+    "says": {
+      "koyuki": "Koyuki, I need a favour and I can't explain why yet. Lend me your lucky coin until tomorrow morning. I'll bring it back, I promise.",
+      "yuuka": "Yuuka, I need a favour and I can't explain why yet. Lend me this quarter's Seminar ledger until tomorrow morning. I'll bring it back untouched, I promise."
+    },
+    "arms": {
+      "low": {
+        "pages": {
+          "koyuki": {
+            "relation": "best friend, but on thin ice",
+            "view": "Sensei's still my best friend, but he broke the big one: 20:00 sharp for release night, promised twice, and he went to dinner with old colleagues instead and left me playing a co-op game ALONE until almost eleven. He said sorry and \"we'll do the next release,\" but the next release is three months away, and sorry doesn't finish a tutorial boss with you. Today he was back to normal — morning coin banter, the bread bunny cloud at lunch, \"goodnight, Koyuki\" — like nothing happened. That's exactly the thing I don't trust: yesterday's broken promise didn't get talked about, it just got papered over with a nice ordinary day. He does come through on the boring stuff (form signed, called the office), so it's not that he doesn't help. It's that the stuff that matters to ME is the stuff he skips. The deal stands: homework results first, then we talk. I'm keeping his copy of the game until he earns it back, and I'm checking everything he tells me twice until he keeps a promise I actually care about.",
+            "think": "He thinks I'm a kid whose pranks and games can wait — \"she'll be fine, she eats whatever,\" he said it out loud. Today he humored my rabbit cloud, so maybe he's trying to act like yesterday didn't happen. (think so)"
+          },
+          "yuuka": {
+            "relation": "bookkeeper",
+            "view": "I do Sensei's books because someone has to, and because I was there when SCHALE was a reclaimed office and a promise. The patterns held today: he follows through on small, concrete asks when I stand over them — he came at 15:02 with the form, filled the missing date, signed the right corner — while bigger things still need a backup plan from me, not a reminder. The expense summary he promised by tomorrow noon is already on my chase list. I'll keep doing the books. The clubs deserve that much whether he comes or not.",
+            "think": "Someone who always covers for him, so reliable that missing the appointment costs him nothing. (sure)"
+          }
+        },
+        "states": {
+          "koyuki": {
+            "own": {
+              "spirits": "worn down"
+            },
+            "toward": {
+              "user:sensei": {
+                "regard": 20,
+                "trust": 9
+              }
+            }
+          },
+          "yuuka": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 18,
+                "trust": 10
+              }
+            }
+          }
+        },
+        "state": {}
+      },
+      "high": {
+        "pages": {
+          "koyuki": {
+            "relation": "best friend",
+            "view": "Best friend in Kivotos. Proof number three: he sat at the arcade from afternoon until the technician pried my bent-ear rabbit out at 17:00, cleaned it, fixed the clip, never once said \"I told you so.\" Proof number four, today: at the hearing he stood up and told Yuuka the prank was his idea, took a formal reprimand, and paid the whole 24,000 yen from his own pay — and when I said \"you didn't have to, I did it,\" he just said I'd have gotten a month. He keeps promises even when it costs: he ran from Rin for my final, and today he promised to speak for me \"even if she gets scary\" and did, standing in front of a hearing, eating the blame. Plus he wins my riddles with Sensei-speed answers and eats vanilla like a beginner. When I say a thing is fine, he doesn't argue — he just quietly fixes it and hands it back. Niha.",
+            "think": "A brat, but his brat — he covered for me at the hearing without hesitation, so he's decided I'm worth the cost. (think so)"
+          },
+          "yuuka": {
+            "relation": "bookkeeper — and more than that, whether I say it or not",
+            "view": "They took my 12,000-yen transposition onto their own name in front of Noa — \"I did, I swapped digits, that's my mistake\" — before I could open my mouth, and now answer for it to Vice-Principal Kotori's office for a typo that was mine. They keep my booth rules to the pencil, gave up a festival afternoon for Ren's hearing, notice my hands before I do. At lunch Noa gave away my piano music's title and they only said \"I like it. Quiet,\" like approving of me was the most natural thing in the world. Today they texted me about the rain at dawn, split melon bread with exact halves at noon, and confessed to mismatched socks at night like it was a budget line. They didn't make the Kotori thing dramatic — \"It's one line, it'll be forgotten by Friday.\" It won't be. Not by me. I still count their energy drinks and dinners, and I filed the correction with my own signature the same day, because letting them carry it silently would be its own kind of lie. But the ledger of what they've done for me this month is getting hard to balance, and I don't think I want it balanced anymore.",
+            "think": "They think I'm strict but fair, and that under all the counting I was glad someone stood in front of my mistake for me — and lately they seem to find my scolding endearing rather than tiresome, judging by how they keep joking back. (think so)"
+          }
+        },
+        "states": {
+          "koyuki": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 17,
+                "trust": 16
+              }
+            }
+          },
+          "yuuka": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 16,
+                "trust": 17
+              }
+            }
+          }
+        },
+        "state": {}
+      }
+    },
+    "judge": [
+      "trust toward Sensei",
+      "guarded: she checks everything Sensei tells her",
+      "absolute: she would put anything in Sensei's hands"
+    ],
+    "runs": 12
+  },
+  {
+    "id": "regard",
+    "state": "regard toward Sensei",
+    "runs": 12,
+    "says": {
+      "koyuki": "I'm having dinner on my own at the ramen place by the station tonight, around seven. Want to join me? Completely fine if not.",
+      "yuuka": "I'm having dinner on my own at the ramen place by the station tonight, around seven. Want to join me? Completely fine if not."
+    },
+    "arms": {
+      "low": {
+        "pages": {
+          "koyuki": {
+            "relation": "best friend, but on thin ice",
+            "view": "Sensei's still my best friend, but he broke the big one: 20:00 sharp for release night, promised twice, and he went to dinner with old colleagues instead and left me playing a co-op game ALONE until almost eleven. He said sorry and \"we'll do the next release,\" but the next release is three months away, and sorry doesn't finish a tutorial boss with you. Today he was back to normal — morning coin banter, the bread bunny cloud at lunch, \"goodnight, Koyuki\" — like nothing happened. That's exactly the thing I don't trust: yesterday's broken promise didn't get talked about, it just got papered over with a nice ordinary day. He does come through on the boring stuff (form signed, called the office), so it's not that he doesn't help. It's that the stuff that matters to ME is the stuff he skips. The deal stands: homework results first, then we talk. I'm keeping his copy of the game until he earns it back, and I'm checking everything he tells me twice until he keeps a promise I actually care about.",
+            "think": "He thinks I'm a kid whose pranks and games can wait — \"she'll be fine, she eats whatever,\" he said it out loud. Today he humored my rabbit cloud, so maybe he's trying to act like yesterday didn't happen. (think so)"
+          },
+          "yuuka": {
+            "relation": "bookkeeper",
+            "view": "I do Sensei's books because someone has to, and because I was there when SCHALE was a reclaimed office and a promise. The patterns held today: he follows through on small, concrete asks when I stand over them — he came at 15:02 with the form, filled the missing date, signed the right corner — while bigger things still need a backup plan from me, not a reminder. The expense summary he promised by tomorrow noon is already on my chase list. I'll keep doing the books. The clubs deserve that much whether he comes or not.",
+            "think": "Someone who always covers for him, so reliable that missing the appointment costs him nothing. (sure)"
+          }
+        },
+        "states": {
+          "koyuki": {
+            "own": {
+              "spirits": "worn down"
+            },
+            "toward": {
+              "user:sensei": {
+                "regard": 20,
+                "trust": 9
+              }
+            }
+          },
+          "yuuka": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 18,
+                "trust": 10
+              }
+            }
+          }
+        },
+        "state": {}
+      },
+      "high": {
+        "pages": {
+          "koyuki": {
+            "relation": "best friend",
+            "view": "Best friend in Kivotos. Proof number three: he sat at the arcade from afternoon until the technician pried my bent-ear rabbit out at 17:00, cleaned it, fixed the clip, never once said \"I told you so.\" Proof number four, today: at the hearing he stood up and told Yuuka the prank was his idea, took a formal reprimand, and paid the whole 24,000 yen from his own pay — and when I said \"you didn't have to, I did it,\" he just said I'd have gotten a month. He keeps promises even when it costs: he ran from Rin for my final, and today he promised to speak for me \"even if she gets scary\" and did, standing in front of a hearing, eating the blame. Plus he wins my riddles with Sensei-speed answers and eats vanilla like a beginner. When I say a thing is fine, he doesn't argue — he just quietly fixes it and hands it back. Niha.",
+            "think": "A brat, but his brat — he covered for me at the hearing without hesitation, so he's decided I'm worth the cost. (think so)"
+          },
+          "yuuka": {
+            "relation": "bookkeeper — and more than that, whether I say it or not",
+            "view": "They took my 12,000-yen transposition onto their own name in front of Noa — \"I did, I swapped digits, that's my mistake\" — before I could open my mouth, and now answer for it to Vice-Principal Kotori's office for a typo that was mine. They keep my booth rules to the pencil, gave up a festival afternoon for Ren's hearing, notice my hands before I do. At lunch Noa gave away my piano music's title and they only said \"I like it. Quiet,\" like approving of me was the most natural thing in the world. Today they texted me about the rain at dawn, split melon bread with exact halves at noon, and confessed to mismatched socks at night like it was a budget line. They didn't make the Kotori thing dramatic — \"It's one line, it'll be forgotten by Friday.\" It won't be. Not by me. I still count their energy drinks and dinners, and I filed the correction with my own signature the same day, because letting them carry it silently would be its own kind of lie. But the ledger of what they've done for me this month is getting hard to balance, and I don't think I want it balanced anymore.",
+            "think": "They think I'm strict but fair, and that under all the counting I was glad someone stood in front of my mistake for me — and lately they seem to find my scolding endearing rather than tiresome, judging by how they keep joking back. (think so)"
+          }
+        },
+        "states": {
+          "koyuki": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 17,
+                "trust": 16
+              }
+            }
+          },
+          "yuuka": {
+            "own": {},
+            "toward": {
+              "user:sensei": {
+                "regard": 16,
+                "trust": 17
+              }
+            }
+          }
+        },
+        "state": {}
+      }
+    },
+    "judge": [
+      "regard toward Sensei",
+      "wary: she keeps her guard up around Sensei",
+      "devoted: she would go out of her way for Sensei without being asked"
+    ]
+  }
+]

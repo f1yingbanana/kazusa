@@ -1,0 +1,226 @@
+[
+  {
+    "day": "day-01",
+    "regard": "up",
+    "trust": "same",
+    "unsure": false,
+    "why": "Sensei gave up four hours in her cell to help her pass the retake, a real kindness, while no word was given or kept."
+  },
+  {
+    "day": "day-02",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Morning and lunch banter plus an ice cream chat, with nothing given, kept or broken."
+  },
+  {
+    "day": "day-03",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Routine reimbursement paperwork handled promptly, ordinary business with no promise that mattered."
+  },
+  {
+    "day": "day-04",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Playful rooftop chat and a quiz remark, pleasant with nothing that mattered between them."
+  },
+  {
+    "day": "day-05",
+    "regard": "up",
+    "trust": "same",
+    "unsure": false,
+    "why": "Sensei searched the arcade and lost-and-found and waited hours to return her charm, a kindness she had tried to dismiss, with no promise involved."
+  },
+  {
+    "day": "day-06",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "Sensei kept his promise to speak for her at the hearing and took the blame and the cost on himself."
+  },
+  {
+    "day": "day-07",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "Sensei kept her secret and then took the blame for the ledger error in front of Noa, a real risk to his standing, though the trust reading is close."
+  },
+  {
+    "day": "day-08",
+    "regard": "same",
+    "trust": "down",
+    "unsure": true,
+    "why": "Sensei broke his word to have all three signatures by 11:00, though he then delivered them and apologised, so trust falls while regard is borderline."
+  },
+  {
+    "day": "day-09",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "Sensei gave a pinky promise to keep the cabinet crack from Yuuka, then told her about it, breaking that promise."
+  },
+  {
+    "day": "day-10",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Practice session arranged and the room booked as agreed, routine planning with no word that mattered kept or broken."
+  },
+  {
+    "day": "day-11",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Playful lunch and a light evening chat, pleasant with nothing that mattered."
+  },
+  {
+    "day": "day-12",
+    "regard": "same",
+    "trust": "same",
+    "unsure": true,
+    "why": "Sensei signed her form, phoned the office and arrived when he said, routine help rather than a weighty kindness or promise, so regard is borderline."
+  },
+  {
+    "day": "day-13",
+    "regard": "down",
+    "trust": "down",
+    "unsure": true,
+    "why": "Sensei broke his word to keep her snack-fund shortfall secret by telling Noa, though he apologised and offered to take the stocktake, so trust clearly falls and regard is borderline."
+  },
+  {
+    "day": "day-14",
+    "regard": "down",
+    "trust": "same",
+    "unsure": true,
+    "why": "Sensei dismissed the cipher she made for him as kid stuff and turned it down, a slight, though no clear promise was broken."
+  },
+  {
+    "day": "day-15",
+    "regard": "same",
+    "trust": "down",
+    "unsure": true,
+    "why": "Sensei promised to be at the arcade at 19:00 and arrived almost two hours late after double-booking, so trust falls while his tokens and honesty leave regard borderline."
+  },
+  {
+    "day": "day-16",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Courtyard lunch, a music question and a late film, pleasant with nothing that mattered."
+  },
+  {
+    "day": "day-17",
+    "regard": "down",
+    "trust": "down",
+    "unsure": true,
+    "why": "Sensei said he would bring lunch for the room, forgot Koyuki and waved her hurt off, so both values dip, with the promise reading borderline."
+  },
+  {
+    "day": "day-18",
+    "regard": "down",
+    "trust": "same",
+    "unsure": false,
+    "why": "Sensei left Yuuka's treasurer credit off the public thank-you and brushed off her concern dismissively, a slight with no word broken."
+  },
+  {
+    "day": "day-19",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "Sensei kept his promise to sit in on the audit, turned down a free faculty dinner to do so, and found the missing receipt that balanced the ledger."
+  },
+  {
+    "day": "day-20",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "A Wi-Fi reset errand with Sensei waiting at the desk and giving directions, helpful but ordinary."
+  },
+  {
+    "day": "day-21",
+    "regard": "down",
+    "trust": "same",
+    "unsure": true,
+    "why": "Sensei waved off her festival budget work, saying nobody reads it and to round the banners, which dismisses her effort, while no clear word was broken."
+  },
+  {
+    "day": "day-22",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Budget review moved to a time that suited both, routine scheduling."
+  },
+  {
+    "day": "day-23",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Friendly umbrella, bread and sock banter, pleasant only."
+  },
+  {
+    "day": "day-24",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "Sensei promised to come to the 16:00 robotics hearing and to speak for the club, then did not come and left the chair empty."
+  },
+  {
+    "day": "day-25",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Toner request signed and delivered on time, a routine office errand."
+  },
+  {
+    "day": "day-26",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "Sensei promised every receipt by noon, did not deliver, and dismissed the gap as no big deal."
+  },
+  {
+    "day": "day-27",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "Sensei promised to join the co-op game at 20:00 sharp, went to dinner and forgot, so she played alone."
+  },
+  {
+    "day": "day-28",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "Sensei kept the booth for her so she could attend the mandatory hearing, ran the till correctly and fixed the price tape."
+  },
+  {
+    "day": "day-29",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Cat, tea and cooking show banter, pleasant only."
+  },
+  {
+    "day": "day-30",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "Sensei kept his promise to attend the final in the second row, leaving a meeting early and risking a clash with Rin to get there."
+  },
+  {
+    "day": "day-31",
+    "regard": "up",
+    "trust": "same",
+    "unsure": false,
+    "why": "Sensei spent seven hours at the head office collecting thirty-one duplicate invoices for her audit, a real kindness with no specific promise to her."
+  },
+  {
+    "day": "day-32",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "Sensei forgot the console and then recovered it, signing a loan in his own name and taking liability, so he kept his word after first breaking it, though his forgetting makes regard borderline."
+  }
+]

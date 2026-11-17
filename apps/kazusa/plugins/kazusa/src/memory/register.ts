@@ -428,7 +428,36 @@ export function registerMemory(
       kind: page?.kind ?? world.pages.get(id)?.kind ?? "concept",
       name: world.pages.get(id)?.name ?? page?.name ?? about,
       ...(page ? { page } : {}),
+      unknown: !page && !world.pages.has(id),
     };
+  };
+  /**
+   * What `recall` would bring up for a name, as lines: the pages a character is
+   * shown before one is made for a name nothing answers to.
+   */
+  const similarTo = async (
+    agentId: string,
+    about: string,
+  ): Promise<string | undefined> => {
+    const found = retrieve(
+      index,
+      await withVector({ agentId, stimulus: about, now: deps.clock.time() }),
+    )
+      .filter(
+        (entity) =>
+          (entity.personal ?? entity.world)?.kind !== "day" &&
+          entity.signals.some(
+            (s) => s === "mention" || s === "keyword" || s === "semantic",
+          ),
+      )
+      .slice(0, 3);
+    if (!found.length) return undefined;
+    return found
+      .map((entity) => {
+        const page = entity.personal ?? entity.world;
+        return `- ${page?.name ?? entity.id} (\`${entity.id}\`): ${page?.summary ?? ""}`.trimEnd();
+      })
+      .join("\n");
   };
   const holder = globalThis as unknown as Record<
     symbol,
@@ -452,6 +481,7 @@ export function registerMemory(
       }),
       touched: familiarity.since,
       subject: subjectOf,
+      similar: similarTo,
       text: (ref, values, agentId) =>
         text(ref, values, { agentId, workspaceDir: workspaceOf(agentId) }),
       ...(deps.states ? { states: deps.states } : {}),
@@ -740,6 +770,7 @@ export function registerMemory(
           source: { type: "string" },
           certainty: { type: "string", enum: [...CERTAINTIES] },
           on: { type: "string" },
+          new: { type: "boolean" },
         },
         required: ["about", "note"],
         additionalProperties: false,
@@ -760,6 +791,7 @@ export function registerMemory(
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/)
             .optional(),
+          new: z.boolean().optional(),
         })
         .parse(input);
       const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
@@ -782,7 +814,15 @@ export function registerMemory(
       if (person && !teller)
         throw new Error(`You don't know anyone called ${person}.`);
       const source = teller ? args.source.replace(person, teller) : args.source;
-      const { id, kind, name } = subjectOf(agentId, args.about);
+      const subject = subjectOf(agentId, args.about);
+      const { id, kind, name } = subject;
+      const first = await sleep.knownOrNew(
+        agentId,
+        subject,
+        args.about,
+        args.new,
+      );
+      if (first) return plain(first);
       const file = path.join(
         workspace,
         "wiki",
@@ -795,7 +835,7 @@ export function registerMemory(
         file,
         (raw) =>
           withNote(raw ?? newPage(name, source), {
-            date: simDate(),
+            date: sleep.day(agentId) ?? simDate(),
             source,
             certainty,
             text: args.note,
@@ -824,6 +864,7 @@ export function registerMemory(
             type: "object",
             additionalProperties: { type: ["string", "number"] },
           },
+          new: { type: "boolean" },
         },
         required: ["about"],
         additionalProperties: false,
