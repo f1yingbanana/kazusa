@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { StatsStreamEventSchema } from "./stats.ts";
 export * from "./access.ts";
 export * from "./speech.ts";
+export * from "./stats.ts";
 
 /* ========================================================================== */
 /* Core Entities & Wire Schemas                                               */
@@ -299,6 +301,7 @@ export const DomainSchema = z.enum([
   "usage",
   "context",
   "scene",
+  "stats",
 ]);
 export type Domain = z.infer<typeof DomainSchema>;
 export const DOMAINS = DomainSchema.options;
@@ -1818,6 +1821,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   JournalStreamEventSchema,
   ClockStreamEventSchema,
   DesiresStreamEventSchema,
+  StatsStreamEventSchema,
   LocationStreamEventSchema,
   PlacesStreamEventSchema,
   WorldStreamEventSchema,

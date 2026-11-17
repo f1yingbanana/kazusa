@@ -21,7 +21,11 @@ import { shutdownSignal } from "../shutdown.ts";
 import { resolveStateDir } from "../state-dir.ts";
 import { openMessageDatabase, type MessageStore } from "./message-database.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
-import { readStickers, stickerText } from "../stickers/stickers.ts";
+import {
+  readStickers,
+  stickerText,
+  wornStickers,
+} from "../stickers/stickers.ts";
 import { readPortraits } from "../scene/portraits.ts";
 import { faceMoods, sayFaces } from "./faces.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -214,6 +218,8 @@ export function registerMessaging(
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
     /** Let the player read chats they aren't in (`observer.enabled`). */
     readonly observer?: boolean;
+    /** The outfit word a character wears, or nothing in the usual clothes. */
+    readonly wearing?: (agentId: string) => string | undefined;
     /** Where a participant stands, for speaking aloud. */
     readonly placeOf?: MessagingDeps["placeOf"];
     /** Lets go of anything frozen on a paused clock; the process's shutdown. */
@@ -492,6 +498,7 @@ export function registerMessaging(
           readPortraits(
             api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
           ),
+          deps.wearing?.(agentId),
         )
       : [];
 
@@ -510,9 +517,14 @@ export function registerMessaging(
         ) => describeTool(text, { name, parameters }, values, skillContext);
         // Bubbles are plain text. What this character can write into one, a
         // face or a sticker of theirs, is the `{data}` of its wording.
+        // Only in what they are wearing: a change of outfit changes both.
         const stickers = stickersOf(context.agentId);
-        const outfits = [...(stickers?.outfits ?? [])];
-        const names = [...(stickers?.stickers.keys() ?? [])];
+        const names = stickers
+          ? wornStickers(
+              stickers,
+              context.agentId ? deps.wearing?.(context.agentId) : undefined,
+            ).map(({ name }) => name)
+          : [];
         const offered = moodsOf(context.agentId);
         const sendMessage = sendMessageSchema(
           messagingConfig.maxBubbles,
@@ -531,19 +543,6 @@ export function registerMessaging(
                   text(
                     "kazusa-tools#send_message.stickers",
                     { stickers: names.join(", ") },
-                    skillContext,
-                  ),
-                ]
-              : []),
-            ...(outfits.length
-              ? [
-                  text(
-                    "kazusa-tools#send_message.sticker-outfits",
-                    {
-                      outfits: outfits
-                        .map(([word, worn]) => `${word}: ${worn}`)
-                        .join("; "),
-                    },
                     skillContext,
                   ),
                 ]

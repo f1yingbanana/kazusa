@@ -32,7 +32,12 @@ import { resolveStateDir } from "../state-dir.ts";
 import { createSkillText, describeTool } from "../skill-text.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
-import { createSleep, type SleepPass, type SleepState } from "./sleep.ts";
+import {
+  createSleep,
+  type SleepDeps,
+  type SleepPass,
+  type SleepState,
+} from "./sleep.ts";
 import {
   embedPending,
   embedQuery,
@@ -297,6 +302,8 @@ export function registerMemory(
     readonly clock: Pick<Clock, "time">;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly feelings?: (agentId: string, at: number) => Promise<string>;
+    /** The world's states a night's sleep reviews (`stats.review`). */
+    readonly states?: SleepDeps["states"];
     /** The model a character actually runs on, which config doesn't know. */
     readonly modelOf?: (agentId: string) => Promise<string | undefined>;
     /** The context engine registers later; it owns reading the ledgers. */
@@ -459,6 +466,7 @@ export function registerMemory(
         }),
       experiences: deps.experiences,
       ...(deps.feelings ? { feelings: deps.feelings } : {}),
+      ...(deps.states ? { states: deps.states } : {}),
       nameOf,
       record: async (agentId, event, text) => {
         const simTime = deps.clock.time();

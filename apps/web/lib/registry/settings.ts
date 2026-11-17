@@ -4,12 +4,14 @@ import {
   CircleArrowUpIcon,
   HistoryIcon,
   PlugIcon,
+  SlidersHorizontalIcon,
   UserIcon,
 } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ContextSettings } from "@/components/views/settings/context-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
+import { StateSettings } from "@/components/views/settings/state-settings";
 import { UpdateSettings } from "@/components/views/settings/update-settings";
 import { UsageSettings } from "@/components/views/settings/usage-settings";
 import type { SettingsCategory } from "./types";
@@ -49,6 +51,15 @@ const CATEGORIES: readonly SettingsCategory[] = [
     order: 15,
     requiresPermission: "manage",
     component: ContextSettings,
+  },
+  {
+    id: "states",
+    label: "States",
+    description: "Values your world keeps for its characters",
+    icon: SlidersHorizontalIcon,
+    order: 17,
+    requiresPermission: "manage",
+    component: StateSettings,
   },
   {
     id: "usage",

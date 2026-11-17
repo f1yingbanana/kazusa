@@ -362,6 +362,7 @@
       "alsoAllow": [
         "start_task",
         "delay_task",
+        "change_state",
         "send_message",
         "create_group",
         "talk",

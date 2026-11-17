@@ -65,6 +65,13 @@ export interface PreparedTaskCommit {
 export interface TaskExtension {
   /** JSON-schema properties merged into `start_task`'s parameters. */
   readonly startTaskParameters: Readonly<Record<string, unknown>>;
+  /**
+   * `start_task`'s properties for one character, when they differ from person
+   * to person; read whenever the tool is built, in place of the above.
+   */
+  readonly startTaskParametersFor?: (
+    agentId: string | undefined,
+  ) => Readonly<Record<string, unknown>>;
   /** The same properties for `delay_task`, which may refer to `start_task`. */
   readonly delayTaskParameters: Readonly<Record<string, unknown>>;
   /** Required properties; each tool requires only the ones it takes. */

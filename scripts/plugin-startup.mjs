@@ -152,6 +152,38 @@ export function denyImpliedTools(root) {
 }
 
 /**
+ * A world's `tools.alsoAllow` is the list of character tools `base.json` had
+ * when it was made, so a tool a later Kazusa adds (`change_state`) is never
+ * offered there. This adds the ones the world lacks, in `base.json`'s order
+ * after the tool before them. A tool missing from a world is taken as newer
+ * than it: to keep one from characters, put it in `tools.deny`, which this
+ * respects and which wins in OpenClaw anyway. A world without the list set its
+ * tools up its own way and is left alone.
+ */
+export function allowNewCharacterTools(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const base = JSON.parse(
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
+  );
+  const wanted = base.config?.tools?.alsoAllow ?? [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const allowed = config.tools?.alsoAllow;
+  if (!Array.isArray(allowed)) return [];
+  const denied = config.tools.deny ?? [];
+  const added = [];
+  wanted.forEach((tool, index) => {
+    if (allowed.includes(tool) || denied.includes(tool)) return;
+    const before = allowed.indexOf(wanted[index - 1]);
+    allowed.splice(before < 0 ? allowed.length : before + 1, 0, tool);
+    added.push(tool);
+  });
+  if (!added.length) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [`Characters can now use new tools: ${added.join(", ")}.`];
+}
+
+/**
  * Two start-up jobs a Kazusa world never needs. `base.json` turns both off for
  * new worlds; older worlds lack the settings, so this adds them. Worktree
  * templates: a world is a git clone, so OpenClaw takes every character's
@@ -183,5 +215,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const line of loadNewPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of denyImpliedTools(root)) console.log(line);
+  for (const line of allowNewCharacterTools(root)) console.log(line);
   for (const line of skipUnusedStartupWork(root)) console.log(line);
 }

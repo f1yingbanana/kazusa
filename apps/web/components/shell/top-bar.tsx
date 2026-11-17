@@ -16,6 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { WorldValues } from "@/components/stats/world-values";
 import { useClockActions, useClockAnchor, useSimNow } from "@/hooks/use-clock";
 import {
   formatSimDate,
@@ -140,8 +141,9 @@ export function SpeedControls({
 }
 
 /**
- * Global time only. Sections, Settings included, live on the rail (or the
- * bottom tab bar on phones); feature controls live inside their section.
+ * The world right now: its time and its own states. Sections, Settings
+ * included, live on the rail (or the bottom tab bar on phones); feature
+ * controls live inside their section.
  */
 export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
@@ -156,6 +158,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="flex flex-1 items-center justify-center gap-3">
         <SimClock />
         <SpeedControls />
+        <WorldValues />
       </div>
 
       <div className="flex items-center gap-1">

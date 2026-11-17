@@ -198,15 +198,15 @@ High-frequency machine state is strictly separated from qualitative Markdown
 files so `<workspace>/MEMORY.md` never suffers from mechanical diff churn or
 file-parsing overhead.
 
-| State Category                        | Canonical Storage Location                                                                      | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| :------------------------------------ | :---------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"location"`, `"inbox"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's inbox/custody state, one per character (key `<agentId>`). Attention decisions are in Kazusa's own `<stateDir>/kazusa/decisions.sqlite`, uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                      |
-| **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                             | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
-| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`           | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                           |
-| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`     | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
-| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                         | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
-| **Objective Canon**                   | `shared/wiki/`                                                                                  | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
-| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                         | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                       |
+| State Category                        | Canonical Storage Location                                                                                 | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :------------------------------------ | :--------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"stats"`, `"location"`, `"inbox"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's inbox/custody state, one per character (key `<agentId>`). Attention decisions are in Kazusa's own `<stateDir>/kazusa/decisions.sqlite`, uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                      |
+| **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`                      | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                           |
+| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`                | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
+| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                                    | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
+| **Objective Canon**                   | `shared/wiki/`                                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
+| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                       |
 
 ### Directory Map (`apps/kazusa/`)
 
@@ -225,6 +225,7 @@ apps/kazusa/
 │       ├── clock/                      # Formula clock, "clock" store, clock_* tools & RPCs
 │       ├── taskman/                    # "tasks" leases, :tasks ledger, wake timer, tools
 │       ├── desires/                    # "desires" anchors, task `afterwards`, desires.* RPCs, GET /kazusa/desires
+│       ├── stats/                      # States: shared/stats.json, "stats" store, task `changes`, change_state, sleep review, outfit, GET /kazusa/stats
 │       ├── location/                   # World map, "location" store, task `where`, location.* RPCs, GET /kazusa/places|locations
 │       ├── context-engine/             # Brain context, skill resolution, assemble()
 │       ├── decisions/                  # `kazusa/jev`: Jev through OpenRouter or TypeSafe, as picked
@@ -1284,6 +1285,31 @@ connect these modules in process.
   art layout and the import:
   [visual novel](../kazusa-client/references/visual-novel.md) §6 and §8.
 
+### 3.9 `src/stats/` — States
+
+- Values a world defines in `shared/stats.json` (text, shipped with the world,
+  edited in Settings → States), held in the `"stats"` store: on a character, on
+  one character's view of another, or on the world. Full design:
+  [states](references/status.md).
+- A state records where things stand and never tells a character who to be. It
+  is a **fact** they have to live with (money, the week it is: they act on it)
+  or a **meter** of where things stand (how one person regards another: it
+  follows what they remember and does not steer them). Measured: a meter set by
+  hand changes no behaviour, the history behind it does. Anything that must
+  happen at a level needs code or the system agent to read the state.
+- A value changes only where the character's own model already runs, never by
+  the attention decision: awake, by `changes` on `start_task` (a
+  `TaskExtension`) or `change_state` mid-activity; asleep, by the sleep pass's
+  review (`reviewed`, for values with a rubric); or by hand
+  (`POST /kazusa/stats/set`, the system agent's `set_state`).
+- `outfit` is built in: its values are each character's own outfits, and
+  `send_message` offers only the stickers and faces of what they wear
+  (`stats.wearing`).
+- Characters read `### Your state` in the situation message; the client reads
+  `GET /kazusa/stats` and SSE `stats`.
+- A state can also be `on: "player"`: only the player holds and sets it, and
+  characters with the player read it.
+
 ## 4. Engineering & Zero-Build Conventions
 
 ### Browser authentication and permissions
@@ -1526,8 +1552,10 @@ Load these reference files on demand when working on their specific subsystem:
 - `references/memory.md` — Read when implementing context retrieval, character
   memories, character contexts related things. `references/memory-checklist.md`
   tracks what is built and the live acceptance tests.
-- `references/status.md` — Design, not built: named values and states on
-  characters, places and pairs (an outfit, a relationship value, a place's
-  condition) that code and characters both change, without new model calls. Read
-  before adding any per-character or per-place state that another module will
-  read; `outfit` is the first slice, for the client's Scene view and stickers.
+- `references/status.md` — States (`src/stats/`): values a world defines on
+  characters, pairs and the world (a mood, regard, HP) and the built-in outfit,
+  set by the character awake, reviewed by their sleep, or by hand; no new model
+  calls. What a state is for (a fact or a meter, never a dial on personality),
+  how band spacing sets the pace, and what replays measured. Read before adding
+  any per-character value another module will read, and before designing
+  anything that expects a state to change behaviour.

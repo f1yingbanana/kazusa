@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { createRouteRegistrar } from "../http/helpers.ts";
 import { registerStickerHttp } from "./http.ts";
-import { readStickers, stickerText, stickerUrl } from "./stickers.ts";
+import {
+  readStickers,
+  stickerText,
+  stickerUrl,
+  wornStickers,
+} from "./stickers.ts";
 
 async function workspaceWith(
   files: readonly string[],
@@ -56,6 +61,16 @@ describe("sticker sets", () => {
       look: "shy",
       outfit: "a maid dress",
     });
+    // Only the stickers of what is worn can be sent.
+    const set = { stickers, outfits };
+    expect(wornStickers(set, undefined).map(({ name }) => name)).toEqual([
+      "eyes-closed",
+      "laughing",
+    ]);
+    expect(wornStickers(set, "maid").map(({ name }) => name)).toEqual([
+      "maid-shy",
+    ]);
+    expect(wornStickers(set, "swimsuit")).toEqual([]);
     // An outfit no sticker shows isn't offered.
     expect([...outfits]).toEqual([["maid", "a maid dress"]]);
     expect(stickerText("Aris", stickers.get("maid-shy")!)).toBe(

@@ -49,6 +49,26 @@ own words for a spot where you are. With {data}, it is where you are going.
 Only the desires this activity changes, each as current→afterwards state, e.g. a
 night's sleep: { "energy": "low→full" }. Desires: {data}
 
+## start_task.changes
+
+What starting this activity changes about you, each given the way it says, e.g.
+getting changed for bed: { "outfit": "pajamas" }. {} when it changes none. What
+you can change: {data}
+
+## change_state
+
+Change something about yourself in the middle of an activity, without starting a
+new one: what you are wearing, or another state this world keeps about you. Only
+when it really changes, by something you do or that happens to you.
+
+## change_state.name
+
+Which one. {data}
+
+## change_state.value
+
+Its new value, given the way the state says.
+
 ## delay_task
 
 Keep at your current activity for longer: estimate when you will be done.
@@ -93,20 +113,16 @@ else: never in the same item as words you say. {data}
 
 Face to face, begin a line with `[face=<mood>]` to show that expression as you
 say or do it. It stays until you show another: write one on your first line in a
-conversation and when your expression changes. Your moods: {faces}.
+conversation and when your expression changes. Your moods, in what you are
+wearing: {faces}.
 
 ## send_message.stickers
 
 By text, an item that is only `[sticker=<name>]` sends a sticker of yourself, to
 show how you feel. A sticker is always an item of its own: never in the same
 item as words. Most messages need none: send one when your mood shifts, and not
-the same mood twice in a row unless the feeling is strong. Your stickers:
-{stickers}.
-
-## send_message.sticker-outfits
-
-A name that starts with an outfit shows you wearing it; the others show your
-usual clothes. {outfits}.
+the same mood twice in a row unless the feeling is strong. Your stickers, in
+what you are wearing: {stickers}.
 
 ## create_group
 

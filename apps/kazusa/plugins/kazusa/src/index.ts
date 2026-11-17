@@ -30,6 +30,8 @@ import {
 } from "./perception/http.ts";
 import { registerDesires } from "./desires/register.ts";
 import { registerDesiresHttp } from "./desires/http.ts";
+import { registerStats } from "./stats/register.ts";
+import { registerStatsHttp } from "./stats/http.ts";
 import { registerLocation, type PlaceEdits } from "./location/register.ts";
 import { registerLocationHttp } from "./location/http.ts";
 import { registerWorldUpdate } from "./world-update/register.ts";
@@ -128,6 +130,8 @@ export default definePluginEntry({
     registerProvidersHttp(api);
     const desires = registerDesires(api, { clock });
     registerDesiresHttp(api, { desires, broadcaster });
+    const stats = registerStats(api, { clock, broadcaster });
+    registerStatsHttp(api, { stats, clock });
     const contextRef: { current?: ReturnType<typeof registerContextEngine> } =
       {};
     const placesRef: { current?: PlaceEdits } = {};
@@ -135,6 +139,7 @@ export default definePluginEntry({
       clock,
       broadcaster,
       feelings: desires.feelings,
+      states: stats.review,
       modelOf: models.model,
       experiences: async (agentId, since, now) =>
         (await contextRef.current?.experiences(agentId, since, now)) ?? {
@@ -179,6 +184,7 @@ export default definePluginEntry({
       broadcaster,
       extensions: [
         desires.taskExtension,
+        stats.taskExtension,
         memory.sleep.taskExtension,
         ...(location.taskExtension ? [location.taskExtension] : []),
       ],
@@ -188,6 +194,7 @@ export default definePluginEntry({
     const context = registerContextEngine(api, {
       clock,
       feelings: desires.feelings,
+      states: stats.situation,
       whereabouts: location.whereabouts,
       inCompany: location.inCompany,
       presence: location.presence,
@@ -312,6 +319,7 @@ export default definePluginEntry({
       broadcaster,
       getStatuses,
       observer,
+      wearing: stats.wearing,
     });
     messagingRef.current = messaging;
     // Talking with someone is what makes them familiar (`usesOfMessage`).

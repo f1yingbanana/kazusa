@@ -424,10 +424,9 @@ describe("send_message SDK integration", () => {
     // Bubbles are plain text and nothing else; what they have is listed.
     const messages = () => tool().parameters.properties.messages;
     expect(messages().items).toEqual({ type: "string" });
-    expect(messages().description).toMatch(
-      /Your\s+stickers:\s+laughing, maid-happy\./,
-    );
-    expect(messages().description).toContain("maid: a maid dress");
+    // Only those of what they are wearing: their usual clothes here.
+    expect(messages().description).toMatch(/wearing:\s+laughing\./);
+    expect(messages().description).not.toContain("maid");
 
     const sent = await h.execute({
       sessionKey: "chat:direct:bob",
@@ -500,7 +499,7 @@ describe("send_message SDK integration", () => {
     const messages = tool().parameters.properties.messages;
     expect(messages.items).toEqual({ type: "string" });
     expect(messages.description).toMatch(
-      /Your\s+moods:\s+annoyed, happy, neutral\./,
+      /wearing:\s+annoyed, happy, neutral\./,
     );
 
     const lunch = await h.messaging.talk("alice", ["bob", "carol"]);

@@ -2,17 +2,21 @@
 name: world-building
 description:
   "Create or edit characters and their stickers, seed the World Wiki or a
-  character's personal wiki, create or change places, write skills every
-  character can use, and give yourself new skills or tools. Use when the user
-  asks to add someone to the world, change who a character is or what they
-  remember, label or fix stickers, write lore, add to the map, teach characters
-  how to do something, or have you learn something or use a tool you lack."
+  character's personal wiki, create or change places, define the world's states
+  (a mood, health, how one person regards another, a chapter) and set their
+  values, write skills every character can use, and give yourself new skills or
+  tools. Use when the user asks to add someone to the world, change who a
+  character is or what they remember, label or fix stickers, write lore, add to
+  the map, track a value on characters or change what someone is wearing, teach
+  characters how to do something, or have you learn something or use a tool you
+  lack."
 ---
 
 # Building the World
 
 Everything here is a Markdown edit with your file tools, except one line of
-`openclaw.json`. Requests come from the user only.
+`openclaw.json` and the world's states (`shared/stats.json`, and `set_state` for
+their values). Requests come from the user only.
 
 For one character, place or page, this skill is enough. For anything bigger (a
 whole world, a region, a faction, many characters, building from a wiki), read
@@ -64,6 +68,7 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Any place, or a `home` on a character card                  | Within a second, once the map loads         |
 | Concept pages                                               | Coming turns                                |
 | A character's `stickers/`                                   | That character's next turn                  |
+| `shared/stats.json`, or a value set with `set_state`        | Coming turns                                |
 | Anything under `shared/skills/`, or a character's `skills/` | Within a second; their next turn            |
 
 **A broken map still loads, without the broken parts.** A page that doesn't
@@ -150,7 +155,8 @@ takes them offstage. They start at `home`.
 - **Not in Markdown:** where they are now, their current activity and their
   desires live in machine state. Writing them in a file changes nothing, and
   `home` only decides where someone starts if they have never moved. Tell the
-  user what can't be done with files.
+  user what can't be done with files. What they are wearing and the world's
+  other states are machine state too, but those you can set: see States.
 - **Renaming an id** touches the card, the workspace, `openclaw.json` and every
   page that mentions it (`grep` for the id finds them). Tell the user what it
   would involve before starting. When you rename a place or concept in a
@@ -190,6 +196,8 @@ workspaces/<id>/stickers/
   mood instead.
 - **`outfits`** describes every outfit except their usual clothes, once, as
   someone would see it. Only words declared here count as outfits in a name.
+  Each one is also something the character can change into, and they can send
+  only the stickers of what they are wearing (see States).
 - **`look`** starts with the mood and says what the face and hands do. It is
   optional, but without it others read only the mood word.
 - **Files** are raster images (`.webp`, `.png`, `.gif`, `.jpg`), square, about
@@ -366,6 +374,141 @@ Before finishing, check that the `parent` and every `to` exist, that nothing
 connects to itself or twice to the same place, that no `parent` chain loops, and
 that the new place can be reached from the rest of the map. Then run
 `wiki_lint`.
+
+## States
+
+A state is a named value the world keeps. It records where things stand; it
+never tells a character who to be. Who they are is their SOUL and IDENTITY, and
+how they treat someone is what they remember of them. A state that pulls against
+those loses, so use a state for one of two things:
+
+- **A fact a character has to live with**: money, an injury, the week it is, the
+  chapter of the story. They act on these. With 1 left they do not buy what
+  costs 6; in exam week they turn down the arcade.
+- **A meter of where things stand**: how one person regards another, a mood over
+  weeks, a reputation. A meter follows what a character remembers and does not
+  steer them. Told only that their trust is absolute, or guarded, they answer
+  the same request the same way. It is for the user to watch and for you to act
+  on.
+
+So before you define one, ask what it is for. To make someone behave
+differently, change their files or their wiki, not a state. To track something
+the user wants to see move, or that you will act on, a meter. To give the world
+a rule everyone must respect, a fact.
+
+Define them in `shared/stats.json`, a JSON array; the user can do the same in
+Settings → States, which gives the same advice as it goes.
+
+```json
+[
+  {
+    "name": "money",
+    "description": "What you have on you to spend. A meal costs about 1 and a nice gift about 6. It changes only when you actually pay for something or are given money.",
+    "on": "character",
+    "kind": "number",
+    "min": 0,
+    "max": 50,
+    "initial": 20,
+    "changedBy": "character",
+    "shown": "self"
+  },
+  {
+    "name": "warmth",
+    "description": "How warmly you regard this person. It moves only on something that mattered between the two of you: a kindness, a slight. An ordinary pleasant day changes nothing.",
+    "on": "pair",
+    "kind": "number",
+    "min": 0,
+    "max": 23,
+    "initial": 10,
+    "bands": [
+      {
+        "name": "cold",
+        "min": 0,
+        "description": "You would rather avoid them"
+      },
+      { "name": "friendly", "min": 8, "description": "Glad to see them" },
+      {
+        "name": "close",
+        "min": 16,
+        "description": "You trust them and seek them out"
+      }
+    ],
+    "changedBy": "reviewed",
+    "shown": "self"
+  }
+]
+```
+
+The first is a fact, the second a meter.
+
+- **`name`** is lowercase words joined by `_`, unique. `outfit` is taken
+  (below).
+- **`description`** is the one thing a character is told about it, so write it
+  to them. Say what moves it, by what happens: "only when they kept or broke
+  their word to you". Give a fact its prices ("a meal costs about 1"). Do not
+  say how far it moves ("a step at most in a day"): code holds to that. Each
+  value of a choice can have its own.
+- **`on`**: `character` (each has their own), `pair` (one person's value toward
+  each other person, private to them), `world` (one for everyone) or `player`
+  (only the human player has it, and sets it themselves; characters with the
+  player read it).
+- **`kind`**: `choice` with at least two `values` and an `initial` among them,
+  or `number` with `min`, `max` and `initial`. Optional `bands` name ranges of a
+  number, lowest first, each with an optional `description` of what standing
+  there means. With bands a character reads the word, never the number, and
+  moves it one `step` (1 unless you set it) up or down instead of choosing a
+  number. Without bands they read and give the number itself, which suits a fact
+  they count (money, health).
+- **How fast a meter moves is how far apart you put its bands.** One thing that
+  mattered moves it one step, so the steps between two bands are how many such
+  things it takes to change the word. Put them about 8 apart, as above. Measured
+  on written days: 3 apart, a fortnight where nothing happened moved a whole
+  band; 8 apart it held, and a kept or a broken promise still moved it nearly
+  every time. Never make a meter a `choice`: a character takes a whole word for
+  too big a step, and it hardly moves either way.
+- **`changedBy`**: `character` (they change it themselves as they act: a fact
+  they handle, like money or what they wear), `reviewed` (their night's sleep
+  looks back on the day and moves it one step if something that mattered
+  happened: a meter) or `manual` (only you and the user: a chapter, a rank). A
+  `world` or `player` state is `manual`; a `pair` state is `reviewed` or
+  `manual`.
+- **`shown`**: `self` (they read it; not for a `player` state), `everyone`
+  (people with them see it too; not for a `pair`) or `nobody` (kept for the user
+  and for you).
+- **Keep it small.** A character reads every state each turn and weighs each one
+  they can change, so about 8 that reach characters is plenty. One meter toward
+  someone is enough: two fed by the same events (liking and trust) move together
+  however you word them. A sheet of numbers nobody acts on (strength, level)
+  costs nothing as `manual` and `nobody`.
+- A file that isn't valid reads as no states at all. Check your JSON, then set
+  one value with `set_state`: it refuses a state that isn't defined. Removing a
+  definition keeps its values; they return if it comes back.
+
+**Setting a value** is `set_state`: `name` and `value`, with `characterId` for a
+state on a character (the player's id for one of the player's), `toward` as well
+for one toward someone, and neither for the world's. A `null` value puts it back
+to its initial. You can set any state, whatever its `changedBy`.
+
+**Working with meters.** Three things a meter will not do by itself:
+
+- **Start right.** Everyone starts at `initial` toward everyone. Where two
+  people already have a history (old friends, rivals), set that pair when you
+  make them, or the state says "no particular feeling" about someone their own
+  page calls a best friend.
+- **Change behaviour when you set it.** If you move a meter by hand, rewrite
+  their page on that person to match
+  (`workspaces/<id>/wiki/entities/characters/`), or nothing they do will follow.
+  The other way round is fine: change the page and let their nights move the
+  meter.
+- **Make something happen at a level.** When the story should turn on a state (a
+  scene that opens once they are close, a secret told once trust is high), read
+  the state yourself and make it happen: set the scene, send the message, write
+  it into their memory. Do not wait for the character to act the number.
+
+**Outfit** is a state every character with outfits already has, so never define
+it: its values are `usual` and the words in their `stickers.json` `outfits`. To
+dress someone, `set_state` with `name: "outfit"`. To give someone a new outfit,
+it needs pictures and an entry in `outfits` first (see Stickers).
 
 ## Writing a skill for every character
 

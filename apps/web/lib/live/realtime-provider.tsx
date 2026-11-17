@@ -17,6 +17,7 @@ import {
 } from "./realtime-state";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
+import { STATS_KEY, withStatsEvent } from "@/lib/source/stats/http";
 import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
 import {
   OBSERVED_MESSAGES_KEY,
@@ -26,6 +27,7 @@ import {
   parseStreamEvent,
   type ObservedChatsResponse,
   type ChatsResponse,
+  type StatsResponse,
   type MessageStreamEvent,
   type TypingStreamEvent,
 } from "@kazusa/client";
@@ -51,6 +53,7 @@ const OBSERVER_EVENTS = [
   "journal",
   "clock",
   "desires",
+  "stats",
   "location",
   "places",
   "observed",
@@ -190,6 +193,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             retainMembers(current.chats);
           });
           break;
+        case "stats":
+          // One record replaced in place. New definitions are refetched, and
+          // so is a snapshot that hasn't arrived: this mutate discards the
+          // fetch under way, which nothing else would start again.
+          void mutate<StatsResponse>(
+            STATS_KEY,
+            (current) => withStatsEvent(current, data) ?? current,
+            { revalidate: (current) => !current || !data.record },
+          );
+          break;
         case "places":
           // A new home moves whoever hasn't gone anywhere yet.
           void mutate(isPlacesKey);
@@ -216,6 +229,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           // Desire records and the map changed while disconnected are only in the
           // snapshot.
           void mutate(isDesiresKey);
+          void mutate(STATS_KEY);
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());

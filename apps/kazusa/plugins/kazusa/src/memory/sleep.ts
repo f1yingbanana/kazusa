@@ -63,6 +63,8 @@ export const SLEEP_OUTPUT = z.object({
     })
     .optional(),
   dream: z.string().optional(),
+  /** The world's states this night reviewed; the states module reads it. */
+  states: z.unknown().optional(),
 });
 export type SleepOutput = z.infer<typeof SLEEP_OUTPUT>;
 
@@ -178,6 +180,8 @@ export interface SleepInput {
     readonly id: string;
     readonly notes: readonly string[];
   }>;
+  /** The world's states this night reviews, and where they stand. */
+  readonly states?: string;
 }
 
 /** One message; the skill says what to do with it. */
@@ -201,6 +205,7 @@ export function sleepMessage(input: SleepInput): string {
             .join("\n\n")}`,
         ]
       : []),
+    ...(input.states ? [`# Your states\n${input.states}`] : []),
   ].join("\n\n");
 }
 
@@ -389,6 +394,21 @@ export interface SleepDeps {
     readonly through: number;
   }>;
   readonly feelings?: (agentId: string, at: number) => Promise<string>;
+  /**
+   * The world's states a night reviews: what to show of them, given who spoke
+   * in the records, and what to do with the night's `states`.
+   */
+  readonly states?: {
+    readonly text: (
+      agentId: string,
+      people: readonly string[],
+    ) => Promise<string | undefined>;
+    readonly apply: (
+      agentId: string,
+      people: readonly string[],
+      answer: unknown,
+    ) => Promise<void>;
+  };
   readonly nameOf: (id: string) => string | undefined;
   /** Into their `:tasks` ledger and the journal. */
   readonly record: (
@@ -450,6 +470,13 @@ export function createSleep(deps: SleepDeps, passes: Map<string, SleepPass>) {
     const fileOf = (page: Page): string =>
       path.join("wiki", DIRECTORY[page.kind], `${page.id}.md`);
     const malformed: string[] = [];
+    // Never at the cost of the night: without them it is slept on as before.
+    const states = await deps.states
+      ?.text(agentId, speakers)
+      .catch((error: unknown) => {
+        deps.warn(`Sleep ${agentId}: states: ${String(error)}`);
+        return undefined;
+      });
     const output = parseSleepOutput(
       await deps.complete({
         agentId,
@@ -483,6 +510,7 @@ export function createSleep(deps: SleepDeps, passes: Map<string, SleepPass>) {
                 )
                 .map((note) => `${note.date}: ${note.text}`),
             })),
+          ...(states ? { states } : {}),
         }),
       }),
       (what) => malformed.push(what),
@@ -512,6 +540,12 @@ export function createSleep(deps: SleepDeps, passes: Map<string, SleepPass>) {
       wakeDay: iso(task ? Date.parse(task.endAt) : now),
       notesPerPage: deps.notesPerPage,
     });
+    if (states && valid.states !== undefined)
+      await deps.states
+        ?.apply(agentId, speakers, valid.states)
+        .catch((error: unknown) => {
+          deps.warn(`Sleep ${agentId}: states: ${String(error)}`);
+        });
     const id = randomUUID();
     await deps.store.register(agentId, {
       watermark: through,

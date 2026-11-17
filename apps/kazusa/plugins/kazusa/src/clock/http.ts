@@ -36,6 +36,7 @@ export const DEFAULT_CAPABILITIES: Readonly<
   status: "live",
   timeline: "live",
   desires: "live",
+  stats: "live",
   stage: "live",
   models: "live",
   context: "live",
