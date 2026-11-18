@@ -191,6 +191,20 @@ describe("state drafts", () => {
       expect(made).not.toEqual(stat);
       expect(withLinesKept(made!, stat)).toEqual(stat);
     }
+    // What a form drops altogether comes back too when nothing was changed.
+    const bare = StatDefinitionSchema.parse({
+      ...number,
+      bands: [],
+    });
+    const blank = StatDefinitionSchema.parse({
+      ...choice,
+      values: [{ name: "calm", description: "" }, { name: "tense" }],
+    });
+    for (const stat of [bare, blank]) {
+      const made = fromDraft(toDraft(stat)).stat;
+      expect(made).not.toEqual(stat);
+      expect(withLinesKept(made!, stat)).toBe(stat);
+    }
     // A meaning the form did change is the form's.
     const draft = toDraft(choice);
     const edited = fromDraft({

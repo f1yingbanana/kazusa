@@ -82,15 +82,21 @@ export function toDraft(stat: StatDefinition): StatDraft {
 }
 
 /**
- * `stat`, as a form made it, with the line breaks of `opened`'s meanings put
- * back wherever the form left a meaning as it was. The form lists meanings one
- * to a line (`line`), so without this a save that touched nothing would still
- * rewrite a meaning written over several lines.
+ * `stat`, as a form made it, with what the form cannot hold of `opened` put
+ * back. A form that changed nothing gives `opened` itself, whatever it had that
+ * a form drops (an empty meaning, an empty list of bands), so saving it changes
+ * nothing. Otherwise the line breaks of a meaning come back wherever the form
+ * left that meaning as it was: it lists meanings one to a line (`line`).
  */
 export function withLinesKept(
   stat: StatDefinition,
   opened: StatDefinition | undefined,
 ): StatDefinition {
+  if (
+    opened &&
+    JSON.stringify(fromDraft(toDraft(opened)).stat) === JSON.stringify(stat)
+  )
+    return opened;
   const kept = <T extends { name: string; description?: string }>(
     made: readonly T[],
     were: readonly T[] | undefined,
