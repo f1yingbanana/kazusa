@@ -135,10 +135,11 @@ outfits to the client. It is `changedBy: character`, `shown: everyone`.
 It is the one state code acts on:
 
 - `send_message` offers only the stickers (`wornStickers`) and the faces
-  (`faceMoods(portraits, worn)`) of what they are wearing, so a character in a
-  swimsuit cannot send themselves in uniform, and refuses a sticker of anything
-  else when it is sent. An outfit with no portraits falls back to the usual
-  clothes' moods; one with no stickers offers none.
+  (`faceMoods(portraits, worn)`) of what they are wearing. Offering is all it
+  does: a sticker or a mood of other clothes is sent as written when they use
+  one (any sticker of theirs; any mood they have a portrait of, `knownMoods`).
+  An outfit with no portraits falls back to the usual clothes' moods; one with
+  no stickers offers none.
 - The Scene view draws the figure in it (`useWornOutfit` sets `Look.outfit`).
 - People with them read `Name: outfit: swimsuit (what is worn)`.
 

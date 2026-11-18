@@ -2,8 +2,8 @@ import type { PortraitSet } from "../scene/portraits.ts";
 import { type FaceRef, faceTag } from "./conversations.ts";
 
 /**
- * The moods a character can give a line (§6.3): those of their portraits in
- * what they are wearing (`worn`, an outfit's word, or nothing in the usual
+ * The moods a character is offered for a line (§6.3): those of their portraits
+ * in what they are wearing (`worn`, an outfit's word, or nothing in the usual
  * clothes), sorted; the usual clothes' where that outfit has no portrait. None
  * when the figure isn't drawn. They change only when the outfit does, so the
  * tool's schema is stable from turn to turn.
@@ -19,6 +19,19 @@ export function faceMoods(portraits: PortraitSet, worn?: string): string[] {
   ];
   const moods = moodsIn(worn);
   return (moods.length ? moods : moodsIn(undefined)).sort();
+}
+
+/**
+ * Every mood a character can give a line: any they have a portrait of, in any
+ * clothes. Wider than what they are offered on purpose: a mood of other clothes
+ * is taken as written, and the scene shows what they are wearing, with its
+ * neutral face where it has no such picture.
+ */
+export function knownMoods(portraits: PortraitSet): string[] {
+  if (portraits.default === undefined) return [];
+  return [
+    ...new Set([...portraits.portraits.values()].map(({ mood }) => mood)),
+  ].sort();
 }
 
 /** A bubble with its mood word replaced by the face it shows. */
