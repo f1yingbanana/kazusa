@@ -40,12 +40,16 @@ export interface TaskTransition {
   readonly params: Readonly<Record<string, unknown>>;
 }
 
-/** What an extension will do once every extension accepted a transition. */
-export interface PreparedTaskCommit {
+/** What an extension says about a transition, for its history. */
+export interface TaskCommitReport {
   /** One sentence added to the ledger row and the tool result. */
   readonly note?: string;
   /** Structured fields merged into the ledger row's journal payload. */
   readonly payload?: Readonly<Record<string, unknown>>;
+}
+
+/** What an extension will do once every extension accepted a transition. */
+export interface PreparedTaskCommit extends TaskCommitReport {
   /**
    * Sim ms by which this lease needs a check-in (an arrival). The earliest one
    * brings the lease's end forward; its one wake is the check-in.
@@ -53,9 +57,11 @@ export interface PreparedTaskCommit {
   readonly checkInAt?: number;
   /**
    * Writes the extension's own state against the final lease, before it is
-   * written.
+   * written. What it returns is reported in place of what was prepared: an
+   * extension whose write is worked out as it lands (another change may have
+   * come first) says what it wrote, not what it expected to.
    */
-  commit(task: ActiveTask): Promise<void>;
+  commit(task: ActiveTask): Promise<TaskCommitReport | void>;
 }
 
 /**
@@ -65,6 +71,13 @@ export interface PreparedTaskCommit {
 export interface TaskExtension {
   /** JSON-schema properties merged into `start_task`'s parameters. */
   readonly startTaskParameters: Readonly<Record<string, unknown>>;
+  /**
+   * `start_task`'s properties for one character, when they differ from person
+   * to person; read whenever the tool is built, in place of the above.
+   */
+  readonly startTaskParametersFor?: (
+    agentId: string | undefined,
+  ) => Readonly<Record<string, unknown>>;
   /** The same properties for `delay_task`, which may refer to `start_task`. */
   readonly delayTaskParameters: Readonly<Record<string, unknown>>;
   /** Required properties; each tool requires only the ones it takes. */

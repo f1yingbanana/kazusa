@@ -4,20 +4,35 @@ import { MapPinIcon } from "lucide-react";
 import { usePlace, usePlayer } from "@/hooks/use-location";
 import { useSelection } from "@/hooks/use-selection";
 
-/** Where the player stands; opens that place, where "Go here" lives too. */
+/**
+ * The player and where they stand. "You" opens the player themselves, who is on
+ * no list: their own states are set there. The place opens that place, where
+ * "Go here" lives too.
+ */
 export function PlayerPlaceItem() {
   const player = usePlayer();
   const place = usePlace(player.placeId);
   const [, select] = useSelection();
-  if (!place) return null;
+  if (!player.id) return null;
   return (
-    <button
-      type="button"
-      className="flex items-center gap-1 hover:text-foreground"
-      onClick={() => void select({ kind: "place", id: place.id })}
-    >
-      <MapPinIcon className="size-3" aria-hidden />
-      {`You're at ${place.name}`}
-    </button>
+    <span className="flex items-center gap-1">
+      <button
+        type="button"
+        className="hover:text-foreground"
+        onClick={() => void select({ kind: "character", id: player.id })}
+      >
+        You
+      </button>
+      {place ? (
+        <button
+          type="button"
+          className="flex items-center gap-1 hover:text-foreground"
+          onClick={() => void select({ kind: "place", id: place.id })}
+        >
+          <MapPinIcon className="size-3" aria-hidden />
+          {`at ${place.name}`}
+        </button>
+      ) : null}
+    </span>
   );
 }

@@ -17,6 +17,8 @@ import {
 } from "./realtime-state";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
+import { STATS_KEY, fetchStats } from "@/lib/source/stats/http";
+import { liveStats, statsSync } from "@/lib/source/stats/sync";
 import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
 import {
   OBSERVED_MESSAGES_KEY,
@@ -26,6 +28,7 @@ import {
   parseStreamEvent,
   type ObservedChatsResponse,
   type ChatsResponse,
+  type StatsResponse,
   type MessageStreamEvent,
   type TypingStreamEvent,
 } from "@kazusa/client";
@@ -51,6 +54,7 @@ const OBSERVER_EVENTS = [
   "journal",
   "clock",
   "desires",
+  "stats",
   "location",
   "places",
   "observed",
@@ -98,6 +102,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const seenMessages = new Set<string>();
     clearTyping();
     silenceScenes();
+    const stats = statsSync({
+      read: fetchStats,
+      write: (data) =>
+        mutate<StatsResponse>(STATS_KEY, data, { revalidate: false }),
+      stale: liveStats.setStale,
+    });
+    const stepDown = liveStats.is(stats);
 
     const rememberMessage = (id: string): boolean => {
       if (seenMessages.has(id)) return false;
@@ -190,6 +201,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             retainMembers(current.chats);
           });
           break;
+        case "stats":
+          // One record replaced in place; new definitions are read whole.
+          stats.event(data);
+          break;
         case "places":
           // A new home moves whoever hasn't gone anywhere yet.
           void mutate(isPlacesKey);
@@ -216,6 +231,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           // Desire records and the map changed while disconnected are only in the
           // snapshot.
           void mutate(isDesiresKey);
+          // Only where something reads them: an older Gateway has none.
+          if (cache.get(STATS_KEY)) stats.refresh();
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());
@@ -320,6 +337,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       disposed = true;
+      stepDown();
+      stats.stop();
       clearTyping();
       silenceScenes();
       setStatus("connecting");

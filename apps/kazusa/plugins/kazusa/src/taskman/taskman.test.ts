@@ -416,4 +416,28 @@ describe("Taskman check-ins", () => {
       "You walk over first. Until Wed 2026-10-21 08:12 (12 min).",
     );
   });
+
+  it("reports what a commit wrote in place of what was prepared", async () => {
+    const { context, messages } = makeContext();
+    const result = await executeStartTask(
+      { type: "eating", description: "Lunch at the cafeteria", duration: 60 },
+      {
+        ...context,
+        prepare: async () => [
+          {
+            note: "You have 17 left.",
+            payload: { states: { money: 17 } },
+            commit: async () => ({
+              note: "You have 14 left.",
+              payload: { states: { money: 14 } },
+            }),
+          },
+          { note: "You walk over first.", commit: async () => {} },
+        ],
+      },
+    );
+    if (!result.success) throw new Error("Expected a start");
+    expect(messages.at(-1)).toContain("You have 14 left. You walk over first.");
+    expect(messages.at(-1)).not.toContain("17");
+  });
 });

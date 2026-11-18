@@ -2,17 +2,21 @@
 name: world-building
 description:
   "Create or edit characters and their stickers, seed the World Wiki or a
-  character's personal wiki, create or change places, write skills every
-  character can use, and give yourself new skills or tools. Use when the user
-  asks to add someone to the world, change who a character is or what they
-  remember, label or fix stickers, write lore, add to the map, teach characters
-  how to do something, or have you learn something or use a tool you lack."
+  character's personal wiki, create or change places, define the world's states
+  (a mood, health, how one person regards another, a chapter) and set their
+  values, write skills every character can use, and give yourself new skills or
+  tools. Use when the user asks to add someone to the world, change who a
+  character is or what they remember, label or fix stickers, write lore, add to
+  the map, track a value on characters or change what someone is wearing, teach
+  characters how to do something, or have you learn something or use a tool you
+  lack."
 ---
 
 # Building the World
 
 Everything here is a Markdown edit with your file tools, except one line of
-`openclaw.json`. Requests come from the user only.
+`openclaw.json` and the world's states (`shared/stats.json`, and `set_state` for
+their values). Requests come from the user only.
 
 For one character, place or page, this skill is enough. For anything bigger (a
 whole world, a region, a faction, many characters, building from a wiki), read
@@ -64,6 +68,7 @@ below for anything new, and don't rewrite old pages unless the user asks.
 | Any place, or a `home` on a character card                  | Within a second, once the map loads         |
 | Concept pages                                               | Coming turns                                |
 | A character's `stickers/`                                   | That character's next turn                  |
+| `shared/stats.json`, or a value set with `set_state`        | Coming turns                                |
 | Anything under `shared/skills/`, or a character's `skills/` | Within a second; their next turn            |
 
 **A broken map still loads, without the broken parts.** A page that doesn't
@@ -150,7 +155,8 @@ takes them offstage. They start at `home`.
 - **Not in Markdown:** where they are now, their current activity and their
   desires live in machine state. Writing them in a file changes nothing, and
   `home` only decides where someone starts if they have never moved. Tell the
-  user what can't be done with files.
+  user what can't be done with files. What they are wearing and the world's
+  other states are machine state too, but those you can set: see States.
 - **Renaming an id** touches the card, the workspace, `openclaw.json` and every
   page that mentions it (`grep` for the id finds them). Tell the user what it
   would involve before starting. When you rename a place or concept in a
@@ -190,6 +196,8 @@ workspaces/<id>/stickers/
   mood instead.
 - **`outfits`** describes every outfit except their usual clothes, once, as
   someone would see it. Only words declared here count as outfits in a name.
+  Each one is also something the character can change into, and they can send
+  only the stickers of what they are wearing (see States).
 - **`look`** starts with the mood and says what the face and hands do. It is
   optional, but without it others read only the mood word.
 - **Files** are raster images (`.webp`, `.png`, `.gif`, `.jpg`), square, about
@@ -366,6 +374,45 @@ Before finishing, check that the `parent` and every `to` exist, that nothing
 connects to itself or twice to the same place, that no `parent` chain loops, and
 that the new place can be reached from the rest of the map. Then run
 `wiki_lint`.
+
+## States
+
+A state is a named value the world keeps. It records where things stand; it
+never tells a character who to be. Who they are is their SOUL and IDENTITY, and
+how they treat someone is what they remember of them. A state that pulls against
+those loses, so use a state for one of two things:
+
+- **A fact a character has to live with**: money, an injury, the week it is, the
+  chapter of the story. They act on these. With 1 left they do not buy what
+  costs 6; in exam week they turn down the arcade.
+- **A meter of where things stand**: how one person regards another, a mood over
+  weeks, a reputation. A meter follows what a character remembers and does not
+  steer them. Told only that their trust is absolute, or guarded, they answer
+  the same request the same way. It is for the user to watch and for you to act
+  on.
+
+So before you define one, ask what it is for. To make someone behave
+differently, change their files or their wiki, not a state. To track something
+the user wants to see move, or that you will act on, a meter. To give the world
+a rule everyone must respect, a fact.
+
+Define them in `shared/stats.json`, a JSON array; the user can do the same in
+Settings → States, which gives the same advice as it goes. **Before you add or
+change a definition, read `references/states.md`** (beside this file): every
+field, how far apart to put a meter's words so it moves at the right pace, and
+the three things a meter will not do by itself (start right for people with a
+history, change behaviour when you set it, make something happen at a level). A
+file that isn't valid reads as no states at all.
+
+**Setting a value** is `set_state`: `name` and `value`, with `characterId` for a
+state on a character (the player's id for one of the player's), `toward` as well
+for one toward someone, and neither for the world's. A `null` value puts it back
+to its initial. You can set any state, whatever its `changedBy`.
+
+**Outfit** is a state every character with outfits already has, so never define
+it: its values are `usual` and the words in their `stickers.json` `outfits`. To
+dress someone, `set_state` with `name: "outfit"`. To give someone a new outfit,
+it needs pictures and an entry in `outfits` first (see Stickers).
 
 ## Writing a skill for every character
 

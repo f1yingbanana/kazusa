@@ -109,21 +109,36 @@ export function registerTaskman(
   const { clock } = deps;
   const text = pluginSkillText(api);
   const extensions = deps.extensions ?? [];
-  const startTaskParameters = extensions.reduce<Record<string, unknown>>(
-    (all, extension) => ({ ...all, ...extension.startTaskParameters }),
-    {},
-  );
-  const delayTaskParameters = extensions.reduce<Record<string, unknown>>(
-    (all, extension) => ({ ...all, ...extension.delayTaskParameters }),
-    {},
-  );
+  // Read when a tool is built, not once: an extension's parameters can depend
+  // on what the world defines now and on who the tool is for (their states).
+  const contributed = (
+    extension: TaskExtension,
+    tool: "startTaskParameters" | "delayTaskParameters",
+    agentId: string | undefined,
+  ): Readonly<Record<string, unknown>> =>
+    tool === "startTaskParameters" && extension.startTaskParametersFor
+      ? extension.startTaskParametersFor(agentId)
+      : extension[tool];
+  const parametersOf = (
+    tool: "startTaskParameters" | "delayTaskParameters",
+    agentId?: string,
+  ): Record<string, unknown> =>
+    extensions.reduce<Record<string, unknown>>(
+      (all, extension) => ({
+        ...all,
+        ...contributed(extension, tool, agentId),
+      }),
+      {},
+    );
   // A tool requires only the extension properties it takes.
   const requiredBy = (
     tool: "startTaskParameters" | "delayTaskParameters",
+    agentId?: string,
   ): string[] =>
-    extensions.flatMap((extension) =>
-      extension.required.filter((name) => name in extension[tool]),
-    );
+    extensions.flatMap((extension) => {
+      const parameters = contributed(extension, tool, agentId);
+      return extension.required.filter((name) => name in parameters);
+    });
   const store = openTaskStore(api);
   const taskChangeListeners = new Set<
     (agentId: string, task: ActiveTask) => void
@@ -234,13 +249,13 @@ export function registerTaskman(
             summary: { type: "string" },
             monologue: { type: "string" },
             metadata: { type: "object" },
-            ...startTaskParameters,
+            ...parametersOf("startTaskParameters", toolContext?.agentId),
           },
           required: [
             "type",
             "description",
             "duration",
-            ...requiredBy("startTaskParameters"),
+            ...requiredBy("startTaskParameters", toolContext?.agentId),
           ],
           additionalProperties: false,
         },
@@ -296,7 +311,7 @@ export function registerTaskman(
             minutesLeft: { type: "number" },
             reason: { type: "string" },
             monologue: { type: "string" },
-            ...delayTaskParameters,
+            ...parametersOf("delayTaskParameters"),
           },
           required: ["minutesLeft", ...requiredBy("delayTaskParameters")],
           additionalProperties: false,

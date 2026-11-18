@@ -22,6 +22,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import {
+  allowNewCharacterTools,
   denyImpliedTools,
   loadNewPlugins,
   skipUnusedStartupWork,
@@ -314,6 +315,7 @@ if (!stopping) {
   }
   try {
     for (const line of denyImpliedTools(ROOT)) console.log(line);
+    for (const line of allowNewCharacterTools(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't settle characters' tool policy: ${error.message}`);
   }

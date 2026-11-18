@@ -49,6 +49,12 @@ interface ContextEngineDeps {
       readonly exclude?: readonly string[];
     },
   ) => Promise<string | undefined>;
+  /** The world's states as they read them: `here` is who is with them. */
+  readonly states?: (
+    agentId: string,
+    here: readonly string[],
+    prompt: string,
+  ) => Promise<string | undefined>;
   /** Whether someone else is where the character is: face to face. */
   readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
   /** Who and what is in front of them, for recognition. */
@@ -228,6 +234,7 @@ function createContextEngine(
     clock,
     awaitingReplies,
     feelings,
+    states,
     whereabouts,
     inCompany,
     presence,
@@ -431,6 +438,7 @@ function createContextEngine(
         listLimit: chosen.placesLimit,
         exclude: recollection?.ids ?? [],
       });
+      const state = await states?.(brainAgentId, here, prompt);
       const brainTurns = await pastTurns;
       // Every build assembles afresh, for its own token budget: each model
       // call leaves less, as the turn's own messages grow.
@@ -444,6 +452,7 @@ function createContextEngine(
         roster: recollection?.roster,
         awaitingReplies: awaiting,
         feelings: feeling,
+        states: state,
         whereabouts: place,
         inCompany: company,
         simTime: now,

@@ -17,6 +17,12 @@ import {
   CharacterRecentSection,
   CharacterRecentSummary,
 } from "@/components/inspector/sections/character-recent";
+import {
+  CharacterStatesSection,
+  CharacterStatesSummary,
+  useIsNotPlayer,
+  useIsPlayer,
+} from "@/components/inspector/sections/character-states";
 import { ChatSummarySection } from "@/components/inspector/sections/chat-summary";
 import { PlaceHeaderSection } from "@/components/inspector/sections/place-header";
 import { PlacePeopleSection } from "@/components/inspector/sections/place-people";
@@ -54,6 +60,30 @@ const SECTIONS: readonly InspectorSection[] = [
     order: 15,
     requires: ["characters", "desires"],
     component: CharacterDesiresSection,
+  },
+  {
+    id: "character.states",
+    entity: "character",
+    title: "States",
+    order: 17,
+    requires: ["characters", "stats"],
+    component: CharacterStatesSection,
+    // Meters to read: a character is changed by what happens to them.
+    useApplies: useIsNotPlayer,
+    fold: "closed",
+    summary: CharacterStatesSummary,
+  },
+  {
+    // The player's own are theirs to set, so these start open.
+    id: "player.states",
+    entity: "character",
+    title: "States",
+    order: 17,
+    requires: ["characters", "stats"],
+    component: CharacterStatesSection,
+    useApplies: useIsPlayer,
+    fold: "open",
+    summary: CharacterStatesSummary,
   },
   {
     id: "character.recent",

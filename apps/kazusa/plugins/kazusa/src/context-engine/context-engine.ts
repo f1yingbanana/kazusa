@@ -69,6 +69,8 @@ export async function assembleContext(params: {
   }[];
   /** One line of desire states, rendered verbatim. */
   readonly feelings?: string;
+  /** The world's states as this character reads them, already rendered. */
+  readonly states?: string;
   /** Position and travel times, rendered verbatim. */
   readonly whereabouts?: string;
   /** Someone else is here, so the in-person skill applies. */
@@ -190,6 +192,7 @@ export async function assembleContext(params: {
       ...(params.onYourMind ? ["", "### On your mind", params.onYourMind] : []),
       ...(params.roster ? ["", "### People you know", params.roster] : []),
       ...(params.feelings ? ["", "### How you feel", params.feelings] : []),
+      ...(params.states ? ["", "### Your state", params.states] : []),
       ...(params.awaitingReplies?.length
         ? [
             "",

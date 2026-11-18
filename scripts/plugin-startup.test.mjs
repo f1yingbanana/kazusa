@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  allowNewCharacterTools,
   CHARACTER_DENIED_TOOLS,
   denyImpliedTools,
   IMPLIED_TOOLS,
@@ -28,6 +29,9 @@ function repo(world) {
             venice: { enabled: true, hooks: policy },
             groq: { enabled: true, hooks: policy },
           },
+        },
+        tools: {
+          alsoAllow: ["start_task", "delay_task", "change_state", "talk"],
         },
       },
     }),
@@ -271,5 +275,44 @@ describe("skipUnusedStartupWork", () => {
 
   it("does nothing before a world exists", () => {
     expect(skipUnusedStartupWork(repo().root)).toEqual([]);
+  });
+});
+
+describe("allowNewCharacterTools", () => {
+  it("adds a tool a later Kazusa brought, in its place, once", () => {
+    const { root, read } = repo({
+      tools: { profile: "minimal", alsoAllow: ["start_task", "delay_task"] },
+    });
+    expect(allowNewCharacterTools(root)).toEqual([
+      "Characters can now use new tools: change_state, talk.",
+    ]);
+    expect(read().tools).toEqual({
+      profile: "minimal",
+      alsoAllow: ["start_task", "delay_task", "change_state", "talk"],
+    });
+    expect(allowNewCharacterTools(root)).toEqual([]);
+  });
+
+  it("keeps a world's own tools and leaves out one it denies", () => {
+    const { root, read } = repo({
+      tools: {
+        deny: ["talk"],
+        alsoAllow: ["delay_task", "my_tool", "start_task"],
+      },
+    });
+    allowNewCharacterTools(root);
+    expect(read().tools.alsoAllow).toEqual([
+      "delay_task",
+      "change_state",
+      "my_tool",
+      "start_task",
+    ]);
+  });
+
+  it("leaves a world without the list alone, and does nothing before one exists", () => {
+    const { root, read } = repo({ tools: { profile: "full" } });
+    expect(allowNewCharacterTools(root)).toEqual([]);
+    expect(read().tools).toEqual({ profile: "full" });
+    expect(allowNewCharacterTools(repo().root)).toEqual([]);
   });
 });

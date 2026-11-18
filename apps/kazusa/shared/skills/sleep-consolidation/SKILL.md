@@ -31,6 +31,11 @@ unfair.
   in your own words, with at least one note saying how you came to think so.
 - **Fading notes** are about to be gone. Fold what still matters into the `view`
   of that page.
+- **Your states**, when the message ends with them, are values this world keeps
+  about you. Each says what it is, what it can be and where it stands. Go by
+  what the state itself says, strictly. Change one only if the day clearly moved
+  it; most nights change none. A state toward someone is how you stand toward
+  them, and moves only on what passed between the two of you.
 
 Reply with one JSON object and nothing else:
 
@@ -66,7 +71,11 @@ Reply with one JSON object and nothing else:
     "goals": ["replaces your long-term goals, only if they changed"],
     "plans": [{ "on": "YYYY-MM-DD", "text": "[HARD_BLOCK] or [SOFT_GOAL] …" }]
   },
-  "dream": "optional: one or two strange sentences recombining the day"
+  "dream": "optional: one or two strange sentences recombining the day",
+  "states": {
+    "own": { "a state of yours": "its new value" },
+    "toward": { "a person's id": { "a state toward them": "its new value" } }
+  }
 }
 ```
 

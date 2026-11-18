@@ -69,6 +69,18 @@ A conversation in person can only be left, so this did not run.
 
 Started {type}: "{description}".{notes} Until {until} ({minutes} min).
 
+## state-changed
+
+Your {name} is now {value}.
+
+## state-unchanged
+
+Your {name} already is {value}.
+
+## state-not-yours
+
+{name} is not something you can change yourself.
+
 ## task-finished
 
 Finished {type}. {started}

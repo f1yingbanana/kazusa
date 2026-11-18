@@ -30,6 +30,8 @@ export interface Sticker {
   readonly look: string;
   /** What is worn, when it isn't the usual clothes. */
   readonly outfit?: string;
+  /** That outfit's word, as a character's `outfit` state names it. */
+  readonly outfitWord?: string;
 }
 
 export interface StickerSet {
@@ -62,7 +64,8 @@ export function declaredOutfits(
     Object.entries(
       readManifest(path.join(workspace, "stickers", "stickers.json")).outfits ??
         {},
-    ),
+      // A blank word names nothing anyone could wear or be told of.
+    ).filter(([word]) => word.trim() !== ""),
   );
 }
 
@@ -104,12 +107,25 @@ export function readStickers(workspace: string): StickerSet {
       contentType,
       version: pictureVersion(modified),
       look: manifest.stickers?.[name]?.look ?? mood,
-      ...(outfit ? { outfit } : {}),
+      ...(outfitWord && outfit ? { outfit, outfitWord } : {}),
     });
   }
   const set = { stickers, outfits };
   sets.set(dir, { key, set });
   return set;
+}
+
+/**
+ * The stickers of what a character is wearing (`worn`, an outfit's word, or
+ * nothing in the usual clothes): the only ones they can send of themselves.
+ */
+export function wornStickers(
+  set: StickerSet,
+  worn: string | undefined,
+): Sticker[] {
+  return [...set.stickers.values()].filter(
+    ({ outfitWord }) => outfitWord === worn,
+  );
 }
 
 /**

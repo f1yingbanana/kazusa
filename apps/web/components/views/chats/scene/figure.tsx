@@ -3,6 +3,7 @@
 import { useEffect, useState, type AnimationEvent } from "react";
 import { useCharacter } from "@/hooks/use-characters";
 import { usePortraits } from "@/hooks/use-scene";
+import { useWornOutfit } from "@/hooks/use-stats";
 import { applySceneEvent } from "@/lib/live/scene-state";
 import {
   columnLeft,
@@ -75,7 +76,15 @@ export function SceneFigure({
   const name = useCharacter(id)?.name ?? id;
   // SWR re-renders only for the fields read here.
   const set = usePortraits(id).data;
-  const portrait = set ? pickPortrait(set, figure.look) : undefined;
+  // What they are wearing is their `outfit` state, not part of a line's face:
+  // back in their usual clothes, an outfit a look still names is not shown.
+  const outfit = useWornOutfit(id);
+  const portrait = set
+    ? pickPortrait(set, {
+        ...(figure.look.mood ? { mood: figure.look.mood } : {}),
+        ...(outfit ? { outfit } : {}),
+      })
+    : undefined;
   const [broken, setBroken] = useState<string | undefined>(undefined);
   const dimmed = lit === false || (lit !== undefined && presence === "leaving");
 

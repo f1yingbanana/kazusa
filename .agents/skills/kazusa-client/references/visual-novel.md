@@ -581,10 +581,11 @@ Built (2026-11-12) as described below, with these differences:
   it in the same call, gets it. The previous face is kept in memory
   (`Messaging.shownFace`) and forgotten when they leave; after a restart the
   first face a speaker shows is read again.
-- In usual clothes the picture's name is the mood. A mood the usual clothes have
-  no picture for shows the set's resting `default` (`pickPortrait`), and
-  listeners still read the mood. A mood only an outfit has can't be sent: the
-  field offers usual-clothes moods only.
+- In usual clothes the picture's name is the mood. A mood the clothes they have
+  on have no picture for shows that outfit's neutral face, or in usual clothes
+  the set's resting `default` (`pickPortrait`), and listeners still read the
+  mood. The field offers the moods of what they are wearing (§6.4), so a mood
+  only another outfit has can't be sent.
 - The director keeps each member's face in `SceneState.moods`: from the speaking
   event as a line starts, else from the message as it lands (an action, an older
   Gateway), seeded from history and from a line already being said when the
@@ -621,12 +622,13 @@ the other, and `face` follows the rule already there:
 ```
 
 - The value is a mood from the character's own set: the distinct moods of their
-  portraits in usual clothes (`faceMoods`), the only clothes worn until §6.4.
-  About 20 words for the largest imported sets, against about 80 full names.
-  Built differently from the first plan (every look's mood, from the stickers):
-  a mood with no usual-clothes picture would change nothing on screen.
-- The list does not depend on what they are wearing or how they feel, so the
-  tool definition never changes with state and stays in the cached prefix.
+  portraits in what they are wearing (`faceMoods`, §6.4); the usual clothes'
+  where that outfit has no portrait. About 20 words for the largest imported
+  sets, against about 80 full names. Built differently from the first plan
+  (every look's mood, from the stickers): a mood that no portrait shows in what
+  they are wearing would change nothing on screen.
+- The list changes only when they change outfit, so the tool definition stays in
+  the cached prefix from turn to turn.
 - A character with no portraits in usual clothes (no `default`, so not drawn)
   has no `face` field at all, as with stickers.
 - It applies from that bubble on. The wording
@@ -640,12 +642,13 @@ the other, and `face` follows the rule already there:
   stickers.
 - An action bubble may carry it too ("looks away", `sad`).
 
-**Resolving it.** With the outfit the character has on (§6.4; usual clothes
-until that exists), the look is `<outfit>-<mood>`. If that outfit has no such
-mood, the figure keeps the outfit and shows its neutral face (else its first);
-in usual clothes, the set's resting `default`. Listeners still read the mood.
-The resolved name is frozen on the delivery (`face: { name }`, as `sticker` is),
-so an old line shows the outfit of its moment.
+**Resolving it.** With the outfit the character has on now (§6.4), the look is
+`<outfit>-<mood>`. If that outfit has no such mood, the figure keeps the outfit
+and shows its neutral face (else its first); in usual clothes, the set's resting
+`default`. Listeners still read the mood. A delivery keeps the mood alone
+(`face`), never the outfit: a figure is drawn in what is worn now, so an old
+line never puts someone back in clothes they have changed out of. A sticker is
+different: it is a picture sent, frozen with its outfit.
 
 **What everyone reads.** People see faces, so listeners do too:
 
@@ -668,22 +671,21 @@ listener. The field reuses the sticker vocabulary without that cost. Why not the
 decision model: a face that characters react to has to be the speaker's own, and
 a judged face would also be one more answer to produce per send.
 
-### 6.4 Outfit (M2, from the status system)
+### 6.4 Outfit (built, from the states system)
 
 Clothes persist: nobody changes between two lines. What a character is wearing
-is state, and it belongs to the planned status system, designed in
-[status](../../kazusa/references/status.md). In short:
+is the built-in `outfit` state ([states](../../kazusa/references/status.md) §3):
 
-- `outfit` is the first attribute: a state on a character, whose possible values
-  are the outfits their set declares plus their usual clothes.
-- The character changes it in a call they already make: an optional parameter on
-  `start_task`, since changing clothes happens at an activity boundary. No new
-  call of any kind.
-- The scene reads it through SSE and sets `Look.outfit`; stickers can use it to
-  be picked by mood alone; people present read it in a few words.
-- Until it exists, everyone wears their usual clothes. Nothing in M0 or M1 waits
-  for it, and nothing built there has to change when it arrives: `Look` already
-  has the field.
+- Its values are the outfits their `stickers/stickers.json` declares plus their
+  usual clothes.
+- The character changes it in their own turn: `changes` on `start_task`, or
+  `change_state` in the middle of an activity. The user can set it in the
+  inspector.
+- The scene reads it from `GET /kazusa/stats` and SSE `stats` (`useWornOutfit`)
+  and sets `Look.outfit`. A line's `face` stays the mood alone, so a figure
+  shows what is worn now, not what was worn when an old line was said.
+- `send_message` offers only the stickers and faces of what they are wearing;
+  people present read it in a few words.
 
 ### 6.5 What does not change
 
