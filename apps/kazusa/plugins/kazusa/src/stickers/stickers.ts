@@ -64,7 +64,8 @@ export function declaredOutfits(
     Object.entries(
       readManifest(path.join(workspace, "stickers", "stickers.json")).outfits ??
         {},
-    ),
+      // A blank word names nothing anyone could wear or be told of.
+    ).filter(([word]) => word.trim() !== ""),
   );
 }
 

@@ -31,7 +31,7 @@ export type StatValueDef = z.infer<typeof StatValueDefSchema>;
  * word a catalog would refuse must not keep the states from loading.
  */
 const OutfitSchema = z.object({
-  name: z.string().min(1),
+  name: z.string(),
   description: z.string().optional(),
 });
 

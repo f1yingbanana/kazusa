@@ -106,6 +106,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       read: fetchStats,
       write: (data) =>
         mutate<StatsResponse>(STATS_KEY, data, { revalidate: false }),
+      stale: liveStats.setStale,
     });
     const stepDown = liveStats.is(stats);
 

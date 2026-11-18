@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import {
   wornOutfit,
@@ -119,7 +119,24 @@ export function useStats() {
     [settle, whole],
   );
 
-  return { enabled, canManage, data, error, set, saveCatalog };
+  /** What is shown may be out of date, and nothing is trying to mend it. */
+  const stale = useSyncExternalStore(
+    liveStats.watch,
+    liveStats.stale,
+    () => false,
+  );
+
+  return {
+    enabled,
+    canManage,
+    data,
+    error,
+    set,
+    saveCatalog,
+    stale,
+    /** Reads everything again; throws when it could not be read. */
+    refresh: whole,
+  };
 }
 
 /** The outfit word a character wears, or nothing in their usual clothes. */

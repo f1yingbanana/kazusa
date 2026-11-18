@@ -208,7 +208,8 @@ reads a process-wide copy of each character's outfit entry, filled at
   outside SWR with the record events that arrived meanwhile put back on top
   (`apps/web/lib/source/stats/sync.ts`): a patch to an SWR cache drops a read of
   it under way. A read that fails is tried again by itself, a few times with
-  longer waits (`RETRY_MS`).
+  longer waits (`RETRY_MS`). When every try has failed, Settings → States says
+  they may be out of date and offers to read again (`liveStats.stale`).
 - **Changes in order**: a change worked out from where a value stands (a signed
   number, a step up or down) is worked out inside that subject's write queue
   (`apply` in `stats/register.ts`), so two at once each start from the other's

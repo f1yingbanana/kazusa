@@ -176,7 +176,7 @@ function summary(stat: StatDefinition): string {
  * inspector.
  */
 export function StateSettings() {
-  const { enabled, data, error, saveCatalog } = useStats();
+  const { enabled, data, error, saveCatalog, stale, refresh } = useStats();
   const [editing, setEditing] = useState<
     | {
         readonly draft: StatDraft;
@@ -298,6 +298,26 @@ export function StateSettings() {
           </Button>
         }
       >
+        {stale ? (
+          <p role="status" className="flex items-center gap-3 text-sm">
+            <span className="border-l-2 border-foreground/40 pl-2">
+              These may be out of date: the states could not be read again.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                void refresh().catch(() =>
+                  toast.error("Couldn't read the states", {
+                    description: "The server did not answer. Try again soon.",
+                  }),
+                )
+              }
+            >
+              Read again
+            </Button>
+          </p>
+        ) : null}
         {catalog.length ? (
           <ul className="flex flex-col divide-y overflow-hidden rounded-lg border">
             {catalog.map((stat) => (

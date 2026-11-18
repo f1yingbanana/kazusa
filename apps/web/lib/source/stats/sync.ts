@@ -20,6 +20,11 @@ export function statsSync(deps: {
   readonly read: () => Promise<StatsResponse>;
   /** Replaces the cached snapshot, or patches it, without a read of its own. */
   readonly write: Write;
+  /**
+   * Told when what is cached may be out of date with nothing left trying to
+   * mend it (every retry failed), and when a read lands again.
+   */
+  readonly stale?: (stale: boolean) => void;
   /** Runs something later and returns how to call it off; a timer by default. */
   readonly later?: (run: () => void, ms: number) => () => void;
 }): {
@@ -65,6 +70,7 @@ export function statsSync(deps: {
         if (stopped || mine !== reading) return;
         reading = 0;
         failed = 0;
+        deps.stale?.(false);
         await deps.write(
           since.reduce(
             (whole, event) => withStatsEvent(whole, event) ?? whole,
@@ -80,6 +86,7 @@ export function statsSync(deps: {
         // wait it is left to the next event or reconnection.
         const wait = RETRY_MS[failed++];
         if (wait !== undefined) cancel = later(refresh, wait);
+        else deps.stale?.(true);
       },
     );
   };
@@ -120,12 +127,30 @@ export function statsSync(deps: {
  * read asks it: a read of its own would be dropped by the stream's next patch.
  */
 let live: ReturnType<typeof statsSync> | undefined;
+let stale = false;
+const watching = new Set<() => void>();
 export const liveStats = {
+  /**
+   * Whether the states shown may be out of date with nothing still trying to
+   * read them again; `watch` is told when that changes.
+   */
+  stale: (): boolean => stale,
+  setStale: (next: boolean): void => {
+    if (next === stale) return;
+    stale = next;
+    for (const told of watching) told();
+  },
+  watch: (told: () => void): (() => void) => {
+    watching.add(told);
+    return () => watching.delete(told);
+  },
   /** Returns how to step down, when the stream does. */
   is(sync: ReturnType<typeof statsSync>): () => void {
     live = sync;
     return () => {
-      if (live === sync) live = undefined;
+      if (live !== sync) return;
+      live = undefined;
+      liveStats.setStale(false);
     };
   },
   /** `undefined` with no stream: nothing patches under a read then. */

@@ -37,16 +37,18 @@ function harness(cached?: StatsResponse) {
       cached = typeof data === "function" ? data(cached) : data;
       return cached;
     },
+    stale: (stale) => stales.push(stale),
     later: (run, ms) => {
       const waiting = { run, ms };
       retries.push(waiting);
       return () => retries.splice(retries.indexOf(waiting), 1);
     },
   });
+  const stales: boolean[] = [];
   /** Retries waiting to run: what a timer would hold. */
   const retries: { run: () => void; ms: number }[] = [];
   const settle = () => new Promise((resolve) => setTimeout(resolve));
-  return { sync, reads, retries, settle, cache: () => cached };
+  return { sync, reads, retries, stales, settle, cache: () => cached };
 }
 
 describe("a Gateway from before catalogs had a revision", () => {
@@ -58,7 +60,7 @@ describe("a Gateway from before catalogs had a revision", () => {
 
 describe("an outfit named in a way no state's value could be", () => {
   it("does not keep the states from loading", () => {
-    const outfits = { natsu: [{ name: "uniform: summer" }] };
+    const outfits = { natsu: [{ name: "uniform: summer" }, { name: "" }] };
     expect(
       StatsResponseSchema.parse({ ...snapshot("r"), outfits }).outfits,
     ).toEqual(outfits);
@@ -158,9 +160,16 @@ describe("the states snapshot under the stream", () => {
       await h.settle();
       h.retries[0].run();
     }
+    expect(h.stales).toEqual([]);
     h.reads[RETRY_MS.length](new Error("down"));
     await h.settle();
     expect(h.retries).toHaveLength(0);
+    // Nothing is trying any more: whoever shows the states is told so.
+    expect(h.stales).toEqual([true]);
+    h.sync.event({ type: "stats", catalog: true });
+    h.reads[RETRY_MS.length + 1](snapshot("new"));
+    await h.settle();
+    expect(h.stales).toEqual([true, false]);
   });
 
   it("says when a whole read has landed, with what arrived during it kept", async () => {

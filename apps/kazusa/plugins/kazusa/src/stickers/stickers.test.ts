@@ -7,6 +7,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { createRouteRegistrar } from "../http/helpers.ts";
 import { registerStickerHttp } from "./http.ts";
 import {
+  declaredOutfits,
   readStickers,
   stickerText,
   stickerUrl,
@@ -88,6 +89,13 @@ describe("sticker sets", () => {
     });
     const none = await mkdtemp(path.join(tmpdir(), "kazusa-stickers-"));
     expect(readStickers(none).stickers.size).toBe(0);
+  });
+
+  it("declares no outfit under a blank word", async () => {
+    const workspace = await workspaceWith([], {
+      outfits: { "": "a coat", " ": "a cape", maid: "a maid dress" },
+    });
+    expect([...declaredOutfits(workspace)]).toEqual([["maid", "a maid dress"]]);
   });
 
   it("rereads a set when its manifest changes", async () => {
