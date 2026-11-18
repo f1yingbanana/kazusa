@@ -124,10 +124,10 @@
           "config": {
             "contextEngine": {
               "shortTermHours": 16,
-              "decisionMaxTokens": 8000,
+              "decisionMaxTokens": 24000,
               "decisionShortTermHours": 4,
-              "decisionIdentityMaxTokens": 600,
-              "decisionSoulMaxTokens": 1000,
+              "decisionIdentityMaxTokens": 1000,
+              "decisionSoulMaxTokens": 4000,
               "decisionMemoryMaxTokens": 1000,
               "decisionBrainMaxTokens": 800,
               "decisionHistoryMaxTokens": 1600,

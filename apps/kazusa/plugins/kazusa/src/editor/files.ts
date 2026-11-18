@@ -29,6 +29,45 @@ export function readText(file: string): EditedText {
   }
 }
 
+/**
+ * A JSON object file as it is. `missing` when there is none; otherwise what is
+ * wrong with it, so nothing is written over a file that couldn't be read.
+ */
+export function readJsonObject(file: string):
+  | { readonly ok: true; readonly value: Record<string, unknown> }
+  | {
+      readonly ok: false;
+      readonly missing: boolean;
+      readonly problem: string;
+    } {
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    return {
+      ok: false,
+      missing,
+      problem: missing
+        ? "is missing"
+        : `can't be read (${(error as Error).message})`,
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return {
+      ok: false,
+      missing: false,
+      problem: `isn't valid JSON (${(error as Error).message})`,
+    };
+  }
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? { ok: true, value: parsed as Record<string, unknown> }
+    : { ok: false, missing: false, problem: "isn't a JSON object" };
+}
+
 /** A save made over a version that is no longer there. */
 export class EditConflict extends Error {
   constructor(readonly current: unknown) {

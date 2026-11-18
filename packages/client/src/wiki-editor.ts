@@ -70,7 +70,7 @@ export type WikiCharacterResponse = z.infer<typeof WikiCharacterResponseSchema>;
 /** Saves MEMORY.md over the version read. */
 export const WikiMemoryPayloadSchema = z.object({
   id: z.string().min(1),
-  text: z.string().max(200_000),
+  text: z.string(),
   base: z.string().nullable(),
 });
 export type WikiMemoryPayload = z.infer<typeof WikiMemoryPayloadSchema>;
@@ -246,9 +246,9 @@ export const WikiPageFormSavePayloadSchema = z.object({
   kind: WikiKindSchema.optional(),
   base: z.string().nullable(),
   fields: WikiPageFormFieldsSchema,
-  lead: z.string().max(200_000),
-  close: z.string().max(400_000),
-  only: z.string().max(400_000),
+  lead: z.string(),
+  close: z.string(),
+  only: z.string(),
   /** For a group: who is in it, written to each character's `in`. */
   members: z
     .array(

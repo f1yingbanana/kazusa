@@ -54,8 +54,17 @@ export function AddPictureDialog({
   const word = toPictureName(mood);
   const name = word ? (outfit ? `${outfit}-${word}` : word) : "";
   const clash = taken.has(name);
+  /** Closing for any reason starts the next opening afresh. */
+  const close = () => {
+    setMood("");
+    setFile(undefined);
+    onOpenChange(false);
+  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -97,11 +106,7 @@ export function AddPictureDialog({
               if (!file) return;
               setBusy(true);
               void onAdd(name, file)
-                .then(() => {
-                  setMood("");
-                  setFile(undefined);
-                  onOpenChange(false);
-                })
+                .then(close)
                 .catch((failure: unknown) => toast.error(failureText(failure)))
                 .finally(() => setBusy(false));
             }}

@@ -284,3 +284,26 @@ describe("rules a review found loose", () => {
     );
   });
 });
+
+describe("a page too long to be read whole", () => {
+  const lint = (text: string, file: string) =>
+    lintWorld(new WorldModel([parsePage(text, file)])).filter((finding) =>
+      /tokens/.test(finding.message),
+    );
+
+  it("says when a character's page passes what their turn takes of it", () => {
+    const page = `---\nname: Yuuka\n---\n\n# Yuuka\n\n${"Numbers. ".repeat(2_300)}`;
+    const [warning] = lint(page, "characters/yuuka.md");
+    expect(warning?.message).toMatch(/only the first 20,000/);
+    expect(warning?.message).toMatch(/about [\d,]+ tokens/);
+  });
+
+  it("weighs words by tokens, so a page in Chinese is long sooner", () => {
+    const zh = `---\nname: 账本\n---\n\n# 账本\n\n${"数".repeat(9_000)}`;
+    expect(lint(zh, "concepts/ledger.md")[0]?.message).toMatch(
+      /long for a page read/,
+    );
+    const en = `---\nname: Ledger\n---\n\n# Ledger\n\n${"ab ".repeat(3_000)}`;
+    expect(lint(en, "concepts/ledger.md")).toEqual([]);
+  });
+});

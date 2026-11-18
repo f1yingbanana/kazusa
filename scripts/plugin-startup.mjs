@@ -210,6 +210,45 @@ export function skipUnusedStartupWork(root) {
   ];
 }
 
+/**
+ * Attention decisions once took 8,000 tokens and cut a character's page to
+ * 1,600, losing the personality and inner voice at its end now that a character
+ * is one page. A world still on exactly those old `base.json` numbers gets the
+ * new ones; a number its owner changed stays.
+ */
+export const OLD_DECISION_LIMITS = {
+  decisionMaxTokens: 8000,
+  decisionIdentityMaxTokens: 600,
+  decisionSoulMaxTokens: 1000,
+};
+
+export function raiseDecisionLimits(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const base = JSON.parse(
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
+  );
+  const wanted = base.config?.plugins?.entries?.kazusa?.config?.contextEngine;
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const engine = config.plugins?.entries?.kazusa?.config?.contextEngine;
+  if (!wanted || !engine) return [];
+  let raised = false;
+  for (const [key, old] of Object.entries(OLD_DECISION_LIMITS))
+    if (
+      engine[key] === old &&
+      typeof wanted[key] === "number" &&
+      wanted[key] > old
+    ) {
+      engine[key] = wanted[key];
+      raised = true;
+    }
+  if (!raised) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [
+    "Attention decisions now read a character's whole page, inner voice included.",
+  ];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
@@ -217,4 +256,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const line of denyImpliedTools(root)) console.log(line);
   for (const line of allowNewCharacterTools(root)) console.log(line);
   for (const line of skipUnusedStartupWork(root)) console.log(line);
+  for (const line of raiseDecisionLimits(root)) console.log(line);
 }

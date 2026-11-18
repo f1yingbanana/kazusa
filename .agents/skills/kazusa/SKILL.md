@@ -1252,8 +1252,9 @@ connect these modules in process.
   model or decision call, nothing characters read, and the server never picks a
   picture for the time of day: the client does, from sim time.
 - **Portraits** (`portraits.ts`): `workspaces/<id>/portraits/<name>.<raster>`,
-  whole figures named like the stickers (`[<outfit>-]<mood>`; the first word is
-  an outfit only when `stickers/stickers.json` declares it), plus optional
+  whole figures named like the stickers (`[<outfit>-]<mood>`; a name starts with
+  an outfit only when `stickers/stickers.json` declares it, the longest that
+  fits, so `school-uniform-happy` is `school-uniform`), plus optional
   `portraits.json` (`size`, `eyeline`, and `placement` by outfit word, `""` for
   none, or by picture name: `centre`, `floor` and `eyes` (where the figure is
   across the picture, where it stands and where its eyes are down it, each 0–1)

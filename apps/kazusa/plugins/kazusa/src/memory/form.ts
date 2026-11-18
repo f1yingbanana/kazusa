@@ -365,7 +365,16 @@ export function composePage(
   const head = Object.keys(out).length
     ? `---\n${YAML.stringify(out, { lineWidth: 0 })}---\n\n`
     : "";
-  const parts = [`# ${fields.name?.trim() || "Untitled"}`];
+  // The heading stays as written (`# Club (部)`) until the name changes.
+  const name = fields.name?.trim() || "Untitled";
+  const written = /^\s*# +(.+?)\s*$/m.exec(
+    original
+      .slice(OPENING.exec(original)?.[0].length ?? 0)
+      .split(/\r?\n## /)[0] ?? "",
+  )?.[1];
+  const parts = [
+    `# ${written && name === was.fields.name?.trim() ? written : name}`,
+  ];
   if (form.lead.trim()) parts.push(form.lead.trim());
   for (const { title, text } of [...close, ...only])
     parts.push(

@@ -396,8 +396,9 @@ export function registerLocation(
       // Whose place is whose: live, Airi going into her own room was judged
       // only likely without it.
       ...(home === undefined ? {} : { home: placeLabel(map, home) }),
-      identity: excerpt(files?.identity ?? null),
-      soul: excerpt(files?.soul ?? null, 600),
+      // The whole page as a rule: its personality and inner voice come last.
+      identity: excerpt(files?.identity ?? null, 4_000),
+      soul: excerpt(files?.soul ?? null, 16_000),
       ...(task
         ? { activity: { type: task.type, description: task.description } }
         : {}),
@@ -733,7 +734,9 @@ export function registerLocation(
     const impressionOf = (id: string): string | null => {
       if (!workspace) return null;
       const card = characterFile(path.join(workspace, "wiki"), id);
-      return existsSync(card) ? excerpt(readFileSync(card, "utf8"), 600) : null;
+      return existsSync(card)
+        ? excerpt(readFileSync(card, "utf8"), 4_000)
+        : null;
     };
     const judgment = await judge(judgeWith(observer, "notice"), {
       agentId: observer,

@@ -1,5 +1,46 @@
+import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import { WorldModel } from "./knowledge.ts";
 import type { Page } from "./page.ts";
+
+/**
+ * OpenClaw's default `bootstrapMaxChars`: a character's turn gets only this
+ * much of their page, which goes in where IDENTITY.md would.
+ */
+export const CARD_MAX_CHARS = 20_000;
+/**
+ * A page past this many tokens (roughly) is long for something read in a
+ * character's context, whose whole turn is 64k tokens by default.
+ */
+export const LONG_PAGE_TOKENS = 8_000;
+
+/** Roughly how many tokens a page's words take, scripts weighed as models do. */
+export const pageTokens = (page: Page): number =>
+  estimateTokens({
+    role: "user",
+    content: [page.lead, ...page.sections.map((section) => section.text)].join(
+      "\n\n",
+    ),
+    timestamp: 0,
+  });
+
+/**
+ * A warning for a page too long to be read whole, if it is. `card`: a World
+ * Wiki page, which is a character's own when it is a person's.
+ */
+function lengthWarning(page: Page, card: boolean): string | undefined {
+  const tokens = pageTokens(page);
+  const about = `about ${tokens.toLocaleString("en")} tokens`;
+  if (
+    card &&
+    page.kind === "person" &&
+    page.path.startsWith("characters/") &&
+    page.length > CARD_MAX_CHARS
+  )
+    return `${page.length.toLocaleString("en")} characters (${about}): a character's turn gets only the first ${CARD_MAX_CHARS.toLocaleString("en")} of their page, so the rest never reaches them. Move what they needn't carry to linked pages.`;
+  if (tokens > LONG_PAGE_TOKENS)
+    return `${about}: long for a page read in a character's context. Splitting it into linked pages lets each part come up when it matters.`;
+  return undefined;
+}
 
 export interface LintFinding {
   readonly level: "error" | "warning";
@@ -19,6 +60,8 @@ export function lintWorld(world: WorldModel): LintFinding[] {
   };
   for (const page of world.pages.values()) {
     for (const problem of page.problems) add("error", page.id, problem);
+    const long = lengthWarning(page, true);
+    if (long) add("warning", page.id, long);
     const reference = (field: string, value: string | undefined): void => {
       if (value && !world.resolve(value))
         add("error", page.id, `\`${field}\` "${value}" resolves to no page`);
@@ -118,6 +161,8 @@ export function lintPersonal(
     const label = `${agentId}/${page.id}`;
     for (const problem of page.problems)
       findings.push({ level: "warning", page: label, message: problem });
+    const long = lengthWarning(page, false);
+    if (long) findings.push({ level: "warning", page: label, message: long });
     if ((page.kind === "person" || page.place) && !world.pages.has(page.id))
       findings.push({
         level: "warning",

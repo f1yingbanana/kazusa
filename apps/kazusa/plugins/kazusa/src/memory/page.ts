@@ -50,6 +50,8 @@ export interface Page {
   readonly kind: PageKind;
   /** Where it is, relative to its wiki's root. */
   readonly path: string;
+  /** The file's length in characters, front matter included. */
+  readonly length: number;
   /** The place component: it is on the map (`place_id`). */
   readonly place: boolean;
   /** The group component: people can be in it (`group: true`). */
@@ -189,6 +191,34 @@ const NOTE =
 const HISTORY = /^- (\d{4}-\d{2}-\d{2})( · news)? — (.+)$/;
 const KNOWN_BY = /^Known by:\s*(.+)$/i;
 const OPENING = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * Front matter without what failed to parse: in a map of groups, only the
+ * entries whose level isn't one (`known: { gehenna: clsoe }`); else the whole
+ * field. `undefined` when the front matter isn't a map at all.
+ */
+function withoutIssues(
+  raw: unknown,
+  issues: readonly { readonly path: readonly PropertyKey[] }[],
+): Record<string, unknown> | undefined {
+  if (!isRecord(raw)) return undefined;
+  const kept: Record<string, unknown> = { ...raw };
+  for (const { path: where } of issues) {
+    const field = where[0];
+    if (field === undefined) continue;
+    const value = kept[String(field)];
+    const entries = isRecord(value)
+      ? Object.entries(value).filter(([, how]) => level.safeParse(how).success)
+      : [];
+    if (entries.length && entries.length < Object.keys(value ?? {}).length)
+      kept[String(field)] = Object.fromEntries(entries);
+    else delete kept[String(field)];
+  }
+  return kept;
+}
 /** Frontmatter numbers a card must not carry; relationships are words. */
 const NUMBER_FIELDS = ["familiarity", "affinity", "trust"];
 
@@ -257,14 +287,20 @@ export function parsePage(raw: string, relative: string): Page {
   let data: z.infer<typeof FRONTMATTER> = { groups: [], known: [], in: [] };
   if (opening) {
     try {
-      const parsed = FRONTMATTER.safeParse(YAML.parse(opening[1]) ?? {});
+      const raw: unknown = YAML.parse(opening[1]) ?? {};
+      const parsed = FRONTMATTER.safeParse(raw);
       if (parsed.success) data = parsed.data;
-      else
+      else {
         problems.push(
           `front matter: ${parsed.error.issues
             .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
             .join("; ")}`,
         );
+        // One bad entry goes alone: the rest of the front matter still holds.
+        const kept = withoutIssues(raw, parsed.error.issues);
+        const again = kept && FRONTMATTER.safeParse(kept);
+        if (again?.success) data = again.data;
+      }
     } catch (error: unknown) {
       problems.push(`front matter is not YAML: ${String(error)}`);
     }
@@ -402,6 +438,7 @@ export function parsePage(raw: string, relative: string): Page {
     path: relative.split(/[\\/]/).join("/"),
     place: data.place_id !== undefined || olderPlace(relative),
     group: data.group === true,
+    length: raw.length,
     name,
     aliases: [
       ...new Set(

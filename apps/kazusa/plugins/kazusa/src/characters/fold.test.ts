@@ -77,6 +77,19 @@ describe("one page per character", () => {
     expect(twice).toBe(once);
   });
 
+  it("keeps front matter that doesn't parse as it was written", () => {
+    const broken = "---\nname: Noa\nknown: [Seminar\n---\n";
+    const after = convertPage(
+      `${broken}\n# Noa\n\nKeeps the minutes.\n`,
+      "person",
+      "noa",
+      { soul: SOUL },
+    );
+    expect(after.startsWith(broken)).toBe(true);
+    expect(after).toContain("# Noa\n\nKeeps the minutes.");
+    expect(after).toContain("Known by: noa\n\nStern, secretly kind.");
+  });
+
   it("leaves a page that needs nothing exactly as it is", () => {
     const page =
       "---\nname: Noa\ngroups: [Seminar]\n---\n\n# Noa\n\nKeeps the minutes.\n";

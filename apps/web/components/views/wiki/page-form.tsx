@@ -62,19 +62,40 @@ const NONE = "__none";
 
 /**
  * Lines a source wrapped by hand, joined back into paragraphs for editing: a
- * list item, a quote or a heading still starts its own line.
+ * list item, a quote or a heading still starts its own line, and a fenced code
+ * block is kept line for line. Only what is edited is saved this way.
  */
 export function unwrap(text: string): string {
   const out: string[] = [];
+  /** The fence a code block opened with, while inside one. */
+  let fence: string | undefined;
   for (const line of text.split(/\r?\n/)) {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence !== undefined) {
+      // A code block is kept line for line, up to the fence that closes it.
+      out.push(line);
+      if (
+        marker &&
+        marker[0] === fence[0] &&
+        marker.length >= fence.length &&
+        line.trim() === marker
+      )
+        fence = undefined;
+      continue;
+    }
+    if (marker) {
+      fence = marker;
+      out.push(line);
+      continue;
+    }
     const last = out.at(-1);
-    const starts = /^\s*([-*+] |\d+\. |>|#|\||```)/.test(line);
+    const starts = /^\s*([-*+] |\d+\. |>|#|\|)/.test(line);
     if (
       last !== undefined &&
       last.trim() !== "" &&
       line.trim() !== "" &&
       !starts &&
-      !/^\s*```/.test(last)
+      !/^\s*(`{3,}|~{3,})/.test(last)
     )
       out[out.length - 1] = `${last} ${line.trim()}`;
     else out.push(line);
@@ -496,9 +517,15 @@ export function PageForm({
         kind: opened.kind,
         base: opened.hash,
         fields: current.fields,
-        lead: current.lead,
-        close: current.close,
-        only: ownVoice ? current.only : "",
+        // A text left as it opened is saved as written, line breaks and all:
+        // the form shows it joined up only to read.
+        lead: current.lead === initial.lead ? opened.lead : current.lead,
+        close: current.close === initial.close ? opened.close : current.close,
+        only: !ownVoice
+          ? ""
+          : current.only === initial.only
+            ? opened.only
+            : current.only,
         ...(isGroup && upgraded
           ? {
               members: current.members.map(({ id: who, level }) => ({

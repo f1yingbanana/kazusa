@@ -2002,7 +2002,7 @@ export const WikiSavePayloadSchema = z.object({
   id: WikiIdSchema,
   agent: z.string().min(1).optional(),
   kind: WikiKindSchema.optional(),
-  text: z.string().max(200_000),
+  text: z.string(),
   base: z.string().nullable().optional(),
 });
 export type WikiSavePayload = z.infer<typeof WikiSavePayloadSchema>;

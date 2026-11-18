@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -18,6 +17,7 @@ import { currentConfig } from "../current-config.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
+  TEXT_BODY_BYTES,
   sendJson,
 } from "../http/helpers.ts";
 import { LOCATION_CONFIG } from "../location/config.ts";
@@ -36,6 +36,7 @@ import {
   EditConflict,
   pictureType,
   putPicture,
+  readJsonObject,
   readText,
   removePicture,
   writeTextOver,
@@ -96,17 +97,21 @@ export function registerWikiEditor(
 
   const stickersFile = (workspace: string) =>
     path.join(workspace, "stickers", "stickers.json");
-  const readStickersFile = (workspace: string): StickersFile => {
-    try {
-      const parsed: unknown = JSON.parse(
-        readFileSync(stickersFile(workspace), "utf8"),
-      );
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as StickersFile)
-        : {};
-    } catch {
-      return {};
-    }
+  /**
+   * `stickers.json` as it is, `{}` while there is none. One that can't be read
+   * or isn't a JSON object reads as `{}` to show, but a save refuses it
+   * (`forSave`): writing over it would lose every outfit and look in it.
+   */
+  const readStickersFile = (
+    workspace: string,
+    forSave = false,
+  ): StickersFile => {
+    const read = readJsonObject(stickersFile(workspace));
+    if (read.ok) return read.value;
+    if (read.missing || !forSave) return {};
+    throw new Refusal(
+      `stickers/stickers.json ${read.problem}. Mend it first: saving now would lose what it holds.`,
+    );
   };
 
   const character = async (id: string): Promise<WikiCharacterResponse> => {
@@ -183,7 +188,9 @@ export function registerWikiEditor(
     "wiki/memory/save",
     "POST",
     handle(async (req, res) => {
-      const payload = WikiMemoryPayloadSchema.parse(await readJsonBody(req));
+      const payload = WikiMemoryPayloadSchema.parse(
+        await readJsonBody(req, TEXT_BODY_BYTES),
+      );
       const file = path.join(workspaceOf(payload.id), "MEMORY.md");
       sendJson(res, 200, writeTextOver(file, payload.text, payload.base));
     }),
@@ -277,7 +284,7 @@ export function registerWikiEditor(
     handle(async (req, res) => {
       const payload = WikiStickersPayloadSchema.parse(await readJsonBody(req));
       const workspace = workspaceOf(payload.id);
-      const manifest = readStickersFile(workspace);
+      const manifest = readStickersFile(workspace, true);
       const outfits = { ...(manifest.outfits ?? {}) };
       for (const [word, worn] of Object.entries(payload.outfits ?? {}))
         if (worn === null) delete outfits[word];

@@ -163,6 +163,19 @@ Milk.
     ).toEqual(["`trust` is a number; use `relation` words"]);
   });
 
+  it("drops only a mistyped level, keeping the rest of the front matter", () => {
+    const page = parsePage(
+      "---\nname: Yuuka Hayase\nsummary: The Seminar's treasurer.\nknown: { everyone: heard of, Gehenna: clsoe, Millennium: knows }\nin: { Seminar: close }\n---\n# Yuuka\n",
+      "characters/yuuka.md",
+    );
+    expect(page.problems.join(" ")).toMatch(/known/);
+    expect(page.name).toBe("Yuuka Hayase");
+    expect(page.summary).toBe("The Seminar's treasurer.");
+    expect(page.everyone).toBe("heard of");
+    expect(page.known).toEqual([{ ref: "Millennium", level: "knows" }]);
+    expect(page.in).toEqual([{ ref: "Seminar", level: "close" }]);
+  });
+
   it("reads `known` and `in` as a list, or with how well each knows them", () => {
     const list = parsePage(
       "---\nin: [Seminar, Millennium]\n---\n# Yuuka\n",

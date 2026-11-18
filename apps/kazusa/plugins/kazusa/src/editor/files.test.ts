@@ -12,12 +12,13 @@ import {
   EditConflict,
   pictureType,
   putPicture,
+  readJsonObject,
   readText,
   removePicture,
   writeTextOver,
 } from "./files.ts";
 
-const dir = () => mkdtempSync(path.join(tmpdir(), "studio-"));
+const dir = () => mkdtempSync(path.join(tmpdir(), "wiki-edit-"));
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const WEBP = Buffer.concat([
@@ -37,6 +38,24 @@ describe("a text the Wiki saves", () => {
     writeFileSync(file, "Slept on it\n");
     expect(() => writeTextOver(file, "Two", first.hash)).toThrow(EditConflict);
     expect(readFileSync(file, "utf8")).toBe("Slept on it\n");
+  });
+});
+
+describe("a JSON file the Wiki writes over", () => {
+  it("is read only when it is an object, and says what is wrong otherwise", () => {
+    const at = dir();
+    const file = path.join(at, "stickers.json");
+    expect(readJsonObject(file)).toMatchObject({ ok: false, missing: true });
+    writeFileSync(file, '{ "outfits": { "swim": "A swimsuit" }, }');
+    expect(readJsonObject(file)).toMatchObject({
+      ok: false,
+      missing: false,
+      problem: expect.stringMatching(/valid JSON/),
+    });
+    writeFileSync(file, "[]");
+    expect(readJsonObject(file)).toMatchObject({ ok: false, missing: false });
+    writeFileSync(file, '{ "outfits": {} }');
+    expect(readJsonObject(file)).toEqual({ ok: true, value: { outfits: {} } });
   });
 });
 

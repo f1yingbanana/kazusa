@@ -66,20 +66,31 @@ export const CARD_FILES = ["IDENTITY.md", "SOUL.md"] as const;
 
 const OPENING = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
-/** Front matter and body; broken front matter is none. */
-export function split(text: string): { front: Front; body: string } {
+/**
+ * Front matter and body. Broken front matter reads as none, and `broken` keeps
+ * it as written so it is never lost.
+ */
+export function split(text: string): {
+  front: Front;
+  body: string;
+  broken?: string;
+} {
   const opening = OPENING.exec(text);
-  let front: Front = {};
+  let front: Front | undefined;
   if (opening) {
     try {
       const parsed: unknown = YAML.parse(opening[1]);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
         front = parsed as Front;
+      else if (parsed === null || parsed === undefined) front = {};
     } catch {
-      front = {};
+      front = undefined;
     }
   }
-  return { front, body: text.slice(opening?.[0].length ?? 0) };
+  const body = text.slice(opening?.[0].length ?? 0);
+  return opening && !front
+    ? { front: {}, body, broken: opening[0] }
+    : { front: front ?? {}, body };
 }
 
 interface Sections {
@@ -167,7 +178,7 @@ export function convertPage(
   id: string,
   card?: Card,
 ): string {
-  const { front, body } = split(text);
+  const { front, body, broken } = split(text);
   const page = sectionsOf(body);
   const identity = card?.identity ? split(card.identity) : undefined;
   const identityBody = identity ? sectionsOf(identity.body) : undefined;
@@ -299,7 +310,12 @@ export function convertPage(
     own = `${own.slice(0, end)}\n${lead}\n${own.slice(end)}`;
   }
   const tail = added.length ? `\n\n${added.join("\n\n")}` : "";
-  return `---\n${YAML.stringify(out, { lineWidth: 0 })}---\n\n${own.trimEnd()}${tail}\n`;
+  // Front matter that doesn't parse stays as it was, for its author to mend:
+  // nothing in it is read, so nothing is written in its place.
+  const opening = broken
+    ? `${broken.trimEnd()}\n`
+    : `---\n${YAML.stringify(out, { lineWidth: 0 })}---\n`;
+  return `${opening}\n${own.trimEnd()}${tail}\n`;
 }
 
 /** A World Wiki page's kind for the fold, from its path under the wiki. */

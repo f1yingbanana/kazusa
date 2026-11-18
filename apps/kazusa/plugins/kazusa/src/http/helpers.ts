@@ -12,9 +12,18 @@ import {
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { readJsonBodyWithLimit } from "openclaw/plugin-sdk/webhook-request-guards";
 
-export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+/**
+ * Room for a whole text a person writes (a page, MEMORY.md): its length is
+ * lint's to weigh in tokens, not a save's to refuse.
+ */
+export const TEXT_BODY_BYTES = 8_000_000;
+
+export async function readJsonBody(
+  req: IncomingMessage,
+  maxBytes = 256_000,
+): Promise<unknown> {
   const result = await readJsonBodyWithLimit(req, {
-    maxBytes: 256_000,
+    maxBytes,
     timeoutMs: 10_000,
     destroyOnLimit: false,
   });

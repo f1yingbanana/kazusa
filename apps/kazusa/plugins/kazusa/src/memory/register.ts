@@ -29,6 +29,7 @@ import { sharedDir } from "../shared-dir.ts";
 import {
   createRouteRegistrar,
   readJsonBody,
+  TEXT_BODY_BYTES,
   sendJson,
 } from "../http/helpers.ts";
 import type { Clock } from "../clock/clock.ts";
@@ -1224,7 +1225,9 @@ export function registerMemory(
     }
   };
   route("wiki/save", "POST", async (req, res) => {
-    const payload = WikiSavePayloadSchema.parse(await readJsonBody(req));
+    const payload = WikiSavePayloadSchema.parse(
+      await readJsonBody(req, TEXT_BODY_BYTES),
+    );
     try {
       sendJson(res, 200, await savePage(payload));
     } catch (error) {
@@ -1295,7 +1298,7 @@ export function registerMemory(
   };
   route("wiki/form/save", "POST", async (req, res) => {
     const payload = WikiPageFormSavePayloadSchema.parse(
-      await readJsonBody(req),
+      await readJsonBody(req, TEXT_BODY_BYTES),
     );
     const root = wikiRoot(payload.agent);
     const kind = kindOf(root, payload.id, payload.kind);

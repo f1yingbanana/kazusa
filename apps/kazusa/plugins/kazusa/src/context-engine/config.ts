@@ -39,10 +39,19 @@ export const CONTEXT_ENGINE_CONFIG = z.strictObject({
   toolHistoryMaxTokens: allowance(600),
   /** The same for the system agent, whose jobs span many calls. */
   systemAgentToolHistoryMaxTokens: allowance(4_000),
-  decisionMaxTokens: z.number().int().min(2_000).max(32_000).default(8_000),
+  /**
+   * The most one attention decision may send. Each part below has its own cap
+   * and a share of this; it is a ceiling, not what a decision costs.
+   */
+  decisionMaxTokens: z.number().int().min(2_000).max(32_000).default(24_000),
   decisionShortTermHours: z.number().positive().default(4),
-  decisionIdentityMaxTokens: allowance(600),
-  decisionSoulMaxTokens: allowance(1_000),
+  /**
+   * A character's page: its opening as `identity`, its sections as `soul`.
+   * Enough for a whole page (Kivotos: openings under 250 tokens, sections at
+   * most about 2,000), so personality and inner voice, at the end, aren't cut.
+   */
+  decisionIdentityMaxTokens: allowance(1_000),
+  decisionSoulMaxTokens: allowance(4_000),
   decisionMemoryMaxTokens: allowance(1_000),
   decisionBrainMaxTokens: allowance(800),
   decisionHistoryMaxTokens: allowance(1_600),

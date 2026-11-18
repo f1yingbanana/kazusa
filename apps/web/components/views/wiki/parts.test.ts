@@ -20,4 +20,12 @@ describe("a page's text opened in the form", () => {
       "A gifted mathematician.\n\n- Hair: long navy blue\n- Eyes: blue\n> Receipt.",
     );
   });
+
+  it("keeps a fenced block line for line, up to the fence that closes it", async () => {
+    const { unwrap } = await import("./page-form");
+    const block = "````\nfirst line\n```\nsecond line\n````";
+    expect(unwrap(`Before\nit.\n${block}\nAfter\nit.`)).toBe(
+      `Before it.\n${block}\nAfter it.`,
+    );
+  });
 });

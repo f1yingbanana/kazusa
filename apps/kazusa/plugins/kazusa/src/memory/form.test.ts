@@ -151,6 +151,24 @@ Windy.
     expect(text).toContain("entry_minutes: 2");
   });
 
+  it("keeps a heading written apart from the name until the name changes", () => {
+    const club = `---\nname: Sweets Club\n---\n\n# Sweets Club (スイーツ部)\n\nCake.\n`;
+    const spot = {
+      kind: "concept",
+      personal: false,
+      id: "sweets_club",
+    } as const;
+    const form = splitPage(club, spot);
+    expect(composePage(club, form, false, spot)).toBe(club);
+    const renamed = composePage(
+      club,
+      { ...form, fields: { ...form.fields, name: "Cake Club" } },
+      false,
+      spot,
+    );
+    expect(renamed).toContain("\n# Cake Club\n");
+  });
+
   it("keeps the old name as another name when renamed", () => {
     const form = splitPage(YUUKA, SPOT);
     const text = composePage(

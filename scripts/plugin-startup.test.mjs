@@ -8,6 +8,7 @@ import {
   denyImpliedTools,
   IMPLIED_TOOLS,
   loadNewPlugins,
+  raiseDecisionLimits,
   skipUnusedStartupWork,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
@@ -24,7 +25,17 @@ function repo(world) {
       config: {
         plugins: {
           entries: {
-            kazusa: { enabled: true, hooks: { allowConversationAccess: true } },
+            kazusa: {
+              enabled: true,
+              hooks: { allowConversationAccess: true },
+              config: {
+                contextEngine: {
+                  decisionMaxTokens: 24000,
+                  decisionIdentityMaxTokens: 1000,
+                  decisionSoulMaxTokens: 4000,
+                },
+              },
+            },
             zai: { enabled: true, hooks: policy },
             venice: { enabled: true, hooks: policy },
             groq: { enabled: true, hooks: policy },
@@ -314,5 +325,46 @@ describe("allowNewCharacterTools", () => {
     expect(allowNewCharacterTools(root)).toEqual([]);
     expect(read().tools).toEqual({ profile: "full" });
     expect(allowNewCharacterTools(repo().root)).toEqual([]);
+  });
+});
+
+describe("raiseDecisionLimits", () => {
+  const world = (contextEngine) => ({
+    plugins: { entries: { kazusa: { config: { contextEngine } } } },
+  });
+  const engine = (read) => read().plugins.entries.kazusa.config.contextEngine;
+
+  it("raises the old numbers to base.json's, once", () => {
+    const { root, read } = repo(
+      world({
+        decisionMaxTokens: 8000,
+        decisionIdentityMaxTokens: 600,
+        decisionSoulMaxTokens: 1000,
+        decisionMemoryMaxTokens: 1000,
+      }),
+    );
+    expect(raiseDecisionLimits(root)).toHaveLength(1);
+    expect(engine(read)).toEqual({
+      decisionMaxTokens: 24000,
+      decisionIdentityMaxTokens: 1000,
+      decisionSoulMaxTokens: 4000,
+      decisionMemoryMaxTokens: 1000,
+    });
+    expect(raiseDecisionLimits(root)).toEqual([]);
+  });
+
+  it("keeps a number the world's owner chose", () => {
+    const { root, read } = repo(
+      world({ decisionMaxTokens: 12000, decisionSoulMaxTokens: 1000 }),
+    );
+    raiseDecisionLimits(root);
+    expect(engine(read)).toEqual({
+      decisionMaxTokens: 12000,
+      decisionSoulMaxTokens: 4000,
+    });
+  });
+
+  it("does nothing before a world exists", () => {
+    expect(raiseDecisionLimits(repo().root)).toEqual([]);
   });
 });
