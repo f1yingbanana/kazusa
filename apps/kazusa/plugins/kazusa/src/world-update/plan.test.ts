@@ -546,3 +546,61 @@ describe("an update between two releases in the two-folder layout", () => {
     expect(get(live, "shared/wiki/concepts/choir.md")).toContain("Songs.");
   });
 });
+
+describe("renames after the move to two folders", () => {
+  it("follows a renamed place or merged concept in concepts/", () => {
+    const v1 = path.join(root, "nv1");
+    const live = path.join(root, "nworld");
+    const v2 = path.join(root, "worlds", "ndemo");
+    const character = "---\nname: Amy\n---\n\n# Amy\n\nShops.\n";
+    for (const dir of [v1, live]) {
+      put(dir, "package.json", pkg({ version: "1.0.0" }));
+      put(dir, "shared/wiki/characters/amy.md", character);
+      put(dir, "shared/wiki/concepts/hub.md", place("hub"));
+      put(
+        dir,
+        "shared/wiki/concepts/old_market.md",
+        place("old_market", "\nparent: hub"),
+      );
+      put(
+        dir,
+        "workspaces/amy/wiki/concepts/old_market.md",
+        "---\nname: old_market\n---\n\nI shop here.\n",
+      );
+    }
+    // Play moved the market on the map and wrote in Amy's page on it.
+    put(
+      live,
+      "shared/wiki/concepts/old_market.md",
+      place("old_market", "\nparent: hub\nmap: { x: 0.2, y: 0.7 }"),
+    );
+    put(
+      live,
+      "workspaces/amy/wiki/concepts/old_market.md",
+      "---\nname: old_market\n---\n\nI shop here. Bo sells pears.\n",
+    );
+    put(
+      v2,
+      "package.json",
+      pkg({ version: "2.0.0" }, { renames: { old_market: "market" } }),
+    );
+    put(v2, "shared/wiki/characters/amy.md", character);
+    put(v2, "shared/wiki/concepts/hub.md", place("hub"));
+    put(v2, "shared/wiki/concepts/market.md", place("market", "\nparent: hub"));
+    put(
+      v2,
+      "workspaces/amy/wiki/concepts/market.md",
+      "---\nname: market\n---\n\nI shop here.\n",
+    );
+    const plan = planOf(live, v2, v1);
+    expect(plan.pendingRenames).toEqual({ old_market: "market" });
+    apply(live, v2, plan);
+    expect(
+      existsSync(path.join(live, "shared/wiki/concepts/old_market.md")),
+    ).toBe(false);
+    expect(get(live, "shared/wiki/concepts/market.md")).toContain("x: 0.2");
+    expect(get(live, "workspaces/amy/wiki/concepts/market.md")).toContain(
+      "Bo sells pears.",
+    );
+  });
+});

@@ -151,6 +151,22 @@ Windy.
     expect(text).toContain("entry_minutes: 2");
   });
 
+  it("reads the editor's level words as the levels they are", () => {
+    const page =
+      "---\nname: Yuuka\nin:\n  seminar: close member\n  millennium: associate\n  gym: member\n---\n\n# Yuuka\n\nTreasurer.\n";
+    const form = splitPage(page, SPOT);
+    expect(form.fields.in).toEqual([
+      { ref: "seminar", level: "close" },
+      { ref: "millennium", level: "heard of" },
+      { ref: "gym", level: "knows" },
+    ]);
+    const after = parsePage(
+      composePage(page, form, false, SPOT),
+      "characters/yuuka-hayase.md",
+    );
+    expect(after.in).toEqual(parsePage(page, "characters/yuuka-hayase.md").in);
+  });
+
   it("keeps a heading written apart from the name until the name changes", () => {
     const club = `---\nname: Sweets Club\n---\n\n# Sweets Club (スイーツ部)\n\nCake.\n`;
     const spot = {

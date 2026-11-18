@@ -231,10 +231,11 @@ export function planUpdate(
       file.startsWith("shared/wiki/characters/"),
     );
   const upgrade = twoFolders(template) && !twoFolders(base);
+  // In the two-folder layout a renamed place, or a merged concept, is in
+  // `concepts/`, whether this update moves the world there or it already is.
+  const inConcepts = twoFolders(template);
   const where = (file: string) =>
-    upgrade
-      ? renamedPath(upgradedPath(file), renames, true)
-      : renamedPath(file, renames);
+    renamedPath(upgrade ? upgradedPath(file) : file, renames, inConcepts);
 
   const liveFiles = mapped(filesOf(live), where);
   const baseOriginal = mapped(base.ids.keys(), where);
@@ -508,7 +509,7 @@ export function planUpdate(
           renamedPath(
             upgrade ? upgradedPath(file) : file,
             { [from]: renames[from] },
-            upgrade,
+            inConcepts,
           ) !== (upgrade ? upgradedPath(file) : file),
       ),
     ),

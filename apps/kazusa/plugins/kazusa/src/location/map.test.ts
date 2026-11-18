@@ -105,6 +105,15 @@ Body text.
       bodyMarkdown: "# Sweets Club Room\n\nBody text.",
     });
     expect(() => parsePlace("---\nname: No id\n---\n")).toThrow();
+    // No summary: the opening's first sentence stands in, as on any page.
+    expect(
+      parsePlace(
+        "---\nplace_id: well\nname: Well\n---\n\n# Well\n\nAn old stone well. Moss grows on it.\n\n## Rumours\n\nWishes.\n",
+      ).summary,
+    ).toBe("An old stone well.");
+    expect(
+      parsePlace("---\nplace_id: well\nname: Well\n---\n\n# Well\n").summary,
+    ).toBe("");
   });
 
   it("orders the tree depth-first, areas by name", () => {

@@ -141,6 +141,15 @@ const level = z
   );
 
 /**
+ * A level as a page may write it, the editor's words included (`member`,
+ * `associate`, `close member`, `know well`); `undefined` when it isn't one.
+ */
+export function levelOf(value: unknown): Level | undefined {
+  const read = level.safeParse(value);
+  return read.success ? read.data : undefined;
+}
+
+/**
  * `known: { everyone: heard of, gehenna: knows, prefect_team: close }`; a plain
  * list means its members know it.
  */
@@ -280,6 +289,25 @@ export function plainLinks(
 }
 
 /** Never throws: a broken page still has an id, a body and a lint problem. */
+/**
+ * A `##` section, and who it is known by when its first paragraph says so
+ * (`Known by: <ids>`, however many lines it wraps to).
+ */
+function sectionOf(title: string, body: string): Section {
+  const [first = "", ...rest] = body.split(/\r?\n\s*\r?\n/);
+  const restricted = first.replace(/\s+/g, " ").match(KNOWN_BY);
+  return restricted
+    ? {
+        title,
+        text: rest.join("\n\n").trim(),
+        knownBy: restricted[1]
+          .split(",")
+          .map((who) => who.trim())
+          .filter(Boolean),
+      }
+    : { title, text: body, knownBy: [] };
+}
+
 export function parsePage(raw: string, relative: string): Page {
   const problems: string[] = [];
   const id = path.basename(relative, ".md");
@@ -368,11 +396,7 @@ export function parsePage(raw: string, relative: string): Page {
         // A History of dated lines is events; one written as prose is just
         // a section, read like any other.
         if (!bulletLines(block.body).some((line) => HISTORY.test(line))) {
-          sections.push({
-            title: block.heading,
-            text: block.body,
-            knownBy: [],
-          });
+          sections.push(sectionOf(block.heading, block.body));
           break;
         }
         for (const line of bulletLines(block.body)) {
@@ -394,23 +418,8 @@ export function parsePage(raw: string, relative: string): Page {
       case "what they think of me":
         theyThinkOfMe = block.body.replace(/\s+/g, " ").trim() || undefined;
         break;
-      default: {
-        // `Known by:` is its own paragraph, however many lines it wraps to.
-        const [first = "", ...rest] = block.body.split(/\r?\n\s*\r?\n/);
-        const restricted = first.replace(/\s+/g, " ").match(KNOWN_BY);
-        sections.push(
-          restricted
-            ? {
-                title: block.heading,
-                text: rest.join("\n\n").trim(),
-                knownBy: restricted[1]
-                  .split(",")
-                  .map((who) => who.trim())
-                  .filter(Boolean),
-              }
-            : { title: block.heading, text: block.body, knownBy: [] },
-        );
-      }
+      default:
+        sections.push(sectionOf(block.heading, block.body));
     }
   }
 

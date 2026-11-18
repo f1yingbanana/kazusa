@@ -31,8 +31,10 @@ export function WikiLink({
         {label}
       </span>
     );
-  // Somewhere else is never still editing, nor a new page half named.
+  // Somewhere else is never still editing, nor a new page half named, nor
+  // the Problems or Nights list in its place.
   const leave = {
+    "wiki.tab": null,
     "wiki.edit": null,
     "wiki.raw": null,
     "wiki.part": null,

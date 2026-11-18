@@ -210,7 +210,8 @@ After-School Sweets Club.
 - `name` (string, required): Display name, used in speech and situations.
 - `parent` (place id, optional): The area this place is inside; absent at top
   level.
-- `summary` (string, required): One sentence shown in **Where you are**.
+- `summary` (string): One sentence shown in **Where you are**; without it, the
+  opening's first sentence.
 - Body: the full description, shown to a character the first time they are there
   (until they have a card for the place).
 - `entry_minutes` (number ≥ 0, default 1): Walking minutes to the parent's open

@@ -416,7 +416,11 @@ export function renderWhereabouts(
   // A link reads as what it links to.
   const plain = (text: string): string =>
     plainLinks(text, (id) => map.names?.get(id) ?? id);
-  const lines = [`${placeLabel(map, place.id)}. ${plain(place.summary)}`];
+  const lines = [
+    [`${placeLabel(map, place.id)}.`, plain(place.summary)]
+      .filter(Boolean)
+      .join(" "),
+  ];
   // What a first visit takes in is its opening; the sections are for those
   // close to it.
   const description = plain(

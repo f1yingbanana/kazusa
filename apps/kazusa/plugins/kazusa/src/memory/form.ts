@@ -1,6 +1,6 @@
 import YAML from "yaml";
 import type { WikiPageForm, WikiPageFormFields } from "@kazusa/client";
-import { EVERYONE, LEVELS, type Level, type PageKind } from "./page.ts";
+import { EVERYONE, levelOf, type Level, type PageKind } from "./page.ts";
 
 /*
  * A page as the Wiki's form edits it, and back: the front matter fields Kazusa
@@ -88,12 +88,8 @@ const asText = (value: unknown): string | undefined =>
     ? String(value).trim() || undefined
     : undefined;
 
-const asLevel = (value: unknown): Level => {
-  const said = String(value).trim().toLowerCase();
-  return (LEVELS as readonly string[]).includes(said)
-    ? (said as Level)
-    : "knows";
-};
+/** A level as written, read the way pages read it; anything else is `knows`. */
+const asLevel = (value: unknown): Level => levelOf(value) ?? "knows";
 
 function groupsOf(value: unknown): WikiPageFormFields["groups"] {
   if (value && typeof value === "object" && !Array.isArray(value))

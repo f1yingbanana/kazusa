@@ -180,8 +180,9 @@ by name keeps its members to itself (older worlds: never shown).
 
 - `## History` holds dated in-world events (§3.4). Undated edits anywhere else
   are retcons.
-- World character cards: `groups` (the groups that know them, and so the groups
-  they are in) and `home`. Their lead is what anyone who sees them notices.
+- World character pages: `in` (the groups they are in, and how involved),
+  `known` (the groups that know them, beyond those) and `home`. Their lead is
+  what anyone who sees them notices.
 
 **Personal page:**
 
@@ -225,18 +226,18 @@ My go-to for strawberry milk after club. Lately I'm not sure it'll last.
 `depth(character, worldPage)` is one of `none < heard of < familiar < intimate`,
 computed in code as the **highest** of:
 
-1. **The page's groups.** Each entry of its `groups` reaches the members of that
-   group: `heard of` gives heard of, `knows` familiar, `close` intimate.
-   `everyone` reaches every character.
-2. **Membership.** A character is in every group their own page lists at `knows`
-   or `close`; a group that has only heard of them doesn't make them its own.
-   They know that group's page as well as their entry says.
+1. **The page's `known`.** Each group it names reaches that group's members:
+   `heard of` gives heard of, `knows` familiar, `close` intimate, capped by how
+   involved each member is. `everyone` reaches every character.
+2. **Membership.** A character is in every group their own page's `in` names:
+   `heard of` (associate), `knows` (member) or `close` (close member). They know
+   that group's page as well as their entry says.
 3. **Home**: their `home`, the place it is in and everything in that give
    intimate, except someone else's home that no group knows (their own room).
 4. **Experience**: having a personal page with that id gives at least familiar
    (they've been there or met them).
 
-A page with no `groups` (a dorm room, a hideout) is known only to those who live
+A page with no `known` (a dorm room, a hideout) is known only to those who live
 there or around it, and to those who have been there. The Wiki shows each page's
 groups at the top, with who in the cast is in a group (`GET /kazusa/wiki/reach`
 gives the names for each depth and a group's members).
@@ -308,9 +309,9 @@ world and workspaces are tracked in git, so every edit has a diff and history.
 **Add a concept, place or person mid-run.** Drop the file in. It reaches
 characters at their depth immediately, as if it always existed.
 
-**Make something exclusive.** Narrow its `groups` to those who know it, or leave
-them out so only those who live there or have been there know it. A secret a few
-people share goes in each of their own wikis.
+**Make something exclusive.** Narrow its `known` to the groups who know it, or
+leave it out so only those who live there or have been there know it. A secret a
+few people share goes in each of their own wikis.
 
 **Give someone an unusual background.** Write it into their own wiki: a personal
 page on the black market makes it familiar to them.
@@ -325,9 +326,10 @@ also have always believed it, edit their notes or ask ARONA to sweep (§5).
 **Retcon what a character believes.** Edit their page: lead, notes or open
 threads. Your edit wins over any concurrent write, and sleep builds on it.
 
-**Plant a common misconception.** Say it in the lead or summary, which those who
-merely know of it read, and keep the truth in a section only those close to it
-get; or seed it as a note in the believers' own wikis.
+**Plant a common misconception.** Say it in the summary, which everyone who has
+heard of it reads (the lead reaches only those who know it), and keep the truth
+in a section only those close to it get; or seed it as a note in the believers'
+own wikis.
 
 **Check what someone knows.** The explainer: pick a character and a page to see
 depth and why ("familiar: northgate_academy: knows"), or a character alone for
@@ -377,9 +379,9 @@ her tools of her own, allowlisted for her only:
 
 **Backfill the current world** (one-off, phase 2)
 
-- World: add `summary` to every concept; infer `groups` from the schools a page
+- World: add `summary` to every concept; infer `known` from the schools a page
   links or mentions and list the ambiguous ones for Sensei; move character
-  cards' `## Public Background` into the lead; give homes no `groups`.
+  cards' `## Public Background` into the lead; give homes no `known`.
 - Personal: move `memory/relationships/*.md` into `wiki/entities/characters/`;
   move root-level pages into `concepts/`; convert interaction logs into notes;
   replace number fields with `relation`; turn `memory/*.md` diaries into
@@ -668,7 +670,7 @@ their view in their own voice, what they guess the other thinks of them, open
 threads and dated notes. Depth (§3.3) decides how much of the canon they see;
 having a personal page makes it at least familiar. Public figures and a player
 the whole cast knows get `everyone: heard of` or `everyone: knows` in the
-`groups` on their world card.
+`known` on their world page.
 
 **What comes to mind** is retrieved from what they perceived (§7.2): the lines
 of the delivery, never Kazusa's wording around them. A check-in perceives
@@ -718,7 +720,7 @@ and `references/context_engine.md`.
    off dreaming and the `session-memory` hook.
 2. **Format and depth**: parser, lint, depth, `knowledge_explain`, `wiki_lint`,
    the explain/lint read models.
-3. **Backfill** (ARONA, §5): world `summary`/`groups`; personal migrations.
+3. **Backfill** (ARONA, §5): world `summary`/`known`; personal migrations.
 4. **Index and retrieval**: SQLite index, watcher, lexical + graph signals,
    replacing `readPersonalWiki` and Places-you-know relevance; the roster; an
    evaluation set from situation snapshots with expected pages (that record was

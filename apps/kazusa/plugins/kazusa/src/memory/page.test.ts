@@ -246,4 +246,16 @@ describe("a History written as prose", () => {
       }),
     );
   });
+  it("keeps who it is known by, like any section", () => {
+    const page = parsePage(
+      "---\nname: Amy\n---\n# Amy\n\nA courier.\n\n## History\n\nKnown by: amy\n\nShe ran from the [[harbour]] as a child.\n",
+      "characters/amy.md",
+    );
+    expect(page.sections).toContainEqual({
+      title: "History",
+      text: "She ran from the [[harbour]] as a child.",
+      knownBy: ["amy"],
+    });
+    expect(page.linksAt.close).not.toContain("harbour");
+  });
 });

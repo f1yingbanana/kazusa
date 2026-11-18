@@ -537,7 +537,10 @@ written. If it was made from a template whose creator has released a version in
 the new format, update to it (`world-update`): that moves every page to its new
 folder and keeps what play wrote. There is no other way into the new format: a
 world without such a release keeps working as it is, and a new world starts in
-it.
+it. Until it updates, add to an older world in its own layout (characters in
+`entities/characters/` with their IDENTITY.md and SOUL.md, places in
+`entities/places/`), never in `characters/` or `concepts/`: the first page there
+makes Kazusa read the world as the new layout.
 
 ## Finishing
 

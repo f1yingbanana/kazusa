@@ -419,6 +419,7 @@ export function WorldPage({ id }: { id: string }) {
                   "wiki.page": null,
                   "wiki.part": null,
                   "wiki.edit": null,
+                  "wiki.tab": null,
                 });
                 void setView("wiki");
               }}

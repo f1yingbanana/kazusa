@@ -176,9 +176,10 @@ Ask the user once how characters should experience the update:
 
 ## 2. Apply
 
-1. Pause the clock: `clock_now` to note the speed, then `clock_set_speed` 0.
-   `world_update` refuses to apply while time runs. It stays paused until the
-   end.
+1. Pause the clock (`clock_set_speed` 0): `world_update` refuses to apply while
+   time runs, and no time may pass while the world changes. Never start it again
+   yourself: when the update is done it stays paused, and starting time, which
+   costs money, is the user's call.
 2. `world_update` with `action: "apply"` and the chosen `layout`. It first saves
    the world exactly as it is (`saved` names the save), then merges the release
    in. Until `finish`, `restore` can put it all back (below).
@@ -269,11 +270,10 @@ the existing one and delete the orphan.
 3. `unregistered` lists new characters with no entry in `openclaw.json` yet.
    Registering someone starts them thinking, which costs money, so ask the user
    first. To register, follow `world-building`, and do it last.
-4. Put the clock back to the speed you noted, never faster: if it was paused
-   (0), it stays paused. Starting time costs money and is the user's call.
-5. Always end by telling the user what changed and what was kept: what you
-   resolved and how, and the choices they made. An update the user hears nothing
-   about looks stuck. Mark the job file done.
+4. Always end by telling the user what changed and what was kept: what you
+   resolved and how, and the choices they made, and that the clock is paused
+   until they start it. An update the user hears nothing about looks stuck. Mark
+   the job file done.
 
 ## If it goes wrong: restore, then carry on
 
