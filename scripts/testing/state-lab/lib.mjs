@@ -191,19 +191,36 @@ export const done = (file) =>
 export const keep = (file, row) =>
   appendFileSync(file, `${JSON.stringify(row)}\n`);
 
+const CAPTURE = path.join(HERE, "corpus/lab-2026-11-17.jsonl");
 let corpus;
 /** Every chat request the lab Gateway sent, exactly as sent. */
 export function requests() {
-  corpus ??= readFileSync(
-    path.join(HERE, "corpus/lab-2026-11-17.jsonl"),
-    "utf8",
-  )
+  if (!existsSync(CAPTURE))
+    throw new Error(
+      `No capture at ${CAPTURE}: it is not in the repository. See "The capture" in README.md.`,
+    );
+  corpus ??= readFileSync(CAPTURE, "utf8")
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line))
     .filter(({ url }) => url.includes("chat/completions"))
     .map(({ body }) => body);
   return corpus;
+}
+
+/**
+ * The captured request a character's replays are cut from, checked to be that
+ * turn: a capture of your own has it at another place.
+ */
+export function captured(character, index, bedtime) {
+  const body = requests()[index];
+  const system = JSON.stringify(body?.messages?.[0] ?? "");
+  const inBed = JSON.stringify(body ?? "").includes("Before sleep takes you");
+  if (!system.includes(character) || inBed !== bedtime)
+    throw new Error(
+      `Request ${index} of the capture is not ${character}'s ${bedtime ? "bedtime" : "daytime"} turn. Set CAST to where it is in yours ("The capture" in README.md).`,
+    );
+  return body;
 }
 
 export const catalogOf = (name = "v0") =>

@@ -2,7 +2,13 @@
 // applied by the plugin's own code. A chain carries states and the page on the
 // other person from night to night, so weeks pass in minutes.
 //   node nights.mjs plans/<plan>.json out/<name>.jsonl [concurrency]
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
   HERE,
@@ -17,7 +23,7 @@ import {
   pool,
   readJson,
   recordOf,
-  requests,
+  captured,
   reviewBlock,
   sectionOf,
   stateBlock,
@@ -51,7 +57,7 @@ function trimMemory(system) {
 const templates = new Map();
 function template(character) {
   if (templates.has(character)) return templates.get(character);
-  const body = requests()[CAST[character]];
+  const body = captured(character, CAST[character], true);
   const { messages, ...fixed } = body;
   const aside = messages.find(
     ({ role, content }) =>
@@ -62,11 +68,15 @@ function template(character) {
     .split(/\n(?=### )/u)[1]
     .trim();
   const v0 = path.join(HERE, "prompts/v0.md");
-  if (!existsSync(v0))
+  if (!existsSync(v0)) {
+    // Whole or not at all: other runners started beside this one read it.
+    const fresh = `${v0}.${process.pid}.tmp`;
     writeFileSync(
-      v0,
+      fresh,
       `${aside.slice(aside.indexOf("Before sleep takes you"), aside.indexOf("\n\nspirits: How you have"))}\n\n{states}\n`,
     );
+    renameSync(fresh, v0);
+  }
   const raw = readFileSync(
     path.join(
       ROOT,
@@ -113,14 +123,14 @@ function bedtime(name) {
       path.join(HERE, "prompts", `${name}.md`),
       "utf8",
     ).trimEnd();
-  const captured = readFileSync(path.join(HERE, "prompts/v0.md"), "utf8");
+  const first = readFileSync(path.join(HERE, "prompts/v0.md"), "utf8");
   const skill = readFileSync(
     path.join(ROOT, "apps/kazusa/shared/skills/sleep-consolidation/SKILL.md"),
     "utf8",
   );
   const from = skill.indexOf("## states\n") + 10;
   const next = skill.indexOf("\n## ", from);
-  return `${captured.slice(0, captured.indexOf("This world keeps these about you."))}${skill.slice(from, next < 0 ? undefined : next).trim()}`;
+  return `${first.slice(0, first.indexOf("This world keeps these about you."))}${skill.slice(from, next < 0 ? undefined : next).trim()}`;
 }
 
 const pageText = ({ summary, relation, view, think, notes }) =>
@@ -243,7 +253,9 @@ async function night({ character, day, offset, record, page, variant }) {
   };
   let next = record;
   let nextPage = { ...page, notes: [...page.notes] };
-  for (; out.rounds < 6 && !out.dayKept; out.rounds += 1) {
+  // Until the model stops calling, as live: writing the day down ends nothing,
+  // and what is gone over after it still counts.
+  for (; out.rounds < 6; out.rounds += 1) {
     const reply = await complete({
       ...base.fixed,
       tools,

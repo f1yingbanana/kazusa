@@ -175,10 +175,13 @@ export function createFamiliarity(
           if (id !== pageIdOf(agentId)) after = withUse(after, id, at, config);
         if (after !== before) await records.register(agentId, after);
       }),
+    // A use within the hour of the last is not written down (`withUse`), so
+    // one kept up to an hour before `since` may stand for a later one: better
+    // gone over twice than missed.
     since: async (agentId, since) =>
       Object.entries((await records.lookup(agentId)) ?? {})
         .map(([id, uses]) => [id, uses.recent.at(-1) ?? uses.first] as const)
-        .filter(([, at]) => at >= since)
+        .filter(([, at]) => at > since - HOUR_MS)
         .sort((a, b) => b[1] - a[1])
         .map(([id]) => id),
     scores: async (agentId, now, pages) => {

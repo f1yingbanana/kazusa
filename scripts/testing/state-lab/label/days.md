@@ -679,9 +679,9 @@ The character (`you` in the log): Koyuki Kurosaki
 ### chat:huddle:y2h5k8d0wq
 # Mon 2026-11-09
 [you 07:50] *bursts into the Seminar office with a pink energy drink in each hand*
-[you 07:51] [face=calm] Koyuki. That's the second energy drink before eight.
+[yuuka-hayase 07:51] [face=calm] Koyuki. That's the second energy drink before eight.
 [you] Research materials! Tonight is the Final Boss run, I need to be at peak!
-[you 07:52] Your attendance record needs to be at peak first. Sit down.
+[yuuka-hayase 07:52] Your attendance record needs to be at peak first. Sit down.
 [you 12:20] *dumps the tray at a table and jabs a chopstick at Momoi*
 [momoi-saiba] [face=smug] Boss cabinet tonight? I'll watch the stream. If you fail, I mean *when*, I'm the commentator.
 [you 12:21] That's not a bet, that's a sure thing!
@@ -1510,12 +1510,12 @@ The character (`you` in the log): Koyuki Kurosaki
 [you 12:33] Boring! You'd take the whole game apart. Next topic!
 [momoi-saiba 12:34] [face=laughing] Okay okay, fine. Rematch tomorrow, loser buys bread.
 [you 14:10] *walks into the Seminar office hallway, peeks around the corner*
-[you] [face=calm] Koyuki. The handheld is not here. Sensei is signing a loan form for it. In his own name.
+[yuuka-hayase] [face=calm] Koyuki. The handheld is not here. Sensei is signing a loan form for it. In his own name.
 [you 14:11] [face=flustered] In his name?! You can do that?!
-[you] If he accepts liability for the next confiscation. He chose the terms.
+[yuuka-hayase] If he accepts liability for the next confiscation. He chose the terms.
 [user:sensei 14:12] Four conditions, Koyuki. No games in the Reflection Room. Yuuka gets a weekly report on it. And if it's confiscated again, I'm the one who sits through Ren's lecture.
 [you 14:13] [face=mischievous] That's two lectures if I get caught. I'll aim for zero. ...Probably.
-[you 14:14] You will get zero.
+[yuuka-hayase 14:14] You will get zero.
 [user:sensei 15:55] *hands the handheld over at the door of the Self-Reflection Room, a little out of breath*
 [you] [face=happy] SENSEI! You really came!
 [user:sensei 15:56] Late in the way that counts, sorry. Your battery is at 40%. I charged it in the office.

@@ -7,6 +7,11 @@ for l in open(sys.argv[1]):
     r = json.loads(l); rows[r["id"]] = r
 probes = {p["id"]: p for p in json.load(open(sys.argv[2]))}
 out = sys.argv[3]; os.makedirs(out, exist_ok=True)
+def publish(path, text):
+    """Whole or not at all: a judge may be reading the pack it replaces."""
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f: f.write(text)
+    os.replace(tmp, path)
 catalog = {s["name"]: s for s in json.load(open("catalogs/v0.json"))}
 random.seed(11)
 MEANING = {
@@ -37,6 +42,6 @@ for pid, probe in probes.items():
             pair = f"{pid}-{n:02d}"; key[pair] = {"low": "B" if flip else "A", "who": who}
             text.append(f"## {pair}\n\n{'Koyuki' if who=='koyuki' else 'Yuuka'} was sent: \"{a['stimulus']}\"\n\nReply A:\n{show(first)}\n\nReply B:\n{show(second)}\n")
     text.append(f"\nWrite your answer as JSON to the path your instructions give: an array, one object per pair, like\n`[{{\"pair\": \"{pid}-01\", \"low\": \"A\", \"sure\": 2, \"why\": \"a few words\"}}]`\nwhere `low` is the letter of the reply you think came from \"{low.split(':')[0]}\". Reply with only the path you wrote.\n")
-    open(f"{out}/{pid}.md", "w").write("\n".join(text))
+    publish(f"{out}/{pid}.md", "\n".join(text))
     print(pid, n, "pairs")
-json.dump(key, open(f"{out}/key.json", "w"), indent=0)
+publish(f"{out}/key.json", json.dumps(key, indent=0))

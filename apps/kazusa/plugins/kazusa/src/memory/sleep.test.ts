@@ -389,6 +389,46 @@ describe("a night gone over", () => {
     );
   });
 
+  it("drops old notes only from a page tonight showed whole", async () => {
+    const notes = (file: string): number =>
+      read(file).match(/^- \d{4}-/gm)?.length ?? 0;
+    const many = (relative: string): void => {
+      const old = Array.from(
+        { length: 31 },
+        (_, at) =>
+          `- 2025-01-${String(at + 1).padStart(2, "0")} · seen it · sure — Old thing ${at}.`,
+      ).join("\n");
+      writeFileSync(
+        file(relative),
+        read(relative).replace(/## Notes\n\n/, `## Notes\n\n${old}\n`),
+      );
+    };
+    const OSWIN = "wiki/entities/characters/oswin-hale.md";
+    many(TOBIN);
+    many(OSWIN);
+    // The day touched Tobin, so bedtime showed his page, notes and all. Of
+    // Oswin's only the view is shown, when a new one is first given.
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await start();
+    for (const about of ["tobin-vell", "oswin-hale", "oswin-hale"])
+      await call("reflect", { about, view: "Seen plainly, for once." });
+    await memory.sleep.runEnded(AGENT);
+    expect(notes(TOBIN)).toBe(30);
+    expect(notes(OSWIN)).toBe(32);
+  });
+
+  it("counts as their night when all it did was move a state", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await start();
+    await call("reflect", { about: "tobin-vell", states: { trust: "up" } });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(1);
+    // Back to bed later the same night: the day is not gone over again.
+    now = BEDTIME + 3 * HOUR;
+    expect(await start()).toBeUndefined();
+  });
+
   it("is not gone over twice in one night's sleep", async () => {
     await goOver();
     // Woken at one, back to bed: the same night.
@@ -441,6 +481,18 @@ describe("a night asked for by hand", () => {
     ).toBe("Kept, about Tobin Vell. Now trust: warm. Left as they were: luck.");
     await call("reflect", { about: "today", view: "Quiet." });
     expect(read("wiki/days/2026-03-10.md")).toContain("Quiet.");
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+  });
+
+  it("is not begun by a note in the run it was asked during", async () => {
+    await memory.sleep.consolidate(AGENT);
+    // Still the run under way: what it notes is the day's, not the night's.
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toBeUndefined();
+    memory.sleep.runStarted(AGENT);
+    await call("reflect", { about: "today", view: "Quiet." });
     await memory.sleep.runEnded(AGENT);
     expect(night()).toMatchObject({ text: "You slept on it." });
   });

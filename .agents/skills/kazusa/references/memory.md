@@ -48,7 +48,7 @@ out in their sleep. The world's author edits Markdown and nothing else.
 | Sleeps on it: keeps the gist, revises opinions, dreams                           | **Sleep consolidation**: the turn that goes to bed goes over the day: rewrites views, adds notes, writes the day page and a dream (§7.5). |
 | Forgets details, keeps a general sense                                           | Notes per page are capped; sleep folds the oldest into the page's current view.                                                           |
 | Always has family, friends and home in mind; a café seen once fades              | **People you know** and **Places you know**, ranked by familiarity: recency and frequency over sim time (§7.7).                           |
-| Woken at 3 am, sleeps badly                                                      | A wake cancels the pass; nothing is applied until the next sleep.                                                                         |
+| Woken at 3 am, sleeps badly                                                      | What they had gone over by then is kept; back in bed the same night, the day is not gone over again (§7.5).                               |
 
 Naps shorter than `memory.sleep.minMinutes` (default 180) don't consolidate.
 
@@ -556,9 +556,13 @@ session, nothing to schedule, interrupt or resume.
 - **The night ends when the run does** (`runEnded`, from Perception's lifecycle
   end), whatever the model did or didn't say. Code then tidies up: plans for
   days gone by leave `MEMORY.md`; notes past `memory.notesPerPage` (default 30,
-  except `always known` ones) leave pages whose view was rewritten tonight; the
-  run is kept; the night is told. A night that wrote nothing leaves no trace and
-  the day waits for the next sleep. Writes after the run are no part of it.
+  except `always known` ones) leave pages whose view was rewritten tonight and
+  that bedtime showed whole (`whole`): a view written after seeing only the old
+  view (`reflect-unread`) has not taken the notes in, so they stay; the run is
+  kept; the night is told. A night that wrote nothing and moved no state leaves
+  no trace and the day waits for the next sleep. One that only moved states is
+  kept as a run with no files, so it is their last night and a nap later does
+  not review the same day again. Writes after the run are no part of it.
 - **Kept**: every write during a night goes through `sleep.write`, which keeps
   what each file was before. The `"memory"` keyed store holds the last 7 runs
   (pre- and post-images), newest first; the newest's time is "last night".
@@ -568,8 +572,10 @@ session, nothing to schedule, interrupt or resume.
   dream).
 - **By hand** (`memory_consolidate`, `POST /kazusa/memory/consolidate`): the
   same words arrive as a stimulus in a turn of their own. The night waits
-  (`waiting`) until that turn's first `reflect` or write, so a run already under
-  way does not end it; if no turn can be handed over, no night is left behind.
+  (`waiting`) until a `reflect`, or a write in a run that began after it was
+  asked for (`offered`), so a run already under way neither ends it nor begins
+  it with a note of its own; if no turn can be handed over, no night is left
+  behind.
 - **Lost on restart**: a night lives in memory. A Gateway stopped mid-run keeps
   what was written but no run and no event, and the next sleep covers the same
   days again.

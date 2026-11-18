@@ -17,6 +17,26 @@ plugin's own functions (`reviewText`, `reviewedChanges`, `statsText`). A change
 to those functions or to a state's wording is therefore under test as soon as it
 is saved.
 
+## The capture
+
+The runners need `corpus/lab-2026-11-17.jsonl`, which is not in the repository:
+it is a day of a private world's prompts, word for word. To make one, run a
+world for a day and a night with every model request logged:
+
+```
+KAZUSA_LLM_LOG=$PWD/scripts/testing/state-lab/corpus/lab-2026-11-17.jsonl \
+  NODE_OPTIONS="--import ./scripts/llm-capture.mjs" npm run dev
+```
+
+Two characters each need a daytime turn and the turn that goes to bed (the one
+whose `start_task` result begins "Before sleep takes you"). The runners take
+them by their place among the capture's chat requests: `CAST` in `behave.mjs`
+(daytime, 1 and 3 in the lab's capture) and in `nights.mjs` (bedtime, 192 and
+199). With a capture of your own, set those to where the turns are in it. A
+runner stops with a message naming the request when one is not that character's
+turn of that kind. The characters' pages on Sensei are read from
+`apps/kazusa/world-lab/.template/workspaces/`.
+
 ## Running
 
 ```
@@ -47,7 +67,10 @@ sets both. Keep under about 40 streams in all, or connections time out.
 - `days/`: one day each, as the character's chat log. `N1` pleasant, `N2`
   logistics only, `SP` a kindness, `KP` word kept at a cost, `SM` a slight, `KM`
   word broken, `RM` broken then repaired, `REAL` the lab's own captured day.
-  Written by agents from `brief/day-author.md`; `{DAY}` is filled per night.
+  Written by agents from `brief/day-author.md`; `{DAY}` is filled per night. In
+  `RM-koyuki-1` and `RM-koyuki-2`, five of Yuuka's lines were marked as Koyuki's
+  own until 2026-11-18; the labels and every number measured before then were
+  taken on the days as they were.
 - `label/`: what three independent readers said each day should do to each
   state, blind to the kind of day. `score.py` scores against their majority.
 - `plans/`: what to run. A chain is `{id, character, days, start, variant}`;

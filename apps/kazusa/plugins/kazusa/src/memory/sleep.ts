@@ -92,6 +92,10 @@ export interface Night {
   readonly wakeDay: string;
   /** Pages they have read tonight: a view replaces only what was read. */
   readonly shown: Set<string>;
+  /** Pages read whole, notes and all: only their oldest notes may go. */
+  readonly whole: Set<string>;
+  /** A state moved tonight: the night happened even if no file changed. */
+  moved?: boolean;
   readonly preimages: Record<string, string | null>;
   readonly pages: Set<string>;
   readonly newPages: Set<string>;
@@ -239,7 +243,10 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     operation: (current: string | undefined) => string,
     noted?: { readonly page: string; readonly note?: boolean },
   ): void => {
-    const night = nights.get(agentId);
+    const held = nights.get(agentId);
+    // One asked for by hand takes nothing before its own turn: the run it was
+    // asked during is not it, and would end it before that turn came.
+    const night = held?.waiting && !held.offered ? undefined : held;
     if (night) {
       delete night.waiting;
       const relative = path.relative(deps.workspaceOf(agentId), file);
@@ -315,6 +322,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       if (!raw || raw.length > room) continue;
       room -= raw.length;
       night.shown.add(id);
+      night.whole.add(id);
       pages.push(`### ${id}\n${raw.trim()}`);
       // Lifelong knowledge never fades; everything else may.
       const old = [...page.notes]
@@ -365,6 +373,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     day: iso(at - HALF_DAY_MS),
     wakeDay: iso(wakeAt),
     shown: new Set(),
+    whole: new Set(),
     preimages: {},
     pages: new Set(),
     newPages: new Set(),
@@ -372,10 +381,14 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     notes: 0,
   });
 
-  /** Keeps what a night wrote so far as its one run, shown and undoable. */
+  /**
+   * Keeps what a night wrote so far as its one run, shown and undoable. One
+   * that only moved states is kept too, with no files: it is still their last
+   * night, so the same day is not gone over again.
+   */
   const keep = async (agentId: string, night: Night): Promise<boolean> => {
     const files = Object.keys(night.preimages);
-    if (!files.length) return false;
+    if (!files.length && !night.moved) return false;
     const workspace = deps.workspaceOf(agentId);
     const postimages: Record<string, string> = {};
     for (const relative of files)
@@ -394,11 +407,11 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   /**
    * The night is over: what code owes it, whatever the model did. Plans for
    * days gone by go, old notes go from pages whose view took them in, its run
-   * is kept and the night is told. One that wrote nothing leaves no trace, and
-   * the day waits for their next sleep.
+   * is kept and the night is told. One that wrote nothing and moved no state
+   * leaves no trace, and the day waits for their next sleep.
    */
   const close = async (agentId: string, night: Night): Promise<void> => {
-    if (!Object.keys(night.preimages).length) return;
+    if (!Object.keys(night.preimages).length && !night.moved) return;
     const memory = path.join(deps.workspaceOf(agentId), "MEMORY.md");
     const before = read(memory) ?? "";
     if (withoutPlansBefore(before, night.wakeDay) !== before)
@@ -452,6 +465,8 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     try {
       const result = await deps.states?.apply(agentId, people, answer);
       if (!result) return "";
+      const night = nights.get(agentId);
+      if (night && result.moved.length) night.moved = true;
       // Said back: a state given the wrong way is otherwise dropped unseen.
       return [
         ...(result.moved.length
@@ -582,7 +597,9 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         },
         { page: id },
       );
-      if (input.view) night.rewritten.add(id);
+      // Their oldest notes go only if tonight showed them: a view written
+      // from the lead alone has not taken them in.
+      if (input.view && night.whole.has(id)) night.rewritten.add(id);
     }
     let states = "";
     if (input.states && kind === "person") {

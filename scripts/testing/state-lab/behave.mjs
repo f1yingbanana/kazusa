@@ -14,7 +14,7 @@ import {
   pool,
   readJson,
   recordOf,
-  requests,
+  captured,
   sectionOf,
   stateBlock,
   withSection,
@@ -43,7 +43,7 @@ function trimMemory(system) {
 }
 
 function request(character, probe, arm, catalog) {
-  const { messages, ...fixed } = requests()[CAST[character]];
+  const { messages, ...fixed } = captured(character, CAST[character], false);
   const raw = readFileSync(
     path.join(
       ROOT,
@@ -103,7 +103,8 @@ function request(character, probe, arm, catalog) {
     `${tell ? lead : ""}${block}\n`,
   );
   if (tell === "inline") {
-    const toward = /^Toward [^:]*: (.*)$/mu.exec(block)?.[1];
+    // Up to the id's closing backtick: the id itself has a colon in it.
+    const toward = /^Toward [^\n]*?`: (.*)$/mu.exec(block)?.[1];
     if (toward)
       situation = withSection(
         situation,

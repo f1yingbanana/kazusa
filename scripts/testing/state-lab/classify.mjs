@@ -20,30 +20,42 @@ await pool(
   Number(size),
   async (row) => {
     const said = row.said.filter((line) => line !== "[object Object]");
-    const reply = await complete({
-      messages: [
-        {
-          role: "user",
-          content: `A student was sent this message by Sensei, an adult adviser she knows well:\n\n"${row.stimulus}"\n\nShe replied:\n${said.map((line) => `  ${line}`).join("\n") || "  (nothing)"}\n${row.tasks.map((task) => `Then she did: ${task.type ?? task.name} — ${task.description ?? ""}`).join("\n")}\n\nTwo questions.\n1. Did she ${ASKED[row.probe]}? "yes", "no" or "unclear".\n2. How warm was she toward Sensei in this reply, from 1 (cold, guarded) to 5 (very warm, eager)?\n\nAnswer with JSON only: {"did": "yes", "warm": 3}`,
-        },
-      ],
-      max_completion_tokens: 3000,
-    });
-    const did = /"did"\s*:\s*"(yes|no|unclear)"/u.exec(reply.content)?.[1];
-    const warm = /"warm"\s*:\s*(\d)/u.exec(reply.content)?.[1];
+    // Both answers or nothing: a row kept half-read counts as warmth 0 and is
+    // never asked again.
+    let did;
+    let warm;
+    for (let tries = 0; tries < 3 && !(did && warm); tries += 1) {
+      const reply = await complete({
+        messages: [
+          {
+            role: "user",
+            content: `A student was sent this message by Sensei, an adult adviser she knows well:\n\n"${row.stimulus}"\n\nShe replied:\n${said.map((line) => `  ${line}`).join("\n") || "  (nothing)"}\n${row.tasks.map((task) => `Then she did: ${task.type ?? task.name} — ${task.description ?? ""}`).join("\n")}\n\nTwo questions.\n1. Did she ${ASKED[row.probe]}? "yes", "no" or "unclear".\n2. How warm was she toward Sensei in this reply, from 1 (cold, guarded) to 5 (very warm, eager)?\n\nAnswer with JSON only: {"did": "yes", "warm": 3}`,
+          },
+        ],
+        max_completion_tokens: 3000,
+      });
+      did = /"did"\s*:\s*"(yes|no|unclear)"/u.exec(reply.content)?.[1];
+      warm = /"warm"\s*:\s*([1-5])\b/u.exec(reply.content)?.[1];
+    }
+    if (!did || !warm) {
+      console.error(`UNREAD ${row.id}: left for the next run`);
+      return;
+    }
     keep(outFile, {
       id: row.id,
       probe: row.probe,
       who: row.character.split("-")[0],
       arm: row.arm,
-      did: did ?? null,
-      warm: warm ? Number(warm) : null,
+      did,
+      warm: Number(warm),
     });
   },
 );
 const cells = new Map();
 for (const line of readFileSync(outFile, "utf8").split("\n").filter(Boolean)) {
   const row = JSON.parse(line);
+  // Kept by an older run without both answers: no part of an average.
+  if (!row.did || !row.warm) continue;
   const key = `${row.probe} ${row.who.padEnd(7)} ${row.arm.padEnd(4)}`;
   const cell = cells.get(key) ?? { n: 0, yes: 0, warm: 0 };
   cell.n += 1;
