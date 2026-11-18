@@ -70,7 +70,7 @@ export interface StatsService {
    * revision the change was made from, throws `StaleCatalogError` when the
    * states have changed since.
    */
-  readonly saveCatalog: (catalog: StatCatalog, base?: string) => void;
+  readonly saveCatalog: (catalog: StatCatalog, base: string) => void;
   readonly record: (characterId: string) => Promise<StatRecord | undefined>;
   readonly world: () => Promise<StatRecord | undefined>;
   /** Sets one value by hand; throws with what is wrong with the request. */
@@ -269,19 +269,18 @@ export function createStats(deps: {
     // Required like `afterwards`: an optional parameter is never filled.
     required: ["changes"],
     async prepare({ kind, agentId, params }) {
-      const changes =
-        kind === "started"
-          ? ownChanges(
-              statsFor(agentId),
-              await store.lookup(agentId),
-              params.changes,
-            )
-          : [];
-      if (!changes.length) return { commit: async () => {} };
+      // Only a start changes states: a delay carries none.
+      if (kind !== "started") return { commit: async () => {} };
+      const changes = ownChanges(
+        statsFor(agentId),
+        await store.lookup(agentId),
+        params.changes,
+      );
       return {
         ...reported(agentId, changes),
         // Worked out again when written, and reported as written: another
-        // change may have landed since.
+        // change may have landed since, and one that came to nothing here
+        // (`-3` from 0) may come to something by then.
         commit: async () => {
           let written: readonly StatChange[] = [];
           await apply(
@@ -312,8 +311,7 @@ export function createStats(deps: {
         worn().set(key, value.own[OUTFIT]);
     },
     saveCatalog(catalog, base) {
-      if (base !== undefined && base !== catalogRevision(file.read()))
-        throw new StaleCatalogError();
+      if (base !== catalogRevision(file.read())) throw new StaleCatalogError();
       file.write(catalog);
       deps.onCatalog?.();
     },

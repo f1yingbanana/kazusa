@@ -324,6 +324,43 @@ describe("a change at an activity start that another change beats", () => {
     expect(report).toMatchObject({ payload: { states: { money: 14 } } });
     expect(report?.note).toContain('"value":"14/50"');
   });
+
+  it("comes to something when written though it came to nothing when checked", async () => {
+    const { stats } = world(
+      StatCatalogSchema.parse([
+        {
+          name: "money",
+          description: "What you have to spend.",
+          on: "character",
+          kind: "number",
+          min: 0,
+          max: 50,
+          initial: 0,
+          changedBy: "character",
+          shown: "self",
+        },
+      ]),
+    );
+    const start = (kind: "started" | "delayed") =>
+      stats.taskExtension.prepare({
+        kind,
+        agentId: "airi",
+        at: 1_000,
+        task: {} as never,
+        params: { changes: { money: "-3" } },
+      });
+    // Nothing to take from 0, so nothing is said yet.
+    const spent = await start("started");
+    expect(spent.note).toBeUndefined();
+    const delayed = await start("delayed");
+    await stats.set({ name: "money", characterId: "airi", value: 10 }, "user");
+    expect(await delayed.commit({} as never)).toBeUndefined();
+    expect((await stats.record("airi"))?.own.money?.value).toBe(10);
+    expect(await spent.commit({} as never)).toMatchObject({
+      payload: { states: { money: 7 } },
+    });
+    expect((await stats.record("airi"))?.own.money?.value).toBe(7);
+  });
 });
 
 describe("changing mid-activity", () => {

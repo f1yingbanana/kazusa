@@ -196,8 +196,7 @@ reads a process-wide copy of each character's outfit entry, filled at
   changed since (another session, the system agent, an edit by hand), so it
   never undoes a change it did not see. The client reads again, through the
   stream's sync (`liveStats.whole`) so the read is not dropped, and asks the
-  user to save again. A Gateway started before this gives no `revision`, and its
-  saves go unchecked. The revision does not cover a form left open: the page
+  user to save again. The revision does not cover a form left open: the page
   follows the stream while the form keeps what it opened on, so the form is
   refused when the state it opened on has changed or gone since
   (`editConflict`). A save that touched no meaning keeps its line breaks

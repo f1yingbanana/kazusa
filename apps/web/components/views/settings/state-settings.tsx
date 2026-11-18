@@ -186,8 +186,9 @@ export function StateSettings() {
     | undefined
   >();
   // What the states are by the time an Undo is pressed.
-  const latest = useRef<{ catalog: StatCatalog; revision?: string }>({
+  const latest = useRef<{ catalog: StatCatalog; revision: string }>({
     catalog: [],
+    revision: "",
   });
   useEffect(() => {
     if (data) latest.current = data;
@@ -218,7 +219,7 @@ export function StateSettings() {
   /** `base`: the revision of the states `next` was made from. */
   const save = async (
     next: StatCatalog,
-    base: string | undefined,
+    base: string,
     done: string,
     undo?: () => void,
   ): Promise<boolean> => {
@@ -602,109 +603,166 @@ function StateDialog({
             });
           }}
         >
-          <DialogHeader>
-            <DialogTitle>{replaces ? "Edit state" : "New state"}</DialogTitle>
-            <DialogDescription>
-              Characters read the name and the words you write here, so write
-              them as you would say them to the character.
-            </DialogDescription>
-          </DialogHeader>
-          <FieldGroup className="min-h-0 overflow-y-auto pr-1">
-            {replaces ? null : (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-sm text-muted-foreground">
-                  Start from
-                </span>
-                {STAT_EXAMPLES.map(({ label, stat }) => (
-                  <Button
-                    key={stat.name}
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() => {
-                      setDraft(toDraft(stat));
-                      setTried(false);
-                    }}
+          {/* What was sent is what is saved: nothing is typed over it meanwhile. */}
+          <fieldset disabled={saving} className="contents">
+            <DialogHeader>
+              <DialogTitle>{replaces ? "Edit state" : "New state"}</DialogTitle>
+              <DialogDescription>
+                Characters read the name and the words you write here, so write
+                them as you would say them to the character.
+              </DialogDescription>
+            </DialogHeader>
+            <FieldGroup className="min-h-0 overflow-y-auto pr-1">
+              {replaces ? null : (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-sm text-muted-foreground">
+                    Start from
+                  </span>
+                  {STAT_EXAMPLES.map(({ label, stat }) => (
+                    <Button
+                      key={stat.name}
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => {
+                        setDraft(toDraft(stat));
+                        setTried(false);
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              <Text
+                id="state-name"
+                label="Name"
+                value={draft.name}
+                onChange={(value) => put("name", value)}
+                error={errors.name}
+                mono
+                placeholder="mood"
+                hint={
+                  replaces && draft.name.trim() !== replaces
+                    ? "A new name starts from the initial value; values set under the old name stay with it."
+                    : "Lowercase, with _ between words. Shown to characters as written."
+                }
+              />
+              <Text
+                id="state-description"
+                label="What it is, and when it changes"
+                value={draft.description}
+                onChange={(value) => put("description", value)}
+                error={errors.description}
+                rows={3}
+                placeholder="Your mood right now. It changes only when something clearly shifts it."
+                hint={
+                  draft.on === "player"
+                    ? "The one thing characters with you are told about it, so write it about you as they would see it."
+                    : "The one thing a character is told about it. If they or their sleep change it, this is the rule they go by."
+                }
+              />
+              <Choice
+                id="state-on"
+                label="Who has it"
+                options={ON}
+                value={draft.on}
+                onChange={setOn}
+              />
+              <Choice
+                id="state-kind"
+                label="Kind of value"
+                options={[
+                  {
+                    value: "choice",
+                    label: "One of a list",
+                    hint: "A named value, like an outfit or the chapter of a story.",
+                  },
+                  {
+                    value: "number",
+                    label: "A number",
+                    hint: "A value in a range, like health, money or trust.",
+                  },
+                ]}
+                value={draft.kind}
+                advice={adviceOn("kind")}
+                onChange={(kind) =>
+                  setDraft((current) => ({ ...current, kind, initial: "" }))
+                }
+              />
+              {number ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Text
+                      id="state-min"
+                      label="Lowest"
+                      value={draft.min}
+                      onChange={(value) => put("min", value)}
+                      error={errors.min}
+                      mono
+                    />
+                    <Text
+                      id="state-max"
+                      label="Highest"
+                      value={draft.max}
+                      onChange={(value) => put("max", value)}
+                      error={errors.max}
+                      mono
+                    />
+                    <Text
+                      id="state-initial"
+                      label="Starts at"
+                      value={draft.initial}
+                      onChange={(value) => put("initial", value)}
+                      error={errors.initial}
+                      mono
+                    />
+                  </div>
+                  <Text
+                    id="state-bands"
+                    label="Words for ranges (optional)"
+                    value={draft.bands}
+                    onChange={(value) => put("bands", value)}
+                    error={errors.bands}
+                    rows={3}
+                    mono
+                    placeholder={
+                      "cold: 0: You would rather avoid them\nfriendly: 4\nclose: 7"
+                    }
+                    hint="One per line as name: from, then what it means if you like. Characters read the word, and move it a step up or down."
+                    advice={adviceOn("bands")}
                   >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            )}
-            <Text
-              id="state-name"
-              label="Name"
-              value={draft.name}
-              onChange={(value) => put("name", value)}
-              error={errors.name}
-              mono
-              placeholder="mood"
-              hint={
-                replaces && draft.name.trim() !== replaces
-                  ? "A new name starts from the initial value; values set under the old name stay with it."
-                  : "Lowercase, with _ between words. Shown to characters as written."
-              }
-            />
-            <Text
-              id="state-description"
-              label="What it is, and when it changes"
-              value={draft.description}
-              onChange={(value) => put("description", value)}
-              error={errors.description}
-              rows={3}
-              placeholder="Your mood right now. It changes only when something clearly shifts it."
-              hint={
-                draft.on === "player"
-                  ? "The one thing characters with you are told about it, so write it about you as they would see it."
-                  : "The one thing a character is told about it. If they or their sleep change it, this is the rule they go by."
-              }
-            />
-            <Choice
-              id="state-on"
-              label="Who has it"
-              options={ON}
-              value={draft.on}
-              onChange={setOn}
-            />
-            <Choice
-              id="state-kind"
-              label="Kind of value"
-              options={[
-                {
-                  value: "choice",
-                  label: "One of a list",
-                  hint: "A named value, like an outfit or the chapter of a story.",
-                },
-                {
-                  value: "number",
-                  label: "A number",
-                  hint: "A value in a range, like health, money or trust.",
-                },
-              ]}
-              value={draft.kind}
-              advice={adviceOn("kind")}
-              onChange={(kind) =>
-                setDraft((current) => ({ ...current, kind, initial: "" }))
-              }
-            />
-            {number ? (
-              <>
-                <div className="grid grid-cols-3 gap-3">
+                    {result.stat?.kind === "number" ? (
+                      <BandScale stat={result.stat} />
+                    ) : null}
+                  </Text>
+                  {draft.bands.trim() || draft.step.trim() ? (
+                    <Text
+                      id="state-step"
+                      label="One step (optional)"
+                      value={draft.step}
+                      onChange={(value) => put("step", value)}
+                      error={errors.step}
+                      mono
+                      placeholder="1"
+                      hint="How far one move up or down takes it."
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <>
                   <Text
-                    id="state-min"
-                    label="Lowest"
-                    value={draft.min}
-                    onChange={(value) => put("min", value)}
-                    error={errors.min}
+                    id="state-values"
+                    label="Values"
+                    value={draft.values}
+                    onChange={(value) => put("values", value)}
+                    error={errors.values}
+                    rows={4}
                     mono
-                  />
-                  <Text
-                    id="state-max"
-                    label="Highest"
-                    value={draft.max}
-                    onChange={(value) => put("max", value)}
-                    error={errors.max}
-                    mono
+                    placeholder={
+                      "calm: Settled, nothing weighing on them\ncheerful: Light and pleased"
+                    }
+                    hint="One per line as name: what it means. The meaning is optional."
                   />
                   <Text
                     id="state-initial"
@@ -713,113 +771,59 @@ function StateDialog({
                     onChange={(value) => put("initial", value)}
                     error={errors.initial}
                     mono
+                    placeholder="calm"
+                    hint="The value everyone has until it changes."
                   />
-                </div>
-                <Text
-                  id="state-bands"
-                  label="Words for ranges (optional)"
-                  value={draft.bands}
-                  onChange={(value) => put("bands", value)}
-                  error={errors.bands}
-                  rows={3}
-                  mono
-                  placeholder={
-                    "cold: 0: You would rather avoid them\nfriendly: 4\nclose: 7"
-                  }
-                  hint="One per line as name: from, then what it means if you like. Characters read the word, and move it a step up or down."
-                  advice={adviceOn("bands")}
+                </>
+              )}
+              <Choice
+                id="state-changed-by"
+                label="What changes it"
+                options={changedBy}
+                value={draft.changedBy}
+                onChange={(value) => put("changedBy", value)}
+                error={errors.changedBy}
+              />
+              <Choice
+                id="state-shown"
+                label="Who reads it"
+                options={shown}
+                value={draft.shown}
+                onChange={(value) => put("shown", value)}
+                error={errors.shown}
+                advice={adviceOn("shown")}
+              />
+              {errors[""] ? <FieldError>{errors[""]}</FieldError> : null}
+            </FieldGroup>
+            <DialogFooter>
+              {replaces ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive sm:mr-auto"
+                  disabled={saving}
+                  onClick={() => {
+                    setSaving(true);
+                    void onDelete().then((deleted) => {
+                      setSaving(false);
+                      if (deleted) onClose();
+                    });
+                  }}
                 >
-                  {result.stat?.kind === "number" ? (
-                    <BandScale stat={result.stat} />
-                  ) : null}
-                </Text>
-                {draft.bands.trim() || draft.step.trim() ? (
-                  <Text
-                    id="state-step"
-                    label="One step (optional)"
-                    value={draft.step}
-                    onChange={(value) => put("step", value)}
-                    error={errors.step}
-                    mono
-                    placeholder="1"
-                    hint="How far one move up or down takes it."
-                  />
-                ) : null}
-              </>
-            ) : (
-              <>
-                <Text
-                  id="state-values"
-                  label="Values"
-                  value={draft.values}
-                  onChange={(value) => put("values", value)}
-                  error={errors.values}
-                  rows={4}
-                  mono
-                  placeholder={
-                    "calm: Settled, nothing weighing on them\ncheerful: Light and pleased"
-                  }
-                  hint="One per line as name: what it means. The meaning is optional."
-                />
-                <Text
-                  id="state-initial"
-                  label="Starts at"
-                  value={draft.initial}
-                  onChange={(value) => put("initial", value)}
-                  error={errors.initial}
-                  mono
-                  placeholder="calm"
-                  hint="The value everyone has until it changes."
-                />
-              </>
-            )}
-            <Choice
-              id="state-changed-by"
-              label="What changes it"
-              options={changedBy}
-              value={draft.changedBy}
-              onChange={(value) => put("changedBy", value)}
-              error={errors.changedBy}
-            />
-            <Choice
-              id="state-shown"
-              label="Who reads it"
-              options={shown}
-              value={draft.shown}
-              onChange={(value) => put("shown", value)}
-              error={errors.shown}
-              advice={adviceOn("shown")}
-            />
-            {errors[""] ? <FieldError>{errors[""]}</FieldError> : null}
-          </FieldGroup>
-          <DialogFooter>
-            {replaces ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-destructive sm:mr-auto"
-                disabled={saving}
-                onClick={() => {
-                  setSaving(true);
-                  void onDelete().then((deleted) => {
-                    setSaving(false);
-                    if (deleted) onClose();
-                  });
-                }}
+                  Delete state
+                </Button>
+              ) : null}
+              <DialogClose
+                render={<Button variant="outline" disabled={saving} />}
               >
-                Delete state
+                Cancel
+              </DialogClose>
+              <Button type="submit" disabled={saving}>
+                {saving ? <Spinner /> : null}
+                {replaces ? "Save state" : "Add state"}
               </Button>
-            ) : null}
-            <DialogClose
-              render={<Button variant="outline" disabled={saving} />}
-            >
-              Cancel
-            </DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Spinner /> : null}
-              {replaces ? "Save state" : "Add state"}
-            </Button>
-          </DialogFooter>
+            </DialogFooter>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

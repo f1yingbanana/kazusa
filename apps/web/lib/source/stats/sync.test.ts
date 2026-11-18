@@ -51,13 +51,6 @@ function harness(cached?: StatsResponse) {
   return { sync, reads, retries, stales, settle, cache: () => cached };
 }
 
-describe("a Gateway from before catalogs had a revision", () => {
-  it("is still read", () => {
-    const { revision: _, ...older } = snapshot("r");
-    expect(StatsResponseSchema.parse(older).revision).toBeUndefined();
-  });
-});
-
 describe("an outfit named in a way no state's value could be", () => {
   it("does not keep the states from loading", () => {
     const outfits = { natsu: [{ name: "uniform: summer" }, { name: "" }] };
@@ -185,19 +178,33 @@ describe("the states snapshot under the stream", () => {
     expect(h.cache()?.records.natsu?.own.hp?.value).toBe(7);
   });
 
-  it("waits for the read that overtook it, and throws when none could be made", async () => {
+  it("follows the read that overtook it, without waiting for the one overtaken", async () => {
     const h = harness(snapshot("old"));
     let landed = false;
     const whole = h.sync.whole().then(() => (landed = true));
     h.sync.event({ type: "stats", catalog: true });
-    h.reads[0](snapshot("stale"));
-    await h.settle();
-    expect(landed).toBe(false);
+    // The newer read lands while the first is still out.
     h.reads[1](snapshot("new"));
     await whole;
+    expect(landed).toBe(true);
     expect(h.cache()?.revision).toBe("new");
+    // And the first, arriving at last, changes nothing.
+    h.reads[0](snapshot("stale"));
+    await h.settle();
+    expect(h.cache()?.revision).toBe("new");
+  });
+
+  it("throws when the read could not be made, or was stopped before it landed", async () => {
+    const h = harness(snapshot("old"));
     const failing = h.sync.whole();
-    h.reads[2](new Error("down"));
+    h.reads[0](new Error("down"));
     await expect(failing).rejects.toThrow("could not be read");
+    const stopped = h.sync.whole();
+    h.sync.stop();
+    await expect(stopped).rejects.toThrow("no longer being read");
+    h.reads[1](snapshot("new"));
+    await h.settle();
+    expect(h.cache()?.revision).toBe("old");
+    await expect(h.sync.whole()).rejects.toThrow("no longer being read");
   });
 });

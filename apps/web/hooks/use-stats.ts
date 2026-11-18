@@ -96,7 +96,7 @@ export function useStats() {
    * throws saying so.
    */
   const saveCatalog = useCallback(
-    async (catalog: StatCatalog, base: string | undefined): Promise<void> => {
+    async (catalog: StatCatalog, base: string): Promise<void> => {
       try {
         await settle(() => saveStatCatalog(catalog, base), afterStatCatalog);
       } catch (error) {

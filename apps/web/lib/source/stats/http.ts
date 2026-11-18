@@ -16,16 +16,15 @@ export async function fetchStats(): Promise<StatsResponse> {
 
 /**
  * `base` is the `revision` of the catalog the change was made from. The save is
- * refused (409) when the catalog has changed since. Without one (an older
- * Gateway gives none) it is not checked.
+ * refused (409) when the catalog has changed since.
  */
 export async function saveStatCatalog(
   catalog: StatCatalog,
-  base: string | undefined,
+  base: string,
 ): Promise<StatsResponse> {
   const data = await postJson<unknown>(buildUrl("/kazusa/stats/catalog"), {
     catalog,
-    ...(base === undefined ? {} : { base }),
+    base,
   });
   return StatsResponseSchema.parse(data);
 }

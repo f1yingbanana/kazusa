@@ -48,8 +48,15 @@ export function statsSync(deps: {
   let cancel: (() => void) | undefined;
   let since: StatsStreamEvent[] = [];
   let stopped = false;
-  /** Over when the read under way has landed or failed. */
-  let landing: Promise<void> = Promise.resolve();
+  /** Whoever waits on `whole`: told how the newest read went, or of a stop. */
+  let waiting: { landed: () => void; lost: (reason: Error) => void }[] = [];
+  const tell = (reason?: Error): void => {
+    const told = waiting;
+    waiting = [];
+    for (const { landed, lost } of told)
+      if (reason) lost(reason);
+      else landed();
+  };
   const later =
     deps.later ??
     ((run, ms) => {
@@ -64,7 +71,7 @@ export function statsSync(deps: {
     reading = mine;
     owed = false;
     since = [];
-    landing = deps.read().then(
+    deps.read().then(
       async (snapshot) => {
         // A later read began after this one and knows more.
         if (stopped || mine !== reading) return;
@@ -77,6 +84,7 @@ export function statsSync(deps: {
             snapshot,
           ),
         );
+        tell();
       },
       () => {
         if (stopped || mine !== reading) return;
@@ -87,17 +95,22 @@ export function statsSync(deps: {
         const wait = RETRY_MS[failed++];
         if (wait !== undefined) cancel = later(refresh, wait);
         else deps.stale?.(true);
+        tell(new Error("The states could not be read."));
       },
     );
   };
 
   return {
     refresh,
-    async whole() {
-      refresh();
-      // A read that another overtook waits for the one that overtook it.
-      for (let seen; seen !== landing;) await (seen = landing);
-      if (owed) throw new Error("The states could not be read.");
+    whole() {
+      // Told by whichever read is the newest when it ends: one that another
+      // overtook is not waited for, and a stop is not a read that landed.
+      const done = new Promise<void>((landed, lost) => {
+        waiting.push({ landed, lost });
+      });
+      if (stopped) tell(new Error("The states are no longer being read."));
+      else refresh();
+      return done;
     },
     event(event) {
       if (!event.record || owed) {
@@ -118,6 +131,7 @@ export function statsSync(deps: {
       stopped = true;
       cancel?.();
       cancel = undefined;
+      tell(new Error("The states are no longer being read."));
     },
   };
 }
