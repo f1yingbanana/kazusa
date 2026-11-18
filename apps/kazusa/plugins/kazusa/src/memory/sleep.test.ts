@@ -33,6 +33,8 @@ let memory: MemoryService;
 let factories: Map<string, unknown>;
 let reviewed: unknown[];
 let turns: string[];
+/** What the world's states say at bedtime, when a test needs it long. */
+let statesText: string | undefined;
 /** The nights' store refuses writes, as a database under load does. */
 let storeDown: boolean;
 const call = async (name: string, input: unknown): Promise<string> => {
@@ -96,6 +98,7 @@ beforeEach(() => {
   reviewed = [];
   turns = [];
   storeDown = false;
+  statesText = undefined;
   const stores = new Map<string, Map<string, unknown>>();
   const api = {
     id: "kazusa",
@@ -148,7 +151,8 @@ beforeEach(() => {
     clock: { time: () => now },
     states: {
       text: async (_agentId, people) =>
-        people.length ? `trust toward ${people.join(", ")}: wary` : undefined,
+        statesText ??
+        (people.length ? `trust toward ${people.join(", ")}: wary` : undefined),
       apply: async (_agentId, people, answer) => {
         reviewed.push({ people, answer });
         return { moved: ["trust: warm"], left: ["luck"] };
@@ -451,6 +455,26 @@ describe("a night gone over", () => {
     // Kept with what the night found, so it can still be undone.
     expect(await memory.sleep.restore(AGENT, runs[0].id)).toBe(true);
     expect(await memory.sleep.runs(AGENT)).toHaveLength(0);
+  });
+
+  it("is not offered again when they go back to bed in the same run", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    expect(await start()).toContain("Before sleep takes you");
+    await call("reflect", { about: "tobin-vell", states: { trust: "up" } });
+    // A second sleep in the same run: the night they are going over stands.
+    expect(await start()).toBeUndefined();
+    await call("reflect", { about: "today", view: "Quiet." });
+    await memory.sleep.runEnded(AGENT);
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(1);
+  });
+
+  it("shows no page that the rest of what it says leaves no room for", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    // States that take nearly all a turn can be handed.
+    statesText = "trust: wary\n".repeat(2_600);
+    const aside = await start();
+    expect(aside).toContain("trust: wary");
+    expect(aside).not.toContain("### tobin-vell");
   });
 
   it("is not gone over twice in one night's sleep", async () => {

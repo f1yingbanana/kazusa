@@ -38,6 +38,7 @@ import { registerLocationHttp } from "./location/http.ts";
 import { registerWorldUpdate } from "./world-update/register.ts";
 import { registerRepoSearch } from "./repo-search/register.ts";
 import { registerMemory } from "./memory/register.ts";
+import { OFFER_CHARS } from "./memory/sleep.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
 import { registerProvidersHttp } from "./providers/http.ts";
@@ -260,7 +261,7 @@ export default definePluginEntry({
         sessionKey: `agent:${agentId}:tasks`,
         sender: "kazusa:memory",
         // A stimulus holds this much; what a night shows is budgeted under it.
-        text: text.slice(0, 32_000),
+        text: text.slice(0, OFFER_CHARS),
         idle: true,
         resume: true,
         timestamp: clock.time(),

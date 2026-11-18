@@ -81,6 +81,14 @@ Your {name} already is {value}.
 
 {name} is not something you can change yourself.
 
+## night-dreamt
+
+You dreamt: {dream}
+
+## night-slept
+
+You slept on it.
+
 ## reflect-awake
 
 You only go over things like this as you fall asleep for the night.

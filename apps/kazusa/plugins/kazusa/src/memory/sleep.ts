@@ -52,6 +52,11 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
  * holds (a night asked for by hand arrives as one).
  */
 const SHOWN_CHARS = 24_000;
+/**
+ * The most a turn can be handed, and so the most going to bed may say in all: a
+ * page cut short on the way would still count as read whole.
+ */
+export const OFFER_CHARS = 32_000;
 /** People whose states a night reviews: those of the day, latest first. */
 const PEOPLE_REVIEWED = 12;
 const RUNS_KEPT = 7;
@@ -350,34 +355,6 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     const personal = deps.index.personal(agentId);
     const world = deps.index.world();
     const touched = await deps.touched(agentId, night.since);
-    const pages: string[] = [];
-    const fading: string[] = [];
-    // One budget for both, latest first: a page goes in whole or not at all,
-    // and its fading notes only if they fit too.
-    let room = SHOWN_CHARS;
-    for (const id of touched) {
-      const page = personal.get(id);
-      if (!page || page.kind === "day") continue;
-      const raw = read(fileOf(agentId, page.kind, id));
-      if (!raw || raw.length > room) continue;
-      room -= raw.length;
-      night.shown.add(id);
-      night.whole.add(id);
-      pages.push(`### ${id}\n${raw.trim()}`);
-      // Lifelong knowledge never fades; everything else may.
-      const old = [...page.notes]
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .filter(
-          (note, at) =>
-            at >= deps.notesPerPage && note.source !== "always known",
-        )
-        .map((note) => `${note.date}: ${note.text}`)
-        .join("\n");
-      if (old && old.length <= room) {
-        room -= old.length;
-        fading.push(`### ${id}\n${old}`);
-      }
-    }
     const people = touched
       .filter(
         (id) => (personal.get(id) ?? world.pages.get(id))?.kind === "person",
@@ -394,9 +371,52 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       name: string,
       values: Readonly<Record<string, string>> = {},
     ): string => deps.text(`sleep-consolidation#${name}`, values, agentId);
-    return [
+    const lead = [
       section("night"),
       ...(states ? [section("states", { states })] : []),
+    ];
+    const pages: string[] = [];
+    const fading: string[] = [];
+    const between = "\n\n".length;
+    // One budget for both, latest first: a page goes in whole or not at all,
+    // and its fading notes only if they fit too. It is what is left of a turn
+    // after everything else said here, so nothing shown is cut on the way.
+    let room = Math.min(
+      SHOWN_CHARS,
+      OFFER_CHARS -
+        [
+          ...lead,
+          section("pages", { pages: "" }),
+          section("fading", { notes: "" }),
+        ].join("\n\n").length,
+    );
+    for (const id of touched) {
+      const page = personal.get(id);
+      if (!page || page.kind === "day") continue;
+      const raw = read(fileOf(agentId, page.kind, id));
+      const shown = raw ? `### ${id}\n${raw.trim()}` : undefined;
+      if (!shown || shown.length + between > room) continue;
+      room -= shown.length + between;
+      night.shown.add(id);
+      night.whole.add(id);
+      pages.push(shown);
+      // Lifelong knowledge never fades; everything else may.
+      const old = [...page.notes]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .filter(
+          (note, at) =>
+            at >= deps.notesPerPage && note.source !== "always known",
+        )
+        .map((note) => `${note.date}: ${note.text}`)
+        .join("\n");
+      const faded = old ? `### ${id}\n${old}` : undefined;
+      if (faded && faded.length + between <= room) {
+        room -= faded.length + between;
+        fading.push(faded);
+      }
+    }
+    return [
+      ...lead,
       ...(pages.length
         ? [section("pages", { pages: pages.join("\n\n") })]
         : []),
@@ -490,7 +510,13 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         notes: night.notes,
         ...(night.dream ? { dream: night.dream } : {}),
       },
-      night.dream ? `You dreamt: ${night.dream}` : "You slept on it.",
+      night.dream
+        ? deps.text(
+            "kazusa-results#night-dreamt",
+            { dream: night.dream },
+            agentId,
+          )
+        : deps.text("kazusa-results#night-slept", {}, agentId),
     );
   };
 
@@ -678,8 +704,15 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
           deps.categories.includes(task.type) &&
           task.duration >= deps.minMinutes
         ) {
+          // A night they are already going over stands: back to bed in the same
+          // run does not offer the day a second time. One asked for by hand
+          // and not begun gives way to this one.
+          const going = nights.get(agentId);
           const since = await lastNight(agentId);
-          if (at - since >= deps.everyMinutes * 60_000) {
+          if (
+            (!going || going.waiting) &&
+            at - since >= deps.everyMinutes * 60_000
+          ) {
             night = begin(at, since, Date.parse(task.endAt));
             aside = await offer(agentId, night);
           }

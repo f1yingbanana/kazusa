@@ -11,6 +11,7 @@ import {
   statsText,
   withEntry,
 } from "../../../apps/kazusa/plugins/kazusa/src/stats/stats.ts";
+import { bundledSkillText } from "../../../apps/kazusa/plugins/kazusa/src/skill-text.ts";
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "../../..");
@@ -71,6 +72,9 @@ function shaped(route, body) {
   };
 }
 
+/** How a completion that said all it had to ends. */
+const ENDED = new Set(["stop", "tool_calls", "function_call", "end_turn"]);
+
 /** One streamed chat completion: text, reasoning, tool calls and usage. */
 export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
   const started = Date.now();
@@ -103,6 +107,7 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
       // A stream can close with a 200 and nothing, or half a reply: only one
       // that said it was finished is a completion.
       let finished = false;
+      let reason;
       for await (const chunk of response.body) {
         buffer += decoder.decode(chunk, { stream: true });
         let at;
@@ -121,7 +126,7 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
           }
           if (event.error) throw new Error(JSON.stringify(event.error));
           if (event.usage) out.usage = event.usage;
-          if (event.choices?.[0]?.finish_reason) finished = true;
+          reason = event.choices?.[0]?.finish_reason ?? reason;
           const delta = event.choices?.[0]?.delta;
           if (!delta) continue;
           if (delta.content) out.content += delta.content;
@@ -140,8 +145,15 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
           }
         }
       }
-      if (!finished)
+      if (!finished && !reason)
         throw new Error("the stream ended before the completion finished");
+      // Cut off at the token limit, filtered or failed: half a reply with no
+      // call would read as the end of a night. Tried a few times, since the
+      // thinking it spends varies, and never kept.
+      if (reason && !ENDED.has(reason))
+        throw Object.assign(new Error(`the completion ended as "${reason}"`), {
+          tries: 3,
+        });
       out.toolCalls = out.toolCalls.filter(Boolean).map((call, index) => {
         let input = {};
         try {
@@ -154,7 +166,7 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
       out.ms = Date.now() - started;
       return out;
     } catch (error) {
-      if (attempt >= tries)
+      if (attempt >= Math.min(tries, error?.tries ?? tries))
         throw new Error(
           `${String(error)} ${error?.cause?.code ?? error?.cause?.message ?? ""}`,
         );
@@ -311,10 +323,23 @@ export function applyReview(catalog, record, answer, people, at) {
     ({ stat, value }) => `${stat.name}: ${statStanding(stat, value)}`,
   );
   const left = [...names].filter((name) => !movedNames.has(name));
+  // Worded by the skill the live `reflect` answers from, so a replay says what
+  // a night would.
+  const text = bundledSkillText();
   const said = [
-    ...(moved.length ? [` Now ${moved.join(", ")}.`] : []),
-    ...(left.length ? [` Left as they were: ${left.join(", ")}.`] : []),
-  ].join("");
+    ...(moved.length
+      ? [text("kazusa-results#reflect-states", { states: moved.join(", ") })]
+      : []),
+    ...(left.length
+      ? [
+          text("kazusa-results#reflect-states-left", {
+            states: left.join(", "),
+          }),
+        ]
+      : []),
+  ]
+    .map((line) => ` ${line.trim()}`)
+    .join("");
   return {
     record: next,
     said,

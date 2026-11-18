@@ -533,8 +533,11 @@ session, nothing to schedule, interrupt or resume.
   `stats.review`, for up to 12 people of the day); their own pages, whole, on
   what the day touched, latest first (`pages`; "touched" is familiarity's uses
   since the last night); and notes past the cap on those pages (`fading`). Pages
-  and fading notes share one budget of 24,000 characters; a page goes in whole
-  or not at all.
+  and fading notes share one budget of 24,000 characters, or less when the rest
+  of what is said leaves less of the 32,000 a turn can be handed
+  (`OFFER_CHARS`): a page goes in whole or not at all, and nothing shown is cut
+  on the way. Going back to bed in the same run says none of this again: the
+  night they are going over stands.
 - **The run goes over it** with two tools. `remember` adds notes as at any other
   time. `reflect` (`REFLECT`, flat on purpose) takes `about` and what changed:
   - a person, place or thing: `view` (replaces the lead), `summary`, `relation`,
@@ -571,7 +574,8 @@ session, nothing to schedule, interrupt or resume.
   memory as it stood, still counts as last night, and is kept at the next read
   of the runs (`settle`); the night is told all the same. One is held per
   character, and a restart loses it.
-- **Surface**: a row in `:tasks` (`You dreamt: …` or `You slept on it.`) and a
+- **Surface**: a row in `:tasks` (`kazusa-results#night-dreamt` or
+  `#night-slept`: `You dreamt: …` or `You slept on it.`) and a
   `memory.consolidated` journal event (window, run id, pages, new pages, notes,
   dream).
 - **By hand** (`memory_consolidate`, `POST /kazusa/memory/consolidate`): the

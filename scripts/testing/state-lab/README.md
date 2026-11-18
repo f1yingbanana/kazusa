@@ -41,6 +41,11 @@ turn of that kind. The characters' pages on Sensei are read from
 
 ```
 ./run-all.sh deep v0        # the day matrix, the chains and the probes of one variant
+
+# One runner at a time: say the condition first, as run-all.sh does for its own
+# jobs. Without a route the runners spread over both, and the two think to
+# different depths.
+export STATE_LAB_ROUTE=openrouter STATE_LAB_EFFORT=high
 node nights.mjs plans/write-v0.json out/write-v0-deep.jsonl 8
 python3 score.py out/write-v0-deep.jsonl            # by kind of day, against the labels
 python3 score.py out/write-v2-deep.jsonl --delta    # how far fine-grained states moved
