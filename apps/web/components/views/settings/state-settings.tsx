@@ -178,10 +178,13 @@ export function StateSettings() {
   const [editing, setEditing] = useState<
     { readonly draft: StatDraft; readonly replaces?: string } | undefined
   >();
-  // What the catalog is by the time an Undo is pressed.
-  const latest = useRef<StatCatalog>([]);
+  // What the states are by the time an Undo is pressed.
+  const latest = useRef<{ catalog: StatCatalog; revision: string }>({
+    catalog: [],
+    revision: "",
+  });
   useEffect(() => {
-    if (data) latest.current = data.catalog;
+    if (data) latest.current = data;
   });
 
   if (!enabled) {
@@ -203,16 +206,18 @@ export function StateSettings() {
     );
   }
 
-  const { catalog } = data;
+  const { catalog, revision } = data;
   const seen = statsCharactersSee(catalog);
 
+  /** `base`: the revision of the states `next` was made from. */
   const save = async (
     next: StatCatalog,
+    base: string,
     done: string,
     undo?: () => void,
   ): Promise<boolean> => {
     try {
-      await saveCatalog(next);
+      await saveCatalog(next, base);
       toast.success(
         done,
         undo ? { action: { label: "Undo", onClick: undo } } : undefined,
@@ -231,11 +236,23 @@ export function StateSettings() {
     const at = catalog.findIndex(({ name }) => name === stat.name);
     return save(
       catalog.filter(({ name }) => name !== stat.name),
+      revision,
       "State deleted",
       () => {
-        const now = latest.current.filter(({ name }) => name !== stat.name);
+        const now = latest.current;
+        // A state made under the name since is not this one's to replace.
+        if (now.catalog.some(({ name }) => name === stat.name)) {
+          toast.error(
+            `Couldn't restore ${statLabel(stat.name).toLowerCase()}`,
+            {
+              description: "Another state has that name now.",
+            },
+          );
+          return;
+        }
         void save(
-          [...now.slice(0, at), stat, ...now.slice(at)],
+          [...now.catalog.slice(0, at), stat, ...now.catalog.slice(at)],
+          now.revision,
           "State restored",
         );
       },
@@ -336,6 +353,7 @@ export function StateSettings() {
                     entry.name === editing.replaces ? stat : entry,
                   )
                 : [...catalog, stat],
+              revision,
               editing.replaces ? "State saved" : "State added",
             )
           }
@@ -516,7 +534,8 @@ function StateDialog({
   const number = draft.kind === "number";
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    // Held open while a save is under way: its result belongs to this form.
+    <Dialog open onOpenChange={(open) => !open && !saving && onClose()}>
       <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
         <form
           className="flex min-h-0 flex-col gap-4"
@@ -663,7 +682,7 @@ function StateDialog({
                     <BandScale stat={result.stat} />
                   ) : null}
                 </Text>
-                {draft.bands.trim() ? (
+                {draft.bands.trim() || draft.step.trim() ? (
                   <Text
                     id="state-step"
                     label="One step (optional)"
@@ -740,7 +759,9 @@ function StateDialog({
                 Delete state
               </Button>
             ) : null}
-            <DialogClose render={<Button variant="outline" />}>
+            <DialogClose
+              render={<Button variant="outline" disabled={saving} />}
+            >
               Cancel
             </DialogClose>
             <Button type="submit" disabled={saving}>

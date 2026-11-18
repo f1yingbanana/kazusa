@@ -13,11 +13,14 @@ export function BandScale({ stat }: { stat: NumberStat }) {
   const span = stat.max - stat.min;
   if (bands.length < 2 || span <= 0) return null;
   const step = stat.step ?? 1;
-  const segments = bands.map((band, index) => {
-    const from = Math.max(band.min, stat.min);
-    const to = bands[index + 1]?.min ?? stat.max;
-    return { name: band.name, from, width: to - from };
-  });
+  // A word whose range lies outside the state's has nothing to draw.
+  const segments = bands
+    .map((band, index) => {
+      const from = Math.max(band.min, stat.min);
+      const to = Math.min(bands[index + 1]?.min ?? stat.max, stat.max);
+      return { name: band.name, from, width: to - from };
+    })
+    .filter(({ width }) => width > 0);
   // Whatever lies under the first word has no name.
   const lead = (segments[0]?.from ?? stat.min) - stat.min;
   const start = ((stat.initial - stat.min) / span) * 100;

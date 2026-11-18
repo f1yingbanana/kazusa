@@ -19,12 +19,17 @@ import {
 } from "@/components/stats/stat-control";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -212,6 +217,7 @@ function Toward({
 }) {
   const { characters } = useCharacters();
   const [open, setOpen] = useState<string | undefined>();
+  const [picking, setPicking] = useState(false);
   const others = characters
     .filter(({ id, kind }) => id !== entity.id && kind !== "npc")
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -274,22 +280,34 @@ function Toward({
         <p className="text-sm text-muted-foreground">Nobody yet.</p>
       )}
       {onSet && rest.length ? (
-        <Select
-          items={rest.map(({ id, name }) => ({ value: id, label: name }))}
-          value={null}
-          onValueChange={(next: string | null) => next && setOpen(next)}
-        >
-          <SelectTrigger size="sm" aria-label="Someone else" className="w-fit">
-            <SelectValue placeholder="Someone else" />
-          </SelectTrigger>
-          <SelectContent>
-            {rest.map(({ id, name }) => (
-              <SelectItem key={id} value={id}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        // Everyone else in the world: found by name, not by scrolling.
+        <Popover open={picking} onOpenChange={setPicking}>
+          <PopoverTrigger
+            render={<Button variant="outline" size="xs" className="w-fit" />}
+          >
+            Someone else
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 gap-0 p-0">
+            <Command>
+              <CommandInput placeholder={`Search ${rest.length} people`} />
+              <CommandList className="max-h-64">
+                <CommandEmpty>Nobody by that name.</CommandEmpty>
+                {rest.map(({ id, name }) => (
+                  <CommandItem
+                    key={id}
+                    value={`${name} ${id}`}
+                    onSelect={() => {
+                      setOpen(id);
+                      setPicking(false);
+                    }}
+                  >
+                    <span className="truncate">{name}</span>
+                  </CommandItem>
+                ))}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       ) : null}
     </div>
   );

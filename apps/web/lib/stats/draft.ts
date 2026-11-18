@@ -42,6 +42,11 @@ export const EMPTY_DRAFT: StatDraft = {
   step: "",
 };
 
+/** A meaning on one line, as the form lists them. */
+function line(description: string): string {
+  return description.replace(/\s*[\r\n]+\s*/gu, " ");
+}
+
 export function toDraft(stat: StatDefinition): StatDraft {
   const choice = stat.kind === "choice";
   return {
@@ -57,7 +62,7 @@ export function toDraft(stat: StatDefinition): StatDraft {
       ? {
           values: stat.values
             .map(({ name, description }) =>
-              description ? `${name}: ${description}` : name,
+              description ? `${name}: ${line(description)}` : name,
             )
             .join("\n"),
         }
@@ -67,7 +72,7 @@ export function toDraft(stat: StatDefinition): StatDraft {
           bands: (stat.bands ?? [])
             .map(({ name, min, description }) =>
               description
-                ? `${name}: ${min}: ${description}`
+                ? `${name}: ${min}: ${line(description)}`
                 : `${name}: ${min}`,
             )
             .join("\n"),
@@ -142,9 +147,7 @@ export function fromDraft(
           max: number(draft.max),
           initial: number(draft.initial),
           ...(bands.length ? { bands } : {}),
-          ...(bands.length && draft.step.trim()
-            ? { step: number(draft.step) }
-            : {}),
+          ...(draft.step.trim() ? { step: number(draft.step) } : {}),
         },
   );
   const errors: Record<string, string> = {};
@@ -170,7 +173,8 @@ const MESSAGES: Record<string, string> = {
   initial: "Start at one of the values, or a number in range.",
   min: "A number.",
   max: "A number above the minimum.",
-  bands: "One per line as `name: from`, lowest first.",
+  bands:
+    "One per line as `name: from`, lowest first, the first from the minimum and none above the maximum.",
   step: "A number above 0.",
 };
 

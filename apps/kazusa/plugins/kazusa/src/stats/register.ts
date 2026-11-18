@@ -15,6 +15,7 @@ import {
   type StatEntry,
   type StatRecord,
   type StatSetPayload,
+  type StatValue,
   type StatValueDef,
 } from "@kazusa/client";
 import type { Clock } from "../clock/clock.ts";
@@ -26,7 +27,12 @@ import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { StateStore } from "../state.ts";
 import { declaredOutfits } from "../stickers/stickers.ts";
 import type { TaskExtension } from "../taskman/types.ts";
-import { catalogFile, statsFile, type CatalogFile } from "./catalog.ts";
+import {
+  catalogFile,
+  catalogRevision,
+  statsFile,
+  type CatalogFile,
+} from "./catalog.ts";
 import {
   WORLD_KEY,
   changesParameter,
@@ -59,8 +65,12 @@ export interface StatsService {
   readonly wearing: (characterId: string) => string | undefined;
   /** Reads what everyone wears into memory, once the Gateway has started. */
   readonly load: () => Promise<void>;
-  /** Replaces the world's states. Values already set stay in the store. */
-  readonly saveCatalog: (catalog: StatCatalog) => void;
+  /**
+   * Replaces the world's states. Values already set stay in the store. With the
+   * revision the change was made from, throws `StaleCatalogError` when the
+   * states have changed since.
+   */
+  readonly saveCatalog: (catalog: StatCatalog, base?: string) => void;
   readonly record: (characterId: string) => Promise<StatRecord | undefined>;
   readonly world: () => Promise<StatRecord | undefined>;
   /** Sets one value by hand; throws with what is wrong with the request. */
@@ -123,6 +133,17 @@ function worn(): Map<string, StatEntry | undefined> {
   return created;
 }
 
+/** A save made from a catalog that has changed since. */
+export class StaleCatalogError extends Error {
+  constructor() {
+    super("The states changed since you opened them.");
+    this.name = "StaleCatalogError";
+  }
+}
+
+/** People named by what arrived whose states toward are shown. */
+const NAMED_SHOWN = 4;
+
 /** What a value has to be, for whoever gave one the state can't hold. */
 function allowed(stat: StatDefinition): string {
   return stat.kind === "choice"
@@ -175,15 +196,24 @@ export function createStats(deps: {
       .map((id) => ({ id }));
   const labelOf = async (id: string) => personLabel(await deps.labelOf(id), id);
 
+  /**
+   * Writes one subject's changes, one caller at a time. Changes worked out from
+   * where a value stands are given as a function of the record, so two moves at
+   * once each start from the other's result; one that throws writes nothing.
+   */
   const apply = (
     key: string,
-    changes: readonly StatChange[],
+    changes:
+      | readonly StatChange[]
+      | ((record: StatRecord | undefined) => readonly StatChange[]),
     by: StatAuthor,
     reset?: { readonly name: string; readonly toward?: string },
   ): Promise<StatRecord> => {
     const run = async () => {
       let record = await store.lookup(key);
-      for (const { stat, toward, value } of changes)
+      const planned = typeof changes === "function" ? changes(record) : changes;
+      if (!planned.length && !reset) return record ?? { own: {}, toward: {} };
+      for (const { stat, toward, value } of planned)
         record = withEntry(
           record,
           { name: stat.name, ...(toward ? { toward } : {}) },
@@ -239,8 +269,13 @@ export function createStats(deps: {
             changes.map(({ stat, value }) => [stat.name, value]),
           ),
         },
+        // Worked out again when written: another change may have landed.
         commit: async () => {
-          await apply(agentId, changes, "character");
+          await apply(
+            agentId,
+            (record) => ownChanges(statsFor(agentId), record, params.changes),
+            "character",
+          );
         },
       };
     },
@@ -261,7 +296,9 @@ export function createStats(deps: {
       for (const { key, value } of await store.entries())
         worn().set(key, value.own[OUTFIT]);
     },
-    saveCatalog(catalog) {
+    saveCatalog(catalog, base) {
+      if (base !== undefined && base !== catalogRevision(file.read()))
+        throw new StaleCatalogError();
       file.write(catalog);
       deps.onCatalog?.();
     },
@@ -325,15 +362,26 @@ export function createStats(deps: {
         throw new Error(
           deps.text("kazusa-results#state-not-yours", { name }, agentId),
         );
-      const record = await store.lookup(agentId);
-      const current = statValue(stat, record?.own[name]);
-      const next = statMoved(stat, current, value);
-      if (next === undefined) throw new Error(movable(stat));
-      const said = { name, value: statStanding(stat, next) };
-      if (next === current)
-        return deps.text("kazusa-results#state-unchanged", said, agentId);
-      await apply(agentId, [{ stat, value: next }], "character");
-      return deps.text("kazusa-results#state-changed", said, agentId);
+      let result = "kazusa-results#state-unchanged";
+      let stands: StatValue = stat.initial;
+      await apply(
+        agentId,
+        (record) => {
+          const current = statValue(stat, record?.own[name]);
+          const next = statMoved(stat, current, value);
+          if (next === undefined) throw new Error(movable(stat));
+          stands = next;
+          if (next === current) return [];
+          result = "kazusa-results#state-changed";
+          return [{ stat, value: next }];
+        },
+        "character",
+      );
+      return deps.text(
+        result,
+        { name, value: statStanding(stat, stands) },
+        agentId,
+      );
     },
     async situation(agentId, here, prompt) {
       const catalog = statsFor(agentId);
@@ -351,21 +399,22 @@ export function createStats(deps: {
       )
         return undefined;
       const record = await store.lookup(agentId);
-      // Toward whoever is at hand: with them, or named by what arrived.
-      const named = Object.keys(record?.toward ?? {}).filter(
-        (id) =>
-          !others.some((person) => person.id === id) &&
-          prompt.includes(`\`${id}\``),
-      );
+      // Toward whoever is at hand: with them, or named by what arrived,
+      // whether or not anything is set toward them yet. A few at most: one
+      // text names its sender, a busy group chat everyone.
+      const named = towardThem(
+        agentId,
+        [...prompt.matchAll(/`([^`\s]+)`/gu)]
+          .map(([, id]) => id)
+          .filter((id) => !others.some((person) => person.id === id)),
+      ).slice(0, NAMED_SHOWN);
       const labelled = async <T extends StatPerson>(person: T) => ({
         ...person,
         label: await labelOf(person.id),
       });
       const [toward, present, world] = await Promise.all([
         catalog.some((stat) => stat.on === "pair" && stat.shown !== "nobody")
-          ? Promise.all(
-              [...others, ...towardThem(agentId, named)].map(labelled),
-            )
+          ? Promise.all([...others, ...named].map(labelled))
           : [],
         Promise.all(
           theirs.map(async (person) => ({
@@ -392,13 +441,17 @@ export function createStats(deps: {
         );
       },
       async apply(agentId, people, answer) {
-        const changes = reviewedChanges(
-          statsFor(agentId),
-          await store.lookup(agentId),
-          answer,
-          towardThem(agentId, people),
+        await apply(
+          agentId,
+          (record) =>
+            reviewedChanges(
+              statsFor(agentId),
+              record,
+              answer,
+              towardThem(agentId, people),
+            ),
+          "reviewed",
         );
-        if (changes.length) await apply(agentId, changes, "reviewed");
       },
     },
   };

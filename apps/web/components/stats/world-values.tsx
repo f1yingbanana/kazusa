@@ -62,7 +62,7 @@ export function WorldValues() {
               : "What is true for everyone right now."}
           </PopoverDescription>
         </PopoverHeader>
-        <ul className="flex flex-col gap-2">
+        <ul className="-mr-2 flex max-h-[60dvh] flex-col gap-2 overflow-y-auto pr-2">
           {world.map((stat) => {
             const entry = data.world[stat.name];
             const label = statLabel(stat.name);

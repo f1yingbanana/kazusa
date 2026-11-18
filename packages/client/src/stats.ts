@@ -11,10 +11,15 @@ import { z } from "zod";
 export const STAT_NAME = /^[a-z][a-z0-9_]*$/u;
 const NAME = z.string().regex(STAT_NAME, "lowercase words joined by _");
 const TEXT = z.string().trim().min(1);
+/**
+ * A value's or a band's word. One line without a colon, so a list of them can
+ * be written one per line as `name: what it means`.
+ */
+const WORD = TEXT.max(64).regex(/^[^:\r\n]+$/u, "one line, without a colon");
 
 /** One value a choice state can have. */
 export const StatValueDefSchema = z.object({
-  name: TEXT.max(64),
+  name: WORD,
   /** What it means, for whoever sets or judges it. */
   description: z.string().trim().optional(),
 });
@@ -22,7 +27,7 @@ export type StatValueDef = z.infer<typeof StatValueDefSchema>;
 
 /** A word for a range of a number state, from `min` up to the next band. */
 export const StatBandSchema = z.object({
-  name: TEXT.max(64),
+  name: WORD,
   min: z.number().finite(),
   /** What standing in it means, for whoever reads it. */
   description: z.string().trim().optional(),
@@ -80,8 +85,9 @@ export const NumberStatSchema = z.object({
   max: z.number().finite(),
   initial: z.number().finite(),
   /**
-   * Ascending. With bands a character reads the word, not the number, and moves
-   * it a `step` at a time by saying which way (`statMoved`).
+   * Ascending, the first from `min` and none above `max`, so every value has a
+   * word. With bands a character reads the word, not the number, and moves it a
+   * `step` at a time by saying which way (`statMoved`).
    */
   bands: z.array(StatBandSchema).optional(),
   /** How far one move takes a state with bands. 1 when absent. */
@@ -131,6 +137,10 @@ export const StatDefinitionSchema = z
       bands.some((band, index) => index > 0 && band.min <= bands[index - 1].min)
     )
       issue("bands", "bands must ascend");
+    if (bands.length && bands[0].min > stat.min)
+      issue("bands", "the first band must start at min");
+    if (bands.some((band) => band.min > stat.max))
+      issue("bands", "no band may start above max");
   });
 export type StatDefinition = z.infer<typeof StatDefinitionSchema>;
 
@@ -237,6 +247,8 @@ export type StatRecord = z.infer<typeof StatRecordSchema>;
 /** GET /kazusa/stats. */
 export const StatsResponseSchema = z.object({
   catalog: StatCatalogSchema,
+  /** Names this version of the catalog, for saving a change to it. */
+  revision: z.string(),
   /** By character id; characters with nothing set are absent. */
   records: z.record(z.string(), StatRecordSchema),
   /** The world's own states by name. */
@@ -246,9 +258,14 @@ export const StatsResponseSchema = z.object({
 });
 export type StatsResponse = z.infer<typeof StatsResponseSchema>;
 
-/** POST /kazusa/stats/catalog: replaces the world's states. */
+/**
+ * POST /kazusa/stats/catalog: replaces the world's states. `base` is the
+ * `revision` the change was made from: when the catalog has changed since, the
+ * save is refused (409) instead of undoing that change.
+ */
 export const StatCatalogSavePayloadSchema = z.object({
   catalog: StatCatalogSchema,
+  base: z.string().optional(),
 });
 export type StatCatalogSavePayload = z.infer<
   typeof StatCatalogSavePayloadSchema
@@ -405,7 +422,7 @@ export function statMoved(
       ? undefined
       : coerceStat(stat, from + move * (stat.step ?? 1));
   }
-  return /^[+-]\d/u.test(word)
+  return /^[+-](?:\d|\.\d)/u.test(word)
     ? coerceStat(stat, from + Number(word))
     : coerceStat(stat, given);
 }

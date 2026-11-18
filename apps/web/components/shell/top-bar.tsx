@@ -16,8 +16,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { WorldValues } from "@/components/stats/world-values";
 import { useClockActions, useClockAnchor, useSimNow } from "@/hooks/use-clock";
+import { TOP_BAR_ITEMS } from "@/lib/registry/top-bar";
+import { satisfies } from "@/lib/source/capabilities";
+import { useSources } from "@/lib/source/provider";
 import {
   formatSimDate,
   formatSimDateLong,
@@ -146,6 +148,10 @@ export function SpeedControls({
  * controls live inside their section.
  */
 export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
+  const { resolved } = useSources();
+  const items = TOP_BAR_ITEMS.filter((item) =>
+    satisfies(resolved, item.requires),
+  ).sort((a, b) => a.order - b.order);
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-sidebar px-3">
       {/* World title comes from GET /kazusa/world once it exists (D1). */}
@@ -158,7 +164,9 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="flex flex-1 items-center justify-center gap-3">
         <SimClock />
         <SpeedControls />
-        <WorldValues />
+        {items.map((item) => (
+          <item.component key={item.id} />
+        ))}
       </div>
 
       <div className="flex items-center gap-1">

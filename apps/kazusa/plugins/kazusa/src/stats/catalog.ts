@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   mkdirSync,
   readFileSync,
@@ -16,6 +16,17 @@ import { StatCatalogSchema, type StatCatalog } from "@kazusa/client";
  */
 export function statsFile(): string {
   return path.resolve("shared", "stats.json");
+}
+
+/**
+ * Names a catalog by what it says, so a save made from an older one is told
+ * apart however the file was changed in between.
+ */
+export function catalogRevision(catalog: StatCatalog): string {
+  return createHash("sha256")
+    .update(JSON.stringify(catalog))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export interface CatalogFile {

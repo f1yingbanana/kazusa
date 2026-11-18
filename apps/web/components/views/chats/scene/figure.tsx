@@ -76,10 +76,14 @@ export function SceneFigure({
   const name = useCharacter(id)?.name ?? id;
   // SWR re-renders only for the fields read here.
   const set = usePortraits(id).data;
-  // What they are wearing is their `outfit` state, not part of a line's face.
+  // What they are wearing is their `outfit` state, not part of a line's face:
+  // back in their usual clothes, an outfit a look still names is not shown.
   const outfit = useWornOutfit(id);
   const portrait = set
-    ? pickPortrait(set, { ...figure.look, ...(outfit ? { outfit } : {}) })
+    ? pickPortrait(set, {
+        ...(figure.look.mood ? { mood: figure.look.mood } : {}),
+        ...(outfit ? { outfit } : {}),
+      })
     : undefined;
   const [broken, setBroken] = useState<string | undefined>(undefined);
   const dimmed = lit === false || (lit !== undefined && presence === "leaving");

@@ -82,16 +82,16 @@ states. Schema: `StatDefinitionSchema` in `@kazusa/client`
 (`packages/client/src/stats.ts`), with the helpers both sides share
 (`coerceStat`, `statValue`, `statBand`, `statWord`, `statsOf`, `wornOutfit`).
 
-| Field         | Meaning                                                                                                      |
-| :------------ | :----------------------------------------------------------------------------------------------------------- |
-| `name`        | `^[a-z][a-z0-9_]*$`, shown to models as written. `outfit` is reserved.                                       |
-| `description` | What it is and when it changes. The one thing a model is told about it.                                      |
-| `on`          | `character`, `pair`, `world` or `player` (§6).                                                               |
-| `kind`        | `choice` (`values: [{ name, description? }]`, `initial`) or `number` (`min`, `max`, `initial`).              |
-| `bands`       | Number only: `[{ name, min, description? }]` ascending. With bands a character reads the word, else `14/20`. |
-| `step`        | Number with bands only: how far one move takes it. 1 when absent.                                            |
-| `changedBy`   | §1. `world` and `player` are `manual` only; `pair` is `reviewed` or `manual`.                                |
-| `shown`       | `self` (they read it), `everyone` (people with them see it too; not for a pair), `nobody` (UI only).         |
+| Field         | Meaning                                                                                                                                                                                                                                               |
+| :------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | `^[a-z][a-z0-9_]*$`, shown to models as written. `outfit` is reserved.                                                                                                                                                                                |
+| `description` | What it is and when it changes. The one thing a model is told about it.                                                                                                                                                                               |
+| `on`          | `character`, `pair`, `world` or `player` (§6).                                                                                                                                                                                                        |
+| `kind`        | `choice` (`values: [{ name, description? }]`, `initial`) or `number` (`min`, `max`, `initial`).                                                                                                                                                       |
+| `bands`       | Number only: `[{ name, min, description? }]` ascending, the first from `min` or below and none above `max`, so every value has a word. With bands a character reads the word, else `14/20`. A band's or a value's `name` is one line without a colon. |
+| `step`        | How far one move takes a number with bands, and one press of an arrow key in the client. 1 when absent.                                                                                                                                               |
+| `changedBy`   | §1. `world` and `player` are `manual` only; `pair` is `reviewed` or `manual`.                                                                                                                                                                         |
+| `shown`       | `self` (they read it), `everyone` (people with them see it too; not for a pair), `nobody` (UI only).                                                                                                                                                  |
 
 **How many.** The file holds up to 64, but keep the states that reach a
 character (any they read or change: `shown` not `nobody`, or `changedBy` not
@@ -136,8 +136,9 @@ It is the one state code acts on:
 
 - `send_message` offers only the stickers (`wornStickers`) and the faces
   (`faceMoods(portraits, worn)`) of what they are wearing, so a character in a
-  swimsuit cannot send themselves in uniform. An outfit with no portraits falls
-  back to the usual clothes' moods; one with no stickers offers none.
+  swimsuit cannot send themselves in uniform, and refuses a sticker of anything
+  else when it is sent. An outfit with no portraits falls back to the usual
+  clothes' moods; one with no stickers offers none.
 - The Scene view draws the figure in it (`useWornOutfit` sets `Look.outfit`).
 - People with them read `Name: outfit: swimsuit (what is worn)`.
 
@@ -184,9 +185,21 @@ reads a process-wide copy of each character's outfit entry, filled at
   value description, a band's: `statMeaning`). Under them, `What these are:`
   describes each state the lines name, once, however many lines name it: a value
   with nothing saying what it is tells its reader nothing.
-- **Read model**: `GET /kazusa/stats` (`{ catalog, records, world, outfits }`),
+- **Read model**: `GET /kazusa/stats`
+  (`{ catalog, revision, records, world, outfits }`),
   `POST /kazusa/stats/catalog` and `/stats/set` (`manage`), SSE `stats` with one
-  whole record, or `catalog: true` to refetch.
+  whole record, or `catalog: true` to refetch. A catalog save carries `base`,
+  the `revision` it was made from, and is refused with 409 when the states have
+  changed since (another session, the system agent, an edit by hand), so it
+  never undoes a change it did not see. The client reads again and asks the user
+  to save again. It takes only what a write changed from that write's response,
+  and makes a whole read outside SWR with the record events that arrived
+  meanwhile put back on top (`apps/web/lib/source/stats/sync.ts`): a patch to an
+  SWR cache drops a read of it under way.
+- **Changes in order**: a change worked out from where a value stands (a signed
+  number, a step up or down) is worked out inside that subject's write queue
+  (`apply` in `stats/register.ts`), so two at once each start from the other's
+  result.
 - **Client**: Settings → States defines them (with examples, advice under a
   field where a state would work badly as defined, and a number's words drawn to
   scale, §2); a value is set where its subject lives: the world's beside the

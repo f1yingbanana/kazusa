@@ -14,7 +14,8 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import type { StatsService } from "./register.ts";
+import { catalogRevision } from "./catalog.ts";
+import { StaleCatalogError, type StatsService } from "./register.ts";
 
 /**
  * Serves the world's states and what each stands at (`GET /kazusa/stats`), and
@@ -43,8 +44,10 @@ export function registerStatsHttp(
         if (record) records[id] = record;
       }),
     );
+    const catalog = stats.catalog();
     return {
-      catalog: stats.catalog(),
+      catalog,
+      revision: catalogRevision(catalog),
       records,
       world: (await stats.world())?.own ?? {},
       outfits: Object.fromEntries(
@@ -74,7 +77,13 @@ export function registerStatsHttp(
       sendJson(res, 400, { error: refused(parsed.error) });
       return;
     }
-    stats.saveCatalog(parsed.data.catalog);
+    try {
+      stats.saveCatalog(parsed.data.catalog, parsed.data.base);
+    } catch (error) {
+      if (!(error instanceof StaleCatalogError)) throw error;
+      sendJson(res, 409, { error: error.message });
+      return;
+    }
     sendJson(res, 200, await read());
   });
 

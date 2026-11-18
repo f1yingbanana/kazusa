@@ -44,6 +44,7 @@ async function setup(
       | "perception"
       | "placeOf"
       | "appendLedger"
+      | "wearing"
     >
   > = {},
 ) {
@@ -401,7 +402,8 @@ describe("send_message SDK integration", () => {
   });
 
   it("offers a character only its own stickers and sends one as everyone reads it", async () => {
-    const h = await setup();
+    let worn: string | undefined;
+    const h = await setup({}, { wearing: () => worn });
     const tool = () =>
       h.registerTool.mock.calls[0][0].create({ agentId: "alice" })[0];
     // No stickers: nothing to pick.
@@ -430,14 +432,24 @@ describe("send_message SDK integration", () => {
 
     const sent = await h.execute({
       sessionKey: "chat:direct:bob",
-      messages: ["So funny", "[sticker=laughing]", "[sticker=maid_happy]"],
+      messages: ["So funny", "[sticker=laughing]"],
     });
     // Written and read the same way.
-    expect(sent.details.said).toEqual([
-      "So funny",
-      "[sticker=laughing]",
-      "[sticker=maid-happy]",
-    ]);
+    expect(sent.details.said).toEqual(["So funny", "[sticker=laughing]"]);
+    // One of an outfit they are not wearing is not theirs to send.
+    await expect(
+      h.execute({
+        sessionKey: "chat:direct:bob",
+        messages: ["[sticker=maid_happy]"],
+      }),
+    ).rejects.toThrow('You have no sticker "maid-happy".');
+    worn = "maid";
+    expect(messages().description).toMatch(/wearing:\s+maid-happy\./);
+    await h.execute({
+      sessionKey: "chat:direct:bob",
+      messages: ["[sticker=maid_happy]"],
+    });
+    worn = undefined;
     const stored = [...h.retained.values()].find(
       ({ params }) => params.sticker?.name === "maid-happy",
     );

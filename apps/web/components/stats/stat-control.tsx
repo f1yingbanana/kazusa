@@ -58,15 +58,18 @@ export function StatControl({
   const [busy, setBusy] = useState(false);
   const value = statValue(stat, entry);
 
-  const set = async (next: StatValue) => {
-    if (!onSet || next === value) return;
+  /** Whether the value now stands as asked. */
+  const set = async (next: StatValue): Promise<boolean> => {
+    if (!onSet || next === value) return true;
     setBusy(true);
     try {
       await onSet(next);
+      return true;
     } catch (error) {
       toast.error(`Couldn't change ${statLabel(stat.name).toLowerCase()}`, {
         description: error instanceof Error ? error.message : String(error),
       });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -128,15 +131,23 @@ function NumberControl({
   value: number;
   busy: boolean;
   label: string;
-  onSet: (value: number) => Promise<void>;
+  onSet: (value: number) => Promise<boolean>;
 }) {
   const [typed, setTyped] = useState(String(value));
   const band = statBand(stat, value);
   const within = (next: number) => Math.min(stat.max, Math.max(stat.min, next));
+  /** The box shows what was asked for, then what stands if that failed. */
   const commit = () => {
     const next = Number(typed);
-    if (typed.trim() === "" || !Number.isFinite(next)) setTyped(String(value));
-    else void onSet(within(next));
+    if (typed.trim() === "" || !Number.isFinite(next)) {
+      setTyped(String(value));
+      return;
+    }
+    const asked = within(next);
+    setTyped(String(asked));
+    void onSet(asked).then((saved) => {
+      if (!saved) setTyped(String(value));
+    });
   };
   /** The arrow keys move what is typed a step; leaving the box saves it. */
   const nudge = (by: number) => {

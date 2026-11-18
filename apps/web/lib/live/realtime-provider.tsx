@@ -17,7 +17,8 @@ import {
 } from "./realtime-state";
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
-import { STATS_KEY, withStatsEvent } from "@/lib/source/stats/http";
+import { STATS_KEY, fetchStats } from "@/lib/source/stats/http";
+import { statsSync } from "@/lib/source/stats/sync";
 import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
 import {
   OBSERVED_MESSAGES_KEY,
@@ -101,6 +102,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const seenMessages = new Set<string>();
     clearTyping();
     silenceScenes();
+    const stats = statsSync({
+      read: fetchStats,
+      write: (data) =>
+        mutate<StatsResponse>(STATS_KEY, data, { revalidate: false }),
+    });
 
     const rememberMessage = (id: string): boolean => {
       if (seenMessages.has(id)) return false;
@@ -194,14 +200,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           });
           break;
         case "stats":
-          // One record replaced in place. New definitions are refetched, and
-          // so is a snapshot that hasn't arrived: this mutate discards the
-          // fetch under way, which nothing else would start again.
-          void mutate<StatsResponse>(
-            STATS_KEY,
-            (current) => withStatsEvent(current, data) ?? current,
-            { revalidate: (current) => !current || !data.record },
-          );
+          // One record replaced in place; new definitions are read whole.
+          stats.event(data);
           break;
         case "places":
           // A new home moves whoever hasn't gone anywhere yet.
@@ -229,7 +229,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           // Desire records and the map changed while disconnected are only in the
           // snapshot.
           void mutate(isDesiresKey);
-          void mutate(STATS_KEY);
+          // Only where something reads them: an older Gateway has none.
+          if (cache.get(STATS_KEY)) stats.refresh();
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());
@@ -334,6 +335,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       disposed = true;
+      stats.stop();
       clearTyping();
       silenceScenes();
       setStatus("connecting");

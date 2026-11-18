@@ -581,10 +581,11 @@ Built (2026-11-12) as described below, with these differences:
   it in the same call, gets it. The previous face is kept in memory
   (`Messaging.shownFace`) and forgotten when they leave; after a restart the
   first face a speaker shows is read again.
-- In usual clothes the picture's name is the mood. A mood the usual clothes have
-  no picture for shows the set's resting `default` (`pickPortrait`), and
-  listeners still read the mood. A mood only an outfit has can't be sent: the
-  field offers usual-clothes moods only.
+- In usual clothes the picture's name is the mood. A mood the clothes they have
+  on have no picture for shows that outfit's neutral face, or in usual clothes
+  the set's resting `default` (`pickPortrait`), and listeners still read the
+  mood. The field offers the moods of what they are wearing (§6.4), so a mood
+  only another outfit has can't be sent.
 - The director keeps each member's face in `SceneState.moods`: from the speaking
   event as a line starts, else from the message as it lands (an action, an older
   Gateway), seeded from history and from a line already being said when the
@@ -641,12 +642,13 @@ the other, and `face` follows the rule already there:
   stickers.
 - An action bubble may carry it too ("looks away", `sad`).
 
-**Resolving it.** With the outfit the character has on (§6.4; usual clothes
-until that exists), the look is `<outfit>-<mood>`. If that outfit has no such
-mood, the figure keeps the outfit and shows its neutral face (else its first);
-in usual clothes, the set's resting `default`. Listeners still read the mood.
-The resolved name is frozen on the delivery (`face: { name }`, as `sticker` is),
-so an old line shows the outfit of its moment.
+**Resolving it.** With the outfit the character has on now (§6.4), the look is
+`<outfit>-<mood>`. If that outfit has no such mood, the figure keeps the outfit
+and shows its neutral face (else its first); in usual clothes, the set's resting
+`default`. Listeners still read the mood. A delivery keeps the mood alone
+(`face`), never the outfit: a figure is drawn in what is worn now, so an old
+line never puts someone back in clothes they have changed out of. A sticker is
+different: it is a picture sent, frozen with its outfit.
 
 **What everyone reads.** People see faces, so listeners do too:
 

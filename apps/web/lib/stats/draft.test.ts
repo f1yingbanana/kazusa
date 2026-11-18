@@ -56,6 +56,42 @@ describe("state drafts", () => {
     });
   });
 
+  it("keeps a meaning written over several lines as one, and a step without words", () => {
+    const mood = StatDefinitionSchema.parse({
+      name: "mood",
+      description: "Mood.",
+      on: "character",
+      kind: "choice",
+      values: [
+        { name: "calm", description: "Settled.\nNothing weighs on you." },
+        { name: "down" },
+      ],
+      initial: "calm",
+      changedBy: "character",
+      shown: "self",
+    });
+    // Never a third value called "Nothing weighs on you.".
+    expect(fromDraft(toDraft(mood)).stat).toMatchObject({
+      values: [
+        { name: "calm", description: "Settled. Nothing weighs on you." },
+        { name: "down" },
+      ],
+    });
+    const coins = StatDefinitionSchema.parse({
+      name: "coins",
+      description: "Coins.",
+      on: "character",
+      kind: "number",
+      min: 0,
+      max: 10,
+      initial: 5,
+      step: 0.5,
+      changedBy: "character",
+      shown: "self",
+    });
+    expect(fromDraft(toDraft(coins)).stat).toEqual(coins);
+  });
+
   it("keeps colons in what a value means", () => {
     const { stat } = fromDraft({
       ...EMPTY_DRAFT,

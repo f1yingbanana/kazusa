@@ -575,12 +575,14 @@ export function registerMessaging(
                 params.messages.map((line) => written(line, moods, aloud)),
                 messaging.shownFace(agentId, params.sessionKey),
               );
-              // A sticker is sent as its description, frozen now.
+              // A sticker is sent as its description, frozen now. Only one of
+              // what they are wearing, as the tool lists them.
               const own = stickersOf(agentId);
+              const worn = deps.wearing?.(agentId);
               const messages = faced.map((bubble) => {
                 if (!("sticker" in bubble)) return bubble;
                 const sticker = own?.stickers.get(bubble.sticker);
-                if (!sticker)
+                if (!sticker || sticker.outfitWord !== worn)
                   throw new Error(`You have no sticker "${bubble.sticker}".`);
                 return {
                   text: stickerText(senderName, sticker),

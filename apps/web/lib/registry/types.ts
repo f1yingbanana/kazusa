@@ -73,6 +73,14 @@ export interface SettingsCategory {
   readonly requiresLocal?: boolean;
 }
 
+/** Something of the world right now, beside the clock in the top bar. */
+export interface TopBarItem {
+  readonly id: string;
+  readonly order: number;
+  readonly requires: readonly Domain[];
+  readonly component: ComponentType;
+}
+
 export interface StatusItem {
   readonly id: string;
   readonly side: "start" | "end";

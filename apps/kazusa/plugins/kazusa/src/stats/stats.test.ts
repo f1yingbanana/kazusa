@@ -11,8 +11,8 @@ import {
 } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
 import { bundledSkillText, describeTool } from "../skill-text.ts";
-import { catalogFile } from "./catalog.ts";
-import { createStats } from "./register.ts";
+import { catalogFile, catalogRevision } from "./catalog.ts";
+import { StaleCatalogError, createStats } from "./register.ts";
 import { changesParameter, statsText } from "./stats.ts";
 
 const OUTFITS = [{ name: "swimsuit", description: "a navy swimsuit" }];
@@ -125,6 +125,39 @@ describe("definitions", () => {
     expect(StatCatalogSchema.safeParse([base, base]).success).toBe(false);
   });
 
+  it("gives every value of a number with bands a word, and words one line each", () => {
+    const warmth = {
+      name: "warmth",
+      description: "Warmth.",
+      on: "pair",
+      kind: "number",
+      min: 0,
+      max: 10,
+      initial: 3,
+      changedBy: "reviewed",
+      shown: "self",
+    };
+    const bands = (...from: number[]) => ({
+      ...warmth,
+      bands: from.map((min, at) => ({ name: `word${at}`, min })),
+    });
+    expect(StatDefinitionSchema.safeParse(bands(0, 5)).success).toBe(true);
+    // Below `min` is fine: the word still covers it.
+    expect(StatDefinitionSchema.safeParse(bands(-2, 5)).success).toBe(true);
+    expect(StatDefinitionSchema.safeParse(bands(1, 5)).success).toBe(false);
+    expect(StatDefinitionSchema.safeParse(bands(0, 11)).success).toBe(false);
+    for (const name of ["a: b", "a\nb"])
+      expect(
+        StatDefinitionSchema.safeParse({
+          ...warmth,
+          bands: [
+            { name, min: 0 },
+            { name: "close", min: 5 },
+          ],
+        }).success,
+      ).toBe(false);
+  });
+
   it("lets only the player set a state of theirs, read by others or nobody", () => {
     const ok = (change: object) =>
       StatDefinitionSchema.safeParse({ ...HALL[0], ...change }).success;
@@ -145,6 +178,18 @@ describe("definitions", () => {
     expect(catalogFile(file, (m) => warned.push(m)).read()).toEqual([]);
     expect(warned).toHaveLength(1);
     expect(catalogFile(path.join(tmpdir(), "missing.json")).read()).toEqual([]);
+  });
+
+  it("refuses a save made from states that have changed since", () => {
+    const { stats } = world();
+    const base = catalogRevision(stats.catalog());
+    const [gear, ...rest] = CATALOG;
+    stats.saveCatalog(rest, base);
+    // Made from the same older states: it would bring `gear` back.
+    expect(() => stats.saveCatalog([gear], base)).toThrow(StaleCatalogError);
+    expect(stats.catalog()).toEqual(rest);
+    stats.saveCatalog([gear], catalogRevision(rest));
+    expect(stats.catalog()).toEqual([gear]);
   });
 });
 
@@ -263,6 +308,34 @@ describe("changing mid-activity", () => {
       "state-not-yours",
     );
   });
+
+  it("starts each of two changes at once from the other's result", async () => {
+    const { stats } = world(
+      StatCatalogSchema.parse([
+        {
+          name: "money",
+          description: "What you have to spend.",
+          on: "character",
+          kind: "number",
+          min: 0,
+          max: 50,
+          initial: 20,
+          changedBy: "character",
+          shown: "self",
+        },
+      ]),
+    );
+    const said = await Promise.all([
+      stats.change("airi", "money", "-3"),
+      stats.change("airi", "money", "-3"),
+    ]);
+    expect((await stats.record("airi"))?.own.money?.value).toBe(14);
+    expect(said[0]).toContain('"value":"17/50"');
+    expect(said[1]).toContain('"value":"14/50"');
+    // One that can't be taken writes nothing and holds nobody up.
+    await expect(stats.change("airi", "money", "lots")).rejects.toThrow();
+    expect(await stats.change("airi", "money", "+1")).toContain("15/50");
+  });
 });
 
 describe("outfits", () => {
@@ -373,6 +446,10 @@ Toward Natsu \`natsu\`: warmth: friendly, close to cold (Glad to see them)`);
     const record = await stats.record("airi");
     expect(record?.toward.natsu.warmth.value).toBe(2);
     expect(record?.own.hp.value).toBe(18);
+    // A change is a change with or without its leading zero.
+    await night({ own: { hp: "-.5" } });
+    expect((await stats.record("airi"))?.own.hp.value).toBe(17.5);
+    await night({ own: { hp: "+.5" } });
     // It stops at its ends.
     for (let times = 0; times < 5; times++)
       await night({ toward: { natsu: { warmth: "down" } } });
@@ -401,6 +478,20 @@ describe("what a character reads", () => {
 Toward Natsu \`natsu\`: warmth: friendly, close to cold (Glad to see them)
 Toward User:sensei \`user:sensei\`: warmth: close
 Natsu \`natsu\`: gear: gym (Gym clothes)
+The world: chapter: one
+What these are:
+- gear: What you are wearing.
+- hp: Health.
+- warmth: How warmly they regard someone.
+- chapter: Where the story is.`);
+  });
+
+  it("shows where they stand toward someone named whom nothing is set toward", async () => {
+    const { stats } = world();
+    // Not `library`, which is nobody, however it is written.
+    expect(await stats.situation("airi", [], "- `natsu`: hi, at `library`"))
+      .toBe(`gear: uniform (School uniform) · hp: 20/20
+Toward Natsu \`natsu\`: warmth: friendly, close to cold (Glad to see them)
 The world: chapter: one
 What these are:
 - gear: What you are wearing.
