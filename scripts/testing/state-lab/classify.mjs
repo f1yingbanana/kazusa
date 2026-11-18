@@ -1,7 +1,7 @@
 // Scores behaviour replays one reply at a time, blind to the arm: did she do
 // what was asked, and how warm was she about it. Counts by arm afterwards.
 //   node classify.mjs out/<behave>.jsonl out/<classified>.jsonl [n]
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { complete, done, keep, pool } from "./lib.mjs";
 
 const ASKED = {
@@ -52,7 +52,9 @@ await pool(
   },
 );
 const cells = new Map();
-for (const line of readFileSync(outFile, "utf8").split("\n").filter(Boolean)) {
+// Nothing kept yet (every reply left unread, or no probe it knows): no rows.
+const kept = existsSync(outFile) ? readFileSync(outFile, "utf8") : "";
+for (const line of kept.split("\n").filter(Boolean)) {
   const row = JSON.parse(line);
   // Kept by an older run without both answers: no part of an average.
   if (!row.did || !row.warm) continue;

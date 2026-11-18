@@ -299,8 +299,48 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     return [...new Set([known ?? id, id, `user:${id}`])];
   };
 
-  const lastNight = async (agentId: string): Promise<number> =>
-    (await deps.store.lookup(agentId))?.runs[0]?.at ?? 0;
+  /**
+   * A night's run that could not be kept when the night ended, by character.
+   * The pages are rewritten and the states moved all the same, so it is still
+   * their last night, and it is kept at the next chance.
+   */
+  const owed = new Map<string, SleepRun>();
+
+  /** Keeps runs, newest first, in place of any kept under the same ids. */
+  const persist = async (
+    agentId: string,
+    runs: readonly SleepRun[],
+  ): Promise<void> => {
+    const ids = new Set(runs.map(({ id }) => id));
+    const state = await deps.store.lookup(agentId);
+    await deps.store.register(agentId, {
+      runs: [...runs, ...(state?.runs ?? []).filter(({ id }) => !ids.has(id))]
+        .sort((a, b) => b.at - a.at)
+        .slice(0, RUNS_KEPT),
+    });
+  };
+
+  /** Keeps a run still owed. Failing again leaves it owed. */
+  const settle = async (agentId: string): Promise<void> => {
+    const run = owed.get(agentId);
+    if (!run) return;
+    try {
+      await persist(agentId, [run]);
+      if (owed.get(agentId) === run) owed.delete(agentId);
+    } catch (error: unknown) {
+      deps.warn(
+        `Sleep ${agentId}: last night is still not kept: ${String(error)}`,
+      );
+    }
+  };
+
+  const lastNight = async (agentId: string): Promise<number> => {
+    await settle(agentId);
+    return Math.max(
+      (await deps.store.lookup(agentId))?.runs[0]?.at ?? 0,
+      owed.get(agentId)?.at ?? 0,
+    );
+  };
 
   /**
    * What going to bed says: how to go over the day, their own pages on what the
@@ -393,14 +433,25 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     const postimages: Record<string, string> = {};
     for (const relative of files)
       postimages[relative] = read(path.join(workspace, relative)) ?? "";
-    const state = await deps.store.lookup(agentId);
-    const earlier = (state?.runs ?? []).filter(({ id }) => id !== night.id);
-    await deps.store.register(agentId, {
-      runs: [
-        { id: night.id, at: night.at, preimages: night.preimages, postimages },
-        ...earlier,
-      ].slice(0, RUNS_KEPT),
-    });
+    const run: SleepRun = {
+      id: night.id,
+      at: night.at,
+      preimages: night.preimages,
+      postimages,
+    };
+    const waiting = owed.get(agentId);
+    try {
+      await persist(agentId, waiting ? [run, waiting] : [run]);
+      owed.delete(agentId);
+    } catch (error: unknown) {
+      // The night is over either way, and its preimages go with it: the run is
+      // held as it stands now and kept before the next night is counted from.
+      // One owed at a time: an older one still waiting gives way.
+      owed.set(agentId, run);
+      deps.warn(
+        `Sleep ${agentId}: the night is not kept yet: ${String(error)}`,
+      );
+    }
     return true;
   };
 
@@ -702,6 +753,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       }
     },
     restore: async (agentId: string, runId: string): Promise<boolean> => {
+      await settle(agentId);
       const state = await deps.store.lookup(agentId);
       const found = state?.runs.find(({ id }) => id === runId);
       if (!state || !found) return false;
@@ -711,7 +763,9 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       });
       return true;
     },
-    runs: async (agentId: string): Promise<readonly SleepRun[]> =>
-      (await deps.store.lookup(agentId))?.runs ?? [],
+    runs: async (agentId: string): Promise<readonly SleepRun[]> => {
+      await settle(agentId);
+      return (await deps.store.lookup(agentId))?.runs ?? [];
+    },
   };
 }

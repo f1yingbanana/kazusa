@@ -51,8 +51,11 @@ python3 judge-pack.py out/behave-v0-deep.jsonl plans/probes-v0.json judge-v0-dee
 python3 judge-score.py judge-v0-deep
 ```
 
-Runs resume: rerun the same command after a failure. A night takes one to two
-minutes of model time, so a twelve-night arc takes about twenty.
+Runs resume: rerun the same command after a failure. A runner exits non-zero
+when any job failed, after the rest have finished, and a reply whose stream
+closed before the model said it was done counts as a failure and is tried again,
+never kept. A night takes one to two minutes of model time, so a twelve-night
+arc takes about twenty.
 
 ## Thinking depth is a condition
 

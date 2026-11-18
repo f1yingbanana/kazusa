@@ -566,7 +566,11 @@ session, nothing to schedule, interrupt or resume.
 - **Kept**: every write during a night goes through `sleep.write`, which keeps
   what each file was before. The `"memory"` keyed store holds the last 7 runs
   (pre- and post-images), newest first; the newest's time is "last night".
-  `memory_restore` puts one back. State changes are not undone.
+  `memory_restore` puts one back. State changes are not undone. When the store
+  refuses the run as the night ends (a database under load), the run is held in
+  memory as it stood, still counts as last night, and is kept at the next read
+  of the runs (`settle`); the night is told all the same. One is held per
+  character, and a restart loses it.
 - **Surface**: a row in `:tasks` (`You dreamt: …` or `You slept on it.`) and a
   `memory.consolidated` journal event (window, run id, pages, new pages, notes,
   dream).

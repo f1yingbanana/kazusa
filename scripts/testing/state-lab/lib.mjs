@@ -100,6 +100,9 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
       };
       const decoder = new TextDecoder();
       let buffer = "";
+      // A stream can close with a 200 and nothing, or half a reply: only one
+      // that said it was finished is a completion.
+      let finished = false;
       for await (const chunk of response.body) {
         buffer += decoder.decode(chunk, { stream: true });
         let at;
@@ -108,6 +111,7 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
           buffer = buffer.slice(at + 1);
           if (!line.startsWith("data:")) continue;
           const data = line.slice(5).trim();
+          if (data === "[DONE]") finished = true;
           if (!data || data === "[DONE]") continue;
           let event;
           try {
@@ -117,6 +121,7 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
           }
           if (event.error) throw new Error(JSON.stringify(event.error));
           if (event.usage) out.usage = event.usage;
+          if (event.choices?.[0]?.finish_reason) finished = true;
           const delta = event.choices?.[0]?.delta;
           if (!delta) continue;
           if (delta.content) out.content += delta.content;
@@ -135,6 +140,8 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
           }
         }
       }
+      if (!finished)
+        throw new Error("the stream ended before the completion finished");
       out.toolCalls = out.toolCalls.filter(Boolean).map((call, index) => {
         let input = {};
         try {
@@ -161,9 +168,14 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
   }
 }
 
-/** Runs jobs a few at a time; one failing never stops the rest. */
+/**
+ * Runs jobs a few at a time; one failing never stops the rest. Returns how many
+ * failed, and makes the process exit non-zero when any did, after whatever the
+ * runner still prints: rows already kept stay for the next run.
+ */
 export async function pool(jobs, size, each) {
   let next = 0;
+  let failed = 0;
   await Promise.all(
     Array.from({ length: Math.min(size, jobs.length) }, async () => {
       while (next < jobs.length) {
@@ -171,11 +183,17 @@ export async function pool(jobs, size, each) {
         try {
           await each(job);
         } catch (error) {
+          failed += 1;
           console.error(`! ${job.id ?? ""}: ${String(error).slice(0, 300)}`);
         }
       }
     }),
   );
+  if (failed) {
+    console.error(`! ${failed} of ${jobs.length} jobs failed`);
+    process.exitCode = 1;
+  }
+  return failed;
 }
 
 export const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));

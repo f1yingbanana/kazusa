@@ -33,6 +33,8 @@ let memory: MemoryService;
 let factories: Map<string, unknown>;
 let reviewed: unknown[];
 let turns: string[];
+/** The nights' store refuses writes, as a database under load does. */
+let storeDown: boolean;
 const call = async (name: string, input: unknown): Promise<string> => {
   const factory = factories.get(name) as (context: { agentId: string }) => Tool;
   return (await factory({ agentId: AGENT }).execute("id", input)).content[0]
@@ -93,6 +95,7 @@ beforeEach(() => {
   factories = new Map();
   reviewed = [];
   turns = [];
+  storeDown = false;
   const stores = new Map<string, Map<string, unknown>>();
   const api = {
     id: "kazusa",
@@ -122,6 +125,8 @@ beforeEach(() => {
           return {
             lookup: async (key: string) => store.get(key),
             register: async (key: string, value: unknown) => {
+              if (storeDown && namespace === "memory")
+                throw new Error("SQLite worker queue capacity reached");
               store.set(key, structuredClone(value));
             },
             entries: async () =>
@@ -427,6 +432,25 @@ describe("a night gone over", () => {
     // Back to bed later the same night: the day is not gone over again.
     now = BEDTIME + 3 * HOUR;
     expect(await start()).toBeUndefined();
+  });
+
+  it("is still their night, and kept later, when it could not be kept", async () => {
+    await start();
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    storeDown = true;
+    await memory.sleep.runEnded(AGENT);
+    // Told all the same: the pages are written whether or not the run is kept.
+    expect(night()).toMatchObject({ text: "You slept on it." });
+    // Back to bed with the store still down: the day is not gone over again.
+    now = BEDTIME + 3 * HOUR;
+    expect(await start()).toBeUndefined();
+    storeDown = false;
+    const runs = await memory.sleep.runs(AGENT);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].at).toBe(BEDTIME);
+    // Kept with what the night found, so it can still be undone.
+    expect(await memory.sleep.restore(AGENT, runs[0].id)).toBe(true);
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(0);
   });
 
   it("is not gone over twice in one night's sleep", async () => {
