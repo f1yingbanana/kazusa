@@ -50,9 +50,12 @@ async function setup(
 ) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "kazusa-message-"));
   directories.push(workspace);
+  // Their name is their World Wiki page's.
+  const wiki = path.join(workspace, "wiki-world");
+  await mkdir(path.join(wiki, "entities", "characters"), { recursive: true });
   await writeFile(
-    path.join(workspace, "IDENTITY.md"),
-    "---\nagent_id: alice\nname: Alice Lin\n---\nCharacter biography.",
+    path.join(wiki, "entities", "characters", "alice.md"),
+    "---\nname: Alice Lin\n---\nCharacter biography.",
   );
   const registerTool = vi.fn();
   const registerService = vi.fn();
@@ -83,7 +86,10 @@ async function setup(
   // Partial SDK host, confined to the test boundary.
   const api = {
     config,
-    pluginConfig,
+    pluginConfig: {
+      ...pluginConfig,
+      memory: { wikiDir: wiki, ...(pluginConfig.memory as object | undefined) },
+    },
     registerTool,
     registerService,
     registerHttpRoute,
@@ -747,13 +753,8 @@ describe("send_message SDK integration", () => {
     },
   );
 
-  it("checks identity file ownership and uses configured identity before file metadata", async () => {
+  it("uses a configured identity before their page's name", async () => {
     const h = await setup();
-    await writeFile(
-      path.join(h.workspace, "IDENTITY.md"),
-      "---\nagent_id: carol\nname: Carol\n---\n",
-    );
-    await expect(h.execute()).rejects.toThrow("identity");
     vi.spyOn(h.api.runtime.agent, "resolveAgentIdentity").mockReturnValue({
       name: "Configured Alice",
     });

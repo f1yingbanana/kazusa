@@ -1,0 +1,71 @@
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  EditConflict,
+  pictureType,
+  putPicture,
+  readText,
+  removePicture,
+  writeTextOver,
+} from "./files.ts";
+
+const dir = () => mkdtempSync(path.join(tmpdir(), "studio-"));
+
+const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+const WEBP = Buffer.concat([
+  Buffer.from("RIFF"),
+  Buffer.from([0, 0, 0, 0]),
+  Buffer.from("WEBPVP8 "),
+]);
+
+describe("a text the Wiki saves", () => {
+  it("is written only over the version that was read", () => {
+    const file = path.join(dir(), "MEMORY.md");
+    const empty = readText(file);
+    expect(empty).toEqual({ text: "", hash: null });
+    const first = writeTextOver(file, "One", null);
+    expect(first.text).toBe("One\n");
+    // A night's sleep writes meanwhile.
+    writeFileSync(file, "Slept on it\n");
+    expect(() => writeTextOver(file, "Two", first.hash)).toThrow(EditConflict);
+    expect(readFileSync(file, "utf8")).toBe("Slept on it\n");
+  });
+});
+
+describe("a picture the Wiki takes", () => {
+  it("is known by its bytes, and must be the type it was sent as", () => {
+    expect(pictureType(PNG, "image/png")).toEqual({
+      type: "image/png",
+      ext: "png",
+    });
+    expect(pictureType(WEBP, undefined)?.ext).toBe("webp");
+    expect(pictureType(PNG, "image/webp")).toBeUndefined();
+    expect(
+      pictureType(
+        Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"),
+        "image/svg+xml",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("replaces one of the same name in another type, keeping it in the trash", () => {
+    const root = dir();
+    const looks = path.join(root, "portraits");
+    const trash = path.join(root, "trash");
+    putPicture(looks, "happy", PNG, "png", trash);
+    expect(putPicture(looks, "happy", WEBP, "webp", trash)).toBe("happy.webp");
+    expect(readdirSync(looks)).toEqual(["happy.webp"]);
+    expect(readdirSync(trash)).toEqual(["happy.png"]);
+    expect(removePicture(looks, "happy", trash)).toBe(1);
+    expect(existsSync(path.join(looks, "happy.webp"))).toBe(false);
+    expect(removePicture(looks, "sad", trash)).toBe(0);
+  });
+});

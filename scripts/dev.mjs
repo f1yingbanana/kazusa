@@ -25,6 +25,7 @@ import {
   allowNewCharacterTools,
   denyImpliedTools,
   loadNewPlugins,
+  foldCharacterCards,
   skipUnusedStartupWork,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
@@ -330,6 +331,13 @@ if (!stopping) {
     for (const line of skipUnusedStartupWork(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't turn off unused start-up work: ${error.message}`);
+  }
+  try {
+    for (const line of foldCharacterCards(ROOT)) console.log(line);
+  } catch (error) {
+    console.warn(
+      `Couldn't fold characters' IDENTITY.md and SOUL.md into their pages: ${error.message}`,
+    );
   }
   start("gateway", process.execPath, [OPENCLAW, "gateway"], {
     cwd: WORLD,

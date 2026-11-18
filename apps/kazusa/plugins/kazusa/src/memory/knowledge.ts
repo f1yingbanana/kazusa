@@ -42,29 +42,16 @@ interface Anchor {
 }
 
 /**
- * Which fields on a character's card place them in the world, and how well that
- * makes them know what is under it. A world names its own: a city and a guild,
- * a company and a team.
- */
-export type Anchors = Readonly<Record<string, Depth>>;
-export const DEFAULT_ANCHORS: Anchors = {
-  club: "intimate",
-  school: "familiar",
-};
-
-/**
  * The canon as one character could know it: pages by id, names resolved, and
  * each page's chain of what it belongs to. Pure over the parsed world pages.
  */
 export class WorldModel {
   readonly pages: ReadonlyMap<string, Page>;
   private readonly names = new Map<string, string[]>();
-  readonly anchorFields: Anchors;
   /** Two pages with one id: only the last is reachable. */
   readonly duplicates: Array<readonly [string, string, string]> = [];
 
-  constructor(pages: Iterable<Page>, anchors: Anchors = DEFAULT_ANCHORS) {
-    this.anchorFields = anchors;
+  constructor(pages: Iterable<Page>) {
     const byId = new Map<string, Page>();
     for (const page of pages) {
       const other = byId.get(page.id);
@@ -94,7 +81,7 @@ export class WorldModel {
     return [...this.names].filter(([, owners]) => owners.length > 1);
   }
 
-  /** The page, then everything it sits in: parents and communities. */
+  /** The page, then everything it sits in: parents and groups. */
   chain(id: string): ReadonlySet<string> {
     const seen = new Set<string>();
     const queue = [id];
@@ -104,15 +91,7 @@ export class WorldModel {
       seen.add(next);
       const page = this.pages.get(next);
       if (!page) continue;
-      for (const up of [
-        page.parent,
-        page.community,
-        ...(page.kind === "person"
-          ? Object.keys(this.anchorFields).flatMap(
-              (field) => page.fields[field] ?? [],
-            )
-          : []),
-      ]) {
+      for (const up of [page.parent, ...page.groups.map(({ ref }) => ref)]) {
         const resolved = this.resolve(up);
         if (resolved) queue.push(resolved);
       }
@@ -122,11 +101,14 @@ export class WorldModel {
 
   private anchors(character: Page): Anchor[] {
     const anchors: Anchor[] = [];
-    for (const [field, depth] of Object.entries(this.anchorFields)) {
-      for (const value of character.fields[field] ?? []) {
-        const id = this.resolve(value);
-        if (id) anchors.push({ id, depth, why: `their own ${field}` });
-      }
+    for (const group of character.groups) {
+      const id = this.resolve(group.ref);
+      if (id)
+        anchors.push({
+          id,
+          depth: group.close ? "intimate" : "familiar",
+          why: group.close ? `close in ${group.ref}` : `in ${group.ref}`,
+        });
     }
     const home = this.resolve(character.home);
     if (home) {
@@ -137,15 +119,6 @@ export class WorldModel {
           ? { id: parent, depth: "intimate", why: "around their home" }
           : { id: home, depth: "intimate", why: "their home", exact: true },
       );
-    }
-    for (const [reference, depth] of Object.entries(character.knows)) {
-      const id = this.resolve(reference);
-      if (id && (DEPTHS as readonly string[]).includes(depth))
-        anchors.push({
-          id,
-          depth: depth as Depth,
-          why: `\`knows\` on their card`,
-        });
     }
     return anchors;
   }
@@ -183,8 +156,8 @@ export class WorldModel {
     );
     if (!character) return best;
     const chain = this.chain(pageId);
-    // An author writing `local` means its own community, not the whole company.
-    const nearest = this.resolve(page.community);
+    // An author writing `local` means its nearest group, not everything above.
+    const nearest = this.resolve(page.groups[0]?.ref);
     const narrow = page.renown === "local" && nearest;
     for (const anchor of this.anchors(character)) {
       if (narrow && anchor.id !== nearest && anchor.id !== pageId) continue;

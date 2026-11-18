@@ -22,6 +22,14 @@ For one character, place or page, this skill is enough. For anything bigger (a
 whole world, a region, a faction, many characters, building from a wiki), read
 `world-project` first: it covers how to do that across many runs.
 
+**A character is one page: theirs in the World Wiki.** It is who they are, and
+they read all of it on every turn; others see as much of it as they know them.
+Workspace `IDENTITY.md` and `SOUL.md` files are no longer read: never write
+them. The user edits all of this in the app's **Wiki**: a character's page with
+its Memory, Looks and Stickers tabs, places, lore and the Backdrops folder. It
+writes the same files you do, so a fix they can make themselves, a picture above
+all, is quicker there; say so when it helps.
+
 **Read `shared/wiki/INDEX.md` first.** It is the world's front page, written for
 you and for the people who build the world: what the world is and at what
 moment, the player, where the lore starts, the shape of the map, the cast, and
@@ -45,9 +53,8 @@ couldn't know.
 | What                 | Where                                       |
 | :------------------- | :------------------------------------------ |
 | Place (the map)      | `shared/wiki/entities/places/<place_id>.md` |
-| Person (the roster)  | `shared/wiki/entities/characters/<id>.md`   |
+| Person: who they are | `shared/wiki/entities/characters/<id>.md`   |
 | Lore, groups, rules  | `shared/wiki/concepts/<id>.md`              |
-| Bio and voice        | `workspaces/<id>/IDENTITY.md`, `SOUL.md`    |
 | Goals and plans      | `workspaces/<id>/MEMORY.md`                 |
 | Their view of people | `workspaces/<id>/wiki/entities/characters/` |
 | Places they know     | `workspaces/<id>/wiki/entities/places/`     |
@@ -62,8 +69,8 @@ below for anything new, and don't rewrite old pages unless the user asks.
 
 | Change                                                      | Takes effect                                |
 | :---------------------------------------------------------- | :------------------------------------------ |
-| Personal wiki, `MEMORY.md`, `SOUL.md`                       | That character's coming turns               |
-| `IDENTITY.md`                                               | Coming turns, and the client's next refresh |
+| Personal wiki, `MEMORY.md`                                  | That character's coming turns               |
+| Their World Wiki page                                       | Coming turns, and the client's next refresh |
 | Adding to `agents.entries` in `openclaw.json`               | By itself, but it can interrupt your turn   |
 | Any place, or a `home` on a character card                  | Within a second, once the map loads         |
 | Concept pages                                               | Coming turns                                |
@@ -98,9 +105,8 @@ First decide with what the user asked for:
 
 - **Simulated:** thinks and acts on their own, and costs model calls. Needs
   every step below.
-- **Background:** only exists for others to talk about. Needs the world card
-  alone, with `is_simulated_agent: false` and no workspace or `openclaw.json`
-  entry.
+- **Background:** only exists for others to talk about. Needs their World Wiki
+  page alone, and no workspace or `openclaw.json` entry.
 
 If the user gave only a rough idea, make the creative choices yourself and tell
 the user what you chose. Don't stop to ask.
@@ -108,37 +114,47 @@ the user what you chose. Don't stop to ask.
 1. Pick an id in kebab-case, unused in `shared/wiki/entities/characters/`.
 2. Pick a `home` that exists in `shared/wiki/entities/places/`. Create a place
    first if they need their own room.
-3. Write the world card:
+3. Write their page, `shared/wiki/entities/characters/<id>.md`, in layers: each
+   character sees as much as they know them (see Seeding the World Wiki).
 
    ```markdown
    ---
-   pageType: entity
-   entityType: person
-   id: entity.character.<id>
-   character_id: <id>
    name: <Full Name>
-   is_simulated_agent: true
+   aliases: [<other names they answer to>]
+   summary: <One line: all someone who has only heard of them knows.>
+   groups: { <their club or team>: close, <their school or city>: member }
    home: <place_id>
    ---
 
    # <Full Name>
 
-   What anyone who sees them would notice, in a sentence or two.
+   Who they are, plainly: what anyone who knows them knows.
+
+   ## Profile
+
+   Age, looks, what they do: for those who know them well.
+
+   ## Inner voice
+
+   Known by: <id>
+
+   Temperament, habits, how they talk, how they treat the people around them,
+   what they want. Only they know it. This is what makes them distinct, so give
+   it the most care.
    ```
 
-4. Write `workspaces/<id>/IDENTITY.md`: front matter with `agent_id`, `name`,
-   and so on, then their bio, profile and appearance. Not their relationships:
-   each person who matters to them gets a page in their wiki (below), which is
-   what brings that person to mind and what sleep and `remember` keep current.
-5. Write `workspaces/<id>/SOUL.md`, in the second or third person: temperament,
-   habits, how they talk, how they treat the people around them. This is what
-   makes them distinct, so give it the most care.
-6. Write `workspaces/<id>/MEMORY.md` and seed their wiki (below).
-7. Never create an `AGENTS.md` in a character's workspace. An avatar, if the
+   Not their relationships: each person who matters to them gets a page in their
+   wiki (below), which is what brings that person to mind and what sleep and
+   `remember` keep current. Facts with no field of their own (a birthday, a
+   weapon) are lines in the text: Kazusa reads only the fields above.
+
+4. Make their workspace folder, `workspaces/<id>/`.
+5. Write `workspaces/<id>/MEMORY.md` and seed their wiki (below).
+6. Never create an `AGENTS.md` in a character's workspace. An avatar, if the
    user gives one, is `avatar.webp`, `.png` or `.jpg` in the workspace root.
-8. Message the user with what you made, because the next step can interrupt your
+7. Message the user with what you made, because the next step can interrupt your
    turn.
-9. Last, `edit` `openclaw.json` to add this under `agents.entries`:
+8. Last, `edit` `openclaw.json` to add this under `agents.entries`:
    `"<id>": { "workspace": "./workspaces/<id>" }`. Leave the rest of the file
    alone.
 
@@ -147,11 +163,12 @@ takes them offstage. They start at `home`.
 
 ## Editing a character
 
-- **Who they are:** `IDENTITY.md` and `SOUL.md`.
+- **Who they are:** their World Wiki page. Their inner voice is a section
+  `Known by:` them alone.
 - **What they remember or believe:** their `MEMORY.md` and personal wiki. An
   edit to a belief means they always believed it.
-- **What is true of them:** their world card. Other characters' notes that
-  disagree stay as they are, unless the user asks you to sweep them.
+- **What is true of them:** the same page. Other characters' notes that disagree
+  stay as they are, unless the user asks you to sweep them.
 - **Not in Markdown:** where they are now, their current activity and their
   desires live in machine state. Writing them in a file changes nothing, and
   `home` only decides where someone starts if they have never moved. Tell the
@@ -172,7 +189,7 @@ the labels are what matters.
 
 ```text
 workspaces/<id>/stickers/
-  happy.webp            # their usual clothes, the ones in IDENTITY.md
+  happy.webp            # their usual clothes, the ones their page describes
   laughing.webp
   maid-laughing.webp    # another outfit: the outfit's word comes first
   stickers.json
@@ -211,7 +228,7 @@ workspaces/<id>/stickers/
 label. You can't download, crop, rename or delete pictures yourself. When a name
 must change, or the user wants new stickers, ask them to put or rename the files
 in the folder, then label them. A character's sticker habit, such as rarely
-using them or favoring one, belongs in their `SOUL.md`.
+using them or favoring one, belongs in their page's inner voice.
 
 ## Seeding the World Wiki
 
@@ -219,7 +236,7 @@ using them or favoring one, belongs in their `SOUL.md`.
 ---
 summary: <One line on what this is.>
 aliases: [<other names people use>]
-community: <concept id of the group it belongs to>
+groups: [<the group it belongs to>]
 renown: known
 ---
 
@@ -231,27 +248,36 @@ What most people know, in a paragraph.
 
 Detail only insiders would know.
 
-## <A secret>
-
-Known by: <character id>, <character id>
-
-Only these characters know this.
-
 ## History
 
 - <date> — Something that happened.
 - <date> · news — Something announced publicly.
 ```
 
-- `summary` is one line. The text before the first `##` is what people generally
-  know, and `##` sections are insider detail.
-- `community` says whose thing it is, as a concept id: a group names the larger
-  body it belongs to, up to the world root. Write those parents first.
-- `renown` is how far its name travels: `private`, `local`, `known` or `famous`.
-  A person defaults to `local`, which nobody outside their own school, club or
-  home knows: give a public figure, and a player the whole cast knows, `known`
-  or `famous`.
-- `Known by:` as the first line of a section limits it to those characters.
+A page has three layers, and each character sees as many as they know it: who
+has **heard of** it sees the `summary`, who **knows** it the opening (the text
+before the first `##`), who **knows it well** the sections, when one comes up.
+
+- `summary` is one line. Left out, it is the opening's first sentence.
+- `groups` are what it belongs to, the nearest first, as page ids or names: a
+  group names the larger one it belongs to, up to the world root, so write those
+  first. Everyone in a group knows what belongs to it. A person knows each of
+  their groups and everyone in them, and a group marked `close`
+  (`{ Seminar: close, Millennium: member }`) well: their club or team, beside
+  their school.
+- `renown` is how far its name travels: `private`, `local` (its nearest group
+  only), `known` (everyone has heard of it) or `famous` (everyone knows it). A
+  person and a place default to `local`; give a public figure, and a player the
+  whole cast knows, `known` or `famous`.
+- **A secret only some characters know goes in each of their own wikis**, on
+  their page about the thing, in their words: it is theirs to forget, get wrong
+  or change their mind about, sleep keeps it, and having that page makes them
+  know the thing. Don't write it on the world page. The one `Known by:` line a
+  world page holds is a character's own inner voice: `Known by: <their id>` on
+  their own page.
+- Kazusa reads only `name`, `aliases`, `summary`, `groups`, `renown`, and `home`
+  on a person, `parent` and `backdrop` on a place (with the map's fields below).
+  Anything else is a line in the text, where characters read it.
 - An undated edit is a retcon: it was always true. A dated line under
   `## History` is something that happened, and `· news` makes it public.
 - `## History` dates must be real (`2026-01-05`). The ancient past goes in an
@@ -378,7 +404,7 @@ that the new place can be reached from the rest of the map. Then run
 ## States
 
 A state is a named value the world keeps. It records where things stand; it
-never tells a character who to be. Who they are is their SOUL and IDENTITY, and
+never tells a character who to be. Who they are is their World Wiki page, and
 how they treat someone is what they remember of them. A state that pulls against
 those loses, so use a state for one of two things:
 

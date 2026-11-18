@@ -310,14 +310,14 @@ export const CASES: readonly RetrievalCase[] = [
   ),
   ship(
     "depth",
-    "`knows` gives more than the deck",
+    "a close group gives more than the deck",
     "cass-holloway",
     "any coolant trouble at the reactor core?",
     { depth: { reactor_core: "intimate" }, shows: ["falsified"] },
   ),
   ship(
     "depth",
-    "without `knows`, the deck's depth",
+    "without it, the deck's depth",
     "ren-adeyemi",
     "any trouble at the Reactor Core?",
     {

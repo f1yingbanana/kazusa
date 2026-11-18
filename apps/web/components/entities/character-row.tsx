@@ -56,8 +56,8 @@ export const CharacterRow = memo(function CharacterRow({
     : task
       ? task.description
       : character.kind === "agent"
-        ? (character.occupation ?? "No current task")
-        : (character.occupation ?? KIND_LABEL[character.kind]);
+        ? (character.summary ?? "No current task")
+        : (character.summary ?? KIND_LABEL[character.kind]);
 
   return (
     <div

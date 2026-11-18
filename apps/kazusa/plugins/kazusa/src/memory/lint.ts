@@ -26,14 +26,8 @@ export function lintWorld(world: WorldModel): LintFinding[] {
         add("error", page.id, `\`${field}\` "${value}" resolves to no page`);
     };
     reference("parent", page.parent);
-    reference("community", page.community);
     reference("home", page.home);
-    if (page.kind === "person") {
-      for (const field of Object.keys(world.anchorFields)) {
-        for (const value of page.fields[field] ?? []) reference(field, value);
-      }
-    }
-    for (const known of Object.keys(page.knows)) reference("knows", known);
+    for (const group of page.groups) reference("groups", group.ref);
     for (const link of page.links) {
       if (!world.resolve(link))
         add("warning", page.id, `link to unknown page "${link}"`);
@@ -47,11 +41,11 @@ export function lintWorld(world: WorldModel): LintFinding[] {
     }
     if (
       page.kind === "concept" &&
-      !page.community &&
+      !page.groups.length &&
       !page.renown &&
       !page.knownBy.length
     )
-      add("warning", page.id, "no `community` or `renown`");
+      add("warning", page.id, "no `groups` or `renown`");
     if (!page.lead && !page.summary)
       add("warning", page.id, "no summary or lead");
   }

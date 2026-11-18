@@ -7,7 +7,7 @@ describe("parsePage", () => {
       `---
 summary: Feared and overworked.
 aliases: [Prefects]
-community: gehenna_academy
+groups: [gehenna_academy]
 renown: known
 ---
 
@@ -38,7 +38,7 @@ Only these two.
       name: "Prefect Team",
       summary: "Feared and overworked.",
       lead: "Everyone in Gehenna knows them.",
-      community: "gehenna_academy",
+      groups: [{ ref: "gehenna_academy", close: false }],
       renown: "known",
       history: [
         { date: "2026-10-24", news: false, text: "Patrols suspended." },
@@ -162,12 +162,22 @@ Milk.
     ).toEqual(["`trust` is a number; use `relation` words"]);
   });
 
-  it("splits a full name into aliases", () => {
-    const page = parsePage(
-      "---\nfull_name: Kazusa Kyouyama (杏山 カズサ)\n---\n# Kazusa\n",
-      "entities/characters/kazusa-kyouyama.md",
+  it("reads groups as a list, or with who is close", () => {
+    const list = parsePage(
+      "---\ngroups: [Seminar, Millennium]\n---\n# Yuuka\n",
+      "entities/characters/yuuka.md",
     );
-    expect(page.name).toBe("Kazusa Kyouyama");
-    expect(page.aliases).toEqual(["杏山 カズサ"]);
+    expect(list.groups).toEqual([
+      { ref: "Seminar", close: false },
+      { ref: "Millennium", close: false },
+    ]);
+    const map = parsePage(
+      "---\ngroups: { Seminar: close, Millennium: member }\n---\n# Yuuka\n",
+      "entities/characters/yuuka.md",
+    );
+    expect(map.groups).toEqual([
+      { ref: "Seminar", close: true },
+      { ref: "Millennium", close: false },
+    ]);
   });
 });

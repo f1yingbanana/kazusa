@@ -41,6 +41,8 @@ import { registerMemory } from "./memory/register.ts";
 import { OFFER_CHARS } from "./memory/sleep.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
+import { registerWikiEditor } from "./editor/register.ts";
+import { registerCharacterCard } from "./characters/card.ts";
 import { registerProvidersHttp } from "./providers/http.ts";
 import { registerSkills } from "./skills/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
@@ -343,6 +345,11 @@ export default definePluginEntry({
       }),
     );
     registerWelcome(api, messaging);
+
+    // A world character lives by their World Wiki page, which the Wiki edits
+    // with their memory, looks, stickers and the world's backdrops.
+    registerCharacterCard(api);
+    registerWikiEditor(api, { places: () => location.world?.map.places });
 
     // Huddles live in Messaging; Location reads them for sightings and
     // `With you`, and takes people out of them when they walk away.

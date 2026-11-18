@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { convertWorld, oldCards } from "./one-page.mjs";
 
 /**
  * Sets the hook policy on each plugin `base.json` sets it on, unless the world
@@ -210,6 +211,36 @@ export function skipUnusedStartupWork(root) {
   ];
 }
 
+/**
+ * Characters are one page each, their World Wiki page, and their workspace
+ * `IDENTITY.md` and `SOUL.md` are no longer read. A world made before that
+ * still has them: this folds them into the pages before the Gateway starts
+ * (`one-page.mjs`), so nobody loses who they are. A page keeps its own text;
+ * what a card adds comes after it. The originals of every page changed, and the
+ * cards themselves, go to `.state/kazusa/one-page/<time>/`, so it runs once and
+ * can be undone by hand. The system agent keeps her files.
+ */
+export function foldCharacterCards(root) {
+  const worldDir = path.join(root, "apps/kazusa/world");
+  const configFile = path.join(worldDir, "openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
+  const cards = oldCards(worldDir, systemAgent);
+  if (!cards.length) return [];
+  const keep = path.join(
+    worldDir,
+    ".state",
+    "kazusa",
+    "one-page",
+    new Date().toISOString().replace(/[:.]/g, "-"),
+  );
+  const changed = convertWorld(worldDir, true, { keep, systemAgent });
+  return [
+    `${cards.length} characters are one page now: their IDENTITY.md and SOUL.md went into their World Wiki pages (${changed.length} pages updated). The originals are in ${path.relative(worldDir, keep)}.`,
+  ];
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
@@ -217,4 +248,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const line of denyImpliedTools(root)) console.log(line);
   for (const line of allowNewCharacterTools(root)) console.log(line);
   for (const line of skipUnusedStartupWork(root)) console.log(line);
+  for (const line of foldCharacterCards(root)) console.log(line);
 }

@@ -137,7 +137,7 @@ function fixture(): string {
           defaultGroup: "crew",
           config: {
             user: { id: "user:me" },
-            memory: { anchors: { guild: "intimate", city: "familiar" } },
+            memory: { sleep: { enabled: true } },
           },
         },
       }),
@@ -154,17 +154,17 @@ function fixture(): string {
   const cards = path.join(app, "worlds/cast-world/shared/wiki");
   write(
     path.join(cards, "entities/characters/ann.md"),
-    '---\nguild: crew\ncity: "Port"\n---\n',
+    '---\nname: Ann Lee\ngroups: { crew: close, "Port": member }\n---\n',
   );
   write(
     path.join(cards, "entities/characters/bo.md"),
-    "---\nguild: crew\ncity: Port\n---\n",
+    "---\ngroups:\n  - crew\n  - Port\n---\n",
   );
   write(
     path.join(cards, "entities/characters/cy.md"),
-    "---\nguild: lone\ncity: Port\n---\n",
+    "---\ngroups: [lone, Port]\n---\n",
   );
-  write(path.join(cards, "concepts/crew.md"), '---\ntitle: "The Crew"\n---\n');
+  write(path.join(cards, "concepts/crew.md"), '---\nname: "The Crew"\n---\n');
   return app;
 }
 
@@ -231,9 +231,9 @@ describe("setup", () => {
       "starter",
     ]);
     expect(status.worlds[0]?.characters).toEqual([
-      { id: "ann", name: "ANN" },
-      { id: "bo", name: "BO" },
-      { id: "cy", name: "CY" },
+      { id: "ann", name: "Ann Lee" },
+      { id: "bo", name: "bo" },
+      { id: "cy", name: "cy" },
     ]);
     expect(status.worlds[1]?.characters).toEqual([]);
   });
@@ -282,12 +282,21 @@ describe("setup", () => {
     expect(existsSync(path.join(app, "world/workspaces/ann"))).toBe(true);
   });
 
-  it("reads groups from the world's anchors, broadest first, skipping groups of one", async () => {
+  it("reads groups off the cast's pages, skipping groups of one", async () => {
     const world = await createSetupHere(app).prepare("cast-world");
     expect(world?.groups).toEqual([
-      { field: "city", groups: [{ name: "Port", ids: ["ann", "bo", "cy"] }] },
-      { field: "guild", groups: [{ name: "The Crew", ids: ["ann", "bo"] }] },
+      {
+        field: "groups",
+        groups: [
+          { name: "Port", ids: ["ann", "bo", "cy"] },
+          { name: "The Crew", ids: ["ann", "bo"] },
+        ],
+      },
     ]);
+    // A page's name wins over the old IDENTITY.md.
+    expect(world?.characters.find(({ id }) => id === "ann")?.name).toBe(
+      "Ann Lee",
+    );
     expect(world?.defaultCast).toEqual(["ann", "bo"]);
   });
 
@@ -329,10 +338,7 @@ describe("setup", () => {
       speed: 0,
       startAt: "2027-01-01T06:30:00.000Z",
     });
-    expect(kazusa.memory).toEqual({
-      sleep: { enabled: true },
-      anchors: { guild: "intimate", city: "familiar" },
-    });
+    expect(kazusa.memory).toEqual({ sleep: { enabled: true } });
     expect(store.entries.get("openrouter")).toBe("sk-test");
     expect(made.agents.defaults.model).toEqual({
       primary: "openrouter/z-ai/glm-5.3-flash",

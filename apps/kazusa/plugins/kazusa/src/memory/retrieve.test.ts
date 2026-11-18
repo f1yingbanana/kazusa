@@ -35,7 +35,7 @@ beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "kazusa-memory-"));
   write(
     "world/concepts/trinity.md",
-    "---\ncommunity: kivotos\naliases: [Trinity General School]\n---\n# Trinity\n\nThe school of tea.\n",
+    "---\ngroups: [kivotos]\naliases: [Trinity General School]\n---\n# Trinity\n\nThe school of tea.\n",
   );
   write(
     "world/concepts/kivotos.md",
@@ -43,31 +43,31 @@ beforeEach(() => {
   );
   write(
     "world/concepts/gehenna.md",
-    "---\ncommunity: kivotos\nrenown: known\n---\n# Gehenna\n\nRowdy school.\n",
+    "---\ngroups: [kivotos]\nrenown: known\n---\n# Gehenna\n\nRowdy school.\n",
   );
   write(
     "world/concepts/sweets.md",
-    "---\ncommunity: trinity\naliases: [Sweets Club]\n---\n# Sweets Club\n\nDesserts.\n\n## Secret stash\n\nKnown by: natsu\n\nThe hidden macaron tin.\n",
+    "---\ngroups: [trinity]\naliases: [Sweets Club]\n---\n# Sweets Club\n\nDesserts.\n\n## Secret stash\n\nKnown by: natsu\n\nThe hidden macaron tin.\n",
   );
   write(
     "world/concepts/prefects.md",
-    "---\nsummary: Gehenna's feared discipline body.\ncommunity: gehenna\nrenown: known\n---\n# Prefect Team\n\nArmbands and patrols everywhere.\n\n## Inner workings\n\nBudget fights over ledgers.\n",
+    "---\nsummary: Gehenna's feared discipline body.\ngroups: [gehenna]\nrenown: known\n---\n# Prefect Team\n\nArmbands and patrols everywhere.\n\n## Inner workings\n\nBudget fights over ledgers.\n",
   );
   write(
     "world/entities/places/gehenna_cellar.md",
-    "---\ncommunity: gehenna\n---\n# Gehenna Cellar\n\nA damp cellar below the hall.\n",
+    "---\ngroups: [gehenna]\n---\n# Gehenna Cellar\n\nA damp cellar below the hall.\n",
   );
   write(
     "world/entities/characters/kazusa.md",
-    "---\nname: Kazusa Kyouyama\nschool: Trinity General School\nclub: Sweets Club\n---\n# Kazusa\n\nAloof.\n",
+    "---\nname: Kazusa Kyouyama\ngroups: { Sweets Club: close, Trinity General School: member }\n---\n# Kazusa\n\nAloof.\n",
   );
   write(
     "world/entities/characters/natsu.md",
-    "---\nname: Natsu Yutori\nschool: Trinity General School\nclub: Sweets Club\n---\n# Natsu\n\nMilk cartons.\n",
+    "---\nname: Natsu Yutori\ngroups: { Sweets Club: close, Trinity General School: member }\n---\n# Natsu\n\nMilk cartons.\n",
   );
   write(
     "world/entities/characters/mine.md",
-    "---\nname: Mine Aomori\nschool: Trinity General School\n---\n# Mine\n\nA Sister.\n",
+    "---\nname: Mine Aomori\ngroups: [Trinity General School]\n---\n# Mine\n\nA Sister.\n",
   );
   write(
     "agents/kazusa/wiki/entities/characters/natsu.md",
@@ -75,7 +75,7 @@ beforeEach(() => {
   );
   write(
     "agents/kazusa/wiki/concepts/past_and_present.md",
-    "---\ntitle: Past and present\n---\nI used to be Cath Palug. I never want that back.\n",
+    "---\nname: Past and present\n---\nI used to be Cath Palug. I never want that back.\n",
   );
   index = new MemoryIndex({
     worldDir: path.join(root, "world"),
@@ -161,7 +161,7 @@ describe("retrieve", () => {
     );
     write(
       "agents/kazusa/wiki/concepts/past_and_present.md",
-      "---\ntitle: Past and present\n---\nThe ramen shop was my hideout.\n",
+      "---\nname: Past and present\n---\nThe ramen shop was my hideout.\n",
     );
     utimesSync(
       path.join(root, "agents/kazusa/wiki/concepts/past_and_present.md"),

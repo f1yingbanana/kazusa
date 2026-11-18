@@ -423,9 +423,7 @@ function Activity({ character }: { character: CharacterSummary | undefined }) {
   const task = status?.task;
   if (!task) {
     return (
-      <span className="truncate">
-        {character?.occupation ?? "Direct message"}
-      </span>
+      <span className="truncate">{character?.summary ?? "Direct message"}</span>
     );
   }
   const Icon = taskIcon(task.type);

@@ -6,8 +6,13 @@ import {
   WikiDeletePayloadSchema,
   WikiKindSchema,
   WikiRenamePayloadSchema,
+  WikiPageFormSavePayloadSchema,
   WikiSavePayloadSchema,
   type WikiEditResult,
+  type WikiKind,
+  type WikiPageForm,
+  type WikiReachResponse,
+  type WikiSavePayload,
   type MemoryRunsResponse,
   type WikiLintResponse,
   type WikiListItem,
@@ -52,14 +57,20 @@ import {
   registerEmbeddingModels,
 } from "./embedding-models.ts";
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
-import type { Anchors } from "./knowledge.ts";
 import { lintMap } from "../location/world.ts";
 import { renamedText } from "../location/pages.ts";
 import type { PlaceEdits } from "../location/register.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { auditWorld, workspacesBeside, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
-import type { Certainty, HistoryLine, Page } from "./page.ts";
+import { composePage, splitPage } from "./form.ts";
+import {
+  pageKind,
+  type Certainty,
+  type HistoryLine,
+  type Page,
+  type PageKind,
+} from "./page.ts";
 import { renderEntity, renderOnYourMind, renderRoster } from "./render.ts";
 import {
   mentionsIn,
@@ -259,7 +270,6 @@ function sharedIndex(
   api: OpenClawPluginApi,
   worldDir: string,
   model: string,
-  anchors: Anchors,
 ): MemoryIndex {
   const holder = globalThis as unknown as Record<symbol, Cells | undefined>;
   const cells: Cells = holder[INDEX_CELL] ?? new Map<string, MemoryIndex>();
@@ -269,7 +279,6 @@ function sharedIndex(
     index = new MemoryIndex({
       worldDir,
       model,
-      anchors,
       vectorsPath: path.join(
         resolveStateDir(process.env, homedir()),
         "kazusa",
@@ -321,7 +330,6 @@ export function registerMemory(
     api,
     worldDir,
     configuredChoice(config.embedding).vectors,
-    config.anchors,
   );
   const nameOf = (id: string): string | undefined =>
     index.world().pages.get(id)?.name;
@@ -1016,7 +1024,14 @@ export function registerMemory(
     knownBy: [...page.knownBy],
     ...(page.theyThinkOfMe ? { theyThinkOfMe: page.theyThinkOfMe } : {}),
     ...(page.relation ? { relation: page.relation } : {}),
-    ...(page.community ? { community: page.community } : {}),
+    ...(page.groups.length
+      ? {
+          groups: page.groups.map((group) => ({
+            ref: group.ref,
+            close: group.close,
+          })),
+        }
+      : {}),
     ...(page.renown ? { renown: page.renown } : {}),
     ...(page.seen ? { seen: page.seen } : {}),
   });
@@ -1046,6 +1061,34 @@ export function registerMemory(
         ? { knowledge: index.world().depth(agent, id, Boolean(personal)) }
         : {}),
     } satisfies WikiPageResponse);
+  });
+  route("wiki/reach", "GET", async (req, res) => {
+    const id = params(req).get("id");
+    if (!id) {
+      sendJson(res, 400, { error: "Missing required id query parameter." });
+      return;
+    }
+    const world = index.world();
+    const config = currentConfig(api);
+    const system = config.agents?.defaults?.systemAgent?.agentId;
+    const reach: WikiReachResponse = {
+      well: [],
+      knows: [],
+      heard: [],
+      none: 0,
+    };
+    for (const agent of listAgentIds(config)) {
+      if (agent === system || agent === id) continue;
+      const person = { id: agent, name: world.pages.get(agent)?.name ?? agent };
+      const { depth } = world.depth(agent, id, index.personal(agent).has(id));
+      if (depth === "intimate") reach.well.push(person);
+      else if (depth === "familiar") reach.knows.push(person);
+      else if (depth === "heard of") reach.heard.push(person);
+      else reach.none += 1;
+    }
+    for (const list of [reach.well, reach.knows, reach.heard])
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    sendJson(res, 200, reach);
   });
   /** The world's wiki, or one character's; never a path the request names. */
   const wikiRoot = (agent: string | null | undefined): string => {
@@ -1089,11 +1132,13 @@ export function registerMemory(
     if (!(error instanceof SourceConflict)) throw error;
     sendJson(res, 409, { error: error.message, current: error.current });
   };
-  route("wiki/save", "POST", async (req, res) => {
-    const payload = WikiSavePayloadSchema.parse(await readJsonBody(req));
+  /** Writes a page by hand, as the raw editor and the form both do. */
+  const savePage = async (
+    payload: WikiSavePayload,
+  ): Promise<ReturnType<typeof saveSource>> => {
     const kind = payload.kind ?? index.world().pages.get(payload.id)?.kind;
     const root = wikiRoot(payload.agent);
-    try {
+    {
       // A world place saved under a new `place_id` is renamed, so whatever
       // names it, and whoever is there, follows instead of losing it.
       const current = readSource(root, payload.id, kind);
@@ -1114,16 +1159,11 @@ export function registerMemory(
           throw new SourceConflict(current);
         await places.rename(from, to);
         index.invalidateWorld();
-        sendJson(
-          res,
-          200,
-          saveSource(root, {
-            id: to,
-            kind: "place",
-            text: renamedText(payload.text, { [from]: to }),
-          }),
-        );
-        return;
+        return saveSource(root, {
+          id: to,
+          kind: "place",
+          text: renamedText(payload.text, { [from]: to }),
+        });
       }
       const saved = saveSource(root, {
         id: payload.id,
@@ -1132,7 +1172,65 @@ export function registerMemory(
         ...(payload.base !== undefined ? { base: payload.base } : {}),
       });
       index.invalidateWorld();
-      sendJson(res, 200, saved);
+      return saved;
+    }
+  };
+  route("wiki/save", "POST", async (req, res) => {
+    const payload = WikiSavePayloadSchema.parse(await readJsonBody(req));
+    try {
+      sendJson(res, 200, await savePage(payload));
+    } catch (error) {
+      conflict(res, error);
+    }
+  });
+  /** A page's kind: what was asked, else where it lives. */
+  const kindOf = (root: string, id: string, asked?: WikiKind): PageKind =>
+    asked ?? pageKind(readSource(root, id).path.split("/").join(path.sep));
+  route("wiki/form", "GET", async (req, res) => {
+    const query = params(req);
+    const id = query.get("id");
+    if (!id) {
+      sendJson(res, 400, { error: "Say which page." });
+      return;
+    }
+    const agent = query.get("agent") ?? undefined;
+    const asked = WikiKindSchema.safeParse(query.get("kind") ?? undefined);
+    const root = wikiRoot(agent);
+    const kind = kindOf(root, id, asked.success ? asked.data : undefined);
+    const source = readSource(root, id, kind);
+    sendJson(res, 200, {
+      id,
+      kind,
+      exists: source.exists,
+      hash: source.hash,
+      ...splitPage(source.text, kind, agent !== undefined),
+    } satisfies WikiPageForm);
+  });
+  route("wiki/form/save", "POST", async (req, res) => {
+    const payload = WikiPageFormSavePayloadSchema.parse(
+      await readJsonBody(req),
+    );
+    const root = wikiRoot(payload.agent);
+    const kind = kindOf(root, payload.id, payload.kind);
+    const source = readSource(root, payload.id, kind);
+    try {
+      sendJson(
+        res,
+        200,
+        await savePage({
+          id: payload.id,
+          ...(payload.agent ? { agent: payload.agent } : {}),
+          kind,
+          base: payload.base,
+          text: composePage(
+            source.text,
+            payload,
+            payload.moveOther === true,
+            kind,
+            payload.agent !== undefined,
+          ),
+        }),
+      );
     } catch (error) {
       conflict(res, error);
     }

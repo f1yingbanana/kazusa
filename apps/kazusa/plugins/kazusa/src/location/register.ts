@@ -7,6 +7,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { readCharacterFiles } from "../context-engine/decision-sources.ts";
+import { readCharacterCard, worldWikiDir } from "../characters/card.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
@@ -380,7 +381,12 @@ export function registerLocation(
   /** Who someone is and where they are, as evidence for a judgment. */
   const person = async (map: WorldMap, id: string, at: number) => {
     const workspace = workspaceOf(id);
-    const files = workspace ? await readCharacterFiles(workspace) : null;
+    const files = workspace
+      ? await readCharacterFiles(
+          workspace,
+          readCharacterCard(worldWikiDir(api), id)?.text,
+        )
+      : null;
     const position = await record(id).then((current) =>
       current ? positionAt(current, at) : undefined,
     );
@@ -930,7 +936,7 @@ export function registerLocation(
     const cards = await cardsOf(agentId);
     const workspace = workspaceOf(agentId);
     const memory = workspace
-      ? ((await readCharacterFiles(workspace)).memory ?? "")
+      ? ((await readCharacterFiles(workspace, undefined)).memory ?? "")
       : "";
     const namedIn = (text: string): string[] => {
       const lower = text.toLowerCase();

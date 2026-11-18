@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { WorldModel, type Anchors } from "./knowledge.ts";
+import { WorldModel } from "./knowledge.ts";
 import { parsePage, type Page } from "./page.ts";
 
 export const WORLD_SCOPE = "world";
@@ -154,8 +154,6 @@ export interface MemoryIndexOptions {
   /** Where vectors persist, since they cost money to rebuild. */
   readonly vectorsPath?: string;
   readonly model?: string;
-  /** Which card fields place a character in this world. */
-  readonly anchors?: Anchors;
   readonly workspaceDir: (agentId: string) => string | undefined;
   /** How stale the world may be, so a busy cast doesn't rescan per turn. */
   readonly worldRefreshMs?: number;
@@ -285,7 +283,6 @@ export class MemoryIndex {
       if (this.sync(WORLD_SCOPE, this.options.worldDir) || !this.worldModel) {
         this.worldModel = new WorldModel(
           [...this.files.get(WORLD_SCOPE)!.values()].map(({ page }) => page),
-          this.options.anchors,
         );
       }
     }

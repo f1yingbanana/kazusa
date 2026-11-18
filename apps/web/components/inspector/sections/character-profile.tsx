@@ -19,8 +19,8 @@ function Row({
 }
 
 /**
- * Frontmatter fields as facts (affiliation is already in the header);
- * `bodyMarkdown` shown verbatim and never mined (D4).
+ * Their aliases and groups, and their World Wiki page's opening shown verbatim
+ * and never mined (D4). The whole page is in the Wiki.
  */
 export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id);
@@ -33,14 +33,8 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
       alias !== character.id &&
       alias.toLowerCase() !== character.name.toLowerCase(),
   );
-  const traits = detail?.personalityTraits ?? [];
-  if (
-    available &&
-    !aliases.length &&
-    !detail?.role &&
-    !traits.length &&
-    !detail?.bodyMarkdown
-  ) {
+  const groups = detail?.groups ?? character.groups ?? [];
+  if (available && !aliases.length && !groups.length && !detail?.bodyMarkdown) {
     return (
       <p className="text-sm text-muted-foreground">No profile written yet.</p>
     );
@@ -52,13 +46,14 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
         {aliases.length ? (
           <Row label="Aliases">{aliases.join(", ")}</Row>
         ) : null}
-        {detail?.role ? <Row label="Role">{detail.role}</Row> : null}
-        {traits.length ? <Row label="Traits">{traits.join(", ")}</Row> : null}
+        {groups.length ? (
+          <Row label="Belongs to">{groups.join(", ")}</Row>
+        ) : null}
       </dl>
       {detail?.bodyMarkdown ? (
         <details className="group rounded-lg border">
           <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-medium">
-            Card
+            Who they are
           </summary>
           <pre className="px-3 pb-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
             {detail.bodyMarkdown}
@@ -67,7 +62,7 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
       ) : null}
       {!available ? (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Full profile (role, traits, card body) needs{" "}
+          Their page&apos;s opening needs{" "}
           <span className="font-mono">GET /kazusa/character</span>.
         </p>
       ) : null}
@@ -75,8 +70,8 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
   );
 }
 
-/** Folded: their role, the one line that says most about who they are. */
+/** Folded: the one line that says most about who they are. */
 export function CharacterProfileSummary({ entity }: { entity: EntityRef }) {
-  const { detail } = useCharacterDetail(entity.id);
-  return detail?.role ? <>{detail.role}</> : null;
+  const character = useCharacter(entity.id);
+  return character?.summary ? <>{character.summary}</> : null;
 }

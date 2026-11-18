@@ -60,6 +60,8 @@ export interface RoutePolicy {
   readonly permission: Permission;
   /** Whether the browser's Next proxy exposes this plugin route. */
   readonly proxy: boolean;
+  /** The body is a picture's bytes, sent on with its own `Content-Type`. */
+  readonly upload?: boolean;
 }
 
 function policy(
@@ -69,6 +71,11 @@ function policy(
 ): RoutePolicy {
   return { method, permission, proxy };
 }
+
+const upload = (permission: Permission): RoutePolicy => ({
+  ...policy("POST", permission),
+  upload: true,
+});
 
 /** Every plugin HTTP route needs an explicit policy, including private routes. */
 export const KAZUSA_ROUTES: ReadonlyMap<string, RoutePolicy> = new Map([
@@ -125,5 +132,14 @@ export const KAZUSA_ROUTES: ReadonlyMap<string, RoutePolicy> = new Map([
   ["wiki/delete", policy("POST", "manage")],
   ["wiki/rename", policy("POST", "manage")],
   ["memory/runs", policy("GET", "observe")],
+  ["wiki/form", policy("GET", "manage")],
+  ["wiki/reach", policy("GET", "manage")],
+  ["wiki/form/save", policy("POST", "manage")],
+  ["wiki/character", policy("GET", "manage")],
+  ["wiki/memory/save", policy("POST", "manage")],
+  ["wiki/picture", upload("manage")],
+  ["wiki/picture/remove", policy("POST", "manage")],
+  ["wiki/stickers/save", policy("POST", "manage")],
+  ["wiki/backdrops", policy("GET", "manage")],
   ["memory/consolidate", policy("POST", "manage", false)],
 ]);

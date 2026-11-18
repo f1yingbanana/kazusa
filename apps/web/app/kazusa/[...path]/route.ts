@@ -56,7 +56,12 @@ async function forward(request: Request, context: Context): Promise<Response> {
   target.search = new URL(request.url).search;
   // Credentials and delegated identity come from the server, never the URL.
   target.searchParams.delete("token");
-  const headers = new Headers({ "Content-Type": "application/json" });
+  // A picture goes on as its bytes, with the type the browser gave it.
+  const headers = new Headers({
+    "Content-Type": policy.upload
+      ? (request.headers.get("content-type") ?? "application/octet-stream")
+      : "application/json",
+  });
   const token = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
   if (!token)
     return accessError(503, "The Kazusa Gateway credential is missing.");
@@ -68,7 +73,12 @@ async function forward(request: Request, context: Context): Promise<Response> {
       headers,
       cache: "no-store",
       signal: request.signal,
-      body: method === "POST" ? await request.text() : undefined,
+      body:
+        method !== "POST"
+          ? undefined
+          : policy.upload
+            ? await request.arrayBuffer()
+            : await request.text(),
     });
     return new Response(response.body, {
       status: response.status,

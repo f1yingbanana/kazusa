@@ -25,9 +25,9 @@ import { useWatchlist } from "@/lib/state/preferences-store";
 
 /*
  * URL params:
- *   world.by   – folder dimension (place | affiliation | activity | brain).
+ *   world.by   – folder dimension (place | group | activity | brain).
  *                Absent means the default: place once the world has places,
- *                affiliation before that.
+ *                group before that.
  *   world.in   – open folder: `all`, `watch`, or a group key. Absent means
  *                "nothing opened yet": desktop shows `all`, narrow screens
  *                show the folder list as the section's first screen.
@@ -40,7 +40,7 @@ export type Dimension = Exclude<GroupBy, "none"> | "place";
 
 const ALL_DIMENSIONS: readonly { id: Dimension; label: string }[] = [
   { id: "place", label: "Place" },
-  { id: "affiliation", label: "Affiliation" },
+  { id: "group", label: "Group" },
   { id: "activity", label: "Activity" },
   { id: "brain", label: "Brain state" },
 ];
@@ -84,7 +84,7 @@ export function useWorldParams() {
   const [rawAs] = useQueryState("world.as", worldParsers["world.as"]);
   const defaultBy: Dimension = dimensions.some((d) => d.id === "place")
     ? "place"
-    : "affiliation";
+    : "group";
   const by: Dimension =
     rawBy && dimensions.some((d) => d.id === rawBy) ? rawBy : defaultBy;
   const kind: KindFilter = rawKind ?? "characters";
@@ -248,7 +248,7 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
 
   /*
    * Who a folder's onstage controls act on: every character in it, whatever
-   * the Show filter hides. Only Everyone and affiliation folders are groups
+   * the Show filter hides. Only Everyone and group folders are groups
    * worth switching; activity, brain and place folders change by the minute,
    * and offstage characters have none of those.
    */
@@ -256,10 +256,10 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
     () => characters.filter((c) => c.kind === "agent").sort(byName),
     [characters],
   );
-  const affiliations = useMemo(
+  const groupFolders = useMemo(
     () =>
       new Map(
-        groupCharacters(agents, "affiliation", () => undefined).map((g) => [
+        groupCharacters(agents, "group", () => undefined).map((g) => [
           g.key,
           g.members,
         ]),
@@ -268,7 +268,7 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
   );
   const castOf = (key: string): readonly CharacterSummary[] | undefined => {
     if (key === ALL_FOLDER) return agents;
-    if (by === "affiliation") return affiliations.get(key);
+    if (by === "group") return groupFolders.get(key);
     return undefined;
   };
 

@@ -4,9 +4,10 @@ import type { WikiKind } from "@kazusa/client";
 export type WikiSide = "world" | "own";
 
 /**
- * What a page is for, said where it's read and edited. A person has three
- * places that sound alike (identity files, their world page, everyone else's
- * page on them), and editing the wrong one changes nothing a reader expects.
+ * What a page is for, said where it's read and edited. A person has two kinds
+ * of page that sound alike (their world page, which is who they are, and each
+ * character's own page on them), and editing the wrong one changes nothing a
+ * reader expects.
  */
 export function describePage(
   side: WikiSide,
@@ -17,7 +18,7 @@ export function describePage(
   if (side === "world")
     switch (kind) {
       case "person":
-        return `Facts about ${subject} that others can know: home, school, club, who they know. How much each character knows depends on how well known ${subject} is. Voice and personality live in ${subject}'s IDENTITY.md and SOUL.md; feelings about ${subject} live in each character's own wiki.`;
+        return `Who ${subject} is. Others see as much of it as they know ${subject}; feelings about ${subject} live in each character's own wiki.`;
       case "place":
         return "The place as it really is. The map reads its area (parent) and roads (connections) from here.";
       case "day":

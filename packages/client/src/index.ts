@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { StatsStreamEventSchema } from "./stats.ts";
 export * from "./access.ts";
+export * from "./wiki-editor.ts";
 export * from "./speech.ts";
 export * from "./stats.ts";
 
@@ -396,7 +397,10 @@ export const WorldPackageSchema = z.looseObject({
     /** How the setup guide lists a template, when not by its `displayName`. */
     title: z.string().optional(),
     systemAgent: z.string(),
-    /** The group picked to start with: a value of one of the world's anchors. */
+    /**
+     * The group picked to start with: one its characters' pages name in
+     * `groups`.
+     */
     defaultGroup: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
@@ -1111,8 +1115,10 @@ export const CharacterSummarySchema = z.object({
    * the portraits. Absent for a character who isn't drawn.
    */
   portraitUrl: z.string().optional(),
-  occupation: z.string().optional(),
-  affiliation: z.string().optional(),
+  /** One line about them: their World Wiki page's summary. */
+  summary: z.string().optional(),
+  /** What their page says they belong to, nearest first. */
+  groups: z.array(z.string()).optional(),
   aliases: z.array(z.string()),
   /** Absent for NPCs. */
   status: CharacterStatusSchema.optional(),
@@ -1125,11 +1131,9 @@ export const CharactersResponseSchema = z.object({
 });
 export type CharactersResponse = z.infer<typeof CharactersResponseSchema>;
 
-/** GET /kazusa/character?id= — frontmatter fields as JSON, body verbatim. */
+/** GET /kazusa/character?id= — the roster's fields and their page's opening. */
 export const CharacterDetailSchema = CharacterSummarySchema.extend({
-  role: z.string().optional(),
-  personalityTraits: z.array(z.string()),
-  /** Rendered verbatim. Never mined for fields. */
+  /** Their page's opening paragraph, rendered verbatim. */
   bodyMarkdown: z.string().optional(),
 });
 export type CharacterDetail = z.infer<typeof CharacterDetailSchema>;
@@ -1905,7 +1909,8 @@ export const WikiPageSchema = WikiListItemSchema.extend({
   openThreads: z.array(z.string()),
   theyThinkOfMe: z.string().optional(),
   relation: z.string().optional(),
-  community: z.string().optional(),
+  /** What it belongs to, nearest first; a person is close to some. */
+  groups: z.array(z.object({ ref: z.string(), close: z.boolean() })).optional(),
   renown: z.string().optional(),
   knownBy: z.array(z.string()),
   seen: z.string().optional(),

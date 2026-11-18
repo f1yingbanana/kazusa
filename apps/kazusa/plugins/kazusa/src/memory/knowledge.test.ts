@@ -19,23 +19,26 @@ const person = (id: string, front: string): string[] => [
 const world = new WorldModel(
   [
     concept("kivotos", "renown: famous"),
-    concept("trinity", "community: kivotos\naliases: [Trinity General School]"),
-    concept("gehenna", "community: kivotos"),
-    concept("sweets", "community: trinity\naliases: [Sweets Club]"),
-    concept("prefects", "community: gehenna\nrenown: known"),
+    concept("trinity", "groups: [kivotos]\naliases: [Trinity General School]"),
+    concept("gehenna", "groups: [kivotos]"),
+    concept("sweets", "groups: [trinity]\naliases: [Sweets Club]"),
+    concept("prefects", "groups: [gehenna]\nrenown: known"),
     concept("secret", "known_by: [kazusa]\nrenown: known"),
-    place("campus", "community: trinity"),
+    place("campus", "groups: [trinity]"),
     place("library", "parent: campus"),
-    place("gehenna_hall", "community: gehenna"),
+    place("gehenna_hall", "groups: [gehenna]"),
     place("west_annex", "parent: campus"),
-    place("clubroom", "parent: west_annex\ncommunity: sweets"),
+    place("clubroom", "parent: west_annex\ngroups: [sweets]"),
     place("kazusa_room", "parent: west_annex\nrenown: private"),
     person(
       "kazusa",
-      "school: Trinity General School\nclub: Sweets Club\nhome: kazusa_room\nknows: { gehenna_hall: familiar }",
+      "groups: { Sweets Club: close, Trinity General School: member }\nhome: kazusa_room",
     ),
-    person("natsu", "school: Trinity General School\nclub: Sweets Club"),
-    person("hina", "school: gehenna\nhome: campus"),
+    person(
+      "natsu",
+      "groups: { Sweets Club: close, Trinity General School: member }",
+    ),
+    person("hina", "groups: [gehenna]\nhome: campus"),
   ].map(([raw, relative]) => parsePage(raw, relative)),
 );
 
@@ -49,7 +52,6 @@ describe("WorldModel.depth", () => {
     ["a rival's public body", "kazusa", "prefects", "heard of"],
     ["a famous page", "kazusa", "kivotos", "familiar"],
     ["a rival's local place", "natsu", "gehenna_hall", "none"],
-    ["`knows` on their card", "kazusa", "gehenna_hall", "familiar"],
     ["their own private room", "kazusa", "kazusa_room", "intimate"],
     ["someone else's private room", "natsu", "kazusa_room", "none"],
     ["`known_by` names them", "kazusa", "secret", "intimate"],
@@ -72,7 +74,10 @@ describe("WorldModel.depth", () => {
   });
 
   it("explains itself in the author's terms", () => {
-    expect(world.depth("kazusa", "library").why).toBe("their own school");
+    expect(world.depth("kazusa", "library").why).toBe(
+      "in Trinity General School",
+    );
+    expect(world.depth("kazusa", "clubroom").why).toBe("close in Sweets Club");
     expect(world.depth("kazusa", "prefects").why).toBe("renown known");
   });
 
@@ -84,36 +89,34 @@ describe("WorldModel.depth", () => {
   });
 });
 
-describe("anchors a world names itself", () => {
+describe("groups", () => {
   const guilds = new WorldModel(
     [
       concept("saltmere", "renown: famous"),
-      concept("eastquay", "community: saltmere"),
-      concept("lamplighters", "community: eastquay"),
-      concept("watch", "community: eastquay"),
-      place("lamp_hall", "community: lamplighters"),
-      person("mara", "guild: Lamplighters\nward: eastquay"),
+      concept("eastquay", "groups: [saltmere]"),
+      concept("lamplighters", "groups: [eastquay]"),
+      concept("watch", "groups: [eastquay]"),
+      place("lamp_hall", "groups: [lamplighters]"),
+      person("mara", "groups: { Lamplighters: close, eastquay: member }"),
     ].map(([raw, relative]) => parsePage(raw, relative)),
-    { guild: "intimate", ward: "familiar" },
   );
 
-  it("reads the fields the world configured", () => {
+  it("make a person know a close group well, and the others", () => {
     expect(guilds.depth("mara", "lamp_hall")).toEqual({
       depth: "intimate",
-      why: "their own guild",
+      why: "close in Lamplighters",
     });
     expect(guilds.depth("mara", "watch")).toEqual({
       depth: "familiar",
-      why: "their own ward",
+      why: "in eastquay",
     });
   });
 
-  it("ignores school and club unless configured", () => {
+  it("are the only field that places someone", () => {
     const world = new WorldModel(
-      [concept("trinity", "community: x"), person("a", "school: trinity")].map(
+      [concept("trinity", "groups: [x]"), person("a", "school: trinity")].map(
         ([raw, relative]) => parsePage(raw, relative),
       ),
-      { guild: "intimate" },
     );
     expect(world.depth("a", "trinity").why).not.toMatch(/school/);
   });
@@ -124,24 +127,22 @@ describe("lintWorld", () => {
     const messages = lintWorld(
       new WorldModel(
         [
-          person("a", "school: Nowhere"),
+          person("a", "groups: [Nowhere]"),
           concept("b", "known_by: [ghost]"),
           concept("c", "renown: known", "See [[missing]]."),
-          concept("d", "community: c"),
-          concept("e", "title: e\nrenown: known"),
+          concept("d", "groups: [c]"),
+          concept("e", "name: e\nrenown: known"),
         ].map(([raw, relative]) => parsePage(raw, relative)),
       ),
     ).map((finding) => `${finding.page}: ${finding.message}`);
     expect(messages).toContain(
-      'world/a: `school` "Nowhere" resolves to no page',
+      'world/a: `groups` "Nowhere" resolves to no page',
     );
     expect(messages).toContain(
       'world/b: `known_by` names unknown character "ghost"',
     );
     expect(messages).toContain('world/c: link to unknown page "missing"');
-    expect(messages.filter((text) => text.includes("no `community`"))).toEqual(
-      [],
-    );
+    expect(messages.filter((text) => text.includes("no `groups`"))).toEqual([]);
   });
 });
 

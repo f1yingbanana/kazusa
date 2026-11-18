@@ -178,7 +178,7 @@ export function CommandPalette({
               {people.map((character) => (
                 <CommandItem
                   key={character.id}
-                  value={`character ${character.name} ${character.aliases.join(" ")} ${character.affiliation ?? ""}`}
+                  value={`character ${character.name} ${character.aliases.join(" ")} ${character.groups?.join(" ") ?? ""}`}
                   onSelect={() =>
                     go({
                       sel: {
@@ -196,9 +196,9 @@ export function CommandPalette({
                     size="xs"
                   />
                   <span className="truncate">{character.name}</span>
-                  {character.affiliation ? (
+                  {character.groups?.[0] ? (
                     <span className="ml-auto truncate text-xs text-muted-foreground">
-                      {character.affiliation}
+                      {character.groups[0]}
                     </span>
                   ) : null}
                 </CommandItem>

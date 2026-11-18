@@ -107,7 +107,6 @@ beforeEach(() => {
     pluginConfig: {
       memory: {
         wikiDir: path.join(root, "world"),
-        anchors: WORLDS.saltmere.anchors,
         embedding: { provider: "kazusa-no-key", model: "m" },
       },
     },

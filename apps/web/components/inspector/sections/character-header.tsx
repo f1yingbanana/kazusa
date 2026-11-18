@@ -90,8 +90,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
 
   // Only the unusual kinds are worth a word; most of the roster is simulated.
   const subtitle = [
-    character.occupation,
-    character.affiliation,
+    character.summary,
     KIND_NOTE[character.kind],
     offstage && "Offstage",
   ]

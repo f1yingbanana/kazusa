@@ -32,8 +32,13 @@ async function put(root: string, name: string, text: string): Promise<void> {
 describe("Decision context sources", () => {
   it("uses the SDK workspace and follows empty catalog pages for incoming and pending channels", async () => {
     const workspace = await fixture();
-    await put(workspace, "IDENTITY.md", "Alice the student");
-    await put(workspace, "SOUL.md", "Protect my friends");
+    const wiki = await fixture();
+    // Their World Wiki page: the opening is who they are, the sections more.
+    await put(
+      wiki,
+      "entities/characters/alice.md",
+      "Alice the student\n\n## Inside\n\nProtect my friends",
+    );
     await put(workspace, "MEMORY.md", "Promised to help Bob");
     const resolveWorkspace = vi.fn(() => workspace);
     const now = Date.parse("2026-10-24T12:00:00Z");
@@ -55,7 +60,7 @@ describe("Decision context sources", () => {
       id: "kazusa",
       rootDir: fileURLToPath(new URL("../..", import.meta.url)),
       config: {},
-      pluginConfig: {},
+      pluginConfig: { memory: { wikiDir: wiki } },
       runtime: {
         agent: {
           resolveAgentWorkspaceDir: resolveWorkspace,
@@ -88,7 +93,7 @@ describe("Decision context sources", () => {
       state: {
         character: {
           identity: "Alice the student",
-          soul: "Protect my friends",
+          soul: "## Inside\n\nProtect my friends",
           memory: "Promised to help Bob",
         },
       },

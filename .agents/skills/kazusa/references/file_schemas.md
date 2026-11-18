@@ -6,40 +6,17 @@ in Kazusa.
 
 ---
 
-## 1. Static Identity & Traits (`<workspace>/IDENTITY.md`)
+## 1. Who a character is (their World Wiki page)
 
-- **Location**: `<workspace>/IDENTITY.md`
-- **Purpose**: Defines static character bio and occupational context. Desire
-  state and per-character drain live in the `"desires"` keyed store, never in
-  Markdown.
-- **Access**: Read by OpenClaw bootstrap. Written once during world generation /
-  import.
-
-```markdown
----
-agent_id: alice
-name: Alice Lin
-occupation: Music Theory Student
----
-
-# Identity
-
-Alice is a 19-year-old sophomore studying music composition at Oak Hill College.
-She is meticulous, passionate about counterpoint, and often gets so absorbed in
-manuscript writing that she forgets to eat.
-```
-
-### Field Specifications
-
-- `agent_id` (string, required): Canonical identifier matching `openclaw.json`
-  entry.
-- `name` (string, required): Full display name.
-- `occupation` (string, required): Primary role or vocation.
-- `avatarUrl` (string, optional): Explicit avatar URL override. Normally
-  omitted: drop `avatar.{webp,png,jpg,jpeg,gif,avif}` in the workspace root and
-  the plugin serves it at `/kazusa/avatar?id=<agent_id>&v=<mtime>`.
-
----
+A world character's card is their page,
+`shared/wiki/entities/characters/<id>.md` (§ World Wiki below for its fields and
+layers). Their turns read it whole where OpenClaw would add `IDENTITY.md` and
+`SOUL.md` (`characters/card.ts`); those workspace files are no longer read, and
+`scripts/one-page.mjs` folds an older world's into the pages. The roster takes
+`name`, `aliases`, `summary` and `groups` from it; the avatar is
+`avatar.{webp,png,jpg,jpeg,gif,avif}` in the workspace, served at
+`/kazusa/avatar?id=<id>&v=<mtime>`. The system agent keeps her own `IDENTITY.md`
+and `SOUL.md`.
 
 ## 2. Working Machine State (OpenClaw Plugin State Stores)
 

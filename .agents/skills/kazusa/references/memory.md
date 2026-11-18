@@ -11,6 +11,15 @@ people and places without being asked, can try to remember or look something up,
 holds beliefs that may be wrong and says where they came from, and sorts the day
 out in their sleep. The world's author edits Markdown and nothing else.
 
+**Changed 2026-11-19 (one page per character):** a character's World Wiki page
+is who they are, read whole on their turns in place of `IDENTITY.md` and
+`SOUL.md` (no longer read); their inner voice is a section `Known by:` them.
+`groups` (a list, or `{ <group>: close | member }`) replaces `community`, the
+world-configured `memory.anchors` (deprecated, ignored) and the default
+`club`/`school` fields; `knows`, `title` and `full_name` are gone (`name`,
+`aliases`). Read older mentions below in that light; `scripts/one-page.mjs`
+converts a world.
+
 ## 0. Principles applied
 
 - **One memory: the wiki.** A character's memory is their personal wiki plus
@@ -83,7 +92,7 @@ shared/wiki/                          WORLD WIKI (canon; author and ARONA write)
 └── entities/characters/<id>.md       roster: home, school, club, knows
 
 workspaces/<agent_id>/                PERSONAL (the character's mind)
-├── SOUL.md | IDENTITY.md             voice and bio (unchanged)
+├── (who they are: their World Wiki page; SOUL.md and IDENTITY.md are not read)
 ├── MEMORY.md                         always loaded: who I am lately, goals, plans
 └── wiki/
     ├── entities/characters/<id>.md   people (same id as the world card)
@@ -117,7 +126,7 @@ detail in the prompt:
 ---
 summary: Gehenna's student disciplinary body; feared and overworked.
 aliases: [Prefects, the Prefect Team]
-community: gehenna_academy # whose thing this is (a concept id)
+groups: [gehenna_academy] # what it belongs to, the nearest first
 renown: known # how far its name travels: private | local | known | famous
 ---
 
@@ -146,9 +155,9 @@ Only these two know it exists…
   same for the whole page.
 - `## History` holds dated in-world events (§3.4). Undated edits anywhere else
   are retcons.
-- Community pages are concepts with a `community` too: a club names its school,
-  a school names the world root. Places inherit `community` from their `parent`
-  chain, so only a campus root needs it.
+- Group pages are concepts with `groups` too: a club names its school, a school
+  names the world root. Places inherit groups from their `parent` chain, so only
+  a campus root needs them.
 - World character cards: `home`, `school`, `club` (names or ids, resolved
   through aliases), optional `knows: { black_market: familiar }`. Their lead is
   what anyone who sees them notices.
@@ -195,19 +204,17 @@ My go-to for strawberry milk after club. Lately I'm not sure it'll last.
 `depth(character, worldPage)` is one of `none < heard of < familiar < intimate`,
 computed in code as the **highest** of:
 
-1. **Anchors** from the character's world card. A page is under an anchor if the
-   anchor is the page itself or appears on its `parent`/`community` chain. The
-   fields are a world's own (`memory.anchors`): a city and a guild, a company
-   and a team. The default is `club` (intimate) and `school` (familiar).
+1. **Anchors** from the character's own page. A page is under an anchor if the
+   anchor is the page itself or appears on its `parent`/`groups` chain.
 
    | Anchor                             | Depth    |
    | ---------------------------------- | -------- |
-   | the world's `memory.anchors`       | as given |
+   | a group in their `groups`          | familiar |
+   | a group they are `close` in        | intimate |
    | home area (the `parent` of `home`) | intimate |
-   | `knows: { <page id>: <depth> }`    | as given |
 
-   An explicit `renown: local` means its own community only: being in the same
-   company does not reach another team's `local` project.
+   An explicit `renown: local` means its nearest group (the first) only: being
+   in the same company does not reach another team's `local` project.
 
 2. **Renown** for everyone else: `private` and `local` give none, `known` gives
    heard of, `famous` gives familiar. Defaults: places `local`, characters

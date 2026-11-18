@@ -27,7 +27,8 @@ export function workspacesBeside(workspace: string): string[] {
     .filter(
       (entry) =>
         entry.isDirectory() &&
-        existsSync(path.join(root, entry.name, "IDENTITY.md")),
+        !entry.name.startsWith(".") &&
+        readdirSync(path.join(root, entry.name)).length > 0,
     )
     .map((entry) => entry.name)
     .toSorted();

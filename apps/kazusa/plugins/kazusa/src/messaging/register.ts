@@ -1,6 +1,5 @@
 import { currentConfig } from "../current-config.ts";
 import { inBackground } from "../background.ts";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import {
@@ -10,7 +9,6 @@ import {
   type OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/core";
 import { publishSessionTranscriptUpdateByIdentity } from "openclaw/plugin-sdk/session-transcript-runtime";
-import YAML from "yaml";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
 import { characterName, personName } from "../identity.ts";
@@ -168,25 +166,8 @@ async function rosterAgent(
     id: agentId,
     name: await characterName(api, config, agentId),
   };
-  try {
-    const text = await readFile(
-      path.join(
-        api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
-        "IDENTITY.md",
-      ),
-      "utf8",
-    );
-    const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-    if (frontmatter) {
-      const presentation = z
-        .object({ avatarUrl: z.string().optional() })
-        .parse(YAML.parse(frontmatter[1]));
-      if (presentation.avatarUrl) agent.avatarUrl = presentation.avatarUrl;
-    }
-  } catch {
-    /* Optional avatar metadata does not block roster discovery. */
-  }
-  agent.avatarUrl ??= await localAvatarUrl(api, agentId, config);
+  // Their face is the avatar picture in their workspace, nothing else.
+  agent.avatarUrl = await localAvatarUrl(api, agentId, config);
   return agent;
 }
 

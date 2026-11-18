@@ -1,6 +1,4 @@
 import { currentConfig } from "../current-config.ts";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type {
   OpenClawConfig,
@@ -21,7 +19,7 @@ import type { TaskStore } from "../taskman/types.ts";
 import type { Messaging } from "../messaging/messaging.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { TaskmanService } from "../taskman/register.ts";
-import { readFrontmatter } from "../markdown/frontmatter.ts";
+import { readCharacterCard, worldWikiDir } from "./card.ts";
 import { localAvatarUrl, registerAvatarHttp } from "./avatar.ts";
 import { defaultPortraitUrl } from "../scene/portraits.ts";
 import type { Stage } from "../stage/stage.ts";
@@ -40,25 +38,11 @@ const USER = z.object({
   name: z.string().trim().min(1).default("Sensei"),
 });
 
-const IDENTITY_FRONTMATTER = z
-  .object({
-    agent_id: z.string().optional(),
-    character_id: z.string().optional(),
-    name: z.string().optional(),
-    full_name: z.string().optional(),
-    handle: z.string().optional(),
-    school: z.string().optional(),
-    club: z.string().optional(),
-    occupation: z.string().optional(),
-    avatarUrl: z.string().optional(),
-    avatar: z.string().optional(),
-    role: z.string().optional(),
-    combat_role: z.string().optional(),
-    aliases: z.array(z.string()).optional(),
-    personality_traits: z.union([z.array(z.string()), z.string()]).optional(),
-  })
-  .passthrough();
-
+/**
+ * What the roster shows of a character, from their World Wiki page: its name,
+ * aliases and summary, the groups it puts them in, and its opening paragraph;
+ * their face is the avatar picture in their workspace.
+ */
 export async function loadCharacterData(
   api: OpenClawPluginApi,
   agentId: string,
@@ -67,107 +51,28 @@ export async function loadCharacterData(
   name: string;
   avatarUrl?: string;
   portraitUrl?: string;
-  occupation?: string;
-  affiliation?: string;
+  summary?: string;
+  groups: string[];
   aliases: string[];
-  role?: string;
-  personalityTraits: string[];
-  bodyMarkdown: string;
+  lead: string;
 }> {
-  let name = agentId;
-  let avatarUrl: string | undefined;
-  let occupation: string | undefined;
-  let affiliation: string | undefined;
-  const aliasSet = new Set<string>();
-  let role: string | undefined;
-  const traitsSet = new Set<string>();
-  let bodyMarkdown = "";
-
-  // 1. Check configured agent identity in OpenClaw
-  const configured = api.runtime.agent.resolveAgentIdentity(config, agentId);
-  if (configured?.name?.trim()) name = configured.name.trim();
-
-  // 2. Read IDENTITY.md from agent workspace
-  try {
-    const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
-      config,
-      agentId,
-    );
-    const text = await readFile(path.join(workspace, "IDENTITY.md"), "utf8");
-    const { data, body } = readFrontmatter(text, IDENTITY_FRONTMATTER);
-    if (data.name?.trim()) name = data.name.trim();
-    if (data.avatarUrl?.trim()) avatarUrl = data.avatarUrl.trim();
-    if (data.occupation?.trim()) occupation = data.occupation.trim();
-    else if (data.club?.trim()) occupation = data.club.trim();
-
-    if (data.school?.trim()) affiliation = data.school.trim();
-    else if (data.club?.trim()) affiliation = data.club.trim();
-
-    if (data.handle?.trim()) aliasSet.add(data.handle.trim());
-    if (Array.isArray(data.aliases)) {
-      for (const a of data.aliases) if (a.trim()) aliasSet.add(a.trim());
-    }
-    if (data.role?.trim()) role = data.role.trim();
-    else if (data.combat_role?.trim()) role = data.combat_role.trim();
-
-    if (Array.isArray(data.personality_traits)) {
-      for (const t of data.personality_traits)
-        if (t.trim()) traitsSet.add(t.trim());
-    } else if (typeof data.personality_traits === "string") {
-      for (const t of data.personality_traits.split(","))
-        if (t.trim()) traitsSet.add(t.trim());
-    }
-    if (body) bodyMarkdown = body;
-  } catch {
-    // Non-fatal if IDENTITY.md is missing or unreadable
-  }
-
-  // 3. An avatar image in the workspace beats the World Wiki card's URL
-  if (!avatarUrl) avatarUrl = await localAvatarUrl(api, agentId, config);
-
-  // 3b. The default portrait: a stat or two, never a listing per request
+  const card = readCharacterCard(worldWikiDir(api), agentId)?.page;
+  const configured = api.runtime.agent
+    .resolveAgentIdentity(config, agentId)
+    ?.name?.trim();
+  const avatarUrl = await localAvatarUrl(api, agentId, config);
   const portraitUrl = defaultPortraitUrl(
     agentId,
     api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
   );
-
-  // 4. Fallback / augment with World Wiki card if present
-  try {
-    const cwd = process.cwd();
-    const possiblePaths = [
-      path.join(cwd, "shared/wiki/entities/characters", `${agentId}.md`),
-    ];
-    for (const wikiPath of possiblePaths) {
-      try {
-        const text = await readFile(wikiPath, "utf8");
-        const { data, body } = readFrontmatter(text, IDENTITY_FRONTMATTER);
-        if (!occupation && data.occupation) occupation = data.occupation;
-        if (!affiliation && (data.school || data.club))
-          affiliation = data.school ?? data.club;
-        if (!role && (data.role || data.combat_role))
-          role = data.role ?? data.combat_role;
-        if (!avatarUrl && (data.avatarUrl || data.avatar))
-          avatarUrl = data.avatarUrl ?? data.avatar;
-        if (body && !bodyMarkdown) bodyMarkdown = body;
-        break;
-      } catch {
-        // Continue searching
-      }
-    }
-  } catch {
-    // Non-fatal
-  }
-
   return {
-    name,
-    avatarUrl,
+    name: configured || card?.name || agentId,
+    ...(avatarUrl === undefined ? {} : { avatarUrl }),
     ...(portraitUrl === undefined ? {} : { portraitUrl }),
-    occupation,
-    affiliation,
-    aliases: [...aliasSet],
-    role,
-    personalityTraits: [...traitsSet],
-    bodyMarkdown,
+    ...(card?.summary ? { summary: card.summary } : {}),
+    groups: card?.groups.map(({ ref }) => ref) ?? [],
+    aliases: [...(card?.aliases ?? [])],
+    lead: card?.lead ?? "",
   };
 }
 
@@ -281,8 +186,8 @@ export function registerCharactersHttp(
           isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
           avatarUrl: data.avatarUrl,
           portraitUrl: data.portraitUrl,
-          occupation: data.occupation,
-          affiliation: data.affiliation,
+          ...(data.summary ? { summary: data.summary } : {}),
+          groups: data.groups,
           aliases: data.aliases,
           status,
         };
@@ -337,7 +242,7 @@ export function registerCharactersHttp(
           name: user.name,
           kind: "player",
           aliases: [],
-          personalityTraits: [],
+          groups: [],
           bodyMarkdown:
             (await readPlayerPage(playerWikiDir(api), user.id))?.about ||
             `The player, ${user.name}.`,
@@ -362,13 +267,11 @@ export function registerCharactersHttp(
       isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
       avatarUrl: data.avatarUrl,
       portraitUrl: data.portraitUrl,
-      occupation: data.occupation,
-      affiliation: data.affiliation,
+      ...(data.summary ? { summary: data.summary } : {}),
+      groups: data.groups,
       aliases: data.aliases,
       status,
-      role: data.role,
-      personalityTraits: data.personalityTraits,
-      bodyMarkdown: data.bodyMarkdown,
+      bodyMarkdown: data.lead,
     };
 
     sendJson(res, 200, { character } satisfies CharacterDetailResponse);
