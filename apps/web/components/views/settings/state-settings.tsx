@@ -44,6 +44,7 @@ import { useStats } from "@/hooks/use-stats";
 import {
   EMPTY_DRAFT,
   STAT_EXAMPLES,
+  editConflict,
   STATS_ADVISED,
   statsCharactersSee,
   fromDraft,
@@ -176,7 +177,12 @@ function summary(stat: StatDefinition): string {
 export function StateSettings() {
   const { enabled, data, error, saveCatalog } = useStats();
   const [editing, setEditing] = useState<
-    { readonly draft: StatDraft; readonly replaces?: string } | undefined
+    | {
+        readonly draft: StatDraft;
+        /** The state being edited, as it was when the form opened. */
+        readonly opened?: StatDefinition;
+      }
+    | undefined
   >();
   // What the states are by the time an Undo is pressed.
   const latest = useRef<{ catalog: StatCatalog; revision?: string }>({
@@ -230,6 +236,27 @@ export function StateSettings() {
     }
   };
 
+  /**
+   * Says so, and is true, when the state a form was opened on is no longer as
+   * the form found it: the states here follow the stream while the form is
+   * open, and the form does not.
+   */
+  const changedElsewhere = (
+    opened: StatDefinition,
+    doing: "save" | "delete",
+  ): boolean => {
+    const conflict = editConflict(catalog, opened);
+    if (!conflict) return false;
+    const label = statLabel(opened.name);
+    toast.error(`Couldn't ${doing} ${label.toLowerCase()}`, {
+      description:
+        conflict === "deleted"
+          ? `${label} was deleted somewhere else while this was open. Close this, and add it again if you still want it.`
+          : `${label} was changed somewhere else while this was open. Close this and open it again to see it as it is now.`,
+    });
+    return true;
+  };
+
   /** Values set under the name are kept, so a delete can be taken back. */
   const remove = (stat: StatDefinition) => {
     const at = catalog.findIndex(({ name }) => name === stat.name);
@@ -278,7 +305,7 @@ export function StateSettings() {
                   type="button"
                   aria-label={`Edit ${stat.name}`}
                   onClick={() =>
-                    setEditing({ draft: toDraft(stat), replaces: stat.name })
+                    setEditing({ draft: toDraft(stat), opened: stat })
                   }
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 >
@@ -336,29 +363,32 @@ export function StateSettings() {
       {editing ? (
         <StateDialog
           initial={editing.draft}
-          replaces={editing.replaces}
+          replaces={editing.opened?.name}
           taken={
             new Set(
               catalog
                 .map(({ name }) => name)
-                .filter((name) => name !== editing.replaces),
+                .filter((name) => name !== editing.opened?.name),
             )
           }
           onClose={() => setEditing(undefined)}
-          onSave={(stat) =>
-            save(
-              editing.replaces
-                ? catalog.map((entry) =>
-                    entry.name === editing.replaces ? stat : entry,
-                  )
-                : [...catalog, stat],
+          onSave={async (stat) => {
+            const { opened } = editing;
+            if (!opened)
+              return save([...catalog, stat], revision, "State added");
+            if (changedElsewhere(opened, "save")) return false;
+            return save(
+              catalog.map((entry) =>
+                entry.name === opened.name ? stat : entry,
+              ),
               revision,
-              editing.replaces ? "State saved" : "State added",
-            )
-          }
-          onDelete={() => {
-            const stat = catalog.find(({ name }) => name === editing.replaces);
-            return stat ? remove(stat) : Promise.resolve(false);
+              "State saved",
+            );
+          }}
+          onDelete={async () => {
+            const { opened } = editing;
+            if (!opened || changedElsewhere(opened, "delete")) return false;
+            return remove(opened);
           }}
         />
       ) : null}

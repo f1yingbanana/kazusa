@@ -6,6 +6,9 @@ type Write = (
     StatsResponse | ((current?: StatsResponse) => StatsResponse | undefined),
 ) => Promise<StatsResponse | undefined>;
 
+/** How long after a failed read the next is tried: doubling, up to the last. */
+export const RETRY_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000] as const;
+
 /**
  * Keeps the states snapshot whole while the stream patches it. Patching a cache
  * makes SWR drop a read of it that is under way, and nothing starts that read
@@ -17,6 +20,8 @@ export function statsSync(deps: {
   readonly read: () => Promise<StatsResponse>;
   /** Replaces the cached snapshot, or patches it, without a read of its own. */
   readonly write: Write;
+  /** Runs something later and returns how to call it off; a timer by default. */
+  readonly later?: (run: () => void, ms: number) => () => void;
 }): {
   /** Reads everything again: definitions changed, or events were missed. */
   readonly refresh: () => void;
@@ -26,12 +31,23 @@ export function statsSync(deps: {
   let reads = 0;
   /** The read under way by its number, or 0. */
   let reading = 0;
-  /** The last read failed: the next event asks again. */
+  /** The last read failed: it is tried again, and the next event asks too. */
   let owed = false;
+  /** Reads failed in a row, and how to call off the retry that is waiting. */
+  let failed = 0;
+  let cancel: (() => void) | undefined;
   let since: StatsStreamEvent[] = [];
   let stopped = false;
+  const later =
+    deps.later ??
+    ((run, ms) => {
+      const timer = setTimeout(run, ms);
+      return () => clearTimeout(timer);
+    });
 
   const refresh = (): void => {
+    cancel?.();
+    cancel = undefined;
     const mine = ++reads;
     reading = mine;
     owed = false;
@@ -41,6 +57,7 @@ export function statsSync(deps: {
         // A later read began after this one and knows more.
         if (stopped || mine !== reading) return;
         reading = 0;
+        failed = 0;
         void deps.write(
           since.reduce(
             (whole, event) => withStatsEvent(whole, event) ?? whole,
@@ -49,9 +66,13 @@ export function statsSync(deps: {
         );
       },
       () => {
-        if (mine !== reading) return;
+        if (stopped || mine !== reading) return;
         reading = 0;
         owed = true;
+        // Nothing else may come down the stream to ask again. After the last
+        // wait it is left to the next event or reconnection.
+        const wait = RETRY_MS[failed++];
+        if (wait !== undefined) cancel = later(refresh, wait);
       },
     );
   };
@@ -75,6 +96,8 @@ export function statsSync(deps: {
     },
     stop() {
       stopped = true;
+      cancel?.();
+      cancel = undefined;
     },
   };
 }

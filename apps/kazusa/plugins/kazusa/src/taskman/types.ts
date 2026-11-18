@@ -40,12 +40,16 @@ export interface TaskTransition {
   readonly params: Readonly<Record<string, unknown>>;
 }
 
-/** What an extension will do once every extension accepted a transition. */
-export interface PreparedTaskCommit {
+/** What an extension says about a transition, for its history. */
+export interface TaskCommitReport {
   /** One sentence added to the ledger row and the tool result. */
   readonly note?: string;
   /** Structured fields merged into the ledger row's journal payload. */
   readonly payload?: Readonly<Record<string, unknown>>;
+}
+
+/** What an extension will do once every extension accepted a transition. */
+export interface PreparedTaskCommit extends TaskCommitReport {
   /**
    * Sim ms by which this lease needs a check-in (an arrival). The earliest one
    * brings the lease's end forward; its one wake is the check-in.
@@ -53,9 +57,11 @@ export interface PreparedTaskCommit {
   readonly checkInAt?: number;
   /**
    * Writes the extension's own state against the final lease, before it is
-   * written.
+   * written. What it returns is reported in place of what was prepared: an
+   * extension whose write is worked out as it lands (another change may have
+   * come first) says what it wrote, not what it expected to.
    */
-  commit(task: ActiveTask): Promise<void>;
+  commit(task: ActiveTask): Promise<TaskCommitReport | void>;
 }
 
 /**

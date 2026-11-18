@@ -278,8 +278,10 @@ role.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **TopBar** is global time only. No per-feature controls, and no settings:
-  Settings is a section.
+- **TopBar** is the world right now: its time and, from `TOP_BAR_ITEMS`, what
+  else is true of the whole world at this moment (its own states, set there by
+  whoever may manage it, as the clock is). Nothing about one character, place or
+  chat, and no settings: Settings is a section.
 - **Rail** (`shell/section-nav.tsx`) lists registered `StageView`s as icons
   (bottom tab bar below `md`), with an optional `badge` per view. The world's
   sections sit at the top; `placement: "end"` views (Settings) sit at the bottom

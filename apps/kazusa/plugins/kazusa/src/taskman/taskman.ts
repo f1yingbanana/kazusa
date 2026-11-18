@@ -7,6 +7,7 @@ import type {
   PreparedTaskCommit,
   StartTaskParams,
   StartTaskResult,
+  TaskCommitReport,
   TaskToolArguments,
   TaskTransition,
   ToolExecutionContext,
@@ -56,15 +57,17 @@ async function commitExtensions(
     return { refusal: error instanceof Error ? error.message : String(error) };
   }
   const task = checkedIn(transition.task, prepared);
-  for (const extension of prepared) await extension.commit(task);
+  const reports: TaskCommitReport[] = [];
+  for (const extension of prepared)
+    reports.push((await extension.commit(task)) ?? extension);
   return {
     task,
-    notes: prepared
+    notes: reports
       .map(({ note }) => note?.trim())
       .filter((note): note is string => !!note)
       .map((note) => ` ${note}`)
       .join(""),
-    payload: prepared.reduce<Record<string, unknown>>(
+    payload: reports.reduce<Record<string, unknown>>(
       (all, { payload }) => ({ ...all, ...payload }),
       {},
     ),

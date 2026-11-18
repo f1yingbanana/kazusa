@@ -179,6 +179,21 @@ const MESSAGES: Record<string, string> = {
 };
 
 /**
+ * Whether the state a form was opened on is still as the form found it. A form
+ * holds what it read when it opened: saving that over a definition someone has
+ * changed since, or back over one they deleted, would undo their change without
+ * anyone seeing it.
+ */
+export function editConflict(
+  catalog: readonly StatDefinition[],
+  opened: StatDefinition,
+): "changed" | "deleted" | undefined {
+  const now = catalog.find(({ name }) => name === opened.name);
+  if (!now) return "deleted";
+  return JSON.stringify(now) === JSON.stringify(opened) ? undefined : "changed";
+}
+
+/**
  * How many states a character can take in at once and still handle each with
  * care. A judgment, not a measurement: every one is read each turn, and each
  * one they can change is weighed at every activity change.

@@ -26,7 +26,7 @@ import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { describeTool, pluginSkillText } from "../skill-text.ts";
 import type { StateStore } from "../state.ts";
 import { declaredOutfits } from "../stickers/stickers.ts";
-import type { TaskExtension } from "../taskman/types.ts";
+import type { TaskCommitReport, TaskExtension } from "../taskman/types.ts";
 import {
   catalogFile,
   catalogRevision,
@@ -234,6 +234,31 @@ export function createStats(deps: {
     return queued;
   };
 
+  /** What a task's history says of the changes made at its start. */
+  const reported = (
+    agentId: string,
+    changes: readonly StatChange[],
+  ): TaskCommitReport =>
+    changes.length
+      ? {
+          note: changes
+            .map(
+              ({ stat, value }) =>
+                ` ${deps.text(
+                  "kazusa-results#state-changed",
+                  { name: stat.name, value: statStanding(stat, value) },
+                  agentId,
+                )}`,
+            )
+            .join(""),
+          payload: {
+            states: Object.fromEntries(
+              changes.map(({ stat, value }) => [stat.name, value]),
+            ),
+          },
+        }
+      : {};
+
   const taskExtension: TaskExtension = {
     startTaskParameters: {},
     startTaskParametersFor(agentId) {
@@ -254,28 +279,18 @@ export function createStats(deps: {
           : [];
       if (!changes.length) return { commit: async () => {} };
       return {
-        note: changes
-          .map(
-            ({ stat, value }) =>
-              ` ${deps.text(
-                "kazusa-results#state-changed",
-                { name: stat.name, value: statStanding(stat, value) },
-                agentId,
-              )}`,
-          )
-          .join(""),
-        payload: {
-          states: Object.fromEntries(
-            changes.map(({ stat, value }) => [stat.name, value]),
-          ),
-        },
-        // Worked out again when written: another change may have landed.
+        ...reported(agentId, changes),
+        // Worked out again when written, and reported as written: another
+        // change may have landed since.
         commit: async () => {
+          let written: readonly StatChange[] = [];
           await apply(
             agentId,
-            (record) => ownChanges(statsFor(agentId), record, params.changes),
+            (record) =>
+              (written = ownChanges(statsFor(agentId), record, params.changes)),
             "character",
           );
+          return reported(agentId, written);
         },
       };
     },

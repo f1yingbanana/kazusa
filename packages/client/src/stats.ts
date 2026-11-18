@@ -25,6 +25,16 @@ export const StatValueDefSchema = z.object({
 });
 export type StatValueDef = z.infer<typeof StatValueDefSchema>;
 
+/**
+ * An outfit as a character's stickers name it. The word comes from their
+ * sticker folder, not from the catalog, so whatever is named there is read: a
+ * word a catalog would refuse must not keep the states from loading.
+ */
+const OutfitSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+});
+
 /** A word for a range of a number state, from `min` up to the next band. */
 export const StatBandSchema = z.object({
   name: WORD,
@@ -257,7 +267,7 @@ export const StatsResponseSchema = z.object({
   /** The world's own states by name. */
   world: EntriesSchema,
   /** By character id: their outfits besides the usual clothes, if any. */
-  outfits: z.record(z.string(), z.array(StatValueDefSchema)),
+  outfits: z.record(z.string(), z.array(OutfitSchema)),
 });
 export type StatsResponse = z.infer<typeof StatsResponseSchema>;
 
@@ -320,7 +330,11 @@ export function coerceStat(
     : undefined;
 }
 
-/** What a state stands at: the entry if it still fits, else the initial. */
+/**
+ * What a state stands at: the entry, a number kept within the range the state
+ * has now; the initial when there is none or the choice no longer has its
+ * word.
+ */
 export function statValue(
   stat: StatDefinition,
   entry: StatEntry | undefined,

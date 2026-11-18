@@ -528,10 +528,12 @@ connect these modules in process.
   this for `afterwards` (§3.5), Location for `where` (§3.6). `prepare` may also
   return `checkInAt`: the earliest one brings the lease's end forward (walking
   over checks in on arrival), and every `commit(task)` receives the lease as
-  written. There is exactly one wake per character. `start_task`, `delay_task`
-  and `send_message` are `catalogMode: "direct-only"`: behind Tool Search their
-  parameter descriptions are invisible and models route calls through a generic
-  `tool_call`.
+  written. A `commit` may return `{ note?, payload? }`, reported in place of
+  what it prepared: States does, because a change is worked out as it is written
+  and another may have landed first. There is exactly one wake per character.
+  `start_task`, `delay_task` and `send_message` are
+  `catalogMode: "direct-only"`: behind Tool Search their parameter descriptions
+  are invisible and models route calls through a generic `tool_call`.
 - **In-Character Monologues**: Transitions and delays may include a brief
   in-character `monologue`. Format it as an italic blockquote directly below the
   factual summary inside the same ledger message text rather than extending

@@ -288,6 +288,44 @@ describe("a character's own changes", () => {
   });
 });
 
+describe("a change at an activity start that another change beats", () => {
+  it("is reported as written, not as it was expected to land", async () => {
+    const { stats } = world(
+      StatCatalogSchema.parse([
+        {
+          name: "money",
+          description: "What you have to spend.",
+          on: "character",
+          kind: "number",
+          min: 0,
+          max: 50,
+          initial: 20,
+          changedBy: "character",
+          shown: "self",
+        },
+      ]),
+    );
+    const prepare = () =>
+      stats.taskExtension.prepare({
+        kind: "started",
+        agentId: "airi",
+        at: 1_000,
+        task: {} as never,
+        params: { changes: { money: "-3" } },
+      });
+    const alone = await prepare();
+    expect(alone.payload).toEqual({ states: { money: 17 } });
+    const beaten = await prepare();
+    expect(await alone.commit({} as never)).toMatchObject({
+      payload: { states: { money: 17 } },
+    });
+    const report = await beaten.commit({} as never);
+    expect((await stats.record("airi"))?.own.money?.value).toBe(14);
+    expect(report).toMatchObject({ payload: { states: { money: 14 } } });
+    expect(report?.note).toContain('"value":"14/50"');
+  });
+});
+
 describe("changing mid-activity", () => {
   it("changes what is theirs and says what is wrong with the rest", async () => {
     const { stats } = world();

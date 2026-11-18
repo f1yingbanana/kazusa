@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import {
   wornOutfit,
   type StatCatalog,
@@ -14,10 +14,11 @@ import { useSources } from "@/lib/source/provider";
 import {
   STATS_KEY,
   fetchStats,
+  afterStatCatalog,
+  afterStatSet,
   saveStatCatalog,
   setStat,
-  withStatCatalog,
-  withStatSet,
+  type AfterStatWrite,
 } from "@/lib/source/stats/http";
 
 /**
@@ -34,19 +35,50 @@ export function useStats() {
     { revalidateOnFocus: false },
   );
 
+  const { cache } = useSWRConfig();
+  /**
+   * Puts a write's response into the snapshot. `before` is the snapshot as the
+   * request went out: a response that arrives after the stream has changed the
+   * same thing is left out, and everything is read again if the two differ.
+   */
+  const settle = useCallback(
+    async <T>(
+      request: () => Promise<T>,
+      after: (
+        before: StatsResponse | undefined,
+        current: StatsResponse | undefined,
+        response: T,
+      ) => AfterStatWrite,
+    ): Promise<void> => {
+      const before = cache.get(STATS_KEY)?.data as StatsResponse | undefined;
+      const response = await request();
+      let reread = false;
+      await mutate(
+        (current) => {
+          const result = after(before, current, response);
+          reread = result.reread;
+          return result.data;
+        },
+        { revalidate: false },
+      );
+      if (reread) void mutate();
+    },
+    [cache, mutate],
+  );
+
   /**
    * Throws with the server's reason, so the control can stay as it was. Only
    * what the write changed is taken from its response: the stream may have
    * brought newer of everything else by the time it arrives.
    */
   const set = useCallback(
-    async (payload: StatSetPayload): Promise<void> => {
-      const response = await setStat(payload);
-      await mutate((current) => withStatSet(current, response, payload), {
-        revalidate: false,
-      });
-    },
-    [mutate],
+    (payload: StatSetPayload): Promise<void> =>
+      settle(
+        () => setStat(payload),
+        (before, current, response) =>
+          afterStatSet(before, current, response, payload),
+      ),
+    [settle],
   );
   /**
    * `base` is the `revision` of the snapshot the change was made from. When the
@@ -55,9 +87,8 @@ export function useStats() {
    */
   const saveCatalog = useCallback(
     async (catalog: StatCatalog, base: string | undefined): Promise<void> => {
-      let response: StatsResponse;
       try {
-        response = await saveStatCatalog(catalog, base);
+        await settle(() => saveStatCatalog(catalog, base), afterStatCatalog);
       } catch (error) {
         if (!(error instanceof KazusaApiError) || error.status !== 409)
           throw error;
@@ -67,11 +98,8 @@ export function useStats() {
           { cause: error },
         );
       }
-      await mutate((current) => withStatCatalog(current, response), {
-        revalidate: false,
-      });
     },
-    [mutate],
+    [mutate, settle],
   );
 
   return { enabled, canManage, data, error, set, saveCatalog };

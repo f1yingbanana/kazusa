@@ -3,6 +3,7 @@ import { StatDefinitionSchema } from "@kazusa/client";
 import {
   EMPTY_DRAFT,
   STAT_EXAMPLES,
+  editConflict,
   fromDraft,
   statsCharactersSee,
   toDraft,
@@ -139,5 +140,18 @@ describe("state drafts", () => {
         { ...mood, name: "b", changedBy: "character", shown: "nobody" },
       ]),
     ).toBe(1);
+  });
+
+  it("sees that the state a form was opened on has changed or gone", () => {
+    const [mood, warmth] = STAT_EXAMPLES.map(({ stat }) => stat);
+    expect(editConflict([mood, warmth], mood)).toBeUndefined();
+    // Someone else's change to another state is not this form's conflict.
+    expect(
+      editConflict([mood, { ...warmth, description: "Changed." }], mood),
+    ).toBeUndefined();
+    expect(
+      editConflict([{ ...mood, description: "Changed." }, warmth], mood),
+    ).toBe("changed");
+    expect(editConflict([warmth], mood)).toBe("deleted");
   });
 });

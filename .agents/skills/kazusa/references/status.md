@@ -151,10 +151,11 @@ reads a process-wide copy of each character's outfit entry, filled at
 - **Store**: `"stats"`, one `StatRecord` per character or player,
   `{ own: { [name]: entry }, toward: { [otherId]: { [name]: entry } } }`, and
   the world's under the key `world`. An entry is `{ value, at, by }`; no entry
-  means `initial`, and an entry the definition can no longer hold reads as
-  `initial` (`statValue`). Deleting a definition keeps its values. Changes to
-  one record queue process-wide (`kazusa.stats.queues`). Never Markdown, never a
-  ledger.
+  means `initial`. An entry is read through the definition as it is now
+  (`statValue`): a number is kept within the range, so 40 under a `max` lowered
+  to 30 reads as 30, and a word the choice no longer has reads as `initial`.
+  Deleting a definition keeps its values. Changes to one record queue
+  process-wide (`kazusa.stats.queues`). Never Markdown, never a ledger.
 - **`changes` on `start_task`** (`changesParameter`, worded by
   `kazusa-tools#start_task.changes`): required while the character has a state
   they set themselves, `{}` for none (an optional parameter is never filled),
@@ -163,7 +164,9 @@ reads a process-wide copy of each character's outfit entry, filled at
   enum, like `afterwards`. A value the state can't hold, a state that isn't
   theirs or an unchanged value is dropped, never refused. A real change adds
   `kazusa-results#state-changed` to the ledger row and `states` to its journal
-  payload. Not on `delay_task`.
+  payload, both with the value as written: a change is worked out again inside
+  the record's queue, so `-3` after another `-3` reports 14, not the 17 it stood
+  to be when the call was checked. Not on `delay_task`.
 - **`change_state`** (`{ name, value }`, worded by `kazusa-tools#change_state`):
   the same states, in the middle of an activity. Absent for a character with
   none. Says what is wrong with a value it can't hold, or that nothing changed.
@@ -193,10 +196,16 @@ reads a process-wide copy of each character's outfit entry, filled at
   changed since (another session, the system agent, an edit by hand), so it
   never undoes a change it did not see. The client reads again and asks the user
   to save again. A Gateway started before this gives no `revision`, and its
-  saves go unchecked. It takes only what a write changed from that write's
-  response, and makes a whole read outside SWR with the record events that
-  arrived meanwhile put back on top (`apps/web/lib/source/stats/sync.ts`): a
-  patch to an SWR cache drops a read of it under way.
+  saves go unchecked. The revision does not cover a form left open: the page
+  follows the stream while the form keeps what it opened on, so the form is
+  refused when the state it opened on has changed or gone since
+  (`editConflict`). The client takes only what a write changed from that write's
+  response, and not even that when the stream changed the same thing while the
+  request was out (`afterStatSet`, `afterStatCatalog`: it reads again if the two
+  differ). It makes a whole read outside SWR with the record events that arrived
+  meanwhile put back on top (`apps/web/lib/source/stats/sync.ts`): a patch to an
+  SWR cache drops a read of it under way. A read that fails is tried again by
+  itself, a few times with longer waits (`RETRY_MS`).
 - **Changes in order**: a change worked out from where a value stands (a signed
   number, a step up or down) is worked out inside that subject's write queue
   (`apply` in `stats/register.ts`), so two at once each start from the other's
