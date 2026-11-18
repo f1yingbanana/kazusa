@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { newPlaceDir, placeDirs } from "../wiki-layout.ts";
 import YAML from "yaml";
 import { z } from "zod";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import type { Place, WorldMap } from "./map.ts";
 
-/** Personal wiki place cards: `<workspace>/wiki/entities/places/<id>.md`. */
+/** Personal wiki place cards: their page on a place, in either layout. */
 const PLACE_CARD = z.object({
   place_id: z.string().optional(),
   aliases: z.array(z.string()).default([]),
@@ -18,27 +19,31 @@ export interface PlaceCard {
 }
 
 const cardsDir = (workspaceDir: string): string =>
-  path.join(workspaceDir, "wiki", "entities", "places");
+  newPlaceDir(path.join(workspaceDir, "wiki"));
 
 /** The character's mental map. Unreadable cards are skipped, never fatal. */
 export async function readPlaceCards(
   workspaceDir: string,
   warn: (message: string) => void,
 ): Promise<PlaceCard[]> {
-  const dir = cardsDir(workspaceDir);
-  let files: string[];
-  try {
-    files = (await fs.readdir(dir)).filter((file) => file.endsWith(".md"));
-  } catch (error: unknown) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT")
-      return [];
-    throw error;
+  const files: string[] = [];
+  for (const dir of placeDirs(path.join(workspaceDir, "wiki"))) {
+    try {
+      for (const file of await fs.readdir(dir))
+        if (file.endsWith(".md")) files.push(path.join(dir, file));
+    } catch (error: unknown) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT")
+        continue;
+      throw error;
+    }
   }
+  // Their pages on anything: the map keeps those on its places.
   const cards = await Promise.all(
-    files.sort().map(async (file): Promise<PlaceCard | undefined> => {
+    files.sort().map(async (filePath): Promise<PlaceCard | undefined> => {
+      const file = path.basename(filePath);
       try {
         const { data } = readFrontmatter(
-          await fs.readFile(path.join(dir, file), "utf8"),
+          await fs.readFile(filePath, "utf8"),
           PLACE_CARD,
         );
         return {

@@ -13,6 +13,7 @@ import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { PLACE_FRONTMATTER } from "./map.ts";
 import {
   removePlacePages,
+  renameCards,
   renamedText,
   renamePlacePages,
   withoutPlace,
@@ -125,7 +126,6 @@ describe("place page files", () => {
       wikiDir: dir,
       id: "club",
       file: path.join(dir, "entities/places/club_copy.md"),
-      trashDir: path.join(dir, ".trash"),
       cwd: dir,
     });
     expect(removed.changed).toEqual([]);
@@ -159,5 +159,85 @@ describe("place page files", () => {
       }),
     ).toThrow("can't be a place id");
     expect(existsSync(path.join(dir, "entities/places/club.md"))).toBe(true);
+  });
+});
+
+describe("a place called something new", () => {
+  it("gives each character's card for it the new name, and nothing else", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kazusa-cards-"));
+    try {
+      const card = path.join(root, "amy", "wiki", "concepts", "club.md");
+      mkdirSync(path.dirname(card), { recursive: true });
+      writeFileSync(
+        card,
+        "---\nplace_id: club\nname: Club Room\n---\n\nname: not this line.\n",
+      );
+      const changed = renameCards({
+        workspaces: [path.join(root, "amy"), path.join(root, "bea")],
+        id: "club",
+        name: "Sweets Club Room",
+        cwd: root,
+      });
+      expect(changed).toEqual(["amy/wiki/concepts/club.md"]);
+      expect(readFileSync(card, "utf8")).toBe(
+        '---\nplace_id: club\nname: "Sweets Club Room"\n---\n\nname: not this line.\n',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("renaming a place that is also a group", () => {
+  it("carries who is in it and who knows through it", () => {
+    const text =
+      "---\nname: Amy\nhome: club\nin:\n  club: close\n  trinity: knows\nknown: { club: knows, everyone: heard of }\n---\n\nIn the [[club]].\n";
+    expect(renamedText(text, { club: "sweets_club" })).toBe(
+      "---\nname: Amy\nhome: sweets_club\nin:\n  sweets_club: close\n  trinity: knows\nknown: { sweets_club: knows, everyone: heard of }\n---\n\nIn the [[sweets_club]].\n",
+    );
+  });
+});
+
+describe("a place saved as no place any more", () => {
+  it("keeps its page and links, and mends the map around it", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "kazusa-unplace-"));
+    try {
+      const write = (file: string, text: string) => {
+        mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+        writeFileSync(path.join(dir, file), text);
+      };
+      write(
+        "concepts/annex.md",
+        "---\nplace_id: annex\nname: Annex\n---\n\n# Annex\n",
+      );
+      write(
+        "concepts/club.md",
+        "---\nplace_id: club\nname: Club\nparent: annex\n---\n\n# Club\n",
+      );
+      write(
+        "concepts/hall.md",
+        "---\nplace_id: hall\nname: Hall\nconnections:\n  - { to: club, ways: [{ by: walk, minutes: 2 }] }\n---\n\nNext to the [[club]].\n",
+      );
+      write("characters/amy.md", "---\nname: Amy\nhome: club\n---\n\n# Amy\n");
+      const keepAs = "---\nname: Club\ngroup: true\n---\n\n# Club\n";
+      removePlacePages({
+        wikiDir: dir,
+        id: "club",
+        file: path.join(dir, "concepts/club.md"),
+        keepAs,
+        cwd: dir,
+      });
+      expect(readFileSync(path.join(dir, "concepts/club.md"), "utf8")).toBe(
+        keepAs,
+      );
+      const hall = readFileSync(path.join(dir, "concepts/hall.md"), "utf8");
+      expect(hall).toContain("[[club]]");
+      expect(hall).not.toContain("to: club");
+      expect(
+        readFileSync(path.join(dir, "characters/amy.md"), "utf8"),
+      ).toContain("home: annex");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

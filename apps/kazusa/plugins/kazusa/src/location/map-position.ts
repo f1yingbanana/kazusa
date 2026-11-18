@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { hasPlace, placeDirs } from "../wiki-layout.ts";
 import type { PlacePositions } from "@kazusa/client";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { PLACE_FRONTMATTER } from "./map.ts";
@@ -49,12 +50,19 @@ export async function writePositions(
   wikiDir: string,
   positions: PlacePositions["positions"],
 ): Promise<number> {
-  const dir = path.join(wikiDir, "entities", "places");
-  const files = (await readdir(dir)).filter((file) => file.endsWith(".md"));
+  const targets = (
+    await Promise.all(
+      placeDirs(wikiDir).map(async (dir) =>
+        (await readdir(dir))
+          .filter((file) => file.endsWith(".md"))
+          .map((file) => path.join(dir, file)),
+      ),
+    )
+  ).flat();
   let written = 0;
-  for (const file of files) {
-    const target = path.join(dir, file);
+  for (const target of targets) {
     const text = await readFile(target, "utf8");
+    if (!hasPlace(text)) continue;
     const { data } = readFrontmatter(text, PLACE_FRONTMATTER);
     const position = positions[data.place_id];
     if (!position) continue;

@@ -11,14 +11,21 @@ people and places without being asked, can try to remember or look something up,
 holds beliefs that may be wrong and says where they came from, and sorts the day
 out in their sleep. The world's author edits Markdown and nothing else.
 
-**Changed 2026-11-19 (one page per character):** a character's World Wiki page
-is who they are, read whole on their turns in place of `IDENTITY.md` and
-`SOUL.md` (no longer read); their inner voice is a section `Known by:` them.
-`groups` (a list, or `{ <group>: close | member }`) replaces `community`, the
-world-configured `memory.anchors` (deprecated, ignored) and the default
+**Changed 2026-11-19 (one page per character, who knows in levels):** a
+character's World Wiki page is who they are, read whole on their turns in place
+of `IDENTITY.md` and `SOUL.md` (no longer read); their inner voice is a section
+`Known by:` them, the only `Known by:` there is. Who knows any page is one
+field, `known`: each group and how well its members know it (`heard of`,
+`knows`, `close`), with `everyone` for every character (§3.3). Only a group (a
+page with `group: true`) can know a page. It replaces `renown`, `known_by`,
+`community`, the world-configured `memory.anchors` (deprecated, ignored) and the
 `club`/`school` fields; `knows`, `title` and `full_name` are gone (`name`,
-`aliases`). Read older mentions below in that light; `scripts/one-page.mjs`
-converts a world.
+`aliases`). A secret only some others know goes in each of their own wikis. Read
+older mentions below in that light. An older world (pages under `entities/`) is
+read the older way (`memory/legacy.ts`, deprecated), its characters'
+`IDENTITY.md` and `SOUL.md` included, until it updates to a release of its
+template in the two-folder layout (`world_update` moves every page and folds the
+cards into the pages). There is no upgrade by hand.
 
 ## 0. Principles applied
 
@@ -46,7 +53,7 @@ converts a world.
 
 | What a real person does                                                          | Kazusa                                                                                                                                    |
 | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Knows their own club and dorm inside out, their school well, rivals by name only | **Depth** from anchors (club, home, school) and the page's renown (§3.3).                                                                 |
+| Knows their own club and dorm inside out, their school well, rivals by name only | **Depth** from the groups a page names, how well each knows it, and home (§3.3).                                                          |
 | Recognizes a face or a place instantly, with feelings attached                   | **Prefetch**: retrieval before every brain turn, no tool call (§7.2).                                                                     |
 | Sees what is actually there, and notices when it changed                         | **Contact**: the world page of what they stand in or face, and its dated changes since they last saw it (§7.3).                           |
 | Has something on the tip of the tongue                                           | `recall`.                                                                                                                                 |
@@ -87,27 +94,28 @@ Naps shorter than `memory.sleep.minMinutes` (default 180) don't consolidate.
 
 ```text
 shared/wiki/                          WORLD WIKI (canon; author and ARONA write)
-├── concepts/<id>.md                  lore, institutions, communities (schools, clubs)
-├── entities/places/<id>.md           the map (Location)
-└── entities/characters/<id>.md       roster: home, school, club, knows
+├── characters/<id>.md                the cast: who they are, `in`, `home`
+└── concepts/<id>.md                  everything else: lore, groups (`group: true`),
+                                      places (`place_id` and the map's fields)
 
 workspaces/<agent_id>/                PERSONAL (the character's mind)
 ├── (who they are: their World Wiki page; SOUL.md and IDENTITY.md are not read)
 ├── MEMORY.md                         always loaded: who I am lately, goals, plans
 └── wiki/
-    ├── entities/characters/<id>.md   people (same id as the world card)
-    ├── entities/places/<id>.md       places (same id as the world place)
-    ├── concepts/<id>.md              views on world concepts, or their own
+    ├── characters/<id>.md            people (same id as the world page)
+    ├── concepts/<id>.md              places and views on world concepts, or their own
     └── days/<YYYY-MM-DD>.md          one per sim day, written in sleep
 
 .state/kazusa/memory-vectors.sqlite   embeddings (cache, rebuildable)
 ```
 
 A page's id is its filename. A personal page with the same id as a world page is
-the character's view of that thing; one with no world counterpart is the
-character's own concept ("Natsu's romance theory"). Removed: `memory/` (diaries
-become `days/`), `memory/relationships/` (moves to `entities/characters/`),
-`reports/`, `syntheses/`, and the YAML `claims:` schema.
+the character's annotation of that thing: what they think of it and what they
+noted, never a copy of the world page, which they read alongside it; one with no
+world counterpart is the character's own concept ("Natsu's romance theory").
+Removed: `memory/` (diaries become `days/`), `memory/relationships/` (moves to
+`entities/characters/`), `reports/`, `syntheses/`, and the YAML `claims:`
+schema.
 
 ### 3.2 Page anatomy
 
@@ -120,47 +128,60 @@ detail in the prompt:
 | L1    | the lead: text between the H1 and first `##`  | familiar       |
 | L2    | `##` sections                                 | intimate       |
 
+**Two folders, components, links (2026-11-20).** A wiki has two folders:
+`characters/` (the cast, each tied to an agent workspace) and `concepts/`
+(everything else). What a concept is comes from its components, its fields, not
+its folder, so a school is one page that is both a place and a group:
+
+| Component | Fields                                                                             | Makes it                                  |
+| --------- | ---------------------------------------------------------------------------------- | ----------------------------------------- |
+| place     | `place_id`, `parent` (its area), `entry_minutes`, `connections`, `map`, `backdrop` | somewhere to be, on the map               |
+| group     | `group: true`                                                                      | something people are in, that knows pages |
+
+There are no other relations in front matter: a club's school, a rival, an
+event's cast are `[[id]]` or `[[id|words]]` links anywhere in the text. They are
+the knowledge graph, read in tiers: a character follows a link only from a part
+of the page they can see (the summary if they have heard of it, the opening if
+they know it, the sections if they are close). A place's area is also an edge.
+
 **World page:**
 
 ```markdown
 ---
-summary: Gehenna's student disciplinary body; feared and overworked.
-aliases: [Prefects, the Prefect Team]
-groups: [gehenna_academy] # what it belongs to, the nearest first
-renown: known # how far its name travels: private | local | known | famous
+summary: The academy's night patrol; feared and overworked.
+aliases: [the Watch, Night Watch]
+group: true
+known: # who knows it, and how well: heard of | knows | close
+  everyone: heard of
+  northgate_academy: knows
 ---
 
-# Prefect Team
+# Night Watch
 
-Everyone in Gehenna knows them: armbands, patrols, Hina at the head… (L1)
+The patrol of [[northgate_academy|Northgate]]: lanterns, armbands, a captain who
+never sleeps… (L1)
 
 ## Inner workings
 
-Shift rotations, the budget fights with Pandemonium Society… (L2)
-
-## Ako's ledger
-
-Known by: hina-sorasaki, ako-amau
-
-Only these two know it exists…
-
-## History
-
-- 2026-10-24 — Hina suspends all patrols after the riot.
-- 2026-10-25 · news — The suspension is announced on the school portal.
+Shift rotations, the budget fights with [[student_council]]… (L2)
 ```
 
-- `Known by:` as the first line of a section restricts that section to the
-  listed characters, whatever their depth. In front matter, `known_by` does the
-  same for the whole page.
+A character's page names the groups they are in and how involved:
+`in: { night_watch: close, northgate_academy: knows }` (`heard of` is an
+associate). Involvement caps what they get through a group: a page a group knows
+`close` reaches its close members whole, its members to the opening, its
+associates to the summary. Two members know each other as well as the less
+involved of them, and their prompt says it is "through" that group; `known` adds
+others (`everyone: knows` for a public figure, `harbor_college: heard of` for a
+rival school). Only a group can be named in `known` or `in`. Someone's groups
+show on their entry ("In: Northgate Academy, Night Watch") to whoever knows the
+group (`knows` or closer), so page text needn't repeat them; a group known only
+by name keeps its members to itself (older worlds: never shown).
+
 - `## History` holds dated in-world events (§3.4). Undated edits anywhere else
   are retcons.
-- Group pages are concepts with `groups` too: a club names its school, a school
-  names the world root. Places inherit groups from their `parent` chain, so only
-  a campus root needs them.
-- World character cards: `home`, `school`, `club` (names or ids, resolved
-  through aliases), optional `knows: { black_market: familiar }`. Their lead is
-  what anyone who sees them notices.
+- World character cards: `groups` (the groups that know them, and so the groups
+  they are in) and `home`. Their lead is what anyone who sees them notices.
 
 **Personal page:**
 
@@ -204,27 +225,21 @@ My go-to for strawberry milk after club. Lately I'm not sure it'll last.
 `depth(character, worldPage)` is one of `none < heard of < familiar < intimate`,
 computed in code as the **highest** of:
 
-1. **Anchors** from the character's own page. A page is under an anchor if the
-   anchor is the page itself or appears on its `parent`/`groups` chain.
-
-   | Anchor                             | Depth    |
-   | ---------------------------------- | -------- |
-   | a group in their `groups`          | familiar |
-   | a group they are `close` in        | intimate |
-   | home area (the `parent` of `home`) | intimate |
-
-   An explicit `renown: local` means its nearest group (the first) only: being
-   in the same company does not reach another team's `local` project.
-
-2. **Renown** for everyone else: `private` and `local` give none, `known` gives
-   heard of, `famous` gives familiar. Defaults: places `local`, characters
-   `local`, concepts `known`.
-3. **`known_by`** (page) gives intimate.
+1. **The page's groups.** Each entry of its `groups` reaches the members of that
+   group: `heard of` gives heard of, `knows` familiar, `close` intimate.
+   `everyone` reaches every character.
+2. **Membership.** A character is in every group their own page lists at `knows`
+   or `close`; a group that has only heard of them doesn't make them its own.
+   They know that group's page as well as their entry says.
+3. **Home**: their `home`, the place it is in and everything in that give
+   intimate, except someone else's home that no group knows (their own room).
 4. **Experience**: having a personal page with that id gives at least familiar
    (they've been there or met them).
 
-`private` pages ignore anchors and renown: only `known_by`, residents (`home`)
-and experience reach them. Use it for dorm rooms and hideouts.
+A page with no `groups` (a dorm room, a hideout) is known only to those who live
+there or around it, and to those who have been there. The Wiki shows each page's
+groups at the top, with who in the cast is in a group (`GET /kazusa/wiki/reach`
+gives the names for each depth and a group's members).
 
 Depth gates what is eligible for prefetch, `recall` and `look_up`, and the
 deepest layer shown. Contact (§7.3) is separate: standing in a place shows it
@@ -276,26 +291,29 @@ world and workspaces are tracked in git, so every edit has a diff and history.
 
 **Create a new world**
 
-1. Community pages in `concepts/`: the world root, then schools
-   (`community: <root>`), then clubs (`community: <school>`).
-2. The map in `entities/places/` (see `location.md` §4.1). Set `community` on
-   each campus root; rooms inherit it. Mark homes `renown: private`.
-3. Character cards in `entities/characters/`: `home`, `school`, `club`, and a
-   lead describing what people see.
-4. Lore in `concepts/`: `summary`, `community`, `renown`. Put what outsiders
-   would know in the lead and insider detail in `##` sections.
+1. The world's root page in `concepts/`, then its groups there (`group: true`):
+   schools, their clubs, each with the `known` that say who knows it
+   (`everyone: heard of` for a school anyone has heard of).
+2. The map in `concepts/` (see `location.md` §4.1), each place with the groups
+   that know it. Homes list none.
+3. Character pages in `characters/`: `in` (a club `close`, a school `knows`: the
+   groups they are in and how involved), `home`, and an opening saying what
+   people see.
+4. Lore in `concepts/`: `summary`, `known`, and `[[links]]` to what it relates
+   to. Put what outsiders would know in the opening and insider detail in `##`
+   sections.
 5. Check lint (Gateway log, client Wiki panel, or ask ARONA).
 6. Ask ARONA to seed each character (§5).
 
 **Add a concept, place or person mid-run.** Drop the file in. It reaches
 characters at their depth immediately, as if it always existed.
 
-**Make something exclusive.** A `##` section starting `Known by: a, b`, or
-`renown: private` with `known_by` on the page.
+**Make something exclusive.** Narrow its `groups` to those who know it, or leave
+them out so only those who live there or have been there know it. A secret a few
+people share goes in each of their own wikis.
 
-**Give someone an unusual background.** `knows:` on their world card
-(`knows: { black_market: familiar, sukeban_gangs: intimate }`). Describe the
-person; the rule applies it everywhere.
+**Give someone an unusual background.** Write it into their own wiki: a personal
+page on the black market makes it familiar to them.
 
 **Something happens in the world.** Add a dated line under `## History`; add
 `· news` if it is public announcement. Characters discover it by being there or
@@ -307,12 +325,12 @@ also have always believed it, edit their notes or ask ARONA to sweep (§5).
 **Retcon what a character believes.** Edit their page: lead, notes or open
 threads. Your edit wins over any concurrent write, and sleep builds on it.
 
-**Plant a common misconception.** A section on the world page, e.g.
-`## What people say`, with `Known by:` or a narrower page. Characters at that
-depth read it as what they know; the canon sections stay hidden.
+**Plant a common misconception.** Say it in the lead or summary, which those who
+merely know of it read, and keep the truth in a section only those close to it
+get; or seed it as a note in the believers' own wikis.
 
 **Check what someone knows.** The explainer: pick a character and a page to see
-depth and why ("familiar: same school; renown known"), or a character alone for
+depth and why ("familiar: northgate_academy: knows"), or a character alone for
 their footprint ("38 intimate, 120 familiar, 300 heard of"). Client Wiki panel,
 or ask ARONA (`knowledge_explain`).
 
@@ -349,7 +367,7 @@ her tools of her own, allowlisted for her only:
    - misconceptions (`think so`, `suspect`) and secrets they hold.
 
    Notes are dated at world start with source `always known`. Never copy world
-   text; never give them a page they couldn't know (check depth or `known_by`).
+   text; never give them a page they couldn't know (check depth).
 
 4. Write `MEMORY.md`: lately, goals, plans.
 5. `wiki_lint`, spot-check with `knowledge_explain`, and `world_audit`: nobody
@@ -359,10 +377,9 @@ her tools of her own, allowlisted for her only:
 
 **Backfill the current world** (one-off, phase 2)
 
-- World: add `summary` to every concept; infer `community` from the schools a
-  page links or mentions and list the ambiguous ones for Sensei; set `renown`;
-  move character cards' `## Public Background` into the lead; mark homes
-  `private`.
+- World: add `summary` to every concept; infer `groups` from the schools a page
+  links or mentions and list the ambiguous ones for Sensei; move character
+  cards' `## Public Background` into the lead; give homes no `groups`.
 - Personal: move `memory/relationships/*.md` into `wiki/entities/characters/`;
   move root-level pages into `concepts/`; convert interaction logs into notes;
   replace number fields with `relation`; turn `memory/*.md` diaries into
@@ -402,7 +419,7 @@ when you were last here.").
 | Tool                                              | Does                                                                                                                                       |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `recall(query)`                                   | Searches their own wiki, days and `MEMORY.md`, plus world pages at their depth. Returns L1, labelled "yours" or "everyone knows".          |
-| `look_up(topic)`                                  | Searches world pages with renown `known` or `famous`, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.                    |
+| `look_up(topic)`                                  | Searches world pages `everyone` has heard of, up to L1. Recorded in `:tasks` so sleep can keep it as `read it`.                            |
 | `remember(about, note, source?, certainty?, on?)` | Appends one dated note now. `about` is a name or id (someone new starts a page) or `me` (`MEMORY.md`, under `## Plans recorded for <on>`). |
 
 **Conventions** (`context-conventions`, about 120 tokens): people and things you
@@ -451,8 +468,8 @@ Runs in `assemble()` for the brain and, without the semantic signal, in the
 decision context for Perception.
 
 1. **Eligible set**: the character's personal pages, plus world pages at depth
-   heard of or above (sections filtered by `Known by:`; `## History` lines only
-   if seen, told or `news`).
+   heard of or above (never a part `Known by:` its own character; `## History`
+   lines only if seen, told or `news`).
 2. **Signals**, each producing a ranked list:
 
    | Signal      | Input                                                                                                                                   |
@@ -461,7 +478,7 @@ decision context for Perception.
    | Mentions    | alias matches in the stimulus, the last ledger records, the task description                                                            |
    | Keywords    | BM25 over what they think about (below); a page only keywords found must share two query words (half of them if merely heard of)        |
    | Semantic    | embedding of what they think about (one provider call per brain turn: later builds reuse it)                                            |
-   | Graph       | one hop from seeds and mentions; personal edges before world edges                                                                      |
+   | Graph       | one hop from seeds and mentions: their own links first, then what it is part of (`parent`), a person's groups, its links, its parts     |
    | News        | `· news` from the last 3 sim days on pages they could know (2 at most)                                                                  |
    | Salience    | open threads, recent `seen`/notes (sim time), today's day page                                                                          |
    | Familiarity | what the other signals found, by familiarity (`familiarity.ts`); a prior that never adds a page                                         |
@@ -477,8 +494,9 @@ decision context for Perception.
 
 3. **Fuse** by weighted reciprocal rank; seeds are pinned.
 4. **Group by id**: a personal page and the world page with the same id are one
-   entity. The personal page leads; world text fills in only where the personal
-   page has no lead (a Location stub), at the character's depth.
+   entity, rendered as the world page at the character's depth (its opening if
+   familiar, else its summary), its groups, then "Your view:" with the personal
+   lead (2026-11-19: the personal page used to replace the world text).
 5. **Render by tier** under `memory.maxTokens` (replaces
    `personalWikiMaxTokens`/`Articles`): top entities at L1 with open threads and
    the newest notes, the next ones as L0 in an "Also:" line. **People you know**
@@ -649,8 +667,8 @@ own, and it never changes depth.
 their view in their own voice, what they guess the other thinks of them, open
 threads and dated notes. Depth (§3.3) decides how much of the canon they see;
 having a personal page makes it at least familiar. Public figures and a player
-the whole cast knows get `renown: known` or `famous` on their world card, so
-everyone has at least heard of them.
+the whole cast knows get `everyone: heard of` or `everyone: knows` in the
+`groups` on their world card.
 
 **What comes to mind** is retrieved from what they perceived (§7.2): the lines
 of the delivery, never Kazusa's wording around them. A check-in perceives
@@ -700,8 +718,7 @@ and `references/context_engine.md`.
    off dreaming and the `session-memory` hook.
 2. **Format and depth**: parser, lint, depth, `knowledge_explain`, `wiki_lint`,
    the explain/lint read models.
-3. **Backfill** (ARONA, §5): world `summary`/`community`/`renown`; personal
-   migrations.
+3. **Backfill** (ARONA, §5): world `summary`/`groups`; personal migrations.
 4. **Index and retrieval**: SQLite index, watcher, lexical + graph signals,
    replacing `readPersonalWiki` and Places-you-know relevance; the roster; an
    evaluation set from situation snapshots with expected pages (that record was

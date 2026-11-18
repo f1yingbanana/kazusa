@@ -126,6 +126,8 @@ export interface WorldMap {
   readonly children: ReadonlyMap<string, readonly string[]>;
   readonly edges: ReadonlyMap<string, readonly Edge[]>;
   readonly problems: readonly MapProblem[];
+  /** Every World Wiki page's name by id, for `[[links]]` in what is shown. */
+  readonly names?: ReadonlyMap<string, string>;
 }
 
 const byName =

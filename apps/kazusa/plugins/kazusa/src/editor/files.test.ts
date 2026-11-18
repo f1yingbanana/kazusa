@@ -56,16 +56,14 @@ describe("a picture the Wiki takes", () => {
     ).toBeUndefined();
   });
 
-  it("replaces one of the same name in another type, keeping it in the trash", () => {
+  it("replaces one of the same name in another type, and deletes for good", () => {
     const root = dir();
     const looks = path.join(root, "portraits");
-    const trash = path.join(root, "trash");
-    putPicture(looks, "happy", PNG, "png", trash);
-    expect(putPicture(looks, "happy", WEBP, "webp", trash)).toBe("happy.webp");
+    putPicture(looks, "happy", PNG, "png");
+    expect(putPicture(looks, "happy", WEBP, "webp")).toBe("happy.webp");
     expect(readdirSync(looks)).toEqual(["happy.webp"]);
-    expect(readdirSync(trash)).toEqual(["happy.png"]);
-    expect(removePicture(looks, "happy", trash)).toBe(1);
+    expect(removePicture(looks, "happy")).toBe(1);
     expect(existsSync(path.join(looks, "happy.webp"))).toBe(false);
-    expect(removePicture(looks, "sad", trash)).toBe(0);
+    expect(removePicture(looks, "sad")).toBe(0);
   });
 });

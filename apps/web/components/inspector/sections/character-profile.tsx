@@ -2,6 +2,7 @@
 
 import { useCharacter, useCharacterDetail } from "@/hooks/use-characters";
 import type { EntityRef } from "@/lib/state/entity-ref";
+import { RichText } from "@/components/views/wiki/page-link";
 
 function Row({
   label,
@@ -73,5 +74,5 @@ export function CharacterProfileSection({ entity }: { entity: EntityRef }) {
 /** Folded: the one line that says most about who they are. */
 export function CharacterProfileSummary({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id);
-  return character?.summary ? <>{character.summary}</> : null;
+  return character?.summary ? <RichText text={character.summary} /> : null;
 }

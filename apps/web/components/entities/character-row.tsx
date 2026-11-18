@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { PresenceAvatar } from "./presence-avatar";
 import { Badge } from "@/components/ui/badge";
 import { taskIcon } from "./task-icon";
+import { usePlainText } from "@/components/views/wiki/page-link";
 
 const KIND_LABEL = {
   agent: "Simulated",
@@ -45,6 +46,7 @@ export const CharacterRow = memo(function CharacterRow({
     character.kind === "agent" ? character.id : undefined,
   );
   const now = useSimNow();
+  const plain = usePlainText();
   const offstage = status?.onstage === false;
   const task = offstage ? undefined : status?.task;
   const TaskIcon = taskIcon(task?.type);
@@ -56,8 +58,12 @@ export const CharacterRow = memo(function CharacterRow({
     : task
       ? task.description
       : character.kind === "agent"
-        ? (character.summary ?? "No current task")
-        : (character.summary ?? KIND_LABEL[character.kind]);
+        ? character.summary
+          ? plain(character.summary)
+          : "No current task"
+        : character.summary
+          ? plain(character.summary)
+          : KIND_LABEL[character.kind];
 
   return (
     <div

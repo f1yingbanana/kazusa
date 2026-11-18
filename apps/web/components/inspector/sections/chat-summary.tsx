@@ -28,6 +28,7 @@ import {
   RemoveButton,
   RemoveConfirm,
 } from "./chat-controls";
+import { usePlainText } from "@/components/views/wiki/page-link";
 
 const TYPE_LABEL = {
   direct: "Direct message",
@@ -41,6 +42,7 @@ const TYPE_LABEL = {
  * add or remove people, or leave.
  */
 export function ChatSummarySection({ entity }: { entity: EntityRef }) {
+  const plain = usePlainText();
   const [queryState, setParams] = useQueryStates({
     view: parseAsString,
     "chats.id": chatsParsers["chats.id"],
@@ -118,7 +120,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
                 <span
                   role="button"
                   tabIndex={0}
-                  title={place.summary}
+                  title={plain(place.summary)}
                   onClick={showPlace}
                   onKeyDown={(event) => {
                     if (event.key !== "Enter" && event.key !== " ") return;

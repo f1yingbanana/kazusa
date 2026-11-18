@@ -1,7 +1,7 @@
 import { currentConfig } from "../current-config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
+import { characterFile } from "../wiki-layout.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
@@ -12,7 +12,6 @@ import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
 import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
-import { resolveStateDir } from "../state-dir.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
 import { openTaskStore } from "../taskman/store.ts";
@@ -91,14 +90,15 @@ export interface PlaceEdits {
     to: string,
   ) => Promise<{ readonly changed: readonly string[] }>;
   /**
-   * Removes a place's page (kept in `kazusa/wiki-trash` in the state folder).
-   * What was in it moves up to its area, connections to it go, and whoever was
-   * there is put in its area.
+   * Deletes a place's page for good. What was in it moves up to its area,
+   * connections to it go, and whoever was there is put in its area.
    */
   readonly remove: (
     id: string,
     /** The page, when two say the same `place_id`. */
     file?: string,
+    /** The page as it stays, no longer a place; else it is deleted. */
+    keepAs?: string,
   ) => Promise<{
     readonly changed: readonly string[];
     readonly relocated: readonly Relocated[];
@@ -265,8 +265,6 @@ export function registerLocation(
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluate?: JudgeDeps["evaluate"];
-    /** Where removed pages go; absent: `kazusa/wiki-trash` in the state folder. */
-    readonly trashDir?: string;
   },
 ): LocationService {
   const getConfig = () => currentConfig(api);
@@ -734,13 +732,7 @@ export function registerLocation(
     const workspace = workspaceOf(observer);
     const impressionOf = (id: string): string | null => {
       if (!workspace) return null;
-      const card = path.join(
-        workspace,
-        "wiki",
-        "entities",
-        "characters",
-        `${id.replace(/^user:/u, "")}.md`,
-      );
+      const card = characterFile(path.join(workspace, "wiki"), id);
       return existsSync(card) ? excerpt(readFileSync(card, "utf8"), 600) : null;
     };
     const judgment = await judge(judgeWith(observer, "notice"), {
@@ -933,7 +925,9 @@ export function registerLocation(
     agentId: string,
     evidence: string,
   ): Promise<PlaceKnowledge> => {
-    const cards = await cardsOf(agentId);
+    const cards = (await cardsOf(agentId)).filter(({ placeId }) =>
+      map.places.has(placeId),
+    );
     const workspace = workspaceOf(agentId);
     const memory = workspace
       ? ((await readCharacterFiles(workspace, undefined)).memory ?? "")
@@ -1083,21 +1077,12 @@ export function registerLocation(
       await repairing;
       return { changed };
     },
-    remove: async (id, file) => {
+    remove: async (id, file, keepAs) => {
       const { changed } = removePlacePages({
         wikiDir: config.wikiDir,
         id,
         ...(file === undefined ? {} : { file }),
-        trashDir: path.join(
-          deps.trashDir ??
-            path.join(
-              resolveStateDir(process.env, homedir()),
-              "kazusa",
-              "wiki-trash",
-            ),
-          new Date().toISOString().replace(/[:.]/g, "-"),
-          "world",
-        ),
+        ...(keepAs === undefined ? {} : { keepAs }),
         cwd: process.cwd(),
       });
       currentWorld.reload();

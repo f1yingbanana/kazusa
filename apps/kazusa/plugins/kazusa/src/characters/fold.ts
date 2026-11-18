@@ -1,46 +1,49 @@
-#!/usr/bin/env node
 /**
- * Brings a world to one page per character, with only the front matter Kazusa
- * reads:
- *
- * - A character's IDENTITY.md and SOUL.md fold into their World Wiki page, which
- *   their turns read instead: IDENTITY's sections become the page's sections,
- *   SOUL's become sections only they know (`Known by: <id>`). The two files
- *   stay where they are, unread.
- * - On every page, `community`, `club` and `school` become `groups` (a club is
- *   close), `title` becomes `name`, `full_name` an alias, and fields Kazusa
- *   doesn't read move into a `## Details` section, where characters read them.
- *
- *   Node scripts/one-page.mjs <world folder> # says what it would do node
- *   scripts/one-page.mjs <world folder> --write # does it
+ * One page per character, with only the front matter Kazusa reads: a
+ * character's IDENTITY.md and SOUL.md fold into their World Wiki page (SOUL's
+ * parts known only by them), `community`, `club` and `school` become `groups`,
+ * `title` becomes `name`, `full_name` an alias, and fields nothing reads move
+ * into a `## Details` section. `world_update` runs it when a world updates to a
+ * release in the two-folder layout, on both sides, so the creator's cards and
+ * play's changes to them meet on the page.
  */
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
+/** A page's kind, as the fold reads it. */
+export type FoldKind = "person" | "place" | "concept" | "day";
+
+/** A character's IDENTITY.md and SOUL.md texts, when they have them. */
+export interface Card {
+  readonly identity?: string | undefined;
+  readonly soul?: string | undefined;
+}
+
+type Front = Record<string, unknown>;
+
 /** What Kazusa reads, by kind; anything else moves into the text. */
-const READ = {
-  common: ["name", "aliases", "summary", "groups", "renown", "known_by"],
-  person: ["home"],
-  place: [
-    "parent",
-    "backdrop",
-    "place_id",
-    "entry_minutes",
-    "connections",
-    "map",
+const PLACE_FIELDS = [
+  "parent",
+  "backdrop",
+  "place_id",
+  "entry_minutes",
+  "connections",
+  "map",
+];
+const READ: Readonly<Record<FoldKind | "common", readonly string[]>> = {
+  // The two-folder layout's fields too: a page already in it loses nothing.
+  common: [
+    "name",
+    "aliases",
+    "summary",
+    "groups",
+    "renown",
+    "known_by",
+    "known",
+    "group",
   ],
-  concept: ["parent"],
+  person: ["home", "in"],
+  place: PLACE_FIELDS,
+  concept: PLACE_FIELDS,
   day: [],
 };
 
@@ -58,17 +61,20 @@ const DROPPED = new Set([
   "avatarUrl",
 ]);
 
+/** The two files a character's card was. */
+export const CARD_FILES = ["IDENTITY.md", "SOUL.md"] as const;
+
 const OPENING = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
 /** Front matter and body; broken front matter is none. */
-export function split(text) {
+export function split(text: string): { front: Front; body: string } {
   const opening = OPENING.exec(text);
-  let front = {};
+  let front: Front = {};
   if (opening) {
     try {
-      const parsed = YAML.parse(opening[1]);
+      const parsed: unknown = YAML.parse(opening[1]);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
-        front = parsed;
+        front = parsed as Front;
     } catch {
       front = {};
     }
@@ -76,10 +82,18 @@ export function split(text) {
   return { front, body: text.slice(opening?.[0].length ?? 0) };
 }
 
+interface Sections {
+  readonly heading: string | undefined;
+  readonly lead: string;
+  readonly sections: readonly { title: string; text: string }[];
+}
+
 /** A body as its H1, opening and `##` sections, fences left whole. */
-export function sectionsOf(body) {
-  const blocks = [{ title: undefined, lines: [] }];
-  let heading;
+export function sectionsOf(body: string): Sections {
+  const blocks: { title: string | undefined; lines: string[] }[] = [
+    { title: undefined, lines: [] },
+  ];
+  let heading: string | undefined;
   let fenced = false;
   for (const line of body.split(/\r?\n/)) {
     if (/^(```|~~~)/.test(line)) fenced = !fenced;
@@ -94,20 +108,20 @@ export function sectionsOf(body) {
     }
     const opened = fenced ? undefined : /^## +(.+?)\s*$/.exec(line);
     if (opened) blocks.push({ title: opened[1], lines: [] });
-    else blocks.at(-1).lines.push(line);
+    else blocks.at(-1)!.lines.push(line);
   }
   const [lead, ...rest] = blocks;
   return {
     heading,
     lead: lead.lines.join("\n").trim(),
     sections: rest.map((block) => ({
-      title: block.title,
+      title: block.title!,
       text: block.lines.join("\n").trim(),
     })),
   };
 }
 
-const list = (value) =>
+const list = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
     : typeof value === "string"
@@ -117,14 +131,23 @@ const list = (value) =>
           .filter(Boolean)
       : [];
 
-const display = (value) =>
+/** A front matter value as text: a scalar as it reads, anything else as YAML. */
+const asText = (value: unknown): string =>
+  value !== null && typeof value === "object"
+    ? YAML.stringify(value, { lineWidth: 0 }).trim()
+    : String(value);
+
+const isMap = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const display = (value: unknown): string =>
   typeof value === "string"
     ? value
     : Array.isArray(value)
       ? value.map(display).join(", ")
       : YAML.stringify(value, { lineWidth: 0 }).trim();
 
-const label = (key) => {
+const label = (key: string): string => {
   const words = key.replace(/[_-]+/g, " ");
   return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 };
@@ -138,18 +161,23 @@ const label = (key) => {
  * doesn't read, are appended as sections after it; a section the page already
  * has isn't added again.
  */
-export function convertPage(text, kind, id, card) {
+export function convertPage(
+  text: string,
+  kind: FoldKind,
+  id: string,
+  card?: Card,
+): string {
   const { front, body } = split(text);
   const page = sectionsOf(body);
   const identity = card?.identity ? split(card.identity) : undefined;
   const identityBody = identity ? sectionsOf(identity.body) : undefined;
   const soul = card?.soul ? sectionsOf(split(card.soul).body) : undefined;
-  const fields = { ...(identity?.front ?? {}), ...front };
+  const fields: Front = { ...(identity?.front ?? {}), ...front };
 
-  const out = {};
+  const out: Front = {};
   const name =
     fields.name ?? fields.title ?? page.heading ?? identityBody?.heading ?? id;
-  out.name = String(name).trim();
+  out.name = asText(name).trim();
   const fullName =
     typeof fields.full_name === "string"
       ? fields.full_name.replace(/\s*\(([^)]*)\)\s*$/, "").trim()
@@ -165,46 +193,43 @@ export function convertPage(text, kind, id, card) {
         ...list(fields.handle),
         fullName,
         nativeName,
-      ].filter((alias) => alias && alias !== out.name),
+      ].filter(
+        (alias): alias is string => Boolean(alias) && alias !== out.name,
+      ),
     ),
   ];
   if (aliases.length) out.aliases = aliases;
-  if (fields.summary) out.summary = String(fields.summary).trim();
+  if (fields.summary) out.summary = asText(fields.summary).trim();
 
   // Groups: what it belongs to, the nearest first; a person's club is close.
-  const groups = [];
-  const addGroup = (ref, close) => {
-    if (!ref || groups.some((group) => group.ref === ref)) return;
-    groups.push({ ref: String(ref).trim(), close });
+  const groups: { ref: string; how: string | undefined }[] = [];
+  const addGroup = (ref: unknown, how: string | undefined) => {
+    if (!ref || groups.some((group) => group.ref === asText(ref).trim()))
+      return;
+    groups.push({ ref: asText(ref).trim(), how });
   };
-  if (
-    fields.groups &&
-    typeof fields.groups === "object" &&
-    !Array.isArray(fields.groups)
-  )
+  if (isMap(fields.groups))
     for (const [ref, how] of Object.entries(fields.groups))
-      addGroup(ref, how === "close");
-  else for (const ref of list(fields.groups)) addGroup(ref, false);
+      addGroup(ref, String(how));
+  else for (const ref of list(fields.groups)) addGroup(ref, undefined);
   if (kind === "person") {
-    for (const ref of list(fields.club)) addGroup(ref, true);
-    for (const ref of list(fields.school)) addGroup(ref, false);
+    for (const ref of list(fields.club)) addGroup(ref, "close");
+    for (const ref of list(fields.school)) addGroup(ref, "member");
   }
-  for (const ref of list(fields.community)) addGroup(ref, false);
+  for (const ref of list(fields.community)) addGroup(ref, "member");
   if (groups.length)
-    out.groups = groups.some((group) => group.close)
-      ? Object.fromEntries(
-          groups.map(({ ref, close }) => [ref, close ? "close" : "member"]),
-        )
+    out.groups = groups.some((group) => group.how)
+      ? Object.fromEntries(groups.map(({ ref, how }) => [ref, how ?? "member"]))
       : groups.map(({ ref }) => ref);
   if (fields.renown) out.renown = fields.renown;
   if (list(fields.known_by).length) out.known_by = list(fields.known_by);
-  for (const key of READ[kind] ?? [])
+  for (const key of READ[kind])
     if (fields[key] !== undefined && fields[key] !== null)
       out[key] = fields[key];
 
   const handled = new Set([
     ...READ.common,
-    ...(READ[kind] ?? []),
+    ...READ[kind],
     "title",
     "full_name",
     "handle",
@@ -217,17 +242,17 @@ export function convertPage(text, kind, id, card) {
       ([, value]) => value !== undefined && value !== null && value !== "",
     );
   const old = Object.keys(fields).some(
-    (key) => !READ.common.includes(key) && !(READ[kind] ?? []).includes(key),
+    (key) => !READ.common.includes(key) && !READ[kind].includes(key),
   );
   if (!old && !identityBody && !soul) return text;
 
   // What the card and the unread fields add, after the page's own text.
   const titles = new Set(page.sections.map((section) => section.title));
-  const added = [];
+  const added: string[] = [];
   // Text the page already holds isn't added again, under any heading.
-  const flat = (words) => words.replace(/\s+/g, " ").trim();
+  const flat = (words: string) => words.replace(/\s+/g, " ").trim();
   const holds = flat(body);
-  const add = (title, words, check = words) => {
+  const add = (title: string, words: string, check = words) => {
     if (!words.trim() || holds.includes(flat(check).slice(0, 120))) return;
     let heading = title;
     for (let n = 2; titles.has(heading); n += 1) heading = `${title} (${n})`;
@@ -249,7 +274,7 @@ export function convertPage(text, kind, id, card) {
       add(section.title, section.text);
   }
   if (soul) {
-    const own = (words) => `Known by: ${id}\n\n${words}`;
+    const own = (words: string) => `Known by: ${id}\n\n${words}`;
     if (soul.lead) add("Inner voice", own(soul.lead), soul.lead);
     for (const section of soul.sections)
       add(
@@ -268,7 +293,7 @@ export function convertPage(text, kind, id, card) {
 
   // The page's own text, untouched but for a heading or opening it lacked.
   let own = body.replace(/^\s+/, "");
-  if (page.heading === undefined) own = `# ${out.name}\n\n${own}`;
+  if (page.heading === undefined) own = `# ${String(out.name)}\n\n${own}`;
   if (lead) {
     const end = own.indexOf("\n", own.indexOf("# ")) + 1 || own.length;
     own = `${own.slice(0, end)}\n${lead}\n${own.slice(end)}`;
@@ -277,96 +302,12 @@ export function convertPage(text, kind, id, card) {
   return `---\n${YAML.stringify(out, { lineWidth: 0 })}---\n\n${own.trimEnd()}${tail}\n`;
 }
 
-function kindOf(relative) {
-  const [first, second] = relative.split(path.sep);
+/** A World Wiki page's kind for the fold, from its path under the wiki. */
+export function foldKind(relative: string): FoldKind {
+  const [first, second] = relative.split(/[\\/]/);
   if (first === "days") return "day";
+  if (first === "characters") return "person";
   if (first === "entities" && second === "places") return "place";
   if (first === "entities" && second === "characters") return "person";
   return "concept";
-}
-
-function pagesIn(dir) {
-  const out = [];
-  const walk = (at) => {
-    for (const entry of readdirSync(at)) {
-      if (entry.startsWith(".")) continue;
-      const full = path.join(at, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (entry.endsWith(".md") && entry !== "INDEX.md") out.push(full);
-    }
-  };
-  if (existsSync(dir)) walk(dir);
-  return out;
-}
-
-/** The character workspaces holding cards, the system agent's aside. */
-export function oldCards(world, systemAgent) {
-  const root = path.join(world, "workspaces");
-  if (!existsSync(root)) return [];
-  return readdirSync(root)
-    .filter((id) => id !== systemAgent && !id.startsWith("."))
-    .filter((id) =>
-      CARD_FILES.some((file) => existsSync(path.join(root, id, file))),
-    );
-}
-
-const CARD_FILES = ["IDENTITY.md", "SOUL.md"];
-
-/**
- * Converts a world folder; returns the pages it changed, writing only with
- * `write`. With `keep`, the original of every page it changes, and every card
- * it folds in, is copied under that folder first, and the cards move there, so
- * the conversion runs once and anything can be put back by hand.
- */
-export function convertWorld(world, write, { keep, systemAgent } = {}) {
-  const wiki = path.join(world, "shared", "wiki");
-  const changed = [];
-  for (const file of pagesIn(wiki)) {
-    const relative = path.relative(wiki, file);
-    const kind = kindOf(relative);
-    const id = path.basename(file, ".md");
-    const workspace = path.join(world, "workspaces", id);
-    const read = (name) => {
-      const at = path.join(workspace, name);
-      return existsSync(at) ? readFileSync(at, "utf8") : undefined;
-    };
-    const card =
-      kind === "person" && id !== systemAgent
-        ? { identity: read("IDENTITY.md"), soul: read("SOUL.md") }
-        : undefined;
-    const before = readFileSync(file, "utf8");
-    const after = convertPage(before, kind, id, card);
-    if (after === before) continue;
-    changed.push(relative);
-    if (!write) continue;
-    if (keep) {
-      const copy = path.join(keep, "shared", "wiki", relative);
-      mkdirSync(path.dirname(copy), { recursive: true });
-      copyFileSync(file, copy);
-    }
-    writeFileSync(file, after);
-  }
-  if (write && keep)
-    for (const id of oldCards(world, systemAgent)) {
-      const aside = path.join(keep, "workspaces", id);
-      mkdirSync(aside, { recursive: true });
-      for (const name of CARD_FILES) {
-        const from = path.join(world, "workspaces", id, name);
-        if (existsSync(from)) renameSync(from, path.join(aside, name));
-      }
-    }
-  return changed;
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [world, flag] = process.argv.slice(2);
-  if (!world || !existsSync(path.join(world, "shared", "wiki"))) {
-    console.error("Usage: node scripts/one-page.mjs <world folder> [--write]");
-    process.exit(1);
-  }
-  const write = flag === "--write";
-  const changed = convertWorld(path.resolve(world), write);
-  console.log(
-    `${write ? "Rewrote" : "Would rewrite"} ${changed.length} pages.${write ? "" : " Run again with --write to do it."}`,
-  );
 }

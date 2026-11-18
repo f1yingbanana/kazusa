@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { homedir } from "node:os";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -31,7 +30,6 @@ import {
 } from "../scene/backdrops.ts";
 import { SCENE_CONFIG } from "../scene/config.ts";
 import { portraitUrl, readPortraits } from "../scene/portraits.ts";
-import { resolveStateDir } from "../state-dir.ts";
 import { declaredOutfits, stickerUrl } from "../stickers/stickers.ts";
 import { readCharacterCard, worldWikiDir } from "../characters/card.ts";
 import {
@@ -40,7 +38,6 @@ import {
   putPicture,
   readText,
   removePicture,
-  trashFor,
   writeTextOver,
   writeWhole,
 } from "./files.ts";
@@ -74,8 +71,7 @@ type StickersFile = {
  * What the Wiki edits beside pages, for the world's owner: a character's
  * MEMORY.md, looks and stickers, and the world's backdrops. Every path is built
  * from a roster id and names `WikiNameSchema` allows, so nothing reaches
- * outside a workspace or the backdrop library. Nothing is deleted: it goes to
- * `<state>/kazusa/wiki-trash/pictures/`.
+ * outside a workspace or the backdrop library.
  */
 export function registerWikiEditor(
   api: OpenClawPluginApi,
@@ -89,12 +85,6 @@ export function registerWikiEditor(
   const { times } = SCENE_CONFIG.parse(api.pluginConfig?.scene ?? {});
   const backdropsDir = backdropsBeside(
     LOCATION_CONFIG.parse(api.pluginConfig?.location ?? {}).wikiDir,
-  );
-  const trashRoot = path.join(
-    resolveStateDir(process.env, homedir()),
-    "kazusa",
-    "wiki-trash",
-    "pictures",
   );
 
   const workspaceOf = (id: string | undefined): string => {
@@ -263,13 +253,7 @@ export function registerWikiEditor(
         throw new Refusal(
           "That isn't a picture the Wiki takes: use WebP, PNG, JPEG, GIF or AVIF.",
         );
-      const file = putPicture(
-        where.dir,
-        where.stem,
-        bytes,
-        type.ext,
-        trashFor(trashRoot, where.scope),
-      );
+      const file = putPicture(where.dir, where.stem, bytes, type.ext);
       sendJson(res, 200, { file });
     }),
   );
@@ -281,11 +265,7 @@ export function registerWikiEditor(
       const payload = WikiRemovePayloadSchema.parse(await readJsonBody(req));
       const name = payload.kind === "avatar" ? undefined : payload.name;
       const where = placeOf({ ...payload, name });
-      const removed = removePicture(
-        where.dir,
-        where.stem,
-        trashFor(trashRoot, where.scope),
-      );
+      const removed = removePicture(where.dir, where.stem);
       if (removed === 0) throw new Refusal("There is no such picture.");
       sendJson(res, 200, { removed });
     }),

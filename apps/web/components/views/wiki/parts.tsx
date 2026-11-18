@@ -62,7 +62,7 @@ export function SaveBar({
     >
       <p className="flex-1 text-sm text-pretty">
         {conflict
-          ? "This changed since you opened it, perhaps in a night's sleep. Your words are still here: copy what you need, then load the new version."
+          ? "This changed since you opened it. Copy your words, then load the new version."
           : "Unsaved changes"}
       </p>
       {conflict ? (
@@ -197,7 +197,7 @@ export function usePicturePicker(
   };
 }
 
-/** Asks before something goes to the trash. */
+/** Asks before something is deleted. */
 export function RemoveButton({
   what,
   onRemove,
@@ -231,8 +231,7 @@ export function RemoveButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {what}?</AlertDialogTitle>
             <AlertDialogDescription>
-              It goes to the Wiki&apos;s trash folder in the world&apos;s state,
-              where it can be put back by hand.
+              This can&apos;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

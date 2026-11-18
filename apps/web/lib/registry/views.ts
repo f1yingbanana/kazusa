@@ -4,7 +4,12 @@ import {
   ListIcon,
   MessagesSquareIcon,
   SettingsIcon,
+  UsersRoundIcon,
 } from "lucide-react";
+import {
+  CharactersSidebar,
+  CharactersView,
+} from "@/components/views/characters/characters-view";
 import { ChatsPanel } from "@/components/views/chats/chats-panel";
 import { SettingsSidebar } from "@/components/views/settings/settings-sidebar";
 import { SettingsView } from "@/components/views/settings/settings-view";
@@ -47,6 +52,15 @@ export const STAGE_VIEWS: readonly StageView[] = [
     requires: ["timeline"],
     component: TimelineView,
     sidebar: TimelineSidebar,
+  },
+  {
+    id: "characters",
+    label: "Characters",
+    icon: UsersRoundIcon,
+    order: 25,
+    requires: ["wiki"],
+    component: CharactersView,
+    sidebar: CharactersSidebar,
   },
   {
     id: "wiki",

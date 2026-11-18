@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
-  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -13,8 +13,7 @@ import type { EditedText } from "@kazusa/client";
 /*
  * The files the Wiki writes beside pages, kept apart from its routes so each rule is
  * tested on its own: a text is written only over the version that was read,
- * a picture only when its bytes are a raster picture, and nothing is deleted:
- * it is moved into the trash, where a person can take it back.
+ * and a picture only when its bytes are a raster picture.
  */
 
 const hashOf = (text: string): string =>
@@ -139,48 +138,28 @@ function sameStem(dir: string, stem: string): string[] {
   });
 }
 
-/** A place in the trash for files from `scope`, made once per removal. */
-export function trashFor(trashRoot: string, scope: string): string {
-  return path.join(
-    trashRoot,
-    new Date().toISOString().replace(/[:.]/g, "-"),
-    scope,
-  );
-}
-
-/** Moves a file or folder into `trashDir`, keeping its name. */
-export function moveToTrash(target: string, trashDir: string): void {
-  if (!existsSync(target)) return;
-  mkdirSync(trashDir, { recursive: true });
-  renameSync(target, path.join(trashDir, path.basename(target)));
-}
-
 /**
  * Puts a picture in `dir` as `<stem>.<ext>`. A picture of that name in another
- * type goes to the trash first, so the name means one picture. Returns the
- * file's whole name.
+ * type is deleted once it is written, so the name means one picture. Returns
+ * the file's whole name.
  */
 export function putPicture(
   dir: string,
   stem: string,
   bytes: Buffer,
   ext: string,
-  trashDir: string,
 ): string {
   const entry = `${stem}.${ext}`;
-  for (const other of sameStem(dir, stem))
-    if (other !== entry) moveToTrash(path.join(dir, other), trashDir);
+  // The new one first: a failed write never leaves the name with nothing.
   writeWhole(path.join(dir, entry), bytes);
+  for (const other of sameStem(dir, stem))
+    if (other !== entry) rmSync(path.join(dir, other), { force: true });
   return entry;
 }
 
-/** Moves every picture named `stem` in `dir` to the trash; how many. */
-export function removePicture(
-  dir: string,
-  stem: string,
-  trashDir: string,
-): number {
+/** Deletes every picture named `stem` in `dir`; how many. */
+export function removePicture(dir: string, stem: string): number {
   const found = sameStem(dir, stem);
-  for (const entry of found) moveToTrash(path.join(dir, entry), trashDir);
+  for (const entry of found) rmSync(path.join(dir, entry), { force: true });
   return found.length;
 }

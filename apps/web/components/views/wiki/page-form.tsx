@@ -2,19 +2,32 @@
 
 import { useEffect, useId, useState } from "react";
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   FileCodeIcon,
+  MapPinIcon,
   PlusIcon,
+  UsersRoundIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
+  WikiGroup,
   WikiKind,
+  WikiLevel,
+  WikiMember,
   WikiPageForm,
   WikiPageFormFields,
   WikiSourceResponse,
 } from "@kazusa/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -26,28 +39,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
-import { useCharacters } from "@/hooks/use-characters";
-import { useWikiList } from "@/hooks/use-wiki";
-import {
-  useWikiBackdrops,
-  useWikiForm,
-  useWikiReach,
-} from "@/hooks/use-wiki-editor";
+import { useSaveWikiPage, useWikiList } from "@/hooks/use-wiki";
+import { useWikiForm, useWikiReach } from "@/hooks/use-wiki-editor";
 import { saveWikiForm } from "@/lib/source/wiki/editor";
 import { WikiConflictError } from "@/lib/source/wiki/http";
 import { cn } from "@/lib/utils";
 import {
-  REACH,
+  EVERYONE,
+  levelsFor,
   Rail,
-  TINT,
   audienceLabel,
-  audienceOf,
+  everyoneFirst,
+  groupName,
   peopleIn,
-  type Audience,
-  type Reach,
 } from "./levels";
+import { LinkTextarea } from "./link-textarea";
+import { slug } from "./new-page-dialog";
 import { failureText } from "./parts";
+import { WhereItIs } from "./place-fields";
 
 const NONE = "__none";
 
@@ -78,112 +87,310 @@ const firstSentence = (text: string): string => {
   return flat.match(/^.+?[.!?。！？](?=\s|$)/u)?.[0] ?? flat;
 };
 
-/** A part as the form edits it: who it is for is its own choice. */
-interface Part {
-  readonly title: string;
-  readonly text: string;
-  readonly audience: Exclude<Audience, "heard" | "knows">;
-  /** For `named`: who. */
-  readonly named: readonly string[];
-}
-
 interface Draft {
   readonly fields: WikiPageFormFields;
   readonly lead: string;
-  readonly parts: readonly Part[];
+  readonly close: string;
+  readonly only: string;
+  readonly members: readonly WikiMember[];
 }
 
-function draftOf(
-  form: WikiPageForm,
-  name: string,
-  self: string | undefined,
-): Draft {
+function draftOf(form: WikiPageForm, name: string): Draft {
   return {
-    fields: { ...form.fields, name: form.fields.name ?? name },
+    fields: {
+      ...form.fields,
+      name: form.fields.name ?? name,
+      groups: everyoneFirst(form.fields.groups),
+    },
     lead: unwrap(form.lead),
-    parts: form.sections.map((section) => {
-      const audience = audienceOf(section.knownBy, self);
-      return {
-        title: section.title,
-        text: unwrap(section.text),
-        audience:
-          audience === "heard" || audience === "knows" ? "close" : audience,
-        named: audience === "named" ? section.knownBy : [],
-      };
-    }),
+    close: unwrap(form.close),
+    only: unwrap(form.only),
+    members: form.members ?? [],
   };
 }
 
-/** A small list of names with a field to add one. */
-function Names({
+/**
+ * Who is in a group: each character with how closely, and a field to add one.
+ * Saving writes it onto each character's page.
+ */
+function MemberRows({
   id,
-  items,
-  label,
-  placeholder,
-  options,
+  members,
+  characters,
   onChange,
-  extra,
 }: {
   id: string;
-  items: readonly string[];
-  label: string;
-  placeholder: string;
-  options: readonly { value: string; label: string }[];
-  onChange: (items: string[]) => void;
-  extra?: (item: string, index: number) => React.ReactNode;
+  members: readonly WikiMember[];
+  characters: readonly { id: string; name: string }[];
+  onChange: (members: WikiMember[]) => void;
 }) {
   const [text, setText] = useState("");
-  const nameOf = (value: string) =>
-    options.find((option) => option.value === value)?.label ?? value;
-  const add = () => {
-    const typed = text.trim();
-    if (!typed) return;
-    const match = options.find(
-      (option) =>
-        option.label.toLowerCase() === typed.toLowerCase() ||
-        option.value === typed,
+  const choices = characters.filter(
+    (one) => !members.some((member) => member.id === one.id),
+  );
+  const add = (value: string) => {
+    const found = choices.find(
+      (one) => one.name.toLowerCase() === value.trim().toLowerCase(),
     );
-    const value = match?.value ?? typed;
-    if (!items.includes(value)) onChange([...items, value]);
+    if (!found) return setText(value);
+    onChange(
+      [
+        ...members,
+        { id: found.id, name: found.name, level: "knows" as const },
+      ].sort((a, b) => a.name.localeCompare(b.name)),
+    );
     setText("");
   };
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {items.map((item, index) => (
-        <span
-          key={item}
-          className="flex h-7 items-center gap-1.5 rounded-full border bg-muted/40 pr-1 pl-2.5 text-sm"
-        >
-          {nameOf(item)}
-          {extra?.(item, index)}
-          <button
-            type="button"
-            className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-            aria-label={`Take out ${nameOf(item)}`}
-            onClick={() => onChange(items.filter((_, at) => at !== index))}
+    <div className="flex flex-col gap-1">
+      {members.length ? (
+        members.map((member, index) => (
+          <div
+            key={member.id}
+            className="grid grid-cols-[minmax(0,12rem)_10rem_2rem] items-center gap-x-4"
           >
-            <XIcon className="size-3" />
-          </button>
-        </span>
-      ))}
+            <span className="truncate text-sm">{member.name}</span>
+            <Select
+              items={MEMBER_LEVELS}
+              value={member.level}
+              onValueChange={(level) =>
+                level &&
+                onChange(
+                  members.map((one, at) =>
+                    at === index ? { ...one, level } : one,
+                  ),
+                )
+              }
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={`How close ${member.name} is in it`}
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                align="end"
+                alignItemWithTrigger={false}
+                className="w-auto"
+              >
+                {MEMBER_LEVELS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Take ${member.name} out`}
+              onClick={() => onChange(members.filter((_, at) => at !== index))}
+            >
+              <XIcon />
+            </Button>
+          </div>
+        ))
+      ) : (
+        <p className="text-sm text-muted-foreground">No one yet.</p>
+      )}
       <Input
-        id={id}
         value={text}
         list={`${id}-list`}
-        placeholder={placeholder}
-        aria-label={label}
-        className="h-7 w-44 text-sm"
-        onChange={(event) => setText(event.target.value)}
+        placeholder="Add a character"
+        aria-label="Add a character"
+        className="mt-1 h-8 w-56 text-sm"
+        onChange={(event) =>
+          pickedFromList(event)
+            ? add(event.target.value)
+            : setText(event.target.value)
+        }
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            add();
+            add(text);
           }
         }}
-        onBlur={add}
       />
       <datalist id={`${id}-list`}>
-        {options.map((option) => (
+        {choices.map((one) => (
+          <option key={one.id} value={one.name} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
+/**
+ * Whether an input's change came from choosing a suggestion, not from typing: a
+ * typed name that happens to match goes in only on Enter.
+ */
+const pickedFromList = (
+  event: React.ChangeEvent<HTMLInputElement>,
+): boolean => {
+  const type = (event.nativeEvent as InputEvent).inputType;
+  return type === undefined || type === "insertReplacementText";
+};
+
+/** How involved someone is in a group: what they get through it. */
+const MEMBER_LEVELS = [
+  { value: "heard of" as const, label: "Associate" },
+  { value: "knows" as const, label: "Member" },
+  { value: "close" as const, label: "Close member" },
+];
+
+/**
+ * The groups that know a page, each with how well, and a field to add one.
+ * Everyone is the group every character is in.
+ */
+function GroupRows({
+  id,
+  groups,
+  options,
+  nameOf,
+  onChange,
+  onCreate,
+  levels = levelsFor(false),
+  everyone = true,
+}: {
+  id: string;
+  groups: readonly WikiGroup[];
+  options: readonly { value: string; label: string }[];
+  /** The level choices, and whether Everyone is offered. */
+  levels?: readonly { value: WikiLevel; label: string }[];
+  everyone?: boolean;
+  /** Any page's name, for groups already listed. */
+  nameOf: (ref: string) => string | undefined;
+  onChange: (groups: WikiGroup[]) => void;
+  /** Makes a group page by that name; resolves to its id. */
+  onCreate: (name: string) => Promise<string>;
+}) {
+  const [text, setText] = useState("");
+  const [creating, setCreating] = useState(false);
+  const listed = (ref: string) =>
+    groups.some((group) => group.ref.toLowerCase() === ref.toLowerCase());
+  const choices = [
+    ...(!everyone || listed(EVERYONE)
+      ? []
+      : [{ value: EVERYONE, label: "Everyone" }]),
+    ...options.filter((option) => !listed(option.value)),
+  ];
+  const typed = text.trim();
+  const match = choices.find(
+    (option) =>
+      option.label.toLowerCase() === typed.toLowerCase() ||
+      option.value === typed,
+  );
+  const put = (ref: string) => {
+    if (!listed(ref))
+      onChange(
+        everyoneFirst([
+          ...groups,
+          { ref, level: ref === EVERYONE ? "heard of" : "knows" },
+        ]),
+      );
+    setText("");
+  };
+  // A name no page has is only made into a group when asked, not on a typo.
+  const add = () => {
+    if (match) put(match.value);
+  };
+  const create = () => {
+    if (!typed || match || creating) return;
+    setCreating(true);
+    void onCreate(typed)
+      .then(put)
+      .catch((failure: unknown) => toast.error(failureText(failure)))
+      .finally(() => setCreating(false));
+  };
+  const setLevel = (index: number, level: WikiLevel) =>
+    onChange(
+      groups.map((group, at) => (at === index ? { ...group, level } : group)),
+    );
+  return (
+    <div className="flex flex-col gap-1">
+      {groups.map((group, index) => {
+        const name = groupName(group.ref, nameOf);
+        return (
+          <div
+            key={group.ref}
+            className="grid grid-cols-[minmax(0,12rem)_10rem_2rem] items-center gap-x-4"
+          >
+            <span className="truncate text-sm">{name}</span>
+            <Select
+              items={levels.map(({ value, label }) => ({ value, label }))}
+              value={group.level}
+              onValueChange={(next) => next && setLevel(index, next)}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={`How well ${name} ${levels === MEMBER_LEVELS ? "takes part" : "knows the page"}`}
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                align="end"
+                alignItemWithTrigger={false}
+                className="w-auto"
+              >
+                {levels.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Take out ${name}`}
+              onClick={() => onChange(groups.filter((_, at) => at !== index))}
+            >
+              <XIcon />
+            </Button>
+          </div>
+        );
+      })}
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Input
+          id={id}
+          value={text}
+          list={`${id}-list`}
+          placeholder={groups.length ? "Add a group" : "Everyone, or a group"}
+          aria-label="Add a group"
+          className="h-8 w-56 text-sm"
+          onChange={(event) => {
+            const value = event.target.value;
+            // Picked from the list: in at once; typed, only on Enter.
+            const picked = pickedFromList(event)
+              ? choices.find((option) => option.label === value)
+              : undefined;
+            if (picked) put(picked.value);
+            else setText(value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (match) add();
+              else create();
+            }
+          }}
+        />
+        {typed && !match ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={creating}
+            onClick={create}
+          >
+            {creating ? <Spinner /> : <PlusIcon />}
+            New group “{typed}”
+          </Button>
+        ) : null}
+      </div>
+      <datalist id={`${id}-list`}>
+        {choices.map((option) => (
           <option key={option.value} value={option.label} />
         ))}
       </datalist>
@@ -191,86 +398,18 @@ function Names({
   );
 }
 
-/** A labelled row of the "Who knows" block: label left, control right. */
-function Row({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  hint?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-[6rem_minmax(0,1fr)]">
-      <label htmlFor={htmlFor} className="pt-1.5 text-sm text-muted-foreground">
-        {label}
-      </label>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {children}
-        {hint ? (
-          <p className="text-xs text-pretty text-muted-foreground">{hint}</p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** A choice in a trigger as quiet as the label it stands in for. */
-function QuietSelect<T extends string>({
-  value,
-  options,
-  label,
-  className,
-  onChange,
-}: {
-  value: T;
-  options: readonly { value: T; label: string }[];
-  label: string;
-  className?: string;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <Select
-      items={options}
-      value={value}
-      onValueChange={(next) => next && onChange(next)}
-    >
-      <SelectTrigger
-        size="sm"
-        aria-label={label}
-        className={cn(
-          "-ml-2 h-7 border-none bg-transparent px-2 text-xs font-medium shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent",
-          className,
-        )}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 /**
- * A page as a form, in the same parts as reading it: the summary line, the
- * opening, then each part, which says who it is for in one choice; then who
- * knows the page at all. A bar pinned to the bottom saves it, over the version
- * opened.
+ * A page as a form, in the same order as reading it: who knows it, then one
+ * field per level of detail (the summary line, the opening, what those close to
+ * it know and, on a character's own page, what only they know). A bar pinned to
+ * the bottom saves it, over the version opened.
  */
+
 export function PageForm({
   id,
   agent,
   kind,
   name,
-  self,
   onDone,
   onRaw,
 }: {
@@ -279,27 +418,25 @@ export function PageForm({
   kind?: WikiKind | undefined;
   /** For a page not written yet. */
   name: string;
-  /** The character the page is about, when it is one of the cast. */
-  self?: { id: string; name: string } | undefined;
   onDone: (saved?: WikiSourceResponse) => void;
   onRaw: () => void;
 }) {
   const source = useWikiForm(id, agent, kind);
   const [opened, setOpened] = useState<WikiPageForm>();
+  // Only what was just read: never a cached copy older than the page.
   useEffect(() => {
-    if (!opened && source.data) setOpened(source.data);
-  }, [opened, source.data]);
+    if (!opened && source.data && !source.isValidating) setOpened(source.data);
+  }, [opened, source.data, source.isValidating]);
+  const [leaving, setLeaving] = useState<"close" | "raw">();
   const [draft, setDraft] = useState<Draft>();
   const [moveOther, setMoveOther] = useState(false);
-  const [secret, setSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const { characters } = useCharacters();
   const { data: list } = useWikiList();
+  const savePage = useSaveWikiPage();
   const personal = agent !== undefined;
   const { data: reach } = useWikiReach(personal ? undefined : id);
   const pageKind = opened?.kind ?? kind;
-  const { data: backdrops } = useWikiBackdrops(pageKind === "place");
   const formId = useId();
 
   if (!opened)
@@ -309,7 +446,7 @@ export function PageForm({
       <p className="text-sm text-muted-foreground">Opening…</p>
     );
 
-  const initial = draftOf(opened, name, self?.id);
+  const initial = draftOf(opened, name);
   const current = draft ?? initial;
   const { fields } = current;
   const subject = fields.name?.trim() || name;
@@ -318,45 +455,37 @@ export function PageForm({
   const set = (patch: Partial<Draft>) => setDraft({ ...current, ...patch });
   const setField = (patch: Partial<WikiPageFormFields>) =>
     set({ fields: { ...fields, ...patch } });
-  const setPart = (index: number, patch: Partial<Part>) =>
-    set({
-      parts: current.parts.map((part, at) =>
-        at === index ? { ...part, ...patch } : part,
-      ),
+  // A world not yet upgraded shows who knows pages, but ARONA rewrites it.
+  const upgraded = list?.upgraded !== false;
+  const groupPages = (list?.pages ?? [])
+    .filter((page) => page.group)
+    .filter((page) => page.id !== id)
+    .map((page) => ({ value: page.id, label: page.name }));
+  const pageName = (ref: string) =>
+    list?.pages.find(
+      (page) =>
+        page.id === ref || page.name.toLowerCase() === ref.toLowerCase(),
+    )?.name;
+  const newGroup = async (groupName: string): Promise<string> => {
+    const taken = new Set((list?.pages ?? []).map((page) => page.id));
+    const base = slug(groupName) || "group";
+    let groupId = base;
+    for (let n = 2; taken.has(groupId); n += 1) groupId = `${base}_${n}`;
+    await savePage({
+      id: groupId,
+      kind: "concept",
+      base: null,
+      text: `---\nname: ${JSON.stringify(groupName)}\ngroup: true\n---\n\n# ${groupName}\n`,
     });
-  const move = (index: number, by: -1 | 1) => {
-    const parts = [...current.parts];
-    const [moved] = parts.splice(index, 1);
-    parts.splice(index + by, 0, moved);
-    set({ parts });
+    return groupId;
   };
-  const cast = characters
-    .filter((one) => one.kind === "agent" && !one.isSystemAgent)
-    .map((one) => ({ value: one.id, label: one.name }));
-  const pages = (list?.pages ?? []).map((page) => ({
-    value: page.id,
-    label: page.name,
-  }));
-  const places = (list?.pages ?? []).filter((page) => page.kind === "place");
-  const how: Reach =
-    secret || fields.knownBy.length
-      ? "secret"
-      : (fields.renown ?? (pageKind === "concept" ? "known" : "local"));
-  // Who a part can be for. Naming others isn't offered: a secret some of
-  // them know goes in their own wikis. An older part that names people keeps
-  // them, so opening and saving changes nothing.
-  const audiencesFor = (part: Part) => [
-    { value: "close" as const, label: audienceLabel("close", subject) },
-    ...(self
-      ? [{ value: "self" as const, label: audienceLabel("self", self.name) }]
-      : []),
-    ...(part.audience === "named"
-      ? [{ value: "named" as const, label: "Only certain people" }]
-      : []),
-  ];
-  const reaches = REACH.filter(
-    (option) => option.value !== "secret" || how === "secret",
-  );
+  const places = (list?.pages ?? []).filter((page) => page.place);
+  const isPlace = pageKind === "concept" && !personal && fields.place === true;
+  const isGroup = pageKind === "concept" && !personal && fields.group === true;
+  const cast = (list?.pages ?? [])
+    .filter((page) => page.kind === "person")
+    .map((page) => ({ id: page.id, name: page.name }));
+  const ownVoice = pageKind === "person" && !personal;
 
   const save = async () => {
     setSaving(true);
@@ -368,16 +497,16 @@ export function PageForm({
         base: opened.hash,
         fields: current.fields,
         lead: current.lead,
-        sections: current.parts.map((part) => ({
-          title: part.title,
-          text: part.text,
-          knownBy:
-            part.audience === "self" && self
-              ? [self.id]
-              : part.audience === "named"
-                ? [...part.named]
-                : [],
-        })),
+        close: current.close,
+        only: ownVoice ? current.only : "",
+        ...(isGroup && upgraded
+          ? {
+              members: current.members.map(({ id: who, level }) => ({
+                id: who,
+                level,
+              })),
+            }
+          : {}),
         ...(moveOther ? { moveOther: true } : {}),
       });
       toast.success(`Saved ${subject}.`);
@@ -389,6 +518,22 @@ export function PageForm({
       setSaving(false);
     }
   };
+
+  const field = (
+    value: string,
+    label: string,
+    placeholder: string,
+    onChange: (value: string) => void,
+  ) => (
+    <LinkTextarea
+      value={value}
+      aria-label={label}
+      placeholder={placeholder}
+      pages={list?.pages ?? []}
+      className="field-sizing-content min-h-24 text-sm leading-relaxed"
+      onChange={onChange}
+    />
+  );
 
   return (
     <div className="flex flex-col gap-10">
@@ -402,7 +547,11 @@ export function PageForm({
             value={fields.name ?? ""}
             onChange={(event) => setField({ name: event.target.value })}
           />
+          <p className="text-xs text-muted-foreground">
+            Id <code className="font-mono">{id}</code>
+          </p>
         </div>
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${formId}-aliases`} className="text-sm font-medium">
             Also called
@@ -443,16 +592,170 @@ export function PageForm({
             />
           </div>
         ) : null}
+        {pageKind === "person" && !personal ? (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${formId}-home`} className="text-sm font-medium">
+              Home
+            </label>
+            <Select
+              items={[
+                { value: NONE, label: "None" },
+                ...places.map((place) => ({
+                  value: place.id,
+                  label: place.name,
+                })),
+              ]}
+              value={fields.home ?? NONE}
+              onValueChange={(value) =>
+                setField({
+                  home: value && value !== NONE ? value : undefined,
+                })
+              }
+            >
+              <SelectTrigger id={`${formId}-home`} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                {places.map((place) => (
+                  <SelectItem key={place.id} value={place.id}>
+                    {place.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {pageKind === "concept" && !personal ? (
+          <div className="flex flex-wrap items-center gap-1.5 sm:col-span-2">
+            {(
+              [
+                [
+                  "place",
+                  MapPinIcon,
+                  "A place",
+                  "On the map: somewhere to be.",
+                ],
+                [
+                  "group",
+                  UsersRoundIcon,
+                  "A group",
+                  "Something people are in.",
+                ],
+              ] as const
+            ).map(([key, Icon, label, title]) => (
+              <button
+                key={key}
+                type="button"
+                title={title}
+                aria-pressed={fields[key] === true}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+                  fields[key] === true &&
+                    "border-foreground/20 bg-accent text-accent-foreground",
+                )}
+                onClick={() => setField({ [key]: fields[key] !== true })}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+            {opened.fields.place && !fields.place ? (
+              <p className="basis-full text-xs text-destructive">
+                Saving takes it off the map: places in it move to its area,
+                homes and anyone there go there too, routes to it go.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
+
+      {isPlace ? (
+        <WhereItIs id={id} fields={fields} onChange={setField} />
+      ) : null}
+
+      {pageKind === "person" && !personal && upgraded ? (
+        <section className="flex max-w-3xl flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-semibold">In</h2>
+            <p className="text-xs text-muted-foreground">
+              Close members get all a group knows, members its openings,
+              associates its summaries.
+            </p>
+          </div>
+          <GroupRows
+            id={`${formId}-in`}
+            groups={fields.in ?? []}
+            options={groupPages}
+            nameOf={pageName}
+            levels={MEMBER_LEVELS}
+            everyone={false}
+            onChange={(groups) => setField({ in: groups })}
+            onCreate={newGroup}
+          />
+        </section>
+      ) : null}
+
+      {personal ? null : (
+        <section className="flex max-w-3xl flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-semibold">
+              {pageKind === "person"
+                ? `Who else knows ${subject}`
+                : `Who knows ${subject}`}
+            </h2>
+            {pageKind === "person" ? (
+              <p className="text-xs text-muted-foreground">
+                Besides the groups they&apos;re in.
+              </p>
+            ) : null}
+          </div>
+          {upgraded ? (
+            <GroupRows
+              id={`${formId}-groups`}
+              groups={fields.groups}
+              options={groupPages}
+              nameOf={pageName}
+              levels={levelsFor(pageKind === "person")}
+              onChange={(groups) => setField({ groups })}
+              onCreate={newGroup}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              This world is in the older format, where who knows {subject} is
+              set by hand in Markdown. A new release of its template brings it
+              into the new one.
+            </p>
+          )}
+        </section>
+      )}
+
+      {isGroup && upgraded ? (
+        <section className="flex max-w-3xl flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-semibold">In {subject}</h2>
+            <p className="text-xs text-muted-foreground">
+              A close member gets all {subject} knows, a member its pages&apos;
+              openings, an associate their summaries.
+            </p>
+          </div>
+          <MemberRows
+            id={`${formId}-members`}
+            members={current.members}
+            characters={cast}
+            onChange={(members) => set({ members })}
+          />
+        </section>
+      ) : null}
 
       <section className="flex max-w-3xl flex-col gap-7">
         <h2 className="text-sm font-semibold">
-          {personal ? "What they think" : `What people know about ${subject}`}
+          {personal ? "What they think" : "What people know"}
         </h2>
         <Rail
           audience="heard"
           label={personal ? "In a line" : audienceLabel("heard", subject)}
-          people={personal ? undefined : peopleIn("heard", reach)}
+          people={personal ? undefined : peopleIn("heard", reach, true)}
         >
           <Input
             value={fields.summary ?? ""}
@@ -470,291 +773,38 @@ export function PageForm({
           label={
             personal ? "Their impression" : audienceLabel("knows", subject)
           }
-          people={personal ? undefined : peopleIn("knows", reach)}
+          people={personal ? undefined : peopleIn("knows", reach, true)}
         >
-          <Textarea
-            value={current.lead}
-            aria-label="Opening"
-            placeholder={`Who ${subject} is, plainly.`}
-            className="field-sizing-content min-h-24 text-sm leading-relaxed"
-            onChange={(event) => set({ lead: event.target.value })}
-          />
+          {field(
+            current.lead,
+            "Opening",
+            `Who ${subject} is, plainly.`,
+            (lead) => set({ lead }),
+          )}
         </Rail>
-        {current.parts.map((part, index) => (
-          <Rail
-            key={index}
-            audience={personal ? "close" : part.audience}
-            label={
-              personal ? (
-                "A part"
-              ) : (
-                <QuietSelect
-                  value={part.audience}
-                  options={audiencesFor(part)}
-                  label="Who knows this part"
-                  className={TINT[part.audience]}
-                  onChange={(audience) => setPart(index, { audience })}
-                />
-              )
-            }
-            people={
-              // Said once for a run of parts with the same audience.
-              !personal &&
-              part.audience === "close" &&
-              current.parts[index - 1]?.audience !== "close"
-                ? peopleIn("close", reach)
-                : undefined
-            }
-          >
-            <div className="flex flex-col gap-2">
-              {!personal && part.audience === "named" ? (
-                <Names
-                  id={`${formId}-named-${index}`}
-                  items={part.named}
-                  label="Name someone who knows this part"
-                  placeholder="Add a name"
-                  options={cast}
-                  onChange={(named) => setPart(index, { named })}
-                />
-              ) : null}
-              <div className="flex items-center gap-1">
-                <Input
-                  value={part.title}
-                  aria-label="Part heading"
-                  placeholder="Heading"
-                  className="h-8 flex-1 font-medium"
-                  onChange={(event) =>
-                    setPart(index, { title: event.target.value })
-                  }
-                />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={index === 0}
-                  aria-label="Move up"
-                  onClick={() => move(index, -1)}
-                >
-                  <ArrowUpIcon />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={index === current.parts.length - 1}
-                  aria-label="Move down"
-                  onClick={() => move(index, 1)}
-                >
-                  <ArrowDownIcon />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove ${part.title || "this part"}`}
-                  onClick={() =>
-                    set({
-                      parts: current.parts.filter((_, at) => at !== index),
-                    })
-                  }
-                >
-                  <XIcon />
-                </Button>
-              </div>
-              <Textarea
-                value={part.text}
-                aria-label={`${part.title || "Part"} text`}
-                className="field-sizing-content min-h-20 text-sm leading-relaxed"
-                onChange={(event) =>
-                  setPart(index, { text: event.target.value })
-                }
-              />
-            </div>
-          </Rail>
-        ))}
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() =>
-            set({
-              parts: [
-                ...current.parts,
-                { title: "", text: "", audience: "close", named: [] },
-              ],
-            })
-          }
+        <Rail
+          audience="close"
+          label={personal ? "The rest" : audienceLabel("close", subject)}
+          people={personal ? undefined : peopleIn("close", reach, true)}
         >
-          <PlusIcon />
-          Add a part
-        </Button>
+          {field(
+            current.close,
+            personal ? "The rest" : "What those close know",
+            "## Habits\n\nWhat only those close would know.",
+            (close) => set({ close }),
+          )}
+        </Rail>
+        {ownVoice ? (
+          <Rail audience="self" label={audienceLabel("self", subject)}>
+            {field(
+              current.only,
+              `What only ${subject} knows`,
+              "How they think and speak, what they want, what they hide.",
+              (only) => set({ only }),
+            )}
+          </Rail>
+        ) : null}
       </section>
-
-      {personal ? null : (
-        <section className="flex max-w-3xl flex-col gap-5">
-          <h2 className="text-sm font-semibold">Who knows {subject}</h2>
-          <Row
-            label="Known"
-            htmlFor={`${formId}-reach`}
-            hint={REACH.find((option) => option.value === how)?.hint(subject)}
-          >
-            <Select
-              items={reaches.map(({ value, label }) => ({ value, label }))}
-              value={how}
-              onValueChange={(next) => {
-                if (!next) return;
-                setSecret(next === "secret");
-                if (next === "secret") setField({ renown: undefined });
-                else setField({ renown: next, knownBy: [] });
-              }}
-            >
-              <SelectTrigger id={`${formId}-reach`} className="w-full max-w-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {reaches.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {how === "secret" ? (
-              <Names
-                id={`${formId}-known-by`}
-                items={fields.knownBy}
-                label="Name someone who knows it"
-                placeholder="Add a name"
-                options={cast}
-                onChange={(knownBy) => setField({ knownBy })}
-              />
-            ) : null}
-          </Row>
-          <Row
-            label="Groups"
-            htmlFor={`${formId}-groups`}
-            hint={
-              pageKind === "person"
-                ? `${subject} and everyone in a group know each other; in a close one, well. The first is the nearest.`
-                : `Everyone in its groups knows ${subject}. The first is the nearest.`
-            }
-          >
-            <Names
-              id={`${formId}-groups`}
-              items={fields.groups.map(({ ref }) => ref)}
-              label="Add a group"
-              placeholder="Add a group"
-              options={pages}
-              onChange={(refs) =>
-                setField({
-                  groups: refs.map(
-                    (ref) =>
-                      fields.groups.find((group) => group.ref === ref) ?? {
-                        ref,
-                        close: false,
-                      },
-                  ),
-                })
-              }
-              {...(pageKind === "person"
-                ? {
-                    extra: (ref: string, index: number) => (
-                      <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Checkbox
-                          checked={fields.groups[index]?.close ?? false}
-                          aria-label={`Close in ${ref}`}
-                          onCheckedChange={(checked) =>
-                            setField({
-                              groups: fields.groups.map((group, at) =>
-                                at === index
-                                  ? { ...group, close: checked === true }
-                                  : group,
-                              ),
-                            })
-                          }
-                        />
-                        close
-                      </label>
-                    ),
-                  }
-                : {})}
-            />
-          </Row>
-          {pageKind === "person" ? (
-            <Row
-              label="Home"
-              htmlFor={`${formId}-home`}
-              hint="Where they live; they know it and what is around it well."
-            >
-              <Select
-                items={[
-                  { value: NONE, label: "None" },
-                  ...places.map((place) => ({
-                    value: place.id,
-                    label: place.name,
-                  })),
-                ]}
-                value={fields.home ?? NONE}
-                onValueChange={(value) =>
-                  setField({
-                    home: value && value !== NONE ? value : undefined,
-                  })
-                }
-              >
-                <SelectTrigger
-                  id={`${formId}-home`}
-                  className="w-full max-w-xs"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>None</SelectItem>
-                  {places.map((place) => (
-                    <SelectItem key={place.id} value={place.id}>
-                      {place.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Row>
-          ) : null}
-          {pageKind === "place" ? (
-            <Row
-              label="Backdrop"
-              htmlFor={`${formId}-backdrop`}
-              hint="The picture a scene here is drawn in front of. Without one, its area's."
-            >
-              <Select
-                items={[
-                  { value: NONE, label: "The area's" },
-                  ...(backdrops?.sets ?? []).map((set) => ({
-                    value: set.name,
-                    label: set.name,
-                  })),
-                ]}
-                value={fields.backdrop ?? NONE}
-                onValueChange={(value) =>
-                  setField({
-                    backdrop: value && value !== NONE ? value : undefined,
-                  })
-                }
-              >
-                <SelectTrigger
-                  id={`${formId}-backdrop`}
-                  className="w-full max-w-xs"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>The area&apos;s</SelectItem>
-                  {(backdrops?.sets ?? []).map((set) => (
-                    <SelectItem key={set.name} value={set.name}>
-                      {set.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Row>
-          ) : null}
-        </section>
-      )}
 
       {opened.other.length ? (
         <section className="flex max-w-3xl flex-col gap-2">
@@ -774,7 +824,7 @@ export function PageForm({
               checked={moveOther}
               onCheckedChange={(checked) => setMoveOther(checked === true)}
             />
-            Move them into a Details part when saving, so characters read them
+            Move them into the text when saving
           </label>
         </section>
       ) : null}
@@ -796,7 +846,11 @@ export function PageForm({
               ? "Unsaved changes"
               : "No changes yet"}
         </p>
-        <Button variant="ghost" size="sm" onClick={onRaw}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => (dirty ? setLeaving("raw") : onRaw())}
+        >
           <FileCodeIcon />
           Edit as Markdown
         </Button>
@@ -815,7 +869,11 @@ export function PageForm({
           </Button>
         ) : (
           <>
-            <Button variant="outline" size="sm" onClick={() => onDone()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => (dirty ? setLeaving("close") : onDone())}
+            >
               {dirty ? "Discard" : "Close"}
             </Button>
             <Button
@@ -829,6 +887,35 @@ export function PageForm({
           </>
         )}
       </div>
+      <AlertDialog
+        open={leaving !== undefined}
+        onOpenChange={(open) => !open && setLeaving(undefined)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard your changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {leaving === "raw"
+                ? "The Markdown editor opens on the page as it was saved, without what you changed here."
+                : "What you changed here won't be saved."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                const next = leaving;
+                setLeaving(undefined);
+                if (next === "raw") onRaw();
+                else onDone();
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

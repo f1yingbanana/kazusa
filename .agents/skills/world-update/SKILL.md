@@ -144,6 +144,11 @@ Ask the user once how characters should experience the update:
      files, not pages or new content to read. When pages are only `updated`,
      compare one with the new release's (`show`) to say what changed (a new
      field such as `backdrop:`, a rewrite).
+   - `merged` are files play changed that the release changed too. Before
+     `apply`, `show` with `version: "update"` gives one as `apply` would write
+     it, so you can see that what play wrote survives. A release can also move
+     pages to new folders (`from` says where one was); the page is the same
+     page, and `show` `"old"` still finds it.
    - `renames` lists only the renames this world hasn't taken yet.
    - `newCharacters` are people the new version adds; `removedCharacters`,
      people it no longer has (this world keeps them).
@@ -264,8 +269,8 @@ the existing one and delete the orphan.
 3. `unregistered` lists new characters with no entry in `openclaw.json` yet.
    Registering someone starts them thinking, which costs money, so ask the user
    first. To register, follow `world-building`, and do it last.
-4. Restore the clock to the speed you noted, only when the user wants time to
-   run again.
+4. Put the clock back to the speed you noted, never faster: if it was paused
+   (0), it stays paused. Starting time costs money and is the user's call.
 5. Always end by telling the user what changed and what was kept: what you
    resolved and how, and the choices they made. An update the user hears nothing
    about looks stuck. Mark the job file done.

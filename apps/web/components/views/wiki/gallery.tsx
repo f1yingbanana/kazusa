@@ -60,8 +60,7 @@ export function AddPictureDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {outfit ? `In the ${outfit} outfit.` : "In their usual clothes."}{" "}
-            The mood is the word they use to show it.
+            {outfit ? `In the ${outfit} outfit.` : "In their usual clothes."}
           </DialogDescription>
         </DialogHeader>
         <Field>
@@ -73,13 +72,11 @@ export function AddPictureDialog({
             placeholder="happy"
             onChange={(event) => setMood(event.target.value)}
           />
-          <FieldDescription>
-            {clash
-              ? `${name} is already there: replace it from its own tile.`
-              : name
-                ? `Saved as ${name}.`
-                : "One or two words, like happy or close to tears."}
-          </FieldDescription>
+          {clash ? (
+            <FieldDescription>
+              {name} is already there: replace it from its own tile.
+            </FieldDescription>
+          ) : null}
         </Field>
         <Field>
           <FieldLabel htmlFor="wiki-add-file">Picture</FieldLabel>

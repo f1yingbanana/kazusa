@@ -341,7 +341,10 @@ export function registerPerception(
       if (!owner || !data.success || owner.rest !== "brain") return;
 
       if (data.data.phase === "finishing") {
+        // Each of the host's retries finishes too: only the last one counts,
+        // so an attempt that got through clears one that timed out before it.
         if (data.data.error) runErrors.set(event.runId, data.data.error);
+        else runErrors.delete(event.runId);
       } else if (data.data.phase === "start") {
         try {
           await perception.started(owner.agentId, event.runId);

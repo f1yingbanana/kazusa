@@ -169,8 +169,8 @@ function EditorBody({
           <AlertTitle>This page changed since you opened it</AlertTitle>
           <AlertDescription>
             {source.exists
-              ? "A night's sleep or a character's note may have written to it. Load their version to start over from it, or save yours over it."
-              : "Someone wrote a page with this name meanwhile. Load it to edit it instead, or save yours over it."}
+              ? "Load the new version, or save yours over it."
+              : "A page with this name was written meanwhile. Load it, or save yours over it."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -240,9 +240,7 @@ function EditorBody({
         </InputGroupAddon>
       </InputGroup>
       <p className="text-xs text-muted-foreground">
-        {describeSaving(side, owner)} Front matter goes between the{" "}
-        <code className="font-mono">---</code> lines, then Markdown; ⌘S saves.
-        Problems lists anything that doesn&apos;t parse.
+        {describeSaving(side, owner)} ⌘S saves.
       </p>
       <AlertDialog open={discarding} onOpenChange={setDiscarding}>
         <AlertDialogContent>

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** What a wiki page is about, which also picks its folder. */
+export const WikiKindSchema = z.enum(["person", "concept", "day"]);
+export type WikiKind = z.infer<typeof WikiKindSchema>;
+
 /*
  * What the Wiki edits beside pages: a character's MEMORY.md, looks and
  * stickers, and the world's backdrops. A text is saved over the version it was
@@ -35,6 +39,15 @@ export const WikiStickerSchema = WikiPictureSchema.extend({
   look: z.string().optional(),
 });
 export type WikiSticker = z.infer<typeof WikiStickerSchema>;
+
+/**
+ * A page's id, and so its file name: lowercase letters, digits, `_` and `-`,
+ * the same for characters, places and every other page.
+ */
+export const WikiIdSchema = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9_-]*$/, "Use lowercase letters, digits, _ or -.")
+  .max(128);
 
 export const WikiCharacterQuerySchema = z.object({ id: z.string().min(1) });
 
@@ -97,7 +110,7 @@ export const WIKI_PICTURE_TYPES = [
 /** At most this many bytes a picture. */
 export const WIKI_MAX_PICTURE_BYTES = 20 * 1024 * 1024;
 
-/** Takes a picture away: into the trash, never gone for good. */
+/** Deletes a picture for good. */
 export const WikiRemovePayloadSchema = z.object({
   kind: WikiPictureKindSchema,
   owner: z.string().min(1).optional(),
@@ -142,41 +155,69 @@ export const WikiBackdropsResponseSchema = z.object({
 });
 export type WikiBackdropsResponse = z.infer<typeof WikiBackdropsResponseSchema>;
 
+/** How well a group knows a page. */
+export const WikiLevelSchema = z.enum(["heard of", "knows", "close"]);
+export type WikiLevel = z.infer<typeof WikiLevelSchema>;
+
+/** One group that knows a page; `everyone` is every character. */
+export const WikiGroupSchema = z.object({
+  ref: z.string(),
+  level: WikiLevelSchema,
+});
+export type WikiGroup = z.infer<typeof WikiGroupSchema>;
+
+/** A character in a group, and how closely. */
+export const WikiMemberSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** How involved: an associate (`heard of`), a member, a close member. */
+  level: z.enum(["heard of", "knows", "close"]),
+});
+export type WikiMember = z.infer<typeof WikiMemberSchema>;
+
 /** The front matter fields Kazusa reads, as the Wiki's form edits them. */
 export const WikiPageFormFieldsSchema = z.object({
   name: z.string().optional(),
   aliases: z.array(z.string()),
   /** What anyone who has heard of it knows: one line. */
   summary: z.string().optional(),
-  /** What it belongs to, nearest first; a person knows a close one well. */
-  groups: z.array(z.object({ ref: z.string(), close: z.boolean() })),
-  /** How widely it is known: private, local, known or famous. */
-  renown: z.enum(["private", "local", "known", "famous"]).optional(),
-  /** The only characters who know it at all, and know it well; else anyone. */
-  knownBy: z.array(z.string()),
+  /**
+   * Who knows it: each group (`everyone` for all) and how well. A person is in
+   * every group that knows them or is close to them.
+   */
+  groups: z.array(WikiGroupSchema),
+  /** On a character's page: the groups they are in, and how involved. */
+  in: z.array(WikiGroupSchema).optional(),
   /** A person's home place. */
   home: z.string().optional(),
   /** The place or group it sits in. */
   parent: z.string().optional(),
+  /** Components of a concept: something people are in, a place. */
+  group: z.boolean().optional(),
+  place: z.boolean().optional(),
   /** A place's backdrop set. */
   backdrop: z.string().optional(),
+  /** A place's walk, in minutes, from the area it is in. */
+  entryMinutes: z.number().min(0).optional(),
+  /** A place's routes to others, each with its ways, the usual first. */
+  connections: z
+    .array(
+      z.object({
+        to: z.string(),
+        ways: z.array(z.object({ by: z.string(), minutes: z.number().min(0) })),
+        note: z.string().optional(),
+      }),
+    )
+    .optional(),
   /** On a character's own page about someone: who they are to them. */
   relation: z.string().optional(),
 });
 export type WikiPageFormFields = z.infer<typeof WikiPageFormFieldsSchema>;
 
-export const WikiPageSectionSchema = z.object({
-  title: z.string(),
-  /** Only these characters know it; empty: everyone who knows it well. */
-  knownBy: z.array(z.string()),
-  text: z.string(),
-});
-export type WikiPageSection = z.infer<typeof WikiPageSectionSchema>;
-
 /** `GET /kazusa/wiki/form?id=&agent=&kind=`: a page split for the form. */
 export const WikiPageFormSchema = z.object({
   id: z.string(),
-  kind: z.enum(["person", "place", "concept", "day"]),
+  kind: WikiKindSchema,
   exists: z.boolean(),
   hash: z.string().nullable(),
   fields: WikiPageFormFieldsSchema,
@@ -186,19 +227,38 @@ export const WikiPageFormSchema = z.object({
   other: z.array(z.object({ key: z.string(), value: z.string() })),
   /** The opening: what anyone who knows it knows. */
   lead: z.string(),
-  sections: z.array(WikiPageSectionSchema),
+  /**
+   * What those close to it know, as Markdown: a `## Title` line starts each
+   * topic, and a topic comes up when the conversation touches it.
+   */
+  close: z.string(),
+  /** On a character's own page, what only they know, the same way. */
+  only: z.string(),
+  /** For a group: the characters in it, from their pages' `in`. */
+  members: z.array(WikiMemberSchema).optional(),
 });
 export type WikiPageForm = z.infer<typeof WikiPageFormSchema>;
 
 /** `POST /kazusa/wiki/form/save`: the form back as a page, over `base`. */
 export const WikiPageFormSavePayloadSchema = z.object({
-  id: z.string().min(1),
+  id: WikiIdSchema,
   agent: z.string().min(1).optional(),
-  kind: z.enum(["person", "place", "concept", "day"]).optional(),
+  kind: WikiKindSchema.optional(),
   base: z.string().nullable(),
   fields: WikiPageFormFieldsSchema,
   lead: z.string().max(200_000),
-  sections: z.array(WikiPageSectionSchema).max(200),
+  close: z.string().max(400_000),
+  only: z.string().max(400_000),
+  /** For a group: who is in it, written to each character's `in`. */
+  members: z
+    .array(
+      z.object({
+        id: z.string(),
+        level: z.enum(["heard of", "knows", "close"]),
+      }),
+    )
+    .max(2000)
+    .optional(),
   /** Move the fields Kazusa doesn't read into a Details section. */
   moveOther: z.boolean().optional(),
 });
@@ -221,5 +281,7 @@ export const WikiReachResponseSchema = z.object({
   heard: z.array(WikiPersonSchema),
   /** How many know nothing of it. */
   none: z.number(),
+  /** For a group: who in the cast is in it. */
+  members: z.array(WikiPersonSchema),
 });
 export type WikiReachResponse = z.infer<typeof WikiReachResponseSchema>;

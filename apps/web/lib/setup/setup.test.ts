@@ -154,7 +154,7 @@ function fixture(): string {
   const cards = path.join(app, "worlds/cast-world/shared/wiki");
   write(
     path.join(cards, "entities/characters/ann.md"),
-    '---\nname: Ann Lee\ngroups: { crew: close, "Port": member }\n---\n',
+    '---\nname: Ann Lee\ngroups: { everyone: heard of, crew: close, "Port": knows }\n---\n',
   );
   write(
     path.join(cards, "entities/characters/bo.md"),
@@ -162,7 +162,8 @@ function fixture(): string {
   );
   write(
     path.join(cards, "entities/characters/cy.md"),
-    "---\ngroups: [lone, Port]\n---\n",
+    // The crew has only heard of Cy, so Cy isn't in it.
+    "---\ngroups:\n  lone: knows\n  Port: close\n  crew: heard of\n---\n",
   );
   write(path.join(cards, "concepts/crew.md"), '---\nname: "The Crew"\n---\n');
   return app;

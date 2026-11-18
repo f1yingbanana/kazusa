@@ -161,8 +161,11 @@ Decisions:
   get short pages. Those who never speak or are dead get a page only, with no
   workspace or `openclaw.json` entry.
 - **Groups.** Decide the setting's own: factions, guilds, crews, realms. Each is
-  a concept page, and a person's page names theirs in `groups`, the one they are
-  close in marked `close` (`{ Iron Guard: close, Northmark: member }`).
+  a page in `shared/wiki/concepts/` with `group: true` (a realm can also be a
+  place). Every page's `known` says which groups know it and how well
+  (`heard of`, `knows`, `close`; `everyone` for all); a character's `in` names
+  theirs (`{ iron_guard: close, northmark: knows }`). How pages relate (a
+  guild's city, a rival) is `[[links]]` in their text.
 - **World settings** in the same config: `user` (the player's id and name),
   `world` (title, summary), `taskman.categories` (keep `sleeping` and
   `traveling`).
@@ -188,23 +191,25 @@ These all happened on a real build.
   character is the name people meet, a section only they know says who they
   really are, and the true identity is a page of its own. Don't list the secret
   name as an alias.
-- **Secrets go in the knowers' own wikis.** Same-group members read everything
-  on a world page when it comes up, and everyone can read a `famous` page's
-  opening. Keep a secret out of the world page altogether: write it on each
-  knower's own page about it, in their words.
+- **Secrets go in the knowers' own wikis.** A group `close` to a world page
+  reads everything on it when it comes up, and `everyone: knows` gives every
+  character its opening. Keep a secret out of the world page altogether: write
+  it on each knower's own page about it, in their words.
 - **Summaries spread.** `summary` reaches anyone who has heard of the page.
-  Don't put where someone is now in a `known` or `famous` summary or lead.
+  Don't put where someone is now in the summary or lead of a page `everyone`
+  knows of.
 - **Descriptions spoil.** A place's body is shown in full on anyone's first
   visit. Describe what a visitor sees, not the hidden door.
-- **Hidden lands** stay `renown: local` or unset, on every page in them.
+- **Hidden lands** have no `everyone` in `known`, on every page in them.
 
 ## 5. Build in this order
 
 Each stage depends on the last, and the project file tracks them.
 
-1. **Concepts.** One root page for the world (`famous`, no `groups`), then
-   regions and major groups under it, then history, cosmology and rules. Aim for
-   a lead that outsiders would know, with insider detail under `##`.
+1. **Concepts and groups.** One root page for the world
+   (`known: { everyone: knows }`), then regions, and the major groups
+   (`group: true`), then history, cosmology and rules. Aim for a lead that
+   outsiders would know, with insider detail under `##`.
 2. **Places.** See below. Run `wiki_lint` after every region.
 3. **People's pages**, one group at a time, so that people who know each other
    are written together: who they are, and their inner voice in a section only

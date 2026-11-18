@@ -2,7 +2,9 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   renameSync,
+  rmdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -127,12 +129,25 @@ export function applyUpdate(live: string, template: Tree, plan: Plan): void {
   for (const change of plan.changes)
     if (!change.copyFromTemplate && change.text !== undefined)
       write(path.join(live, change.path), change.text);
+  const emptied = new Set<string>();
   for (const change of plan.changes) {
-    if (change.from && !kept.has(change.from))
+    if (change.from && !kept.has(change.from)) {
       rmSync(path.join(live, change.from), { force: true });
-    if (!kept.has(change.path))
+      emptied.add(path.dirname(change.from));
+    }
+    if (!kept.has(change.path)) {
       rmSync(path.join(live, change.path), { force: true });
+      emptied.add(path.dirname(change.path));
+    }
   }
+  // A folder the update emptied goes: an empty older one would still say
+  // which layout a wiki is in.
+  for (const dir of [...emptied].sort((a, b) => b.length - a.length))
+    for (let at = dir; at && at !== "."; at = path.dirname(at)) {
+      const full = path.join(live, at);
+      if (!existsSync(full) || readdirSync(full).length) break;
+      rmdirSync(full);
+    }
 }
 
 /** The update being resolved, if one is. */

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { characterFile } from "../wiki-layout.ts";
 import type {
   OpenClawConfig,
   OpenClawPluginApi,
@@ -18,7 +19,6 @@ import { sharedDir } from "../shared-dir.ts";
  */
 
 /** Where pages live that make up a character's card. */
-export const CHARACTER_PAGES = path.join("entities", "characters");
 
 /** The World Wiki's folder, as memory reads it. */
 export function worldWikiDir(api: OpenClawPluginApi): string {
@@ -29,7 +29,7 @@ export function worldWikiDir(api: OpenClawPluginApi): string {
 }
 
 export const characterPagePath = (wikiDir: string, id: string): string =>
-  path.join(wikiDir, CHARACTER_PAGES, `${id}.md`);
+  characterFile(wikiDir, id);
 
 export interface CharacterCard {
   /** The page as written, for the character's own turns. */
@@ -50,7 +50,10 @@ export function readCharacterCard(
   }
   return {
     text,
-    page: parsePage(text, path.join(CHARACTER_PAGES, `${id}.md`)),
+    page: parsePage(
+      text,
+      path.relative(wikiDir, characterPagePath(wikiDir, id)),
+    ),
   };
 }
 
@@ -87,6 +90,10 @@ export function registerCharacterCard(api: OpenClawPluginApi): void {
       const files = context.bootstrapFiles;
       if (!agentId || !files || !context.workspaceDir) return;
       if (agentId === systemAgentOf(currentConfig(api))) return;
+      // A world not yet updated to one page per character still has its
+      // cards: they stay its character's, as they were.
+      if (files.some((file) => REPLACED.has(file.name) && !file.missing))
+        return;
       const kept = files.filter((file) => !REPLACED.has(file.name));
       const card = readCharacterCard(wikiDir, agentId);
       if (card)
@@ -101,7 +108,7 @@ export function registerCharacterCard(api: OpenClawPluginApi): void {
     {
       name: "kazusa-character-card",
       description:
-        "A world character's turns read their World Wiki page in place of IDENTITY.md and SOUL.md.",
+        "A world character's turns read their World Wiki page in place of IDENTITY.md and SOUL.md, once those are gone.",
     },
   );
 }

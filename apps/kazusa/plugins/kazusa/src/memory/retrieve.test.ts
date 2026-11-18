@@ -35,42 +35,46 @@ beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "kazusa-memory-"));
   write(
     "world/concepts/trinity.md",
-    "---\ngroups: [kivotos]\naliases: [Trinity General School]\n---\n# Trinity\n\nThe school of tea.\n",
+    "---\ngroup: true\nknown: { everyone: heard of }\naliases: [Trinity General School]\n---\n# Trinity\n\nThe school of tea.\n",
   );
   write(
     "world/concepts/kivotos.md",
-    "---\nrenown: famous\n---\n# Kivotos\n\nA city.\n",
+    "---\nknown: { everyone: knows }\n---\n# Kivotos\n\nA city.\n",
   );
   write(
     "world/concepts/gehenna.md",
-    "---\ngroups: [kivotos]\nrenown: known\n---\n# Gehenna\n\nRowdy school.\n",
+    "---\ngroup: true\nknown: { everyone: heard of }\n---\n# Gehenna\n\nRowdy school.\n",
   );
   write(
     "world/concepts/sweets.md",
-    "---\ngroups: [trinity]\naliases: [Sweets Club]\n---\n# Sweets Club\n\nDesserts.\n\n## Secret stash\n\nKnown by: natsu\n\nThe hidden macaron tin.\n",
+    "---\ngroup: true\nknown: { everyone: heard of, trinity: knows }\naliases: [Sweets Club]\n---\n# Sweets Club\n\nDesserts.\n",
+  );
+  write(
+    "agents/natsu/wiki/concepts/sweets.md",
+    "---\nname: Sweets Club\n---\n# Sweets Club\n\n## Secret stash\n\nThe hidden macaron tin.\n",
   );
   write(
     "world/concepts/prefects.md",
-    "---\nsummary: Gehenna's feared discipline body.\ngroups: [gehenna]\nrenown: known\n---\n# Prefect Team\n\nArmbands and patrols everywhere.\n\n## Inner workings\n\nBudget fights over ledgers.\n",
+    "---\nsummary: Gehenna's feared discipline body.\ngroup: true\nknown: { everyone: heard of }\n---\n# Prefect Team\n\nArmbands and patrols everywhere.\n\n## Inner workings\n\nBudget fights over ledgers.\n",
   );
   write(
-    "world/entities/places/gehenna_cellar.md",
-    "---\ngroups: [gehenna]\n---\n# Gehenna Cellar\n\nA damp cellar below the hall.\n",
+    "world/concepts/gehenna_cellar.md",
+    "---\nplace_id: gehenna_cellar\nknown: { gehenna: knows }\n---\n# Gehenna Cellar\n\nA damp cellar below the hall.\n",
   );
   write(
-    "world/entities/characters/kazusa.md",
-    "---\nname: Kazusa Kyouyama\ngroups: { Sweets Club: close, Trinity General School: member }\n---\n# Kazusa\n\nAloof.\n",
+    "world/characters/kazusa.md",
+    "---\nname: Kazusa Kyouyama\nin: { Sweets Club: close, Trinity General School: knows }\n---\n# Kazusa\n\nAloof.\n",
   );
   write(
-    "world/entities/characters/natsu.md",
-    "---\nname: Natsu Yutori\ngroups: { Sweets Club: close, Trinity General School: member }\n---\n# Natsu\n\nMilk cartons.\n",
+    "world/characters/natsu.md",
+    "---\nname: Natsu Yutori\nin: { Sweets Club: close, Trinity General School: knows }\n---\n# Natsu\n\nMilk cartons.\n",
   );
   write(
-    "world/entities/characters/mine.md",
-    "---\nname: Mine Aomori\ngroups: [Trinity General School]\n---\n# Mine\n\nA Sister.\n",
+    "world/characters/mine.md",
+    "---\nname: Mine Aomori\nin: [Trinity General School]\n---\n# Mine\n\nA Sister.\n",
   );
   write(
-    "agents/kazusa/wiki/entities/characters/natsu.md",
+    "agents/kazusa/wiki/characters/natsu.md",
     "---\nname: Natsu Yutori\nrelation: close friend\n---\nPhilosophical troublemaker.\n\n## What they think of me\n\nEnjoys needling me. (think so)\n\n## Open threads\n\n- Stop her saying Cath Palug.\n\n## Notes\n\n- 2026-10-24 · told by natsu · suspect — Angel 24 might drop strawberry milk.\n- 2026-10-01 · seen it · sure — Old note.\n- 2026-09-01 · seen it · sure — Older note.\n",
   );
   write(
@@ -99,7 +103,7 @@ describe("retrieve", () => {
 
   it("strips the player prefix from ids", () => {
     write(
-      "agents/kazusa/wiki/entities/characters/sensei.md",
+      "agents/kazusa/wiki/characters/sensei.md",
       "---\npeer_id: user:sensei\nname: Sensei\n---\nGuides us.\n",
     );
     expect(ids("hi", ["user:sensei"])[0]).toBe("sensei");
@@ -116,7 +120,7 @@ describe("retrieve", () => {
     expect(ids("damp cellar below")).not.toContain("gehenna_cellar");
   });
 
-  it("does not read insider or `Known by:` text for outsiders", () => {
+  it("does not read insider text, or another's wiki, for outsiders", () => {
     expect(ids("budget fights over ledgers")).not.toContain("prefects");
     expect(ids("hidden macaron tin")).not.toContain("sweets");
     expect(ids("hidden macaron tin", [], "natsu")).toContain("sweets");
@@ -127,6 +131,16 @@ describe("retrieve", () => {
     expect(ids("Philosophical troublemaker", [], "natsu")).not.toContain(
       "past_and_present",
     );
+  });
+
+  it("brings to mind what a page links to, where they can see it", () => {
+    write(
+      "world/concepts/seminar.md",
+      "---\ngroup: true\nknown: { everyone: heard of }\nsummary: The council of [[kivotos]].\n---\n# Seminar\n\nAt odds with [[trinity]].\n",
+    );
+    // Heard of it: its summary's link, not its opening's.
+    expect(ids("the Seminar met today")).toContain("kivotos");
+    expect(ids("the Seminar met today")).not.toContain("trinity");
   });
 
   it("does not take a common word for a name", () => {
@@ -186,7 +200,7 @@ describe("brainRequest", () => {
 
   it("does not let those owed a reply crowd out who is speaking", () => {
     write(
-      "agents/kazusa/wiki/entities/characters/mine.md",
+      "agents/kazusa/wiki/characters/mine.md",
       "---\nname: Mine Aomori\n---\nA Sister.\n",
     );
     const entities = retrieve(
@@ -242,7 +256,7 @@ describe("render", () => {
   it("shows view, guess, threads and the newest notes", () => {
     const { text } = renderOnYourMind(entities("", ["natsu"]), options);
     expect(text).toContain(
-      "Natsu Yutori `natsu` (close friend): Philosophical troublemaker. You guess they think: Enjoys needling me. (think so) Unfinished: Stop her saying Cath Palug.",
+      "Natsu Yutori `natsu` (close friend): Milk cartons. In: Sweets Club, Trinity. Your view: Philosophical troublemaker. You guess they think: Enjoys needling me. (think so) Unfinished: Stop her saying Cath Palug.",
     );
     expect(text).toContain(
       "· Oct 24, Natsu Yutori told you: Angel 24 might drop strawberry milk. (suspect)",
@@ -259,6 +273,38 @@ describe("render", () => {
     expect(text).not.toContain("Armbands");
   });
 
+  it("says what they know someone only through", () => {
+    const { text } = renderOnYourMind(
+      entities("I saw Mine at the chapel."),
+      options,
+    );
+    expect(text).toContain("Mine Aomori `mine`: A Sister. (through Trinity)");
+  });
+
+  it("says which groups someone is in, of those they know who is in", () => {
+    write(
+      "world/characters/iroha.md",
+      "---\nname: Iroha\nin: { gehenna: knows, prefects: heard of }\nknown: { everyone: heard of }\n---\n# Iroha\n\nSleepy.\n",
+    );
+    expect(renderOnYourMind(entities("", ["mine"]), options).text).toContain(
+      "A Sister. (through Trinity) In: Trinity.",
+    );
+    // Gehenna and its prefects she has only heard of.
+    expect(
+      renderOnYourMind(entities("", ["iroha"]), options).text,
+    ).not.toContain("In:");
+  });
+
+  it("reads a link as the name of what it links to", () => {
+    write(
+      "world/characters/mine.md",
+      "---\nname: Mine Aomori\nin: [Trinity General School]\n---\n# Mine\n\nA Sister of [[trinity]], fond of [[sweets|the Sweets Club]].\n",
+    );
+    expect(renderOnYourMind(entities("", ["mine"]), options).text).toContain(
+      "A Sister of Trinity, fond of the Sweets Club.",
+    );
+  });
+
   it("drops whole entities over budget into Also", () => {
     const { text } = renderOnYourMind(entities("", ["natsu"]), {
       ...options,
@@ -269,7 +315,7 @@ describe("render", () => {
 
   it("lists the people most in their life, addressed by their chat id, once", () => {
     write(
-      "agents/kazusa/wiki/entities/characters/sensei.md",
+      "agents/kazusa/wiki/characters/sensei.md",
       "---\npeer_id: user:sensei\nname: Sensei\nrelation: mentor\n---\nGuides us.\n",
     );
     const pages = () => index.personal("kazusa").values();
@@ -305,7 +351,7 @@ describe("spokenText and the closing reminder", () => {
   it("searches a check-in by the activity and today's plans, not its wording", () => {
     write(
       "world/concepts/studying.md",
-      "---\nrenown: famous\n---\n# Studying\n\nActivity check-in planned studying activity.\n",
+      "---\nknown: { everyone: knows }\n---\n# Studying\n\nActivity check-in planned studying activity.\n",
     );
     const request = brainRequest({
       agentId: "kazusa",
@@ -328,7 +374,7 @@ describe("keyword floor", () => {
   beforeEach(() => {
     write(
       "world/concepts/bake_sale.md",
-      "---\nrenown: famous\n---\n# Bake Sale\n\nA new stall for cakes and cookies.\n",
+      "---\nknown: { everyone: knows }\n---\n# Bake Sale\n\nA new stall for cakes and cookies.\n",
     );
   });
 
@@ -360,8 +406,8 @@ describe("familiarity", () => {
       mine(new Map()).score,
     );
     expect(mine(new Map([["mine", 1]])).signals).toContain("familiarity");
-    expect(found(new Map([["trinity", 9]])).map(({ id }) => id)).not.toContain(
-      "trinity",
+    expect(found(new Map([["sweets", 9]])).map(({ id }) => id)).not.toContain(
+      "sweets",
     );
   });
 });

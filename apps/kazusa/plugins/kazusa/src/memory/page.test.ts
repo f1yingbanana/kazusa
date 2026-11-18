@@ -7,8 +7,7 @@ describe("parsePage", () => {
       `---
 summary: Feared and overworked.
 aliases: [Prefects]
-groups: [gehenna_academy]
-renown: known
+known: { everyone: heard of, gehenna_academy: knows }
 ---
 
 # Prefect Team
@@ -38,8 +37,8 @@ Only these two.
       name: "Prefect Team",
       summary: "Feared and overworked.",
       lead: "Everyone in Gehenna knows them.",
-      groups: [{ ref: "gehenna_academy", close: false }],
-      renown: "known",
+      known: [{ ref: "gehenna_academy", level: "knows" }],
+      everyone: "heard of",
       history: [
         { date: "2026-10-24", news: false, text: "Patrols suspended." },
         { date: "2026-10-25", news: true, text: "Announced on the portal." },
@@ -145,8 +144,10 @@ Milk.
       "# Angel 24\n\nOpen all night. Bright.\n",
       "entities/places/angel_24.md",
     );
+    // In a world not yet upgraded, its folder makes it a place.
     expect(page).toMatchObject({
-      kind: "place",
+      kind: "concept",
+      place: true,
       name: "Angel 24",
       summary: "Open all night.",
     });
@@ -162,22 +163,74 @@ Milk.
     ).toEqual(["`trust` is a number; use `relation` words"]);
   });
 
-  it("reads groups as a list, or with who is close", () => {
+  it("reads `known` and `in` as a list, or with how well each knows them", () => {
     const list = parsePage(
-      "---\ngroups: [Seminar, Millennium]\n---\n# Yuuka\n",
-      "entities/characters/yuuka.md",
+      "---\nin: [Seminar, Millennium]\n---\n# Yuuka\n",
+      "characters/yuuka.md",
     );
-    expect(list.groups).toEqual([
-      { ref: "Seminar", close: false },
-      { ref: "Millennium", close: false },
+    expect(list.in).toEqual([
+      { ref: "Seminar", level: "knows" },
+      { ref: "Millennium", level: "knows" },
     ]);
     const map = parsePage(
-      "---\ngroups: { Seminar: close, Millennium: member }\n---\n# Yuuka\n",
-      "entities/characters/yuuka.md",
+      "---\nin: { Seminar: close, Millennium: knows }\nknown: { everyone: heard of, Gehenna: heard of }\n---\n# Yuuka\n",
+      "characters/yuuka.md",
     );
-    expect(map.groups).toEqual([
-      { ref: "Seminar", close: true },
-      { ref: "Millennium", close: false },
+    expect(map.in).toEqual([
+      { ref: "Seminar", level: "close" },
+      { ref: "Millennium", level: "knows" },
     ]);
+    expect(map.known).toEqual([{ ref: "Gehenna", level: "heard of" }]);
+    expect(map.everyone).toBe("heard of");
+  });
+
+  it("reads its components and its links by who can see them", () => {
+    const page = parsePage(
+      "---\nplace_id: gehenna\ngroup: true\nsummary: A school, rival of [[trinity]].\n---\n# Gehenna\n\nRun by [[pandemonium]].\n\n## Inside\n\nThe [[prefects]] patrol.\n\n## Voice\n\nKnown by: gehenna\n\nA [[secret]].\n",
+      "concepts/gehenna.md",
+    );
+    expect([page.kind, page.place, page.group]).toEqual([
+      "concept",
+      true,
+      true,
+    ]);
+    expect(page.linksAt).toEqual({
+      heard: ["trinity"],
+      knows: ["pandemonium"],
+      close: ["prefects"],
+    });
+  });
+});
+
+describe("levels in the editor's words", () => {
+  it("read as the levels they stand for", () => {
+    const page = parsePage(
+      "---\nname: Amy\nhome: room\nin: { choir: associate, club: close member, school: member }\n---\n# Amy\n",
+      "characters/amy.md",
+    );
+    expect(page.problems).toEqual([]);
+    expect(page.home).toBe("room");
+    expect(page.in).toEqual([
+      { ref: "choir", level: "heard of" },
+      { ref: "club", level: "close" },
+      { ref: "school", level: "knows" },
+    ]);
+  });
+});
+
+describe("a History written as prose", () => {
+  it("is an ordinary section, not lost", () => {
+    const page = parsePage(
+      "---\nname: Trinity\n---\n# Trinity\n\nA school.\n\n## History\n\nFounded long ago by three factions.\n",
+      "concepts/trinity.md",
+    );
+    expect(page.problems).toEqual([]);
+    expect(page.history).toEqual([]);
+    expect(page.sections).toContainEqual(
+      expect.objectContaining({
+        title: "History",
+        text: expect.stringContaining("three factions"),
+      }),
+    );
   });
 });

@@ -4,12 +4,13 @@ import { homedir } from "node:os";
 import path from "node:path";
 import {
   WikiDeletePayloadSchema,
+  WikiIdSchema,
   WikiKindSchema,
-  WikiRenamePayloadSchema,
   WikiPageFormSavePayloadSchema,
   WikiSavePayloadSchema,
   type WikiEditResult,
   type WikiKind,
+  type WikiMember,
   type WikiPageForm,
   type WikiReachResponse,
   type WikiSavePayload,
@@ -58,14 +59,15 @@ import {
 } from "./embedding-models.ts";
 import { MemoryIndex, WORLD_SCOPE } from "./index.ts";
 import { lintMap } from "../location/world.ts";
-import { renamedText } from "../location/pages.ts";
+import { renameCards, renamedText } from "../location/pages.ts";
 import type { PlaceEdits } from "../location/register.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import { auditWorld, workspacesBeside, type WorldAudit } from "./audit.ts";
 import { lintPersonal, lintWorld, type LintFinding } from "./lint.ts";
-import { composePage, splitPage } from "./form.ts";
+import { composePage, splitPage, withMembership } from "./form.ts";
 import {
   pageKind,
+  plainLinks,
   type Certainty,
   type HistoryLine,
   type Page,
@@ -89,7 +91,6 @@ import {
 import { MEMORY_CONFIG } from "./config.ts";
 import {
   deleteSource,
-  PAGE_DIRECTORY,
   readSource,
   saveSource,
   SourceConflict,
@@ -463,7 +464,7 @@ export function registerMemory(
     return found
       .map((entity) => {
         const page = entity.personal ?? entity.world;
-        return `- ${page?.name ?? entity.id} (\`${entity.id}\`): ${page?.summary ?? ""}`.trimEnd();
+        return `- ${page?.name ?? entity.id} (\`${entity.id}\`): ${plainLinks(page?.summary ?? "", (id) => nameOf(id) ?? id)}`.trimEnd();
       })
       .join("\n");
   };
@@ -585,7 +586,11 @@ export function registerMemory(
       const changes = changesSince(agentId, placeId, now);
       const date = new Date(now).toISOString().slice(0, 10);
       applyOperation(
-        path.join(workspace, "wiki", PAGE_DIRECTORY.place, `${placeId}.md`),
+        path.join(
+          workspace,
+          "wiki",
+          readSource(path.join(workspace, "wiki"), placeId, "concept").path,
+        ),
         (raw) => {
           let next = withField(
             raw ?? newPage(nameOf(placeId) ?? placeId, "been there"),
@@ -608,7 +613,7 @@ export function registerMemory(
       retrieve(index, { agentId, stimulus: text, now })
         .filter(
           (entity) =>
-            entity.personal?.kind === "place" &&
+            Boolean(entity.world?.place ?? entity.personal?.place) &&
             entity.signals.some((s) => s === "mention" || s === "keyword"),
         )
         .map((entity) => ({
@@ -731,18 +736,21 @@ export function registerMemory(
       const { topic } = z.object({ topic: z.string().min(1) }).parse(input);
       const world = index.world();
       const isPublic = (page: Page | undefined): page is Page =>
-        Boolean(page) &&
-        page!.kind !== "day" &&
-        !page!.knownBy.length &&
-        (page!.renown === "known" ||
-          page!.renown === "famous" ||
-          (page!.renown === undefined && page!.kind === "concept"));
+        Boolean(page) && world.isPublic(page!);
       const ids = [
         ...new Set([
           ...mentionsIn(topic, world.pages.values()),
           ...index
             .search(agentId, topic)
-            .filter((hit) => hit.scope === WORLD_SCOPE && hit.layer !== "L2")
+            .filter(
+              (hit) =>
+                hit.scope === WORLD_SCOPE &&
+                (hit.layer === "L0" ||
+                  (hit.layer === "L1" &&
+                    ["knows", "close"].includes(
+                      world.pages.get(hit.pageId)?.everyone ?? "",
+                    ))),
+            )
             .map((hit) => hit.pageId),
         ]),
       ]
@@ -752,7 +760,12 @@ export function registerMemory(
         ? ids
             .map((id) => {
               const page = world.pages.get(id)!;
-              return `${page.name} \`${id}\`: ${(page.lead || page.summary).replace(/\s+/g, " ")}`;
+              // What everyone knows of it: the opening only if everyone knows it.
+              const known =
+                page.everyone === "knows" || page.everyone === "close"
+                  ? page.lead || page.summary
+                  : page.summary;
+              return `${page.name} \`${id}\`: ${plainLinks(known, (link) => nameOf(link) ?? link).replace(/\s+/g, " ")}`;
             })
             .join("\n")
         : "Nothing public turns up.";
@@ -831,11 +844,11 @@ export function registerMemory(
         args.new,
       );
       if (first) return plain(first);
+      // Where their page on it is, or would go.
       const file = path.join(
         workspace,
         "wiki",
-        PAGE_DIRECTORY[kind],
-        `${id}.md`,
+        readSource(path.join(workspace, "wiki"), id, kind).path,
       );
       const certainty: Certainty = args.certainty;
       sleep.write(
@@ -1009,7 +1022,44 @@ export function registerMemory(
     kind: page.kind,
     name: page.name,
     summary: page.summary,
+    ...(page.parent ? { parent: page.parent } : {}),
+    ...(page.place ? { place: true } : {}),
+    ...(page.group ? { group: true } : {}),
   });
+  /**
+   * Who knows a page, as the Wiki shows it: in a world not yet upgraded, its
+   * older `groups` and `renown` said the new way, so nothing looks empty.
+   */
+  const whoKnows = (
+    page: Page,
+  ): Pick<WikiPage, "known" | "in" | "everyone"> => {
+    const copy = (list: Page["known"]) =>
+      list.map(({ ref, level }) => ({ ref, level }));
+    if (index.world().upgraded)
+      return {
+        ...(page.known.length ? { known: copy(page.known) } : {}),
+        ...(page.in.length ? { in: copy(page.in) } : {}),
+        ...(page.everyone ? { everyone: page.everyone } : {}),
+      };
+    const older = page.legacyGroups.filter(
+      ({ ref }) => ref.toLowerCase() !== "everyone",
+    );
+    const member = (level: string) =>
+      page.kind === "person" && level !== "heard of";
+    const everyone =
+      page.legacyGroups.find(({ ref }) => ref.toLowerCase() === "everyone")
+        ?.level ??
+      (page.renown === "famous"
+        ? "knows"
+        : page.renown === "known"
+          ? "heard of"
+          : undefined);
+    return {
+      known: copy(older.filter(({ level }) => !member(level))),
+      in: copy(older.filter(({ level }) => member(level))),
+      ...(everyone ? { everyone } : {}),
+    };
+  };
   const fullPage = (page: Page): WikiPage => ({
     ...listItem(page),
     aliases: [...page.aliases],
@@ -1021,18 +1071,11 @@ export function registerMemory(
     notes: page.notes.map((note) => ({ ...note })),
     history: page.history.map((line) => ({ ...line })),
     openThreads: [...page.openThreads],
-    knownBy: [...page.knownBy],
     ...(page.theyThinkOfMe ? { theyThinkOfMe: page.theyThinkOfMe } : {}),
     ...(page.relation ? { relation: page.relation } : {}),
-    ...(page.groups.length
-      ? {
-          groups: page.groups.map((group) => ({
-            ref: group.ref,
-            close: group.close,
-          })),
-        }
-      : {}),
-    ...(page.renown ? { renown: page.renown } : {}),
+    ...whoKnows(page),
+    place: page.place,
+    group: page.group,
     ...(page.seen ? { seen: page.seen } : {}),
   });
   route("wiki", "GET", async (req, res) => {
@@ -1042,6 +1085,7 @@ export function registerMemory(
       : index.world().pages.values();
     sendJson(res, 200, {
       pages: [...pages].map(listItem),
+      upgraded: index.world().upgraded,
     } satisfies WikiListResponse);
   });
   route("wiki/page", "GET", async (req, res) => {
@@ -1076,7 +1120,15 @@ export function registerMemory(
       knows: [],
       heard: [],
       none: 0,
+      members: [],
     };
+    const cast = new Set(listAgentIds(config));
+    for (const member of world.members(id))
+      if (cast.has(member) && member !== system)
+        reach.members.push({
+          id: member,
+          name: world.pages.get(member)?.name ?? member,
+        });
     for (const agent of listAgentIds(config)) {
       if (agent === system || agent === id) continue;
       const person = { id: agent, name: world.pages.get(agent)?.name ?? agent };
@@ -1086,7 +1138,7 @@ export function registerMemory(
       else if (depth === "heard of") reach.heard.push(person);
       else reach.none += 1;
     }
-    for (const list of [reach.well, reach.knows, reach.heard])
+    for (const list of [reach.well, reach.knows, reach.heard, reach.members])
       list.sort((a, b) => a.name.localeCompare(b.name));
     sendJson(res, 200, reach);
   });
@@ -1110,8 +1162,6 @@ export function registerMemory(
     sendJson(res, 200, readSource(wikiRoot(agent), id, fallback));
   });
   const PLACE_ID_FIELD = z.object({ place_id: z.string().optional() });
-  /** Where place pages live, as `readSource` reports paths. */
-  const PLACES_PATH = `${PAGE_DIRECTORY.place.split(path.sep).join("/")}/`;
   const placeIdIn = (text: string): string | undefined => {
     try {
       return readFrontmatter(text, PLACE_ID_FIELD).data.place_id;
@@ -1119,15 +1169,6 @@ export function registerMemory(
       return undefined;
     }
   };
-  /** Kept, never gone for good: a person can put a page back by hand. */
-  const trashDir = (scope: string) =>
-    path.join(
-      resolveStateDir(process.env, homedir()),
-      "kazusa",
-      "wiki-trash",
-      new Date().toISOString().replace(/[:.]/g, "-"),
-      scope,
-    );
   const conflict = (res: ServerResponse, error: unknown): void => {
     if (!(error instanceof SourceConflict)) throw error;
     sendJson(res, 409, { error: error.message, current: error.current });
@@ -1142,10 +1183,7 @@ export function registerMemory(
       // A world place saved under a new `place_id` is renamed, so whatever
       // names it, and whoever is there, follows instead of losing it.
       const current = readSource(root, payload.id, kind);
-      const from =
-        current.exists && current.path.startsWith(PLACES_PATH)
-          ? placeIdIn(current.text)
-          : undefined;
+      const from = current.exists ? placeIdIn(current.text) : undefined;
       const to = placeIdIn(payload.text);
       const places = deps.places?.current;
       if (
@@ -1161,9 +1199,19 @@ export function registerMemory(
         index.invalidateWorld();
         return saveSource(root, {
           id: to,
-          kind: "place",
+          kind: "concept",
           text: renamedText(payload.text, { [from]: to }),
         });
+      }
+      // A world place saved as no place any more comes off the map the way
+      // a removed one does, its page kept: what was in it moves up, homes and
+      // people there go to its area, routes to it go.
+      if (!payload.agent && places && from !== undefined && to === undefined) {
+        if (payload.base !== undefined && payload.base !== current.hash)
+          throw new SourceConflict(current);
+        await places.remove(from, path.join(root, current.path), payload.text);
+        index.invalidateWorld();
+        return readSource(root, payload.id, kind);
       }
       const saved = saveSource(root, {
         id: payload.id,
@@ -1188,9 +1236,9 @@ export function registerMemory(
     asked ?? pageKind(readSource(root, id).path.split("/").join(path.sep));
   route("wiki/form", "GET", async (req, res) => {
     const query = params(req);
-    const id = query.get("id");
+    const id = WikiIdSchema.safeParse(query.get("id")).data;
     if (!id) {
-      sendJson(res, 400, { error: "Say which page." });
+      sendJson(res, 400, { error: "Say which page, by its id." });
       return;
     }
     const agent = query.get("agent") ?? undefined;
@@ -1203,9 +1251,48 @@ export function registerMemory(
       kind,
       exists: source.exists,
       hash: source.hash,
-      ...splitPage(source.text, kind, agent !== undefined),
+      ...splitPage(source.text, { id, kind, personal: agent !== undefined }),
+      ...(agent || kind !== "concept" ? {} : { members: membersOf(id) }),
     } satisfies WikiPageForm);
   });
+  /** The characters in a group, from their pages' `in`. */
+  const membersOf = (id: string): WikiMember[] => {
+    const world = index.world();
+    return [...world.pages.values()]
+      .filter((page) => page.kind === "person")
+      .flatMap((page) => {
+        // As the model reads it: the group by any name, the closer of two.
+        const level = world.memberships(page).get(id);
+        return level ? [{ id: page.id, name: page.name, level }] : [];
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
+  type WikiMemberPick = {
+    readonly id: string;
+    readonly level: "heard of" | "knows" | "close";
+  };
+  /** Writes who is in a group onto each character whose place in it changed. */
+  const saveMembers = (id: string, wanted: readonly WikiMemberPick[]) => {
+    const world = index.world();
+    const group = world.pages.get(id);
+    const names = [id, ...(group ? [group.name, ...group.aliases] : [])];
+    const before = new Map(
+      membersOf(id).map(({ id: who, level }) => [who, level]),
+    );
+    const after = new Map(wanted.map(({ id: who, level }) => [who, level]));
+    for (const who of new Set([...before.keys(), ...after.keys()])) {
+      if (before.get(who) === after.get(who)) continue;
+      const current = readSource(worldDir, who, "person");
+      if (!current.exists) continue;
+      saveSource(worldDir, {
+        id: who,
+        kind: "person",
+        base: current.hash,
+        text: withMembership(current.text, id, names, after.get(who)),
+      });
+    }
+    index.invalidateWorld();
+  };
   route("wiki/form/save", "POST", async (req, res) => {
     const payload = WikiPageFormSavePayloadSchema.parse(
       await readJsonBody(req),
@@ -1213,24 +1300,47 @@ export function registerMemory(
     const root = wikiRoot(payload.agent);
     const kind = kindOf(root, payload.id, payload.kind);
     const source = readSource(root, payload.id, kind);
+    const NAME = z.object({ name: z.string().optional() });
+    const nameIn = (text: string): string | undefined => {
+      try {
+        return readFrontmatter(text, NAME).data.name;
+      } catch {
+        return undefined;
+      }
+    };
     try {
-      sendJson(
-        res,
-        200,
-        await savePage({
+      const saved = await savePage({
+        id: payload.id,
+        ...(payload.agent ? { agent: payload.agent } : {}),
+        kind,
+        base: payload.base,
+        text: composePage(source.text, payload, payload.moveOther === true, {
           id: payload.id,
-          ...(payload.agent ? { agent: payload.agent } : {}),
           kind,
-          base: payload.base,
-          text: composePage(
-            source.text,
-            payload,
-            payload.moveOther === true,
-            kind,
-            payload.agent !== undefined,
-          ),
+          personal: payload.agent !== undefined,
         }),
-      );
+      });
+      if (!payload.agent && payload.members)
+        saveMembers(saved.id, payload.members);
+      // A place called something new: characters' cards for it follow.
+      const after = source.exists ? readSource(root, saved.id, kind) : source;
+      const name = nameIn(after.text);
+      if (
+        !payload.agent &&
+        source.exists &&
+        placeIdIn(after.text) !== undefined &&
+        name !== undefined &&
+        name !== nameIn(source.text)
+      ) {
+        renameCards({
+          workspaces: listAgentIds(currentConfig(api)).map(workspaceOf),
+          id: placeIdIn(after.text)!,
+          name,
+          cwd: process.cwd(),
+        });
+        index.invalidateWorld();
+      }
+      sendJson(res, 200, saved);
     } catch (error) {
       conflict(res, error);
     }
@@ -1259,9 +1369,7 @@ export function registerMemory(
       }
       const places = deps.places?.current;
       const placeId =
-        payload.agent || !current.path.startsWith(PLACES_PATH)
-          ? undefined
-          : placeIdIn(current.text);
+        payload.agent || !current.exists ? undefined : placeIdIn(current.text);
       if (placeId !== undefined && places) {
         const { changed, relocated } = await places.remove(
           placeId,
@@ -1275,7 +1383,7 @@ export function registerMemory(
         } satisfies WikiEditResult);
         return;
       }
-      deleteSource(root, payload, trashDir(payload.agent ?? "world"));
+      deleteSource(root, payload);
       index.invalidateWorld();
       sendJson(res, 200, {
         id: payload.id,
@@ -1285,26 +1393,6 @@ export function registerMemory(
     } catch (error) {
       conflict(res, error);
     }
-  });
-  route("wiki/rename", "POST", async (req, res) => {
-    const payload = WikiRenamePayloadSchema.parse(await readJsonBody(req));
-    const current = readSource(worldDir, payload.id);
-    const from =
-      current.exists && current.path.startsWith(PLACES_PATH)
-        ? placeIdIn(current.text)
-        : undefined;
-    const places = deps.places?.current;
-    if (from === undefined || !places) {
-      sendJson(res, 400, { error: "Only World Wiki places can be renamed." });
-      return;
-    }
-    const { changed } = await places.rename(from, payload.to);
-    index.invalidateWorld();
-    sendJson(res, 200, {
-      id: payload.to,
-      changed: [...changed],
-      relocated: [],
-    } satisfies WikiEditResult);
   });
   // Go over the day now, on request: what a long sleep starts, in its own turn.
   route("memory/consolidate", "POST", async (req, res) => {

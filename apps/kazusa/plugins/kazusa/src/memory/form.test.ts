@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { composePage, splitPage } from "./form.ts";
+import { composePage, splitPage, withMembership } from "./form.ts";
 import { parsePage } from "./page.ts";
+
+const SPOT = {
+  id: "yuuka-hayase",
+  kind: "person",
+  personal: false,
+} as const;
+const PLACE = { id: "rooftop", kind: "concept", personal: false } as const;
 
 const YUUKA = `---
 name: Yuuka Hayase
-groups: { Seminar: close, Millennium: member }
+known: { everyone: heard of }
+in: { Seminar: close, Millennium: knows }
 home: room_yuuka
 year: 2nd
 halo: a visor-like ring
@@ -23,16 +31,23 @@ Keeps the budgets.
 Known by: yuuka-hayase
 
 Secretly kind.
+
+## Fears
+
+Known by: yuuka-hayase
+
+Being wasteful.
 `;
 
 describe("a page in the Wiki's form", () => {
-  it("splits into the fields Kazusa reads, the opening and sections", () => {
-    const form = splitPage(YUUKA, "person", false);
+  it("splits into the fields Kazusa reads and one field per level", () => {
+    const form = splitPage(YUUKA, SPOT);
     expect(form.fields).toMatchObject({
       name: "Yuuka Hayase",
-      groups: [
-        { ref: "Seminar", close: true },
-        { ref: "Millennium", close: false },
+      groups: [{ ref: "everyone", level: "heard of" }],
+      in: [
+        { ref: "Seminar", level: "close" },
+        { ref: "Millennium", level: "knows" },
       ],
       home: "room_yuuka",
     });
@@ -41,30 +56,27 @@ describe("a page in the Wiki's form", () => {
       { key: "halo", value: "a visor-like ring" },
     ]);
     expect(form.lead).toBe("The treasurer of Seminar.");
-    expect(form.sections).toEqual([
-      { title: "Profile", knownBy: [], text: "Keeps the budgets." },
-      {
-        title: "Inner voice",
-        knownBy: ["yuuka-hayase"],
-        text: "Secretly kind.",
-      },
-    ]);
+    expect(form.close).toBe("## Profile\n\nKeeps the budgets.");
+    // The first part only she knows needs no title; the rest keep theirs.
+    expect(form.only).toBe("Secretly kind.\n\n## Fears\n\nBeing wasteful.");
   });
 
   it("composes back to a page that reads the same", () => {
-    const form = splitPage(YUUKA, "person", false);
-    const text = composePage(YUUKA, form, false, "person", false);
-    const before = parsePage(YUUKA, "entities/characters/yuuka-hayase.md");
-    const after = parsePage(text, "entities/characters/yuuka-hayase.md");
-    expect(after.groups).toEqual(before.groups);
+    const form = splitPage(YUUKA, SPOT);
+    const text = composePage(YUUKA, form, false, SPOT);
+    const before = parsePage(YUUKA, "characters/yuuka-hayase.md");
+    const after = parsePage(text, "characters/yuuka-hayase.md");
+    expect(after.in).toEqual(before.in);
+    expect(after.known).toEqual(before.known);
+    expect(after.everyone).toBe("heard of");
     expect(after.sections).toEqual(before.sections);
     expect(after.lead).toBe(before.lead);
     expect(text).toContain("halo: a visor-like ring");
   });
 
   it("moves fields Kazusa doesn't read into the text", () => {
-    const form = splitPage(YUUKA, "person", false);
-    const text = composePage(YUUKA, form, true, "person", false);
+    const form = splitPage(YUUKA, SPOT);
+    const text = composePage(YUUKA, form, true, SPOT);
     expect(text).not.toContain("halo:");
     expect(text).toContain(
       "## Details\n\n- Year: 2nd\n- Halo: a visor-like ring",
@@ -84,17 +96,108 @@ map: { x: 1, y: 2 }
 
 Windy.
 `;
-    const form = splitPage(place, "place", false);
-    expect(form.kept).toEqual(["place_id", "entry_minutes", "map"]);
+    const form = splitPage(place, PLACE);
+    expect(form.kept).toEqual(["map"]);
+    expect(form.fields.place).toBe(true);
+    expect(form.fields.entryMinutes).toBe(3);
     const text = composePage(
       place,
       { ...form, fields: { ...form.fields, backdrop: "rooftop-sky" } },
       false,
-      "place",
-      false,
+      PLACE,
     );
     expect(text).toContain("backdrop: rooftop-sky");
     expect(text).toContain("place_id: rooftop");
     expect(text).toContain("entry_minutes: 3");
+  });
+
+  it("edits a place's routes, each with its ways, and drops what can't be used", () => {
+    const place = "---\nplace_id: rooftop\nname: Rooftop\n---\n\n# Rooftop\n";
+    const form = splitPage(place, PLACE);
+    const text = composePage(
+      place,
+      {
+        ...form,
+        fields: {
+          ...form.fields,
+          entryMinutes: 2,
+          connections: [
+            {
+              to: "station",
+              ways: [
+                { by: "walk", minutes: 20 },
+                { by: "bike", minutes: 4 },
+                { by: " ", minutes: 1 },
+              ],
+              note: "Downhill all the way.",
+            },
+            { to: "", ways: [{ by: "walk", minutes: 1 }] },
+          ],
+        },
+      },
+      false,
+      PLACE,
+    );
+    expect(splitPage(text, PLACE).fields.connections).toEqual([
+      {
+        to: "station",
+        ways: [
+          { by: "walk", minutes: 20 },
+          { by: "bike", minutes: 4 },
+        ],
+        note: "Downhill all the way.",
+      },
+    ]);
+    expect(text).toContain("entry_minutes: 2");
+  });
+
+  it("keeps the old name as another name when renamed", () => {
+    const form = splitPage(YUUKA, SPOT);
+    const text = composePage(
+      YUUKA,
+      { ...form, fields: { ...form.fields, name: "Yuuka" } },
+      false,
+      SPOT,
+    );
+    const page = parsePage(text, "characters/yuuka-hayase.md");
+    expect(page.name).toBe("Yuuka");
+    expect(page.aliases).toEqual(["Yuuka Hayase"]);
+  });
+
+  it("titles text written before any heading, and keeps a page's own voice its own", () => {
+    const text = composePage(
+      YUUKA,
+      {
+        fields: { aliases: [], groups: [] },
+        lead: "Treasurer.",
+        close: "Strict with money.\n\n## Rumours\n\nNever sleeps.",
+        only: "Tired.",
+      },
+      false,
+      SPOT,
+    );
+    const page = parsePage(text, "characters/yuuka-hayase.md");
+    expect(page.sections).toEqual([
+      { title: "About", text: "Strict with money.", knownBy: [] },
+      { title: "Rumours", text: "Never sleeps.", knownBy: [] },
+      { title: "Inner voice", text: "Tired.", knownBy: ["yuuka-hayase"] },
+    ]);
+    expect(text).not.toContain("groups:");
+  });
+
+  it("puts a character in a group, or takes them out, keeping the rest", () => {
+    const page =
+      "---\nname: Noa\nin:\n  Seminar: close\n  millennium: knows\n---\n\n# Noa\n\nKeeps the minutes.\n";
+    const out = withMembership(
+      page,
+      "seminar",
+      ["seminar", "Seminar"],
+      undefined,
+    );
+    expect(out).toContain("in:\n  millennium: knows\n");
+    expect(out).not.toContain("Seminar");
+    expect(out.endsWith("# Noa\n\nKeeps the minutes.\n")).toBe(true);
+    const back = withMembership(out, "seminar", ["seminar"], "knows");
+    expect(back).toContain("in:\n  millennium: knows\n  seminar: knows\n");
   });
 });

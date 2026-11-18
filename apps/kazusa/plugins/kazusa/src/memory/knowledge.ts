@@ -1,4 +1,5 @@
-import type { Page, Renown } from "./page.ts";
+import { legacyDepth, legacyPublic } from "./legacy.ts";
+import { LEVELS, type Level, type Page } from "./page.ts";
 
 /** Ordered: each depth also sees everything the ones before it see. */
 export const DEPTHS = ["none", "heard of", "familiar", "intimate"] as const;
@@ -8,23 +9,22 @@ export interface Knowledge {
   readonly depth: Depth;
   /** In the author's terms, for the explainer. */
   readonly why: string;
+  /** The group they know it through, when that is all that connects them. */
+  readonly through?: string;
 }
 
 const atLeast = (a: Knowledge, b: Knowledge): Knowledge =>
   DEPTHS.indexOf(b.depth) > DEPTHS.indexOf(a.depth) ? b : a;
 
-const DEFAULT_RENOWN: Readonly<Record<Page["kind"], Renown>> = {
-  place: "local",
-  person: "local",
-  concept: "known",
-  day: "private",
-};
+/** The depth each level of a page's `groups` gives its members. */
+/** The closer of two levels. */
+const higher = (a: Level | undefined, b: Level): Level =>
+  a !== undefined && LEVELS.indexOf(a) >= LEVELS.indexOf(b) ? a : b;
 
-const RENOWN_DEPTH: Readonly<Record<Renown, Depth>> = {
-  private: "none",
-  local: "none",
-  known: "heard of",
-  famous: "familiar",
+export const LEVEL_DEPTH: Readonly<Record<Level, Depth>> = {
+  "heard of": "heard of",
+  knows: "familiar",
+  close: "intimate",
 };
 
 const normalize = (name: string): string =>
@@ -32,14 +32,6 @@ const normalize = (name: string): string =>
     .toLowerCase()
     .replace(/^user:/, "")
     .trim();
-
-interface Anchor {
-  readonly id: string;
-  readonly depth: Depth;
-  readonly why: string;
-  /** Only this page, not what lies under it. */
-  readonly exact?: boolean;
-}
 
 /**
  * The canon as one character could know it: pages by id, names resolved, and
@@ -73,7 +65,37 @@ export class WorldModel {
   resolve(reference: string | undefined): string | undefined {
     if (!reference) return undefined;
     if (this.pages.has(reference)) return reference;
-    return this.names.get(normalize(reference))?.[0];
+    // A page whose id is the name wins over another's alias.
+    const key = normalize(reference);
+    if (this.pages.has(key)) return key;
+    return this.names.get(key)?.[0];
+  }
+
+  /**
+   * Whether the world is in two folders, `characters/` and `concepts/`, and
+   * says who knows its pages with `known` and `in`. One that isn't yet is read
+   * the older way until it updates to a release in the two-folder layout.
+   */
+  get upgraded(): boolean {
+    // Older only while pages still live where the older layout kept them: a new
+    // world with no characters yet is in two folders all the same.
+    this.isUpgraded ??= ![...this.pages.values()].some((page) =>
+      /^(entities|groups)\//.test(page.path),
+    );
+    return this.isUpgraded;
+  }
+  private isUpgraded?: boolean;
+
+  /** A group, the only kind of page that can know one, or none. */
+  group(reference: string | undefined): string | undefined {
+    const id = this.resolve(reference);
+    return id && this.pages.get(id)?.group ? id : undefined;
+  }
+
+  /** Whether `look_up` finds it: everyone has heard of it. */
+  isPublic(page: Page): boolean {
+    if (page.kind === "day") return false;
+    return this.upgraded ? page.everyone !== undefined : legacyPublic(page);
   }
 
   /** Aliases two pages claim, for lint. */
@@ -81,101 +103,119 @@ export class WorldModel {
     return [...this.names].filter(([, owners]) => owners.length > 1);
   }
 
-  /** The page, then everything it sits in: parents and groups. */
+  /**
+   * The page, then every place it sits in. Only a place has an area; an older
+   * world also reads `parent` on its other pages.
+   */
   chain(id: string): ReadonlySet<string> {
     const seen = new Set<string>();
-    const queue = [id];
-    while (queue.length) {
-      const next = queue.shift()!;
-      if (seen.has(next)) continue;
+    for (let next: string | undefined = id; next && !seen.has(next);) {
       seen.add(next);
       const page = this.pages.get(next);
-      if (!page) continue;
-      for (const up of [page.parent, ...page.groups.map(({ ref }) => ref)]) {
-        const resolved = this.resolve(up);
-        if (resolved) queue.push(resolved);
-      }
+      next =
+        page && (page.place || !this.upgraded)
+          ? this.resolve(page.parent)
+          : undefined;
     }
     return seen;
   }
 
-  private anchors(character: Page): Anchor[] {
-    const anchors: Anchor[] = [];
-    for (const group of character.groups) {
-      const id = this.resolve(group.ref);
-      if (id)
-        anchors.push({
-          id,
-          depth: group.close ? "intimate" : "familiar",
-          why: group.close ? `close in ${group.ref}` : `in ${group.ref}`,
-        });
+  /** The groups a character is in (`in`), by page id, and how closely. */
+  memberships(person: Page): ReadonlyMap<string, Level> {
+    const groups = new Map<string, Level>();
+    if (!this.upgraded) {
+      // Older worlds: every group a character's `groups` names.
+      for (const { ref, level } of person.legacyGroups) {
+        const id = this.resolve(ref);
+        if (id) groups.set(id, higher(groups.get(id), level));
+      }
+      return groups;
     }
-    const home = this.resolve(character.home);
-    if (home) {
-      const parent = this.resolve(this.pages.get(home)?.parent);
-      // Living on a campus root makes that place home, not every room in it.
-      anchors.push(
-        parent
-          ? { id: parent, depth: "intimate", why: "around their home" }
-          : { id: home, depth: "intimate", why: "their home", exact: true },
-      );
+    // A group named twice (its id and its name): the closer of the two.
+    for (const { ref, level } of person.in) {
+      const id = this.group(ref);
+      if (id) groups.set(id, higher(groups.get(id), level));
     }
-    return anchors;
+    return groups;
+  }
+
+  private homesOf?: ReadonlySet<string>;
+
+  /** Every page someone lives in. */
+  homes(): ReadonlySet<string> {
+    this.homesOf ??= new Set(
+      [...this.pages.values()]
+        .map((page) => this.resolve(page.home))
+        .filter((id): id is string => Boolean(id)),
+    );
+    return this.homesOf;
+  }
+
+  /** The cast in a group, by id. */
+  members(groupId: string): string[] {
+    return [...this.pages.values()]
+      .filter((page) => page.kind === "person")
+      .filter((page) => this.memberships(page).has(groupId))
+      .map(({ id }) => id);
   }
 
   /** §3.3. `experienced`: the character has a personal page with this id. */
   depth(characterId: string, pageId: string, experienced = false): Knowledge {
-    const page = this.pages.get(pageId);
     if (characterId === pageId)
       return { depth: "intimate", why: "this is them" };
-    const experience: Knowledge = experienced
+    let best: Knowledge = experienced
       ? { depth: "familiar", why: "they have their own page on it" }
       : { depth: "none", why: "nothing connects them to it" };
-    if (!page) return experience;
-    if (page.knownBy.length) {
-      return page.knownBy.includes(characterId)
-        ? { depth: "intimate", why: "`known_by` names them" }
-        : atLeast(
-            { depth: "none", why: "`known_by` does not name them" },
-            experience,
-          );
-    }
+    const page = this.pages.get(pageId);
+    if (!page) return best;
+    if (!this.upgraded) return legacyDepth(this, characterId, page, best);
+    if (page.everyone)
+      best = atLeast(best, {
+        depth: LEVEL_DEPTH[page.everyone],
+        why: "known to everyone",
+      });
     const character = this.pages.get(characterId);
-    const renown = page.renown ?? DEFAULT_RENOWN[page.kind];
-    if (renown === "private") {
-      return character && this.resolve(character.home) === pageId
-        ? { depth: "intimate", why: "they live here" }
-        : atLeast({ depth: "none", why: "private" }, experience);
-    }
-    let best = atLeast(
-      {
-        depth: RENOWN_DEPTH[renown],
-        why: page.renown ? `renown ${renown}` : `default renown ${renown}`,
-      },
-      experience,
-    );
     if (!character) return best;
-    const chain = this.chain(pageId);
-    // An author writing `local` means its nearest group, not everything above.
-    const nearest = this.resolve(page.groups[0]?.ref);
-    const narrow = page.renown === "local" && nearest;
-    for (const anchor of this.anchors(character)) {
-      if (narrow && anchor.id !== nearest && anchor.id !== pageId) continue;
-      if (anchor.exact ? anchor.id === pageId : chain.has(anchor.id))
-        best = atLeast(best, { depth: anchor.depth, why: anchor.why });
+    const mine = this.memberships(character);
+    // Through each group they're in, as far as the page lets its members and
+    // no further than they are involved: an associate gets only the summary.
+    // A character's own groups know them as closely as they are in it.
+    for (const { ref, level } of [
+      ...page.known,
+      ...(page.kind === "person" ? page.in : []),
+    ]) {
+      const id = this.group(ref);
+      const involved = id ? mine.get(id) : undefined;
+      if (!id || !involved) continue;
+      const reach =
+        LEVELS.indexOf(level) < LEVELS.indexOf(involved) ? level : involved;
+      best = atLeast(best, {
+        depth: LEVEL_DEPTH[reach],
+        why: `in ${this.pages.get(id)?.name ?? ref}`,
+        through: id,
+      });
     }
+    // A group they're in: as close as they are in it.
+    const own = mine.get(pageId);
+    if (own)
+      best = atLeast(best, { depth: LEVEL_DEPTH[own], why: "they are in it" });
+    // Their home, and all around it: the place it is in and what is in that;
+    // someone else's home only when it is known as more than a name (a
+    // guardhouse someone sleeps in, not their bedroom).
+    const home = this.resolve(character.home);
+    const around = this.resolve(this.pages.get(home ?? "")?.parent);
+    if (home === pageId)
+      best = atLeast(best, { depth: "intimate", why: "their home" });
+    else if (
+      around &&
+      this.chain(pageId).has(around) &&
+      (!this.homes().has(pageId) ||
+        [...page.known.map(({ level }) => level), page.everyone].some(
+          (level) => level === "knows" || level === "close",
+        ))
+    )
+      best = atLeast(best, { depth: "intimate", why: "around their home" });
     return best;
-  }
-
-  /** Whether `##` section text is visible to this character at this depth. */
-  sectionVisible(
-    section: Page["sections"][number],
-    characterId: string,
-    depth: Depth,
-  ): boolean {
-    return section.knownBy.length
-      ? section.knownBy.includes(characterId)
-      : depth === "intimate";
   }
 
   /** The author's sanity check: how much of the world one character knows. */

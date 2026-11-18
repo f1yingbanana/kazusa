@@ -8,8 +8,6 @@ export interface LintFinding {
   readonly message: string;
 }
 
-const ROOT_KINDS: ReadonlySet<Page["kind"]> = new Set(["place", "person"]);
-
 export function lintWorld(world: WorldModel): LintFinding[] {
   const findings: LintFinding[] = [];
   const add = (
@@ -27,28 +25,74 @@ export function lintWorld(world: WorldModel): LintFinding[] {
     };
     reference("parent", page.parent);
     reference("home", page.home);
-    for (const group of page.groups) reference("groups", group.ref);
+    if (world.upgraded) {
+      if (page.parent && !page.place)
+        add(
+          "warning",
+          page.id,
+          "`parent` is only read on a place: link to what it belongs to instead",
+        );
+      for (const [field, list] of [
+        ["known", page.known],
+        ["in", page.in],
+      ] as const)
+        for (const { ref } of list) {
+          reference(field, ref);
+          const named = world.pages.get(world.resolve(ref) ?? "");
+          if (named && !named.group)
+            add(
+              "error",
+              page.id,
+              `\`${field}\` names ${named.name}, which isn't a group (\`group: true\`)`,
+            );
+        }
+      if (page.in.length && page.kind !== "person")
+        add("warning", page.id, "`in` is only read on a character's page");
+      const older = page.renown
+        ? "renown"
+        : page.knownBy.length
+          ? "known_by"
+          : page.legacyGroups.length
+            ? "groups"
+            : undefined;
+      if (older)
+        add(
+          "warning",
+          page.id,
+          `\`${older}\` is from the older format and isn't read: say who knows it in \`known\``,
+        );
+    }
     for (const link of page.links) {
       if (!world.resolve(link))
         add("warning", page.id, `link to unknown page "${link}"`);
     }
-    for (const who of [
-      ...page.knownBy,
-      ...page.sections.flatMap((section) => section.knownBy),
-    ]) {
-      if (world.pages.get(who)?.kind !== "person")
-        add("error", page.id, `\`known_by\` names unknown character "${who}"`);
+    for (const section of page.sections) {
+      if (section.knownBy.some((who) => who !== page.id))
+        add(
+          "error",
+          page.id,
+          `"${section.title}" is \`Known by:\` someone else: only a character's own page has parts only they know; what others know goes in their own wikis`,
+        );
     }
     if (
+      world.upgraded &&
       page.kind === "concept" &&
-      !page.groups.length &&
-      !page.renown &&
-      !page.knownBy.length
+      !page.known.length &&
+      !page.everyone &&
+      !page.group &&
+      !page.place
     )
-      add("warning", page.id, "no `groups` or `renown`");
+      add("warning", page.id, "nobody knows it: no `known`");
     if (!page.lead && !page.summary)
       add("warning", page.id, "no summary or lead");
   }
+  if (!world.upgraded && world.pages.size)
+    findings.push({
+      level: "warning",
+      page: "world",
+      message:
+        "This world is in the older format: a new release of its template can bring it into the new one",
+    });
   for (const [id, first, second] of world.duplicates)
     add(
       "error",
@@ -74,7 +118,7 @@ export function lintPersonal(
     const label = `${agentId}/${page.id}`;
     for (const problem of page.problems)
       findings.push({ level: "warning", page: label, message: problem });
-    if (ROOT_KINDS.has(page.kind) && !world.pages.has(page.id))
+    if ((page.kind === "person" || page.place) && !world.pages.has(page.id))
       findings.push({
         level: "warning",
         page: label,

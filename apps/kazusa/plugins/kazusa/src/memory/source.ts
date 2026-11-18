@@ -13,11 +13,33 @@ import type { WikiKind, WikiSourceResponse } from "@kazusa/client";
 
 /** Where a new page of each kind goes, in either wiki. */
 export const PAGE_DIRECTORY: Readonly<Record<WikiKind, string>> = {
-  person: path.join("entities", "characters"),
-  place: path.join("entities", "places"),
+  person: "characters",
   concept: "concepts",
   day: "days",
 };
+
+/** Deprecated: where a world not yet upgraded keeps new pages. */
+const OLDER_DIRECTORY: Readonly<Record<WikiKind, string>> = {
+  person: path.join("entities", "characters"),
+  concept: "concepts",
+  day: "days",
+};
+
+/**
+ * Where a new page goes: `characters/` or `concepts/`, or in a world not yet
+ * upgraded (no `characters/`, but `entities/`), where it kept them.
+ */
+export function pageDirectory(
+  root: string,
+  kind: WikiKind,
+  place = false,
+): string {
+  const older =
+    !existsSync(path.join(root, "characters")) &&
+    existsSync(path.join(root, "entities"));
+  if (!older) return PAGE_DIRECTORY[kind];
+  return place ? path.join("entities", "places") : OLDER_DIRECTORY[kind];
+}
 
 const hash = (text: string): string =>
   createHash("sha256").update(text).digest("hex");
@@ -53,7 +75,8 @@ export function readSource(
   kind: WikiKind = "concept",
 ): WikiSourceResponse {
   const file =
-    findPage(root, id) ?? path.join(root, PAGE_DIRECTORY[kind], `${id}.md`);
+    findPage(root, id) ??
+    path.join(root, pageDirectory(root, kind), `${id}.md`);
   const text = existsSync(file) ? readFileSync(file, "utf8") : undefined;
   return {
     id,
@@ -105,14 +128,10 @@ export function saveSource(
   return readSource(root, input.id, input.kind);
 }
 
-/**
- * Moves a page into `trashDir`, keeping its path under the wiki. With `base`,
- * only the version that was read.
- */
+/** Deletes a page for good. With `base`, only the version that was read. */
 export function deleteSource(
   root: string,
   input: { readonly id: string; readonly base?: string | null },
-  trashDir: string,
 ): WikiSourceResponse {
   const current = readSource(root, input.id);
   if (
@@ -120,10 +139,6 @@ export function deleteSource(
     (input.base !== undefined && input.base !== current.hash)
   )
     throw new SourceConflict(current);
-  const file = path.join(root, current.path);
-  const kept = path.join(trashDir, current.path);
-  mkdirSync(path.dirname(kept), { recursive: true });
-  writeFileSync(kept, current.text);
-  unlinkSync(file);
+  unlinkSync(path.join(root, current.path));
   return current;
 }

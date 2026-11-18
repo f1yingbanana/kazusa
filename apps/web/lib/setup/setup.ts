@@ -280,9 +280,18 @@ async function directories(dir: string): Promise<string[]> {
  * keeps her own files) their `IDENTITY.md`'s, else their id.
  */
 async function characterName(workspaces: string, id: string): Promise<string> {
-  const page = await readIfPresent(
-    path.join(workspaces, "..", "shared/wiki/entities/characters", `${id}.md`),
-  );
+  const page =
+    (await readIfPresent(
+      path.join(workspaces, "..", "shared/wiki/characters", `${id}.md`),
+    )) ??
+    (await readIfPresent(
+      path.join(
+        workspaces,
+        "..",
+        "shared/wiki/entities/characters",
+        `${id}.md`,
+      ),
+    ));
   const identity = page
     ? undefined
     : await readIfPresent(path.join(workspaces, id, "IDENTITY.md"));
@@ -300,37 +309,51 @@ const readIfPresent = async (file: string): Promise<string | undefined> =>
   existsSync(file) ? readFile(file, "utf8") : undefined;
 
 /**
- * The groups a page names in its front matter, in any of the shapes YAML
- * allows: `[A, B]`, `{ A: close }`, or one per line beneath `groups:`.
+ * The groups a character's page puts them in: its `in`, or in a world not yet
+ * upgraded, each group its `groups` says knows them or is close to them (not
+ * `everyone`, nor one that has only heard of them). YAML allows `[A, B]`, `{ A:
+ * close }`, or one per line beneath the field.
  */
 export function groupsIn(text: string): string[] {
+  const own = entriesOf(text, "in");
+  return (own.length ? own : entriesOf(text, "groups"))
+    .filter(
+      ([ref, level]) =>
+        ref && ref.toLowerCase() !== "everyone" && level !== "heard of",
+    )
+    .map(([ref]) => ref);
+}
+
+function entriesOf(text: string, field: string): [string, string][] {
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
   const lines = front.split(/\r?\n/);
-  const at = lines.findIndex((line) => /^groups:/.test(line));
+  const at = lines.findIndex((line) => line.startsWith(`${field}:`));
   if (at < 0) return [];
   const clean = (value: string) =>
     value
       .trim()
       .replace(/^["']|["']$/g, "")
       .trim();
-  const inline = lines[at].slice("groups:".length).trim();
-  if (inline) {
-    const inside = inline.replace(/^[[{]|[\]}]$/g, "");
-    return inside
-      .split(",")
-      .map((item) => clean(item.split(":")[0] ?? ""))
-      .filter(Boolean);
-  }
-  const groups: string[] = [];
-  for (const line of lines.slice(at + 1)) {
-    if (!/^\s+\S/.test(line)) break;
-    const item = line.trim().replace(/^-\s*/, "");
-    const ref = clean(
-      line.trim().startsWith("-") ? item : (item.split(":")[0] ?? ""),
-    );
-    if (ref) groups.push(ref);
-  }
-  return groups;
+  const entries: [string, string][] = [];
+  const inline = lines[at].slice(field.length + 1).trim();
+  if (inline)
+    for (const item of inline.replace(/^[[{]|[\]}]$/g, "").split(","))
+      entries.push([
+        clean(item.split(":")[0] ?? ""),
+        clean(item.split(":")[1] ?? ""),
+      ]);
+  else
+    for (const line of lines.slice(at + 1)) {
+      if (!/^\s+\S/.test(line)) break;
+      const item = line.trim();
+      if (item.startsWith("-")) entries.push([clean(item.slice(1)), ""]);
+      else
+        entries.push([
+          clean(item.split(":")[0] ?? ""),
+          clean(item.split(":")[1] ?? ""),
+        ]);
+    }
+  return entries;
 }
 
 /**
@@ -341,9 +364,9 @@ export function groupsIn(text: string): string[] {
 async function characterGroups(wiki: string, ids: readonly string[]) {
   const members = new Map<string, string[]>();
   for (const id of ids) {
-    const card = await readIfPresent(
-      path.join(wiki, "entities/characters", `${id}.md`),
-    );
+    const card =
+      (await readIfPresent(path.join(wiki, "characters", `${id}.md`))) ??
+      (await readIfPresent(path.join(wiki, "entities/characters", `${id}.md`)));
     for (const ref of card ? groupsIn(card) : [])
       members.set(ref, [...(members.get(ref) ?? []), id]);
   }

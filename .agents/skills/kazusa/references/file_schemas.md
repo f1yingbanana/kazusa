@@ -8,12 +8,13 @@ in Kazusa.
 
 ## 1. Who a character is (their World Wiki page)
 
-A world character's card is their page,
-`shared/wiki/entities/characters/<id>.md` (§ World Wiki below for its fields and
-layers). Their turns read it whole where OpenClaw would add `IDENTITY.md` and
-`SOUL.md` (`characters/card.ts`); those workspace files are no longer read, and
-`scripts/one-page.mjs` folds an older world's into the pages. The roster takes
-`name`, `aliases`, `summary` and `groups` from it; the avatar is
+A world character's card is their page, `shared/wiki/characters/<id>.md` (§
+World Wiki below for its fields and layers). Their turns read it whole where
+OpenClaw would add `IDENTITY.md` and `SOUL.md` (`characters/card.ts`) once those
+workspace files are gone; a world that still has them reads them as before,
+until `world_update` to a release in the two-folder layout folds them into the
+pages (`characters/fold.ts`). The roster takes `name`, `aliases`, `summary` and
+the groups they are in (`groups` at `knows` or `close`) from it; the avatar is
 `avatar.{webp,png,jpg,jpeg,gif,avif}` in the workspace, served at
 `/kazusa/avatar?id=<id>&v=<mtime>`. The system agent keeps her own `IDENTITY.md`
 and `SOUL.md`.
@@ -162,9 +163,9 @@ transitions, deadline settlement and the operator `location.place` RPC.
 The World Wiki acts as the canonical encyclopedia and physical ground truth of
 the simulation.
 
-### 3.1 Objective Places (`shared/wiki/entities/places/<place_id>.md`)
+### 3.1 Objective Places (`shared/wiki/concepts/<place_id>.md`)
 
-- **Location**: `shared/wiki/entities/places/<place_id>.md`
+- **Location**: `shared/wiki/concepts/<place_id>.md`
 - **Purpose**: Shared, objective physical setting facts and the map's topology.
   Read by `src/location/`, which a file watcher keeps current (no restart); a
   broken page or edge is left out and listed by `wiki_lint`
@@ -231,9 +232,9 @@ After-School Sweets Club.
   ignored, so the area's applies.
 - `status` and opening hours are not yet part of the schema.
 
-### 3.2 Canonical World Character Roster (`shared/wiki/entities/characters/<character_id>.md`)
+### 3.2 Canonical World Character Roster (`shared/wiki/characters/<character_id>.md`)
 
-- **Location**: `shared/wiki/entities/characters/<character_id>.md`
+- **Location**: `shared/wiki/characters/<character_id>.md`
 - **Purpose**: Canonical definition of all characters in the world (e.g. 100+
   students, citizens, shopkeepers).
 - **Simulation Mapping**:
@@ -308,9 +309,9 @@ conscious. Halos vary widely in geometric shape, color, and size.
 Each active simulated agent maintains their own subjective worldview, isolated
 from other agents.
 
-### 4.1 Subjective Relationship Cards (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`)
+### 4.1 Subjective Relationship Cards (`workspaces/<id>/wiki/characters/<peer_id>.md`)
 
-- **Location**: `workspaces/<id>/wiki/entities/characters/<peer_id>.md`
+- **Location**: `workspaces/<id>/wiki/characters/<peer_id>.md`
 - **Purpose**: Two-tier memory model: Tier 1 eager summary
   (`## Quick Impression`) and Tier 2 lazy interaction logs, structured with
   `memory-wiki` edge metadata.
@@ -380,9 +381,8 @@ Characters own and update their own subjective Personal Wiki:
 
 1. **First Encounters**: When an agent meets an unfamiliar character or
    exchanges contact info, they initialize a new card at
-   `workspaces/<id>/wiki/entities/characters/<peer_id>.md` with initial
-   `summary`, `relation_type: acquaintance`, and an initial
-   `## Quick Impression`.
+   `workspaces/<id>/wiki/characters/<peer_id>.md` with initial `summary`,
+   `relation_type: acquaintance`, and an initial `## Quick Impression`.
 2. **Social Evolution & Reflection**: During conversations or during nightly
    sleep reflection, agents update the card:
    - Adjust `summary` and `relation_type` as their dynamic evolves.
@@ -392,7 +392,7 @@ Characters own and update their own subjective Personal Wiki:
 3. **Tool Grounding**: Agents perform these updates via deterministic wiki tools
    (`wiki_update_entity` / `wiki_patch`), maintaining markdown integrity.
 
-### 4.2 Subjective Place Cards (`workspaces/<id>/wiki/entities/places/<place_id>.md`)
+### 4.2 Subjective Place Cards (`workspaces/<id>/wiki/concepts/<place_id>.md`)
 
 - **Purpose**: The character's mental map. Only places they know reach their
   prompt (**Places you know**); the world wiki is never shown whole.

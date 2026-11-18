@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryStates, useQueryState } from "nuqs";
+import { parseAsString, useQueryStates, useQueryState } from "nuqs";
 import {
   BookOpenIcon,
   CameraIcon,
@@ -10,7 +10,7 @@ import {
   PencilIcon,
   UserRoundIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import type {
@@ -35,29 +35,55 @@ import { useAccess } from "@/hooks/use-access";
 import { useCharacter, useCharacters } from "@/hooks/use-characters";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
 import { useWikiCharacter, useWikiReach } from "@/hooks/use-wiki-editor";
-import { useSources } from "@/lib/source/provider";
+import { CHARACTERS_KEY, useSources } from "@/lib/source/provider";
 import { uploadPicture } from "@/lib/source/wiki/editor";
-import { requestSidebar } from "@/lib/state/ui-store";
+import { WIKI_KEY } from "@/lib/source/wiki/http";
+import {
+  entityRefParser,
+  serializeEntityRef,
+  type EntityKind,
+} from "@/lib/state/entity-ref";
+import { markQuietSelection, requestSidebar } from "@/lib/state/ui-store";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
-import { BackdropEditor } from "./backdrop-editor";
+import { PlaceBackdrop } from "./backdrop-editor";
 import { LooksTab } from "./looks-tab";
 import { MemoryTab } from "./memory-tab";
-import { DeletePageButton, RenamePlaceButton } from "./page-actions";
+import { PageMenu, ShowOnMapButton } from "./page-actions";
 import { PageEditor } from "./page-editor";
 import { PageForm } from "./page-form";
+import { RichText, WikiLink, usePlainText } from "./page-link";
 import { PageLayers, Prose } from "./page-layers";
-import { describePage, type WikiSide } from "./page-roles";
+import type { WikiSide } from "./page-roles";
 import { failureText, usePicturePicker } from "./parts";
+
+/** Where a note came from, with the person who told it as a link. */
+function NoteSource({ source }: { source: string }) {
+  const who = /^(told by|overheard) (.+)$/.exec(source);
+  return who ? (
+    <>
+      {who[1]} <WikiLink id={who[2].replace(/^user:/, "")} />
+    </>
+  ) : (
+    <>{source}</>
+  );
+}
+
 import { StickersTab } from "./stickers-tab";
-import { PAGE_PARTS, wikiParsers, type PagePart } from "./search-params";
+import {
+  CHARACTER_PARTS,
+  PLACE_PARTS,
+  wikiParsers,
+  type PagePart,
+} from "./search-params";
 
 const PART_LABELS: Readonly<Record<PagePart, string>> = {
   page: "Page",
   memory: "Memory",
   looks: "Looks",
   stickers: "Stickers",
+  backdrop: "Backdrop",
 };
 
 /** A character's page on someone, read as what they think. */
@@ -74,7 +100,11 @@ function PersonalBody({
         <Prose text={page.lead} className="italic" />
       ) : (
         <p className="text-sm text-muted-foreground">
-          {page.summary || "Nothing written yet."}
+          {page.summary ? (
+            <RichText text={page.summary} />
+          ) : (
+            "Nothing written yet."
+          )}
         </p>
       )}
       {page.relation ? (
@@ -87,7 +117,9 @@ function PersonalBody({
           <h4 className="mb-1 text-xs font-medium text-muted-foreground">
             {guessHeading}
           </h4>
-          <p className="text-sm italic">{page.theyThinkOfMe}</p>
+          <p className="text-sm italic">
+            <RichText text={page.theyThinkOfMe} />
+          </p>
         </div>
       ) : null}
       {page.openThreads.length ? (
@@ -97,7 +129,9 @@ function PersonalBody({
           </h4>
           <ul className="list-disc space-y-1 pl-4 text-sm">
             {page.openThreads.map((thread) => (
-              <li key={thread}>{thread}</li>
+              <li key={thread}>
+                <RichText text={thread} />
+              </li>
             ))}
           </ul>
         </div>
@@ -118,9 +152,12 @@ function PersonalBody({
           <ul className="space-y-2 text-sm">
             {page.notes.map((note) => (
               <li key={`${note.date}${note.text}`}>
-                <span className="italic">{note.text}</span>
+                <span className="italic">
+                  <RichText text={note.text} />
+                </span>
                 <span className="block text-xs text-muted-foreground">
-                  {note.date}, {note.source}, {note.certainty}
+                  {note.date}, <NoteSource source={note.source} />,{" "}
+                  {note.certainty}
                 </span>
               </li>
             ))}
@@ -146,7 +183,6 @@ function PageEditing({
   name,
   side,
   owner,
-  self,
   onDone,
 }: {
   id: string;
@@ -155,18 +191,17 @@ function PageEditing({
   name: string;
   side: WikiSide;
   owner?: string | undefined;
-  self?: { id: string; name: string } | undefined;
   onDone: (saved?: WikiSourceResponse) => void;
 }) {
   const [params, setParams] = useQueryStates(wikiParsers);
   const { mutate } = useSWRConfig();
-  // The other view reads the page afresh once this one saved it.
+  // After a save, read again without passing data: even `undefined` would
+  // empty every wiki list, the sidebar's too, until it came back.
   const done = (saved?: WikiSourceResponse) => {
-    void mutate(
-      (key) => Array.isArray(key) && String(key[0]).startsWith("kazusa/wiki"),
-      undefined,
-      { revalidate: true },
-    );
+    if (saved)
+      void mutate(
+        (key) => Array.isArray(key) && String(key[0]).startsWith("kazusa/wiki"),
+      );
     void setParams({ "wiki.raw": null });
     onDone(saved);
   };
@@ -186,7 +221,6 @@ function PageEditing({
       agent={agent}
       kind={kind}
       name={name}
-      self={self}
       onDone={done}
       onRaw={() => void setParams({ "wiki.raw": "1" })}
     />
@@ -204,12 +238,19 @@ function AvatarButton({
   url: string | undefined;
 }) {
   const [busy, setBusy] = useState(false);
+  const { canManage } = useAccess();
   const { mutate } = useSWRConfig();
   const { pick, input } = usePicturePicker(([file]) => {
     if (!file) return;
     setBusy(true);
     void uploadPicture({ kind: "avatar", owner: id }, file)
-      .then(() => mutate(() => true, undefined, { revalidate: true }))
+      .then(() =>
+        mutate(
+          (key) =>
+            Array.isArray(key) &&
+            (key[0] === CHARACTERS_KEY[0] || key[0] === WIKI_KEY),
+        ),
+      )
       .then(() => toast.success(`Changed ${name}'s avatar.`))
       .catch((failure: unknown) => toast.error(failureText(failure)))
       .finally(() => setBusy(false));
@@ -218,6 +259,7 @@ function AvatarButton({
     <button
       type="button"
       onClick={pick}
+      disabled={!canManage}
       className="group/avatar relative shrink-0 rounded-full focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       aria-label={`Change ${name}'s avatar`}
     >
@@ -225,7 +267,7 @@ function AvatarButton({
         {url ? <AvatarImage src={url} alt="" /> : null}
         <AvatarFallback>{name.slice(0, 1)}</AvatarFallback>
       </Avatar>
-      <span className="absolute inset-0 grid place-items-center rounded-full bg-background/70 opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
+      <span className="absolute inset-0 grid place-items-center rounded-full bg-background/70 opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100 group-disabled/avatar:hidden">
         {busy ? <Spinner /> : <CameraIcon className="size-4" />}
       </span>
       {input}
@@ -246,13 +288,15 @@ function CharacterPart({ id, part }: { id: string; part: PagePart }) {
 }
 
 /**
- * A World Wiki page. A character of the cast gets tabs: their page, which is
- * who they are, then their memory, looks and stickers.
+ * A World Wiki page; a character's has tabs for their memory, looks and
+ * stickers.
  */
-function WorldPage({ id }: { id: string }) {
+export function WorldPage({ id }: { id: string }) {
   const read = useWikiPage(id);
   const { data, isLoading } = read;
   const [params, setParams] = useQueryStates(wikiParsers);
+  const [, setView] = useQueryState("view", parseAsString);
+  const [, setCharacter] = useQueryState("character", parseAsString);
   const { canManage } = useAccess();
   const character = useCharacter(id);
   const cast =
@@ -260,8 +304,29 @@ function WorldPage({ id }: { id: string }) {
       ? character
       : undefined;
   const editing = canManage && params["wiki.edit"] === "world";
+  const plain = usePlainText();
   const { data: reach } = useWikiReach(id);
-  const part: PagePart = (cast && params["wiki.part"]) || "page";
+  // The inspector follows: the character or place this page is.
+  const [, setSelection] = useQueryState("sel", entityRefParser);
+  const subject: EntityKind | undefined = character
+    ? "character"
+    : data?.world?.place
+      ? "place"
+      : undefined;
+  useEffect(() => {
+    if (!subject) return;
+    const ref = { kind: subject, id } as const;
+    // Quietly: on a narrow screen it doesn't open over the page.
+    markQuietSelection(serializeEntityRef(ref));
+    void setSelection(ref, { history: "replace" });
+  }, [id, subject, setSelection]);
+  const parts = cast
+    ? CHARACTER_PARTS
+    : data?.world?.place
+      ? PLACE_PARTS
+      : undefined;
+  const asked = params["wiki.part"];
+  const part: PagePart = asked && parts?.includes(asked) ? asked : "page";
   const open = (page: string | null) =>
     void setParams({
       "wiki.page": page,
@@ -286,8 +351,10 @@ function WorldPage({ id }: { id: string }) {
       </p>
     );
   const page = data?.world;
-  const name = params["wiki.name"] ?? page?.name ?? cast?.name ?? id;
-  const kind: WikiKind | undefined = params["wiki.kind"] ?? page?.kind;
+  // A new page's name and kind, until it is written; never over a real page.
+  const name = page?.name ?? cast?.name ?? params["wiki.name"] ?? id;
+  const kind: WikiKind | undefined =
+    page?.kind ?? params["wiki.kind"] ?? undefined;
 
   const pageTab = editing ? (
     <PageEditing
@@ -296,13 +363,12 @@ function WorldPage({ id }: { id: string }) {
       kind={kind}
       name={name}
       side="world"
-      self={cast ? { id, name: cast.name } : undefined}
       onDone={(saved) =>
         saved && saved.id !== id ? open(saved.id) : edit(false)
       }
     />
   ) : page ? (
-    <PageLayers page={page} self={cast ? id : undefined} reach={reach} />
+    <PageLayers page={page} reach={reach} />
   ) : (
     <div className="flex flex-col items-start gap-2">
       <p className="text-sm text-muted-foreground">Nothing written yet.</p>
@@ -328,11 +394,12 @@ function WorldPage({ id }: { id: string }) {
           <h1 className="truncate text-xl font-semibold tracking-tight">
             {name}
           </h1>
-          <p className="line-clamp-1 text-sm text-muted-foreground">
-            {cast
-              ? `This page is who ${cast.name} is: they read all of it on every turn.`
-              : describePage("world", kind, { subject: name })}
-          </p>
+          {page?.summary ? (
+            <p className="line-clamp-1 text-sm text-muted-foreground">
+              {/* While editing, a link would leave the edit. */}
+              {editing ? plain(page.summary) : <RichText text={page.summary} />}
+            </p>
+          ) : null}
         </div>
         <div
           className={cn(
@@ -340,18 +407,21 @@ function WorldPage({ id }: { id: string }) {
             editing && "hidden",
           )}
         >
+          {page?.place ? <ShowOnMapButton id={id} /> : null}
           {cast ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
+              onClick={() => {
+                // Their own wiki, in the Wiki tab.
                 void setParams({
                   "wiki.agent": id,
                   "wiki.page": null,
                   "wiki.part": null,
                   "wiki.edit": null,
-                })
-              }
+                });
+                void setView("wiki");
+              }}
             >
               <EyeIcon />
               {cast.name}&apos;s view
@@ -360,7 +430,7 @@ function WorldPage({ id }: { id: string }) {
           {part === "page" && !editing && page ? (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 disabled={!canManage}
                 onClick={() => edit(true)}
@@ -368,22 +438,26 @@ function WorldPage({ id }: { id: string }) {
                 <PencilIcon />
                 Edit
               </Button>
-              {canManage && page.kind === "place" ? (
-                <RenamePlaceButton id={id} name={name} onRenamed={open} />
-              ) : null}
-              {canManage && !cast ? (
-                <DeletePageButton
-                  id={id}
-                  name={name}
-                  place={page.kind === "place"}
-                  onDeleted={() => open(null)}
-                />
-              ) : null}
+              <PageMenu
+                id={id}
+                name={name}
+                kind={kind}
+                place={page.place === true}
+                // The system agent stays: switching to another comes later.
+                canDelete={canManage && !character?.isSystemAgent}
+                character={Boolean(cast)}
+                onDeleted={() => {
+                  // Gone: neither page nor inspector points at them.
+                  void setSelection(null);
+                  if (cast) void setCharacter(null);
+                  open(null);
+                }}
+              />
             </>
           ) : null}
         </div>
       </header>
-      {cast ? (
+      {parts ? (
         <Tabs
           value={part}
           onValueChange={(next: PagePart) =>
@@ -398,7 +472,7 @@ function WorldPage({ id }: { id: string }) {
             variant="line"
             className="w-full justify-start gap-4 border-b"
           >
-            {PAGE_PARTS.map((value) => (
+            {parts.map((value) => (
               <TabsTrigger key={value} value={value} className="flex-none px-0">
                 {PART_LABELS[value]}
               </TabsTrigger>
@@ -407,11 +481,17 @@ function WorldPage({ id }: { id: string }) {
           <TabsContent value="page" className="pt-5">
             {pageTab}
           </TabsContent>
-          {PAGE_PARTS.filter((value) => value !== "page").map((value) => (
-            <TabsContent key={value} value={value} className="pt-5">
-              {part === value ? <CharacterPart id={id} part={value} /> : null}
-            </TabsContent>
-          ))}
+          {parts
+            .filter((value) => value !== "page")
+            .map((value) => (
+              <TabsContent key={value} value={value} className="pt-5">
+                {part !== value ? null : value === "backdrop" ? (
+                  <PlaceBackdrop id={id} />
+                ) : (
+                  <CharacterPart id={id} part={value} />
+                )}
+              </TabsContent>
+            ))}
         </Tabs>
       ) : (
         pageTab
@@ -423,14 +503,12 @@ function WorldPage({ id }: { id: string }) {
 function Column({
   icon: Icon,
   title,
-  description,
   onEdit,
   actions,
   children,
 }: {
   icon: typeof GlobeIcon;
   title: string;
-  description: string;
   onEdit?: (() => void) | undefined;
   actions?: React.ReactNode;
   children: React.ReactNode;
@@ -445,7 +523,7 @@ function Column({
         </h3>
         {onEdit ? (
           <Button
-            variant="ghost"
+            variant="outline"
             size="xs"
             disabled={!canManage}
             onClick={onEdit}
@@ -457,8 +535,7 @@ function Column({
         ) : null}
         {canManage && onEdit ? actions : null}
       </div>
-      <p className="mt-1 mb-4 text-xs text-muted-foreground">{description}</p>
-      <div className="space-y-4">{children}</div>
+      <div className="mt-3 space-y-4">{children}</div>
     </section>
   );
 }
@@ -535,18 +612,19 @@ function TheirPage({ id, agent }: { id: string; agent: string }) {
           <Column
             icon={UserRoundIcon}
             title={`What ${name} makes of it`}
-            description={describePage("own", kind, { owner: name, subject })}
             onEdit={
               editing === "own" || !data?.personal
                 ? undefined
                 : () => edit("own")
             }
             actions={
-              <DeletePageButton
+              <PageMenu
                 id={id}
                 name={`${name}'s page on ${subject}`}
                 agent={agent}
                 place={false}
+                canDelete
+                size="xs"
                 onDeleted={() => void read.mutate()}
               />
             }
@@ -580,7 +658,6 @@ function TheirPage({ id, agent }: { id: string; agent: string }) {
           <Column
             icon={GlobeIcon}
             title="The world"
-            description={describePage("world", kind, { subject })}
             onEdit={
               editing === "world" || !data?.world
                 ? undefined
@@ -593,7 +670,7 @@ function TheirPage({ id, agent }: { id: string; agent: string }) {
               <PageLayers page={data.world} />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Not in the world wiki: this is theirs alone.
+                Only in their own wiki.
               </p>
             )}
           </Column>
@@ -686,18 +763,13 @@ function LintPane({ agent }: { agent?: string }) {
 }
 
 /**
- * The world's pages, each character's view of them, and the backdrop library. A
- * character's page is who they are; its tabs hold their memory, looks and
- * stickers.
+ * The world's pages and each character's view of them. A character's page is
+ * who they are; its tabs hold their memory, looks and stickers.
  */
 export function WikiView() {
   const { resolved } = useSources();
   const [agent] = useQueryState("wiki.agent", wikiParsers["wiki.agent"]);
   const [page] = useQueryState("wiki.page", wikiParsers["wiki.page"]);
-  const [backdrop] = useQueryState(
-    "wiki.backdrop",
-    wikiParsers["wiki.backdrop"],
-  );
   const [tab] = useQueryState("wiki.tab", wikiParsers["wiki.tab"]);
   const { byId } = useCharacters();
   const agentName = agent ? (byId.get(agent)?.name ?? agent) : undefined;
@@ -717,8 +789,6 @@ export function WikiView() {
           <LintPane {...(agent ? { agent } : {})} />
         ) : tab === "nights" && agent ? (
           <NightsPane agent={agent} />
-        ) : backdrop && !agent ? (
-          <BackdropEditor key={backdrop} name={backdrop} />
         ) : page && agent ? (
           <TheirPage id={page} agent={agent} />
         ) : page ? (
@@ -732,11 +802,11 @@ export function WikiView() {
               <EmptyTitle>
                 {agentName ? `${agentName}'s view` : "Pick a page"}
               </EmptyTitle>
-              <EmptyDescription>
-                {agentName
-                  ? `Pick a page on the left: each shows what ${agentName} makes of it next to what is true, and how well they know it.`
-                  : "A character's page is who they are: open one to change it, their memory, looks and stickers. Places, lore and the Backdrops folder are on the left too."}
-              </EmptyDescription>
+              {agentName ? (
+                <EmptyDescription>
+                  Pick a page to see what {agentName} makes of it.
+                </EmptyDescription>
+              ) : null}
             </EmptyHeader>
           </Empty>
         )}

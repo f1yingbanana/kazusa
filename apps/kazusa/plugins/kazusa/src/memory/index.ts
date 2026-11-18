@@ -16,8 +16,6 @@ export interface SearchHit {
   readonly pageId: string;
   readonly layer: ChunkLayer;
   readonly text: string;
-  /** Character ids a `Known by:` section is limited to; empty means anyone. */
-  readonly knownBy: readonly string[];
   /** Higher is better; only comparable within one search. */
   readonly score: number;
   /** For `H`: its date, and whether it was public news. */
@@ -86,38 +84,34 @@ export function searchQuery(text: string): string | undefined {
 export function chunksOf(page: Page): Array<{
   layer: ChunkLayer;
   text: string;
-  knownBy: readonly string[];
   date?: string;
   news?: boolean;
 }> {
-  const open = (layer: ChunkLayer, text: string) => ({
-    layer,
-    text,
-    knownBy: [] as readonly string[],
-  });
+  const open = (layer: ChunkLayer, text: string) => ({ layer, text });
   return [
     open("L0", [page.name, ...page.aliases, page.summary].join(" · ")),
     ...(page.lead ? [open("L1", page.lead)] : []),
     // One bullet or paragraph at a time: long sections otherwise lose to any
     // short page that mentions the word once.
-    ...page.sections.flatMap((section) =>
-      section.text
-        .split(/\n\s*\n|\n(?=[-*] )/)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .map((part) => ({
-          layer: "L2" as const,
-          text: `${section.title}: ${part}`,
-          knownBy: section.knownBy,
-        })),
-    ),
+    // A part only the page's own character knows is never looked up.
+    ...page.sections
+      .filter((section) => !section.knownBy.length)
+      .flatMap((section) =>
+        section.text
+          .split(/\n\s*\n|\n(?=[-*] )/)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .map((part) => ({
+            layer: "L2" as const,
+            text: `${section.title}: ${part}`,
+          })),
+      ),
     ...page.openThreads.map((thread) => open("L1", thread)),
     ...(page.theyThinkOfMe ? [open("L1", page.theyThinkOfMe)] : []),
     ...page.notes.map((note) => open("L2", note.text)),
     ...page.history.map((line) => ({
       layer: "H" as const,
       text: line.text,
-      knownBy: [] as readonly string[],
       date: line.date,
       news: line.news,
     })),
@@ -129,7 +123,6 @@ interface EmbeddedChunk {
   readonly news?: boolean;
   readonly pageId: string;
   readonly layer: ChunkLayer;
-  readonly knownBy: readonly string[];
   readonly text: string;
   readonly vector: Float32Array;
 }
@@ -187,7 +180,7 @@ export class MemoryIndex {
     );
     this.useVectors(options.model ?? "");
     this.db.exec(
-      "CREATE VIRTUAL TABLE chunks USING fts5(scope UNINDEXED, page UNINDEXED, layer UNINDEXED, known_by UNINDEXED, date UNINDEXED, news UNINDEXED, text, tokenize = 'porter unicode61 remove_diacritics 2')",
+      "CREATE VIRTUAL TABLE chunks USING fts5(scope UNINDEXED, page UNINDEXED, layer UNINDEXED, date UNINDEXED, news UNINDEXED, text, tokenize = 'porter unicode61 remove_diacritics 2')",
     );
   }
 
@@ -257,14 +250,13 @@ export class MemoryIndex {
 
   private insert(scope: string, page: Page): void {
     const statement = this.db.prepare(
-      "INSERT INTO chunks (scope, page, layer, known_by, date, news, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO chunks (scope, page, layer, date, news, text) VALUES (?, ?, ?, ?, ?, ?)",
     );
     for (const chunk of chunksOf(page)) {
       statement.run(
         scope,
         page.id,
         chunk.layer,
-        chunk.knownBy.join(","),
         chunk.date ?? "",
         chunk.news ? 1 : 0,
         chunk.text,
@@ -311,13 +303,12 @@ export class MemoryIndex {
     if (!query) return [];
     const rows = this.db
       .prepare(
-        "SELECT scope, page, layer, known_by, date, news, text, bm25(chunks) AS rank FROM chunks WHERE chunks MATCH ? AND scope IN (?, ?) ORDER BY rank LIMIT ?",
+        "SELECT scope, page, layer, date, news, text, bm25(chunks) AS rank FROM chunks WHERE chunks MATCH ? AND scope IN (?, ?) ORDER BY rank LIMIT ?",
       )
       .all(query, WORLD_SCOPE, personalScope(agentId), limit) as Array<{
       scope: string;
       page: string;
       layer: ChunkLayer;
-      known_by: string;
       date: string;
       news: number;
       text: string;
@@ -328,7 +319,6 @@ export class MemoryIndex {
       pageId: row.page,
       layer: row.layer,
       text: row.text,
-      knownBy: row.known_by ? row.known_by.split(",") : [],
       score: -row.rank,
       ...(row.date ? { date: row.date, news: row.news === 1 } : {}),
     }));
@@ -434,7 +424,6 @@ export class MemoryIndex {
           chunks.push({
             pageId: page.id,
             layer: chunk.layer,
-            knownBy: chunk.knownBy,
             text: chunk.text,
             vector,
             ...(chunk.date ? { date: chunk.date, news: chunk.news } : {}),
@@ -455,7 +444,6 @@ export class MemoryIndex {
           pageId: chunk.pageId,
           layer: chunk.layer,
           text: chunk.text,
-          knownBy: chunk.knownBy,
           score: cosine(query, chunk.vector),
           ...(chunk.date ? { date: chunk.date, news: chunk.news } : {}),
         });

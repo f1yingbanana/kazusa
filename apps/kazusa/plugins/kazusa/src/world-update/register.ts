@@ -45,7 +45,7 @@ const PARAMS = z.object({
   layout: z.enum(["keep", "reset"]).default("keep"),
   rehome: z.enum(["stale", "all"]).default("stale"),
   path: z.string().optional(),
-  version: z.enum(["new", "old"]).default("new"),
+  version: z.enum(["new", "old", "update"]).default("new"),
 });
 
 /** Keeps a tool result readable: long lists are cut and say so. */
@@ -243,7 +243,7 @@ export function registerWorldUpdate(
     name: "world_update",
     label: "World Update",
     description:
-      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) saves the world as it is, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it or as the world's old version had it (`version`: new or old); `restore` (clock paused) puts the world back exactly as that save kept it and closes the update, for an `apply` cut short or an update the user wants abandoned; `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. Once finished there is no undo. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home.",
+      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) saves the world as it is, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it, as the world's old version had it (a page since moved to a new folder is found where it was), or as `apply` would write it, play's changes and all (`version`: new, old or update); `restore` (clock paused) puts the world back exactly as that save kept it and closes the update, for an `apply` cut short or an update the user wants abandoned; `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. Once finished there is no undo. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home.",
     parameters: {
       type: "object",
       properties: {
@@ -251,7 +251,7 @@ export function registerWorldUpdate(
         layout: { type: "string", enum: ["keep", "reset"] },
         rehome: { type: "string", enum: ["stale", "all"] },
         path: { type: "string" },
-        version: { type: "string", enum: ["new", "old"] },
+        version: { type: "string", enum: ["new", "old", "update"] },
       },
       required: ["action"],
       additionalProperties: false,
@@ -269,6 +269,38 @@ export function registerWorldUpdate(
       const release = downloadedRelease(git);
       if (action === "show") {
         if (!params.path) throw new Error("`show` needs a `path`.");
+        const file = params.path;
+        if (params.version === "update") {
+          const base = commitOf(git, PLAY);
+          if (open || !release || !base)
+            return textResult({
+              note: "`update` previews an update not yet applied: there is none to preview.",
+            });
+          const template = commitTree(git, release.commit);
+          const plan = planUpdate(world, template, commitTree(git, base), {
+            layout,
+          });
+          const change = plan.changes.find(
+            (one) => one.path === file || one.from === file,
+          );
+          if (!change)
+            return textResult({
+              path: file,
+              note: "The update leaves this file as it is.",
+            });
+          return textResult({
+            path: change.path,
+            ...(change.from ? { from: change.from } : {}),
+            outcome: change.outcome,
+            ...(change.conflicts ? { conflicts: change.conflicts } : {}),
+            ...(change.reason ? { reason: change.reason } : {}),
+            ...(change.text !== undefined
+              ? { text: change.text }
+              : change.copyFromTemplate
+                ? { text: template.text(change.path) ?? "" }
+                : {}),
+          });
+        }
         const commit =
           params.version === "old"
             ? (open?.from ?? commitOf(git, PLAY))
@@ -277,18 +309,35 @@ export function registerWorldUpdate(
           return textResult({
             note: `There's no ${params.version} version to show.`,
           });
-        try {
-          return textResult({
-            path: params.path,
-            version: params.version,
-            text: git(["show", `${commit}:${params.path}`]).toString("utf8"),
-          });
-        } catch {
-          return textResult({
-            path: params.path,
-            note: `The ${params.version} version has no such file.`,
-          });
+        // An older release kept a page in another folder: look there too.
+        const where =
+          params.version === "old"
+            ? [
+                file,
+                file.replace(
+                  /\/wiki\/characters\//,
+                  "/wiki/entities/characters/",
+                ),
+                file.replace(/\/wiki\/concepts\//, "/wiki/entities/places/"),
+                file.replace(/\/wiki\/concepts\//, "/wiki/groups/"),
+                file.replace(/\/wiki\/concepts\//, "/wiki/entities/concepts/"),
+              ]
+            : [file];
+        for (const at of [...new Set(where)]) {
+          try {
+            return textResult({
+              path: at,
+              version: params.version,
+              text: git(["show", `${commit}:${at}`]).toString("utf8"),
+            });
+          } catch {
+            // Not there: the next place it could have been.
+          }
         }
+        return textResult({
+          path: file,
+          note: `The ${params.version} version has no such file.`,
+        });
       }
       if (action === "conflicts") {
         if (!open) return textResult({ note: "No update is open." });

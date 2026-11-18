@@ -230,7 +230,6 @@ function setup(
     use: async (agentId, ids, at) => {
       uses.push({ agentId, ids, at });
     },
-    trashDir: temporary("kazusa-trash-"),
   });
   const extensions = [desires.taskExtension, location.taskExtension!];
   const ledger: { text: string; metadata: unknown }[] = [];
@@ -258,7 +257,7 @@ function setup(
     return result;
   };
   const card = (agentId: string, placeId: string): string =>
-    path.join(workspaces, agentId, "wiki/entities/places", `${placeId}.md`);
+    path.join(workspaces, agentId, "wiki/concepts", `${placeId}.md`);
   return {
     api,
     hooks,
@@ -531,9 +530,7 @@ describe("location registration", () => {
     write(card("kazusa", "club"), "---\nplace_id: club\n---\n");
     write(
       path.join(
-        path.dirname(
-          path.dirname(path.dirname(path.dirname(card("kazusa", "club")))),
-        ),
+        path.dirname(path.dirname(path.dirname(card("kazusa", "club")))),
         "MEMORY.md",
       ),
       "## Plans\n- [HARD_BLOCK] 17:00 study at the Library with Airi\n",

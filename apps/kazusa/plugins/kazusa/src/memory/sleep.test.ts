@@ -45,7 +45,7 @@ const call = async (name: string, input: unknown): Promise<string> => {
 const file = (relative: string): string =>
   path.join(root, "agents", AGENT, relative);
 const read = (relative: string): string => readFileSync(file(relative), "utf8");
-const TOBIN = "wiki/entities/characters/tobin-vell.md";
+const TOBIN = "wiki/characters/tobin-vell.md";
 
 const task = (type: string, minutes: number): ActiveTask => ({
   id: `task-${now}`,
@@ -249,11 +249,11 @@ describe("a night gone over", () => {
   it("reviews states toward the player under the id the player goes by", async () => {
     // Live, a night moved its regard for Sensei and nothing changed: their
     // page is `sensei`, and states are kept under `user:sensei`.
-    mkdirSync(path.dirname(file("wiki/entities/characters/sensei.md")), {
+    mkdirSync(path.dirname(file("wiki/characters/sensei.md")), {
       recursive: true,
     });
     writeFileSync(
-      file("wiki/entities/characters/sensei.md"),
+      file("wiki/characters/sensei.md"),
       "---\nname: Sensei\npeer_id: user:sensei\n---\n\n# Sensei\n\nKeeps odd hours.\n",
     );
     await memory.use(AGENT, ["user:sensei"], NOON);
@@ -322,8 +322,8 @@ describe("a night gone over", () => {
     const [run] = await memory.sleep.runs(AGENT);
     expect(Object.keys(run.preimages).sort()).toEqual([
       "MEMORY.md",
-      "wiki/days/2026-03-10.md",
       TOBIN,
+      "wiki/days/2026-03-10.md",
     ]);
     expect(await memory.sleep.restore(AGENT, run.id)).toBe(true);
     expect(read(TOBIN)).toBe(before);
@@ -341,9 +341,9 @@ describe("a night gone over", () => {
     await memory.sleep.runEnded(AGENT);
     const runs = await memory.sleep.runs(AGENT);
     expect(runs).toHaveLength(1);
-    expect(
-      runs[0].postimages["wiki/entities/characters/ilse-dray.md"],
-    ).toContain("Her knee gave out.");
+    expect(runs[0].postimages["wiki/characters/ilse-dray.md"]).toContain(
+      "Her knee gave out.",
+    );
     expect(read("wiki/days/2026-03-10.md")).not.toContain("Again.");
     // Awake again, what they note is no part of last night.
     await call("remember", { about: "ilse-dray", note: "She is on a stick." });
@@ -386,14 +386,14 @@ describe("a night gone over", () => {
       view: "He was almost kind today.",
     });
     expect(first).toContain("A bully with a badge.");
-    expect(read("wiki/entities/characters/oswin-hale.md")).toContain(
+    expect(read("wiki/characters/oswin-hale.md")).toContain(
       "A bully with a badge.",
     );
     await call("reflect", {
       about: "oswin-hale",
       view: "A bully with a badge, who was almost kind today.",
     });
-    expect(read("wiki/entities/characters/oswin-hale.md")).toContain(
+    expect(read("wiki/characters/oswin-hale.md")).toContain(
       "who was almost kind today.",
     );
   });
@@ -412,7 +412,7 @@ describe("a night gone over", () => {
         read(relative).replace(/## Notes\n\n/, `## Notes\n\n${old}\n`),
       );
     };
-    const OSWIN = "wiki/entities/characters/oswin-hale.md";
+    const OSWIN = "wiki/characters/oswin-hale.md";
     many(TOBIN);
     many(OSWIN);
     // The day touched Tobin, so bedtime showed his page, notes and all. Of

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -300,5 +301,174 @@ describe("registerCharactersHttp", () => {
       (await post({ ids: ["kazusa", "nobody"], onstage: true })).status,
     ).toBe(404);
     expect(setOnstage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("making and deleting a character", () => {
+  it("writes their page and workspace offstage, joins the cast, and leaves it for good", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "kazusa-cast-"));
+    const wiki = path.join(root, "shared", "wiki");
+    await mkdir(path.join(wiki, "characters"), { recursive: true });
+    await mkdir(path.join(wiki, "concepts"), { recursive: true });
+    await writeFile(path.join(wiki, "concepts", "choir.md"), "# Choir\n");
+    const workspaceOf = (id: string) => path.join(root, "workspaces", id);
+    await mkdir(workspaceOf("bea"), { recursive: true });
+    let config = {
+      gateway: { auth: { token: "test-service-token" } },
+      agents: {
+        defaults: { systemAgent: { agentId: "amy" } },
+        entries: {
+          amy: { workspace: "./workspaces/amy" },
+          bea: { workspace: "./workspaces/bea", tools: { deny: ["exec"] } },
+        } as Record<string, unknown>,
+      },
+    };
+    const routes = new Map<
+      string,
+      (req: IncomingMessage, res: ServerResponse) => Promise<boolean>
+    >();
+    const api = {
+      config,
+      pluginConfig: { memory: { wikiDir: wiki } },
+      registerHttpRoute: vi.fn((opts) => routes.set(opts.path, opts.handler)),
+      runtime: {
+        agent: {
+          resolveAgentWorkspaceDir: vi.fn((_: unknown, id: string) =>
+            workspaceOf(id),
+          ),
+        },
+        config: {
+          // The Gateway reloads `openclaw.json` when it changes.
+          current: () => {
+            const file = process.env.OPENCLAW_CONFIG_PATH;
+            if (!file || !existsSync(file)) return config;
+            const onDisk = JSON.parse(readFileSync(file, "utf8")) as {
+              agents: { entries: Record<string, unknown> };
+            };
+            return {
+              ...config,
+              agents: { ...config.agents, entries: onDisk.agents.entries },
+            };
+          },
+          mutateConfigFile: vi.fn(
+            async ({ mutate }: { mutate: (draft: typeof config) => void }) => {
+              const draft = structuredClone(config);
+              mutate(draft);
+              config = draft;
+            },
+          ),
+        },
+      },
+    } as unknown as OpenClawPluginApi;
+    const setOnstage = vi.fn(async () => {});
+    registerCharactersHttp(api, {
+      taskman: {
+        store: { lookup: vi.fn(async () => undefined) },
+        onTaskChange: vi.fn(() => () => {}),
+      } as never,
+      perception: { onBrainStateChange: vi.fn(() => () => {}) } as never,
+      messaging: { onEvent: vi.fn(() => () => {}) } as never,
+      broadcaster: new KazusaRealtimeBroadcaster(),
+      stage: { isOnstage: async () => true, lookup: async () => undefined },
+      setOnstage,
+    });
+    const post = async (route: string, body: unknown) => {
+      const req = Object.assign(
+        Readable.from([Buffer.from(JSON.stringify(body))]),
+        {
+          method: "POST",
+          url: route,
+          headers: { authorization: "Bearer test-service-token" },
+          socket: new Socket(),
+        },
+      );
+      const res = {
+        statusCode: 0,
+        body: "",
+        writeHead(status: number) {
+          this.statusCode = status;
+        },
+        setHeader: vi.fn(),
+        end(data: string) {
+          this.body = data;
+        },
+      };
+      await routes.get(route)!(
+        req as unknown as IncomingMessage,
+        res as unknown as ServerResponse,
+      );
+      return { status: res.statusCode, json: JSON.parse(res.body) as unknown };
+    };
+    const previous = process.env.OPENCLAW_STATE_DIR;
+    const previousConfig = process.env.OPENCLAW_CONFIG_PATH;
+    process.env.OPENCLAW_STATE_DIR = path.join(root, ".state");
+    // As written: the system agent's entry holds an `$include`.
+    const configFile = path.join(root, "openclaw.json");
+    await writeFile(
+      configFile,
+      JSON.stringify({
+        agents: {
+          entries: {
+            amy: { $include: "./.state/system-agent.json" },
+            bea: { workspace: "./workspaces/bea", tools: { deny: ["exec"] } },
+          },
+        },
+      }),
+    );
+    process.env.OPENCLAW_CONFIG_PATH = configFile;
+    const written = async () =>
+      (
+        JSON.parse(await readFile(configFile, "utf8")) as {
+          agents: { entries: Record<string, unknown> };
+        }
+      ).agents.entries;
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      const { access } = await import("node:fs/promises");
+      // An id another page has is taken.
+      expect(
+        (await post("/kazusa/character/create", { id: "choir", name: "Choir" }))
+          .status,
+      ).toBe(409);
+      expect(
+        await post("/kazusa/character/create", {
+          id: "cleo-day",
+          name: "Cleo Day",
+        }),
+      ).toEqual({ status: 200, json: { id: "cleo-day" } });
+      expect(
+        await readFile(path.join(wiki, "characters", "cleo-day.md"), "utf8"),
+      ).toBe('---\nname: "Cleo Day"\n---\n\n# Cleo Day\n');
+      expect(
+        await readFile(path.join(workspaceOf("cleo-day"), "MEMORY.md"), "utf8"),
+      ).toBe("# Cleo Day\n");
+      expect(setOnstage).toHaveBeenCalledWith("cleo-day", false, ["cleo-day"]);
+      expect((await written())["cleo-day"]).toEqual({
+        workspace: "./workspaces/cleo-day",
+        tools: { deny: ["exec"] },
+      });
+      expect((await written()).amy).toEqual({
+        $include: "./.state/system-agent.json",
+      });
+
+      expect(
+        (await post("/kazusa/character/delete", { id: "amy" })).status,
+      ).toBe(400);
+      expect(
+        await post("/kazusa/character/delete", { id: "cleo-day" }),
+      ).toEqual({ status: 200, json: { id: "cleo-day" } });
+      expect((await written())["cleo-day"]).toBeUndefined();
+      await expect(
+        access(path.join(wiki, "characters", "cleo-day.md")),
+      ).rejects.toThrow();
+      await expect(access(workspaceOf("cleo-day"))).rejects.toThrow();
+    } finally {
+      process.chdir(cwd);
+      if (previous === undefined) delete process.env.OPENCLAW_STATE_DIR;
+      else process.env.OPENCLAW_STATE_DIR = previous;
+      if (previousConfig === undefined) delete process.env.OPENCLAW_CONFIG_PATH;
+      else process.env.OPENCLAW_CONFIG_PATH = previousConfig;
+    }
   });
 });

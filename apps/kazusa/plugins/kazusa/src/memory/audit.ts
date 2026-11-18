@@ -53,8 +53,7 @@ export function auditWorld(
     const own = [...personal(id).values()];
     const people = own.filter((page) => page.kind === "person");
     if (!people.length) knowNobody.push(id);
-    if (own.filter((page) => page.kind === "place").length < 2)
-      knowNoPlaces.push(id);
+    if (own.filter((page) => page.place).length < 2) knowNoPlaces.push(id);
     for (const { id: other } of people) {
       known.add(other);
       if (edges.has(other)) {
@@ -79,7 +78,7 @@ export function auditWorld(
     socialGroups.push(group);
   }
   socialGroups.sort((a, b) => b.length - a.length);
-  const places = pages.filter((page) => page.kind === "place");
+  const places = pages.filter((page) => page.place);
   const mapRoots: Record<string, number> = {};
   for (const place of places) {
     let root = place;

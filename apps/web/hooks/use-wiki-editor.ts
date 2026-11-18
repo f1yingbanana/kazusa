@@ -51,7 +51,8 @@ export function useWikiForm(
   return useSWR<WikiPageForm, Error>(
     id ? wikiFormKey(id, agent, kind) : null,
     () => fetchWikiForm(id ?? "", agent, kind),
-    { ...QUIET, revalidateOnReconnect: false },
+    // Read afresh each time it opens: a cached copy may be older than the page.
+    { ...QUIET, revalidateOnMount: true, revalidateOnReconnect: false },
   );
 }
 

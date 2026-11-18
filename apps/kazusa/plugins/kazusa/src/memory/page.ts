@@ -2,8 +2,13 @@ import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
 
-export type PageKind = "place" | "person" | "concept" | "day";
+/** A character, everything else, or a day of a character's diary. */
+export type PageKind = "person" | "concept" | "day";
 export type Certainty = "sure" | "think so" | "suspect" | "doubt it";
+/** How well a group knows a page: who has heard of it, knows it, or is close. */
+export type Level = "heard of" | "knows" | "close";
+export const LEVELS: readonly Level[] = ["heard of", "knows", "close"];
+/** Deprecated: how widely a page was known before `everyone` (`legacy.ts`). */
 export type Renown = "private" | "local" | "known" | "famous";
 
 export interface Note {
@@ -22,14 +27,33 @@ export interface HistoryLine {
 export interface Section {
   readonly title: string;
   readonly text: string;
-  /** Character ids from a `Known by:` first line; empty means unrestricted. */
+  /**
+   * Ids from a `Known by:` first line: a part only the page's own character
+   * knows (their inner voice). Empty: anyone close to it.
+   */
   readonly knownBy: readonly string[];
+}
+
+/** Links a character can follow from a page, by how well they must know it. */
+export interface TieredLinks {
+  /** In the summary: anyone who has heard of it. */
+  readonly heard: readonly string[];
+  /** In the opening, and a place's routes: anyone who knows it. */
+  readonly knows: readonly string[];
+  /** In its sections: those close to it. */
+  readonly close: readonly string[];
 }
 
 /** One Markdown file of either wiki, read in layers (memory.md §3.2). */
 export interface Page {
   readonly id: string;
   readonly kind: PageKind;
+  /** Where it is, relative to its wiki's root. */
+  readonly path: string;
+  /** The place component: it is on the map (`place_id`). */
+  readonly place: boolean;
+  /** The group component: people can be in it (`group: true`). */
+  readonly group: boolean;
   readonly name: string;
   readonly aliases: readonly string[];
   /** L0: `summary`, else the lead's first sentence. */
@@ -43,12 +67,17 @@ export interface Page {
   readonly openThreads: readonly string[];
   /** `## What they think of me`, the character's guess (§3.5). */
   readonly theyThinkOfMe?: string;
-  /**
-   * What it belongs to (a club, a school, a district), first the nearest. A
-   * person knows each of theirs at "familiar", or "intimate" when close.
-   */
-  readonly groups: readonly Group[];
+  /** `known`: the groups whose members know it, and how well. */
+  readonly known: readonly Group[];
+  /** How well everyone knows it, if everyone has at least heard of it. */
+  readonly everyone?: Level;
+  /** `in`, on a character's page: the groups they are in, and how closely. */
+  readonly in: readonly Group[];
+  /** Deprecated: `groups` in a world not yet upgraded (`legacy.ts`). */
+  readonly legacyGroups: readonly Group[];
+  /** Deprecated: read only in a world not yet upgraded (`legacy.ts`). */
   readonly renown?: Renown;
+  /** Deprecated: the only characters who knew it, before upgrading. */
   readonly knownBy: readonly string[];
   readonly parent?: string;
   readonly home?: string;
@@ -57,16 +86,21 @@ export interface Page {
   readonly personId?: string;
   readonly seen?: string;
   readonly touched: readonly string[];
+  /** Every page it links to, in any part. */
   readonly links: readonly string[];
+  readonly linksAt: TieredLinks;
   /** Everything lint should say about this file alone. */
   readonly problems: readonly string[];
 }
 
-/** A group a page belongs to; a person who is close knows it well. */
+/** A group and a level: how well its members know a page. */
 export interface Group {
   readonly ref: string;
-  readonly close: boolean;
+  readonly level: Level;
 }
+
+/** The group every character is in. */
+export const EVERYONE = "everyone";
 
 const text = z.union([z.string(), z.number()]).transform(String).optional();
 const texts = z
@@ -78,32 +112,50 @@ const texts = z
   )
   .optional();
 
+const level = z
+  .union([z.string(), z.number()])
+  .transform((value) => String(value).trim().toLowerCase())
+  // The words the editor shows for involvement read as their levels, and
+  // `member` is how worlds made before levels wrote "knows".
+  .pipe(
+    z.enum([
+      "heard of",
+      "knows",
+      "close",
+      "member",
+      "associate",
+      "close member",
+      "know well",
+    ]),
+  )
+  .transform(
+    (value): Level =>
+      (({
+        member: "knows",
+        associate: "heard of",
+        "close member": "close",
+        "know well": "close",
+      })[value as string] as Level | undefined) ?? (value as Level),
+  );
+
 /**
- * `groups: [A, B]`, or `groups: { A: close, B: member }` where closeness
- * matters, as for a person's club beside their school.
+ * `known: { everyone: heard of, gehenna: knows, prefect_team: close }`; a plain
+ * list means its members know it.
  */
 const groups = z
   .union([
-    texts,
-    z.record(z.string(), z.enum(["close", "member"])).transform((value) =>
+    texts.transform((refs) =>
+      (refs ?? []).map((ref): Group => ({ ref, level: "knows" })),
+    ),
+    z.record(z.string(), level).transform((value) =>
       Object.entries(value).map(([ref, how]) => ({
         ref: ref.trim(),
-        close: how === "close",
+        level: how,
       })),
     ),
   ])
   .optional()
-  .transform((value): Group[] =>
-    (value ?? []).flatMap((item) =>
-      typeof item === "string"
-        ? item
-          ? [{ ref: item, close: false }]
-          : []
-        : item.ref
-          ? [item]
-          : [],
-    ),
-  );
+  .transform((value): Group[] => (value ?? []).filter(({ ref }) => ref));
 
 /**
  * The fields Kazusa reads. Anything else in front matter is the author's own:
@@ -113,8 +165,15 @@ const FRONTMATTER = z.looseObject({
   name: text,
   aliases: texts,
   summary: text,
+  known: groups,
+  in: groups,
+  group: z.boolean().optional().catch(undefined),
+  place_id: text,
   groups,
-  renown: z.enum(["private", "local", "known", "famous"]).optional(),
+  renown: z
+    .enum(["private", "local", "known", "famous"])
+    .optional()
+    .catch(undefined),
   known_by: texts,
   parent: text,
   home: text,
@@ -157,13 +216,37 @@ const listItems = (body: string): string[] =>
     .map((line) => line.match(/^[-*]\s+(.+)$/)?.[1]?.trim())
     .filter((item): item is string => Boolean(item));
 
-/** The kind a page has by where it lives, in either wiki. */
+function everyoneOf(list: readonly Group[]): { everyone?: Level } {
+  const found = list.find(({ ref }) => ref.toLowerCase() === EVERYONE);
+  return found ? { everyone: found.level } : {};
+}
+
+/** The kind a page has by where it lives, in either wiki and either layout. */
 export function pageKind(relative: string): PageKind {
-  const parts = relative.split(path.sep);
+  const parts = relative.split(/[\\/]/);
   if (parts[0] === "days") return "day";
-  if (parts[0] === "entities" && parts[1] === "places") return "place";
+  if (parts[0] === "characters") return "person";
   if (parts[0] === "entities" && parts[1] === "characters") return "person";
   return "concept";
+}
+
+/** Whether a page lives where a world not yet upgraded keeps places. */
+const olderPlace = (relative: string): boolean =>
+  /^entities[\\/]places[\\/]/.test(relative);
+
+const LINK = /\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
+const linksIn = (text: string): string[] =>
+  [...text.matchAll(LINK)].map((match) => match[1].trim());
+
+/** `[[id|words]]` as its words, `[[id]]` as `name(id)`: what a reader sees. */
+export function plainLinks(
+  text: string,
+  name: (id: string) => string = (id) => id,
+): string {
+  return text.replace(
+    /\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g,
+    (_, id: string, words?: string) => words?.trim() || name(id.trim()),
+  );
 }
 
 /** Never throws: a broken page still has an id, a body and a lint problem. */
@@ -171,7 +254,7 @@ export function parsePage(raw: string, relative: string): Page {
   const problems: string[] = [];
   const id = path.basename(relative, ".md");
   const opening = raw.match(OPENING);
-  let data: z.infer<typeof FRONTMATTER> = { groups: [] };
+  let data: z.infer<typeof FRONTMATTER> = { groups: [], known: [], in: [] };
   if (opening) {
     try {
       const parsed = FRONTMATTER.safeParse(YAML.parse(opening[1]) ?? {});
@@ -246,6 +329,16 @@ export function parsePage(raw: string, relative: string): Page {
         }
         break;
       case "history":
+        // A History of dated lines is events; one written as prose is just
+        // a section, read like any other.
+        if (!bulletLines(block.body).some((line) => HISTORY.test(line))) {
+          sections.push({
+            title: block.heading,
+            text: block.body,
+            knownBy: [],
+          });
+          break;
+        }
         for (const line of bulletLines(block.body)) {
           const match = line.match(HISTORY);
           if (match) {
@@ -285,15 +378,30 @@ export function parsePage(raw: string, relative: string): Page {
     }
   }
 
-  const links = new Set<string>();
-  for (const match of body.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g))
-    links.add(match[1].trim());
-  for (const link of data.connections ?? []) links.add(link.to);
+  const linksAt: TieredLinks = {
+    heard: linksIn(data.summary ?? ""),
+    knows: [
+      ...linksIn(lead),
+      ...(data.connections ?? []).map((link) => link.to),
+    ],
+    // A part only the page's own character knows is never followed.
+    close: sections
+      .filter((section) => !section.knownBy.length)
+      .flatMap((section) => linksIn(section.text)),
+  };
+  const links = new Set([
+    ...linksIn(data.summary ?? ""),
+    ...linksIn(body),
+    ...(data.connections ?? []).map((link) => link.to),
+  ]);
 
   const name = data.name ?? title ?? id;
   return {
     id,
     kind: pageKind(relative),
+    path: relative.split(/[\\/]/).join("/"),
+    place: data.place_id !== undefined || olderPlace(relative),
+    group: data.group === true,
     name,
     aliases: [
       ...new Set(
@@ -309,7 +417,10 @@ export function parsePage(raw: string, relative: string): Page {
     history,
     openThreads,
     ...(theyThinkOfMe ? { theyThinkOfMe } : {}),
-    groups: data.groups,
+    known: data.known.filter(({ ref }) => ref.toLowerCase() !== EVERYONE),
+    ...everyoneOf(data.known),
+    in: data.in.filter(({ ref }) => ref.toLowerCase() !== EVERYONE),
+    legacyGroups: data.groups,
     ...(data.renown ? { renown: data.renown } : {}),
     knownBy: data.known_by ?? [],
     ...(data.parent ? { parent: data.parent } : {}),
@@ -319,6 +430,7 @@ export function parsePage(raw: string, relative: string): Page {
     ...(data.seen ? { seen: data.seen } : {}),
     touched: data.touched ?? [],
     links: [...links],
+    linksAt,
     problems,
   };
 }

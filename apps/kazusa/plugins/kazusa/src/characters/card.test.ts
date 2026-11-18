@@ -27,19 +27,19 @@ function setup() {
     }),
   } as unknown as OpenClawPluginApi;
   registerCharacterCard(api);
-  const files = () => [
+  const files = (cards = false) => [
     { name: "AGENTS.md", path: "/w/AGENTS.md", content: "a", missing: false },
     {
       name: "SOUL.md",
       path: "/w/SOUL.md",
       content: "old soul",
-      missing: false,
+      missing: !cards,
     },
     {
       name: "IDENTITY.md",
       path: "/w/IDENTITY.md",
       content: "old",
-      missing: false,
+      missing: !cards,
     },
     {
       name: "MEMORY.md",
@@ -48,11 +48,11 @@ function setup() {
       missing: false,
     },
   ];
-  const run = (agentId: string) => {
+  const run = (agentId: string, cards = false) => {
     const context: Record<string, unknown> = {
       agentId,
       workspaceDir: "/w",
-      bootstrapFiles: files(),
+      bootstrapFiles: files(cards),
     };
     handler?.({ context });
     return context.bootstrapFiles as ReturnType<typeof files>;
@@ -61,7 +61,7 @@ function setup() {
 }
 
 describe("a world character's card", () => {
-  it("is their World Wiki page in place of IDENTITY.md and SOUL.md", () => {
+  it("is their World Wiki page in place of IDENTITY.md and SOUL.md, once gone", () => {
     const { run } = setup();
     const files = run("yuuka");
     expect(files.map(({ name }) => name)).toEqual([
@@ -80,9 +80,19 @@ describe("a world character's card", () => {
     ]);
   });
 
+  it("keeps a world's cards as they are until it updates", () => {
+    const { run } = setup();
+    expect(run("yuuka", true).map(({ name }) => name)).toEqual([
+      "AGENTS.md",
+      "SOUL.md",
+      "IDENTITY.md",
+      "MEMORY.md",
+    ]);
+  });
+
   it("leaves the system agent's own files alone", () => {
     const { run } = setup();
-    expect(run("arona").map(({ name }) => name)).toEqual([
+    expect(run("arona", true).map(({ name }) => name)).toEqual([
       "AGENTS.md",
       "SOUL.md",
       "IDENTITY.md",

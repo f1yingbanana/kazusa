@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { PenLineIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, EllipsisIcon, MapIcon, Trash2Icon } from "lucide-react";
+import { parseAsString, useQueryStates } from "nuqs";
 import { toast } from "sonner";
-import { WikiRenamePayloadSchema, type WikiEditResult } from "@kazusa/client";
+import type { WikiEditResult, WikiKind } from "@kazusa/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,17 +17,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { useDeleteWikiPage, useRenameWikiPage } from "@/hooks/use-wiki";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { worldParsers } from "@/components/views/world/search-params";
+import { PLACE_PREFIX } from "@/components/views/world/world-state";
+import { useCastChange } from "@/hooks/use-characters";
+import { useDeleteWikiPage, useWikiSource } from "@/hooks/use-wiki";
+import { deleteCharacter } from "@/lib/source/characters/http";
+import { fetchWikiSource } from "@/lib/source/wiki/http";
+import { entityRefParser } from "@/lib/state/entity-ref";
 
 /** "Moved Airi to School · rewrote 3 pages", or nothing worth saying. */
 function describeResult(result: WikiEditResult): string | undefined {
@@ -41,128 +44,116 @@ function describeResult(result: WikiEditResult): string | undefined {
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-/** Gives a World Wiki place a new id; everything naming it follows. */
-export function RenamePlaceButton({
-  id,
-  name,
-  onRenamed,
-}: {
-  id: string;
-  name: string;
-  onRenamed: (id: string) => void;
-}) {
-  const rename = useRenameWikiPage();
-  const [open, setOpen] = useState(false);
-  const [to, setTo] = useState(id);
-  const [busy, setBusy] = useState(false);
-  const valid = WikiRenamePayloadSchema.shape.to.safeParse(to);
-  const error =
-    to === id || valid.success
-      ? undefined
-      : "Use lowercase letters, digits, _ or -, starting with a letter or digit.";
-
-  const submit = async () => {
-    if (busy || to === id || error) return;
-    setBusy(true);
-    try {
-      const result = await rename({ id, to });
-      toast.success(`Renamed to ${result.id}`, {
-        description: describeResult(result),
-      });
-      setOpen(false);
-      onRenamed(result.id);
-    } catch (failure) {
-      toast.error("Couldn't rename the place", {
-        description:
-          failure instanceof Error ? failure.message : String(failure),
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
+/** Opens a place on the World map, with the place picked. */
+export function ShowOnMapButton({ id }: { id: string }) {
+  const [, setParams] = useQueryStates({
+    view: parseAsString,
+    "world.by": worldParsers["world.by"],
+    "world.in": worldParsers["world.in"],
+    "world.as": worldParsers["world.as"],
+    sel: entityRefParser,
+  });
   return (
-    <>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={() => {
-          setTo(id);
-          setOpen(true);
-        }}
-        aria-label={`Rename ${name}`}
-      >
-        <PenLineIcon />
-        Rename
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Rename {name}</DialogTitle>
-              <DialogDescription>
-                Its page, every page and character card that names it, and
-                anyone there or on their way follow the new id. To change only
-                what it&apos;s called, edit its name instead.
-              </DialogDescription>
-            </DialogHeader>
-            <Field data-invalid={error ? true : undefined}>
-              <FieldLabel htmlFor="rename-place-id">New id</FieldLabel>
-              <Input
-                id="rename-place-id"
-                value={to}
-                autoFocus
-                className="font-mono"
-                aria-invalid={error ? true : undefined}
-                onChange={(event) => setTo(event.target.value)}
-              />
-              {error ? <FieldError>{error}</FieldError> : null}
-            </Field>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
-                Cancel
-              </DialogClose>
-              <Button
-                type="submit"
-                disabled={busy || to === id || Boolean(error)}
-              >
-                {busy ? "Renaming…" : "Rename"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() =>
+        void setParams({
+          view: "world",
+          "world.by": "place",
+          "world.in": `${PLACE_PREFIX}${id}`,
+          "world.as": "map",
+          sel: { kind: "place", id },
+        })
+      }
+    >
+      <MapIcon />
+      Show on map
+    </Button>
   );
 }
 
-/** Removes a page, after asking; a place takes the map's links to it along. */
-export function DeletePageButton({
+/**
+ * More for a page: copy its Markdown, and delete it, after asking; a place
+ * takes the map's links to it along.
+ */
+export function PageMenu({
   id,
   name,
   agent,
+  kind,
   place,
+  canDelete,
   onDeleted,
+  size = "sm",
+  character = false,
 }: {
   id: string;
   name: string;
   /** Their wiki; absent: the World Wiki. */
   agent?: string;
+  kind?: WikiKind | undefined;
   /** A World Wiki place, whose removal changes the map. */
   place: boolean;
+  canDelete: boolean;
   onDeleted: () => void;
+  /** Matches the buttons beside it. */
+  size?: "sm" | "xs";
+  /** A character in the cast: deleting takes them out of it. */
+  character?: boolean;
 }) {
   const remove = useDeleteWikiPage();
+  const castChange = useCastChange();
   const [open, setOpen] = useState(false);
+  // Read with the page, so the text is at hand when the click comes.
+  const source = useWikiSource(id, agent, kind);
 
+  const copy = async () => {
+    // Handed to the clipboard within the click, even while it still loads:
+    // browsers only let a page write there while answering a click.
+    const text = source.data
+      ? Promise.resolve(source.data.text)
+      : fetchWikiSource(id, agent, kind).then(({ text: page }) => page);
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write)
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": text.then(
+              (page) => new Blob([page], { type: "text/plain" }),
+            ),
+          }),
+        ]);
+      else await navigator.clipboard.writeText(await text);
+      toast.success("Copied as Markdown");
+    } catch (failure) {
+      // Clipboard access refused: the older way, from a selection.
+      const area = document.createElement("textarea");
+      area.value = await text.catch(() => "");
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.append(area);
+      area.select();
+      const copied = area.value !== "" && document.execCommand("copy");
+      area.remove();
+      if (copied) toast.success("Copied as Markdown");
+      else
+        toast.error("Couldn't copy the page", {
+          description:
+            failure instanceof Error ? failure.message : String(failure),
+        });
+    }
+  };
   const confirm = async () => {
     try {
+      if (character) {
+        await castChange(() => deleteCharacter(id));
+        toast.success(`${name} left the cast`, {
+          description: "Their page and workspace are deleted.",
+        });
+        onDeleted();
+        return;
+      }
       const result = await remove({ id, ...(agent ? { agent } : {}) });
       toast.success(`Deleted ${name}`, { description: describeResult(result) });
       onDeleted();
@@ -176,23 +167,47 @@ export function DeletePageButton({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={() => setOpen(true)}
-        aria-label={`Delete ${name}`}
-      >
-        <Trash2Icon />
-        Delete
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="outline"
+              size={size === "xs" ? "icon-xs" : "icon-sm"}
+            />
+          }
+        >
+          <EllipsisIcon />
+          <span className="sr-only">{`More for ${name}`}</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => void copy()}>
+            <CopyIcon />
+            Copy Markdown
+          </DropdownMenuItem>
+          {canDelete ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setOpen(true)}
+              >
+                <Trash2Icon />
+                {character ? "Delete character" : "Delete page"}
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {place
-                ? "It comes off the map. Places inside it move up to the area it was in, connections to it go, and anyone there, or whose home it was, ends up in that area. Characters' own pages about it stay: they remember it."
-                : "The page is moved to the world's trash folder, where it can be put back by hand."}
+              {character
+                ? "They leave the cast: they stop, go offstage and come out of the world's setup. Their page and workspace, with their memories and own wiki, are deleted. This can't be undone. Other pages that mention them stay as they are."
+                : place
+                  ? "It comes off the map. Places inside it move up to the area it was in, connections to it go, and anyone there, or whose home it was, ends up in that area. Characters' own pages about it stay: they remember it. This can't be undone."
+                  : "The page is deleted. This can't be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -201,7 +216,7 @@ export function DeletePageButton({
               variant="destructive"
               onClick={() => void confirm()}
             >
-              Delete page
+              {character ? "Delete character" : "Delete page"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,35 +1,42 @@
 "use client";
 
 import {
-  BookOpenIcon,
   CalendarIcon,
-  ChevronRightIcon,
-  EyeIcon,
-  FolderIcon,
-  ImageIcon,
-  ImagePlusIcon,
   MapPinIcon,
   UserRoundIcon,
+  UsersRoundIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { WikiKind, WikiListItem } from "@kazusa/client";
+import type { WikiListItem } from "@kazusa/client";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { usePlainText } from "./page-link";
 
-const FOLDERS: ReadonlyArray<{
-  readonly kind: WikiKind;
-  readonly label: string;
-  readonly icon: LucideIcon;
-}> = [
-  { kind: "person", label: "People", icon: UserRoundIcon },
-  { kind: "place", label: "Places", icon: MapPinIcon },
-  { kind: "concept", label: "Concepts", icon: BookOpenIcon },
-  { kind: "day", label: "Journal", icon: CalendarIcon },
+/** What a page is, for the filters: a page can be both a place and a group. */
+export type Category = "people" | "places" | "groups";
+
+export const CATEGORY_LABEL: Readonly<Record<Category, string>> = {
+  people: "People",
+  places: "Places",
+  groups: "Groups",
+};
+
+export function categoriesOf(page: WikiListItem): Category[] {
+  if (page.kind === "person") return ["people"];
+  const found: Category[] = [];
+  if (page.place) found.push("places");
+  if (page.group) found.push("groups");
+  return found;
+}
+
+/** Every category a page is in, each with its icon: a page can be several. */
+const markersOf = (
+  page: WikiListItem,
+): { icon: LucideIcon; label: string }[] => [
+  ...(page.kind === "person" ? [{ icon: UserRoundIcon, label: "Person" }] : []),
+  ...(page.kind === "day" ? [{ icon: CalendarIcon, label: "Diary day" }] : []),
+  ...(page.place ? [{ icon: MapPinIcon, label: "Place" }] : []),
+  ...(page.group ? [{ icon: UsersRoundIcon, label: "Group" }] : []),
 ];
 
 const rowClass = (selected: boolean) =>
@@ -38,152 +45,103 @@ const rowClass = (selected: boolean) =>
     selected && "bg-accent text-accent-foreground",
   );
 
-function Folder({
-  label,
-  icon: Icon,
-  children,
+/** All, then one toggle per category the list has. */
+export function CategoryFilter({
+  categories,
+  value,
+  onChange,
 }: {
-  label: string;
-  icon: LucideIcon;
-  children: React.ReactNode;
+  categories: readonly Category[];
+  value: Category | undefined;
+  onChange: (value: Category | undefined) => void;
 }) {
+  if (!categories.length) return null;
+  const chip = (pressed: boolean) =>
+    cn(
+      "h-6 rounded-full border px-2.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+      pressed && "border-foreground/20 bg-accent text-accent-foreground",
+    );
   return (
-    <Collapsible defaultOpen>
-      <CollapsibleTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start font-normal aria-expanded:bg-transparent aria-expanded:hover:bg-muted dark:aria-expanded:hover:bg-muted/50"
-          />
-        }
+    <div
+      role="group"
+      aria-label="Show"
+      className="flex flex-wrap gap-1 px-3 pb-2"
+    >
+      <button
+        type="button"
+        aria-pressed={!value}
+        className={chip(!value)}
+        onClick={() => onChange(undefined)}
       >
-        <ChevronRightIcon className="transition-transform group-data-panel-open/button:rotate-90" />
-        <Icon />
-        {label}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="ml-4 flex flex-col">{children}</div>
-      </CollapsibleContent>
-    </Collapsible>
+        All
+      </button>
+      {categories.map((category) => (
+        <button
+          key={category}
+          type="button"
+          aria-pressed={value === category}
+          className={chip(value === category)}
+          onClick={() => onChange(category)}
+        >
+          {CATEGORY_LABEL[category]}
+        </button>
+      ))}
+    </div>
   );
 }
 
 /**
- * A wiki's pages in a folder per kind, all open to start: shadcn's file tree
- * (ui.shadcn.com/docs/ai-elements/base/file-tree), a Collapsible per folder and
- * a Button per page. A character of the cast has a button for their view, as
- * Chats has one for their conversations; the world's has a Backdrops folder.
+ * A wiki's pages as one list by name (days, newest first), each with the icon
+ * of what it is.
  */
 export function PageTree({
   pages,
   selected,
   onSelect,
-  viewable,
-  onView,
-  backdrops,
-  backdrop,
-  onBackdrop,
-  onNewBackdrop,
 }: {
   pages: readonly WikiListItem[];
   selected?: string | undefined;
   onSelect: (id: string) => void;
-  /** Pages that are characters of the cast, by id: name. */
-  viewable?: ReadonlyMap<string, string>;
-  onView?: (id: string) => void;
-  backdrops?: readonly { name: string; preview?: string | undefined }[];
-  backdrop?: string | undefined;
-  onBackdrop?: (name: string) => void;
-  onNewBackdrop?: () => void;
 }) {
+  const plain = usePlainText();
+  const sorted = [...pages].sort((a, b) =>
+    a.kind === "day" && b.kind === "day"
+      ? b.id.localeCompare(a.id)
+      : a.name.localeCompare(b.name),
+  );
   return (
     <div className="flex flex-col text-sm">
-      {FOLDERS.map((folder) => {
-        const inside = pages
-          .filter((page) => page.kind === folder.kind)
-          .sort((a, b) =>
-            // The newest day first; everything else by name.
-            folder.kind === "day"
-              ? b.id.localeCompare(a.id)
-              : a.name.localeCompare(b.name),
-          );
-        if (!inside.length) return null;
+      {sorted.map((page) => {
+        const markers = markersOf(page);
         return (
-          <Folder key={folder.kind} label={folder.label} icon={FolderIcon}>
-            {inside.map((page) => {
-              const who = viewable?.get(page.id);
-              return (
-                <div key={page.id} className="group/row flex items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      rowClass(selected === page.id),
-                      "min-w-0 flex-1",
-                    )}
-                    aria-current={selected === page.id ? "true" : undefined}
-                    title={page.summary || page.name}
-                    onClick={() => onSelect(page.id)}
-                  >
-                    <folder.icon />
-                    <span className="truncate">{page.name}</span>
-                  </Button>
-                  {who && onView ? (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-                      aria-label={`See ${who}'s view`}
-                      title={`${who}'s view`}
-                      onClick={() => onView(page.id)}
-                    >
-                      <EyeIcon />
-                    </Button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </Folder>
+          <div key={page.id} className="group/row flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(rowClass(selected === page.id), "min-w-0 flex-1")}
+              aria-current={selected === page.id ? "true" : undefined}
+              title={plain(page.summary) || page.name}
+              onClick={() => onSelect(page.id)}
+            >
+              <span className="min-w-0 flex-1 truncate text-left">
+                {page.name}
+              </span>
+              {markers.length ? (
+                <span
+                  className="flex shrink-0 items-center gap-1 text-muted-foreground"
+                  aria-label={markers.map(({ label }) => label).join(", ")}
+                >
+                  {markers.map(({ icon: Marker, label }) => (
+                    <Marker key={label} aria-hidden className="size-3.5">
+                      <title>{label}</title>
+                    </Marker>
+                  ))}
+                </span>
+              ) : null}
+            </Button>
+          </div>
         );
       })}
-      {backdrops ? (
-        <Folder label="Backdrops" icon={FolderIcon}>
-          {backdrops.map((set) => (
-            <Button
-              key={set.name}
-              variant="ghost"
-              size="sm"
-              className={rowClass(backdrop === set.name)}
-              aria-current={backdrop === set.name ? "true" : undefined}
-              onClick={() => onBackdrop?.(set.name)}
-            >
-              {set.preview ? (
-                <img
-                  src={set.preview}
-                  alt=""
-                  loading="lazy"
-                  className="size-4 shrink-0 rounded-sm object-cover"
-                />
-              ) : (
-                <ImageIcon />
-              )}
-              <span className="truncate">{set.name}</span>
-            </Button>
-          ))}
-          {onNewBackdrop ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start font-normal text-muted-foreground"
-              onClick={onNewBackdrop}
-            >
-              <ImagePlusIcon />
-              New backdrop set
-            </Button>
-          ) : null}
-        </Folder>
-      ) : null}
     </div>
   );
 }

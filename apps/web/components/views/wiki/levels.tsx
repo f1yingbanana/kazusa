@@ -1,55 +1,63 @@
 "use client";
 
-import type { WikiPageFormFields, WikiReachResponse } from "@kazusa/client";
+import type { WikiGroup, WikiLevel, WikiReachResponse } from "@kazusa/client";
 import { cn } from "@/lib/utils";
+import { PeopleLinks } from "./page-link";
 
 /*
- * Who can know each part of a page, said one way wherever a page is read or
- * edited. Kazusa works out how well each character knows a page; a part says
- * which of them it is for:
- *
- * - the summary line, for anyone who has heard of it;
- * - the opening, for anyone who knows it;
- * - a part, for those close to it, when the conversation comes to it;
- * - on a character's own page, a part only they know: their inner voice.
- *
- * A secret only some others know isn't written here: it goes in each of
- * their own wikis, in their own words, where they can forget it or be wrong.
- * An older part naming people (`named`) is still shown as it is.
+ * Who gets each part of a page, worded once for reading and editing: the
+ * summary (heard of), the opening (knows), topics (close), and on a
+ * character's own page their inner voice (only them).
  */
 
-export type Audience = "heard" | "knows" | "close" | "self" | "named";
+export type Audience = "heard" | "knows" | "close" | "self";
+
+/** The group every character is in. */
+export const EVERYONE = "everyone";
 
 /** A part's audience from its `Known by:` line. */
-export function audienceOf(
-  knownBy: readonly string[],
-  self: string | undefined,
-): Audience {
-  if (!knownBy.length) return "close";
-  return self !== undefined && knownBy.length === 1 && knownBy[0] === self
-    ? "self"
-    : "named";
+export function audienceOf(knownBy: readonly string[]): Audience {
+  return knownBy.length ? "self" : "close";
 }
 
-/** "Anyone who knows Yuuka", "Only Hoshino and Shiroko". */
-export function audienceLabel(
-  audience: Audience,
-  subject: string,
-  names: readonly string[] = [],
-): string {
+/** "Anyone who's heard of Yuuka", "Only Yuuka". */
+export function audienceLabel(audience: Audience, subject: string): string {
   switch (audience) {
     case "heard":
       return `Anyone who's heard of ${subject}`;
     case "knows":
       return `Anyone who knows ${subject}`;
     case "close":
-      return `Close to ${subject}`;
+      return `Anyone who knows ${subject} well`;
     case "self":
       return `Only ${subject}`;
-    case "named":
-      return names.length ? `Only ${listOf(names)}` : "Only certain people";
   }
 }
+
+/**
+ * How well a group knows a page, as its choice reads: "them" for a person, "it"
+ * for anything else.
+ */
+export const levelsFor = (
+  person: boolean,
+): ReadonlyArray<{ readonly value: WikiLevel; readonly label: string }> => {
+  const thing = person ? "them" : "it";
+  return [
+    { value: "heard of", label: `Heard of ${thing}` },
+    { value: "knows", label: `Know ${thing}` },
+    { value: "close", label: `Know ${thing} well` },
+  ];
+};
+
+export const levelLabel = (level: WikiLevel, person: boolean): string =>
+  levelsFor(person).find((option) => option.value === level)?.label ?? level;
+
+/** The audience a level reaches. */
+export const AUDIENCE_OF: Readonly<Record<WikiLevel, Audience>> = {
+  "heard of": "heard",
+  knows: "knows",
+  close: "close",
+};
 
 /** The colour of a part's left edge: the wider its audience, the quieter. */
 export const RAIL: Readonly<Record<Audience, string>> = {
@@ -57,7 +65,6 @@ export const RAIL: Readonly<Record<Audience, string>> = {
   knows: "border-l-primary/35",
   close: "border-l-primary",
   self: "border-l-amber-500",
-  named: "border-l-amber-500",
 };
 
 /** The label's colour, matching the rail. */
@@ -66,77 +73,38 @@ export const TINT: Readonly<Record<Audience, string>> = {
   knows: "text-primary/80",
   close: "text-primary",
   self: "text-amber-600 dark:text-amber-400",
-  named: "text-amber-600 dark:text-amber-400",
 };
 
-/** "Noa, Koyuki and 3 others". */
-export function listOf(names: readonly string[], max = 3): string {
-  if (names.length <= max)
-    return names.length > 1
-      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
-      : (names[0] ?? "");
-  const rest = names.length - max;
-  return `${names.slice(0, max).join(", ")} and ${rest} other${rest === 1 ? "" : "s"}`;
-}
-
-/** Who in the cast is in an audience, as the page now stands. */
+/** Who in the cast is in an audience, as the page now stands: each a link. */
 export function peopleIn(
   audience: Audience,
   reach: WikiReachResponse | undefined,
-): string | undefined {
-  if (!reach) return undefined;
-  const names = (list: WikiReachResponse["well"]) =>
-    list.map(({ name }) => name);
+  /** Names only: while editing, a link would leave the edit. */
+  plain = false,
+): React.ReactNode {
+  if (!reach || audience === "self") return undefined;
   const people =
     audience === "close"
-      ? names(reach.well)
+      ? reach.well
       : audience === "knows"
-        ? [...names(reach.well), ...names(reach.knows)]
-        : audience === "heard"
-          ? [...names(reach.well), ...names(reach.knows), ...names(reach.heard)]
-          : undefined;
-  if (!people) return undefined;
+        ? [...reach.well, ...reach.knows]
+        : [...reach.well, ...reach.knows, ...reach.heard];
   if (!people.length) return "nobody yet";
-  return people.length > 6 ? `${people.length} characters` : listOf(people, 6);
+  return <PeopleLinks people={people} max={6} plain={plain} />;
 }
 
-/** How widely a page is known: its renown, or a secret (`known_by`). */
-export type Reach = NonNullable<WikiPageFormFields["renown"]> | "secret";
+/** A group's name as a page lists it: Everyone, or its page's name. */
+export function groupName(
+  ref: string,
+  nameOf: (ref: string) => string | undefined,
+): string {
+  return ref.toLowerCase() === EVERYONE ? "Everyone" : (nameOf(ref) ?? ref);
+}
 
-export const REACH: ReadonlyArray<{
-  readonly value: Reach;
-  readonly label: string;
-  readonly hint: (subject: string) => string;
-}> = [
-  {
-    value: "local",
-    label: "Its own groups",
-    hint: (subject) =>
-      `People in ${subject}'s groups know it; nobody else has heard of it.`,
-  },
-  {
-    value: "known",
-    label: "Everyone has heard of it",
-    hint: (subject) =>
-      `Everyone gets the summary line; people in ${subject}'s groups know it.`,
-  },
-  {
-    value: "famous",
-    label: "Everyone knows it",
-    hint: () => "Everyone gets the summary line and the opening.",
-  },
-  {
-    value: "private",
-    label: "Hidden",
-    hint: () =>
-      "Only those who live there, or have met it, know it. Nobody else has heard of it.",
-  },
-  {
-    value: "secret",
-    label: "Only certain people",
-    hint: () =>
-      "Only the people named know it. Better written in their own wikis, so it is theirs to forget or get wrong.",
-  },
+/** Everyone first, then the rest as written. */
+export const everyoneFirst = (groups: readonly WikiGroup[]): WikiGroup[] => [
+  ...groups.filter(({ ref }) => ref.toLowerCase() === EVERYONE),
+  ...groups.filter(({ ref }) => ref.toLowerCase() !== EVERYONE),
 ];
 
 /** The left-edged block one part of a page sits in. */
@@ -144,14 +112,17 @@ export function Rail({
   audience,
   label,
   people,
+  hint,
   className,
   children,
 }: {
   audience: Audience;
-  /** The audience, said; a control can stand in for it. */
+  /** The audience, said. */
   label: React.ReactNode;
-  /** Who that is now, in names. */
-  people?: string | undefined;
+  /** Who that is now, by name. */
+  people?: React.ReactNode;
+  /** What the part is for, under the label. */
+  hint?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -161,6 +132,11 @@ export function Rail({
         <span className={cn("font-medium", TINT[audience])}>{label}</span>
         {people ? (
           <span className="text-muted-foreground">{people}</span>
+        ) : null}
+        {hint ? (
+          <span className="basis-full text-pretty text-muted-foreground">
+            {hint}
+          </span>
         ) : null}
       </div>
       {children}

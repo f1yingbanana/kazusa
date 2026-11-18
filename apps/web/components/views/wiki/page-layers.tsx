@@ -1,35 +1,21 @@
 "use client";
 
 import type { WikiPage, WikiReachResponse } from "@kazusa/client";
-import { useCharacters } from "@/hooks/use-characters";
+import { useWikiList } from "@/hooks/use-wiki";
 import { cn } from "@/lib/utils";
+import { PlaceFacts } from "./place-fields";
+import { PeopleLinks, RichText, WikiLink, inline } from "./page-link";
 import {
-  REACH,
+  AUDIENCE_OF,
+  EVERYONE,
   Rail,
+  TINT,
   audienceLabel,
-  audienceOf,
+  everyoneFirst,
+  groupName,
+  levelLabel,
   peopleIn,
-  type Reach,
 } from "./levels";
-
-/** `**strong**`, `*emphasis*` and `code` inside a line. */
-function inline(text: string): React.ReactNode[] {
-  return text
-    .split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g)
-    .map((part, index) => {
-      if (/^\*\*[^*]+\*\*$/.test(part))
-        return <strong key={index}>{part.slice(2, -2)}</strong>;
-      if (/^\*[^*]+\*$/.test(part))
-        return <em key={index}>{part.slice(1, -1)}</em>;
-      if (/^`[^`]+`$/.test(part))
-        return (
-          <code key={index} className="rounded bg-muted px-1 font-mono text-xs">
-            {part.slice(1, -1)}
-          </code>
-        );
-      return part;
-    });
-}
 
 /**
  * The little Markdown pages use: paragraphs, bulleted lists (a wrapped bullet
@@ -81,63 +67,130 @@ export function Prose({
   );
 }
 
-/** Parts in a row for the same audience, under one rail. */
-function groupParts(
-  sections: WikiPage["sections"],
-  self: string | undefined,
-): {
-  audience: ReturnType<typeof audienceOf>;
-  knownBy: readonly string[];
-  parts: WikiPage["sections"];
-}[] {
-  const groups: ReturnType<typeof groupParts> = [];
-  for (const section of sections) {
-    const audience = audienceOf(section.knownBy, self);
-    const last = groups.at(-1);
-    if (
-      last &&
-      last.audience === audience &&
-      last.knownBy.join() === section.knownBy.join()
-    )
-      last.parts.push(section);
-    else groups.push({ audience, knownBy: section.knownBy, parts: [section] });
-  }
-  return groups;
+/** A group by name, linked to its page; everyone is just words. */
+function GroupLink({
+  group: id,
+  nameOf,
+}: {
+  group: string;
+  nameOf: (ref: string) => string | undefined;
+}) {
+  return id.toLowerCase() === EVERYONE || !nameOf(id) ? (
+    <>{groupName(id, nameOf)}</>
+  ) : (
+    <WikiLink id={id} />
+  );
+}
+
+/**
+ * Who knows a page and how well, as a short list: each group with what its
+ * members know, and for a group, who in the cast is in it.
+ */
+export function WhoKnows({
+  page,
+  reach,
+}: {
+  page: WikiPage;
+  reach?: WikiReachResponse | undefined;
+}) {
+  const { data: list } = useWikiList();
+  const nameOf = (ref: string) =>
+    list?.pages.find(
+      (one) => one.id === ref || one.name.toLowerCase() === ref.toLowerCase(),
+    )?.name;
+  const groups = everyoneFirst([
+    ...(page.everyone ? [{ ref: EVERYONE, level: page.everyone }] : []),
+    ...(page.known ?? []),
+  ]);
+  const involvement = {
+    "heard of": "Associate",
+    knows: "Member",
+    close: "Close member",
+  } as const;
+  const members = reach?.members ?? [];
+  return (
+    <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
+      {(page.in ?? []).map(({ ref, level }) => (
+        <div key={`in-${ref}`} className="contents">
+          <dt className="min-w-0 text-pretty">
+            In <GroupLink group={ref} nameOf={nameOf} />
+          </dt>
+          <dd className={TINT[AUDIENCE_OF[level]]}>{involvement[level]}</dd>
+        </div>
+      ))}
+      {groups.length || page.in?.length ? (
+        groups.map(({ ref, level }) => (
+          <div key={ref} className="contents">
+            <dt className="min-w-0 text-pretty">
+              <GroupLink group={ref} nameOf={nameOf} />
+            </dt>
+            <dd className={TINT[AUDIENCE_OF[level]]}>
+              {levelLabel(level, page.kind === "person")}
+            </dd>
+          </div>
+        ))
+      ) : (
+        <p className="text-muted-foreground sm:col-span-2">
+          {page.place
+            ? "Only those who live or have been here."
+            : "Nobody yet."}
+        </p>
+      )}
+      {members.length ? (
+        <div className="contents">
+          <dt className="text-muted-foreground">In {page.name}</dt>
+          <dd>
+            <PeopleLinks people={members} />
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
 }
 
 /**
  * A World Wiki page as its parts, each on a rail saying who can know it, with
- * who that is in this world: the summary line, the opening, then each part for
- * those close to it or only for some. Then who knows it, and why.
+ * who that is in this world: who knows it first, then the summary line, the
+ * opening, what those close to it know, and on a character's own page what only
+ * they know.
  */
 export function PageLayers({
   page,
-  self,
   reach,
 }: {
   page: WikiPage;
-  /** The character the page is about, when it is one of the cast. */
-  self?: string | undefined;
   reach?: WikiReachResponse | undefined;
 }) {
-  const { byId } = useCharacters();
-  const nameOf = (id: string) => byId.get(id)?.name ?? id;
   const subject = page.name;
-  const how: Reach = page.knownBy.length
-    ? "secret"
-    : ((page.renown as Reach | undefined) ??
-      (page.kind === "concept" ? "known" : "local"));
-  const reachLine = REACH.find((option) => option.value === how);
+  const close = page.sections.filter((section) => !section.knownBy.length);
+  const own = page.sections.filter((section) => section.knownBy.length);
+  const parts = (sections: WikiPage["sections"]) => (
+    <div className="flex flex-col gap-5">
+      {sections.map((section) => (
+        <div key={section.title}>
+          <h3 className="mb-1.5 text-sm font-semibold">{section.title}</h3>
+          <Prose text={section.text} />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-7">
+      {page.place ? <PlaceFacts id={page.id} /> : null}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">Who knows {subject}</h2>
+        <WhoKnows page={page} reach={reach} />
+      </section>
       <Rail
         audience="heard"
         label={audienceLabel("heard", subject)}
         people={peopleIn("heard", reach)}
       >
         <p className="text-sm">
-          {page.summary || (
+          {page.summary ? (
+            <RichText text={page.summary} />
+          ) : (
             <span className="text-muted-foreground">No summary yet.</span>
           )}
         </p>
@@ -153,31 +206,20 @@ export function PageLayers({
           <p className="text-sm text-muted-foreground">No opening yet.</p>
         )}
       </Rail>
-      {groupParts(page.sections, self).map((group) => (
+      {close.length ? (
         <Rail
-          key={group.parts[0].title}
-          audience={group.audience}
-          label={audienceLabel(
-            group.audience,
-            subject,
-            group.knownBy.map(nameOf),
-          )}
-          people={
-            group.audience === "close" ? peopleIn("close", reach) : undefined
-          }
+          audience="close"
+          label={audienceLabel("close", subject)}
+          people={peopleIn("close", reach)}
         >
-          <div className="flex flex-col gap-5">
-            {group.parts.map((section) => (
-              <div key={section.title}>
-                <h3 className="mb-1.5 text-sm font-semibold">
-                  {section.title}
-                </h3>
-                <Prose text={section.text} />
-              </div>
-            ))}
-          </div>
+          {parts(close)}
         </Rail>
-      ))}
+      ) : null}
+      {own.length ? (
+        <Rail audience="self" label={audienceLabel("self", subject)}>
+          {parts(own)}
+        </Rail>
+      ) : null}
       {page.history.length ? (
         <Rail audience="knows" label="What happened">
           <ul className="space-y-1 text-sm">
@@ -192,27 +234,6 @@ export function PageLayers({
           </ul>
         </Rail>
       ) : null}
-      <dl className="grid gap-x-6 gap-y-2 border-t pt-5 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">Known</dt>
-        <dd>
-          {how === "secret"
-            ? `Only ${page.knownBy.map(nameOf).join(", ")}`
-            : reachLine?.label}
-          <span className="block text-xs text-muted-foreground">
-            {reachLine?.hint(subject)}
-          </span>
-        </dd>
-        {page.groups?.length ? (
-          <>
-            <dt className="text-muted-foreground">Groups</dt>
-            <dd>
-              {page.groups
-                .map(({ ref, close }) => (close ? `${ref} (close)` : ref))
-                .join(", ")}
-            </dd>
-          </>
-        ) : null}
-      </dl>
     </div>
   );
 }

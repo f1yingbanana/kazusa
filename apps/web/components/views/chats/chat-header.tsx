@@ -38,6 +38,7 @@ import {
 } from "./scene/fullscreen-controls";
 import { SceneSwitch } from "./scene/scene-switch";
 import type { ChatRenderingState } from "./scene/use-chat-rendering";
+import { usePlainText } from "@/components/views/wiki/page-link";
 
 const MAX_FACES = 4;
 
@@ -72,6 +73,7 @@ export function ChatHeader({
   /** Reading mode; given only while the scene shows, to a clock manager. */
   reading?: ReadingToggleProps;
 }) {
+  const plain = usePlainText();
   const { canPlay } = useAccess();
   const { byId } = useCharacters();
   const [selection, select] = useSelection();
@@ -124,7 +126,7 @@ export function ChatHeader({
             // a narrow header would cut "Talking at …" before the place.
             <button
               type="button"
-              title={place.summary}
+              title={plain(place.summary)}
               onClick={() => show({ kind: "place", id: place.id })}
               className="max-w-full truncate rounded-sm text-left underline decoration-muted-foreground/40 underline-offset-2 outline-none hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
@@ -416,6 +418,7 @@ function TalkInPerson({ id }: { id: string }) {
  * text is shown verbatim, never parsed (D7).
  */
 function Activity({ character }: { character: CharacterSummary | undefined }) {
+  const plain = usePlainText();
   const status = useCharacterStatus(
     character?.kind === "agent" ? character.id : undefined,
   );
@@ -423,7 +426,9 @@ function Activity({ character }: { character: CharacterSummary | undefined }) {
   const task = status?.task;
   if (!task) {
     return (
-      <span className="truncate">{character?.summary ?? "Direct message"}</span>
+      <span className="truncate">
+        {character?.summary ? plain(character.summary) : "Direct message"}
+      </span>
     );
   }
   const Icon = taskIcon(task.type);
