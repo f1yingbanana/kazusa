@@ -2,7 +2,7 @@
 // what was asked, and how warm was she about it. Counts by arm afterwards.
 //   node classify.mjs out/<behave>.jsonl out/<classified>.jsonl [n]
 import { existsSync, readFileSync } from "node:fs";
-import { complete, done, keep, pool } from "./lib.mjs";
+import { complete, keep, pool } from "./lib.mjs";
 
 const ASKED = {
   trust: "agree to lend what Sensei asked for (with or without conditions)",
@@ -14,7 +14,26 @@ const rows = readFileSync(rowsFile, "utf8")
   .filter(Boolean)
   .map((line) => JSON.parse(line))
   .filter(({ probe }) => ASKED[probe]);
-const finished = done(outFile);
+/** Both answers, each one it could be: older runs kept rows without. */
+const whole = (row) =>
+  ["yes", "no", "unclear"].includes(row.did) &&
+  Number.isInteger(row.warm) &&
+  row.warm >= 1 &&
+  row.warm <= 5;
+/** What is kept so far; nothing when no run has kept a row yet. */
+const kept = () =>
+  existsSync(outFile)
+    ? readFileSync(outFile, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+    : [];
+// A row kept without both answers is asked again, not counted as done.
+const finished = new Set(
+  kept()
+    .filter(whole)
+    .map(({ id }) => id),
+);
 await pool(
   rows.filter(({ id }) => !finished.has(id)),
   Number(size),
@@ -52,17 +71,15 @@ await pool(
   },
 );
 const cells = new Map();
-// Nothing kept yet (every reply left unread, or no probe it knows): no rows.
-const kept = existsSync(outFile) ? readFileSync(outFile, "utf8") : "";
-for (const line of kept.split("\n").filter(Boolean)) {
-  const row = JSON.parse(line);
-  // Kept by an older run without both answers: no part of an average.
-  if (!row.did || !row.warm) continue;
+// One row a reply, the latest whole one: a row asked again is kept twice.
+const latest = new Map();
+for (const row of kept()) if (whole(row)) latest.set(row.id, row);
+for (const row of latest.values()) {
   const key = `${row.probe} ${row.who.padEnd(7)} ${row.arm.padEnd(4)}`;
   const cell = cells.get(key) ?? { n: 0, yes: 0, warm: 0 };
   cell.n += 1;
   cell.yes += row.did === "yes" ? 1 : 0;
-  cell.warm += row.warm ?? 0;
+  cell.warm += row.warm;
   cells.set(key, cell);
 }
 for (const [key, { n, yes, warm }] of [...cells].sort())
