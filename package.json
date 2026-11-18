@@ -17,7 +17,7 @@
     "doctor": "npm run --workspace=@openrp-ai/kazusa doctor",
     "web": "npm run --workspace=@kazusa/web dev",
     "web:build": "npm run --workspace=@kazusa/web build",
-    "typecheck": "tsc -p apps/kazusa/plugins/kazusa",
+    "typecheck": "tsc -p apps/kazusa/plugins/kazusa && tsc -p apps/kazusa/plugins/nvidia",
     "test": "vitest run --config ./vitest.config.ts",
     "lint": "npm run lint --workspaces --if-present",
     "fix": "pretty-quick --branch main",

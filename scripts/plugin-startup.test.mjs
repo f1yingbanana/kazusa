@@ -9,6 +9,7 @@ import {
   loadNewPlugins,
   skipUnusedStartupWork,
   startProviderPlugins,
+  turnOffReplacedPlugins,
 } from "./plugin-startup.mjs";
 
 const policy = { allowPromptInjection: true };
@@ -142,6 +143,46 @@ describe("loadNewPlugins", () => {
     expect(read().plugins).toEqual({
       load: { paths: ["../plugins/kazusa", OPENRP] },
     });
+  });
+});
+
+describe("turnOffReplacedPlugins", () => {
+  /** Base turns OpenClaw's NVIDIA plugin off for Kazusa's own. */
+  const replacingNvidia = (root) => {
+    const file = path.join(root, "apps/kazusa/base.json");
+    const base = JSON.parse(readFileSync(file, "utf8"));
+    base.config.plugins.entries.nvidia = { enabled: false };
+    writeFileSync(file, JSON.stringify(base));
+    return root;
+  };
+
+  it("turns the old plugin off and stops allowing it, once", () => {
+    const { root, read } = repo({
+      plugins: {
+        allow: ["kazusa", "nvidia", "zai", "kazusa-nvidia"],
+        entries: { nvidia: { enabled: true, hooks: policy } },
+      },
+    });
+    expect(turnOffReplacedPlugins(replacingNvidia(root))).toEqual([
+      "Kazusa's own plugins now stand in for: nvidia.",
+    ]);
+    expect(read().plugins).toEqual({
+      allow: ["kazusa", "zai", "kazusa-nvidia"],
+      entries: { nvidia: { enabled: false } },
+    });
+    expect(turnOffReplacedPlugins(root)).toEqual([]);
+  });
+
+  it("turns it off in a world that allows every plugin", () => {
+    const { root, read } = repo({ plugins: {} });
+    turnOffReplacedPlugins(replacingNvidia(root));
+    expect(read().plugins).toEqual({ entries: { nvidia: { enabled: false } } });
+  });
+
+  it("leaves plugins base.json keeps on", () => {
+    const { root, read } = repo({ plugins: { allow: ["zai"] } });
+    expect(turnOffReplacedPlugins(root)).toEqual([]);
+    expect(read().plugins).toEqual({ allow: ["zai"] });
   });
 });
 

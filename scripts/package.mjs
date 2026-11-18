@@ -82,7 +82,12 @@ const INCLUDED = [
   ".agents/skills/",
 ];
 const EXCLUDED = [/\.test\.tsx?$/, /\.env\.example$/];
-const WORKSPACE_LINKS = ["@kazusa/plugin", "@kazusa/web", "@openrp-ai/kazusa"];
+const WORKSPACE_LINKS = [
+  "@kazusa/plugin",
+  "@kazusa/nvidia-provider",
+  "@kazusa/web",
+  "@openrp-ai/kazusa",
+];
 // Windows refuses paths over 260 characters, and the install folder takes up to 70.
 const LONGEST_PATH = 190;
 

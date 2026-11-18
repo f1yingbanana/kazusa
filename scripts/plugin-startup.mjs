@@ -82,6 +82,37 @@ export function loadNewPlugins(root) {
 }
 
 /**
+ * OpenClaw plugins `base.json` turns off (`enabled: false`) because Kazusa has
+ * its own in their place: NVIDIA's, which listed only a few models. Only one
+ * plugin may own a provider, so a world made before the replacement turns the
+ * old one off here and stops allowing it. Run after `loadNewPlugins`, which
+ * brings the replacement in.
+ */
+export function turnOffReplacedPlugins(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const base = JSON.parse(
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
+  );
+  const replaced = Object.entries(base.config?.plugins?.entries ?? {})
+    .filter(([, entry]) => entry?.enabled === false)
+    .map(([id]) => id);
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const plugins = (config.plugins ??= {});
+  const entries = (plugins.entries ??= {});
+  const off = replaced.filter((id) => {
+    const allowed = plugins.allow?.includes(id) ?? false;
+    if (entries[id]?.enabled === false && !allowed) return false;
+    if (allowed) plugins.allow = plugins.allow.filter((other) => other !== id);
+    entries[id] = { enabled: false };
+    return true;
+  });
+  if (!off.length) return [];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [`Kazusa's own plugins now stand in for: ${off.join(", ")}.`];
+}
+
+/**
  * The tools OpenClaw once granted for `tools.exec` and `tools.fs` being set. It
  * no longer does, but warns about it on every tool-policy check of every
  * character (#47487): six lines per turn, 40% of a long run's log.
@@ -181,6 +212,7 @@ export function skipUnusedStartupWork(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
+  for (const line of turnOffReplacedPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of denyImpliedTools(root)) console.log(line);
   for (const line of skipUnusedStartupWork(root)) console.log(line);

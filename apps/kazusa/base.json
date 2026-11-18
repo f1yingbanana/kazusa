@@ -72,7 +72,7 @@
         "mistral",
         "moonshot",
         "novita",
-        "nvidia",
+        "kazusa-nvidia",
         "ollama",
         "openai",
         "opencode-go",
@@ -93,6 +93,7 @@
       "load": {
         "paths": [
           "../plugins/kazusa",
+          "../plugins/nvidia",
           "../../../node_modules/@openclaw/parallel-plugin",
           "../../../node_modules/@openclaw/byteplus-provider",
           "../../../node_modules/@openclaw/cerebras-provider",
@@ -210,11 +211,14 @@
             "allowPromptInjection": true
           }
         },
-        "nvidia": {
+        "kazusa-nvidia": {
           "enabled": true,
           "hooks": {
             "allowPromptInjection": true
           }
+        },
+        "nvidia": {
+          "enabled": false
         },
         "ollama": {
           "enabled": true,

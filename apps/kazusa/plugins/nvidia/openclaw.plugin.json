@@ -1,0 +1,63 @@
+{
+  "id": "kazusa-nvidia",
+  "name": "NVIDIA (every model)",
+  "description": "NVIDIA's provider with every chat model its API lists, in place of OpenClaw's, which offers only a picked few.",
+  "categories": ["models"],
+  "activation": {
+    "onStartup": false
+  },
+  "enabledByDefault": true,
+  "providers": ["nvidia"],
+  "providerEndpoints": [
+    {
+      "endpointClass": "nvidia-native",
+      "hosts": ["integrate.api.nvidia.com"],
+      "baseUrls": ["https://integrate.api.nvidia.com/v1"]
+    }
+  ],
+  "modelIdNormalization": {
+    "providers": {
+      "nvidia": {
+        "prefixWhenBare": "nvidia"
+      }
+    }
+  },
+  "modelCatalog": {
+    "modelsDev": {
+      "nvidia": "nvidia"
+    },
+    "discovery": {
+      "nvidia": "refreshable"
+    }
+  },
+  "setup": {
+    "providers": [
+      {
+        "id": "nvidia",
+        "authMethods": ["api-key"],
+        "envVars": ["NVIDIA_API_KEY"]
+      }
+    ]
+  },
+  "providerAuthChoices": [
+    {
+      "provider": "nvidia",
+      "method": "api-key",
+      "choiceId": "nvidia-api-key",
+      "appGuidedSecret": true,
+      "choiceLabel": "NVIDIA API key",
+      "groupId": "nvidia",
+      "groupLabel": "NVIDIA",
+      "groupHint": "Direct API key",
+      "optionKey": "nvidiaApiKey",
+      "cliFlag": "--nvidia-api-key",
+      "cliOption": "--nvidia-api-key <key>",
+      "cliDescription": "NVIDIA API key"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

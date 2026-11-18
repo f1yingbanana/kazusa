@@ -686,6 +686,8 @@ export const PROVIDERS: readonly ProviderEntry[] = [
     keyName: "NOVITA_API_KEY",
   }),
   entry("nvidia", "NVIDIA", {
+    // Kazusa's own, which lists every model; OpenClaw's lists a few.
+    plugin: "kazusa-nvidia",
     hint: "Open models on NVIDIA's servers",
     keysUrl: "https://build.nvidia.com/settings/api-keys",
     keyName: "NVIDIA_API_KEY",

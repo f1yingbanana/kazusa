@@ -367,7 +367,12 @@ apps/kazusa/
   OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
   `@openrp-ai/openclaw-provider` (from the openrp repo), a dependency of
   `apps/kazusa` loaded by path from `base.json` like the official
-  `@openclaw/*-provider` packages.
+  `@openclaw/*-provider` packages. Every offered provider lists the models its
+  API serves (checked 2026-11-18) except OpenClaw's NVIDIA, which kept only
+  bundled or featured ones, so Kazusa has its own (`apps/kazusa/plugins/nvidia`,
+  plugin `kazusa-nvidia`, provider still `nvidia`): one plugin may own a
+  provider, so `base.json` turns OpenClaw's off and `turnOffReplacedPlugins`
+  does the same for older worlds.
 - **Gateway token**: required even on loopback, because without it any website
   can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
   `.env`, and hands it to the frontend's proxy. Plugin routes read it from
