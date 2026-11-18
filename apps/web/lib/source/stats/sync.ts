@@ -25,6 +25,11 @@ export function statsSync(deps: {
 }): {
   /** Reads everything again: definitions changed, or events were missed. */
   readonly refresh: () => void;
+  /**
+   * The same, for whoever has to know it is done: over once the newest read has
+   * landed in the cache, and throwing when it could not be made.
+   */
+  readonly whole: () => Promise<void>;
   readonly event: (event: StatsStreamEvent) => void;
   readonly stop: () => void;
 } {
@@ -38,6 +43,8 @@ export function statsSync(deps: {
   let cancel: (() => void) | undefined;
   let since: StatsStreamEvent[] = [];
   let stopped = false;
+  /** Over when the read under way has landed or failed. */
+  let landing: Promise<void> = Promise.resolve();
   const later =
     deps.later ??
     ((run, ms) => {
@@ -52,13 +59,13 @@ export function statsSync(deps: {
     reading = mine;
     owed = false;
     since = [];
-    deps.read().then(
-      (snapshot) => {
+    landing = deps.read().then(
+      async (snapshot) => {
         // A later read began after this one and knows more.
         if (stopped || mine !== reading) return;
         reading = 0;
         failed = 0;
-        void deps.write(
+        await deps.write(
           since.reduce(
             (whole, event) => withStatsEvent(whole, event) ?? whole,
             snapshot,
@@ -79,6 +86,12 @@ export function statsSync(deps: {
 
   return {
     refresh,
+    async whole() {
+      refresh();
+      // A read that another overtook waits for the one that overtook it.
+      for (let seen; seen !== landing;) await (seen = landing);
+      if (owed) throw new Error("The states could not be read.");
+    },
     event(event) {
       if (!event.record || owed) {
         refresh();
@@ -101,3 +114,20 @@ export function statsSync(deps: {
     },
   };
 }
+
+/**
+ * The page's one sync, while its stream is up. Anything else that needs a whole
+ * read asks it: a read of its own would be dropped by the stream's next patch.
+ */
+let live: ReturnType<typeof statsSync> | undefined;
+export const liveStats = {
+  /** Returns how to step down, when the stream does. */
+  is(sync: ReturnType<typeof statsSync>): () => void {
+    live = sync;
+    return () => {
+      if (live === sync) live = undefined;
+    };
+  },
+  /** `undefined` with no stream: nothing patches under a read then. */
+  whole: (): Promise<void> | undefined => live?.whole(),
+};

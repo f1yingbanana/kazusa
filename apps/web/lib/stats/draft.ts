@@ -81,6 +81,45 @@ export function toDraft(stat: StatDefinition): StatDraft {
   };
 }
 
+/**
+ * `stat`, as a form made it, with the line breaks of `opened`'s meanings put
+ * back wherever the form left a meaning as it was. The form lists meanings one
+ * to a line (`line`), so without this a save that touched nothing would still
+ * rewrite a meaning written over several lines.
+ */
+export function withLinesKept(
+  stat: StatDefinition,
+  opened: StatDefinition | undefined,
+): StatDefinition {
+  const kept = <T extends { name: string; description?: string }>(
+    made: readonly T[],
+    were: readonly T[] | undefined,
+  ): T[] =>
+    made.map((entry) => {
+      const was = were?.find(({ name }) => name === entry.name)?.description;
+      return was !== undefined && line(was) === entry.description
+        ? { ...entry, description: was }
+        : entry;
+    });
+  if (stat.kind === "choice")
+    return {
+      ...stat,
+      values: kept(
+        stat.values,
+        opened?.kind === "choice" ? opened.values : undefined,
+      ),
+    };
+  return stat.bands
+    ? {
+        ...stat,
+        bands: kept(
+          stat.bands,
+          opened?.kind === "number" ? opened.bands : undefined,
+        ),
+      }
+    : stat;
+}
+
 /** Non-empty lines, each split on its first `parts - 1` colons. */
 function rows(text: string, parts: number): string[][] {
   return text

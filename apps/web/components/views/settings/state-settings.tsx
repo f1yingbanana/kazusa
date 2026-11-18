@@ -49,6 +49,7 @@ import {
   statsCharactersSee,
   fromDraft,
   toDraft,
+  withLinesKept,
   type StatDraft,
 } from "@/lib/stats/draft";
 import { catalogAdvice, statAdvice, type StatAdvice } from "@/lib/stats/advice";
@@ -377,9 +378,10 @@ export function StateSettings() {
             if (!opened)
               return save([...catalog, stat], revision, "State added");
             if (changedElsewhere(opened, "save")) return false;
+            const made = withLinesKept(stat, opened);
             return save(
               catalog.map((entry) =>
-                entry.name === opened.name ? stat : entry,
+                entry.name === opened.name ? made : entry,
               ),
               revision,
               "State saved",

@@ -625,8 +625,8 @@ the other, and `face` follows the rule already there:
   portraits in what they are wearing (`faceMoods`, §6.4); the usual clothes'
   where that outfit has no portrait. About 20 words for the largest imported
   sets, against about 80 full names. Built differently from the first plan
-  (every look's mood, from the stickers): a mood with no usual-clothes picture
-  would change nothing on screen.
+  (every look's mood, from the stickers): a mood that no portrait shows in what
+  they are wearing would change nothing on screen.
 - The list changes only when they change outfit, so the tool definition stays in
   the cached prefix from turn to turn.
 - A character with no portraits in usual clothes (no `default`, so not drawn)

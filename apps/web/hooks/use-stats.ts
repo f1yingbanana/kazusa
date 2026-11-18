@@ -11,6 +11,7 @@ import {
 import { useAccess } from "@/hooks/use-access";
 import { KazusaApiError } from "@/lib/source/http";
 import { useSources } from "@/lib/source/provider";
+import { liveStats } from "@/lib/source/stats/sync";
 import {
   STATS_KEY,
   fetchStats,
@@ -37,6 +38,15 @@ export function useStats() {
 
   const { cache } = useSWRConfig();
   /**
+   * Everything read again, and over when it is in the cache: through the
+   * stream's sync when there is one, since a read of SWR's own is dropped by
+   * the stream's next patch.
+   */
+  const whole = useCallback(
+    async (): Promise<void> => void (await (liveStats.whole() ?? mutate())),
+    [mutate],
+  );
+  /**
    * Puts a write's response into the snapshot. `before` is the snapshot as the
    * request went out: a response that arrives after the stream has changed the
    * same thing is left out, and everything is read again if the two differ.
@@ -61,9 +71,9 @@ export function useStats() {
         },
         { revalidate: false },
       );
-      if (reread) void mutate();
+      if (reread) void whole().catch(() => {});
     },
-    [cache, mutate],
+    [cache, mutate, whole],
   );
 
   /**
@@ -92,14 +102,21 @@ export function useStats() {
       } catch (error) {
         if (!(error instanceof KazusaApiError) || error.status !== 409)
           throw error;
-        await mutate();
+        try {
+          await whole();
+        } catch {
+          throw new Error(
+            "The states changed somewhere else, and could not be read again. Reload the page before saving.",
+            { cause: error },
+          );
+        }
         throw new Error(
           "The states changed somewhere else. They are up to date now: check them and save again.",
           { cause: error },
         );
       }
     },
-    [mutate, settle],
+    [settle, whole],
   );
 
   return { enabled, canManage, data, error, set, saveCatalog };

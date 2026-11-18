@@ -5,6 +5,7 @@ import {
   STAT_EXAMPLES,
   editConflict,
   fromDraft,
+  withLinesKept,
   statsCharactersSee,
   toDraft,
 } from "./draft";
@@ -153,5 +154,49 @@ describe("state drafts", () => {
       editConflict([{ ...mood, description: "Changed." }, warmth], mood),
     ).toBe("changed");
     expect(editConflict([warmth], mood)).toBe("deleted");
+  });
+
+  it("saves a state it did not touch exactly as it was, line breaks and all", () => {
+    const choice = StatDefinitionSchema.parse({
+      name: "mood",
+      description: "How they feel.",
+      on: "character",
+      kind: "choice",
+      values: [
+        { name: "calm", description: "At ease.\nNothing pressing." },
+        { name: "tense" },
+      ],
+      initial: "calm",
+      changedBy: "character",
+      shown: "self",
+    });
+    const number = StatDefinitionSchema.parse({
+      name: "trust",
+      description: "How far they rely on them.",
+      on: "pair",
+      kind: "number",
+      min: 0,
+      max: 40,
+      initial: 12,
+      step: 1,
+      bands: [
+        { name: "wary", min: 0, description: "Keeps them\n  at arm's length." },
+        { name: "sure", min: 20 },
+      ],
+      changedBy: "reviewed",
+      shown: "self",
+    });
+    for (const stat of [choice, number]) {
+      const made = fromDraft(toDraft(stat)).stat;
+      expect(made).not.toEqual(stat);
+      expect(withLinesKept(made!, stat)).toEqual(stat);
+    }
+    // A meaning the form did change is the form's.
+    const draft = toDraft(choice);
+    const edited = fromDraft({
+      ...draft,
+      values: draft.values.replace("Nothing pressing.", "Nothing at all."),
+    }).stat;
+    expect(withLinesKept(edited!, choice)).toEqual(edited);
   });
 });

@@ -18,7 +18,7 @@ import {
 import { eventsUrl } from "@/lib/source/chats/http";
 import { isDesiresKey } from "@/lib/source/desires/http";
 import { STATS_KEY, fetchStats } from "@/lib/source/stats/http";
-import { statsSync } from "@/lib/source/stats/sync";
+import { liveStats, statsSync } from "@/lib/source/stats/sync";
 import { isLocationsKey, isPlacesKey } from "@/lib/source/location/http";
 import {
   OBSERVED_MESSAGES_KEY,
@@ -107,6 +107,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       write: (data) =>
         mutate<StatsResponse>(STATS_KEY, data, { revalidate: false }),
     });
+    const stepDown = liveStats.is(stats);
 
     const rememberMessage = (id: string): boolean => {
       if (seenMessages.has(id)) return false;
@@ -335,6 +336,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       disposed = true;
+      stepDown();
       stats.stop();
       clearTyping();
       silenceScenes();

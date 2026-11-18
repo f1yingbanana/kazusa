@@ -162,4 +162,33 @@ describe("the states snapshot under the stream", () => {
     await h.settle();
     expect(h.retries).toHaveLength(0);
   });
+
+  it("says when a whole read has landed, with what arrived during it kept", async () => {
+    const h = harness(snapshot("old"));
+    let landed = false;
+    const whole = h.sync.whole().then(() => (landed = true));
+    h.sync.event(record("natsu", 7));
+    await h.settle();
+    expect(landed).toBe(false);
+    h.reads[0](snapshot("new"));
+    await whole;
+    expect(h.cache()?.revision).toBe("new");
+    expect(h.cache()?.records.natsu?.own.hp?.value).toBe(7);
+  });
+
+  it("waits for the read that overtook it, and throws when none could be made", async () => {
+    const h = harness(snapshot("old"));
+    let landed = false;
+    const whole = h.sync.whole().then(() => (landed = true));
+    h.sync.event({ type: "stats", catalog: true });
+    h.reads[0](snapshot("stale"));
+    await h.settle();
+    expect(landed).toBe(false);
+    h.reads[1](snapshot("new"));
+    await whole;
+    expect(h.cache()?.revision).toBe("new");
+    const failing = h.sync.whole();
+    h.reads[2](new Error("down"));
+    await expect(failing).rejects.toThrow("could not be read");
+  });
 });
