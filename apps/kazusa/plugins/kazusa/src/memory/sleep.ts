@@ -226,6 +226,17 @@ function asked(agentId: string): Set<string> {
   return mine;
 }
 
+/**
+ * A night's run that could not be kept when the night ended, by character. One
+ * map for the process, as the nights are: whichever registration is asked next
+ * must know of it.
+ */
+const OWED = Symbol.for("kazusa.memory.owed");
+function owedRuns(): Map<string, SleepRun> {
+  const scope = globalThis as { [OWED]?: Map<string, SleepRun> };
+  return (scope[OWED] ??= new Map<string, SleepRun>());
+}
+
 /** One night per character at a time, shared by every registration. */
 export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
   const read = (file: string): string | undefined =>
@@ -309,7 +320,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
    * The pages are rewritten and the states moved all the same, so it is still
    * their last night, and it is kept at the next chance.
    */
-  const owed = new Map<string, SleepRun>();
+  const owed = owedRuns();
 
   /** Keeps runs, newest first, in place of any kept under the same ids. */
   const persist = async (

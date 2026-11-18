@@ -88,6 +88,7 @@ beforeEach(() => {
     "kazusa.memory",
     "kazusa.memory.nights",
     "kazusa.memory.asked",
+    "kazusa.memory.owed",
   ])
     delete (globalThis as Record<symbol, unknown>)[Symbol.for(cell)];
   root = materialize(WORLDS.saltmere);

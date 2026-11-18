@@ -34,6 +34,7 @@ function harness(cached?: StatsResponse) {
         );
       }),
     write: async (data) => {
+      await held;
       cached = typeof data === "function" ? data(cached) : data;
       return cached;
     },
@@ -45,10 +46,28 @@ function harness(cached?: StatsResponse) {
     },
   });
   const stales: boolean[] = [];
+  /** Writes wait while this is set, as a cache write that takes a while. */
+  let held: Promise<void> | undefined;
+  const holdWrites = (): (() => void) => {
+    let release = (): void => {};
+    held = new Promise((resolve) => (release = resolve));
+    return () => {
+      held = undefined;
+      release();
+    };
+  };
   /** Retries waiting to run: what a timer would hold. */
   const retries: { run: () => void; ms: number }[] = [];
   const settle = () => new Promise((resolve) => setTimeout(resolve));
-  return { sync, reads, retries, stales, settle, cache: () => cached };
+  return {
+    sync,
+    reads,
+    retries,
+    stales,
+    settle,
+    holdWrites,
+    cache: () => cached,
+  };
 }
 
 describe("an outfit named in a way no state's value could be", () => {
@@ -206,5 +225,22 @@ describe("the states snapshot under the stream", () => {
     await h.settle();
     expect(h.cache()?.revision).toBe("old");
     await expect(h.sync.whole()).rejects.toThrow("no longer being read");
+  });
+
+  it("is not told of a read that was still being written when it asked", async () => {
+    const h = harness(snapshot("old"));
+    const release = h.holdWrites();
+    h.sync.refresh();
+    h.reads[0](snapshot("first"));
+    await h.settle();
+    // Asked while the first read is on its way into the cache.
+    let landed = false;
+    const whole = h.sync.whole().then(() => (landed = true));
+    release();
+    await h.settle();
+    expect(landed).toBe(false);
+    h.reads[1](snapshot("second"));
+    await whole;
+    expect(h.cache()?.revision).toBe("second");
   });
 });

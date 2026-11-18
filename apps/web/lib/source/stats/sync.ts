@@ -84,7 +84,9 @@ export function statsSync(deps: {
             snapshot,
           ),
         );
-        tell();
+        // A read begun while this one was being written is the one waited
+        // for now, and a stop has already said so.
+        if (!stopped && !reading) tell();
       },
       () => {
         if (stopped || mine !== reading) return;

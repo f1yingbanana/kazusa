@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import {
+  MALFORMED,
   HERE,
   ROOT,
   applyReview,
@@ -280,7 +281,8 @@ async function night({ character, day, offset, record, page, variant }) {
       const key = about.toLowerCase();
       const sensei = /sensei/u.test(key);
       let said;
-      if (name === "remember") {
+      if (input.unparsed !== undefined) said = MALFORMED;
+      else if (name === "remember") {
         if (input.on) said = "Noted in your plans.";
         else {
           if (sensei)

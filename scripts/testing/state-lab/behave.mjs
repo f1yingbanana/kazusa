@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
+  MALFORMED,
   HERE,
   ROOT,
   catalogOf,
@@ -174,7 +175,8 @@ async function run(character, probe, arm, catalog) {
     for (const { id, name, input } of reply.toolCalls) {
       out.tools.push(name);
       let said = '{"status":"ok"}';
-      if (name === "send_message") {
+      if (input.unparsed !== undefined) said = MALFORMED;
+      else if (name === "send_message") {
         out.said.push(...[input.messages ?? []].flat().map(String));
         said = '{"status":"delivered"}';
         acted = true;

@@ -386,10 +386,14 @@ export function statStanding(stat: StatDefinition, value: StatValue): string {
     return statWord(stat, value);
   const { at, below, above } = bandsAt(stat, value);
   if (!at) return statWord(stat, value);
+  // Where one move lands, kept within the range: a band the range never
+  // reaches is not one they are close to.
+  const moved = (by: number): number =>
+    Math.min(stat.max, Math.max(stat.min, value + by));
   const step = stat.step ?? 1;
-  if (above && value + step >= above.min)
+  if (above && moved(step) >= above.min)
     return `${at.name}, close to ${above.name}`;
-  if (below && value - step < at.min)
+  if (below && moved(-step) < at.min)
     return `${at.name}, close to ${below.name}`;
   return at.name;
 }

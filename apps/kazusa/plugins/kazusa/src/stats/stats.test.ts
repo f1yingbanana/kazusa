@@ -5,6 +5,7 @@ import {
   StatCatalogSchema,
   StatDefinitionSchema,
   statMoved,
+  statStanding,
   statStride,
   type StatCatalog,
   type StatRecord,
@@ -459,6 +460,29 @@ describe("a state with bands", () => {
     ],
     changedBy: "reviewed",
     shown: "self",
+  });
+
+  it("is close only to a band a move can reach", () => {
+    const kept = StatDefinitionSchema.parse({
+      name: "heat",
+      description: "How warm they are.",
+      on: "character",
+      kind: "number",
+      min: 0,
+      max: 10,
+      initial: 0,
+      bands: [
+        { name: "cold", min: -10 },
+        { name: "warm", min: 0 },
+        { name: "hot", min: 10 },
+      ],
+      changedBy: "reviewed",
+      shown: "self",
+    });
+    // Down from 0 stays at 0: cold is no closer than it ever is.
+    expect(statStanding(kept, 0)).toBe("warm");
+    expect(statStanding(kept, 9)).toBe("warm, close to hot");
+    expect(statStanding(kept, 10)).toBe("hot, close to warm");
   });
 
   it("is told how fine it is, and moves a step at a time", () => {

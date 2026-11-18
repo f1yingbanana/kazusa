@@ -181,6 +181,13 @@ export async function complete(body, { tries = 10, timeoutMs = 900_000 } = {}) {
 }
 
 /**
+ * What a call whose arguments were not JSON is answered with, as the host
+ * answers one live: the model calls again, and nothing is kept for it.
+ */
+export const MALFORMED =
+  "The arguments could not be read as JSON, so nothing was done. Call again with valid JSON.";
+
+/**
  * Runs jobs a few at a time; one failing never stops the rest. Returns how many
  * failed, and makes the process exit non-zero when any did, after whatever the
  * runner still prints: rows already kept stay for the next run.
