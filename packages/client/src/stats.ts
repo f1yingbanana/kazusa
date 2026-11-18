@@ -247,8 +247,11 @@ export type StatRecord = z.infer<typeof StatRecordSchema>;
 /** GET /kazusa/stats. */
 export const StatsResponseSchema = z.object({
   catalog: StatCatalogSchema,
-  /** Names this version of the catalog, for saving a change to it. */
-  revision: z.string(),
+  /**
+   * Names this version of the catalog, for saving a change to it. Absent from a
+   * Gateway started before it had one: its saves go unchecked, as they did.
+   */
+  revision: z.string().optional(),
   /** By character id; characters with nothing set are absent. */
   records: z.record(z.string(), StatRecordSchema),
   /** The world's own states by name. */

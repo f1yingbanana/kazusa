@@ -54,7 +54,7 @@ export function useStats() {
    * throws saying so.
    */
   const saveCatalog = useCallback(
-    async (catalog: StatCatalog, base: string): Promise<void> => {
+    async (catalog: StatCatalog, base: string | undefined): Promise<void> => {
       let response: StatsResponse;
       try {
         response = await saveStatCatalog(catalog, base);

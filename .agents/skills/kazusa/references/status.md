@@ -192,10 +192,11 @@ reads a process-wide copy of each character's outfit entry, filled at
   the `revision` it was made from, and is refused with 409 when the states have
   changed since (another session, the system agent, an edit by hand), so it
   never undoes a change it did not see. The client reads again and asks the user
-  to save again. It takes only what a write changed from that write's response,
-  and makes a whole read outside SWR with the record events that arrived
-  meanwhile put back on top (`apps/web/lib/source/stats/sync.ts`): a patch to an
-  SWR cache drops a read of it under way.
+  to save again. A Gateway started before this gives no `revision`, and its
+  saves go unchecked. It takes only what a write changed from that write's
+  response, and makes a whole read outside SWR with the record events that
+  arrived meanwhile put back on top (`apps/web/lib/source/stats/sync.ts`): a
+  patch to an SWR cache drops a read of it under way.
 - **Changes in order**: a change worked out from where a value stands (a signed
   number, a step up or down) is worked out inside that subject's write queue
   (`apply` in `stats/register.ts`), so two at once each start from the other's

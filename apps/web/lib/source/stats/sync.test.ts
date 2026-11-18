@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { StatsResponse, StatsStreamEvent } from "@kazusa/client";
+import {
+  StatsResponseSchema,
+  type StatsResponse,
+  type StatsStreamEvent,
+} from "@kazusa/client";
 import { statsSync } from "./sync";
 
 const entry = (value: number) => ({ value, at: 1, by: "user" as const });
@@ -37,6 +41,13 @@ function harness(cached?: StatsResponse) {
   const settle = () => new Promise((resolve) => setTimeout(resolve));
   return { sync, reads, settle, cache: () => cached };
 }
+
+describe("a Gateway from before catalogs had a revision", () => {
+  it("is still read", () => {
+    const { revision: _, ...older } = snapshot("r");
+    expect(StatsResponseSchema.parse(older).revision).toBeUndefined();
+  });
+});
 
 describe("the states snapshot under the stream", () => {
   it("keeps a read of new definitions when a record event lands first", async () => {

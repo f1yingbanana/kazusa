@@ -179,9 +179,8 @@ export function StateSettings() {
     { readonly draft: StatDraft; readonly replaces?: string } | undefined
   >();
   // What the states are by the time an Undo is pressed.
-  const latest = useRef<{ catalog: StatCatalog; revision: string }>({
+  const latest = useRef<{ catalog: StatCatalog; revision?: string }>({
     catalog: [],
-    revision: "",
   });
   useEffect(() => {
     if (data) latest.current = data;
@@ -212,7 +211,7 @@ export function StateSettings() {
   /** `base`: the revision of the states `next` was made from. */
   const save = async (
     next: StatCatalog,
-    base: string,
+    base: string | undefined,
     done: string,
     undo?: () => void,
   ): Promise<boolean> => {
