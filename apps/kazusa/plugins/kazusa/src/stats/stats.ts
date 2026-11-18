@@ -259,8 +259,9 @@ export function reviewText(
     toward.some(({ stats: theirs }) => theirs.includes(stat)),
   );
   if (!own.length && !pair.length) return undefined;
+  // What each value means is said once above, not on every person's line.
   const stands = (stat: StatDefinition, towardId?: string) =>
-    line(
+    `${stat.name}: ${statStanding(
       stat,
       statValue(
         stat,
@@ -269,7 +270,7 @@ export function reviewText(
           ...(towardId ? { toward: towardId } : {}),
         }),
       ),
-    );
+    )}`;
   return [
     [...own, ...pair].map(describeStat).join("\n"),
     ...(own.length

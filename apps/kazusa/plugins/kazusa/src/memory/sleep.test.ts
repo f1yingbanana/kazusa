@@ -1,502 +1,567 @@
-import { readFileSync, existsSync, rmSync } from "node:fs";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { materialize, WORLDS } from "./fixtures/worlds.ts";
-import { MemoryIndex } from "./index.ts";
 import {
-  createSleep,
-  parseSleepOutput,
-  validateSleep,
-  type SleepEvent,
-  type SleepOutput,
-  type SleepState,
-} from "./sleep.ts";
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ActiveTask } from "../taskman/types.ts";
+import { materialize, WORLDS } from "./fixtures/worlds.ts";
+import { registerMemory, type MemoryService } from "./register.ts";
 
-const NOW = Date.parse(WORLDS.saltmere.now);
+vi.mock("../ledger.ts", () => ({ appendLedgerEntry: vi.fn(async () => {}) }));
+vi.mock("../current-config.ts", () => ({ currentConfig: () => ({}) }));
+import { appendLedgerEntry } from "../ledger.ts";
+
+const HOUR = 3_600_000;
+const NOON = Date.parse(WORLDS.saltmere.now);
+const BEDTIME = NOON + 10 * HOUR;
 const AGENT = "mara-vell";
-let root: string;
-let index: MemoryIndex;
-const workspace = (): string => path.join(root, "agents", AGENT);
-const read = (relative: string): string =>
-  readFileSync(path.join(workspace(), relative), "utf8");
-
-const NIGHT: SleepOutput = {
-  day: {
-    summary: "Tobin apologized.",
-    gist: "He came by with the rent and could not look at me.",
-    touched: ["tobin-vell"],
-  },
-  pages: [
-    {
-      id: "tobin-vell",
-      view: "He is trying, in his way.",
-      openThreads: ["See if he keeps it up."],
-      theyThinkOfMe: {
-        guess: "Still afraid of my temper.",
-        certainty: "suspect",
-      },
-      notes: [
-        {
-          source: "seen it",
-          certainty: "sure",
-          text: "Paid the February rent.",
-        },
-      ],
-      links: ["oswin-hale"],
-    },
-    {
-      id: "oil_theft",
-      kind: "concept",
-      name: "The oil thefts",
-      notes: [
-        {
-          source: "told by tobin-vell",
-          certainty: "think so",
-          text: "It stops at the Watch House.",
-        },
-      ],
-      links: [],
-    },
-  ],
-  self: {
-    lately: "Tired, less angry.",
-    plans: [{ on: "2026-03-11", text: "[SOFT_GOAL] Walk the north round." }],
-  },
-  dream: "The bell rang inside a lamp.",
+type Tool = {
+  name: string;
+  execute: (
+    id: string,
+    input: unknown,
+  ) => Promise<{ content: Array<{ text: string }> }>;
 };
+let root: string;
+let now: number;
+let memory: MemoryService;
+let factories: Map<string, unknown>;
+let reviewed: unknown[];
+let turns: string[];
+/** What the world's states say at bedtime, when a test needs it long. */
+let statesText: string | undefined;
+/** The nights' store refuses writes, as a database under load does. */
+let storeDown: boolean;
+const call = async (name: string, input: unknown): Promise<string> => {
+  const factory = factories.get(name) as (context: { agentId: string }) => Tool;
+  return (await factory({ agentId: AGENT }).execute("id", input)).content[0]
+    .text;
+};
+const file = (relative: string): string =>
+  path.join(root, "agents", AGENT, relative);
+const read = (relative: string): string => readFileSync(file(relative), "utf8");
+const TOBIN = "wiki/entities/characters/tobin-vell.md";
 
-function setup(
-  overrides: { complete?: () => Promise<string>; through?: number } = {},
-) {
-  const store = new Map<string, SleepState>();
-  const events: SleepEvent[] = [];
-  const passes = new Map();
-  const complete = vi.fn(
-    overrides.complete ?? (async () => JSON.stringify(NIGHT)),
-  );
-  const sleep = createSleep(
-    {
-      index,
-      enabled: true,
-      categories: ["sleeping"],
-      minMinutes: 180,
-      notesPerPage: 3,
-      now: () => NOW,
-      workspaceOf: () => workspace(),
-      store: {
-        lookup: async (key) => store.get(key),
-        register: async (key, value) => {
-          store.set(key, value);
-        },
-      },
-      complete,
-      instructions: async () => "sort out the day",
-      experiences: async () => ({
-        text: "[Tobin Vell `tobin-vell`] Here is the rent.",
-        speakers: ["tobin-vell"],
-        through: overrides.through ?? NOW,
-      }),
-      nameOf: (id) => index.world().pages.get(id)?.name,
-      record: async (_agent, event) => {
-        events.push(event);
-      },
-      warn: () => {},
-    },
-    passes,
-  );
-  return { sleep, store, events, complete, passes };
-}
-
-const task = (over: Partial<Record<string, unknown>> = {}) => ({
-  id: "night",
-  type: "sleeping",
-  description: "Going to bed",
-  startedAt: "2026-03-10T22:00:00Z",
-  endAt: "2026-03-11T06:00:00Z",
-  duration: 480,
-  ...over,
+const task = (type: string, minutes: number): ActiveTask => ({
+  id: `task-${now}`,
+  type: type as ActiveTask["type"],
+  description: "In bed",
+  startedAt: new Date(now).toISOString(),
+  endAt: new Date(now + minutes * 60_000).toISOString(),
+  duration: minutes,
 });
-const commitTask = async (
-  sleep: ReturnType<typeof setup>["sleep"],
-  kind: "started" | "delayed",
-  active: ReturnType<typeof task>,
-): Promise<void> => {
-  const prepared = await sleep.taskExtension.prepare({
-    kind,
+/** `start_task`, as far as sleep sees it: what it says with the result. */
+const start = async (
+  type = "sleeping",
+  minutes = 480,
+): Promise<string | undefined> => {
+  const lease = task(type, minutes);
+  const prepared = await memory.sleep.taskExtension.prepare({
+    kind: "started",
     agentId: AGENT,
-    at: NOW,
-    task: active as never,
+    at: now,
+    task: lease,
     params: {},
   });
-  await prepared.commit(active as never);
+  await prepared.commit(lease);
+  return prepared.aside;
 };
+const night = (): unknown =>
+  vi
+    .mocked(appendLedgerEntry)
+    .mock.calls.map(([, entry]) => entry)
+    .find(
+      (entry) =>
+        (entry.metadata as { kind?: string } | undefined)?.kind ===
+        "memory.consolidated",
+    );
 
 beforeEach(() => {
+  vi.mocked(appendLedgerEntry).mockClear();
+  // Each test gets its own world, nights and familiarity.
+  for (const cell of [
+    "kazusa.memory",
+    "kazusa.memory.nights",
+    "kazusa.memory.asked",
+    "kazusa.memory.owed",
+  ])
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for(cell)];
   root = materialize(WORLDS.saltmere);
-  index = new MemoryIndex({
-    worldDir: path.join(root, "world"),
-    workspaceDir: (id) => path.join(root, "agents", id),
-    anchors: WORLDS.saltmere.anchors,
+  // Its own state folder: the vectors database is one file per state folder.
+  vi.stubEnv("OPENCLAW_STATE_DIR", path.join(root, "state"));
+  now = BEDTIME;
+  factories = new Map();
+  reviewed = [];
+  turns = [];
+  storeDown = false;
+  statesText = undefined;
+  const stores = new Map<string, Map<string, unknown>>();
+  const api = {
+    id: "kazusa",
+    rootDir: fileURLToPath(new URL("../..", import.meta.url)),
+    pluginConfig: {
+      memory: {
+        wikiDir: path.join(root, "world"),
+        anchors: WORLDS.saltmere.anchors,
+        embedding: { provider: "kazusa-no-key", model: "m" },
+      },
+    },
+    logger: { warn: () => {} },
+    registerHttpRoute: () => {},
+    registerTool: (tool: Tool | ((context: unknown) => Tool)) => {
+      const shape = typeof tool === "function" ? tool({ agentId: "x" }) : tool;
+      factories.set(shape.name, tool);
+    },
+    runtime: {
+      agent: {
+        resolveAgentWorkspaceDir: (_config: unknown, id: string) =>
+          path.join(root, "agents", id),
+      },
+      state: {
+        openKeyedStore: ({ namespace }: { namespace: string }) => {
+          const store = stores.get(namespace) ?? new Map<string, unknown>();
+          stores.set(namespace, store);
+          return {
+            lookup: async (key: string) => store.get(key),
+            register: async (key: string, value: unknown) => {
+              if (storeDown && namespace === "memory")
+                throw new Error("SQLite worker queue capacity reached");
+              store.set(key, structuredClone(value));
+            },
+            entries: async () =>
+              [...store].map(([key, value]) => ({ key, value })),
+          };
+        },
+      },
+      config: { current: () => ({}) },
+      modelAuth: {
+        isProviderApiKeyConfigured: () => false,
+        resolveApiKeyForProvider: async () => ({
+          source: "none",
+          mode: "api-key",
+        }),
+      },
+    },
+  };
+  memory = registerMemory(api as never, {
+    clock: { time: () => now },
+    states: {
+      text: async (_agentId, people) =>
+        statesText ??
+        (people.length ? `trust toward ${people.join(", ")}: wary` : undefined),
+      apply: async (_agentId, people, answer) => {
+        reviewed.push({ people, answer });
+        return { moved: ["trust: warm"], left: ["luck"] };
+      },
+    },
+    turn: {
+      current: async (_agentId, text) => {
+        turns.push(text);
+      },
+    },
   });
 });
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
 
-describe("a night", () => {
-  it("rewrites views, adds notes, writes the day and the plans", async () => {
-    const { sleep, events, complete } = setup();
-    await sleep.consolidate(AGENT);
-    const tobin = read("wiki/entities/characters/tobin-vell.md");
-    expect(tobin).toContain("He is trying, in his way.");
-    expect(tobin).not.toContain("still check he has eaten");
-    expect(tobin).toContain("Still afraid of my temper. (suspect)");
-    expect(tobin).toContain("- See if he keeps it up.");
-    expect(tobin).not.toContain("rent for February");
-    expect(tobin).toContain("[[oswin-hale]]");
-    const page = index.personal(AGENT).get("tobin-vell")!;
-    expect(page.notes[0].text).toBe("Paid the February rent.");
-    expect(page.theyThinkOfMe).toBe("Still afraid of my temper. (suspect)");
-    expect(page.problems).toEqual([]);
-    expect(read("wiki/concepts/oil_theft.md")).toContain(
-      "It stops at the Watch House.",
+describe("going to bed", () => {
+  it("answers a night's sleep with how to go over the day and what it touched", async () => {
+    await memory.use(AGENT, ["tobin-vell", "lamp_hall"], NOON);
+    const aside = await start();
+    expect(aside).toContain("Before sleep takes you, go over the day");
+    // Their own pages, whole, on who and what the day touched.
+    expect(aside).toContain("### tobin-vell");
+    expect(aside).toContain("He still owes me the rent for February.");
+    expect(aside).toContain("### lamp_hall");
+    // Not on what it didn't.
+    expect(aside).not.toContain("### oswin-hale");
+    // The states a night reviews, toward the people of the day.
+    expect(aside).toContain("trust toward tobin-vell");
+  });
+
+  it("says nothing more for a nap, or for anything that isn't sleep", async () => {
+    expect(await start("sleeping", 90)).toBeUndefined();
+    expect(await start("studying", 480)).toBeUndefined();
+    await expect(
+      call("reflect", { about: "today", view: "Fine." }),
+    ).rejects.toThrow(
+      "You only go over things like this as you fall asleep for the night.",
     );
-    expect(read("wiki/days/2026-03-10.md")).toContain("could not look at me");
-    expect(read("wiki/days/2026-03-10.md")).toContain(
-      "The bell rang inside a lamp.",
-    );
-    expect(read("MEMORY.md")).toContain("Tired, less angry.");
-    expect(read("MEMORY.md")).toContain("[SOFT_GOAL] Walk the north round.");
-    expect(events[0]).toMatchObject({
-      pages: ["tobin-vell", "oil_theft"],
-      newPages: ["oil_theft"],
-      notes: 2,
-      interrupted: false,
+  });
+});
+
+describe("a night gone over", () => {
+  const goOver = async (): Promise<void> => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await start();
+    await call("reflect", {
+      about: "tobin-vell",
+      view: "He is trying, in his way.",
+      openThreads: ["See if he keeps it up."],
+      theyThinkOfMe: "Still afraid of my temper. (suspect)",
+      states: { trust: "warm" },
+    });
+    await call("remember", {
+      about: "tobin-vell",
+      note: "Paid the February rent.",
+    });
+    await call("reflect", { about: "me", view: "Tired, less angry." });
+    await call("reflect", {
+      about: "today",
+      view: "He came by with the rent and could not look at me.",
+      summary: "Tobin apologized.",
       dream: "The bell rang inside a lamp.",
     });
-    expect(complete.mock.calls[0]).toBeDefined();
-  });
-
-  it("gives the model the day and their own pages, nobody else's", async () => {
-    const { sleep, complete } = setup();
-    await sleep.consolidate(AGENT);
-    const { message } = (
-      complete.mock.calls[0] as unknown as [{ message: string }]
-    )[0];
-    expect(message).toContain("Here is the rent.");
-    expect(message).toContain("still check he has eaten");
-    expect(message).not.toContain("Thinks I sold out");
-  });
-
-  it("a restore puts every file back, and removes what it made", async () => {
-    const { sleep, store } = setup();
-    const before = read("wiki/entities/characters/tobin-vell.md");
-    await sleep.consolidate(AGENT);
-    const { id } = store.get(AGENT)!.runs[0];
-    expect(await sleep.restore(AGENT, id)).toBe(true);
-    expect(read("wiki/entities/characters/tobin-vell.md")).toBe(before);
-    expect(
-      existsSync(path.join(workspace(), "wiki/concepts/oil_theft.md")),
-    ).toBe(false);
-    expect(existsSync(path.join(workspace(), "wiki/days/2026-03-10.md"))).toBe(
-      false,
-    );
-    expect(await sleep.restore(AGENT, "nope")).toBe(false);
-  });
-
-  it("a human edit made during the pass survives", async () => {
-    const file = path.join(
-      workspace(),
-      "wiki/entities/characters/oswin-hale.md",
-    );
-    const { sleep } = setup({
-      complete: async () =>
-        JSON.stringify({
-          day: { summary: "s", gist: "g", touched: [] },
-          pages: [
-            {
-              id: "oswin-hale",
-              notes: [
-                { source: "seen it", certainty: "sure", text: "Saw him." },
-              ],
-            },
-          ],
-        }),
-    });
-    await sleep.consolidate(AGENT);
-    expect(readFileSync(file, "utf8")).toContain("A bully with a badge.");
-    expect(readFileSync(file, "utf8")).toContain("Saw him.");
-  });
-});
-
-describe("the watermark", () => {
-  it("stops at the last record read, so a backlog waits for next sleep", async () => {
-    const { sleep, store } = setup({ through: NOW - 5_000 });
-    await sleep.consolidate(AGENT);
-    expect(store.get(AGENT)?.watermark).toBe(NOW - 5_000);
-  });
-});
-
-describe("when it runs", () => {
-  it("starts on a long sleep, not a nap or another activity", async () => {
-    const { sleep, complete } = setup();
-    await commitTask(sleep, "started", task({ duration: 30 }));
-    await commitTask(sleep, "started", task({ type: "working" }));
-    await sleep.settled(AGENT);
-    expect(complete).not.toHaveBeenCalled();
-    await commitTask(sleep, "started", task());
-    await sleep.settled(AGENT);
-    expect(complete).toHaveBeenCalledTimes(1);
-  });
-
-  it("is off unless a world turns it on", async () => {
-    const passes = new Map();
-    const complete = vi.fn(async () => "{}");
-    const { sleep: enabledShape } = setup();
-    void enabledShape;
-    const off = createSleep(
-      {
-        index,
-        enabled: false,
-        categories: ["sleeping"],
-        minMinutes: 180,
-        notesPerPage: 3,
-        now: () => NOW,
-        workspaceOf: () => workspace(),
-        store: { lookup: async () => undefined, register: async () => {} },
-        complete,
-        instructions: async () => "",
-        experiences: async () => ({ text: "x", speakers: [], through: NOW }),
-        nameOf: () => undefined,
-        record: async () => {},
-        warn: () => {},
-      },
-      passes,
-    );
-    await commitTask(off, "started", task());
-    expect(complete).not.toHaveBeenCalled();
-  });
-
-  it("a wake applies nothing and keeps the watermark", async () => {
-    let finish: (value: string) => void = () => {};
-    const { sleep, store, events } = setup({
-      complete: () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    });
-    const before = read("wiki/entities/characters/tobin-vell.md");
-    await commitTask(sleep, "started", task());
-    await vi.waitFor(() => {
-      expect(finish).not.toEqual(expect.any(Number));
-    });
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    sleep.wake(AGENT);
-    finish(JSON.stringify(NIGHT));
-    await sleep.settled(AGENT);
-    expect(read("wiki/entities/characters/tobin-vell.md")).toBe(before);
-    expect(store.get(AGENT)).toBeUndefined();
-    expect(events[0]).toMatchObject({ interrupted: true, pages: [] });
-  });
-
-  it("replacing the sleep with another activity also ends the pass", async () => {
-    let finish: (value: string) => void = () => {};
-    const { sleep, store } = setup({
-      complete: () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    });
-    await commitTask(sleep, "started", task());
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    await commitTask(sleep, "started", task({ id: "up", type: "working" }));
-    finish(JSON.stringify(NIGHT));
-    await sleep.settled(AGENT);
-    expect(store.get(AGENT)).toBeUndefined();
-  });
-
-  it("nothing happened: no model call", async () => {
-    const passes = new Map();
-    const complete = vi.fn(async () => "{}");
-    const quiet = createSleep(
-      {
-        index,
-        enabled: true,
-        categories: ["sleeping"],
-        minMinutes: 180,
-        notesPerPage: 3,
-        now: () => NOW,
-        workspaceOf: () => workspace(),
-        store: { lookup: async () => undefined, register: async () => {} },
-        complete,
-        instructions: async () => "",
-        experiences: async () => ({ text: " ", speakers: [], through: NOW }),
-        nameOf: () => undefined,
-        record: async () => {},
-        warn: () => {},
-      },
-      passes,
-    );
-    await quiet.consolidate(AGENT);
-    expect(complete).not.toHaveBeenCalled();
-  });
-
-  it("a malformed reply changes nothing", async () => {
-    const warn = vi.fn();
-    const { sleep, store } = setup({
-      complete: async () => "I dreamt of nothing.",
-    });
-    void warn;
-    const before = read("wiki/entities/characters/tobin-vell.md");
-    await sleep.consolidate(AGENT);
-    expect(read("wiki/entities/characters/tobin-vell.md")).toBe(before);
-    expect(store.get(AGENT)).toBeUndefined();
-  });
-});
-
-describe("validateSleep", () => {
-  const evidence = {
-    speakers: new Set(["tobin-vell", "user:sensei"]),
-    present: new Set(["tobin-vell", "sensei"]),
-    known: new Set(["tobin-vell"]),
-    resolve: (reference: string) => reference,
+    // The run that went to bed is over, and the night with it.
+    await memory.sleep.runEnded(AGENT);
   };
-  const page = (over: object) => ({
-    id: "tobin-vell",
-    notes: [],
-    links: [],
-    ...over,
-  });
-  const day = { summary: "s", gist: "g", touched: [] };
 
-  it("keeps grounded sources, including the player", () => {
-    const { output, dropped } = validateSleep(
-      {
-        day,
-        pages: [
-          page({
-            notes: [
-              { source: "told by tobin-vell", certainty: "sure", text: "a" },
-              { source: "told by user:sensei", certainty: "sure", text: "b" },
-              { source: "my guess", certainty: "suspect", text: "c" },
-            ],
-          }),
-        ],
+  it("rewrites what the day changed and keeps the rest", async () => {
+    await goOver();
+    const tobin = read(TOBIN);
+    expect(tobin).toContain("He is trying, in his way.");
+    expect(tobin).not.toContain("He thinks the coat makes him a man.");
+    expect(tobin).toContain("- See if he keeps it up.");
+    expect(tobin).toContain("Still afraid of my temper. (suspect)");
+    expect(tobin).toContain("Paid the February rent.");
+    // Older notes stay: nothing here is over the cap.
+    expect(tobin).toContain("Lent him ten coppers.");
+    expect(read("MEMORY.md")).toContain("## Lately\n\nTired, less angry.");
+    const day = read("wiki/days/2026-03-10.md");
+    expect(day).toContain('summary: "Tobin apologized."');
+    expect(day).toContain('touched: ["tobin-vell"]');
+    expect(day).toContain("## Dream\n\nThe bell rang inside a lamp.");
+  });
+
+  it("reviews the states toward the person reflected on", async () => {
+    await goOver();
+    expect(reviewed).toMatchObject([
+      { answer: { toward: { "tobin-vell": { trust: "warm" } } } },
+    ]);
+  });
+
+  it("reviews states toward the player under the id the player goes by", async () => {
+    // Live, a night moved its regard for Sensei and nothing changed: their
+    // page is `sensei`, and states are kept under `user:sensei`.
+    mkdirSync(path.dirname(file("wiki/entities/characters/sensei.md")), {
+      recursive: true,
+    });
+    writeFileSync(
+      file("wiki/entities/characters/sensei.md"),
+      "---\nname: Sensei\npeer_id: user:sensei\n---\n\n# Sensei\n\nKeeps odd hours.\n",
+    );
+    await memory.use(AGENT, ["user:sensei"], NOON);
+    const aside = await start();
+    expect(aside).toContain("user:sensei");
+    await call("reflect", { about: "Sensei", states: { trust: "warm" } });
+    expect(reviewed).toMatchObject([
+      { answer: { toward: { "user:sensei": { trust: "warm" } } } },
+    ]);
+    expect((reviewed[0] as { people: string[] }).people).toContain(
+      "user:sensei",
+    );
+  });
+
+  it("closes the day they were up for when bed comes after midnight", async () => {
+    now = BEDTIME + 3 * HOUR;
+    await start();
+    await call("reflect", { about: "today", view: "Too long." });
+    expect(read("wiki/days/2026-03-10.md")).toContain("Too long.");
+  });
+
+  it("takes a date for the day, never for a page of its own", async () => {
+    // Live, back after days away, one wrote the day down as `2026-11-03`: it
+    // became a concept page, and the day and its dream were lost.
+    now = BEDTIME + 3 * HOUR;
+    await start();
+    await call("reflect", { about: "2026-03-11", view: "Past midnight." });
+    expect(read("wiki/days/2026-03-10.md")).toContain("Past midnight.");
+    expect(existsSync(file("wiki/concepts/2026_03_11.md"))).toBe(false);
+  });
+
+  it("files the day under an earlier date when that is the one they name", async () => {
+    await start();
+    await call("reflect", { about: "2026-03-08", view: "Days ago." });
+    expect(read("wiki/days/2026-03-08.md")).toContain("Days ago.");
+    expect(existsSync(file("wiki/concepts/2026_03_08.md"))).toBe(false);
+  });
+
+  it("dates a note made in bed after midnight to the day they were up for", async () => {
+    // Dated tomorrow, the next night reads it as that day's news and goes
+    // over it again.
+    now = BEDTIME + 3 * HOUR;
+    await start();
+    await call("remember", {
+      about: "Tobin",
+      note: "Paid me back.",
+      source: "seen it",
+      certainty: "sure",
+    });
+    expect(read(TOBIN)).toContain(
+      "- 2026-03-10 · seen it · sure — Paid me back.",
+    );
+  });
+
+  it("is told once, with the dream, and can be undone whole", async () => {
+    const before = read(TOBIN);
+    await goOver();
+    expect(night()).toMatchObject({
+      agentId: AGENT,
+      stream: "tasks",
+      text: "You dreamt: The bell rang inside a lamp.",
+      metadata: {
+        payload: { pages: ["tobin-vell"], newPages: [], notes: 1 },
       },
-      evidence,
-    );
-    expect(dropped).toEqual([]);
-    expect(output.pages[0].notes).toHaveLength(3);
+    });
+    const [run] = await memory.sleep.runs(AGENT);
+    expect(Object.keys(run.preimages).sort()).toEqual([
+      "MEMORY.md",
+      "wiki/days/2026-03-10.md",
+      TOBIN,
+    ]);
+    expect(await memory.sleep.restore(AGENT, run.id)).toBe(true);
+    expect(read(TOBIN)).toBe(before);
+    expect(existsSync(file("wiki/days/2026-03-10.md"))).toBe(false);
   });
 
-  it("takes the player's address as their page id", () => {
-    const { output, dropped } = validateSleep(
-      {
-        day,
-        pages: [
-          page({
-            id: "user:sensei",
-            notes: [{ source: "seen it", certainty: "sure", text: "a" }],
-          }),
-        ],
-      },
-      evidence,
+  it("keeps a call that arrives after the day's, and none after the run", async () => {
+    // Calls sent together run in any order: the day's ends nothing.
+    await start();
+    await call("reflect", { about: "today", view: "A long day." });
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    expect(await call("reflect", { about: "Tonight", view: "Again." })).toBe(
+      "The day is kept.",
     );
-    expect(dropped).toEqual([]);
-    expect(output.pages[0].id).toBe("sensei");
+    await memory.sleep.runEnded(AGENT);
+    const runs = await memory.sleep.runs(AGENT);
+    expect(runs).toHaveLength(1);
+    expect(
+      runs[0].postimages["wiki/entities/characters/ilse-dray.md"],
+    ).toContain("Her knee gave out.");
+    expect(read("wiki/days/2026-03-10.md")).not.toContain("Again.");
+    // Awake again, what they note is no part of last night.
+    await call("remember", { about: "ilse-dray", note: "She is on a stick." });
+    expect((await memory.sleep.runs(AGENT))[0].postimages).toEqual(
+      runs[0].postimages,
+    );
+    await expect(
+      call("reflect", { about: "ilse-dray", view: "Frail." }),
+    ).rejects.toThrow("as you fall asleep");
   });
 
-  it("drops a source who said nothing that day", () => {
-    const { output, dropped } = validateSleep(
-      {
-        day,
-        pages: [
-          page({
-            notes: [{ source: "told by ghost", certainty: "sure", text: "a" }],
-          }),
-        ],
-      },
-      evidence,
-    );
-    expect(output.pages[0].notes).toEqual([]);
-    expect(dropped[0]).toMatch(/ghost said nothing/);
+  it("shows the pages they have before making one for an unknown name", async () => {
+    await start();
+    // Saying it is new on a first try proves nothing: they are shown first.
+    const asked = await call("reflect", {
+      about: "February rent",
+      view: "It is a weight between us.",
+      new: true,
+    });
+    expect(asked).toContain("You have no page called February rent.");
+    expect(asked).toContain("(`tobin-vell`)");
+    expect(existsSync(file("wiki/concepts/february_rent.md"))).toBe(false);
+    // The same while awake.
+    await memory.sleep.runEnded(AGENT);
+    expect(
+      await call("remember", {
+        about: "February rent",
+        note: "Still owed.",
+        new: true,
+      }),
+    ).toBe("Noted, about February rent.");
+    expect(read("wiki/concepts/february_rent.md")).toContain("Still owed.");
   });
 
-  it("drops an unknown source form", () => {
-    const { dropped } = validateSleep(
-      {
-        day,
-        pages: [
-          page({
-            notes: [{ source: "the universe", certainty: "sure", text: "a" }],
-          }),
-        ],
-      },
-      evidence,
+  it("shows a view before replacing one they haven't read tonight", async () => {
+    // Nothing of the day touched Oswin, so his page wasn't shown at bedtime.
+    await start();
+    const first = await call("reflect", {
+      about: "oswin-hale",
+      view: "He was almost kind today.",
+    });
+    expect(first).toContain("A bully with a badge.");
+    expect(read("wiki/entities/characters/oswin-hale.md")).toContain(
+      "A bully with a badge.",
     );
-    expect(dropped).toHaveLength(1);
+    await call("reflect", {
+      about: "oswin-hale",
+      view: "A bully with a badge, who was almost kind today.",
+    });
+    expect(read("wiki/entities/characters/oswin-hale.md")).toContain(
+      "who was almost kind today.",
+    );
   });
 
-  it("drops a new page with no grounded note, and a bad id", () => {
-    const { output, dropped } = validateSleep(
-      { day, pages: [page({ id: "brand_new" }), page({ id: "../escape" })] },
-      evidence,
-    );
-    expect(output.pages).toEqual([]);
-    expect(dropped).toHaveLength(2);
+  it("drops old notes only from a page tonight showed whole", async () => {
+    const notes = (file: string): number =>
+      read(file).match(/^- \d{4}-/gm)?.length ?? 0;
+    const many = (relative: string): void => {
+      const old = Array.from(
+        { length: 31 },
+        (_, at) =>
+          `- 2025-01-${String(at + 1).padStart(2, "0")} · seen it · sure — Old thing ${at}.`,
+      ).join("\n");
+      writeFileSync(
+        file(relative),
+        read(relative).replace(/## Notes\n\n/, `## Notes\n\n${old}\n`),
+      );
+    };
+    const OSWIN = "wiki/entities/characters/oswin-hale.md";
+    many(TOBIN);
+    many(OSWIN);
+    // The day touched Tobin, so bedtime showed his page, notes and all. Of
+    // Oswin's only the view is shown, when a new one is first given.
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await start();
+    for (const about of ["tobin-vell", "oswin-hale", "oswin-hale"])
+      await call("reflect", { about, view: "Seen plainly, for once." });
+    await memory.sleep.runEnded(AGENT);
+    expect(notes(TOBIN)).toBe(30);
+    expect(notes(OSWIN)).toBe(32);
   });
 
-  it("drops a guess about someone not in the records, keeps the rest", () => {
-    const { output } = validateSleep(
-      {
-        day,
-        pages: [
-          page({
-            id: "hope-marrow",
-            theyThinkOfMe: { guess: "x", certainty: "sure" },
-            notes: [{ source: "seen it", certainty: "sure", text: "n" }],
-          }),
-        ],
-      },
-      evidence,
-    );
-    expect(output.pages[0].theyThinkOfMe).toBeUndefined();
-    expect(output.pages[0].notes).toHaveLength(1);
+  it("counts as their night when all it did was move a state", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await start();
+    await call("reflect", { about: "tobin-vell", states: { trust: "up" } });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(1);
+    // Back to bed later the same night: the day is not gone over again.
+    now = BEDTIME + 3 * HOUR;
+    expect(await start()).toBeUndefined();
+  });
+
+  it("is still their night, and kept later, when it could not be kept", async () => {
+    await start();
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    storeDown = true;
+    await memory.sleep.runEnded(AGENT);
+    // Told all the same: the pages are written whether or not the run is kept.
+    expect(night()).toMatchObject({ text: "You slept on it." });
+    // Back to bed with the store still down: the day is not gone over again.
+    now = BEDTIME + 3 * HOUR;
+    expect(await start()).toBeUndefined();
+    storeDown = false;
+    const runs = await memory.sleep.runs(AGENT);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].at).toBe(BEDTIME);
+    // Kept with what the night found, so it can still be undone.
+    expect(await memory.sleep.restore(AGENT, runs[0].id)).toBe(true);
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(0);
+  });
+
+  it("is not offered again when they go back to bed in the same run", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    expect(await start()).toContain("Before sleep takes you");
+    await call("reflect", { about: "tobin-vell", states: { trust: "up" } });
+    // A second sleep in the same run: the night they are going over stands.
+    expect(await start()).toBeUndefined();
+    await call("reflect", { about: "today", view: "Quiet." });
+    await memory.sleep.runEnded(AGENT);
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(1);
+  });
+
+  it("shows no page that the rest of what it says leaves no room for", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    // States that take nearly all a turn can be handed.
+    statesText = "trust: wary\n".repeat(2_600);
+    const aside = await start();
+    expect(aside).toContain("trust: wary");
+    expect(aside).not.toContain("### tobin-vell");
+  });
+
+  it("is not gone over twice in one night's sleep", async () => {
+    await goOver();
+    // Woken at one, back to bed: the same night.
+    now = BEDTIME + 3 * HOUR;
+    expect(await start()).toBeUndefined();
+    now = BEDTIME + 24 * HOUR;
+    expect(await start()).toContain("Before sleep takes you");
   });
 });
 
-describe("parseSleepOutput", () => {
-  it("loses only the bad part of a page, not the night", () => {
-    const dropped: string[] = [];
-    const output = parseSleepOutput(
-      JSON.stringify({
-        day: { gist: "g" },
-        pages: [
-          { id: "a", theyThinkOfMe: { certainty: "sure" }, view: "kept" },
-          {
-            id: "b",
-            notes: [
-              { text: "no source" },
-              { source: "seen it", certainty: "sure", text: "ok" },
-            ],
-          },
-          { nope: true },
-        ],
-      }),
-      (what) => dropped.push(what),
+describe("a night that never wrote the day down", () => {
+  it("is kept and tidied all the same when its run ends", async () => {
+    writeFileSync(
+      file("MEMORY.md"),
+      "# Memory\n\n## Plans recorded for 2026-03-09\n\n- Mend the net.\n\n## Plans recorded for 2026-03-12\n\n- Market day.\n",
     );
-    expect(output.pages.map(({ id }) => id)).toEqual(["a", "b"]);
-    expect(output.pages[0]).toMatchObject({ view: "kept" });
-    expect(output.pages[0].theyThinkOfMe).toBeUndefined();
-    expect(output.pages[1].notes).toHaveLength(1);
-    expect(dropped).toHaveLength(3);
+    await start();
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    expect(night()).toBeUndefined();
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(1);
+    // Plans for days gone by went with it, without the model saying so.
+    expect(read("MEMORY.md")).not.toContain("Mend the net.");
+    expect(read("MEMORY.md")).toContain("Market day.");
   });
 
-  it("reads through a code fence and rejects non-JSON", () => {
+  it("leaves no trace when nothing was gone over, and the next sleep offers again", async () => {
+    await start();
+    await memory.sleep.runEnded(AGENT);
+    now = BEDTIME + HOUR;
+    expect(await start()).toContain("Before sleep takes you");
+    expect(night()).toBeUndefined();
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(0);
+  });
+});
+
+describe("a night asked for by hand", () => {
+  it("hands them a turn of their own with the same words", async () => {
+    await memory.use(AGENT, ["tobin-vell"], NOON);
+    await memory.sleep.consolidate(AGENT);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toContain("Before sleep takes you");
+    expect(turns[0]).toContain("### tobin-vell");
+    // A run already under way ends first: the night is for the turn to come.
+    await memory.sleep.runEnded(AGENT);
+    memory.sleep.runStarted(AGENT);
     expect(
-      parseSleepOutput('```json\n{"day":{"summary":"s","gist":"g"}}\n```').day
-        .gist,
-    ).toBe("g");
-    expect(() => parseSleepOutput("no")).toThrow();
+      await call("reflect", { about: "tobin-vell", states: { trust: "up" } }),
+    ).toBe("Kept, about Tobin Vell. Now trust: warm. Left as they were: luck.");
+    await call("reflect", { about: "today", view: "Quiet." });
+    expect(read("wiki/days/2026-03-10.md")).toContain("Quiet.");
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+  });
+
+  it("is not begun by a note in the run it was asked during", async () => {
+    await memory.sleep.consolidate(AGENT);
+    // Still the run under way: what it notes is the day's, not the night's.
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toBeUndefined();
+    memory.sleep.runStarted(AGENT);
+    await call("reflect", { about: "today", view: "Quiet." });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({ text: "You slept on it." });
+  });
+
+  it("is dropped when its turn comes and goes without a call", async () => {
+    // Live, the turn ran out of thinking time before its first call.
+    await memory.sleep.consolidate(AGENT);
+    memory.sleep.runStarted(AGENT);
+    await memory.sleep.runEnded(AGENT);
+    await call("remember", { about: "ilse-dray", note: "Her knee gave out." });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toBeUndefined();
+    expect(await memory.sleep.runs(AGENT)).toHaveLength(0);
+  });
+
+  it("leaves no night behind when no turn could be handed over", async () => {
+    turns = undefined as never;
+    await expect(memory.sleep.consolidate(AGENT)).rejects.toThrow();
+    await expect(
+      call("reflect", { about: "today", view: "Quiet." }),
+    ).rejects.toThrow("as you fall asleep");
   });
 });

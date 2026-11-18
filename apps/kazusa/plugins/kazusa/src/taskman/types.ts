@@ -44,6 +44,11 @@ export interface TaskTransition {
 export interface TaskCommitReport {
   /** One sentence added to the ledger row and the tool result. */
   readonly note?: string;
+  /**
+   * Said to the character with `start_task`'s result and nowhere else: never in
+   * their records, so it is read once, in the turn that made the call.
+   */
+  readonly aside?: string;
   /** Structured fields merged into the ledger row's journal payload. */
   readonly payload?: Readonly<Record<string, unknown>>;
 }
@@ -157,6 +162,8 @@ export type StartTaskResult =
       readonly success: true;
       readonly task: ActiveTask;
       readonly message: string;
+      /** What extensions say with the result alone (`aside`). */
+      readonly aside?: string;
       /** The journal payload written with the ledger row. */
       readonly payload: TaskStartedPayload;
       /** The ledger row's sim time; the live event must carry the same one. */

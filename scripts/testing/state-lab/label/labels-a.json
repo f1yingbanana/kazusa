@@ -1,0 +1,226 @@
+[
+  {
+    "day": "day-01",
+    "regard": "up",
+    "trust": "same",
+    "unsure": true,
+    "why": "Four-hour tutoring was a real kindness; no promise at stake."
+  },
+  {
+    "day": "day-02",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Light chat only."
+  },
+  {
+    "day": "day-03",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Routine paperwork, receipt delivered as asked."
+  },
+  {
+    "day": "day-04",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Idle pleasant chat."
+  },
+  {
+    "day": "day-05",
+    "regard": "up",
+    "trust": "same",
+    "unsure": false,
+    "why": "He spent hours retrieving her lost charm, a real kindness."
+  },
+  {
+    "day": "day-06",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "He took the blame and paid 24,000 yen from his own pay as promised."
+  },
+  {
+    "day": "day-07",
+    "regard": "up",
+    "trust": "up",
+    "unsure": false,
+    "why": "He kept her secret then took the blame and a council minute for her."
+  },
+  {
+    "day": "day-08",
+    "regard": "same",
+    "trust": "down",
+    "unsure": true,
+    "why": "He broke the 11:00 promise but owned it at once and delivered before the window."
+  },
+  {
+    "day": "day-09",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "He broke a pinky promise and told Yuuka."
+  },
+  {
+    "day": "day-10",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Ordinary scheduling."
+  },
+  {
+    "day": "day-11",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Banter only."
+  },
+  {
+    "day": "day-12",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Routine help with a form."
+  },
+  {
+    "day": "day-13",
+    "regard": "same",
+    "trust": "down",
+    "unsure": true,
+    "why": "He broke the secrecy promise, confessed, repaired it and took her stocktake."
+  },
+  {
+    "day": "day-14",
+    "regard": "down",
+    "trust": "same",
+    "unsure": false,
+    "why": "He brushed off her gift puzzle as kid stuff."
+  },
+  {
+    "day": "day-15",
+    "regard": "same",
+    "trust": "down",
+    "unsure": true,
+    "why": "He broke the 19:00 word but owned it and arrived late with tokens."
+  },
+  {
+    "day": "day-16",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Small talk."
+  },
+  {
+    "day": "day-17",
+    "regard": "down",
+    "trust": "same",
+    "unsure": false,
+    "why": "He forgot her lunch and shrugged it off as she eats anything."
+  },
+  {
+    "day": "day-18",
+    "regard": "down",
+    "trust": "same",
+    "unsure": false,
+    "why": "He dismissed her credit for the audit."
+  },
+  {
+    "day": "day-19",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "He kept his word at cost, skipping dinner and finding the receipt."
+  },
+  {
+    "day": "day-20",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Plain help."
+  },
+  {
+    "day": "day-21",
+    "regard": "down",
+    "trust": "down",
+    "unsure": true,
+    "why": "He ignored her budget, mocked the abacus and did not initial it as agreed."
+  },
+  {
+    "day": "day-22",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Scheduling only."
+  },
+  {
+    "day": "day-23",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Small talk."
+  },
+  {
+    "day": "day-24",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "He did not come to the hearing after promising."
+  },
+  {
+    "day": "day-25",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "He kept the minor appointment as agreed."
+  },
+  {
+    "day": "day-26",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "He missed the noon promise and shrugged it off."
+  },
+  {
+    "day": "day-27",
+    "regard": "down",
+    "trust": "down",
+    "unsure": false,
+    "why": "He broke his promise to play and forgot."
+  },
+  {
+    "day": "day-28",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "He covered her booth and returned it balanced."
+  },
+  {
+    "day": "day-29",
+    "regard": "same",
+    "trust": "same",
+    "unsure": false,
+    "why": "Small talk."
+  },
+  {
+    "day": "day-30",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "He ran from a meeting to keep his promise to attend."
+  },
+  {
+    "day": "day-31",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "He spent seven hours fetching duplicate invoices for her."
+  },
+  {
+    "day": "day-32",
+    "regard": "up",
+    "trust": "up",
+    "unsure": true,
+    "why": "He forgot, then admitted it and got the console, signing liability for her."
+  }
+]

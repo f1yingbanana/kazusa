@@ -81,6 +81,60 @@ Your {name} already is {value}.
 
 {name} is not something you can change yourself.
 
+## night-dreamt
+
+You dreamt: {dream}
+
+## night-slept
+
+You slept on it.
+
+## reflect-awake
+
+You only go over things like this as you fall asleep for the night.
+
+## reflect-unread
+
+Nothing changed yet. This is how you see {name} now:
+
+{view}
+
+A new view replaces it whole.
+
+## reflect-kept
+
+Kept, about {name}.
+
+## reflect-self
+
+Kept.
+
+## reflect-states
+
+Now {states}.
+
+## reflect-states-left
+
+Left as they were: {states}.
+
+## reflect-no-day
+
+The day needs a `view`: how it was, in a few sentences.
+
+## reflect-day
+
+The day is kept.
+
+## page-unknown
+
+Nothing kept yet. You have no page called {name}. These are the closest you
+have:
+
+{pages}
+
+If it is one of them, say it again about that one, by the id in backticks. If it
+is none of them, say it again with `new`: true.
+
 ## task-finished
 
 Finished {type}. {started}

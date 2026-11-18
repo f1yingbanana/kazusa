@@ -79,8 +79,10 @@ export function registerPerception(
     readonly model?: (agentId: string) => Promise<string | undefined>;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluateDecision?: PerceptionDeps["evaluateDecision"];
-    /** Something woke them, or broke into what they were doing. */
-    readonly onAwoken?: (agentId: string) => void;
+    /** A brain run of theirs began. */
+    readonly onRunStarted?: (agentId: string) => void;
+    /** A brain run of theirs is over, however it went. */
+    readonly onRunEnded?: (agentId: string) => Promise<void>;
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -92,12 +94,6 @@ export function registerPerception(
     decision: AttentionDecision & DecisionTrace,
     record?: PerceptionDecisionRecord,
   ): void => {
-    if (
-      decision.source !== "automatic" &&
-      decision.action !== "DEFER" &&
-      decision.action !== "IGNORE"
-    )
-      deps.onAwoken?.(agentId);
     if (record)
       deps.broadcaster?.broadcast({
         type: "journal",
@@ -352,6 +348,11 @@ export function registerPerception(
         } catch (err: unknown) {
           api.logger.warn(`Perception started error: ${String(err)}`);
         }
+        try {
+          deps.onRunStarted?.(owner.agentId);
+        } catch (err: unknown) {
+          api.logger.warn(`Perception: as the run began: ${String(err)}`);
+        }
       } else {
         endBrainRun(event.runId);
         try {
@@ -364,6 +365,11 @@ export function registerPerception(
           );
         } catch (err: unknown) {
           api.logger.warn(`Perception ended error: ${String(err)}`);
+        }
+        try {
+          await deps.onRunEnded?.(owner.agentId);
+        } catch (err: unknown) {
+          api.logger.warn(`Perception: after the run: ${String(err)}`);
         }
         // Only here is the run truly over: `agent_end` also fires for each of
         // the host's retries, and what arrives then joins the expired run.

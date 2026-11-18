@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,10 +78,7 @@ beforeEach(() => {
       },
     },
   };
-  registerMemory(api as never, {
-    clock: { time: () => NOW },
-    experiences: async () => ({ text: "", speakers: [], through: NOW }),
-  });
+  registerMemory(api as never, { clock: { time: () => NOW } });
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
@@ -173,10 +170,24 @@ describe("remember", () => {
     );
   });
 
-  it("starts a concept for something new", async () => {
+  it("starts a concept for something new, once they have seen their closest pages", async () => {
+    const file = path.join(
+      root,
+      "agents/mara-vell/wiki/concepts/oil_prices.md",
+    );
+    // `new` on a first try proves nothing: models send it unprompted.
+    const first = await call("remember", "mara-vell", {
+      about: "Oil Prices!",
+      note: "Up again.",
+      new: true,
+    });
+    expect(first).toContain("You have no page called Oil Prices!");
+    expect(first).toMatch(/\(`[a-z_-]+`\)/);
+    expect(existsSync(file)).toBe(false);
     await call("remember", "mara-vell", {
       about: "Oil Prices!",
       note: "Up again.",
+      new: true,
     });
     expect(page("mara-vell", "concepts/oil_prices.md")).toContain("Up again.");
   });

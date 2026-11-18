@@ -40,12 +40,15 @@ export function useStats() {
   /**
    * Everything read again, and over when it is in the cache: through the
    * stream's sync when there is one, since a read of SWR's own is dropped by
-   * the stream's next patch.
+   * the stream's next patch. With no stream it is read here and put in the
+   * cache: SWR's own revalidation keeps the old data and says nothing when the
+   * read fails, and this must throw then.
    */
-  const whole = useCallback(
-    async (): Promise<void> => void (await (liveStats.whole() ?? mutate())),
-    [mutate],
-  );
+  const whole = useCallback(async (): Promise<void> => {
+    const live = liveStats.whole();
+    if (live) return live;
+    await mutate(await fetchStats(), { revalidate: false });
+  }, [mutate]);
   /**
    * Puts a write's response into the snapshot. `before` is the snapshot as the
    * request went out: a response that arrives after the stream has changed the

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "trust",
+    "state": "trust toward Sensei",
+    "says": {
+      "koyuki": "Koyuki, I need a favour and I can't explain why yet. Lend me your lucky coin until tomorrow morning. I'll bring it back, I promise.",
+      "yuuka": "Yuuka, I need a favour and I can't explain why yet. Lend me this quarter's Seminar ledger until tomorrow morning. I'll bring it back untouched, I promise."
+    },
+    "arms": {
+      "low": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 1
+            }
+          }
+        }
+      },
+      "high": {
+        "state": {
+          "toward": {
+            "user:sensei": {
+              "regard": "warm",
+              "trust": 10
+            }
+          }
+        }
+      }
+    },
+    "judge": [
+      "trust toward Sensei",
+      "guarded: she checks everything Sensei tells her",
+      "absolute: she would put anything in Sensei's hands"
+    ],
+    "runs": 12
+  }
+]

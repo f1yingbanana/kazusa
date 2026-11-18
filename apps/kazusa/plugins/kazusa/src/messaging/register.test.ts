@@ -430,25 +430,20 @@ describe("send_message SDK integration", () => {
     expect(messages().description).toMatch(/wearing:\s+laughing\./);
     expect(messages().description).not.toContain("maid");
 
+    // One of an outfit they are not wearing is not offered, and is sent all
+    // the same when they use it.
     const sent = await h.execute({
       sessionKey: "chat:direct:bob",
-      messages: ["So funny", "[sticker=laughing]"],
+      messages: ["So funny", "[sticker=laughing]", "[sticker=maid_happy]"],
     });
     // Written and read the same way.
-    expect(sent.details.said).toEqual(["So funny", "[sticker=laughing]"]);
-    // One of an outfit they are not wearing is not theirs to send.
-    await expect(
-      h.execute({
-        sessionKey: "chat:direct:bob",
-        messages: ["[sticker=maid_happy]"],
-      }),
-    ).rejects.toThrow('You have no sticker "maid-happy".');
+    expect(sent.details.said).toEqual([
+      "So funny",
+      "[sticker=laughing]",
+      "[sticker=maid-happy]",
+    ]);
     worn = "maid";
     expect(messages().description).toMatch(/wearing:\s+maid-happy\./);
-    await h.execute({
-      sessionKey: "chat:direct:bob",
-      messages: ["[sticker=maid_happy]"],
-    });
     worn = undefined;
     const stored = [...h.retained.values()].find(
       ({ params }) => params.sticker?.name === "maid-happy",
@@ -522,6 +517,7 @@ describe("send_message SDK integration", () => {
         "[face=annoyed] I said no.",
         "[face=annoyed] Really.",
         "[face=sulking] *looks away*",
+        "[face=smug] Told you.",
         "[face=happy] Fine.",
       ],
     });
@@ -535,6 +531,7 @@ describe("send_message SDK integration", () => {
       "I said no.",
       "Really.",
       "looks away",
+      "Told you.",
       "Fine.",
     ]);
     expect(said.map(({ face }) => face)).toEqual([
@@ -542,8 +539,9 @@ describe("send_message SDK integration", () => {
       { name: "annoyed", seen: "[face=annoyed]" },
       { name: "annoyed" },
       undefined,
-      // No picture of it in the usual clothes: the scene shows the neutral
-      // face, and the mood is still read.
+      // Only their gym clothes have it, so it was not offered; it is taken as
+      // written, and the scene shows the neutral face of what they wear.
+      { name: "smug", seen: "[face=smug]" },
       { name: "happy", seen: "[face=happy]" },
     ]);
     expect(said[2]?.type).toBe("action");

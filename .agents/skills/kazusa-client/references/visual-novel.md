@@ -584,8 +584,8 @@ Built (2026-11-12) as described below, with these differences:
 - In usual clothes the picture's name is the mood. A mood the clothes they have
   on have no picture for shows that outfit's neutral face, or in usual clothes
   the set's resting `default` (`pickPortrait`), and listeners still read the
-  mood. The field offers the moods of what they are wearing (§6.4), so a mood
-  only another outfit has can't be sent.
+  mood. The field offers the moods of what they are wearing (§6.4); a mood only
+  another outfit has is not offered, and is taken as written when they use it.
 - The director keeps each member's face in `SceneState.moods`: from the speaking
   event as a line starts, else from the message as it lands (an action, an older
   Gateway), seeded from history and from a line already being said when the

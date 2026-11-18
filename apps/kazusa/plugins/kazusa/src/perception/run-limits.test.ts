@@ -4,6 +4,7 @@ import {
   beginBrainRun,
   brainRunLimits,
   registerBrainRunLimits,
+  roomForSleep,
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
 import type { Clock } from "../clock/clock.ts";
@@ -137,6 +138,19 @@ describe("brain run hard budgets", () => {
     expect(h.tool("d", "start_task")).toBeUndefined();
     expect(h.tool("e", "delay_task")).toBeUndefined();
   });
+  it("gives a run that goes to sleep room to go over the day, once", () => {
+    const h = setup();
+    h.start("m1");
+    expect(h.tool("t1")).toBeUndefined();
+    expect(h.tool("t2")).toBeUndefined();
+    expect(h.tool("t3")).toMatchObject({ block: true });
+    roomForSleep("alice");
+    roomForSleep("alice");
+    for (let at = 4; at < 4 + 24; at++)
+      expect(h.tool(`t${at}`)).toBeUndefined();
+    expect(h.tool("t28")).toMatchObject({ block: true });
+  });
+
   it("spends none of its time waiting on tools", () => {
     vi.useFakeTimers();
     const h = setup();

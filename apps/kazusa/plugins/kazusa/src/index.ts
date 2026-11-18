@@ -23,6 +23,7 @@ import { registerDecisionModelsHttp } from "./decisions/http.ts";
 import { modelsConfig } from "./models/config.ts";
 import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
+import { roomForSleep } from "./perception/run-limits.ts";
 import { beginGatewayLifetime, followGatewayLifetime } from "./shutdown.ts";
 import {
   registerBrainHttp,
@@ -37,6 +38,7 @@ import { registerLocationHttp } from "./location/http.ts";
 import { registerWorldUpdate } from "./world-update/register.ts";
 import { registerRepoSearch } from "./repo-search/register.ts";
 import { registerMemory } from "./memory/register.ts";
+import { OFFER_CHARS } from "./memory/sleep.ts";
 import { registerModels } from "./models/register.ts";
 import { registerProfile } from "./profile/register.ts";
 import { registerProvidersHttp } from "./providers/http.ts";
@@ -132,21 +134,16 @@ export default definePluginEntry({
     registerDesiresHttp(api, { desires, broadcaster });
     const stats = registerStats(api, { clock, broadcaster });
     registerStatsHttp(api, { stats, clock });
-    const contextRef: { current?: ReturnType<typeof registerContextEngine> } =
-      {};
     const placesRef: { current?: PlaceEdits } = {};
+    const sleepTurnRef: {
+      current?: (agentId: string, text: string) => Promise<void>;
+    } = {};
     const memory = registerMemory(api, {
       clock,
       broadcaster,
-      feelings: desires.feelings,
       states: stats.review,
-      modelOf: models.model,
-      experiences: async (agentId, since, now) =>
-        (await contextRef.current?.experiences(agentId, since, now)) ?? {
-          text: "",
-          speakers: [],
-          through: now,
-        },
+      room: roomForSleep,
+      turn: sleepTurnRef,
       places: placesRef,
     });
     const location = registerLocation(api, {
@@ -191,7 +188,7 @@ export default definePluginEntry({
       stage,
     });
     const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
-    const context = registerContextEngine(api, {
+    registerContextEngine(api, {
       clock,
       feelings: desires.feelings,
       states: stats.situation,
@@ -204,7 +201,6 @@ export default definePluginEntry({
       awaitingReplies: async (agentId, since) =>
         (await messagingRef.current?.awaitingReplies(agentId, since)) ?? [],
     });
-    contextRef.current = context;
     registerContextHttp(api);
     registerSkills(api);
     registerUsageHttp(api, decisionUsage);
@@ -215,17 +211,14 @@ export default definePluginEntry({
         (await messagingRef.current?.chatFacts(agentId, sessionKeys)) ?? [],
       recollections: memory.recollections,
     });
-    // The wake turn should see the morning's memory, within reason.
-    const onDeadline = async (agentId: string) => {
-      await memory.sleep.settled(agentId);
-      return location.settle(agentId);
-    };
     const perception = registerPerception(api, {
       clock,
       evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
-      onAwoken: memory.sleep.wake,
+      // The night a run went over ends with it (`memory/sleep.ts`).
+      onRunStarted: memory.sleep.runStarted,
+      onRunEnded: memory.sleep.runEnded,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
       realtime: async (agentId, item) =>
@@ -261,6 +254,18 @@ export default definePluginEntry({
       async (agentId) => (await perception.getBrainState(agentId)).failure,
     );
     location.attachPerception(perception);
+    // A night asked for by hand: a turn of their own, like a job's next run.
+    sleepTurnRef.current = (agentId, text) =>
+      perception.receive(agentId, {
+        id: `sleep:${agentId}:${clock.time()}`,
+        sessionKey: `agent:${agentId}:tasks`,
+        sender: "kazusa:memory",
+        // A stimulus holds this much; what a night shows is budgeted under it.
+        text: text.slice(0, OFFER_CHARS),
+        idle: true,
+        resume: true,
+        timestamp: clock.time(),
+      });
 
     const stopSupervisor = taskman.attachSupervisor(perception);
     api.lifecycle.onDispose?.(stopSupervisor);
@@ -270,10 +275,12 @@ export default definePluginEntry({
         api,
         async () => {
           await clock.init();
-          const note = await onDeadline(agentId).catch((error: unknown) => {
-            api.logger.warn(`Perception onDeadline: ${String(error)}`);
-            return undefined;
-          });
+          const note = await location
+            .settle(agentId)
+            .catch((error: unknown) => {
+              api.logger.warn(`Location settle: ${String(error)}`);
+              return undefined;
+            });
           await perception.deadline(agentId, note);
         },
         (error) =>

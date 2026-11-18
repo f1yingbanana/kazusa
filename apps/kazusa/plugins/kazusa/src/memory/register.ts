@@ -25,7 +25,6 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import { inBackground } from "../background.ts";
 import type { Clock } from "../clock/clock.ts";
 import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
 import { resolveStateDir } from "../state-dir.ts";
@@ -34,9 +33,11 @@ import { appendLedgerEntry } from "../ledger.ts";
 import { withJournalSeq, type KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   createSleep,
+  REFLECT,
+  type Night,
   type SleepDeps,
-  type SleepPass,
   type SleepState,
+  type Subject,
 } from "./sleep.ts";
 import {
   embedPending,
@@ -249,10 +250,8 @@ export interface MemoryService {
   readonly sleep: ReturnType<typeof createSleep>;
 }
 
-/** A slow provider took 100 s on an ordinary turn; a night is a larger one. */
-const SLEEP_TIMEOUT_MS = 240_000;
 const INDEX_CELL = Symbol.for("kazusa.memory");
-const PASSES_CELL = Symbol.for("kazusa.memory.sleep");
+const NIGHTS_CELL = Symbol.for("kazusa.memory.nights");
 type Cells = Map<string, MemoryIndex>;
 
 /** One index per world per process: every registration shares it. */
@@ -301,21 +300,15 @@ export function registerMemory(
   deps: {
     readonly clock: Pick<Clock, "time">;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
-    readonly feelings?: (agentId: string, at: number) => Promise<string>;
     /** The world's states a night's sleep reviews (`stats.review`). */
     readonly states?: SleepDeps["states"];
-    /** The model a character actually runs on, which config doesn't know. */
-    readonly modelOf?: (agentId: string) => Promise<string | undefined>;
-    /** The context engine registers later; it owns reading the ledgers. */
-    readonly experiences: (
-      agentId: string,
-      since: number,
-      now: number,
-    ) => Promise<{
-      readonly text: string;
-      readonly speakers: readonly string[];
-      readonly through: number;
-    }>;
+    /** More calls for the run that goes over a day (`roomForSleep`). */
+    readonly room?: SleepDeps["room"];
+    /**
+     * Perception registers later; it hands a character a turn of their own, for
+     * a night asked for by hand.
+     */
+    readonly turn?: { current?: NonNullable<SleepDeps["deliver"]> };
     /** Location registers later; it edits place pages so the map holds. */
     readonly places?: { current?: PlaceEdits };
   },
@@ -419,18 +412,66 @@ export function registerMemory(
     api.runtime.agent.resolveAgentWorkspaceDir(currentConfig(api), agentId);
   const skills = pluginSkillLoader(api);
   const text = createSkillText(skills);
+  /** Who or what a character means by `about`, among what they know. */
+  const subjectOf = (agentId: string, about: string): Subject => {
+    const world = index.world();
+    const personal = index.personal(agentId);
+    const id =
+      mentionsIn(about, personal.values())[0] ??
+      world.resolve(about) ??
+      mentionsIn(about, world.pages.values())[0] ??
+      SLUG(about);
+    if (!id) throw new Error("about needs a name.");
+    const page = personal.get(id);
+    return {
+      id,
+      kind: page?.kind ?? world.pages.get(id)?.kind ?? "concept",
+      name: world.pages.get(id)?.name ?? page?.name ?? about,
+      ...(page ? { page } : {}),
+      unknown: !page && !world.pages.has(id),
+    };
+  };
+  /**
+   * What `recall` would bring up for a name, as lines: the pages a character is
+   * shown before one is made for a name nothing answers to.
+   */
+  const similarTo = async (
+    agentId: string,
+    about: string,
+  ): Promise<string | undefined> => {
+    const found = retrieve(
+      index,
+      await withVector({ agentId, stimulus: about, now: deps.clock.time() }),
+    )
+      .filter(
+        (entity) =>
+          (entity.personal ?? entity.world)?.kind !== "day" &&
+          entity.signals.some(
+            (s) => s === "mention" || s === "keyword" || s === "semantic",
+          ),
+      )
+      .slice(0, 3);
+    if (!found.length) return undefined;
+    return found
+      .map((entity) => {
+        const page = entity.personal ?? entity.world;
+        return `- ${page?.name ?? entity.id} (\`${entity.id}\`): ${page?.summary ?? ""}`.trimEnd();
+      })
+      .join("\n");
+  };
   const holder = globalThis as unknown as Record<
     symbol,
-    Map<string, SleepPass> | undefined
+    Map<string, Night> | undefined
   >;
-  const passes = holder[PASSES_CELL] ?? new Map<string, SleepPass>();
-  holder[PASSES_CELL] = passes;
+  const nights = holder[NIGHTS_CELL] ?? new Map<string, Night>();
+  holder[NIGHTS_CELL] = nights;
   const sleep = createSleep(
     {
       index,
       enabled: config.sleep.enabled,
       categories: config.sleep.categories,
       minMinutes: config.sleep.minMinutes,
+      everyMinutes: config.sleep.everyMinutes,
       notesPerPage: config.sleep.notesPerPage,
       now: () => deps.clock.time(),
       workspaceOf,
@@ -438,36 +479,18 @@ export function registerMemory(
         namespace: "memory",
         retention: "retained",
       }),
-      // Detached: inside a tool or request this inherits the caller's scopes
-      // and is cancelled when the caller ends, and a night outlives a tool call.
-      complete: ({ agentId, message, instructions, signal }) =>
-        new Promise<string>((resolve, reject) => {
-          inBackground(
-            api,
-            async () => {
-              const model = await deps.modelOf?.(agentId);
-              const { text } = await api.runtime.subagent.complete({
-                agentId,
-                message,
-                ...(model ? { model } : {}),
-                extraSystemPrompt: instructions,
-                timeoutMs: SLEEP_TIMEOUT_MS,
-                signal,
-              });
-              resolve(text);
-            },
-            reject,
-          );
-        }),
-      instructions: (agentId) =>
-        skills.loadSkill("sleep-consolidation", {
-          agentId,
-          workspaceDir: workspaceOf(agentId),
-        }),
-      experiences: deps.experiences,
-      ...(deps.feelings ? { feelings: deps.feelings } : {}),
+      touched: familiarity.since,
+      subject: subjectOf,
+      similar: similarTo,
+      text: (ref, values, agentId) =>
+        text(ref, values, { agentId, workspaceDir: workspaceOf(agentId) }),
       ...(deps.states ? { states: deps.states } : {}),
-      nameOf,
+      ...(deps.room ? { room: deps.room } : {}),
+      deliver: async (agentId, message) => {
+        if (!deps.turn?.current)
+          throw new Error("Nothing can hand them a turn yet.");
+        await deps.turn.current(agentId, message);
+      },
       record: async (agentId, event, text) => {
         const simTime = deps.clock.time();
         const payload = {
@@ -494,7 +517,7 @@ export function registerMemory(
       },
       warn,
     },
-    passes,
+    nights,
   );
 
   /** Today's plans from MEMORY.md, which a query falls back to with no words. */
@@ -747,6 +770,7 @@ export function registerMemory(
           source: { type: "string" },
           certainty: { type: "string", enum: [...CERTAINTIES] },
           on: { type: "string" },
+          new: { type: "boolean" },
         },
         required: ["about", "note"],
         additionalProperties: false,
@@ -767,6 +791,7 @@ export function registerMemory(
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/)
             .optional(),
+          new: z.boolean().optional(),
         })
         .parse(input);
       const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
@@ -774,7 +799,7 @@ export function registerMemory(
         agentId,
       );
       if (["me", "myself"].includes(args.about.trim().toLowerCase())) {
-        applyOperation(path.join(workspace, "MEMORY.md"), (raw) =>
+        sleep.write(agentId, path.join(workspace, "MEMORY.md"), (raw) =>
           withPlan(raw ?? "", args.on ?? simDate(), args.note),
         );
         return plain("Noted in your plans.");
@@ -789,32 +814,69 @@ export function registerMemory(
       if (person && !teller)
         throw new Error(`You don't know anyone called ${person}.`);
       const source = teller ? args.source.replace(person, teller) : args.source;
-      const personal = index.personal(agentId);
-      const id =
-        mentionsIn(args.about, personal.values())[0] ??
-        world.resolve(args.about) ??
-        mentionsIn(args.about, world.pages.values())[0] ??
-        SLUG(args.about);
-      if (!id) throw new Error("about needs a name.");
-      const existing = personal.get(id);
-      const kind = existing?.kind ?? world.pages.get(id)?.kind ?? "concept";
+      const subject = subjectOf(agentId, args.about);
+      const { id, kind, name } = subject;
+      const first = await sleep.knownOrNew(
+        agentId,
+        subject,
+        args.about,
+        args.new,
+      );
+      if (first) return plain(first);
       const file = path.join(
         workspace,
         "wiki",
         PAGE_DIRECTORY[kind],
         `${id}.md`,
       );
-      const name = world.pages.get(id)?.name ?? args.about;
       const certainty: Certainty = args.certainty;
-      applyOperation(file, (raw) =>
-        withNote(raw ?? newPage(name, source), {
-          date: simDate(),
-          source,
-          certainty,
-          text: args.note,
-        }),
+      sleep.write(
+        agentId,
+        file,
+        (raw) =>
+          withNote(raw ?? newPage(name, source), {
+            date: sleep.day(agentId) ?? simDate(),
+            source,
+            certainty,
+            text: args.note,
+          }),
+        { page: id, note: true },
       );
       return plain(`Noted, about ${name}.`);
+    },
+  }));
+
+  api.registerTool((context) => ({
+    ...worded(
+      "reflect",
+      {
+        type: "object",
+        properties: {
+          about: { type: "string" },
+          view: { type: "string" },
+          summary: { type: "string" },
+          relation: { type: "string" },
+          openThreads: { type: "array", items: { type: "string" } },
+          theyThinkOfMe: { type: "string" },
+          goals: { type: "array", items: { type: "string" } },
+          dream: { type: "string" },
+          states: {
+            type: "object",
+            additionalProperties: { type: ["string", "number"] },
+          },
+          new: { type: "boolean" },
+        },
+        required: ["about"],
+        additionalProperties: false,
+      },
+      context.agentId,
+    ),
+    catalogMode: "direct-only",
+    label: "Reflect",
+    async execute(_id: string, input: unknown) {
+      return plain(
+        await sleep.reflect(toolAgent(context), REFLECT.parse(input)),
+      );
     },
   }));
 
@@ -899,7 +961,7 @@ export function registerMemory(
     name: "memory_consolidate",
     label: "Consolidate Memory",
     description:
-      "Run one character's sleep consolidation now over everything since their last one. Sends their records and pages to the model.",
+      "Have one character go over everything since they last slept on things, now, in a turn of their own, without waiting for them to sleep.",
     parameters: {
       type: "object",
       properties: { agent: { type: "string" } },
@@ -909,14 +971,14 @@ export function registerMemory(
     async execute(_id: string, input: unknown) {
       const { agent } = z.object({ agent: z.string() }).parse(input);
       await sleep.consolidate(agent);
-      return textResult(await sleep.runs(agent));
+      return textResult({ asked: agent });
     },
   });
   api.registerTool({
     name: "memory_restore",
     label: "Restore Memory",
     description:
-      "Undo one sleep pass: every file it touched goes back as it was. The run id is in the memory.consolidated journal event.",
+      "Undo one night's sleep: every file it touched goes back as it was. The run id is in the memory.consolidated journal event. States it changed stay.",
     parameters: {
       type: "object",
       properties: { agent: { type: "string" }, run: { type: "string" } },
@@ -1146,13 +1208,13 @@ export function registerMemory(
       relocated: [],
     } satisfies WikiEditResult);
   });
-  // Sleep on it now, on request; the same pass a long sleep starts.
+  // Go over the day now, on request: what a long sleep starts, in its own turn.
   route("memory/consolidate", "POST", async (req, res) => {
     const { agent } = z
       .object({ agent: z.string().min(1) })
       .parse(await readJsonBody(req));
     await sleep.consolidate(agent);
-    sendJson(res, 200, { runs: (await sleep.runs(agent)).length });
+    sendJson(res, 200, { asked: agent });
   });
   route("memory/runs", "GET", async (req, res) => {
     const agent = params(req).get("agent");

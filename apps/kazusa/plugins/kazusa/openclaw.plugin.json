@@ -174,7 +174,7 @@
             "properties": {
               "enabled": {
                 "type": "boolean",
-                "default": false
+                "default": true
               },
               "categories": {
                 "type": "array",
@@ -186,6 +186,11 @@
                 "type": "integer",
                 "minimum": 0,
                 "default": 180
+              },
+              "everyMinutes": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 720
               },
               "notesPerPage": {
                 "type": "integer",
@@ -673,6 +678,7 @@
       "recall",
       "look_up",
       "remember",
+      "reflect",
       "wiki_lint",
       "world_audit",
       "memory_preview",

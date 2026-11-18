@@ -141,6 +141,8 @@ export interface FamiliarityService {
     ids: readonly string[],
     at: number,
   ) => Promise<void>;
+  /** What they did something with since `since`, latest first, by page id. */
+  readonly since: (agentId: string, since: number) => Promise<string[]>;
   /**
    * How familiar each thing is at `now`, by page id: everything they used, and
    * their own pages by when they last moved. Unknown ids are absent.
@@ -173,6 +175,15 @@ export function createFamiliarity(
           if (id !== pageIdOf(agentId)) after = withUse(after, id, at, config);
         if (after !== before) await records.register(agentId, after);
       }),
+    // A use within the hour of the last is not written down (`withUse`), so
+    // one kept up to an hour before `since` may stand for a later one: better
+    // gone over twice than missed.
+    since: async (agentId, since) =>
+      Object.entries((await records.lookup(agentId)) ?? {})
+        .map(([id, uses]) => [id, uses.recent.at(-1) ?? uses.first] as const)
+        .filter(([, at]) => at > since - HOUR_MS)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => id),
     scores: async (agentId, now, pages) => {
       const record = (await records.lookup(agentId)) ?? {};
       const latest = new Map<string, number>();

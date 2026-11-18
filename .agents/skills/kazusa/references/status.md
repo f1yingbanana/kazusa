@@ -61,7 +61,7 @@ classifies and cannot reason about a rubric (tried first, removed 2026-11-16).
 | `changedBy` | For                            | How                                                                                                  |
 | :---------- | :----------------------------- | :--------------------------------------------------------------------------------------------------- |
 | `character` | outfit, mood, HP               | Awake, in their own turn: `changes` on `start_task`, or `change_state` in the middle of an activity. |
-| `reviewed`  | regard, anything with a rubric | Asleep: the sleep pass looks back on the whole day and returns what moved.                           |
+| `reviewed`  | regard, anything with a rubric | Going to sleep: the turn that goes over the day gives what moved, as `states` on `reflect`.          |
 | `manual`    | STR, level, a chapter          | Nobody. The user and the system agent only.                                                          |
 
 The user (`POST /kazusa/stats/set`, by `user`) and the system agent
@@ -135,10 +135,11 @@ outfits to the client. It is `changedBy: character`, `shown: everyone`.
 It is the one state code acts on:
 
 - `send_message` offers only the stickers (`wornStickers`) and the faces
-  (`faceMoods(portraits, worn)`) of what they are wearing, so a character in a
-  swimsuit cannot send themselves in uniform, and refuses a sticker of anything
-  else when it is sent. An outfit with no portraits falls back to the usual
-  clothes' moods; one with no stickers offers none.
+  (`faceMoods(portraits, worn)`) of what they are wearing. Offering is all it
+  does: a sticker or a mood of other clothes is sent as written when they use
+  one (any sticker of theirs; any mood they have a portrait of, `knownMoods`).
+  An outfit with no portraits falls back to the usual clothes' moods; one with
+  no stickers offers none.
 - The Scene view draws the figure in it (`useWornOutfit` sets `Look.outfit`).
 - People with them read `Name: outfit: swimsuit (what is worn)`.
 
@@ -173,14 +174,14 @@ reads a process-wide copy of each character's outfit entry, filled at
   A character tool: it needs `contracts.tools` and `base.json`'s `alsoAllow`; a
   world made before it gets it at the next start (`allowNewCharacterTools`,
   `scripts/plugin-startup.mjs`).
-- **Sleep review** (`SleepDeps.states`, `stats.review`): the sleep message ends
-  with `# Your states`: each `reviewed` state as described, where their own
-  stand, and where those toward each person who spoke in the day's records stand
-  (`reviewText`). The night's JSON may carry
-  `states: { own: {…}, toward: { <id>: {…} } }`; only reviewed states, toward
-  people of the day, with a value the state can hold are applied
-  (`reviewedChanges`), by `reviewed`. Worded in `sleep-consolidation`. A failure
-  never costs the night. Undoing a sleep run does not undo its state changes.
+- **Sleep review** (`SleepDeps.states`, `stats.review`; memory.md §7.5): going
+  to bed shows each `reviewed` state as described, where their own stand, and
+  where those toward up to 12 people of the day stand (`reviewText`, in
+  `sleep-consolidation#states`). `reflect` carries `states`: about a person,
+  theirs toward that person; about `me`, their own. Only reviewed states, given
+  the way the state takes them, are applied (`reviewedChanges`), by `reviewed`,
+  and `reflect` answers with what moved. A failure never costs the night.
+  Undoing a night does not undo its state changes.
 - **Prompt**: `### Your state` in the situation message, after How you feel
   (`statsText`): their own; `Toward <person>` for people with them or named in
   what arrived; other people's `everyone` states that differ from the initial;
@@ -229,18 +230,15 @@ Checked on the lab world with a real model (2026-11-16, GLM-5.3-flash, one
 character): `### Your state` in the prompt; `changes: {}` on an activity that
 changed nothing, then `changes: { "outfit": "gym" }` when she changed; the next
 turn offered only `gym-*` stickers and the gym portraits' moods, and she sent
-`[sticker=gym-calm]`. **Not yet run with a model** on this branch: the sleep
-review of the sleep pass, and `change_state` (offered, never called in the run).
+`[sticker=gym-calm]`. **Not yet run with a model**: `change_state` (offered,
+never called in the run).
 
-Measured on replays (2026-11-17, branch `feat/sleep-in-brain`, where a character
-goes over the day in the turn that goes to bed and gives `states` on `reflect`;
-`scripts/testing/state-lab/` there, with a README; about 4,500 replays on
-GLM-5.3-flash). A replay is a captured prompt with one thing changed, so a night
-costs one model run instead of a simulated day. The harness applies states with
-this module's own functions, but the old sleep pass on this branch was not
-measured.
+Measured on replays (2026-11-17, `scripts/testing/state-lab/`, about 4,500
+replays on GLM-5.3-flash; its README says how). A replay is a captured prompt
+with one thing changed, so a night costs one model run instead of a simulated
+day. The harness applies states with this module's own functions.
 
-- **A day moves a meter.** With bands about 8 steps apart and that branch's
+- **A day moves a meter.** With bands about 8 steps apart and the
   `sleep-consolidation#states` wording, a kept promise raised trust on all 24
   nights it was tried, a broken one lowered it on 23 of 24, and twelve
   uneventful days moved it 0.7 to 1.3 steps of 8. With bands 3 steps apart and

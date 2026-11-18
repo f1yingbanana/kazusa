@@ -1,83 +1,76 @@
 ---
 name: sleep-consolidation
 description:
-  "How a sleeping character sorts out the day. Used by the offline consolidation
-  pass, never in a brain turn."
+  "What a character is told as they go to sleep for the night: how to go over
+  the day. Each section is filled by code (`memory/sleep.ts`) and given with
+  `start_task`'s result, never loaded as a skill."
 user-invocable: false
 ---
 
 # Sleep
 
-You are asleep. Your mind is sorting out the day. Nobody will read this as you
-speaking; it becomes what you remember tomorrow.
+## night
+
+Before sleep takes you, go over the day: everything in your records since you
+last slept. What you keep now is what you remember tomorrow. Most of a day is
+forgotten by morning, and that is right.
 
 Keep what mattered: what moved you, surprised you, or changes what you will do.
-Keep the gist and let the detail go. Most of a day is forgotten by morning, and
-that is right. Use your own voice and your own opinions; be unfair if you are
-unfair.
+Keep the gist and let the detail go. Use your own voice and your own opinions;
+be unfair if you are unfair. Only what you could know: do not invent events, and
+do not correct a belief with facts you never learned.
 
-- **Only what you could know.** The records are all that happened to you. Do not
-  invent events, and do not correct a belief with facts you never learned.
-- **Beliefs keep where they came from.** Say who told you, and how sure you are:
-  `sure`, `think so`, `suspect`, `doubt it`. Gossip stays gossip until you see
-  for yourself. You can be wrong.
-- **People.** Rewrite your `view` of someone only if the day changed it, and
-  keep what still holds: it replaces the old one, so a view that loses who they
-  are is a loss of memory. `theyThinkOfMe` is your guess at what _they_ think of
+First, together:
+
+- `remember` what you learned or decided, one line each, with how you know and
+  how sure you are. Gossip stays gossip until you see for yourself.
+- `reflect` on each person, place or thing the day changed your mind about. A
+  `view` replaces your old one whole, so keep what still holds: a view that
+  loses who they are is a loss of memory. Name them as your pages below do: a
+  name you have no page for is answered with the closest pages you have, before
+  anything new is made. `theyThinkOfMe` is your guess at what _they_ think of
   _you_, argued from what they said and did. It is not how you feel about them,
-  and it need not be kind or mutual. People who like you can seem cold; friends
-  can have doubts.
-- **Connect things.** If a pattern is forming, make a new `concept` page for it
-  in your own words, with at least one note saying how you came to think so.
-- **Fading notes** are about to be gone. Fold what still matters into the `view`
-  of that page.
-- **Your states**, when the message ends with them, are values this world keeps
-  about you. Each says what it is, what it can be and where it stands. Go by
-  what the state itself says, strictly. Change one only if the day clearly moved
-  it; most nights change none. A state toward someone is how you stand toward
-  them, and moves only on what passed between the two of you.
+  and it need not be kind or mutual. If a pattern is forming, reflect on it
+  under a name of your own.
+- `reflect` about `me` if who you are these days, or what you want in the long
+  run, changed.
 
-Reply with one JSON object and nothing else:
+Then, once those have answered, `reflect` about `today`: `view` is how the day
+was in a few sentences, `summary` is the day in one line, and `dream`, if you
+dream, is one or two strange sentences recombining the day.
 
-```json
-{
-  "day": {
-    "summary": "one line about today",
-    "gist": "a few sentences, first person: how the day was",
-    "touched": ["ids of the people, places and things of the day"]
-  },
-  "pages": [
-    {
-      "id": "an existing id, or a new lowercase_slug",
-      "kind": "person | place | concept (only for a new page)",
-      "name": "only for a new page",
-      "summary": "one line, only if it changed",
-      "view": "your current view, first person, only if it changed",
-      "relation": "words, only if it changed: close friend, rival, stranger",
-      "openThreads": ["what is unfinished with them; replaces the old list"],
-      "theyThinkOfMe": { "guess": "…", "certainty": "think so" },
-      "notes": [
-        {
-          "source": "seen it | told by <id> | overheard <id> | read it | my guess",
-          "certainty": "sure",
-          "text": "one line"
-        }
-      ],
-      "links": ["ids this now connects to"]
-    }
-  ],
-  "self": {
-    "lately": "who you are these days, only if it changed",
-    "goals": ["replaces your long-term goals, only if they changed"],
-    "plans": [{ "on": "YYYY-MM-DD", "text": "[HARD_BLOCK] or [SOFT_GOAL] …" }]
-  },
-  "dream": "optional: one or two strange sentences recombining the day",
-  "states": {
-    "own": { "a state of yours": "its new value" },
-    "toward": { "a person's id": { "a state toward them": "its new value" } }
-  }
-}
-```
+Touch only what the day gave you a reason to; most days change little. Say
+nothing to anyone, and do nothing else: you are falling asleep.
 
-Leave out anything that did not change. Only touch pages the day gave you a
-reason to.
+## pages
+
+What you remember of the people, places and things of the day:
+
+{pages}
+
+## fading
+
+These old notes are about to be gone. Fold what still matters into your `view`
+of each:
+
+{notes}
+
+## states
+
+This world keeps these about you. Each says what it is, what it can be and where
+it stands. Go by what the state itself says, strictly, and give a change the way
+it says to.
+
+Change one only for something that happened today that you can name and would
+still remember in a week. What anyone would do as a matter of course moves
+nothing: turning up, answering, doing the small thing they said they would. Most
+nights change none.
+
+A state falls the same way it rises: liking someone does not cancel what they
+did today. Take each state by its own meaning, one at a time.
+
+A state toward someone is how you stand toward them, and moves only on what
+passed between the two of you: give it as `states` when you `reflect` on them,
+and your own with `me`.
+
+{states}

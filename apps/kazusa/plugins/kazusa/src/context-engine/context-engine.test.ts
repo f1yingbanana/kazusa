@@ -6,7 +6,6 @@ import { CONTEXT_ENGINE_CONFIG } from "./config.ts";
 import {
   assembleContext,
   ledgerCutoff,
-  ledgerWindowEnd,
   renderLedgerRecords,
   type ContextEngine,
 } from "./context-engine.ts";
@@ -801,90 +800,5 @@ describe("Context assembly", () => {
       "Skill content for my-conventions",
     );
     expect(guidanceOf(result)).toContain("Skill content for my-lifecycle");
-  });
-});
-
-describe("ledgerWindowEnd", () => {
-  const item = (at: number, text: string) =>
-    ({
-      type: "agentMessage",
-      timestamp: new Date(at).toISOString(),
-      text,
-    }) as never;
-  const sessionsContext = {
-    "agent:a:tasks": [
-      item(1_000, "x".repeat(400)),
-      item(2_000, "y".repeat(400)),
-      item(3_000, "z".repeat(400)),
-    ],
-  };
-
-  it("reads everything when it fits", () => {
-    expect(
-      ledgerWindowEnd({
-        sessionsContext,
-        since: 0,
-        now: 9_000,
-        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
-        tokenBudget: 100_000,
-      }),
-    ).toBe(9_000);
-  });
-
-  it("stops at the oldest that fit, leaving the rest for later", () => {
-    expect(
-      ledgerWindowEnd({
-        sessionsContext,
-        since: 0,
-        now: 9_000,
-        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
-        tokenBudget: 150,
-      }),
-    ).toBeLessThan(3_000);
-  });
-
-  it("reads as much as fits once rendered the way sleep renders it", () => {
-    const text = (section: string) =>
-      bundledSkillText()(`kazusa-deliveries#${section}`);
-    const streams = {
-      "agent:alice:tasks": Array.from({ length: 200 }, (_, index) =>
-        event(`moment ${index}`, NOW - (200 - index) * 60_000),
-      ),
-    };
-    const since = NOW - 86_400_000;
-    const through = ledgerWindowEnd({
-      sessionsContext: streams,
-      since,
-      now: NOW,
-      tokenBudget: 500,
-      text,
-    });
-    const { text: rendered } = renderLedgerRecords({
-      sessionsContext: streams,
-      simTime: through,
-      cutoff: since,
-      tokenBudget: Number.POSITIVE_INFINITY,
-      trimTo: 1,
-      text,
-    });
-    const used = estimateTokens({
-      role: "user",
-      content: rendered,
-      timestamp: NOW,
-    });
-    expect(used).toBeLessThanOrEqual(500);
-    expect(used).toBeGreaterThan(450);
-  });
-
-  it("always moves forward past one oversized record", () => {
-    expect(
-      ledgerWindowEnd({
-        sessionsContext,
-        since: 0,
-        now: 9_000,
-        text: (section) => bundledSkillText()(`kazusa-deliveries#${section}`),
-        tokenBudget: 1,
-      }),
-    ).toBe(1_000);
   });
 });

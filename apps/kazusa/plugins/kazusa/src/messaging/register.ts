@@ -27,7 +27,7 @@ import {
   wornStickers,
 } from "../stickers/stickers.ts";
 import { readPortraits } from "../scene/portraits.ts";
-import { faceMoods, sayFaces } from "./faces.ts";
+import { faceMoods, knownMoods, sayFaces } from "./faces.ts";
 import type { Perception } from "../perception/perception.ts";
 import {
   Messaging,
@@ -491,16 +491,13 @@ export function registerMessaging(
           api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
         )
       : undefined;
-  /** The faces a character can give a line: their portraits' moods. */
+  const portraitsOf = (agentId: string) =>
+    readPortraits(
+      api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
+    );
+  /** The faces a character is offered for a line: their moods as dressed. */
   const moodsOf = (agentId: string | undefined) =>
-    agentId
-      ? faceMoods(
-          readPortraits(
-            api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
-          ),
-          deps.wearing?.(agentId),
-        )
-      : [];
+    agentId ? faceMoods(portraitsOf(agentId), deps.wearing?.(agentId)) : [];
 
   api.registerTool(
     {
@@ -569,20 +566,21 @@ export function registerMessaging(
               const senderName = await characterName(api, config, agentId);
               // What each bubble of text means, then its face as everyone
               // reads it, only as it changes.
-              const moods = moodsOf(agentId);
+              // Any mood of theirs is taken, offered or not.
+              const moods = knownMoods(portraitsOf(agentId));
               const aloud = /(?:^|:)chat:huddle:/.test(params.sessionKey);
               const faced = sayFaces(
                 params.messages.map((line) => written(line, moods, aloud)),
                 messaging.shownFace(agentId, params.sessionKey),
               );
-              // A sticker is sent as its description, frozen now. Only one of
-              // what they are wearing, as the tool lists them.
+              // A sticker is sent as its description, frozen now. Any of theirs
+              // is taken: the tool lists those of what they are wearing, and
+              // one of other clothes is not refused.
               const own = stickersOf(agentId);
-              const worn = deps.wearing?.(agentId);
               const messages = faced.map((bubble) => {
                 if (!("sticker" in bubble)) return bubble;
                 const sticker = own?.stickers.get(bubble.sticker);
-                if (!sticker || sticker.outfitWord !== worn)
+                if (!sticker)
                   throw new Error(`You have no sticker "${bubble.sticker}".`);
                 return {
                   text: stickerText(senderName, sticker),

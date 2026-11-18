@@ -101,4 +101,26 @@ describe("familiarity", () => {
     expect([...scores.keys()].sort()).toEqual(["natsu", "sensei"]);
     expect(scores.get("sensei")).toBeGreaterThan(scores.get("natsu") ?? 0);
   });
+
+  it("lists what they did something with since a moment, latest first", async () => {
+    const familiarity = createFamiliarity(memoryStore(), config);
+    await familiarity.use("kazusa", ["natsu"], NOW - 30 * HOUR);
+    await familiarity.use("kazusa", ["airi"], NOW - 5 * HOUR);
+    await familiarity.use("kazusa", ["user:sensei"], NOW - HOUR);
+    // What a night goes over: the people and places since the last one.
+    expect(await familiarity.since("kazusa", NOW - 12 * HOUR)).toEqual([
+      "sensei",
+      "airi",
+    ]);
+  });
+
+  it("lists someone met again within the hour, across the moment asked from", async () => {
+    const familiarity = createFamiliarity(memoryStore(), config);
+    // Ten minutes before bed and twenty after: the second is not written
+    // down, so the first has to stand for it.
+    await familiarity.use("kazusa", ["natsu"], NOW - 10 * 60_000);
+    await familiarity.use("kazusa", ["natsu"], NOW + 20 * 60_000);
+    expect(await familiarity.since("kazusa", NOW)).toEqual(["natsu"]);
+    expect(await familiarity.since("kazusa", NOW + HOUR)).toEqual([]);
+  });
 });

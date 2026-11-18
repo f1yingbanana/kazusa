@@ -289,12 +289,8 @@ export const TIMELINE_KINDS: KindMap = {
     facet: "mind",
     salience: "normal",
     fact: (event) => {
-      const { interrupted, pages, newPages } = event.payload;
-      return interrupted ? (
-        <span className="text-muted-foreground">
-          Sleep was broken; nothing kept
-        </span>
-      ) : (
+      const { pages, newPages } = event.payload;
+      return (
         <span className="text-muted-foreground">
           {`Rethought ${pages.length} ${pages.length === 1 ? "thing" : "things"}${newPages.length ? `, ${newPages.length} new` : ""}`}
         </span>

@@ -35,20 +35,20 @@ out in their sleep. The world's author edits Markdown and nothing else.
 
 ## 1. Simulation: how a person knows and remembers
 
-| What a real person does                                                          | Kazusa                                                                                                                            |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Knows their own club and dorm inside out, their school well, rivals by name only | **Depth** from anchors (club, home, school) and the page's renown (§3.3).                                                         |
-| Recognizes a face or a place instantly, with feelings attached                   | **Prefetch**: retrieval before every brain turn, no tool call (§7.2).                                                             |
-| Sees what is actually there, and notices when it changed                         | **Contact**: the world page of what they stand in or face, and its dated changes since they last saw it (§7.3).                   |
-| Has something on the tip of the tongue                                           | `recall`.                                                                                                                         |
-| Checks the school portal, asks around online                                     | `look_up`: public world pages only.                                                                                               |
-| Believes gossip, misreads people, holds theories                                 | Notes with a source (`told by natsu-yutori`) and a certainty word. Canon never corrects them silently.                            |
-| Guesses what others think of them, and is often wrong                            | **What they think of me** on every people page: a guess with a certainty word, never a mirror of their own view (§3.5).           |
-| Writes down what would hurt to forget: a promise, someone new, a change of heart | `remember`, in the moment; small talk is left to sleep.                                                                           |
-| Sleeps on it: keeps the gist, revises opinions, dreams                           | **Sleep consolidation**: one offline pass per real sleep that rewrites views, adds notes, writes the day page and a dream (§7.5). |
-| Forgets details, keeps a general sense                                           | Notes per page are capped; sleep folds the oldest into the page's current view.                                                   |
-| Always has family, friends and home in mind; a café seen once fades              | **People you know** and **Places you know**, ranked by familiarity: recency and frequency over sim time (§7.7).                   |
-| Woken at 3 am, sleeps badly                                                      | A wake cancels the pass; nothing is applied until the next sleep.                                                                 |
+| What a real person does                                                          | Kazusa                                                                                                                                    |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Knows their own club and dorm inside out, their school well, rivals by name only | **Depth** from anchors (club, home, school) and the page's renown (§3.3).                                                                 |
+| Recognizes a face or a place instantly, with feelings attached                   | **Prefetch**: retrieval before every brain turn, no tool call (§7.2).                                                                     |
+| Sees what is actually there, and notices when it changed                         | **Contact**: the world page of what they stand in or face, and its dated changes since they last saw it (§7.3).                           |
+| Has something on the tip of the tongue                                           | `recall`.                                                                                                                                 |
+| Checks the school portal, asks around online                                     | `look_up`: public world pages only.                                                                                                       |
+| Believes gossip, misreads people, holds theories                                 | Notes with a source (`told by natsu-yutori`) and a certainty word. Canon never corrects them silently.                                    |
+| Guesses what others think of them, and is often wrong                            | **What they think of me** on every people page: a guess with a certainty word, never a mirror of their own view (§3.5).                   |
+| Writes down what would hurt to forget: a promise, someone new, a change of heart | `remember`, in the moment; small talk is left to sleep.                                                                                   |
+| Sleeps on it: keeps the gist, revises opinions, dreams                           | **Sleep consolidation**: the turn that goes to bed goes over the day: rewrites views, adds notes, writes the day page and a dream (§7.5). |
+| Forgets details, keeps a general sense                                           | Notes per page are capped; sleep folds the oldest into the page's current view.                                                           |
+| Always has family, friends and home in mind; a café seen once fades              | **People you know** and **Places you know**, ranked by familiarity: recency and frequency over sim time (§7.7).                           |
+| Woken at 3 am, sleeps badly                                                      | What they had gone over by then is kept; back in bed the same night, the day is not gone over again (§7.5).                               |
 
 Naps shorter than `memory.sleep.minMinutes` (default 180) don't consolidate.
 
@@ -323,8 +323,8 @@ her tools of her own, allowlisted for her only:
 | --------------------------------- | -------------------------------------------------------- |
 | `wiki_lint`                       | Lint both wikis, or one character's.                     |
 | `knowledge_explain(agent, page?)` | Depth and the rule that gave it, or the whole footprint. |
-| `memory_consolidate(agent)`       | Run a sleep pass now (for backfill from ledgers).        |
-| `memory_restore(agent, run)`      | Restore the preimages of one sleep pass.                 |
+| `memory_consolidate(agent)`       | Have them go over the day now, in a turn of their own.   |
+| `memory_restore(agent, run)`      | Restore the preimages of one night's sleep.              |
 
 **Seed a new character**
 
@@ -516,61 +516,77 @@ survives.
 
 ### 7.5 Sleep consolidation
 
-- **Trigger**: a Taskman extension's `commit`. A task whose category is in
-  `memory.sleep.categories` (default `["sleeping"]`) and planned for at least
-  `memory.sleep.minMinutes` (180) starts a pass, once a world sets
-  `memory.sleep.enabled`, because it sends their records to the model. Taskman
-  stays ignorant of what sleep means.
-- **Runner**: `api.runtime.subagent.complete` with the character's model, one
-  tool-free call, no session, no ledger; `:brain` stays free so Perception keeps
-  working.
-- **Instructions**: `shared/skills/sleep-consolidation/SKILL.md`.
-- **Records**: oldest first up to 8,000 tokens; the watermark moves only as far
-  as what was read, so a backlog waits for the next sleep instead of being lost.
-- **Input** (one message, about 8–12k tokens): name and a `SOUL.md` excerpt; the
-  desires line; those records; `MEMORY.md`; the full personal pages of every
-  entity in the records or rendered that day; ids and summaries of the rest;
-  pages over the note cap with their oldest notes marked _fading_. No world text
-  beyond what the records show.
-- **Output** (Zod), operations not files:
+A character goes over the day in the turn that puts them to bed
+(`memory/sleep.ts`). There is no pass of its own: no extra model call, no
+session, nothing to schedule, interrupt or resume.
 
-  ```ts
-  {
-    day: { summary: string; gist: string; touched: string[] };
-    pages: Array<{
-      id: string;                         // existing, or a new slug
-      kind?: "person" | "place" | "concept"; // required when new
-      name?: string; aliases?: string[];
-      summary?: string;                   // L0
-      view?: string;                      // L1 lead, replaces
-      relation?: string;                  // people
-      openThreads?: string[];             // replaces
-      theyThinkOfMe?: { guess: string; certainty: Certainty }; // people, replaces
-      notes?: Array<{ source: string; certainty: Certainty; text: string }>;
-      links?: string[];
-    }>;
-    self?: { lately?: string; goals?: string[]; plans?: string[] };
-    dream?: string;
-  }
-  ```
+- **Trigger**: a Taskman extension. A `start_task` whose category is in
+  `memory.sleep.categories` (default `["sleeping"]`), planned for at least
+  `memory.sleep.minMinutes` (180), and at least `memory.sleep.everyMinutes`
+  (720) of sim time after the last night that kept anything, opens a **night**.
+  `memory.sleep.enabled` is on by default. Taskman stays ignorant of what sleep
+  means.
+- **What going to bed says**: `start_task`'s result carries an `aside`
+  (`PreparedTaskCommit.aside`: said with the result and never written to their
+  records), worded by `shared/skills/sleep-consolidation/SKILL.md`: how to go
+  over the day (`night`); the states a night reviews (`states`, from
+  `stats.review`, for up to 12 people of the day); their own pages, whole, on
+  what the day touched, latest first (`pages`; "touched" is familiarity's uses
+  since the last night); and notes past the cap on those pages (`fading`). Pages
+  and fading notes share one budget of 24,000 characters, or less when the rest
+  of what is said leaves less of the 32,000 a turn can be handed
+  (`OFFER_CHARS`): a page goes in whole or not at all, and nothing shown is cut
+  on the way. Going back to bed in the same run says none of this again: the
+  night they are going over stands.
+- **The run goes over it** with two tools. `remember` adds notes as at any other
+  time. `reflect` (`REFLECT`, flat on purpose) takes `about` and what changed:
+  - a person, place or thing: `view` (replaces the lead), `summary`, `relation`,
+    `openThreads`, `theyThinkOfMe`, and `states` toward a person;
+  - `me`: `view` (Lately), `goals`, and their own `states`;
+  - `today` (or the night's date): `view`, `summary`, `dream`. This writes the
+    day page (`wiki/days/<date>.md`; the date is the day they were up for, so
+    bed after midnight still writes yesterday). It ends nothing.
 
-- **Validation**: `told by`/`overheard` must name someone who spoke in the input
-  records; a new page needs at least one grounded note; ids must be valid slugs;
-  `theyThinkOfMe` only for people who appear in the records. The skill asks for
-  the guess to be argued from what that person did, not from the character's own
-  view of them. Invalid items are dropped and logged, not the whole pass.
-- **Apply**: preimages of every touched file and the watermark go to a
-  `"memory"` keyed store (one run id); operations per §7.4; fading notes past
-  `memory.notesPerPage` (default 30) (except `always known` ones) are removed
-  once their page's view was rewritten; the day page is written (a second sleep
-  the same day appends).
-- **Surface**: a `memory.dream` row in `:tasks` at the sim time the pass ends; a
-  `memory.consolidated` journal event (agent, window, run id, pages and notes
-  changed, new pages, `interrupted`).
-- **Waking**: a `WAKE`/`STEER` during sleep aborts the pass (nothing applied,
-  watermark kept). A deadline that arrives while the pass runs is held by
-  Perception, bounded, until it settles.
-- **Cost**: about 10k input and 1.5k output tokens per character per night.
+  A `view` replaces the old one whole, so a page they were not shown tonight is
+  shown first and nothing changes (`reflect-unread`). The run gets more calls
+  and time once (`roomForSleep`).
+
+- **A name nothing answers to** (`knownOrNew`, for `remember` too, at any time):
+  when `about` resolves to neither a page of theirs nor a world page, nothing is
+  written; the reply lists the closest pages they have, from the same retrieval
+  `recall` uses (`similarTo`). They say it again about one of those, or with
+  `new: true`. Without this a friend called by first name got a second page.
+- **The night ends when the run does** (`runEnded`, from Perception's lifecycle
+  end), whatever the model did or didn't say. Code then tidies up: plans for
+  days gone by leave `MEMORY.md`; notes past `memory.notesPerPage` (default 30,
+  except `always known` ones) leave pages whose view was rewritten tonight and
+  that bedtime showed whole (`whole`): a view written after seeing only the old
+  view (`reflect-unread`) has not taken the notes in, so they stay; the run is
+  kept; the night is told. A night that wrote nothing and moved no state leaves
+  no trace and the day waits for the next sleep. One that only moved states is
+  kept as a run with no files, so it is their last night and a nap later does
+  not review the same day again. Writes after the run are no part of it.
+- **Kept**: every write during a night goes through `sleep.write`, which keeps
+  what each file was before. The `"memory"` keyed store holds the last 7 runs
+  (pre- and post-images), newest first; the newest's time is "last night".
+  `memory_restore` puts one back. State changes are not undone. When the store
+  refuses the run as the night ends (a database under load), the run is held in
+  memory as it stood, still counts as last night, and is kept at the next read
+  of the runs (`settle`); the night is told all the same. One is held per
+  character, and a restart loses it.
+- **Surface**: a row in `:tasks` (`kazusa-results#night-dreamt` or
+  `#night-slept`: `You dreamt: …` or `You slept on it.`) and a
+  `memory.consolidated` journal event (window, run id, pages, new pages, notes,
+  dream).
+- **By hand** (`memory_consolidate`, `POST /kazusa/memory/consolidate`): the
+  same words arrive as a stimulus in a turn of their own. The night waits
+  (`waiting`) until a `reflect`, or a write in a run that began after it was
+  asked for (`offered`), so a run already under way neither ends it nor begins
+  it with a note of its own; if no turn can be handed over, no night is left
+  behind.
+- **Lost on restart**: a night lives in memory. A Gateway stopped mid-run keeps
+  what was written but no run and no event, and the next sleep covers the same
+  days again.
 
 ### 7.6 Read models
 

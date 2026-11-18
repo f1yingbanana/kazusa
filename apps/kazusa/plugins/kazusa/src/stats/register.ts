@@ -95,12 +95,18 @@ export interface StatsService {
       agentId: string,
       people: readonly string[],
     ) => Promise<string | undefined>;
+    /** What moved, as they read it, and the names given that didn't. */
     readonly apply: (
       agentId: string,
       people: readonly string[],
       answer: unknown,
-    ) => Promise<void>;
+    ) => Promise<StatReview>;
   };
+}
+
+export interface StatReview {
+  readonly moved: readonly string[];
+  readonly left: readonly string[];
 }
 
 /*
@@ -454,17 +460,41 @@ export function createStats(deps: {
         );
       },
       async apply(agentId, people, answer) {
+        // Worked out where it is written, from where each value stands then.
+        let changes: readonly StatChange[] = [];
         await apply(
           agentId,
           (record) =>
-            reviewedChanges(
+            (changes = reviewedChanges(
               statsFor(agentId),
               record,
               answer,
               towardThem(agentId, people),
-            ),
+            )),
           "reviewed",
         );
+        const given = (values: unknown): string[] =>
+          values && typeof values === "object" ? Object.keys(values) : [];
+        const { own, toward } = (answer ?? {}) as {
+          own?: unknown;
+          toward?: Record<string, unknown>;
+        };
+        const names = new Set([
+          ...given(own),
+          ...Object.values(toward ?? {}).flatMap(given),
+        ]);
+        const moved = new Set(changes.map(({ stat }) => stat.name));
+        return {
+          moved: [
+            ...new Map(
+              changes.map(({ stat, value }) => [
+                stat.name,
+                `${stat.name}: ${statStanding(stat, value)}`,
+              ]),
+            ).values(),
+          ],
+          left: [...names].filter((name) => !moved.has(name)),
+        };
       },
     },
   };

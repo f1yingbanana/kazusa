@@ -1659,14 +1659,12 @@ export const MemoryConsolidatedEventSchema = z.object({
   ...JournalBase,
   kind: z.literal("memory.consolidated"),
   payload: z.object({
-    /** Empty when `interrupted`: nothing was applied. */
     runId: z.string(),
     from: z.number(),
     to: z.number(),
     pages: z.array(z.string()),
     newPages: z.array(z.string()),
     notes: z.number(),
-    interrupted: z.boolean(),
     dream: z.string().optional(),
   }),
 });
