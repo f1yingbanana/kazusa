@@ -146,23 +146,37 @@ export function hostError(): Response {
   return accessError(403, "Open Kazusa at localhost.");
 }
 
-/** Desktop host operations are unavailable on a public or cloud deployment. */
+/**
+ * Setting up and updating the Kazusa on this machine: its local owner, or the
+ * owner signed in to its public frontend (`npm run public`). Never a cloud or
+ * read-only demo deployment.
+ */
+export function requireMaintainer(request: Request): Response | undefined {
+  return requireOwner(request, true);
+}
+
+/** Showing a file in Finder or Explorer: only someone at this machine. */
 export function requireLocalOwner(request: Request): Response | undefined {
+  return requireOwner(request, false);
+}
+
+function requireOwner(
+  request: Request,
+  signedIn: boolean,
+): Response | undefined {
+  const denied = accessError(
+    403,
+    signedIn
+      ? "This action is only available to the owner."
+      : "This action is only available to the local owner.",
+  );
   try {
     const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
-    if (mode !== "local") {
-      return accessError(
-        403,
-        "This action is only available to the local owner.",
-      );
-    }
     const viewer = resolveViewer(request);
-    if (viewer.role !== "owner") {
-      return accessError(
-        403,
-        "This action is only available to the local owner.",
-      );
-    }
+    const allowed =
+      mode === "local" ||
+      (signedIn && mode === "public" && viewer.signIn === true);
+    if (!allowed || viewer.role !== "owner") return denied;
     if (!isAllowedHost(hostOf(request))) return hostError();
   } catch (err) {
     if (err instanceof AuthError) {

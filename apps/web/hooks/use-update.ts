@@ -35,7 +35,7 @@ export type UpdatePhase =
  * when the frontend is back.
  */
 export function useUpdate() {
-  const { isOwner, isLocal } = useAccess();
+  const { canMaintain } = useAccess();
   const [phase, setPhase] = useState<UpdatePhase | null>(null);
   const [checking, setChecking] = useState(false);
   // The boot of a frontend another page's update will restart.
@@ -44,7 +44,7 @@ export function useUpdate() {
   // check (`useAnnouncedRelease`) only on request. While another page
   // downloads, the route answers from its cache. Desktop local owner only.
   const resource = useSWR<UpdateStatus, Error>(
-    isOwner && isLocal ? UPDATE_KEY : null,
+    canMaintain ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,
@@ -128,9 +128,9 @@ export function useUpdate() {
  * its answer with Settings → Updates.
  */
 export function useAnnouncedRelease(): UpdateTarget | null {
-  const { isOwner, isLocal } = useAccess();
+  const { canMaintain } = useAccess();
   const { data } = useSWR<UpdateStatus, Error>(
-    isOwner && isLocal ? UPDATE_KEY : null,
+    canMaintain ? UPDATE_KEY : null,
     () => fetchUpdateStatus(),
     {
       revalidateOnFocus: false,

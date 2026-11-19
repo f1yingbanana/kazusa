@@ -1,6 +1,6 @@
 import { createLoader, parseAsString } from "nuqs/server";
 import { z } from "zod";
-import { requireLocalOwner } from "../../lib/auth/access";
+import { requireMaintainer } from "../../lib/auth/access";
 import { runUpdater } from "../../lib/update/run";
 
 // These flags are presence-based: ?boot and ?boot=0 both count.
@@ -19,11 +19,11 @@ let checked: { at: number; status: Record<string, unknown> } | undefined;
 let staging = false;
 
 /**
- * Local only, like `/setup`: it reports and updates the copy this frontend runs
- * from. `?boot=1` answers at once, for a page waiting out the restart.
+ * The owner only, like `/setup`: it reports and updates the copy this frontend
+ * runs from. `?boot=1` answers at once, for a page waiting out the restart.
  */
 export async function GET(request: Request): Promise<Response> {
-  const denied = requireLocalOwner(request);
+  const denied = requireMaintainer(request);
   if (denied) return denied;
   const params = loadUpdateParams(request);
   if (params.boot !== null) return Response.json({ boot: BOOT });
@@ -42,7 +42,7 @@ export async function GET(request: Request): Promise<Response> {
 
 /** Downloads the update; `scripts/dev.mjs` applies it as it restarts Kazusa. */
 export async function POST(request: Request): Promise<Response> {
-  const denied = requireLocalOwner(request);
+  const denied = requireMaintainer(request);
   if (denied) return denied;
   const parsed = StageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST as PROXY_POST } from "../../app/kazusa/[...path]/route";
 import { DELETE, POST } from "../../app/owner/route";
-import { requireLocalOwner, resolveViewer } from "./access";
+import { requireLocalOwner, requireMaintainer, resolveViewer } from "./access";
 import { MAX_AGE_S, ownerCookie } from "./owner-session";
 
 const TOKEN = "a".repeat(64);
@@ -144,12 +144,18 @@ describe("owner sign-in on a public frontend", () => {
     expect(await access.json()).toMatchObject({ role: "owner", signIn: true });
   });
 
-  it("still keeps desktop-only operations off the internet", async () => {
+  it("lets the signed-in owner set up and update, but not reveal files", async () => {
     const good = sessionOf(await signIn(TOKEN));
-    const request = new Request(`${ORIGIN}/setup`, {
-      method: "POST",
-      headers: { cookie: good, Origin: ORIGIN, Host: "kazusa.example" },
-    });
-    expect(requireLocalOwner(request)?.status).toBe(403);
+    const request = (cookie: string) =>
+      new Request(`${ORIGIN}/setup`, {
+        method: "POST",
+        headers: { cookie, Origin: ORIGIN },
+      });
+    expect(requireMaintainer(request(""))?.status).toBe(403);
+    expect(requireMaintainer(request(good))).toBeUndefined();
+    expect(requireLocalOwner(request(good))?.status).toBe(403);
+    // A read-only demo or a cloud wrapper never maintains this machine.
+    vi.stubEnv("KAZUSA_OWNER_SIGN_IN", undefined);
+    expect(requireMaintainer(request(good))?.status).toBe(403);
   });
 });

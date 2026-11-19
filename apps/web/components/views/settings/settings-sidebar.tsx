@@ -12,12 +12,12 @@ import {
 import { cn } from "@/lib/utils";
 
 function useAllowedCategories() {
-  const { hasPermission, isLocal } = useAccess();
+  const { hasPermission, canMaintain } = useAccess();
   return SETTINGS_CATEGORIES.filter(
     (category) =>
       (!category.requiresPermission ||
         hasPermission(category.requiresPermission)) &&
-      (!category.requiresLocal || isLocal),
+      (!category.requiresMaintain || canMaintain),
   );
 }
 

@@ -10,8 +10,9 @@
  *
  * `--public` (`npm run public`) serves a built frontend for a tunnel, such as
  * Cloudflare's, to put on the internet. Everyone there can watch; whoever signs
- * in with the Gateway token in Settings > Connection is the owner. The Gateway
- * itself stays on loopback and only ever hears from the frontend.
+ * in with the Gateway token is the owner, who can also set up and update this
+ * Kazusa from there. The Gateway itself stays on loopback and only ever hears
+ * from the frontend.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -257,17 +258,12 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => stop(0));
 
-if (PUBLIC) {
-  // A public frontend has no setup guide; the world has to be made already.
-  if (!existsSync(CONFIG) || !isClone(WORLD))
-    fail("Make a world first: run `npm run dev` and finish setting it up.");
-  // Never the dev server on the internet: it serves source and dev endpoints.
-  if (!PACKAGED)
-    execFileSync(process.execPath, [NEXT, "build"], {
-      cwd: path.join(ROOT, "apps/web"),
-      stdio: "inherit",
-    });
-}
+// Never the dev server on the internet: it serves source and dev endpoints.
+if (PUBLIC && !PACKAGED)
+  execFileSync(process.execPath, [NEXT, "build"], {
+    cwd: path.join(ROOT, "apps/web"),
+    stdio: "inherit",
+  });
 
 start(
   "web",
@@ -301,12 +297,17 @@ if (!stopping) {
   console.log(`\nKazusa is running. Open ${url}\n`);
   if (PUBLIC)
     console.log(
-      `For your phone, tunnel it: cloudflared tunnel --url ${url}\nSign in there under Settings > Connection with OPENCLAW_GATEWAY_TOKEN from ${path.relative(ROOT, ENV_FILE)}.\n`,
+      `For your phone, tunnel it: cloudflared tunnel --url ${url}\nSign in there with OPENCLAW_GATEWAY_TOKEN from ${path.relative(ROOT, ENV_FILE)}: setup asks for it first, then Settings > Connection.\n`,
     );
   // Someone who double-clicked an icon has no terminal habit to fall back on.
   // After an update, the page that asked for it reloads itself.
   const opener = BROWSER_OPENERS[process.platform];
-  if (opener && !process.env.KAZUSA_RESTARTED && (firstRun || PACKAGED))
+  if (
+    opener &&
+    !process.env.KAZUSA_RESTARTED &&
+    (firstRun || PACKAGED) &&
+    !PUBLIC
+  )
     spawn(opener[0], [...opener.slice(1), url], { stdio: "ignore" });
 }
 

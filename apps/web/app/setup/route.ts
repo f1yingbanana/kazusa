@@ -1,4 +1,4 @@
-import { requireLocalOwner } from "../../lib/auth/access";
+import { requireMaintainer } from "../../lib/auth/access";
 import { setup, SetupRequestSchema } from "../../lib/setup/setup";
 
 /** Costs nothing. Undefined means OpenRouter couldn't be reached to say. */
@@ -14,9 +14,9 @@ async function keyWorks(key: string): Promise<boolean | undefined> {
   }
 }
 
-/** Local only: `scripts/dev.mjs` binds the frontend to loopback. */
+/** The owner, at this machine or signed in to its public frontend. */
 export async function POST(request: Request): Promise<Response> {
-  const denied = requireLocalOwner(request);
+  const denied = requireMaintainer(request);
   if (denied) return denied;
   const parsed = SetupRequestSchema.safeParse(await request.json());
   if (!parsed.success)

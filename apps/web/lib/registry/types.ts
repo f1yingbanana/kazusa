@@ -70,7 +70,8 @@ export interface SettingsCategory {
   readonly order: number;
   readonly component: ComponentType;
   readonly requiresPermission?: Permission;
-  readonly requiresLocal?: boolean;
+  /** Only for whoever may set up and update this machine (`canMaintain`). */
+  readonly requiresMaintain?: boolean;
 }
 
 /** Something of the world right now, beside the clock in the top bar. */
@@ -88,7 +89,8 @@ export interface StatusItem {
   readonly requires: readonly Domain[];
   readonly component: ComponentType;
   readonly requiresPermission?: Permission;
-  readonly requiresLocal?: boolean;
+  /** Only for whoever may set up and update this machine (`canMaintain`). */
+  readonly requiresMaintain?: boolean;
 }
 
 export interface ThoughtLine {
