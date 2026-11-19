@@ -9,6 +9,7 @@ import {
   type Access,
 } from "@kazusa/client";
 import { isSameOrigin } from "../same-origin";
+import { hasOwnerSession, ownerSignInEnabled } from "./owner-session";
 
 export class AuthError extends Error {
   constructor(
@@ -38,7 +39,8 @@ function getHeader(
  * Server-only deployment choice.
  *
  * - In local mode, zero-login owner with local: true.
- * - In public mode, every browser is a visitor with local: false.
+ * - In public mode, every browser is a visitor with local: false, except one
+ *   holding a signed owner cookie when owner sign-in is on (`owner-session`).
  * - In trusted-proxy mode, requires private wrapper authentication with
  *   timing-safe secret check, rejecting forged or duplicate identity headers.
  */
@@ -48,7 +50,13 @@ export function resolveViewer(request?: Request | Headers): Access {
     return accessForRole("owner", { local: true });
   }
   if (mode === "public") {
-    return accessForRole("visitor", { local: false });
+    if (!ownerSignInEnabled())
+      return accessForRole("visitor", { local: false });
+    const owner = hasOwnerSession(getHeader(request, "cookie"));
+    return {
+      ...accessForRole(owner ? "owner" : "visitor", { local: false }),
+      signIn: true,
+    };
   }
   if (mode === "trusted-proxy") {
     const expectedSecret = process.env.KAZUSA_TRUSTED_PROXY_SECRET?.trim();

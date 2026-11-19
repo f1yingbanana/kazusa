@@ -11,6 +11,8 @@ export const AccessSchema = z.object({
   role: RoleSchema,
   permissions: z.array(PermissionSchema),
   local: z.boolean().optional(),
+  /** This server lets its owner sign in from elsewhere (`--public`). */
+  signIn: z.boolean().optional(),
 });
 export type Access = z.infer<typeof AccessSchema>;
 

@@ -122,6 +122,21 @@ role after authenticating the private service token. Set the Gateway process to
 `public` as well when all its Kazusa HTTP callers must be read-only (even a
 bearer-token caller asserting owner).
 
+`npm run public` (`scripts/dev.mjs --public`) is for reaching your own world
+from a phone through a tunnel such as
+`cloudflared tunnel --url http://localhost:3000`. It builds the frontend and
+serves it with `next start` (never the dev server), runs Next in `public` mode
+with `KAZUSA_OWNER_SIGN_IN=1`, and keeps the Gateway in `local` mode on loopback
+so it honors the owner role the frontend asserts. Everyone is a visitor until
+they paste `OPENCLAW_GATEWAY_TOKEN` (from `apps/kazusa/world/.state/.env`) under
+Settings > Connection. `POST /owner` checks it in constant time and sets
+`kazusa_owner`: the issue time signed with HMAC-SHA256 keyed by the token,
+`HttpOnly`, `SameSite=Strict`, `Secure` behind HTTPS, valid 30 days. The token
+itself never reaches the cookie. A new token signs every device out;
+`DELETE /owner` signs out one browser. Desktop operations (`requireLocalOwner`:
+setup, updates, reveal) stay refused to a signed-in owner, because the mode is
+not `local`.
+
 Set `KAZUSA_AUTH_MODE=trusted-proxy` on hosted instances behind an upstream
 wrapper (such as OpenRP Cloud). In this mode:
 
