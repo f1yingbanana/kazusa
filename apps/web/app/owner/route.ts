@@ -36,12 +36,36 @@ function signedIn(request: Request, setCookie: string): Response {
   });
 }
 
+/**
+ * The body as text, or undefined past `MAX_BODY` bytes. Anyone on the internet
+ * can post here, so it stops reading there rather than holding all of it.
+ */
+async function readCapped(request: Request): Promise<string | undefined> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY)
+    return undefined;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /** Signs this browser in as the owner, given the Gateway token. */
 export async function POST(request: Request): Promise<Response> {
   const denied = refused(request);
   if (denied) return denied;
-  const text = await request.text();
-  if (text.length > MAX_BODY) return accessError(413, "That's too long.");
+  const text = await readCapped(request);
+  if (text === undefined) return accessError(413, "That's too long.");
   let token: unknown;
   try {
     token = (JSON.parse(text) as { token?: unknown }).token;

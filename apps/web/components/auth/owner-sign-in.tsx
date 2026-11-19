@@ -65,14 +65,18 @@ export function OwnerSignInForm() {
           value={token}
           disabled={busy}
           aria-invalid={error ? true : undefined}
-          onChange={(event) => setToken(event.target.value)}
+          aria-describedby={error ? "owner-token-error" : undefined}
+          onChange={(event) => {
+            setToken(event.target.value);
+            setError(undefined);
+          }}
           className="h-8 min-w-0 flex-1 sm:max-w-80"
         />
         <Button size="sm" type="submit" disabled={busy || !token.trim()}>
           Sign in
         </Button>
       </form>
-      {error ? <FieldError>{error}</FieldError> : null}
+      {error ? <FieldError id="owner-token-error">{error}</FieldError> : null}
     </div>
   );
 }

@@ -75,6 +75,35 @@ describe("owner sign-in on a public frontend", () => {
     expect(crossSite.headers.get("set-cookie")).toBeNull();
   });
 
+  it("stops reading a sign-in body once it is too long", async () => {
+    // Chunked, with no Content-Length, and endless.
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(512).fill(32));
+      },
+    });
+    const response = await POST(
+      new Request(`${ORIGIN}/owner`, {
+        method: "POST",
+        headers: { Origin: ORIGIN },
+        body,
+        duplex: "half",
+      } as RequestInit),
+    );
+    expect(response.status).toBe(413);
+    expect(pulls).toBeLessThan(10);
+    const declared = await POST(
+      new Request(`${ORIGIN}/owner`, {
+        method: "POST",
+        headers: { Origin: ORIGIN, "Content-Length": "999999" },
+        body: "{}",
+      }),
+    );
+    expect(declared.status).toBe(413);
+  });
+
   it("trusts no forged, stale, doubled or old-token session", async () => {
     const good = sessionOf(await signIn(TOKEN));
     const [name, value] = good.split("=");
