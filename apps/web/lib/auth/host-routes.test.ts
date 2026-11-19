@@ -3,6 +3,7 @@ import { POST as setupPost } from "../../app/setup/route";
 import { POST as worldPost } from "../../app/setup/world/route";
 import { POST as revealPost } from "../../app/reveal/route";
 import { GET as updateGet, POST as updatePost } from "../../app/update/route";
+import { ownerCookie } from "./owner-session";
 
 const effects = vi.hoisted(() => ({
   apply: vi.fn(),
@@ -102,5 +103,53 @@ describe("desktop-only routes", () => {
     }
     for (const effect of Object.values(effects))
       expect(effect).not.toHaveBeenCalled();
+  });
+
+  it("lets the owner signed in to `npm run public` set up and update, never reveal", async () => {
+    vi.stubEnv("KAZUSA_OWNER_SIGN_IN", "1");
+    vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", "t".repeat(64));
+    const origin = "https://kazusa.example";
+    const call = (
+      handler: (request: Request) => Promise<Response> | Response,
+      path: string,
+      method: string,
+      headers: Record<string, string>,
+    ) =>
+      handler(
+        new Request(`${origin}/${path}`, {
+          method,
+          headers: { Origin: origin, ...headers },
+          ...(method === "POST" ? { body: "{}" } : {}),
+        }),
+      );
+    // Not signed in yet: nothing runs, whatever the request claims.
+    for (const { path, method, handler } of ROUTES)
+      expect(
+        (await call(handler, path, method, { "x-kazusa-role": "owner" }))
+          .status,
+      ).toBe(403);
+    for (const effect of Object.values(effects))
+      expect(effect).not.toHaveBeenCalled();
+
+    const cookie = ownerCookie(new Request(origin)).split(";")[0];
+    expect((await call(setupPost, "setup", "POST", { cookie })).status).toBe(
+      200,
+    );
+    expect(effects.apply).toHaveBeenCalledWith({});
+    const boot = await call(updateGet, "update?boot=1", "GET", { cookie });
+    expect(boot.status).toBe(200);
+    expect((await call(revealPost, "reveal", "POST", { cookie })).status).toBe(
+      403,
+    );
+    expect(effects.reveal).not.toHaveBeenCalled();
+    const crossSite = await setupPost(
+      new Request(`${origin}/setup`, {
+        method: "POST",
+        headers: { Origin: "https://evil.example", cookie },
+        body: "{}",
+      }),
+    );
+    expect(crossSite.status).toBe(403);
+    expect(effects.apply).toHaveBeenCalledTimes(1);
   });
 });

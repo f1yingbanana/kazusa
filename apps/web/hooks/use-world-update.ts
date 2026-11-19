@@ -34,7 +34,7 @@ export function useWorldUpdate(): {
     ? characters.find(({ id }) => id === update.systemAgent)
     : characters.find(({ isSystemAgent }) => isSystemAgent);
   const admin = character?.name ?? "your admin";
-  const { isOwner, isLocal } = useAccess();
+  const { canMaintain } = useAccess();
   const { mutate } = useSWRConfig();
   const [, setParams] = useQueryStates({
     view: parseAsString,
@@ -63,7 +63,7 @@ export function useWorldUpdate(): {
     admin,
     known: Boolean(character),
     // Whoever may change this machine, as for Kazusa's own updates.
-    canAsk: isOwner && isLocal,
+    canAsk: canMaintain,
     asking,
     ask,
   };
@@ -169,9 +169,9 @@ export function recheckWorld({
  * (the local owner): nobody else is asked or told.
  */
 export function useWorldCheck() {
-  const { isOwner, isLocal } = useAccess();
+  const { canMaintain } = useAccess();
   const { world, worldResource } = useSources();
-  const enabled = isOwner && isLocal && Boolean(world?.package);
+  const enabled = canMaintain && Boolean(world?.package);
   const resource = useSWR<WorldCheck, Error>(
     enabled ? WORLD_CHECK_KEY : null,
     () => fetchWorldCheck(false),

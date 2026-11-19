@@ -1,4 +1,4 @@
-import { requireLocalOwner } from "../../../lib/auth/access";
+import { requireMaintainer } from "../../../lib/auth/access";
 import {
   runScript,
   tracking,
@@ -27,11 +27,11 @@ function state() {
 /**
  * Whether the creator released something newer than the world stands on
  * (`scripts/world.mjs check`), nothing downloaded, and how a download is going.
- * Local only, like `/update`: only someone who may change this machine is
+ * The owner only, like `/update`: only someone who may change this machine is
  * asked. `?fresh=1` checks again at once.
  */
 export async function GET(request: Request): Promise<Response> {
-  const denied = requireLocalOwner(request);
+  const denied = requireMaintainer(request);
   if (denied) return denied;
   const fresh = new URL(request.url).searchParams.has("fresh");
   if (!checked || fresh || Date.now() - checked.at > CHECK_TTL_MS) {
@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
  * from git's own progress, and how it ended.
  */
 export function POST(request: Request): Response {
-  const denied = requireLocalOwner(request);
+  const denied = requireMaintainer(request);
   if (denied) return denied;
   if (downloading)
     return Response.json(

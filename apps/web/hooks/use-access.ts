@@ -38,6 +38,8 @@ export function computeAccessState(
     : false;
   const isOwner = hasKnownAccess && safeAccess.role === "owner";
   const isLocal = hasKnownAccess ? Boolean(safeAccess.local) : false;
+  // Sets up and updates this machine: at it, or signed in to `npm run public`.
+  const canMaintain = isOwner && (isLocal || Boolean(safeAccess.signIn));
   // Visitors cannot play, so they are read-only. Collaborators can play, so they are not view-only.
   const isReadOnly = hasKnownAccess ? !canPlay : true;
 
@@ -59,6 +61,7 @@ export function computeAccessState(
     isReadOnly,
     isOwner,
     isLocal,
+    canMaintain,
     hasPermission: hasPerm,
   };
 }
@@ -74,6 +77,8 @@ export interface UseAccessResult {
   readonly isReadOnly: boolean;
   readonly isOwner: boolean;
   readonly isLocal: boolean;
+  /** May set up and update this machine's Kazusa and world. */
+  readonly canMaintain: boolean;
   readonly hasPermission: (permission: Permission) => boolean;
   readonly mutate: () => Promise<Access | undefined>;
 }

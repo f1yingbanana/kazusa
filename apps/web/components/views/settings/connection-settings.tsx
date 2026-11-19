@@ -1,6 +1,12 @@
 "use client";
 
+import {
+  OwnerSignInForm,
+  OwnerSignOutButton,
+  TOKEN_HINT,
+} from "@/components/auth/owner-sign-in";
 import { Button } from "@/components/ui/button";
+import { useAccess } from "@/hooks/use-access";
 import { useRealtimeStore } from "@/lib/live/realtime-state";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
@@ -47,6 +53,27 @@ function GatewayStatus() {
   );
 }
 
+/** On a public server (`npm run public`), the owner signs in here. */
+function OwnerSignIn() {
+  const { access, isOwner } = useAccess();
+  if (!access.signIn) return null;
+  return isOwner ? (
+    <SettingsSection
+      title="Owner"
+      description="This browser is signed in as the owner."
+    >
+      <OwnerSignOutButton />
+    </SettingsSection>
+  ) : (
+    <SettingsSection
+      title="Owner"
+      description={`You're viewing this world. To play and change it, sign in with its Gateway token, ${TOKEN_HINT}.`}
+    >
+      <OwnerSignInForm />
+    </SettingsSection>
+  );
+}
+
 /**
  * The Gateway's health. The browser only ever talks to this app's proxy, which
  * holds the Gateway credential on the server.
@@ -60,6 +87,7 @@ export function ConnectionSettings() {
       >
         <GatewayStatus />
       </SettingsSection>
+      <OwnerSignIn />
     </div>
   );
 }

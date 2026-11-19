@@ -7,6 +7,12 @@
  * website the player visits can POST to it. Nobody has to see the token: it is
  * made once, kept with the world's keys, and handed to the frontend's proxy.
  * The frontend binds to loopback because that proxy adds the token.
+ *
+ * `--public` (`npm run public`) serves a built frontend for a tunnel, such as
+ * Cloudflare's, to put on the internet. Everyone there can watch; whoever signs
+ * in with the Gateway token is the owner, who can also set up and update this
+ * Kazusa from there. The Gateway itself stays on loopback and only ever hears
+ * from the frontend.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -43,6 +49,7 @@ const POLL_MS = 500;
 
 // The installer ships a built frontend and its own Node (`scripts/package.mjs`).
 const PACKAGED = process.argv.includes("--packaged");
+const PUBLIC = process.argv.includes("--public");
 
 // Run through Node, because `.bin` holds `.cmd` shims that Windows can't spawn.
 const NEXT = path.join(ROOT, "node_modules/next/dist/bin/next");
@@ -251,12 +258,19 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => stop(0));
 
+// Never the dev server on the internet: it serves source and dev endpoints.
+if (PUBLIC && !PACKAGED)
+  execFileSync(process.execPath, [NEXT, "build"], {
+    cwd: path.join(ROOT, "apps/web"),
+    stdio: "inherit",
+  });
+
 start(
   "web",
   process.execPath,
   [
     NEXT,
-    PACKAGED ? "start" : "dev",
+    PACKAGED || PUBLIC ? "start" : "dev",
     "--hostname",
     "127.0.0.1",
     "--port",
@@ -270,6 +284,9 @@ start(
       OPENCLAW_GATEWAY_TOKEN: token,
       // Tells the updater someone can restart Kazusa once it's staged.
       KAZUSA_SUPERVISED: "1",
+      ...(PUBLIC
+        ? { KAZUSA_AUTH_MODE: "public", KAZUSA_OWNER_SIGN_IN: "1" }
+        : {}),
     },
   },
 );
@@ -278,10 +295,19 @@ while (!stopping && !(await isListening(WEB_PORT))) await sleep(POLL_MS);
 if (!stopping) {
   const url = `http://localhost:${WEB_PORT}`;
   console.log(`\nKazusa is running. Open ${url}\n`);
+  if (PUBLIC)
+    console.log(
+      `For your phone, tunnel it: cloudflared tunnel --url ${url}\nSign in there with OPENCLAW_GATEWAY_TOKEN from ${path.relative(ROOT, ENV_FILE)}: setup asks for it first, then Settings > Connection.\n`,
+    );
   // Someone who double-clicked an icon has no terminal habit to fall back on.
   // After an update, the page that asked for it reloads itself.
   const opener = BROWSER_OPENERS[process.platform];
-  if (opener && !process.env.KAZUSA_RESTARTED && (firstRun || PACKAGED))
+  if (
+    opener &&
+    !process.env.KAZUSA_RESTARTED &&
+    (firstRun || PACKAGED) &&
+    !PUBLIC
+  )
     spawn(opener[0], [...opener.slice(1), url], { stdio: "ignore" });
 }
 
@@ -336,6 +362,9 @@ if (!stopping) {
     stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...withBundledNode(process.env),
+      // The frontend decides who is the owner and says so to the Gateway, which
+      // a public Gateway would overrule by making everyone a visitor.
+      ...(PUBLIC ? { KAZUSA_AUTH_MODE: "local" } : {}),
       OPENCLAW_CONFIG_PATH: "./openclaw.json",
       OPENCLAW_STATE_DIR: "./.state",
       OPENCLAW_GATEWAY_HOST_LIFELINE: "stdin",

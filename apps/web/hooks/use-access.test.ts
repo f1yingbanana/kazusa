@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AccessSchema, accessForRole } from "@kazusa/client";
+import { AccessSchema, accessForRole, type Access } from "@kazusa/client";
 import { computeAccessState } from "./use-access";
 
 describe("computeAccessState", () => {
@@ -106,6 +106,22 @@ describe("computeAccessState", () => {
 
     const cloudVisitor = accessForRole("visitor", { local: false });
     expect(computeAccessState(cloudVisitor, false, undefined).isLocal).toBe(
+      false,
+    );
+  });
+
+  it("lets the local owner and a signed-in public owner maintain, nobody else", () => {
+    const maintain = (access: Access) =>
+      computeAccessState(access, false, undefined).canMaintain;
+    expect(maintain(accessForRole("owner", { local: true }))).toBe(true);
+    expect(
+      maintain({ ...accessForRole("owner", { local: false }), signIn: true }),
+    ).toBe(true);
+    expect(
+      maintain({ ...accessForRole("visitor", { local: false }), signIn: true }),
+    ).toBe(false);
+    expect(maintain(accessForRole("owner", { local: false }))).toBe(false);
+    expect(computeAccessState(undefined, true, undefined).canMaintain).toBe(
       false,
     );
   });

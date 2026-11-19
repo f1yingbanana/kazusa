@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { parseAuthMode } from "@kazusa/client";
+import { OwnerGate } from "@/components/auth/owner-sign-in";
 import { SetupGuide } from "@/components/setup/setup-guide";
 import { StartOver } from "@/components/setup/start-over";
 import { Shell } from "@/components/shell/shell";
@@ -22,14 +23,18 @@ export default async function Page() {
     }
     return <p>Kazusa authentication is not configured correctly.</p>;
   }
-  // Only the desktop has a setup step. A hosted frontend learns whether its
-  // world is up from its Gateway, so it never touches local setup machinery.
+  // Only this machine's Kazusa has a setup step: the desktop, or its public
+  // frontend (`npm run public`). A hosted frontend learns whether its world is
+  // up from its Gateway, so it never touches local setup machinery.
   const mode = parseAuthMode(process.env.KAZUSA_AUTH_MODE);
-  if (mode === "local" && viewer.role === "owner") {
-    // Kazusa was updated past a world an older version made.
+  const ownMachine =
+    mode === "local" || (mode === "public" && viewer.signIn === true);
+  // Kazusa was updated past a world an older version made, or there is none.
+  if (ownMachine && (setup.outdated() || !setup.configured())) {
+    // Setting up writes keys and downloads worlds: the owner signs in first.
+    if (viewer.role !== "owner") return <OwnerGate />;
     if (setup.outdated()) return <StartOver />;
-    if (!setup.configured())
-      return <SetupGuide status={await setup.status()} />;
+    return <SetupGuide status={await setup.status()} />;
   }
   return (
     <Suspense>

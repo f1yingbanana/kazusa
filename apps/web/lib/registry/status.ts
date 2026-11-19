@@ -20,7 +20,7 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     order: -30,
     requires: [],
     requiresPermission: "manage",
-    requiresLocal: true,
+    requiresMaintain: true,
     component: UpdateAvailableItem,
   },
   {
