@@ -19,6 +19,7 @@ import {
   type Stimulus,
 } from "./types.ts";
 import {
+  isDatabaseRefusal,
   Perception,
   type PerceptionDeps,
   type PerceptionDelivery,
@@ -28,6 +29,11 @@ import { BrainSlots } from "./brain-slots.ts";
 import type { DecisionStore } from "./decision-database.ts";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
+
+/** What OpenClaw throws for a character whose agent database it hasn't admitted. */
+class AgentDatabaseAdmissionError extends Error {
+  override name = "AgentDatabaseAdmissionError";
+}
 
 function stimulus(
   id: string,
@@ -1247,6 +1253,120 @@ describe("Brain handoff custody", () => {
     const h = await leftover(false);
     await vi.waitFor(() => expect(h.deliver).toHaveBeenCalledTimes(2));
     expect(h.deliver.mock.calls[1][0].ids).toEqual(["a"]);
+  });
+
+  // Live (145 characters, after an unclean stop): OpenClaw prepares agent
+  // databases for minutes after start and refuses them meanwhile. Every
+  // character whose turn was refused stayed stopped for the whole boot, also
+  // once their database was open.
+  describe("while OpenClaw refuses a character's database", () => {
+    const refusal = () =>
+      new AgentDatabaseAdmissionError(
+        "Agent alice (/agents/alice/agent/openclaw-agent.sqlite): Agent alice has not completed startup inspection and preparation.",
+      );
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps the input waiting and hands it over once the database opens", async () => {
+      vi.useFakeTimers();
+      const h = setupWake();
+      try {
+        h.deliver.mockRejectedValueOnce(refusal());
+        await h.router.receive("alice", stimulus("a"));
+        expect(h.snapshot().stopped).toBeFalsy();
+        expect(h.snapshot().deliveries).toBeUndefined();
+        expect(h.snapshot().pending).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(14_999);
+        expect(h.deliver).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(h.deliver).toHaveBeenCalledTimes(2);
+        expect(h.deliveries.map((delivery) => delivery.ids)).toEqual([["a"]]);
+      } finally {
+        h.router.dispose();
+      }
+    });
+
+    it("tries less often while it stays refused, and stops on dispose", async () => {
+      vi.useFakeTimers();
+      const h = setupWake();
+      try {
+        h.deliver.mockRejectedValue(refusal());
+        await h.router.receive("alice", stimulus("a"));
+        // 15 s, then 30 s, then each minute.
+        await vi.advanceTimersByTimeAsync(15_000);
+        expect(h.deliver).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(h.deliver).toHaveBeenCalledTimes(3);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(h.deliver).toHaveBeenCalledTimes(4);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(h.deliver).toHaveBeenCalledTimes(5);
+        h.router.dispose();
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(h.deliver).toHaveBeenCalledTimes(5);
+        expect(h.snapshot().pending).toHaveLength(1);
+      } finally {
+        h.router.dispose();
+      }
+    });
+
+    it("reconciles a handoff left from before the restart once the transcript can be read", async () => {
+      vi.useFakeTimers();
+      const h = setupWake();
+      try {
+        h.deliver.mockRejectedValueOnce(
+          new Error("Connection failed after possible acceptance"),
+        );
+        await expect(h.router.receive("alice", stimulus("a"))).rejects.toThrow(
+          "possible acceptance",
+        );
+        const adopted = vi
+          .fn<NonNullable<PerceptionDeps["adopted"]>>()
+          .mockRejectedValueOnce(refusal())
+          .mockResolvedValue(false);
+        const restarted = h.restart({ adopted });
+        try {
+          await restarted.recover();
+          // Not knowing whether the brain got it, they wait: no duplicate turn.
+          expect(h.snapshot().stopped).toBe(true);
+          expect(h.deliver).toHaveBeenCalledTimes(1);
+          await vi.advanceTimersByTimeAsync(15_000);
+          // The brain never got it: handed over again.
+          expect(adopted).toHaveBeenCalledTimes(2);
+          expect(h.snapshot().stopped).toBe(false);
+          expect(h.deliver).toHaveBeenCalledTimes(2);
+          expect(h.deliver.mock.calls[1][0].ids).toEqual(["a"]);
+        } finally {
+          restarted.dispose();
+        }
+      } finally {
+        h.router.dispose();
+      }
+    });
+
+    it("recovers everyone else when one character fails", async () => {
+      const h = setupWake();
+      h.states.set("alice", { pending: [stimulus("a")] });
+      h.states.set("bob", { pending: [stimulus("b", "bob")] });
+      h.deliver.mockImplementation(async (delivery, lifecycle) => {
+        if (delivery.agentId === "alice") throw new Error("boom");
+        h.deliveries.push(structuredClone(delivery));
+        await lifecycle.onAdopted();
+      });
+      await h.router.recover();
+      expect(h.deliveries.map((delivery) => delivery.agentId)).toEqual(["bob"]);
+    });
+
+    it("finds the refusal inside a wrapped error", () => {
+      expect(
+        isDatabaseRefusal(new Error("dispatch failed", { cause: refusal() })),
+      ).toBe(true);
+      expect(isDatabaseRefusal(new AggregateError([refusal()]))).toBe(true);
+      expect(isDatabaseRefusal(new Error("worker task capacity reached"))).toBe(
+        false,
+      );
+    });
   });
 
   it("tells read listeners what the brain was shown, once adopted", async () => {
