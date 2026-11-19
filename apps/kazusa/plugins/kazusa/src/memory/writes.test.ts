@@ -25,7 +25,7 @@ describe("withNote", () => {
       "# Angel 24\n\nOpen.\n\n## Notes\n\n- 2026-10-01 · seen it · sure — Old.\n",
       note,
     );
-    const page = parsePage(once, "entities/places/angel.md");
+    const page = parsePage(once, "concepts/angel.md");
     expect(page.problems).toEqual([]);
     expect(page.notes.map(({ text }) => text)).toEqual([
       "It may close.",

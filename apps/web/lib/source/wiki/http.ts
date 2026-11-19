@@ -11,7 +11,6 @@ import {
   type WikiDeletePayload,
   type WikiEditResult,
   type WikiKind,
-  type WikiRenamePayload,
   type WikiPageResponse,
   type WikiSavePayload,
   type WikiSourceResponse,
@@ -94,15 +93,4 @@ export async function deleteWikiPage(
       throw new WikiConflictError(error.message);
     throw error;
   }
-}
-
-/** Gives a World Wiki place a new id everywhere. */
-export async function renameWikiPage(
-  payload: WikiRenamePayload,
-): Promise<WikiEditResult> {
-  const data = await postJson<unknown>(
-    buildUrl("/kazusa/wiki/rename"),
-    payload,
-  );
-  return WikiEditResultSchema.parse(data);
 }

@@ -817,11 +817,11 @@ export function withBackdrop(text, set) {
 }
 
 /**
- * `place_id` → page file, for every page in
- * `<world>/shared/wiki/entities/places`.
+ * `place_id` → page file, for every place page: in `concepts/`, or a world not
+ * yet upgraded's `entities/places`.
  */
 export function placePages(world) {
-  const dir = path.join(world, "shared", "wiki", "entities", "places");
+  const wiki = path.join(world, "shared", "wiki");
   const pages = new Map();
   const walk = (at) => {
     for (const entry of readdirSync(at, { withFileTypes: true })) {
@@ -843,7 +843,11 @@ export function placePages(world) {
       }
     }
   };
-  if (existsSync(dir)) walk(dir);
+  for (const dir of [
+    path.join(wiki, "concepts"),
+    path.join(wiki, "entities", "places"),
+  ])
+    if (existsSync(dir)) walk(dir);
   return pages;
 }
 

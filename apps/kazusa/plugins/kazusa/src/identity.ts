@@ -1,22 +1,13 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import type {
   OpenClawConfig,
   OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-import YAML from "yaml";
-import { z } from "zod";
-import { AGENT_ID } from "./messaging/conversations.ts";
-
-const IDENTITY = z.object({
-  agent_id: AGENT_ID.optional(),
-  name: z.string().trim().min(1),
-});
+import { readCharacterCard, worldWikiDir } from "./characters/card.ts";
 
 /**
- * Resolve a character's display label from native identity or its own
- * workspace. Authorship always comes from the tool context; neither this label
- * nor file metadata can change which character is sending the message.
+ * Resolve a character's display label from native identity or their World Wiki
+ * page. Authorship always comes from the tool context; neither this label nor
+ * file metadata can change which character is sending the message.
  */
 export async function characterName(
   api: OpenClawPluginApi,
@@ -27,20 +18,7 @@ export async function characterName(
     .resolveAgentIdentity(config, agentId)
     ?.name?.trim();
   if (configured) return configured;
-  const workspace = api.runtime.agent.resolveAgentWorkspaceDir(config, agentId);
-  try {
-    const text = await readFile(path.join(workspace, "IDENTITY.md"), "utf8");
-    const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-    if (!frontmatter) return agentId;
-    const identity = IDENTITY.parse(YAML.parse(frontmatter[1]));
-    if (identity.agent_id && identity.agent_id !== agentId)
-      throw new Error("Character identity does not match the sending agent.");
-    return identity.name;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT")
-      return agentId;
-    throw error;
-  }
+  return readCharacterCard(worldWikiDir(api), agentId)?.page.name ?? agentId;
 }
 
 /**

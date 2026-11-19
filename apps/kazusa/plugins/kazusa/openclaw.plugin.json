@@ -201,6 +201,7 @@
           },
           "anchors": {
             "type": "object",
+            "description": "Which card fields place a character in the world. deprecated: a page's groups place characters now; read and ignored",
             "additionalProperties": {
               "type": "string",
               "enum": ["heard of", "familiar", "intimate"]

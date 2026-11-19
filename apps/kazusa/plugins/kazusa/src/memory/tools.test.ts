@@ -44,7 +44,6 @@ beforeEach(() => {
     pluginConfig: {
       memory: {
         wikiDir: path.join(root, "world"),
-        anchors: WORLDS.saltmere.anchors,
         embedding: {
           provider: "kazusa-no-key",
           model: "m",
@@ -115,11 +114,13 @@ describe("recall", () => {
 });
 
 describe("look_up", () => {
-  it("finds public pages, and records that they looked", async () => {
+  it("finds public pages, as much as everyone knows, and records that they looked", async () => {
     const text = await call("look_up", "hope-marrow", {
       topic: "Drowned Bell",
     });
-    expect(text).toContain("Fishermen swear");
+    // Everyone has only heard of it: its summary, not its opening.
+    expect(text).toContain("A legend that a bell rings");
+    expect(text).not.toContain("Fishermen swear");
     expect(vi.mocked(appendLedgerEntry).mock.calls[0][1]).toMatchObject({
       agentId: "hope-marrow",
       stream: "tasks",
@@ -152,7 +153,7 @@ describe("remember", () => {
       about: "Tobin",
       note: "He looks thin.",
     });
-    const notes = page("mara-vell", "entities/characters/tobin-vell.md");
+    const notes = page("mara-vell", "characters/tobin-vell.md");
     expect(notes).toMatch(
       /- 2026-03-10 · seen it · sure — He looks thin\.\n- 2026-03-08/,
     );
@@ -165,7 +166,7 @@ describe("remember", () => {
       source: "told by Oswin Hale",
       certainty: "suspect",
     });
-    expect(page("tobin-vell", "entities/characters/bram-stokes.md")).toContain(
+    expect(page("tobin-vell", "characters/bram-stokes.md")).toContain(
       "- 2026-03-10 · told by oswin-hale · suspect — Paid in new coin.",
     );
   });

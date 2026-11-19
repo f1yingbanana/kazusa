@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { characterFile, charactersDir } from "../wiki-layout.ts";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import { LOCATION_CONFIG } from "../location/config.ts";
@@ -17,11 +18,8 @@ const TITLE = /^# .*(?:\r?\n)*/;
 export const playerWikiDir = (api: OpenClawPluginApi): string =>
   LOCATION_CONFIG.parse(api.pluginConfig?.location ?? {}).wikiDir;
 
-const charactersDir = (wikiDir: string): string =>
-  path.join(wikiDir, "entities", "characters");
-
 const namedFile = (wikiDir: string, id: string): string =>
-  path.join(charactersDir(wikiDir), `${id.replace(/^user:/, "")}.md`);
+  characterFile(wikiDir, id);
 
 export interface PlayerPage {
   readonly file: string;

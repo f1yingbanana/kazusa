@@ -18,6 +18,7 @@ import type { Chat } from "@/lib/source/chats/types";
 import { useDraftChat } from "@/lib/state/chat-draft";
 import { cn } from "@/lib/utils";
 import { PresenceAvatar } from "./presence-avatar";
+import { usePlainText } from "@/components/views/wiki/page-link";
 
 const chipClass =
   "inline-flex max-w-40 min-w-0 items-center sm:max-w-48 gap-1.5 rounded-md px-1 py-0.5 align-middle text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
@@ -159,10 +160,11 @@ export function PlaceChip({
 }) {
   const place = usePlace(id);
   const [, setSelection] = useQueryState("sel", entityRefParser);
+  const plain = usePlainText();
   return (
     <button
       type="button"
-      title={place?.summary}
+      title={place?.summary ? plain(place.summary) : undefined}
       className={cn(chipClass, className)}
       onClick={() => void setSelection({ kind: "place", id })}
     >

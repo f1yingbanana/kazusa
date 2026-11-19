@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
 import { ancestors } from "@/lib/location/places";
 import type { EntityRef } from "@/lib/state/entity-ref";
+import { RichText } from "@/components/views/wiki/page-link";
 
 /** Frontmatter as facts, the description verbatim and never mined (D4). */
 export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
@@ -58,7 +59,9 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
           </h2>
         </div>
       </div>
-      <p className="text-sm leading-relaxed text-pretty">{place.summary}</p>
+      <p className="text-sm leading-relaxed text-pretty">
+        <RichText text={place.summary} />
+      </p>
       {aliases.length ? (
         <p className="text-xs text-muted-foreground">
           Also called{" "}

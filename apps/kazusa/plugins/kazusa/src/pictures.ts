@@ -82,16 +82,25 @@ export function readPictures(dir: string): Picture[] | undefined {
 }
 
 /**
- * Splits `<prefix>-<rest>` when the first word is a declared prefix (an outfit,
- * a place's state) and something follows it; otherwise the whole name is the
- * rest. `rest` keeps its dashes.
+ * Splits `<prefix>-<rest>` when the name starts with a declared prefix (an
+ * outfit, a place's state) and something follows it; otherwise the whole name
+ * is the rest. A prefix may have dashes of its own (`school-uniform`): the
+ * longest declared one that fits wins. `rest` keeps its dashes.
  */
 export function splitPictureName(
   name: string,
-  declared: { has(word: string): boolean },
+  declared: { keys(): Iterable<string> },
 ): { readonly prefix?: string; readonly rest: string } {
-  const [first, ...rest] = name.split("-");
-  return rest.length > 0 && declared.has(first)
-    ? { prefix: first, rest: rest.join("-") }
-    : { rest: name };
+  let prefix: string | undefined;
+  for (const word of declared.keys())
+    if (
+      word &&
+      name.startsWith(`${word}-`) &&
+      name.length > word.length + 1 &&
+      word.length > (prefix?.length ?? 0)
+    )
+      prefix = word;
+  return prefix === undefined
+    ? { rest: name }
+    : { prefix, rest: name.slice(prefix.length + 1) };
 }

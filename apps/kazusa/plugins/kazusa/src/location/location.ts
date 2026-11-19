@@ -1,5 +1,6 @@
 import { formatSimTime } from "../context-engine/format.ts";
 import { personLabel } from "../person-label.ts";
+import { plainLinks } from "../memory/page.ts";
 import type { ActiveTask, TaskTransition } from "../taskman/types.ts";
 import {
   describeTravel,
@@ -412,8 +413,19 @@ export function renderWhereabouts(
         routes.has(id),
     )
     .slice(0, limit);
-  const lines = [`${placeLabel(map, place.id)}. ${place.summary}`];
-  const description = place.bodyMarkdown.replace(/^#[^\n]*\n+/u, "").trim();
+  // A link reads as what it links to.
+  const plain = (text: string): string =>
+    plainLinks(text, (id) => map.names?.get(id) ?? id);
+  const lines = [
+    [`${placeLabel(map, place.id)}.`, plain(place.summary)]
+      .filter(Boolean)
+      .join(" "),
+  ];
+  // What a first visit takes in is its opening; the sections are for those
+  // close to it.
+  const description = plain(
+    place.bodyMarkdown.replace(/^#[^\n]*\n+/u, "").split(/^## /mu)[0] ?? "",
+  ).trim();
   if (!knowledge.known.has(place.id) && description) {
     lines.push(`New to you; you take it all in: ${description}`);
   }

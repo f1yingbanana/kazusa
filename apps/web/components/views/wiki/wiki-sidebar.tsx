@@ -3,18 +3,12 @@
 import { useQueryStates, type inferParserType } from "nuqs";
 import { wikiParsers } from "./search-params";
 import { useMemo, useState } from "react";
-import { AlertTriangleIcon, FilePlusIcon, MoonIcon } from "lucide-react";
+import { AlertTriangleIcon, FilePlusIcon, MoonIcon, XIcon } from "lucide-react";
 import type { WikiListItem } from "@kazusa/client";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -25,50 +19,79 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useWikiLint, useWikiList } from "@/hooks/use-wiki";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { NewPageDialog } from "./new-page-dialog";
-import { PageTree } from "./page-tree";
+import {
+  CategoryFilter,
+  PageTree,
+  categoriesOf,
+  type Category,
+} from "./page-tree";
 
 /** Leaving a page leaves its editor too. */
-const CLOSED = { "wiki.edit": null, "wiki.kind": null, "wiki.name": null };
+const CLOSED = {
+  "wiki.edit": null,
+  "wiki.kind": null,
+  "wiki.name": null,
+  "wiki.raw": null,
+};
 
-/** Pick a wiki (the world's, or one character's mind), then a page in it. */
+/**
+ * The World Wiki's pages, or one character's own pages while in their view.
+ * Each character of the cast has a button for their view.
+ */
 export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const [queryState, setParams] = useQueryStates(wikiParsers);
   const agent = queryState["wiki.agent"] ?? undefined;
   const open = queryState["wiki.page"];
   const tab = queryState["wiki.tab"];
   const { canManage } = useAccess();
-  const { characters } = useCharacters();
+  const { byId } = useCharacters();
   const { data } = useWikiList(agent);
   const { data: lint } = useWikiLint(agent);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<Category>();
+  // A filter belongs to the wiki it was chosen in.
+  const [filteredIn, setFilteredIn] = useState(agent);
+  if (filteredIn !== agent) {
+    setFilteredIn(agent);
+    setCategory(undefined);
+  }
   const [creating, setCreating] = useState(false);
-  const wikis = useMemo(
-    () => [
-      { label: "The world", value: null },
-      ...characters.map((character) => ({
-        label: character.name,
-        value: character.id,
-      })),
-    ],
-    [characters],
-  );
-  const agentName = characters.find(
-    (character) => character.id === agent,
-  )?.name;
+  const viewer = agent ? byId.get(agent) : undefined;
   const existing = useMemo(
     () => new Set((data?.pages ?? []).map((page: WikiListItem) => page.id)),
     [data],
   );
   const needle = query.trim().toLowerCase();
-  const pages = useMemo(
+  // The cast has its own tab; anyone else with a page (the system agent, a
+  // character who isn't simulated) stays here, as do a character's own pages.
+  const listed = useMemo(
     () =>
       (data?.pages ?? []).filter(
         (page: WikiListItem) =>
-          !needle ||
-          page.name.toLowerCase().includes(needle) ||
-          page.summary.toLowerCase().includes(needle),
+          agent ||
+          page.kind !== "person" ||
+          byId.get(page.id)?.kind !== "agent" ||
+          byId.get(page.id)?.isSystemAgent === true,
       ),
-    [data, needle],
+    [data, agent, byId],
+  );
+  const categories = useMemo(
+    () =>
+      (["people", "places", "groups"] as const).filter((one) =>
+        listed.some((page) => categoriesOf(page).includes(one)),
+      ),
+    [listed],
+  );
+  const pages = useMemo(
+    () =>
+      listed.filter(
+        (page: WikiListItem) =>
+          (!category || categoriesOf(page).includes(category)) &&
+          (!needle ||
+            page.name.toLowerCase().includes(needle) ||
+            page.summary.toLowerCase().includes(needle)),
+      ),
+    [listed, category, needle],
   );
 
   const go = (patch: Partial<inferParserType<typeof wikiParsers>>) => {
@@ -79,30 +102,41 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="px-2 pt-2">
-        <Select
-          items={wikis}
-          value={agent ?? null}
-          onValueChange={(value) =>
-            go({ "wiki.agent": value ?? null, "wiki.tab": null })
-          }
-        >
-          <SelectTrigger className="w-full" aria-label="Whose wiki">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {wikis.map((wiki) => (
-              <SelectItem key={wiki.value ?? ""} value={wiki.value}>
-                {wiki.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {agent ? (
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <Avatar className="size-6">
+            {viewer?.avatarUrl ? (
+              <AvatarImage src={viewer.avatarUrl} alt="" />
+            ) : null}
+            <AvatarFallback className="text-[0.65rem]">
+              {(viewer?.name ?? agent).slice(0, 1)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {viewer?.name ?? agent}&apos;s view
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Back to the world"
+            title="Back to the world"
+            onClick={() =>
+              go({
+                "wiki.agent": null,
+                "wiki.page": agent,
+                "wiki.tab": null,
+                "wiki.part": null,
+              })
+            }
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : null}
       <PanelToolbar
         query={query}
         onQueryChange={setQuery}
-        placeholder={`Search ${data?.pages.length ?? 0} pages`}
+        placeholder={`Search ${listed.length} pages`}
         label="Search pages"
       >
         <Tooltip>
@@ -125,17 +159,24 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
       <NewPageDialog
         open={creating}
         onOpenChange={setCreating}
-        whose={agentName ? `${agentName}'s wiki` : "the World Wiki"}
+        whose={viewer ? `${viewer.name}'s wiki` : "the World Wiki"}
+        personal={Boolean(viewer)}
         existing={existing}
         onCreate={(page) =>
           go({
             "wiki.page": page.id,
             "wiki.tab": null,
+            "wiki.part": null,
             "wiki.edit": agent ? "own" : "world",
             "wiki.kind": page.kind,
             "wiki.name": page.name,
           })
         }
+      />
+      <CategoryFilter
+        categories={categories}
+        value={category}
+        onChange={setCategory}
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {pages.length ? (
@@ -144,7 +185,13 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
             key={needle ? "search" : "browse"}
             pages={pages}
             selected={tab ? undefined : (open ?? undefined)}
-            onSelect={(id) => go({ "wiki.page": id, "wiki.tab": null })}
+            onSelect={(id) =>
+              go({
+                "wiki.page": id,
+                "wiki.tab": null,
+                "wiki.part": null,
+              })
+            }
           />
         ) : (
           <p className="px-2 py-4 text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, watch } from "node:fs";
 import path from "node:path";
+import { charactersDir, hasPlace, placeDirs } from "../wiki-layout.ts";
 import { z, ZodError } from "zod";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 import type { LintFinding } from "../memory/lint.ts";
@@ -52,19 +53,31 @@ export function loadWorld(
   wikiDir: string,
   backdropsDir = backdropsBeside(wikiDir),
 ): World | undefined {
-  const placesDir = path.join(wikiDir, "entities", "places");
   const problems: MapProblem[] = [];
   const files = new Map<string, string>();
   const places: Place[] = [];
+  const names = new Map<string, string>();
+  const nameIn = (file: string, text: string): void => {
+    const name = text.match(
+      /^---\n[\s\S]*?^name:\s*["']?(.+?)["']?\s*$/mu,
+    )?.[1];
+    if (name) names.set(file.slice(0, -".md".length), name);
+  };
   const version = createHash("sha256");
   const read = (dir: string, file: string): string => {
     const text = readFileSync(path.join(dir, file), "utf8");
     version.update(`${dir}/${file}\0${text}\0`);
     return text;
   };
-  for (const file of markdownFiles(placesDir)) {
+  // A place is any page with the place component, in either layout.
+  for (const [placesDir, file] of placeDirs(wikiDir).flatMap((dir) =>
+    markdownFiles(dir).map((name) => [dir, name] as const),
+  )) {
+    const text = read(placesDir, file);
+    nameIn(file, text);
+    if (!hasPlace(text)) continue;
     try {
-      const place = parsePlace(read(placesDir, file));
+      const place = parsePlace(text);
       places.push(place);
       files.set(file, place.id);
     } catch (error: unknown) {
@@ -82,21 +95,23 @@ export function loadWorld(
   if (places.length === 0) return undefined;
   const backdrops = readBackdrops(backdropsDir);
   version.update(`${backdropsDir}\0${backdrops.key}\0`);
-  const map = buildMap(places, new Set(backdrops.sets.keys()));
-  problems.push(...map.problems);
+  const built = buildMap(places, new Set(backdrops.sets.keys()));
+  problems.push(...built.problems);
   const homes = new Map<string, string>();
-  const charactersDir = path.join(wikiDir, "entities", "characters");
-  for (const file of markdownFiles(charactersDir)) {
+  const cast = charactersDir(wikiDir);
+  for (const file of markdownFiles(cast)) {
     let data: z.infer<typeof CHARACTER_HOME>;
+    const text = read(cast, file);
+    nameIn(file, text);
     try {
-      ({ data } = readFrontmatter(read(charactersDir, file), CHARACTER_HOME));
+      ({ data } = readFrontmatter(text, CHARACTER_HOME));
     } catch {
       // The card's own lint says what is wrong with it.
       continue;
     }
     if (data.home === undefined) continue;
     const id = data.character_id ?? file.slice(0, -".md".length);
-    if (!map.places.has(data.home)) {
+    if (!built.places.has(data.home)) {
       problems.push({
         message: `${id}'s home ${data.home} isn't on the map, so they have none for now`,
       });
@@ -104,6 +119,9 @@ export function loadWorld(
     }
     homes.set(id, data.home);
   }
+  // Places by their map name; other pages by their own.
+  for (const place of built.places.values()) names.set(place.id, place.name);
+  const map: WorldMap = { ...built, names };
   return {
     map,
     homes,

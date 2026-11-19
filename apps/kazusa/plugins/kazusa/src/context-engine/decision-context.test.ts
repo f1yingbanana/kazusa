@@ -88,7 +88,9 @@ describe("Bounded decision evidence", () => {
       },
       wiki: ["article ".repeat(10000)],
     });
-    expect(textTokens(JSON.stringify(result))).toBeLessThanOrEqual(8000 - 512);
+    expect(textTokens(JSON.stringify(result))).toBeLessThanOrEqual(
+      24_000 - 512,
+    );
     expect(result).toMatchObject({ incomingBundle: expect.any(Array) });
   });
 

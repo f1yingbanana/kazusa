@@ -7,11 +7,11 @@ const people: CharacterSummary[] = [
     id: "a",
     name: "Ada",
     kind: "agent",
-    affiliation: "Archive",
+    groups: ["Archive"],
     aliases: ["Adi"],
   },
   { id: "b", name: "Bram", kind: "agent", aliases: [] },
-  { id: "n", name: "Nils", kind: "npc", affiliation: "Archive", aliases: [] },
+  { id: "n", name: "Nils", kind: "npc", groups: ["Archive"], aliases: [] },
 ];
 
 describe("roster filtering and grouping", () => {
@@ -34,8 +34,8 @@ describe("roster filtering and grouping", () => {
     ).toEqual(["b"]);
   });
   it("puts characters without the structured field in a trailing honest bucket", () => {
-    const groups = groupCharacters(people, "affiliation", () => undefined);
-    expect(groups.map((g) => g.label)).toEqual(["Archive", "No affiliation"]);
+    const groups = groupCharacters(people, "group", () => undefined);
+    expect(groups.map((g) => g.label)).toEqual(["Archive", "No group"]);
     expect(groups[0].members.map((c) => c.id)).toEqual(["a", "n"]);
   });
   it("groups by live status fields, never by task text", () => {

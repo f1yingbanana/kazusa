@@ -257,6 +257,14 @@ describe("Perception host integration", () => {
       expect((await failure())?.error).toBe("billing error");
     });
 
+    it("forgets an attempt that timed out once a retry gets through", async () => {
+      const { event, failure } = failing();
+      await event({ phase: "finishing", error: "LLM request timed out." });
+      await event({ phase: "finishing" });
+      await event({ phase: "end" });
+      expect(await failure()).toBeUndefined();
+    });
+
     it("covers every character, but not a run someone stopped", async () => {
       const { event, failure } = failing();
       await event({ phase: "error", error: "billing error" }, "bob");

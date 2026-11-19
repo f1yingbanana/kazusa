@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { firstSentence } from "../memory/page.ts";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 
 const PLACE_ID = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/u);
@@ -17,7 +18,8 @@ export const PLACE_FRONTMATTER = z.object({
   name: z.string().trim().min(1),
   aliases: z.array(z.string().trim().min(1)).default([]),
   parent: PLACE_ID.optional(),
-  summary: z.string().trim().min(1),
+  /** Without one, the opening's first sentence, as on any page. */
+  summary: z.string().trim().optional(),
   entry_minutes: z.number().min(0).default(1),
   /** Only a picture, so a bad value is dropped rather than failing the world. */
   map: z
@@ -84,6 +86,10 @@ export interface Place {
   readonly bodyMarkdown: string;
 }
 
+/** A page's opening: its text after the H1, before the first `##` section. */
+const openingOf = (body: string): string =>
+  (body.replace(/^\s*# [^\n]*(?:\n|$)/, "").split(/\n## /)[0] ?? "").trim();
+
 export function parsePlace(text: string): Place {
   const { data, body } = readFrontmatter(text, PLACE_FRONTMATTER);
   return {
@@ -91,7 +97,7 @@ export function parsePlace(text: string): Place {
     name: data.name,
     aliases: data.aliases,
     ...(data.parent === undefined ? {} : { parent: data.parent }),
-    summary: data.summary,
+    summary: data.summary || firstSentence(openingOf(body)),
     entryMinutes: data.entry_minutes,
     connections: data.connections,
     ...(data.map === undefined ? {} : { map: data.map }),
@@ -126,6 +132,8 @@ export interface WorldMap {
   readonly children: ReadonlyMap<string, readonly string[]>;
   readonly edges: ReadonlyMap<string, readonly Edge[]>;
   readonly problems: readonly MapProblem[];
+  /** Every World Wiki page's name by id, for `[[links]]` in what is shown. */
+  readonly names?: ReadonlyMap<string, string>;
 }
 
 const byName =

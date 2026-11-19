@@ -9,17 +9,17 @@ import { parsePage, type Page } from "./page.ts";
 const person = (id: string): Page =>
   parsePage(
     `---\nname: ${id}\nhome: hall\n---\n\n# ${id}\n\nLead.`,
-    `entities/characters/${id}.md`,
+    `characters/${id}.md`,
   );
 const place = (id: string, parent?: string): Page =>
   parsePage(
     `---\nplace_id: ${id}\nname: ${id}\nsummary: A place.\n${parent ? `parent: ${parent}\n` : ""}---\n\n# ${id}\n\nLead.`,
-    `entities/places/${id}.md`,
+    `concepts/${id}.md`,
   );
 const knows = (id: string): Page =>
   parsePage(
     `---\nname: ${id}\nrelation: friend\n---\n\n# ${id}\n\nLead.`,
-    `entities/characters/${id}.md`,
+    `characters/${id}.md`,
   );
 
 describe("auditWorld", () => {

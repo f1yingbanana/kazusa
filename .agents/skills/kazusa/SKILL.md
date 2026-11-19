@@ -198,15 +198,15 @@ High-frequency machine state is strictly separated from qualitative Markdown
 files so `<workspace>/MEMORY.md` never suffers from mechanical diff churn or
 file-parsing overhead.
 
-| State Category                        | Canonical Storage Location                                                                                 | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| :------------------------------------ | :--------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"stats"`, `"location"`, `"inbox"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's inbox/custody state, one per character (key `<agentId>`). Attention decisions are in Kazusa's own `<stateDir>/kazusa/decisions.sqlite`, uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                      |
-| **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                        |
-| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`                      | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                           |
-| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`                | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes. |
-| **Agent Identity & Memory**           | `workspaces/<id>/{SOUL,IDENTITY,MEMORY}.md` + `memory/`                                                    | Static voice/values (`SOUL.md`), bio (`IDENTITY.md`), qualitative reflections (`MEMORY.md`), and vector-indexed daily summaries (`memory/YYYY-MM-DD.md`). **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills.                                                                                                                                                                           |
-| **Objective Canon**                   | `shared/wiki/`                                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                            |
-| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                       |
+| State Category                        | Canonical Storage Location                                                                                 | Purpose & Mutation Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| :------------------------------------ | :--------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"stats"`, `"location"`, `"inbox"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's inbox/custody state, one per character (key `<agentId>`). Attention decisions are in Kazusa's own `<stateDir>/kazusa/decisions.sqlite`, uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                                                                                                                                             |
+| **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`                      | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                                                                                                  |
+| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`                | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes.                                                                                                                        |
+| **Agent Identity & Memory**           | `shared/wiki/characters/<id>.md`, `workspaces/<id>/MEMORY.md` + `memory/`                                  | Who they are is their World Wiki page, read whole at the start of their turns in place of `IDENTITY.md`/`SOUL.md` (an `agent:bootstrap` hook, `characters/card.ts`; those files are no longer read for world characters once their world is in the new layout; a character who still has them, in an older world, keeps reading them, and the system agent keeps hers); `MEMORY.md` holds qualitative reflections, `memory/YYYY-MM-DD.md` daily summaries. **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills. |
+| **Objective Canon**                   | `shared/wiki/`                                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                                                                                                                                              |
 
 ### Directory Map (`apps/kazusa/`)
 
@@ -240,16 +240,15 @@ apps/kazusa/
     ├── shared/backdrops/<set>/         # <[state-]time>.webp + backdrops.json, named by places' `backdrop`
     ├── shared/wiki/                    # WORLD WIKI (objective truth)
     │   ├── INDEX.md                    # Front page for humans and the system agent; not a page
-    │   ├── entities/{places,characters}/<id>.md
-    │   ├── concepts/<topic>.md
-    │   └── reports/
+    │   ├── characters/<id>.md          # The cast: one page each, who they are
+    │   └── concepts/<id>.md            # Lore, groups (`group: true`), places (`place_id`)
     ├── workspaces/<agent_id>/          # Per-agent workspace
-    │   ├── SOUL.md | IDENTITY.md | MEMORY.md
+    │   ├── MEMORY.md   (who they are: shared/wiki/characters/<id>.md)
     │   ├── memory/YYYY-MM-DD.md
     │   ├── stickers/                   # <[outfit-]mood>.webp + stickers.json (references/messaging.md)
     │   ├── portraits/                  # Whole figures under the stickers' names + portraits.json
     │   └── wiki/                       # PERSONAL WIKI (subjective beliefs)
-    │       ├── entities/{characters,places}/<id>.md
+    │       ├── characters/<id>.md, concepts/<id>.md
     │       ├── concepts/<id>.md | syntheses/ | reports/
     └── .state/                         # SQLite backing for keyed stores; .env holds the Gateway token
 
@@ -421,7 +420,8 @@ apps/kazusa/
 - **A world's first moments** come from config the guide writes: `stage.cast`
   and `stage.defaultOnstage: false` for who is simulated, `clock.startAt` and
   `clock.speed: 0` so a chosen cast starts paused. The cast picker's tags are
-  the world's `memory.anchors` read off its character cards.
+  the groups its characters are in (what their World Wiki pages' `groups` say
+  knows them or is close to them).
 
 ## 3. Unified Plugin Architecture & Module Boundaries
 
@@ -580,9 +580,10 @@ connect these modules in process.
   explicitly targets `:brain`; OpenClaw 2026.10.5 ignores `session.mainKey` and
   keeps its default session at `main`. Never run character turns in chat
   ledgers.
-- Reuses native workspace injection for `SOUL.md`, `IDENTITY.md`, and
-  `MEMORY.md`; `memory/` remains tool-recalled archive, subject to OpenClaw's
-  native new/reset note-loading behavior.
+- Reuses native workspace injection for `MEMORY.md`, and for who a character is:
+  an `agent:bootstrap` hook (`characters/card.ts`) swaps `IDENTITY.md` and
+  `SOUL.md` for their World Wiki page; `memory/` remains tool-recalled archive,
+  subject to OpenClaw's native new/reset note-loading behavior.
 - **Strict Invariant: No `AGENTS.md` in Character Workspaces**: Never create or
   copy `AGENTS.md` into character workspaces (`workspaces/<agent_id>/`). In
   OpenClaw, any `AGENTS.md` in an agent's workspace is statically injected into
@@ -590,9 +591,9 @@ connect these modules in process.
   lifecycle, interrupt protocols) is injected dynamically by the Context Engine
   via shared skills (`shared/skills/*`). Placing `AGENTS.md` in character
   workspaces causes duplicate instructions, prompt drift across characters, and
-  token bloat. Character workspaces must strictly contain only identity
-  (`SOUL.md`, `IDENTITY.md`), qualitative memory (`MEMORY.md`), and subjective
-  wiki entries (`wiki/`).
+  token bloat. Character workspaces hold qualitative memory (`MEMORY.md`),
+  subjective wiki entries (`wiki/`) and pictures; who they are is their World
+  Wiki page.
 - Replays no past brain turns (`brainHistory`): only the turn under way, which
   the host appends itself when it passes `prompt`. Past turns live in the
   ledgers. Replaying them cost 50-80k tokens a call and taught the model to copy
@@ -798,11 +799,11 @@ connect these modules in process.
      the latest $K$ unique individuals (configurable `contactRosterLimit`,
      default 20) with whom the agent has recently exchanged messages (sent or
      received) or interacted. Pulls each peer's relationship card from the
-     character's Personal Wiki
-     (`workspaces/<id>/wiki/entities/characters/<peer_id>.md`) to extract
-     display name, handle, relationship type, short summary, and direct chat
-     address (`- Name (@handle, relation): summary [chat:direct:<peer_id>]`). At
-     ~150 tokens for 20 contacts, this eliminates redundant
+     character's Personal Wiki (`workspaces/<id>/wiki/characters/<peer_id>.md`)
+     to extract display name, handle, relationship type, short summary, and
+     direct chat address
+     (`- Name (@handle, relation): summary [chat:direct:<peer_id>]`). At ~150
+     tokens for 20 contacts, this eliminates redundant
      `wiki_search`/`list_chats` tool round-trips, grounds spontaneous social
      agency, and prevents hallucinations.
    - **Active Peer Impressions**: Eagerly injects full `## Quick Impression`
@@ -1073,23 +1074,23 @@ connect these modules in process.
   judged (noticing) or played out by the character (getting in), with
   descriptions as evidence. Do not add a frontmatter flag for something a
   description can say.
-- **Map (`map.ts`, pure)**: World Wiki places
-  (`shared/wiki/entities/places/<id>.md`): `place_id`, `name`, `aliases`,
-  `summary`, `parent`, `entry_minutes`, `connections` (two-way, declared once;
-  `ways`, the first is usual), optional `map` (`{ plane?, x, y }`, drawn by the
-  client, written by `POST /kazusa/places/positions`, never read by routing),
-  optional `backdrop` (a set in `shared/backdrops/`, inherited down the tree;
-  one naming no set is a problem and the place uses its area's, §3.8); the body
-  is the full description. A tree through `parent`; every place is somewhere to
-  stand. `sharedWorld` (`world.ts`): one watcher per process keeps the map
-  current, so a new place or `home` needs no reload and SSE `places` tells
-  clients to refetch. **Nothing broken stops the map loading** (`buildMap` never
-  throws; `loadWorld` only when no place page parses at all, which keeps the map
-  in use): a page that doesn't parse, a connection to nowhere or declared on
-  both pages, a duplicate id or an unknown home is left out, an unknown parent
-  or a cycle puts the place at top level, a map in separate parts loads (no
-  route between parts: travel there is refused in-world, travel lists skip it),
-  and each is a `problems` entry `wiki_lint` reports per page. Live, keeping the
+- **Map (`map.ts`, pure)**: World Wiki places (`shared/wiki/concepts/<id>.md`):
+  `place_id`, `name`, `aliases`, `summary`, `parent`, `entry_minutes`,
+  `connections` (two-way, declared once; `ways`, the first is usual), optional
+  `map` (`{ plane?, x, y }`, drawn by the client, written by
+  `POST /kazusa/places/positions`, never read by routing), optional `backdrop`
+  (a set in `shared/backdrops/`, inherited down the tree; one naming no set is a
+  problem and the place uses its area's, §3.8); the body is the full
+  description. A tree through `parent`; every place is somewhere to stand.
+  `sharedWorld` (`world.ts`): one watcher per process keeps the map current, so
+  a new place or `home` needs no reload and SSE `places` tells clients to
+  refetch. **Nothing broken stops the map loading** (`buildMap` never throws;
+  `loadWorld` only when no place page parses at all, which keeps the map in
+  use): a page that doesn't parse, a connection to nowhere or declared on both
+  pages, a duplicate id or an unknown home is left out, an unknown parent or a
+  cycle puts the place at top level, a map in separate parts loads (no route
+  between parts: travel there is refused in-world, travel lists skip it), and
+  each is a `problems` entry `wiki_lint` reports per page. Live, keeping the
   last good map on any problem meant one bad line hid a whole edit with only a
   log line to say why. **Nobody is left nowhere** (`repair` in `register.ts`, on
   every change that alters a page the map reads, and once at `gateway_start` for
@@ -1104,16 +1105,16 @@ connect these modules in process.
   (`location.pages`, `pages.ts`) does it properly: `rename` moves the page and
   rewrites `place_id`, `parent`, `home`, `to`, `entity.place.<id>` and `[[id]]`
   links in every world page and each character's wiki, card file included;
-  `remove` trashes the page (`<state>/kazusa/wiki-trash/<stamp>/`), moves what
-  was in it up a level, drops connections to it, moves homes there up, and
-  unlinks links; characters' cards stay. Exposed as `POST /kazusa/wiki/rename`
-  and `/wiki/delete` (any page; a registered character's world card is refused),
-  saving a world place page with a new `place_id` (a rename), and ARONA's
+  `remove` deletes the page for good, moves what was in it up a level, drops
+  connections to it, moves homes there up, and unlinks links; characters' cards
+  stay. Exposed as `POST /kazusa/wiki/delete` (any page; a registered
+  character's world card is refused), saving a world place page with a new
+  `place_id` (a rename) or without one (off the map, the page kept), and ARONA's
   `map_rename_place`/`map_remove_place`. A world without places disables
   Location. `visibleFrom` = parent, children, siblings, connection ends.
 - **Knowledge (`knowledge.ts`)**: known places are exactly the character's
-  cards, `workspaces/<id>/wiki/entities/places/<place_id>.md`. **Visit loop**:
-  with no card, **Where you are** shows the whole description; starting the next
+  cards, `workspaces/<id>/wiki/concepts/<place_id>.md`. **Visit loop**: with no
+  card, **Where you are** shows the whole description; starting the next
   activity from that place writes a frontmatter-only stub (atomic, never
   overwriting), after which only the summary shows; the character adds what they
   remember. **Places you know**: home, then places named (names, aliases, card
@@ -1251,8 +1252,9 @@ connect these modules in process.
   model or decision call, nothing characters read, and the server never picks a
   picture for the time of day: the client does, from sim time.
 - **Portraits** (`portraits.ts`): `workspaces/<id>/portraits/<name>.<raster>`,
-  whole figures named like the stickers (`[<outfit>-]<mood>`; the first word is
-  an outfit only when `stickers/stickers.json` declares it), plus optional
+  whole figures named like the stickers (`[<outfit>-]<mood>`; a name starts with
+  an outfit only when `stickers/stickers.json` declares it, the longest that
+  fits, so `school-uniform-happy` is `school-uniform`), plus optional
   `portraits.json` (`size`, `eyeline`, and `placement` by outfit word, `""` for
   none, or by picture name: `centre`, `floor` and `eyes` (where the figure is
   across the picture, where it stands and where its eyes are down it, each 0–1)
@@ -1517,8 +1519,8 @@ Load these reference files on demand when working on their specific subsystem:
   public visitor, and the planned trusted-proxy adapter share one UI; progress
   lives in `apps/kazusa/docs/auth-implementation.md`. Scaling is a separate PR.
 - `references/file_schemas.md` — Read when implementing Markdown/YAML parsers or
-  creating/modifying `SOUL.md`, `IDENTITY.md`, `MEMORY.md`, World Wiki, or
-  Personal Wiki files.
+  creating/modifying `MEMORY.md`, World Wiki (a character's page is who they
+  are), or Personal Wiki files.
 - `references/mathematics.md` — Read when implementing or tuning desires
   (states, drain, task effects, rendering), task lease rules, or encounter
   probability rolls.

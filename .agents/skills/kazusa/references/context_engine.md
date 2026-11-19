@@ -44,8 +44,11 @@ claiming hook after their producer has persisted the chat. OpenClaw 2026.10.5
 ignores `session.mainKey`, so it cannot rename the default `main` session into
 `brain`.
 
-- `SOUL.md`, `IDENTITY.md`, `MEMORY.md`: native workspace bootstrap. Do not
-  inject them twice. `MEMORY.md` is curated long-term memory.
+- `MEMORY.md` and who they are: native workspace bootstrap. For a world
+  character an `agent:bootstrap` hook (`characters/card.ts`) puts their World
+  Wiki page, whole, where `IDENTITY.md` goes and drops `SOUL.md`; workspace
+  `IDENTITY.md`/`SOUL.md` are not read. Do not inject them twice. `MEMORY.md` is
+  curated long-term memory.
 - `memory/`: tool-recalled archive, not another eagerly loaded context stream.
   Native `/new` and `/reset` may load daily notes; we do not override that.
   Shared recall configuration lives under `memory.search`.
@@ -191,8 +194,8 @@ section explains what fills it and what the settings in **Settings → Context**
 
 In order, from what never changes to what changes every turn:
 
-1. **Who they are**: their `SOUL.md`, `IDENTITY.md` and `MEMORY.md`, the skills
-   they can read, and Kazusa's conventions. The same on every turn.
+1. **Who they are**: their World Wiki page and `MEMORY.md`, the skills they can
+   read, and Kazusa's conventions. The same on every turn.
 2. **What happened lately**: their records of the last while (everything they
    did, saw, said and were told), oldest first. New records join at the end.
 3. **How to act now**: the guidance for this moment (choosing an activity, or

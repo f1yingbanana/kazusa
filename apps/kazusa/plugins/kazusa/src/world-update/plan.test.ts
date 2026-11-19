@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyUpdate, openReport, readReport } from "./apply.ts";
 import { areaOf, planUpdate } from "./plan.ts";
 import { blobId, folderTree } from "./tree.ts";
+import { convertPage } from "../characters/fold.ts";
 
 let root: string;
 const put = (dir: string, file: string, text: string) => {
@@ -369,5 +370,237 @@ describe("areaOf", () => {
     );
     expect(areaOf("workspaces/ami/SOUL.md").area).toBe("workspaces/*/SOUL.md");
     expect(areaOf("package.json").area).toBe("package.json");
+  });
+});
+
+describe("a release in the two-folder layout", () => {
+  /** V1 in the older layout with a character card; v2 in the new one. */
+  function older() {
+    const v1 = path.join(root, "v1");
+    const live = path.join(root, "world");
+    const v2 = path.join(root, "worlds", "demo");
+    const bea = "---\nname: Bea\nclub: choir\n---\n\n# Bea\n\nSings.\n";
+    for (const dir of [v1, live]) {
+      put(dir, "package.json", pkg({ version: "1.0.0" }));
+      put(dir, "shared/wiki/entities/places/hub.md", place("hub"));
+      put(dir, "shared/wiki/entities/characters/bea.md", bea);
+      put(
+        dir,
+        "shared/wiki/concepts/choir.md",
+        "---\nname: Choir\nrenown: known\n---\n\n# Choir\n\nSongs.\n",
+      );
+      put(
+        dir,
+        "workspaces/amy/wiki/entities/characters/bea.md",
+        "---\nname: Bea\n---\n\nMy friend.\n",
+      );
+    }
+    put(v1, "workspaces/bea/IDENTITY.md", "# Bea\n\n## Looks\n\nTall.\n");
+    put(v1, "workspaces/bea/SOUL.md", "Shy.\n");
+    // Live: Kazusa folded the cards at start-up, and play wrote a note.
+    for (const [file, text] of [
+      ["shared/wiki/entities/characters/bea.md", bea],
+      [
+        "shared/wiki/concepts/choir.md",
+        "---\nname: Choir\nrenown: known\n---\n\n# Choir\n\nSongs.\n",
+      ],
+    ] as const) {
+      const relative = file.slice("shared/wiki/".length);
+      const kind = relative.startsWith("entities/characters")
+        ? "person"
+        : "concept";
+      put(
+        live,
+        file,
+        convertPage(
+          text,
+          kind,
+          path.basename(file, ".md"),
+          kind === "person"
+            ? {
+                identity: get(v1, "workspaces/bea/IDENTITY.md"),
+                soul: get(v1, "workspaces/bea/SOUL.md"),
+              }
+            : undefined,
+        ),
+      );
+    }
+    put(
+      live,
+      "workspaces/amy/wiki/entities/characters/bea.md",
+      "---\nname: Bea\n---\n\nMy friend.\n\n## Notes\n\n- 2026-11-01 · seen it · sure — She sang.\n",
+    );
+    put(v2, "package.json", pkg({ version: "2.0.0" }));
+    put(v2, "shared/wiki/concepts/hub.md", place("hub"));
+    put(
+      v2,
+      "shared/wiki/characters/bea.md",
+      "---\nname: Bea\nin:\n  choir: close\n---\n\n# Bea\n\nA singer of the [[choir]].\n",
+    );
+    put(
+      v2,
+      "shared/wiki/concepts/choir.md",
+      "---\nname: Choir\ngroup: true\nknown:\n  everyone: heard of\n---\n\n# Choir\n\nSongs.\n",
+    );
+    put(
+      v2,
+      "workspaces/amy/wiki/characters/bea.md",
+      "---\nname: Bea\n---\n\nMy friend.\n",
+    );
+    return { live, v2 };
+  }
+
+  it("folds a world's cards into its pages itself, keeping play's change to one", () => {
+    const { live, v2 } = older();
+    // Never folded: the cards are still there, and play added to the soul.
+    put(
+      live,
+      "shared/wiki/entities/characters/bea.md",
+      get(path.join(root, "v1"), "shared/wiki/entities/characters/bea.md"),
+    );
+    put(
+      live,
+      "shared/wiki/concepts/choir.md",
+      get(path.join(root, "v1"), "shared/wiki/concepts/choir.md"),
+    );
+    put(
+      live,
+      "workspaces/bea/IDENTITY.md",
+      get(path.join(root, "v1"), "workspaces/bea/IDENTITY.md"),
+    );
+    put(live, "workspaces/bea/SOUL.md", "Shy.\n\n## Lately\n\nBraver.\n");
+    const plan = planOf(live, v2);
+    expect(
+      plan.changes.filter(
+        ({ outcome }) => outcome === "conflict" || outcome === "orphaned",
+      ),
+    ).toEqual([]);
+    apply(live, v2, plan);
+    const page = get(live, "shared/wiki/characters/bea.md");
+    expect(page).toContain("in:\n  choir: close");
+    expect(page).toContain("Braver.");
+    expect(existsSync(path.join(live, "workspaces/bea/SOUL.md"))).toBe(false);
+    expect(existsSync(path.join(live, "workspaces/bea/IDENTITY.md"))).toBe(
+      false,
+    );
+  });
+
+  it("moves every page to its new folder, takes the release's, and keeps what play wrote", () => {
+    const { live, v2 } = older();
+    const plan = planOf(live, v2);
+    expect(
+      plan.changes.filter(({ outcome }) => outcome === "conflict"),
+    ).toEqual([]);
+    apply(live, v2, plan);
+    expect(get(live, "shared/wiki/characters/bea.md")).toContain(
+      "in:\n  choir: close",
+    );
+    expect(get(live, "shared/wiki/concepts/choir.md")).toContain("group: true");
+    expect(get(live, "shared/wiki/concepts/hub.md")).toContain("place_id: hub");
+    expect(get(live, "workspaces/amy/wiki/characters/bea.md")).toContain(
+      "She sang.",
+    );
+    for (const gone of ["shared/wiki/entities", "workspaces/amy/wiki/entities"])
+      expect(existsSync(path.join(live, gone))).toBe(false);
+  });
+});
+
+describe("an update between two releases in the two-folder layout", () => {
+  it("leaves every page's fields as they are, play's places and groups included", () => {
+    const v1 = path.join(root, "v1");
+    const live = path.join(root, "world");
+    const v2 = path.join(root, "worlds", "demo");
+    const hub =
+      "---\nplace_id: hub\nname: Hub\nsummary: A place.\nknown:\n  choir: knows\nmap: { x: 0.5, y: 0.5 }\n---\n\n# Hub\n";
+    const choir =
+      "---\nname: Choir\ngroup: true\nknown:\n  everyone: heard of\n---\n\n# Choir\n";
+    const bea =
+      "---\nname: Bea\nhome: hub\nin:\n  choir: close\n---\n\n# Bea\n";
+    for (const dir of [v1, live, v2]) {
+      put(
+        dir,
+        "package.json",
+        pkg({ version: dir === v2 ? "2.0.0" : "1.0.0" }),
+      );
+      put(dir, "shared/wiki/concepts/hub.md", hub);
+      put(dir, "shared/wiki/concepts/choir.md", choir);
+      put(dir, "shared/wiki/characters/bea.md", bea);
+    }
+    // Play made a place that is also a group.
+    const den =
+      "---\nplace_id: den\nname: Den\nsummary: A den.\nparent: hub\ngroup: true\n---\n\n# Den\n";
+    put(live, "shared/wiki/concepts/den.md", den);
+    put(
+      v2,
+      "shared/wiki/concepts/choir.md",
+      choir.replace("# Choir", "# Choir\n\nSongs."),
+    );
+    const plan = planOf(live, v2);
+    expect(
+      plan.changes.filter(({ outcome }) => outcome === "conflict"),
+    ).toEqual([]);
+    apply(live, v2, plan);
+    expect(get(live, "shared/wiki/concepts/den.md")).toBe(den);
+    expect(get(live, "shared/wiki/concepts/hub.md")).toBe(hub);
+    expect(get(live, "shared/wiki/characters/bea.md")).toBe(bea);
+    expect(get(live, "shared/wiki/concepts/choir.md")).toContain("Songs.");
+  });
+});
+
+describe("renames after the move to two folders", () => {
+  it("follows a renamed place or merged concept in concepts/", () => {
+    const v1 = path.join(root, "nv1");
+    const live = path.join(root, "nworld");
+    const v2 = path.join(root, "worlds", "ndemo");
+    const character = "---\nname: Amy\n---\n\n# Amy\n\nShops.\n";
+    for (const dir of [v1, live]) {
+      put(dir, "package.json", pkg({ version: "1.0.0" }));
+      put(dir, "shared/wiki/characters/amy.md", character);
+      put(dir, "shared/wiki/concepts/hub.md", place("hub"));
+      put(
+        dir,
+        "shared/wiki/concepts/old_market.md",
+        place("old_market", "\nparent: hub"),
+      );
+      put(
+        dir,
+        "workspaces/amy/wiki/concepts/old_market.md",
+        "---\nname: old_market\n---\n\nI shop here.\n",
+      );
+    }
+    // Play moved the market on the map and wrote in Amy's page on it.
+    put(
+      live,
+      "shared/wiki/concepts/old_market.md",
+      place("old_market", "\nparent: hub\nmap: { x: 0.2, y: 0.7 }"),
+    );
+    put(
+      live,
+      "workspaces/amy/wiki/concepts/old_market.md",
+      "---\nname: old_market\n---\n\nI shop here. Bo sells pears.\n",
+    );
+    put(
+      v2,
+      "package.json",
+      pkg({ version: "2.0.0" }, { renames: { old_market: "market" } }),
+    );
+    put(v2, "shared/wiki/characters/amy.md", character);
+    put(v2, "shared/wiki/concepts/hub.md", place("hub"));
+    put(v2, "shared/wiki/concepts/market.md", place("market", "\nparent: hub"));
+    put(
+      v2,
+      "workspaces/amy/wiki/concepts/market.md",
+      "---\nname: market\n---\n\nI shop here.\n",
+    );
+    const plan = planOf(live, v2, v1);
+    expect(plan.pendingRenames).toEqual({ old_market: "market" });
+    apply(live, v2, plan);
+    expect(
+      existsSync(path.join(live, "shared/wiki/concepts/old_market.md")),
+    ).toBe(false);
+    expect(get(live, "shared/wiki/concepts/market.md")).toContain("x: 0.2");
+    expect(get(live, "workspaces/amy/wiki/concepts/market.md")).toContain(
+      "Bo sells pears.",
+    );
   });
 });

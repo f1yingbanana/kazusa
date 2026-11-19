@@ -19,10 +19,13 @@ export const MEMORY_CONFIG = z.strictObject({
       episodeHours: z.number().min(0).default(24),
     })
     .prefault({}),
-  /** Which card fields place a character in this world, and how deeply. */
+  /**
+   * Deprecated: a page's `groups` place a character in the world now. Read and
+   * ignored, so an older world's config still loads.
+   */
   anchors: z
     .record(z.string(), z.enum(["heard of", "familiar", "intimate"]))
-    .default({ club: "intimate", school: "familiar" }),
+    .optional(),
   /**
    * Going over the day at bedtime (`sleep.ts`): a sleep of at least
    * `minMinutes` in one of `categories`, and no more often than every

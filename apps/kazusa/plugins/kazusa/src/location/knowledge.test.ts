@@ -56,7 +56,7 @@ describe("place knowledge", () => {
     const library = map.places.get("library")!;
     const at = Date.parse("2026-10-27T16:00:00.000Z");
     expect(await writePlaceStub(dir, library, at)).toBe(true);
-    const file = path.join(dir, "wiki/entities/places/library.md");
+    const file = path.join(dir, "wiki/concepts/library.md");
     writeFileSync(
       file,
       `${readFileSync(file, "utf8")}\nQuiet. Airi studies here.\n`,

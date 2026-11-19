@@ -527,8 +527,9 @@ where none fits. Each name is distinct, so there is no `-2`. The optional
 ```
 
 - `outfits` describes each outfit other than the character's usual clothes
-  (those in `IDENTITY.md`) once. A name's first word is an outfit only when
-  `outfits` declares it, so `eyes-closed` stays a mood.
+  (their page) once. A name starts with an outfit only when `outfits` declares
+  it, so `eyes-closed` stays a mood; an outfit may have dashes
+  (`school-uniform`), and the longest declared one that fits wins.
 - `look` starts with the mood and says what the face does. Without it the mood
   word stands alone. A sticker missing from `stickers` still works.
 

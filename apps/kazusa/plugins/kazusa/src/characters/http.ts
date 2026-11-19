@@ -1,7 +1,6 @@
 import { currentConfig } from "../current-config.ts";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
+import { resolveConfigPath } from "openclaw/plugin-sdk/state-paths";
 import type {
   OpenClawConfig,
   OpenClawPluginApi,
@@ -12,16 +11,30 @@ import {
   type CharacterStatus,
   type CharacterSummary,
   type CharactersResponse,
+  CharacterCreatePayloadSchema,
+  CharacterDeletePayloadSchema,
+  type CharacterCreateResponse,
   StagePayloadSchema,
   type StageResponse,
 } from "@kazusa/client";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import type { Perception } from "../perception/perception.ts";
 import type { TaskStore } from "../taskman/types.ts";
 import type { Messaging } from "../messaging/messaging.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { TaskmanService } from "../taskman/register.ts";
-import { readFrontmatter } from "../markdown/frontmatter.ts";
+import { readCharacterCard, systemAgentOf, worldWikiDir } from "./card.ts";
+import { characterFile } from "../wiki-layout.ts";
 import { localAvatarUrl, registerAvatarHttp } from "./avatar.ts";
 import { defaultPortraitUrl } from "../scene/portraits.ts";
 import type { Stage } from "../stage/stage.ts";
@@ -40,24 +53,42 @@ const USER = z.object({
   name: z.string().trim().min(1).default("Sensei"),
 });
 
-const IDENTITY_FRONTMATTER = z
-  .object({
-    agent_id: z.string().optional(),
-    character_id: z.string().optional(),
-    name: z.string().optional(),
-    full_name: z.string().optional(),
-    handle: z.string().optional(),
-    school: z.string().optional(),
-    club: z.string().optional(),
-    occupation: z.string().optional(),
-    avatarUrl: z.string().optional(),
-    avatar: z.string().optional(),
-    role: z.string().optional(),
-    combat_role: z.string().optional(),
-    aliases: z.array(z.string()).optional(),
-    personality_traits: z.union([z.array(z.string()), z.string()]).optional(),
-  })
-  .passthrough();
+/**
+ * What the roster shows of a character, from their World Wiki page: its name,
+ * aliases and summary, the groups they are in, and its opening paragraph; their
+ * face is the avatar picture in their workspace.
+ */
+/**
+ * Changes the cast in `openclaw.json` as written, the way the system agent
+ * does: OpenClaw's own writer refuses `agents` while an entry holds an
+ * `$include` (the system agent's does), and the Gateway reloads the file
+ * itself.
+ */
+function editCast(
+  change: (entries: Record<string, Record<string, unknown>>) => void,
+): void {
+  const file = resolveConfigPath(process.env);
+  const config = JSON.parse(readFileSync(file, "utf8")) as {
+    agents?: { entries?: Record<string, Record<string, unknown>> };
+  };
+  change(((config.agents ??= {}).entries ??= {}));
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`);
+  renameSync(temporary, file);
+}
+
+/** Every page id in the World Wiki, any folder. */
+function wikiPageIds(wikiDir: string): Set<string> {
+  const ids = new Set<string>();
+  const walk = (dir: string) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true }))
+      if (entry.isDirectory()) walk(path.join(dir, entry.name));
+      else if (entry.name.endsWith(".md")) ids.add(entry.name.slice(0, -3));
+  };
+  walk(wikiDir);
+  return ids;
+}
 
 export async function loadCharacterData(
   api: OpenClawPluginApi,
@@ -67,107 +98,32 @@ export async function loadCharacterData(
   name: string;
   avatarUrl?: string;
   portraitUrl?: string;
-  occupation?: string;
-  affiliation?: string;
+  summary?: string;
+  groups: string[];
   aliases: string[];
-  role?: string;
-  personalityTraits: string[];
-  bodyMarkdown: string;
+  lead: string;
 }> {
-  let name = agentId;
-  let avatarUrl: string | undefined;
-  let occupation: string | undefined;
-  let affiliation: string | undefined;
-  const aliasSet = new Set<string>();
-  let role: string | undefined;
-  const traitsSet = new Set<string>();
-  let bodyMarkdown = "";
-
-  // 1. Check configured agent identity in OpenClaw
-  const configured = api.runtime.agent.resolveAgentIdentity(config, agentId);
-  if (configured?.name?.trim()) name = configured.name.trim();
-
-  // 2. Read IDENTITY.md from agent workspace
-  try {
-    const workspace = api.runtime.agent.resolveAgentWorkspaceDir(
-      config,
-      agentId,
-    );
-    const text = await readFile(path.join(workspace, "IDENTITY.md"), "utf8");
-    const { data, body } = readFrontmatter(text, IDENTITY_FRONTMATTER);
-    if (data.name?.trim()) name = data.name.trim();
-    if (data.avatarUrl?.trim()) avatarUrl = data.avatarUrl.trim();
-    if (data.occupation?.trim()) occupation = data.occupation.trim();
-    else if (data.club?.trim()) occupation = data.club.trim();
-
-    if (data.school?.trim()) affiliation = data.school.trim();
-    else if (data.club?.trim()) affiliation = data.club.trim();
-
-    if (data.handle?.trim()) aliasSet.add(data.handle.trim());
-    if (Array.isArray(data.aliases)) {
-      for (const a of data.aliases) if (a.trim()) aliasSet.add(a.trim());
-    }
-    if (data.role?.trim()) role = data.role.trim();
-    else if (data.combat_role?.trim()) role = data.combat_role.trim();
-
-    if (Array.isArray(data.personality_traits)) {
-      for (const t of data.personality_traits)
-        if (t.trim()) traitsSet.add(t.trim());
-    } else if (typeof data.personality_traits === "string") {
-      for (const t of data.personality_traits.split(","))
-        if (t.trim()) traitsSet.add(t.trim());
-    }
-    if (body) bodyMarkdown = body;
-  } catch {
-    // Non-fatal if IDENTITY.md is missing or unreadable
-  }
-
-  // 3. An avatar image in the workspace beats the World Wiki card's URL
-  if (!avatarUrl) avatarUrl = await localAvatarUrl(api, agentId, config);
-
-  // 3b. The default portrait: a stat or two, never a listing per request
+  const card = readCharacterCard(worldWikiDir(api), agentId)?.page;
+  const configured = api.runtime.agent
+    .resolveAgentIdentity(config, agentId)
+    ?.name?.trim();
+  const avatarUrl = await localAvatarUrl(api, agentId, config);
   const portraitUrl = defaultPortraitUrl(
     agentId,
     api.runtime.agent.resolveAgentWorkspaceDir(config, agentId),
   );
-
-  // 4. Fallback / augment with World Wiki card if present
-  try {
-    const cwd = process.cwd();
-    const possiblePaths = [
-      path.join(cwd, "shared/wiki/entities/characters", `${agentId}.md`),
-    ];
-    for (const wikiPath of possiblePaths) {
-      try {
-        const text = await readFile(wikiPath, "utf8");
-        const { data, body } = readFrontmatter(text, IDENTITY_FRONTMATTER);
-        if (!occupation && data.occupation) occupation = data.occupation;
-        if (!affiliation && (data.school || data.club))
-          affiliation = data.school ?? data.club;
-        if (!role && (data.role || data.combat_role))
-          role = data.role ?? data.combat_role;
-        if (!avatarUrl && (data.avatarUrl || data.avatar))
-          avatarUrl = data.avatarUrl ?? data.avatar;
-        if (body && !bodyMarkdown) bodyMarkdown = body;
-        break;
-      } catch {
-        // Continue searching
-      }
-    }
-  } catch {
-    // Non-fatal
-  }
-
   return {
-    name,
-    avatarUrl,
+    name: configured || card?.name || agentId,
+    ...(avatarUrl === undefined ? {} : { avatarUrl }),
     ...(portraitUrl === undefined ? {} : { portraitUrl }),
-    occupation,
-    affiliation,
-    aliases: [...aliasSet],
-    role,
-    personalityTraits: [...traitsSet],
-    bodyMarkdown,
+    ...(card?.summary ? { summary: card.summary } : {}),
+    // Only groups they're in; one that has merely heard of them isn't.
+    groups: [
+      ...(card?.in ?? []),
+      ...(card?.legacyGroups ?? []).filter(({ level }) => level !== "heard of"),
+    ].map(({ ref }) => ref),
+    aliases: [...(card?.aliases ?? [])],
+    lead: card?.lead ?? "",
   };
 }
 
@@ -281,8 +237,8 @@ export function registerCharactersHttp(
           isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
           avatarUrl: data.avatarUrl,
           portraitUrl: data.portraitUrl,
-          occupation: data.occupation,
-          affiliation: data.affiliation,
+          ...(data.summary ? { summary: data.summary } : {}),
+          groups: data.groups,
           aliases: data.aliases,
           status,
         };
@@ -322,6 +278,91 @@ export function registerCharactersHttp(
     sendJson(res, 200, { statuses } satisfies StageResponse);
   });
 
+  route("character/create", "POST", async (req, res) => {
+    const { id, name } = CharacterCreatePayloadSchema.parse(
+      await readJsonBody(req),
+    );
+    const config = getConfig();
+    const cast = listAgentIds(config);
+    const wikiDir = worldWikiDir(api);
+    // Characters, places and concepts share one namespace of ids.
+    const taken =
+      cast.includes(id) ||
+      id === user.id.replace(/^user:/, "") ||
+      wikiPageIds(wikiDir).has(id);
+    const someone = cast.find((one) => one !== systemAgentOf(config));
+    const anchorAgent = someone ?? cast[0];
+    const workspaces = anchorAgent
+      ? path.dirname(
+          api.runtime.agent.resolveAgentWorkspaceDir(config, anchorAgent),
+        )
+      : path.resolve("workspaces");
+    const workspace = path.join(workspaces, id);
+    if (taken || existsSync(workspace)) {
+      sendJson(res, 409, {
+        error: `There is already a page or character called ${id}.`,
+      });
+      return;
+    }
+    const page = characterFile(wikiDir, id);
+    mkdirSync(path.dirname(page), { recursive: true });
+    writeFileSync(
+      page,
+      `---\nname: ${JSON.stringify(name)}\n---\n\n# ${name}\n`,
+      { flag: "wx" },
+    );
+    mkdirSync(path.join(workspace, "wiki"), { recursive: true });
+    writeFileSync(path.join(workspace, "MEMORY.md"), `# ${name}\n`, {
+      flag: "wx",
+    });
+    const like = someone ? config.agents?.entries?.[someone] : undefined;
+    try {
+      // Offstage until someone brings them on: a new character costs nothing yet.
+      await deps.setOnstage(id, false, [id]);
+      editCast((entries) => {
+        entries[id] = {
+          // Beside the rest of the cast's, written the way theirs are.
+          workspace: `${
+            typeof like?.workspace === "string"
+              ? path.posix.dirname(like.workspace)
+              : "./workspaces"
+          }/${id}`,
+          // The same tools as the rest of the cast.
+          ...(like?.tools ? { tools: structuredClone(like.tools) } : {}),
+        };
+      });
+    } catch (error) {
+      // Nothing half made: the page and workspace go again.
+      rmSync(page, { force: true });
+      rmSync(workspace, { recursive: true, force: true });
+      throw error;
+    }
+    sendJson(res, 200, { id } satisfies CharacterCreateResponse);
+  });
+
+  route("character/delete", "POST", async (req, res) => {
+    const { id } = CharacterDeletePayloadSchema.parse(await readJsonBody(req));
+    const config = getConfig();
+    if (!listAgentIds(config).includes(id)) {
+      sendJson(res, 404, { error: `Character not found: ${id}` });
+      return;
+    }
+    if (id === systemAgentOf(config)) {
+      sendJson(res, 400, { error: "The system agent can't be deleted." });
+      return;
+    }
+    const workspace = api.runtime.agent.resolveAgentWorkspaceDir(config, id);
+    // Stopped first: nothing they were doing goes on half done.
+    await deps.setOnstage(id, false, [id]);
+    editCast((entries) => {
+      delete entries[id];
+    });
+    // Gone for good: their page and their workspace.
+    rmSync(characterFile(worldWikiDir(api), id), { force: true });
+    rmSync(workspace, { recursive: true, force: true });
+    sendJson(res, 200, { id } satisfies CharacterCreateResponse);
+  });
+
   route("character", "GET", async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const id = url.searchParams.get("id");
@@ -337,7 +378,7 @@ export function registerCharactersHttp(
           name: user.name,
           kind: "player",
           aliases: [],
-          personalityTraits: [],
+          groups: [],
           bodyMarkdown:
             (await readPlayerPage(playerWikiDir(api), user.id))?.about ||
             `The player, ${user.name}.`,
@@ -362,13 +403,11 @@ export function registerCharactersHttp(
       isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
       avatarUrl: data.avatarUrl,
       portraitUrl: data.portraitUrl,
-      occupation: data.occupation,
-      affiliation: data.affiliation,
+      ...(data.summary ? { summary: data.summary } : {}),
+      groups: data.groups,
       aliases: data.aliases,
       status,
-      role: data.role,
-      personalityTraits: data.personalityTraits,
-      bodyMarkdown: data.bodyMarkdown,
+      bodyMarkdown: data.lead,
     };
 
     sendJson(res, 200, { character } satisfies CharacterDetailResponse);

@@ -1,6 +1,8 @@
+import { hasPlace } from "../wiki-layout.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { WorldPackageSchema } from "@kazusa/client";
+import { CARD_FILES, convertPage, foldKind } from "../characters/fold.ts";
 import { renamedText } from "../location/pages.ts";
 import { WORLD_PACKAGE } from "../world/package.ts";
 import {
@@ -26,21 +28,79 @@ const LAYOUT_KEYS = ["fm:map"];
 // ------------------------------------------------------------------- renames
 
 function renamesOf(template: Tree): Record<string, string> {
+  let renames: Record<string, string>;
   try {
-    return (
+    renames =
       WorldPackageSchema.safeParse(JSON.parse(template.text(PACKAGE) ?? ""))
-        .data?.kazusa.renames ?? {}
-    );
+        .data?.kazusa.renames ?? {};
   } catch {
     return {};
   }
+  // An old id the release uses again is another page now: it stays.
+  const pages = new Set(
+    [...template.ids.keys()]
+      .map((file) => /^shared\/wiki\/(?:.+\/)?([^/]+)\.md$/.exec(file)?.[1])
+      .filter((id): id is string => id !== undefined),
+  );
+  return Object.fromEntries(
+    Object.entries(renames).filter(([from]) => !pages.has(from)),
+  );
 }
 
-function renamedPath(file: string, renames: Record<string, string>): string {
-  const match = /^(.*\/wiki\/entities\/places\/)([^/]+)\.md$/.exec(file);
+function renamedPath(
+  file: string,
+  renames: Record<string, string>,
+  /**
+   * In the two-folder layout places are in `concepts/`; before, a concept could
+   * share a place's id.
+   */
+  upgraded = false,
+): string {
+  const match = (
+    upgraded
+      ? /^(.*\/wiki\/(?:entities\/places|concepts)\/)([^/]+)\.md$/
+      : /^(.*\/wiki\/entities\/places\/)([^/]+)\.md$/
+  ).exec(file);
   if (!match) return file;
   const to = renames[match[2]];
   return to ? `${match[1]}${to}.md` : file;
+}
+
+/** A page of the older wiki layout, World Wiki or a character's. */
+const OLDER =
+  /^(shared\/wiki|workspaces\/[^/]+\/wiki)\/(entities\/characters|entities\/places|entities\/concepts|groups)\/([^/]+)$/;
+
+/**
+ * Where a page of the older layout lives in the two-folder one: the cast in
+ * `characters/`, everything else in `concepts/`. Ids stay the same.
+ */
+export function upgradedPath(file: string): string {
+  const match = OLDER.exec(file);
+  if (!match) return file;
+  const folder = match[2] === "entities/characters" ? "characters" : "concepts";
+  return `${match[1]}/${folder}/${match[3]}`;
+}
+
+/**
+ * Files by where they belong in the release, each from where it is. A page
+ * already where it belongs keeps its place when an older one would land there
+ * too: that one stays where it is, for judgment.
+ */
+function mapped(
+  files: Iterable<string>,
+  where: (file: string) => string,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  // Already there first, then a page that only changes folder, then a rename.
+  const rank = (file: string) => {
+    const at = where(file);
+    return at === file ? 0 : path.basename(at) === path.basename(file) ? 1 : 2;
+  };
+  for (const file of [...files].sort((a, b) => rank(a) - rank(b))) {
+    const at = where(file);
+    out.set(out.has(at) ? file : at, file);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------- plan
@@ -146,9 +206,15 @@ function areasOf(changes: readonly Change[]): Area[] {
 const ownerOf = (file: string): MergePolicy["owner"] =>
   /^workspaces\/[^/]+\/(wiki\/|MEMORY\.md$)/.test(file) ? "personal" : "world";
 
-const CHARACTER = /^shared\/wiki\/entities\/characters\/([^/]+)\.md$/;
-const PLACE = /^shared\/wiki\/entities\/places\/([^/]+)\.md$/;
-const CARD = /^workspaces\/[^/]+\/wiki\/entities\/places\/([^/]+)\.md$/;
+const CHARACTER = /^shared\/wiki\/(?:entities\/)?characters\/([^/]+)\.md$/;
+/** A World Wiki page that can be a place, in either layout. */
+const PLACE = /^shared\/wiki\/(?:entities\/places|concepts)\/([^/]+)\.md$/;
+/** A character's page that can be on a place, in either layout. */
+const CARD =
+  /^workspaces\/[^/]+\/wiki\/(?:entities\/places|concepts)\/([^/]+)\.md$/;
+/** Whether a page is a place: in the older folder, or with `place_id`. */
+const isPlace = (file: string, text: string | undefined): boolean =>
+  file.includes("/entities/places/") || (text !== undefined && hasPlace(text));
 
 export function planUpdate(
   live: string,
@@ -157,13 +223,64 @@ export function planUpdate(
   options: { readonly layout: MergePolicy["layout"] },
 ): Plan {
   const renames = renamesOf(template);
+  // A release in the two-folder layout brings an older world's pages along.
+  // Only the update that moves an older world: once it stands on a release in
+  // the two-folder layout, its pages are already where they belong.
+  const twoFolders = (tree: Tree) =>
+    [...tree.ids.keys()].some((file) =>
+      file.startsWith("shared/wiki/characters/"),
+    );
+  const upgrade = twoFolders(template) && !twoFolders(base);
+  // In the two-folder layout a renamed place, or a merged concept, is in
+  // `concepts/`, whether this update moves the world there or it already is.
+  const inConcepts = twoFolders(template);
+  const where = (file: string) =>
+    renamedPath(upgrade ? upgradedPath(file) : file, renames, inConcepts);
 
-  const liveFiles = new Map<string, string>();
-  for (const file of filesOf(live))
-    liveFiles.set(renamedPath(file, renames), file);
-  const baseOriginal = new Map(
-    [...base.ids.keys()].map((file) => [renamedPath(file, renames), file]),
-  );
+  const liveFiles = mapped(filesOf(live), where);
+  const baseOriginal = mapped(base.ids.keys(), where);
+  // A release in the new layout has one page per character: a character's
+  // card (IDENTITY.md, SOUL.md) folds into their World Wiki page, and every
+  // page gets the front matter Kazusa reads (`characters/fold.ts`). Both sides
+  // are read as that leaves them, each with its own cards, so the creator's
+  // card and play's changes to it meet on the page.
+  const folds = (id: string) =>
+    upgrade &&
+    template.ids.has(`shared/wiki/characters/${id}.md`) &&
+    !CARD_FILES.some((name) => template.ids.has(`workspaces/${id}/${name}`));
+  const readLive = (file: string) => {
+    try {
+      return readFileSync(path.join(live, file), "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+  const asFolded = (
+    file: string,
+    text: string,
+    cardText: (file: string) => string | undefined,
+  ): string => {
+    const relative = /^shared\/wiki\/(.+\.md)$/.exec(file)?.[1];
+    if (!upgrade || !relative || relative === "INDEX.md") return text;
+    const kind = foldKind(relative);
+    const id = path.basename(relative, ".md");
+    return convertPage(
+      text,
+      kind,
+      id,
+      kind === "person" && folds(id)
+        ? {
+            identity: cardText(`workspaces/${id}/${CARD_FILES[0]}`),
+            soul: cardText(`workspaces/${id}/${CARD_FILES[1]}`),
+          }
+        : undefined,
+    );
+  };
+  /** A card the release folded into its character's page. */
+  const foldedCard = (file: string): boolean => {
+    const match = /^workspaces\/([^/]+)\/(IDENTITY|SOUL)\.md$/.exec(file);
+    return match !== null && folds(match[1]);
+  };
   const baseFiles = new Set(baseOriginal.keys());
   const templateFiles = new Set(template.ids.keys());
   const all = [
@@ -171,20 +288,34 @@ export function planUpdate(
   ].sort();
 
   const read = (file: string) => readFileSync(file, "utf8");
-  const liveText = (file: string) =>
-    renamedText(read(path.join(live, liveFiles.get(file)!)), renames);
+  const liveText = (file: string) => {
+    const original = liveFiles.get(file)!;
+    return renamedText(
+      asFolded(original, read(path.join(live, original)), readLive),
+      renames,
+    );
+  };
   const liveHash = (file: string) =>
     blobId(readFileSync(path.join(live, liveFiles.get(file)!)));
   const baseText = (file: string) => {
-    const text = base.text(baseOriginal.get(file)!);
-    return text === undefined ? undefined : renamedText(text, renames);
+    const original = baseOriginal.get(file)!;
+    const text = base.text(original);
+    return text === undefined
+      ? undefined
+      : renamedText(
+          asFolded(original, text, (card) => base.text(card)),
+          renames,
+        );
   };
   const baseHash = (file: string) => base.ids.get(baseOriginal.get(file)!);
   const templateText = (file: string) => template.text(file) ?? "";
   /** A card's `name` follows its place's world page, as the release has it. */
   const cardNamed = (file: string, text: string) => {
     const id = CARD.exec(file)?.[1];
-    const page = id && template.text(`shared/wiki/entities/places/${id}.md`);
+    const page =
+      id &&
+      (template.text(`shared/wiki/concepts/${id}.md`) ??
+        template.text(`shared/wiki/entities/places/${id}.md`));
     const name = page && /^name:.*$/m.exec(page)?.[0];
     return name ? text.replace(/^name:.*$/m, name) : text;
   };
@@ -217,6 +348,11 @@ export function planUpdate(
         changes.push({ path: file, outcome: "added", copyFromTemplate: true });
       else if (templateHash(file) !== baseHash(file))
         changes.push({ path: file, outcome: "kept-deleted" });
+      continue;
+    }
+    if (!inT && inL && foldedCard(file)) {
+      // Its words are on the character's page now.
+      changes.push({ path: file, outcome: "removed", ...from });
       continue;
     }
     if (!inT && inL) {
@@ -309,15 +445,28 @@ export function planUpdate(
       .filter(({ outcome }) => outcome === "removed")
       .map(({ path: file }) => file),
   );
+  const textOf = (file: string): string | undefined =>
+    liveFiles.has(file) ? liveText(file) : template.text(file);
   const places = new Set(
     [...new Set([...liveFiles.keys(), ...templateFiles])]
-      .filter((file) => PLACE.test(file) && !removed.has(file))
+      .filter(
+        (file) =>
+          PLACE.test(file) && !removed.has(file) && isPlace(file, textOf(file)),
+      )
       .map((file) => PLACE.exec(file)![1]),
   );
+  /** Whether the release before this one had a place with this id. */
+  const wasPlace = (id: string): boolean =>
+    [
+      `shared/wiki/entities/places/${id}.md`,
+      `shared/wiki/concepts/${id}.md`,
+    ].some((file) => baseFiles.has(file) && isPlace(file, baseText(file)));
   const planned = new Map(changes.map((change) => [change.path, change]));
   for (const file of liveFiles.keys()) {
     const card = CARD.exec(file)?.[1];
     if (!card || places.has(card) || templateFiles.has(file)) continue;
+    // A page on lore, not a place: nothing to forget.
+    if (!isPlace(file, liveText(file)) && !wasPlace(card)) continue;
     const text = liveText(file);
     const ownWords = parseDoc(text).body.some(({ key }) => key !== "title");
     const seed =
@@ -332,7 +481,7 @@ export function planUpdate(
         ? {
             path: file,
             outcome: "orphaned",
-            ...(baseFiles.has(`shared/wiki/entities/places/${card}.md`)
+            ...(wasPlace(card)
               ? { reason: "its place no longer exists" }
               : {
                   reason: "its place was already gone before this update",
@@ -356,7 +505,12 @@ export function planUpdate(
   const pendingRenames = Object.fromEntries(
     Object.entries(renames).filter(([from]) =>
       [...liveFiles.values()].some(
-        (file) => renamedPath(file, { [from]: renames[from] }) !== file,
+        (file) =>
+          renamedPath(
+            upgrade ? upgradedPath(file) : file,
+            { [from]: renames[from] },
+            inConcepts,
+          ) !== (upgrade ? upgradedPath(file) : file),
       ),
     ),
   );

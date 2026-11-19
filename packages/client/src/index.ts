@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { StatsStreamEventSchema } from "./stats.ts";
 export * from "./access.ts";
+export * from "./wiki-editor.ts";
+import {
+  WikiGroupSchema,
+  WikiIdSchema,
+  WikiKindSchema,
+} from "./wiki-editor.ts";
 export * from "./speech.ts";
 export * from "./stats.ts";
 
@@ -396,7 +402,10 @@ export const WorldPackageSchema = z.looseObject({
     /** How the setup guide lists a template, when not by its `displayName`. */
     title: z.string().optional(),
     systemAgent: z.string(),
-    /** The group picked to start with: a value of one of the world's anchors. */
+    /**
+     * The group picked to start with: one its characters' pages name in
+     * `groups`.
+     */
     defaultGroup: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
@@ -1111,8 +1120,10 @@ export const CharacterSummarySchema = z.object({
    * the portraits. Absent for a character who isn't drawn.
    */
   portraitUrl: z.string().optional(),
-  occupation: z.string().optional(),
-  affiliation: z.string().optional(),
+  /** One line about them: their World Wiki page's summary. */
+  summary: z.string().optional(),
+  /** What their page says they belong to, nearest first. */
+  groups: z.array(z.string()).optional(),
   aliases: z.array(z.string()),
   /** Absent for NPCs. */
   status: CharacterStatusSchema.optional(),
@@ -1125,11 +1136,9 @@ export const CharactersResponseSchema = z.object({
 });
 export type CharactersResponse = z.infer<typeof CharactersResponseSchema>;
 
-/** GET /kazusa/character?id= — frontmatter fields as JSON, body verbatim. */
+/** GET /kazusa/character?id= — the roster's fields and their page's opening. */
 export const CharacterDetailSchema = CharacterSummarySchema.extend({
-  role: z.string().optional(),
-  personalityTraits: z.array(z.string()),
-  /** Rendered verbatim. Never mined for fields. */
+  /** Their page's opening paragraph, rendered verbatim. */
   bodyMarkdown: z.string().optional(),
 });
 export type CharacterDetail = z.infer<typeof CharacterDetailSchema>;
@@ -1155,6 +1164,35 @@ export const StageResponseSchema = z.object({
   statuses: z.record(z.string(), CharacterStatusSchema),
 });
 export type StageResponse = z.infer<typeof StageResponseSchema>;
+
+/** A character's id: a page id, like `airi-kurimura`. */
+export const CharacterIdSchema = WikiIdSchema;
+
+/**
+ * POST /kazusa/character/create. A new character: their World Wiki page, their
+ * workspace, and a place in the cast, offstage until someone brings them on.
+ */
+export const CharacterCreatePayloadSchema = z.object({
+  id: CharacterIdSchema,
+  name: z.string().trim().min(1).max(120),
+});
+export type CharacterCreatePayload = z.infer<
+  typeof CharacterCreatePayloadSchema
+>;
+
+/**
+ * POST /kazusa/character/delete. Takes a character out of the cast: offstage,
+ * out of `openclaw.json`, their page and workspace deleted for good.
+ */
+export const CharacterDeletePayloadSchema = z.object({ id: CharacterIdSchema });
+export type CharacterDeletePayload = z.infer<
+  typeof CharacterDeletePayloadSchema
+>;
+
+export const CharacterCreateResponseSchema = z.object({ id: z.string() });
+export type CharacterCreateResponse = z.infer<
+  typeof CharacterCreateResponseSchema
+>;
 
 /* ========================================================================== */
 /* Read model: desires (GET /kazusa/desires, SSE `desires`)                   */
@@ -1863,20 +1901,27 @@ export function parseStreamEvent(raw: unknown): StreamEvent | null {
 /* Read model: wiki (GET /kazusa/wiki, /wiki/page, /wiki/lint, /memory/runs)  */
 /* -------------------------------------------------------------------------- */
 
-export const WikiKindSchema = z.enum(["place", "person", "concept", "day"]);
-export type WikiKind = z.infer<typeof WikiKindSchema>;
-
 export const WikiListItemSchema = z.object({
   id: z.string(),
   kind: WikiKindSchema,
   name: z.string(),
   summary: z.string(),
+  /** A place's area, as written. */
+  parent: z.string().optional(),
+  /** Components: on the map, and something people are in. */
+  place: z.boolean().optional(),
+  group: z.boolean().optional(),
 });
 export type WikiListItem = z.infer<typeof WikiListItemSchema>;
 
 /** One wiki's pages: the world's without `agent`, a character's with it. */
 export const WikiListResponseSchema = z.object({
   pages: z.array(WikiListItemSchema),
+  /**
+   * Whether the world is in the current format. One that isn't yet shows who
+   * knows its pages but can't edit that until ARONA upgrades it.
+   */
+  upgraded: z.boolean().optional(),
 });
 export type WikiListResponse = z.infer<typeof WikiListResponseSchema>;
 
@@ -1905,9 +1950,15 @@ export const WikiPageSchema = WikiListItemSchema.extend({
   openThreads: z.array(z.string()),
   theyThinkOfMe: z.string().optional(),
   relation: z.string().optional(),
-  community: z.string().optional(),
-  renown: z.string().optional(),
-  knownBy: z.array(z.string()),
+  /** The groups whose members know it, and how well. */
+  known: z.array(WikiGroupSchema).optional(),
+  /** On a character's page: the groups they are in, and how closely. */
+  in: z.array(WikiGroupSchema).optional(),
+  /** Components: on the map, and something people are in. */
+  place: z.boolean().optional(),
+  group: z.boolean().optional(),
+  /** How well everyone knows it, when everyone has heard of it. */
+  everyone: z.enum(["heard of", "knows", "close"]).optional(),
   seen: z.string().optional(),
 });
 export type WikiPage = z.infer<typeof WikiPageSchema>;
@@ -1948,21 +1999,19 @@ export type WikiSourceResponse = z.infer<typeof WikiSourceResponseSchema>;
  * places a new page; an existing one stays where it is.
  */
 export const WikiSavePayloadSchema = z.object({
-  id: z
-    .string()
-    .regex(/^[\p{L}\p{N}][\p{L}\p{N}_-]*$/u, "Use letters, digits, _ or -."),
+  id: WikiIdSchema,
   agent: z.string().min(1).optional(),
   kind: WikiKindSchema.optional(),
-  text: z.string().max(200_000),
+  text: z.string(),
   base: z.string().nullable().optional(),
 });
 export type WikiSavePayload = z.infer<typeof WikiSavePayloadSchema>;
 
 /**
- * POST /kazusa/wiki/delete. The page goes to the trash (`.state/kazusa/
- * wiki-trash`). A World Wiki place takes the map with it: what was in it moves
- * up to its area, connections to it go, homes and people there go to its area.
- * With `base`, only the version that was read; 409 as for a save.
+ * POST /kazusa/wiki/delete. The page is deleted for good. A World Wiki place
+ * takes the map with it: what was in it moves up to its area, connections to it
+ * go, homes and people there go to its area. With `base`, only the version that
+ * was read; 409 as for a save.
  */
 export const WikiDeletePayloadSchema = WikiSavePayloadSchema.pick({
   id: true,
@@ -1970,20 +2019,6 @@ export const WikiDeletePayloadSchema = WikiSavePayloadSchema.pick({
   base: true,
 });
 export type WikiDeletePayload = z.infer<typeof WikiDeletePayloadSchema>;
-
-/**
- * POST /kazusa/wiki/rename. A World Wiki place takes a new id everywhere: its
- * page, pages and character cards naming it, and positions, trips and
- * conversations there. Saving a place page with a new `place_id` does the
- * same.
- */
-export const WikiRenamePayloadSchema = z.object({
-  id: z.string().min(1),
-  to: z
-    .string()
-    .regex(/^[a-z0-9][a-z0-9_-]*$/u, "Use lowercase letters, digits, _ or -."),
-});
-export type WikiRenamePayload = z.infer<typeof WikiRenamePayloadSchema>;
 
 /** What a delete or rename did besides the page itself. */
 export const WikiEditResultSchema = z.object({

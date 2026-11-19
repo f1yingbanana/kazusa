@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import useSWR from "swr";
+import { useCallback, useMemo } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import type {
   CharacterDetail,
   CharacterStatus,
@@ -9,7 +9,12 @@ import type {
 } from "@kazusa/client";
 import { useLiveStore } from "@/lib/live/state";
 import { fetchCharacterDetail } from "@/lib/source/characters/http";
-import { useSources, useCharactersResource } from "@/lib/source/provider";
+import {
+  CHARACTERS_KEY,
+  useSources,
+  useCharactersResource,
+} from "@/lib/source/provider";
+import { WIKI_KEY } from "@/lib/source/wiki/http";
 
 const EMPTY_CHARACTERS: readonly CharacterSummary[] = [];
 export function useCharacters() {
@@ -58,4 +63,21 @@ export function useCharacterStatus(
   id: string | undefined,
 ): CharacterStatus | undefined {
   return useLiveStore((state) => (id ? state.statuses.get(id) : undefined));
+}
+
+/**
+ * Makes or deletes a character, then has the roster and the wiki read again,
+ * keeping what they show meanwhile.
+ */
+export function useCastChange() {
+  const { mutate } = useSWRConfig();
+  return useCallback(
+    async <T>(change: () => Promise<T>): Promise<T> => {
+      const result = await change();
+      void mutate(CHARACTERS_KEY);
+      void mutate((key) => Array.isArray(key) && key[0] === WIKI_KEY);
+      return result;
+    },
+    [mutate],
+  );
 }

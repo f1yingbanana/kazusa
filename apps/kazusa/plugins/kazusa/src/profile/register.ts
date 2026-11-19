@@ -1,4 +1,5 @@
 import path from "node:path";
+import { characterFile } from "../wiki-layout.ts";
 import { ProfileSavePayloadSchema, type ProfileResponse } from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
@@ -26,13 +27,7 @@ export function registerProfile(api: OpenClawPluginApi): void {
       about: page?.about ?? "",
       wikiPage: path.relative(
         path.dirname(wikiDir),
-        page?.file ??
-          path.join(
-            wikiDir,
-            "entities",
-            "characters",
-            `${player.id.replace(/^user:/, "")}.md`,
-          ),
+        page?.file ?? characterFile(wikiDir, player.id),
       ),
     };
   };

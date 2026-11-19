@@ -1,6 +1,6 @@
 import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
 
-export type GroupBy = "none" | "affiliation" | "activity" | "brain";
+export type GroupBy = "none" | "group" | "activity" | "brain";
 /**
  * `characters` are all agents, onstage or not; `onstage` and `offstage` split
  * them by whether they're being simulated right now.
@@ -10,7 +10,7 @@ export type KindFilter =
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   none: "None",
-  affiliation: "Affiliation",
+  group: "Group",
   activity: "Activity type",
   brain: "Brain state",
 };
@@ -64,7 +64,7 @@ export function groupCharacters(
     ];
   const groups = new Map<string, CharacterSummary[]>();
   const keyOf = (character: CharacterSummary) => {
-    if (by === "affiliation") return character.affiliation ?? "";
+    if (by === "group") return character.groups?.[0] ?? "";
     const status = statusOf(character.id);
     if (by === "activity") return status?.task?.type ?? "";
     return status?.brain ?? "";
@@ -74,7 +74,7 @@ export function groupCharacters(
     groups.set(key, [...(groups.get(key) ?? []), character]);
   }
   const fallback = {
-    affiliation: "No affiliation",
+    group: "No group",
     activity: "No current task",
     brain: "No status",
   }[by];

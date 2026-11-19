@@ -267,12 +267,6 @@ export interface SetupStatus {
   readonly savedKey: SetupProvider | null;
 }
 
-/** What `memory.anchors` defaults to in the plugin. */
-const DEFAULT_ANCHORS = { school: "familiar", club: "intimate" };
-const AnchorsSchema = z.object({
-  memory: z.object({ anchors: z.record(z.string(), z.string()) }),
-});
-
 async function directories(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   return entries
@@ -281,14 +275,31 @@ async function directories(dir: string): Promise<string[]> {
     .sort();
 }
 
-/** A character's display name, from the frontmatter of their `IDENTITY.md`. */
+/**
+ * A character's name: their World Wiki page's, else (for the system agent, who
+ * keeps her own files) their `IDENTITY.md`'s, else their id.
+ */
 async function characterName(workspaces: string, id: string): Promise<string> {
-  const identity = await readFile(
-    path.join(workspaces, id, "IDENTITY.md"),
-    "utf8",
+  const page =
+    (await readIfPresent(
+      path.join(workspaces, "..", "shared/wiki/characters", `${id}.md`),
+    )) ??
+    (await readIfPresent(
+      path.join(
+        workspaces,
+        "..",
+        "shared/wiki/entities/characters",
+        `${id}.md`,
+      ),
+    ));
+  const identity = page
+    ? undefined
+    : await readIfPresent(path.join(workspaces, id, "IDENTITY.md"));
+  return (
+    (page && frontmatterField(page, "name")) ??
+    (identity && frontmatterField(identity, "name")) ??
+    id
   );
-  const name = /^name:\s*["']?(.+?)["']?\s*$/m.exec(identity)?.[1];
-  return name ?? id;
 }
 
 const frontmatterField = (text: string, field: string): string | undefined =>
@@ -298,57 +309,89 @@ const readIfPresent = async (file: string): Promise<string | undefined> =>
   existsSync(file) ? readFile(file, "utf8") : undefined;
 
 /**
- * The groups a world already defines: its anchors, read off the wiki's
- * character cards. An anchor's value may name a concept page, whose title reads
- * better.
+ * The groups a character's page puts them in: its `in`, or in a world not yet
+ * upgraded, each group its `groups` says knows them or is close to them (not
+ * `everyone`, nor one that has only heard of them). YAML allows `[A, B]`, `{ A:
+ * close }`, or one per line beneath the field.
  */
-async function characterGroups(
-  wiki: string,
-  ids: readonly string[],
-  anchors: Readonly<Record<string, string>>,
-) {
-  const cards = await Promise.all(
-    ids.map(
-      async (id) =>
-        [
-          id,
-          (await readIfPresent(
-            path.join(wiki, "entities/characters", `${id}.md`),
-          )) ?? "",
-        ] as const,
-    ),
+export function groupsIn(text: string): string[] {
+  const own = entriesOf(text, "in");
+  return (own.length ? own : entriesOf(text, "groups"))
+    .filter(
+      ([ref, level]) =>
+        ref && ref.toLowerCase() !== "everyone" && level !== "heard of",
+    )
+    .map(([ref]) => ref);
+}
+
+function entriesOf(text: string, field: string): [string, string][] {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
+  const lines = front.split(/\r?\n/);
+  const at = lines.findIndex((line) => line.startsWith(`${field}:`));
+  if (at < 0) return [];
+  const clean = (value: string) =>
+    value
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .trim();
+  const entries: [string, string][] = [];
+  const inline = lines[at].slice(field.length + 1).trim();
+  if (inline)
+    for (const item of inline.replace(/^[[{]|[\]}]$/g, "").split(","))
+      entries.push([
+        clean(item.split(":")[0] ?? ""),
+        clean(item.split(":")[1] ?? ""),
+      ]);
+  else
+    for (const line of lines.slice(at + 1)) {
+      if (!/^\s+\S/.test(line)) break;
+      const item = line.trim();
+      if (item.startsWith("-")) entries.push([clean(item.slice(1)), ""]);
+      else
+        entries.push([
+          clean(item.split(":")[0] ?? ""),
+          clean(item.split(":")[1] ?? ""),
+        ]);
+    }
+  return entries;
+}
+
+/**
+ * The groups a world's cast belongs to, from the `groups` on their World Wiki
+ * pages: those two or more share, named by the group's own page when it has
+ * one.
+ */
+async function characterGroups(wiki: string, ids: readonly string[]) {
+  const members = new Map<string, string[]>();
+  for (const id of ids) {
+    const card =
+      (await readIfPresent(path.join(wiki, "characters", `${id}.md`))) ??
+      (await readIfPresent(path.join(wiki, "entities/characters", `${id}.md`)));
+    for (const ref of card ? groupsIn(card) : [])
+      members.set(ref, [...(members.get(ref) ?? []), id]);
+  }
+  const groups = await Promise.all(
+    [...members]
+      .filter(([, group]) => group.length > 1)
+      .map(async ([value, group]) => {
+        const page = await readIfPresent(
+          path.join(wiki, "concepts", `${value}.md`),
+        );
+        return {
+          value,
+          name: (page && frontmatterField(page, "name")) ?? value,
+          ids: group,
+        };
+      }),
   );
-  const fields = Object.keys(anchors).sort(
-    (a, b) =>
-      Number(anchors[a] === "intimate") - Number(anchors[b] === "intimate"),
-  );
-  return Promise.all(
-    fields.map(async (field) => {
-      const members = new Map<string, string[]>();
-      for (const [id, card] of cards) {
-        const value = frontmatterField(card, field);
-        if (value) members.set(value, [...(members.get(value) ?? []), id]);
-      }
-      const groups = await Promise.all(
-        [...members]
-          .filter(([, group]) => group.length > 1)
-          .map(async ([value, group]) => {
-            const concept = await readIfPresent(
-              path.join(wiki, "concepts", `${value}.md`),
-            );
-            return {
-              value,
-              name: (concept && frontmatterField(concept, "title")) ?? value,
-              ids: group,
-            };
-          }),
-      );
-      return {
-        field,
-        groups: groups.toSorted((a, b) => a.name.localeCompare(b.name)),
-      };
-    }),
-  );
+  return groups.length
+    ? [
+        {
+          field: "groups",
+          groups: groups.toSorted((a, b) => a.name.localeCompare(b.name)),
+        },
+      ]
+    : [];
 }
 
 /**
@@ -386,11 +429,8 @@ export function createSetup(
       })),
     );
     const characters = named.toSorted((a, b) => a.name.localeCompare(b.name));
-    const anchors =
-      AnchorsSchema.safeParse(world.kazusa.config).data?.memory.anchors ??
-      DEFAULT_ANCHORS;
     const fields = ids.length
-      ? await characterGroups(path.join(dir, "shared/wiki"), ids, anchors)
+      ? await characterGroups(path.join(dir, "shared/wiki"), ids)
       : [];
     const defaultCast =
       fields

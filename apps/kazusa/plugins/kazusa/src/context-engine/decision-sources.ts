@@ -15,6 +15,7 @@ import {
   type DecisionContextAssembler,
 } from "./decision-context.ts";
 import { pluginSkillLoader, type SkillLoader } from "./skill-loader.ts";
+import { readCharacterCard, worldWikiDir } from "../characters/card.ts";
 
 /** Bound disk I/O before token selection; never follow a file symlink. */
 async function readText(
@@ -47,16 +48,26 @@ async function readText(
   }
 }
 
+/**
+ * Who a character is, for a judgment about them: their World Wiki page (its
+ * front matter and opening as `identity`, its sections as `soul`) and their
+ * `MEMORY.md`. `IDENTITY.md` and `SOUL.md` are no longer read.
+ */
 export async function readCharacterFiles(
   workspace: string,
+  card: string | undefined,
   signal?: AbortSignal,
 ): Promise<CharacterFiles> {
-  const [identity, soul, memory] = await Promise.all(
-    ["IDENTITY.md", "SOUL.md", "MEMORY.md"].map((name) =>
-      readText(path.join(workspace, name), signal),
-    ),
-  );
-  return { identity, soul, memory };
+  const memory = await readText(path.join(workspace, "MEMORY.md"), signal);
+  if (card === undefined) return { identity: null, soul: null, memory };
+  const sections = card.search(/^## /m);
+  return sections < 0
+    ? { identity: card, soul: null, memory }
+    : {
+        identity: card.slice(0, sections).trim(),
+        soul: card.slice(sections).trim(),
+        memory,
+      };
 }
 
 /** Four catalog pages: how far back a decision looks, at most. */
@@ -77,6 +88,7 @@ export function createDecisionContextAssembler(
   },
 ): DecisionContextAssembler {
   const getConfig = () => currentConfig(api);
+  const wikiDir = worldWikiDir(api);
   const config = CONTEXT_ENGINE_CONFIG.parse(
     api.pluginConfig?.contextEngine ?? {},
   );
@@ -147,7 +159,11 @@ export function createDecisionContextAssembler(
             return [sessionKey, items.reverse()] as const;
           }),
         ),
-        readCharacterFiles(workspace, request.signal),
+        readCharacterFiles(
+          workspace,
+          readCharacterCard(wikiDir, agentId)?.text,
+          request.signal,
+        ),
         Promise.resolve(
           deps.recollections?.(
             {

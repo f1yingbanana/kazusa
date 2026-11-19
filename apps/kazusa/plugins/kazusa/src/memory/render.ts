@@ -1,6 +1,6 @@
 import { DEPTHS } from "./knowledge.ts";
 import type { Entity, Signal } from "./retrieve.ts";
-import type { Note, Page } from "./page.ts";
+import { plainLinks, type Note, type Page } from "./page.ts";
 
 export interface RenderOptions {
   /** Whole entities are kept or dropped, never cut. */
@@ -26,7 +26,7 @@ const FULL_SIGNALS: ReadonlySet<Signal> = new Set([
   "news",
 ]);
 
-const flat = (text: string): string => text.replace(/\s+/g, " ").trim();
+const flatten = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 const shortDate = (date: string): string => {
   const [, month, day] = date.split("-");
@@ -62,33 +62,50 @@ export function renderEntity(
   entity: Entity,
   nameOf: RenderOptions["nameOf"],
 ): string {
+  // A link reads as what it links to.
+  const flat = (text: string): string =>
+    flatten(plainLinks(text, (id) => nameOf(id) ?? id));
   const own: Page | undefined = entity.personal;
   const canon = entity.world;
   const relation = own?.relation ? ` (${own.relation})` : "";
   const familiar =
     DEPTHS.indexOf(entity.knowledge.depth) >= DEPTHS.indexOf("familiar");
-  const view = own?.lead
-    ? flat(own.lead)
-    : canon && familiar && canon.lead
+  // The world's page as deep as they know it, then their own page on top.
+  const world = canon
+    ? familiar && canon.lead
       ? flat(canon.lead)
-      : (own?.summary ?? canon?.summary ?? "");
-  const hedge =
-    !own && entity.knowledge.depth === "heard of"
-      ? " (you've only heard of it)"
-      : "";
+      : flat(canon.summary)
+    : "";
+  const mine = own ? flat(own.lead || own.summary) : "";
+  const view = world || mine;
+  // Known only through a group: who they are, not them.
+  const through = entity.knowledge.through
+    ? (nameOf(entity.knowledge.through) ?? entity.knowledge.through)
+    : undefined;
+  const thing = canon?.kind === "person" ? "them" : "it";
+  const hedge = own
+    ? ""
+    : entity.knowledge.depth === "heard of"
+      ? ` (you've only heard of ${thing}${through ? `, through ${through}` : ""})`
+      : through
+        ? ` (through ${through})`
+        : "";
   const lines = [`${label(entity)}${relation}: ${view}${hedge}`];
+  if (entity.groups?.length)
+    lines[0] += ` In: ${entity.groups.map((id) => nameOf(id) ?? id).join(", ")}.`;
+  if (world && mine && mine !== world) lines[0] += ` Your view: ${mine}`;
   if (own?.theyThinkOfMe)
-    lines[0] += ` You guess they think: ${own.theyThinkOfMe}`;
+    lines[0] += ` You guess they think: ${flat(own.theyThinkOfMe)}`;
   if (own?.openThreads.length)
-    lines[0] += ` Unfinished: ${own.openThreads.join("; ")}`;
+    lines[0] += ` Unfinished: ${own.openThreads.map(flat).join("; ")}`;
   if (own) {
     const notes = [...own.notes].sort((a, b) => b.date.localeCompare(a.date));
     for (const note of notes.slice(0, NOTES_SHOWN))
-      lines.push(noteLine(note, nameOf));
+      lines.push(noteLine({ ...note, text: flat(note.text) }, nameOf));
   }
   for (const line of entity.history.slice(0, NOTES_SHOWN))
     lines.push(
-      `  · ${shortDate(line.date)}${line.news ? ", the news" : ""}: ${line.text}`,
+      `  · ${shortDate(line.date)}${line.news ? ", the news" : ""}: ${flat(line.text)}`,
     );
   if (entity.matched && !lines.join("\n").includes(flat(entity.matched))) {
     const excerpt = flat(entity.matched);
@@ -99,9 +116,11 @@ export function renderEntity(
   return lines.join("\n");
 }
 
-function oneLine(entity: Entity): string {
+function oneLine(entity: Entity, nameOf: RenderOptions["nameOf"]): string {
   const page = (entity.personal ?? entity.world)!;
-  const about = entity.personal?.relation ?? flat(page.summary);
+  const about =
+    entity.personal?.relation ??
+    flatten(plainLinks(page.summary, (id) => nameOf(id) ?? id));
   return `${label(entity)}${about ? ` (${about})` : ""}`;
 }
 
@@ -126,7 +145,7 @@ export function renderOnYourMind(
       entity.signals.some((signal) => FULL_SIGNALS.has(signal)) &&
       // The current place is already in Where you are; only a personal view adds.
       !(
-        entity.world?.kind === "place" &&
+        entity.world?.place === true &&
         !entity.personal?.lead &&
         entity.signals.every((signal) => signal === "seed")
       );
@@ -149,7 +168,7 @@ export function renderOnYourMind(
   const line: string[] = [];
   for (const entity of also) {
     if (line.length >= MAX_ALSO) break;
-    const text = oneLine(entity);
+    const text = oneLine(entity, options.nameOf);
     const tokens = options.estimate(text);
     if (tokens > remaining) continue;
     line.push(text);

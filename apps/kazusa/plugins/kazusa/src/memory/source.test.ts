@@ -102,23 +102,16 @@ describe("saveSource", () => {
 });
 
 describe("deleteSource", () => {
-  it("moves the page to the trash, keeping where it lived", () => {
-    const trash = path.join(root, "..", `${path.basename(root)}-trash`);
+  it("deletes the page for good", () => {
     const { hash } = readSource(root, "plaza");
-    deleteSource(root, { id: "plaza", base: hash }, trash);
+    deleteSource(root, { id: "plaza", base: hash });
     expect(existsSync(path.join(root, "entities/places/plaza.md"))).toBe(false);
-    expect(
-      readFileSync(path.join(trash, "entities/places/plaza.md"), "utf8"),
-    ).toContain("# Plaza");
-    rmSync(trash, { recursive: true });
   });
 
   it("refuses a page that changed since it was read, or isn't there", () => {
-    expect(() =>
-      deleteSource(root, { id: "plaza", base: "stale" }, root),
-    ).toThrow(SourceConflict);
-    expect(() => deleteSource(root, { id: "nowhere" }, root)).toThrow(
+    expect(() => deleteSource(root, { id: "plaza", base: "stale" })).toThrow(
       SourceConflict,
     );
+    expect(() => deleteSource(root, { id: "nowhere" })).toThrow(SourceConflict);
   });
 });

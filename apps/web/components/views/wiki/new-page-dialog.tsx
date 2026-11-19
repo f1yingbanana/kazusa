@@ -32,25 +32,91 @@ const KINDS: ReadonlyArray<{
   readonly value: WikiKind;
   readonly label: string;
 }> = [
+  { value: "concept", label: "Concept" },
   { value: "person", label: "Person" },
-  { value: "place", label: "Place" },
-  { value: "concept", label: "Thing" },
-  { value: "day", label: "Diary day" },
 ];
 
-/** Same as the plugin's: a page's id is its file name. */
-const slug = (name: string): string =>
+/**
+ * An id from a name, as the plugin makes one: a page's id is its file name.
+ * Characters' ids take hyphens (`airi-kurimura`), other pages underscores.
+ */
+export const slug = (name: string, separator: "_" | "-" = "_"): string =>
   name
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[^\p{L}\p{N}]+/gu, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, separator)
+    .replace(/^[-_]+|[-_]+$/g, "");
+
+/**
+ * The id a name makes, shown under it, and changeable: an id is for good, so it
+ * is said once here, and never clashes with a page already there.
+ */
+export function IdLine({
+  id,
+  typed,
+  onType,
+  error,
+  inputId,
+}: {
+  id: string;
+  /** What the user typed, once they chose to; else the id follows the name. */
+  typed: string | undefined;
+  onType: (id: string | undefined) => void;
+  error: string | undefined;
+  inputId: string;
+}) {
+  if (typed === undefined)
+    return (
+      <div className="flex min-h-5 items-center gap-1.5 text-xs text-muted-foreground">
+        {id ? (
+          <>
+            <span>Id</span>
+            <code className="rounded bg-muted px-1 font-mono">{id}</code>
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              className="h-auto px-0 text-xs"
+              onClick={() => onType(id)}
+            >
+              Change
+            </Button>
+          </>
+        ) : (
+          <span>The id comes from the name.</span>
+        )}
+        {error ? <span className="text-destructive">{error}</span> : null}
+      </div>
+    );
+  return (
+    <Field data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={inputId}>Id</FieldLabel>
+      <Input
+        id={inputId}
+        value={typed}
+        autoFocus
+        className="font-mono"
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => onType(event.target.value)}
+      />
+      {error ? (
+        <FieldError>{error}</FieldError>
+      ) : (
+        <FieldDescription>
+          Pages link to it, and it stays once the page is made.
+        </FieldDescription>
+      )}
+    </Field>
+  );
+}
 
 /** Names a page, then opens it in the editor; nothing is written until saved. */
 export function NewPageDialog({
   open,
   onOpenChange,
   whose,
+  personal = false,
   existing,
   onCreate,
 }: {
@@ -58,18 +124,20 @@ export function NewPageDialog({
   onOpenChange: (open: boolean) => void;
   /** "the World Wiki" or "Airi's wiki". */
   whose: string;
+  /** A character's own wiki: pages on people and diary days too. */
+  personal?: boolean;
   existing: ReadonlySet<string>;
   onCreate: (page: { id: string; kind: WikiKind; name: string }) => void;
 }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<WikiKind>("concept");
   const [typedId, setTypedId] = useState<string | undefined>();
-  const id = typedId ?? slug(name);
+  const id = typedId ?? slug(name, kind === "person" ? "-" : "_");
   const valid = WikiSavePayloadSchema.shape.id.safeParse(id);
   const error = !id
     ? undefined
     : existing.has(id)
-      ? "A page with this file name already exists."
+      ? "Another page has this id."
       : valid.success
         ? undefined
         : "Use letters, digits, _ or -, starting with a letter or digit.";
@@ -101,9 +169,7 @@ export function NewPageDialog({
         >
           <DialogHeader>
             <DialogTitle>New page</DialogTitle>
-            <DialogDescription>
-              In {whose}. You write it next; nothing is saved until you do.
-            </DialogDescription>
+            <DialogDescription>In {whose}.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -112,46 +178,37 @@ export function NewPageDialog({
                 id="new-page-name"
                 value={name}
                 autoFocus
-                placeholder={kind === "day" ? "2026-11-04" : undefined}
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="new-page-kind">Kind</FieldLabel>
-              <Select
-                items={KINDS}
-                value={kind}
-                onValueChange={(value) => value && setKind(value)}
-              >
-                <SelectTrigger id="new-page-kind" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {KINDS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                {kind === "person"
-                  ? "A character's page uses their id as its file name."
-                  : kind === "day"
-                    ? "Name a diary day by its date."
-                    : "Sets the folder it goes in."}
-              </FieldDescription>
-            </Field>
-            <Field data-invalid={error ? true : undefined}>
-              <FieldLabel htmlFor="new-page-id">File name</FieldLabel>
-              <Input
-                id="new-page-id"
-                value={id}
-                aria-invalid={error ? true : undefined}
-                onChange={(event) => setTypedId(event.target.value)}
-              />
-              {error ? <FieldError>{error}</FieldError> : null}
-            </Field>
+            {personal ? (
+              <Field>
+                <FieldLabel htmlFor="new-page-kind">Kind</FieldLabel>
+                <Select
+                  items={KINDS}
+                  value={kind}
+                  onValueChange={(value) => value && setKind(value)}
+                >
+                  <SelectTrigger id="new-page-kind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KINDS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+            <IdLine
+              id={id}
+              typed={typedId}
+              onType={setTypedId}
+              error={error}
+              inputId="new-page-id"
+            />
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>

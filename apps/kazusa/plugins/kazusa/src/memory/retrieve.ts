@@ -1,7 +1,7 @@
 import { DEPTHS, type Depth, type Knowledge } from "./knowledge.ts";
 import { personalScope, type MemoryIndex, type SearchHit } from "./index.ts";
 import { NAME_LIKE_WORDS, searchWords, STOPWORDS } from "./index.ts";
-import type { HistoryLine, Note, Page } from "./page.ts";
+import { LEVELS, type HistoryLine, type Note, type Page } from "./page.ts";
 
 export interface RetrievalRequest {
   readonly agentId: string;
@@ -53,6 +53,8 @@ export interface Entity {
   readonly matched?: string;
   /** Dated world events they have seen or heard, newest first. */
   readonly history: readonly HistoryLine[];
+  /** A person's groups that they know well enough to know who is in them. */
+  readonly groups?: readonly string[];
 }
 
 const WEIGHTS: Readonly<Record<Signal, number>> = {
@@ -84,6 +86,16 @@ const MAX_SEMANTIC_PAGES = 6;
 const MAX_GRAPH_PER_SOURCE = 4;
 const RECENT_MS = 3 * 86_400_000;
 const MAX_NEWS_PAGES = 2;
+
+/** The links in the parts of a page someone knowing it this well can see. */
+function visibleLinks(page: Page, depth: Depth): string[] {
+  const at = DEPTHS.indexOf(depth);
+  return [
+    ...(at >= DEPTHS.indexOf("heard of") ? page.linksAt.heard : []),
+    ...(at >= DEPTHS.indexOf("familiar") ? page.linksAt.knows : []),
+    ...(at >= DEPTHS.indexOf("intimate") ? page.linksAt.close : []),
+  ];
+}
 
 const isOrdinaryWord = (word: string): boolean =>
   STOPWORDS.has(word) || NAME_LIKE_WORDS.has(word);
@@ -317,7 +329,6 @@ export function retrieve(
         news: hit.news ?? false,
         text: hit.text,
       });
-    if (hit.knownBy.length) return hit.knownBy.includes(agentId);
     const depth = knowledgeOf(hit.pageId).depth;
     const needed: Depth =
       hit.layer === "L0"
@@ -364,7 +375,9 @@ export function retrieve(
     lists.set("semantic", semantic);
   }
 
-  // Graph: one hop from what is already in front of them, their own links first.
+  // Graph: one hop from what is already in front of them: their own links
+  // first, then the links in the parts of the world page they can see, and a
+  // place's area.
   const sources = [
     ...(lists.get("seed") ?? []),
     ...(lists.get("mention") ?? []),
@@ -376,7 +389,8 @@ export function retrieve(
     const neighbors = [
       ...(own?.links ?? []),
       ...(own?.touched ?? []),
-      ...(canon?.parent ? [canon.parent] : []),
+      ...(canon?.place && canon.parent ? [canon.parent] : []),
+      ...(canon ? visibleLinks(canon, knowledgeOf(source).depth) : []),
       ...[...personal.values()]
         .filter(
           (page) =>
@@ -484,6 +498,17 @@ export function retrieve(
       const own = personal.get(id);
       const canon = world.pages.get(id);
       const text = matched.get(id);
+      const groups =
+        world.upgraded && canon?.kind === "person"
+          ? [...world.memberships(canon)]
+              .sort(([, a], [, b]) => LEVELS.indexOf(b) - LEVELS.indexOf(a))
+              .map(([group]) => group)
+              .filter(
+                (group) =>
+                  group !== agentId &&
+                  DEPTHS.indexOf(knowledgeOf(group).depth) >= 2,
+              )
+          : [];
       return {
         id,
         ...(own ? { personal: own } : {}),
@@ -495,6 +520,7 @@ export function retrieve(
         history: (canon?.history ?? [])
           .filter((line) => heardOf(id, line))
           .sort((a, b) => b.date.localeCompare(a.date)),
+        ...(groups.length ? { groups } : {}),
       };
     });
 }

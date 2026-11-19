@@ -1,17 +1,17 @@
 import { currentConfig } from "../current-config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
+import { characterFile } from "../wiki-layout.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { readCharacterFiles } from "../context-engine/decision-sources.ts";
+import { readCharacterCard, worldWikiDir } from "../characters/card.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
 import { pluginSkillLoader } from "../context-engine/skill-loader.ts";
-import { resolveStateDir } from "../state-dir.ts";
 import { appendLedgerEntry } from "../ledger.ts";
 import { cachedStore } from "../state.ts";
 import { openTaskStore } from "../taskman/store.ts";
@@ -90,14 +90,15 @@ export interface PlaceEdits {
     to: string,
   ) => Promise<{ readonly changed: readonly string[] }>;
   /**
-   * Removes a place's page (kept in `kazusa/wiki-trash` in the state folder).
-   * What was in it moves up to its area, connections to it go, and whoever was
-   * there is put in its area.
+   * Deletes a place's page for good. What was in it moves up to its area,
+   * connections to it go, and whoever was there is put in its area.
    */
   readonly remove: (
     id: string,
     /** The page, when two say the same `place_id`. */
     file?: string,
+    /** The page as it stays, no longer a place; else it is deleted. */
+    keepAs?: string,
   ) => Promise<{
     readonly changed: readonly string[];
     readonly relocated: readonly Relocated[];
@@ -264,8 +265,6 @@ export function registerLocation(
     readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluate?: JudgeDeps["evaluate"];
-    /** Where removed pages go; absent: `kazusa/wiki-trash` in the state folder. */
-    readonly trashDir?: string;
   },
 ): LocationService {
   const getConfig = () => currentConfig(api);
@@ -380,7 +379,12 @@ export function registerLocation(
   /** Who someone is and where they are, as evidence for a judgment. */
   const person = async (map: WorldMap, id: string, at: number) => {
     const workspace = workspaceOf(id);
-    const files = workspace ? await readCharacterFiles(workspace) : null;
+    const files = workspace
+      ? await readCharacterFiles(
+          workspace,
+          readCharacterCard(worldWikiDir(api), id)?.text,
+        )
+      : null;
     const position = await record(id).then((current) =>
       current ? positionAt(current, at) : undefined,
     );
@@ -392,8 +396,9 @@ export function registerLocation(
       // Whose place is whose: live, Airi going into her own room was judged
       // only likely without it.
       ...(home === undefined ? {} : { home: placeLabel(map, home) }),
-      identity: excerpt(files?.identity ?? null),
-      soul: excerpt(files?.soul ?? null, 600),
+      // The whole page as a rule: its personality and inner voice come last.
+      identity: excerpt(files?.identity ?? null, 4_000),
+      soul: excerpt(files?.soul ?? null, 16_000),
       ...(task
         ? { activity: { type: task.type, description: task.description } }
         : {}),
@@ -728,14 +733,10 @@ export function registerLocation(
     const workspace = workspaceOf(observer);
     const impressionOf = (id: string): string | null => {
       if (!workspace) return null;
-      const card = path.join(
-        workspace,
-        "wiki",
-        "entities",
-        "characters",
-        `${id.replace(/^user:/u, "")}.md`,
-      );
-      return existsSync(card) ? excerpt(readFileSync(card, "utf8"), 600) : null;
+      const card = characterFile(path.join(workspace, "wiki"), id);
+      return existsSync(card)
+        ? excerpt(readFileSync(card, "utf8"), 4_000)
+        : null;
     };
     const judgment = await judge(judgeWith(observer, "notice"), {
       agentId: observer,
@@ -927,10 +928,12 @@ export function registerLocation(
     agentId: string,
     evidence: string,
   ): Promise<PlaceKnowledge> => {
-    const cards = await cardsOf(agentId);
+    const cards = (await cardsOf(agentId)).filter(({ placeId }) =>
+      map.places.has(placeId),
+    );
     const workspace = workspaceOf(agentId);
     const memory = workspace
-      ? ((await readCharacterFiles(workspace)).memory ?? "")
+      ? ((await readCharacterFiles(workspace, undefined)).memory ?? "")
       : "";
     const namedIn = (text: string): string[] => {
       const lower = text.toLowerCase();
@@ -1077,21 +1080,12 @@ export function registerLocation(
       await repairing;
       return { changed };
     },
-    remove: async (id, file) => {
+    remove: async (id, file, keepAs) => {
       const { changed } = removePlacePages({
         wikiDir: config.wikiDir,
         id,
         ...(file === undefined ? {} : { file }),
-        trashDir: path.join(
-          deps.trashDir ??
-            path.join(
-              resolveStateDir(process.env, homedir()),
-              "kazusa",
-              "wiki-trash",
-            ),
-          new Date().toISOString().replace(/[:.]/g, "-"),
-          "world",
-        ),
+        ...(keepAs === undefined ? {} : { keepAs }),
         cwd: process.cwd(),
       });
       currentWorld.reload();

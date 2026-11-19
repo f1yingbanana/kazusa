@@ -310,14 +310,14 @@ export const CASES: readonly RetrievalCase[] = [
   ),
   ship(
     "depth",
-    "`knows` gives more than the deck",
+    "a close group gives more than the deck",
     "cass-holloway",
     "any coolant trouble at the reactor core?",
     { depth: { reactor_core: "intimate" }, shows: ["falsified"] },
   ),
   ship(
     "depth",
-    "without `knows`, the deck's depth",
+    "without it, the deck's depth",
     "ren-adeyemi",
     "any trouble at the Reactor Core?",
     {
@@ -337,7 +337,7 @@ export const CASES: readonly RetrievalCase[] = [
   // Exclusive knowledge.
   north(
     "exclusive",
-    "a `Known by:` section reaches its reader",
+    "a secret in their own wiki reaches them",
     PRIYA,
     "what is the Atlas rollback plan?",
     { shows: ["restore last month's snapshot"] },
@@ -355,10 +355,10 @@ export const CASES: readonly RetrievalCase[] = [
   ),
   north(
     "exclusive",
-    "a `known_by` page reaches its reader",
+    "a secret page reaches the one who knows it",
     "grace-kim",
     "where are we on the Layoffs Plan?",
-    { expect: ["layoffs_plan"], depth: { layoffs_plan: "intimate" } },
+    { expect: ["layoffs_plan"], depth: { layoffs_plan: "familiar" } },
   ),
   north(
     "exclusive",
@@ -423,13 +423,14 @@ export const CASES: readonly RetrievalCase[] = [
     depth: { mara_loft: "familiar" },
   }),
 
-  // Beliefs: personal views stand, wrong or not, and stay private.
+  // Beliefs: personal views stand beside what they know of canon, wrong or
+  // not, and stay private.
   salt(
     "beliefs",
-    "their view leads over canon",
+    "their view stands beside canon",
     MARA,
     "what do you make of the Tide Tax?",
-    { shows: ["racket"], hides: ["on each spring tide"] },
+    { shows: ["racket", "on each spring tide"] },
   ),
   salt(
     "beliefs",
@@ -480,7 +481,7 @@ export const CASES: readonly RetrievalCase[] = [
     "a personal view of a rival",
     PRIYA,
     "would you ever go to Helix Labs?",
-    { shows: ["turned down their offer"], hides: ["poached"] },
+    { shows: ["turned down their offer", "poached"] },
   ),
 
   // Topics: words their own memory shares with the message.

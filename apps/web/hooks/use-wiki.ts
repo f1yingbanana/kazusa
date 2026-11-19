@@ -6,7 +6,6 @@ import type {
   MemoryRunsResponse,
   WikiDeletePayload,
   WikiEditResult,
-  WikiRenamePayload,
   WikiKind,
   WikiSavePayload,
   WikiSourceResponse,
@@ -21,7 +20,6 @@ import {
   fetchWikiList,
   fetchWikiPage,
   fetchWikiSource,
-  renameWikiPage,
   saveWikiSource,
   WIKI_KEY,
 } from "@/lib/source/wiki/http";
@@ -95,11 +93,10 @@ function useWikiWrite<Payload, Result>(
         throw new Error("You do not have permission to edit the wiki.");
       }
       const result = await write(payload);
+      // Without data: even `undefined` would empty every list meanwhile.
       void mutate(
         (key) =>
           Array.isArray(key) && key[0] === WIKI_KEY && key[1] !== "source",
-        undefined,
-        { revalidate: true },
       );
       return result;
     },
@@ -113,8 +110,4 @@ export function useSaveWikiPage() {
 
 export function useDeleteWikiPage() {
   return useWikiWrite<WikiDeletePayload, WikiEditResult>(deleteWikiPage);
-}
-
-export function useRenameWikiPage() {
-  return useWikiWrite<WikiRenamePayload, WikiEditResult>(renameWikiPage);
 }

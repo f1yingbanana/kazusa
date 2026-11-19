@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { placeDirs } from "../wiki-layout.ts";
 import { z } from "zod";
 import { readFrontmatter } from "../markdown/frontmatter.ts";
 
@@ -24,7 +25,10 @@ export const PLACE_ID = /^[a-z0-9][a-z0-9_-]*$/u;
 const OPENING = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** A page's text with place ids renamed: its id, references to it, links. */
+/**
+ * A page's text with ids renamed: its id, references to it, links, and the
+ * group entries of `known` and `in`.
+ */
 export function renamedText(
   text: string,
   renames: Record<string, string>,
@@ -50,6 +54,21 @@ export function renamedText(
       .replace(
         new RegExp(`\\[\\[${escape(from)}(\\s*(?:\\|[^\\]]*)?\\]\\])`, "g"),
         `[[${to}$1`,
+      )
+      // A group's id where who knows a page, or who is in one, names it.
+      .replace(
+        new RegExp(
+          `^(\\s+)"?${escape(from)}"?(\\s*:\\s*(?:heard of|knows|close|member)\\s*)$`,
+          "gm",
+        ),
+        `$1${to}$2`,
+      )
+      .replace(
+        new RegExp(
+          `([{,]\\s*)"?${escape(from)}"?(\\s*:\\s*(?:heard of|knows|close|member)\\s*[,}])`,
+          "g",
+        ),
+        `$1${to}$2`,
       );
   }
   return next;
@@ -66,15 +85,19 @@ export function withoutPlace(
     readonly id: string;
     readonly name: string;
     readonly parent?: string;
+    /** The page stays, only not as a place: links to it stay too. */
+    readonly keepLinks?: boolean;
   },
 ): string {
   const { id, name, parent } = removed;
   const opening = OPENING.exec(text);
   const unlinked = (body: string) =>
-    body.replace(
-      new RegExp(`\\[\\[${escape(id)}\\s*(?:\\|([^\\]]*))?\\]\\]`, "g"),
-      (_match, label: string | undefined) => label?.trim() || name,
-    );
+    removed.keepLinks
+      ? body
+      : body.replace(
+          new RegExp(`\\[\\[${escape(id)}\\s*(?:\\|([^\\]]*))?\\]\\]`, "g"),
+          (_match, label: string | undefined) => label?.trim() || name,
+        );
   if (!opening) return unlinked(text);
   const newline = opening[0].includes("\r\n") ? "\r\n" : "\n";
   const lines = opening[1].split(/\r?\n/u);
@@ -169,8 +192,6 @@ const PLACE_FIELDS = z.object({
 
 /** The page holding a place: `<id>.md`, else whichever says `place_id: <id>`. */
 export function placeFile(wikiDir: string, id: string): string | undefined {
-  const dir = path.join(wikiDir, "entities", "places");
-  const named = path.join(dir, `${id}.md`);
   const fields = (file: string) => {
     try {
       return readFrontmatter(readFileSync(file, "utf8"), PLACE_FIELDS).data;
@@ -178,8 +199,13 @@ export function placeFile(wikiDir: string, id: string): string | undefined {
       return {};
     }
   };
-  if (existsSync(named) && (fields(named).place_id ?? id) === id) return named;
-  return markdownUnder(dir).find((file) => fields(file).place_id === id);
+  for (const dir of placeDirs(wikiDir)) {
+    const named = path.join(dir, `${id}.md`);
+    if (existsSync(named) && fields(named).place_id === id) return named;
+  }
+  return placeDirs(wikiDir)
+    .flatMap((dir) => markdownUnder(dir))
+    .find((file) => fields(file).place_id === id);
 }
 
 /**
@@ -202,7 +228,7 @@ export function renamePlacePages(params: {
     );
   const source = placeFile(wikiDir, from);
   if (!source) throw new Error(`No place page for ${from}.`);
-  const target = path.join(wikiDir, "entities", "places", `${to}.md`);
+  const target = path.join(path.dirname(source), `${to}.md`);
   if (placeFile(wikiDir, to) || existsSync(target))
     throw new Error(`There is already a place called ${to}.`);
   // Characters, places and concepts share one namespace of ids.
@@ -225,8 +251,11 @@ export function renamePlacePages(params: {
   );
   for (const workspace of params.workspaces) {
     const root = path.join(workspace, "wiki");
-    const card = path.join(root, "entities", "places", `${from}.md`);
-    const moved = path.join(root, "entities", "places", `${to}.md`);
+    const card =
+      markdownUnder(root).find(
+        (file) => path.basename(file) === `${from}.md`,
+      ) ?? path.join(root, "concepts", `${from}.md`);
+    const moved = path.join(path.dirname(card), `${to}.md`);
     if (existsSync(card) && !existsSync(moved)) {
       writeAtomic(moved, change(readFileSync(card, "utf8")));
       unlinkSync(card);
@@ -238,20 +267,52 @@ export function renamePlacePages(params: {
 }
 
 /**
- * Removes a place page into `trashDir` and mends the World Wiki around it.
- * Characters' own cards stay: they remember a place that's gone. `file` picks
- * one page when two say the same `place_id`; while another still does, the
- * place stays and nothing else changes. Returns the pages rewritten, relative
- * to the Gateway's working directory.
+ * A place's new name on each character's card for it, so their own wiki calls
+ * it what the world now does. Returns the cards rewritten, relative to `cwd`.
+ */
+export function renameCards(params: {
+  readonly workspaces: readonly string[];
+  readonly id: string;
+  readonly name: string;
+  readonly cwd: string;
+}): string[] {
+  const changed: string[] = [];
+  const line = `name: ${JSON.stringify(params.name)}`;
+  for (const workspace of params.workspaces)
+    for (const dir of ["concepts", path.join("entities", "places")]) {
+      const card = path.join(workspace, "wiki", dir, `${params.id}.md`);
+      if (!existsSync(card)) continue;
+      const text = readFileSync(card, "utf8");
+      const next = text.replace(
+        /^(---\r?\n[\s\S]*?)^name:.*$/mu,
+        (_, head: string) => `${head}${line}`,
+      );
+      if (next === text) continue;
+      writeAtomic(card, next);
+      changed.push(path.relative(params.cwd, card).split(path.sep).join("/"));
+    }
+  return changed;
+}
+
+/**
+ * Deletes a place page for good and mends the World Wiki around it. Characters'
+ * own cards stay: they remember a place that's gone. `file` picks one page when
+ * two say the same `place_id`; while another still does, the place stays and
+ * nothing else changes. Returns the pages rewritten, relative to the Gateway's
+ * working directory.
  */
 export function removePlacePages(params: {
   readonly wikiDir: string;
   readonly id: string;
   readonly file?: string;
-  readonly trashDir: string;
   readonly cwd: string;
+  /**
+   * The page as it is to stay, no longer a place: kept, and links to it with
+   * it; else the page is deleted.
+   */
+  readonly keepAs?: string;
 }): { readonly parent?: string; readonly changed: string[] } {
-  const { wikiDir, id, cwd } = params;
+  const { wikiDir, id, cwd, keepAs } = params;
   const source = params.file ?? placeFile(wikiDir, id);
   if (!source || !existsSync(source))
     throw new Error(`No place page for ${id}.`);
@@ -263,15 +324,19 @@ export function removePlacePages(params: {
     // A page that doesn't parse held nothing the map used.
   }
   const parent = fields.parent === id ? undefined : fields.parent;
-  writeAtomic(path.join(params.trashDir, path.relative(wikiDir, source)), text);
-  unlinkSync(source);
+  if (keepAs === undefined) unlinkSync(source);
+  else writeAtomic(source, keepAs);
   if (placeFile(wikiDir, id)) return { changed: [] };
-  const changed = rewriteAll(markdownUnder(wikiDir), cwd, (page) =>
-    withoutPlace(page, {
-      id,
-      name: fields.name ?? id,
-      ...(parent === undefined ? {} : { parent }),
-    }),
+  const changed = rewriteAll(
+    markdownUnder(wikiDir).filter((file) => file !== source),
+    cwd,
+    (page) =>
+      withoutPlace(page, {
+        id,
+        name: fields.name ?? id,
+        ...(parent === undefined ? {} : { parent }),
+        ...(keepAs === undefined ? {} : { keepLinks: true }),
+      }),
   );
   return { ...(parent === undefined ? {} : { parent }), changed };
 }

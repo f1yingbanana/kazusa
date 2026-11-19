@@ -44,7 +44,7 @@ The user's request, word for word.
 
 ## Decisions
 
-Source, time period, what's excluded, travel scale, anchors, the player.
+Source, time period, what's excluded, travel scale, groups, the player.
 
 ## Ids
 
@@ -158,12 +158,14 @@ Decisions:
 - **The moment in time.** One point in the story, usually its opening. It
   decides who's alive, who's where and what's still secret.
 - **Scope and tiers.** Count the cast. Major figures get full care. Minor ones
-  get short files. Those who never speak or are dead get a background card only,
-  with `is_simulated_agent: false`.
-- **Anchors.** Replace school and club with the setting's own groups: in
-  `openclaw.json`, set `plugins.entries.kazusa.config.memory.anchors`, such as
-  `{ "faction": "intimate", "realm": "familiar" }`. Cards then carry those
-  fields.
+  get short pages. Those who never speak or are dead get a page only, with no
+  workspace or `openclaw.json` entry.
+- **Groups.** Decide the setting's own: factions, guilds, crews, realms. Each is
+  a page in `shared/wiki/concepts/` with `group: true` (a realm can also be a
+  place). Every page's `known` says which groups know it and how well
+  (`heard of`, `knows`, `close`; `everyone` for all); a character's `in` names
+  theirs (`{ iron_guard: close, northmark: knows }`). How pages relate (a
+  guild's city, a rival) is `[[links]]` in their text.
 - **World settings** in the same config: `user` (the player's id and name),
   `world` (title, summary), `taskman.categories` (keep `sleeping` and
   `traveling`).
@@ -186,30 +188,33 @@ These all happened on a real build.
   shouldn't match a place's name: "The Realm of Northmark", not "Northmark".
 - **Names leak.** Everyone who sees a character reads their name, and aliases
   bring up that page. So a disguise must be a separate identity: the simulated
-  character is the name people meet, their `SOUL.md` says who they really are,
-  and the true identity is a background card. Don't list the secret name as an
-  alias.
-- **Secrets go in `Known by:` sections.** Same-group members read everything
-  else on a page, and everyone can read a `famous` page's lead. Keep a secret
-  out of the card's lead, `summary` and `## Background`. Give it a `## Secret`
-  section. Write the public version in the card, and the truth in `IDENTITY.md`.
+  character is the name people meet, a section only they know says who they
+  really are, and the true identity is a page of its own. Don't list the secret
+  name as an alias.
+- **Secrets go in the knowers' own wikis.** A group `close` to a world page
+  reads everything on it when it comes up, and `everyone: knows` gives every
+  character its opening. Keep a secret out of the world page altogether: write
+  it on each knower's own page about it, in their words.
 - **Summaries spread.** `summary` reaches anyone who has heard of the page.
-  Don't put where someone is now in a `known` or `famous` summary or lead.
+  Don't put where someone is now in the summary or lead of a page `everyone`
+  knows of.
 - **Descriptions spoil.** A place's body is shown in full on anyone's first
   visit. Describe what a visitor sees, not the hidden door.
-- **Hidden lands** stay `renown: local` or unset, on every page in them.
+- **Hidden lands** have no `everyone` in `known`, on every page in them.
 
 ## 5. Build in this order
 
 Each stage depends on the last, and the project file tracks them.
 
-1. **Concepts.** One root page for the world (`famous`, no `community`), then
-   regions and major groups under it, then history, cosmology and rules. Aim for
-   a lead that outsiders would know, with insider detail under `##`.
+1. **Concepts and groups.** One root page for the world
+   (`known: { everyone: knows }`), then regions, and the major groups
+   (`group: true`), then history, cosmology and rules. Aim for a lead that
+   outsiders would know, with insider detail under `##`.
 2. **Places.** See below. Run `wiki_lint` after every region.
-3. **Cards** for everyone, background included.
-4. **Workspaces**, one group at a time, so that people who know each other are
-   written together: `IDENTITY.md`, `SOUL.md`, `MEMORY.md`.
+3. **People's pages**, one group at a time, so that people who know each other
+   are written together: who they are, and their inner voice in a section only
+   they know. Everyone gets one, background included.
+4. **Workspaces** for the simulated cast: `MEMORY.md`, avatar and pictures.
 5. **Seeding** (section 7).
 6. **The index page.** Write `shared/wiki/INDEX.md` (see `world-building`): the
    world and its moment, the player, where the lore starts, the map's top-level
@@ -267,24 +272,23 @@ Each stage depends on the last, and the project file tracks them.
 - "malformed history": `## History` lines need a real date,
   `- 2026-01-05 — Text`, for things that happen in play. For the ancient past,
   use a section such as `## The Old Wars` with prose or plain bullets, not
-  `## History`.
-- "`known_by` names unknown character": fine until that character's card exists.
-  Check it again after cards are written.
+  `## History`. Check it again after cards are written.
 
 ### Characters
 
 The voice is why people play. For each person, before writing, ask how they
 differ from everyone else in the same group.
 
-- `SOUL.md` covers temperament, habits, how they talk, then two or three new
-  sample lines. Write these yourself, in their voice, rather than quoting the
-  source. Vocabulary and rhythm should be recognisable with the name covered.
+- Their inner voice (a section `Known by:` them alone) covers temperament,
+  habits, how they talk, then two or three new sample lines. Write these
+  yourself, in their voice, rather than quoting the source. Vocabulary and
+  rhythm should be recognisable with the name covered.
 - Avoid the same turns of phrase across characters. Vary sentence length, and
   let some be rude, boring, funny or silent. Someone who doesn't speak gets
   action lines.
-- Beings who can't speak, sleep or eat say so in `SOUL.md`.
-- Write what they believe, including what's wrong. `IDENTITY.md` holds what's
-  true of them, including what they don't admit.
+- Beings who can't speak, sleep or eat say so in their inner voice.
+- Write what they believe, including what's wrong, in their own wiki. Their page
+  holds what's true of them, including what they don't admit.
 
 ## 6. Registering
 
@@ -313,8 +317,8 @@ the lore doesn't have to dictate it, as long as nothing contradicts it.
   islands: people know their own leaders and council, classmates, neighbors and
   those their group deals with, so `world_audit` should show one society, not a
   `socialGroups` entry per club. If a setting has true loners, leave them alone,
-  and say so in your report. Relationships live only in these pages, never in
-  `IDENTITY.md` or `SOUL.md`.
+  and say so in your report. Relationships live only in these pages, never on
+  their World Wiki page.
 - **Haunts.** Place cards for where they'd know, with a line in their voice.
   Leave some places unknown so that first visits happen.
 - **Beliefs.** Give a few a wrong theory or a private view under
@@ -348,7 +352,7 @@ Don't report a stage as done before it's checked.
   outsider about hidden places, and someone from each side about the disguise.
   If a secret shows up, find which page leaked it. A small amount of irrelevant
   recall is normal.
-- Read three `SOUL.md` files from one group side by side. If they sound alike,
+- Read three inner voices from one group side by side. If they sound alike,
   rewrite them.
 
 ## 9. Finishing
@@ -408,7 +412,7 @@ These checks need no model or provider key. `memory_preview` takes `agent` and
   `continue_work`, run limits and `apply_patch`. You still keep the project
   file, so the job survives a lost session.
 - Scripts are fine for fetching, for checks and for repetitive wiring such as
-  ids and connections. Write `SOUL.md` and sample lines yourself, because
+  ids and connections. Write inner voices and sample lines yourself, because
   generated voices sound alike.
 - Register the cast (section 6) as the last edit, as written. Nobody should
   start thinking while you build.

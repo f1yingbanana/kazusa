@@ -1,6 +1,9 @@
 import {
   BrainAbortResponseSchema,
   type BrainAbortResponse,
+  CharacterCreateResponseSchema,
+  type CharacterCreatePayload,
+  type CharacterCreateResponse,
   CharacterDetailResponseSchema,
   CharactersResponseSchema,
   type CharacterDetail,
@@ -27,4 +30,20 @@ export async function abortCharacterBrain(
   return BrainAbortResponseSchema.parse(
     await postJson<unknown>(buildUrl("/kazusa/brain/abort"), { agentId }),
   );
+}
+
+/** A new character: their page, their workspace, offstage in the cast. */
+export async function createCharacter(
+  payload: CharacterCreatePayload,
+): Promise<CharacterCreateResponse> {
+  const data = await postJson<unknown>(
+    buildUrl("/kazusa/character/create"),
+    payload,
+  );
+  return CharacterCreateResponseSchema.parse(data);
+}
+
+/** Takes a character out of the cast, deleting their page and workspace. */
+export async function deleteCharacter(id: string): Promise<void> {
+  await postJson<unknown>(buildUrl("/kazusa/character/delete"), { id });
 }

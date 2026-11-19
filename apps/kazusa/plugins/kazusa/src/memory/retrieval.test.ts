@@ -18,7 +18,6 @@ function indexOf(name: string): MemoryIndex {
     index = new MemoryIndex({
       worldDir: path.join(root, "world"),
       workspaceDir: (agentId) => path.join(root, "agents", agentId),
-      anchors: WORLDS[name].anchors,
     });
     indexes.set(name, index);
   }
