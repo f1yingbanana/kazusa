@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_WATCHED,
-  promisedIn,
   digestOf,
   happeningOf,
   recordHappening,
@@ -134,20 +133,6 @@ describe("the digest", () => {
   });
 });
 
-describe("promised beats", () => {
-  it("reads them from front matter, line by line when YAML breaks", () => {
-    expect(
-      promisedIn("---\npromised:\n  - They argue\n  - They make up\n---\n"),
-    ).toEqual(["They argue", "They make up"]);
-    expect(
-      promisedIn(
-        "---\nwatching:\n  - who: a\n    for: Watch: x\npromised:\n  - Beat one: loud\n    and long\n---\n",
-      ),
-    ).toEqual(["Beat one: loud and long"]);
-    expect(promisedIn("# none")).toEqual([]);
-  });
-});
-
 describe("the settings block", () => {
   it("is found wherever the director left it", () => {
     const notebook = [
@@ -158,13 +143,10 @@ describe("the settings block", () => {
       "---",
       "watching:",
       "  - who: ann",
-      "promised:",
-      "  - They argue",
       "---",
       "",
       "## Arcs",
     ].join("\n");
     expect(watchingIn(notebook)).toEqual([{ who: "ann" }]);
-    expect(promisedIn(notebook)).toEqual(["They argue"]);
   });
 });

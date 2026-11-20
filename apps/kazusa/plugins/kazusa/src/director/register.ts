@@ -2,7 +2,6 @@ import { stat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-import type { DecisionRuntimeV1 } from "openclaw/plugin-sdk/decisions";
 import type { Clock } from "../clock/clock.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { currentConfig } from "../current-config.ts";
@@ -14,7 +13,6 @@ import type { Stimulus } from "../stimulus.ts";
 import {
   digestOf,
   happeningOf,
-  promisedIn,
   recordHappening,
   sharedHappenings,
   watchingIn,
@@ -25,21 +23,6 @@ import {
 const CUE_GAP_MS = 10 * 60_000;
 /** How many happenings one digest lists, at most. */
 const DIGEST_LINES = 60;
-/** A promised beat: since when, looks without it, and when it was seen. */
-interface Beat {
-  readonly since: number;
-  readonly looks: number;
-  readonly seenAt?: number;
-}
-/** How many lines of each watched conversation a beat is checked against. */
-const BEAT_LINES = 24;
-/** How long the note on open beats may take, and how long it may be. */
-const NOTE_TIMEOUT_MS = 30_000;
-const NOTE_CHARS = 1_200;
-/** How far back the note reads the watched characters' conversations. */
-const NOTE_WINDOW_MS = 24 * 60 * 60_000;
-/** How long the decision model has to check the beats. */
-const BEAT_TIMEOUT_MS = 10_000;
 /** How far back a watched character's chats count as their scene. */
 const SCENE_WINDOW_MS = 90 * 60_000;
 /** How much of each onstage character's activity the cast overview shows. */
@@ -90,21 +73,14 @@ const DIRECTOR_SKILL = "world-director";
  * narrating. Code gives it what it can't see: the cast; a digest of what
  * happened with each check-in of its own activities; the few characters its
  * notebook's settings block names (`watching:`), with a cue when the moment it
- * watches for comes up; and whether the beats it promised the user are on the
- * page yet, judged by someone other than itself. `references/director.md`.
+ * watches for comes up. Whether a scene went as scripted is its own judgment.
+ * `references/director.md`.
  */
 export function registerDirector(
   api: OpenClawPluginApi,
   deps: {
     readonly clock: Pick<Clock, "time">;
     readonly broadcaster: KazusaRealtimeBroadcaster;
-    /**
-     * A text model's one reply to a prompt, for the note on beats not yet seen.
-     * By default OpenClaw's default model (`api.runtime.llm.complete`).
-     */
-    readonly complete?: (prompt: string) => Promise<string | undefined>;
-    /** The decision model, which checks promised beats against the page. */
-    readonly evaluate?: DecisionRuntimeV1["evaluate"];
     /** Hands a stimulus to an agent's brain, as Perception does. */
     readonly receive: (agentId: string, stimulus: Stimulus) => Promise<void>;
     /** The conversation in person a character is in, if any. */
@@ -179,8 +155,6 @@ export function registerDirector(
         file: string;
         mtime: number;
         watches: Watch[];
-        promised: string[];
-        arcs: boolean;
       }
     | undefined;
   const notebook = async () => {
@@ -195,8 +169,6 @@ export function registerDirector(
           file,
           mtime: mtimeMs,
           watches: watchingIn(text),
-          promised: promisedIn(text),
-          arcs: /^#{2,3} Arcs\b/m.test(text),
         };
       }
       return cached;
@@ -389,159 +361,6 @@ export function registerDirector(
     },
   });
 
-  /** The promised beats as the director reads them: seen, or for how long not. */
-  const promiseView = async (id: string): Promise<string | undefined> => {
-    const state = await beatsOf(id);
-    const entries = Object.entries(state);
-    if (!entries.length) return undefined;
-    const say = (section: string, values: Record<string, string>) =>
-      text(`kazusa-director#${section}`, values, { agentId: id });
-    const lines = entries.map(([beat, at]) =>
-      at.seenAt
-        ? say("promised-seen", { beat, time: clockOf(at.seenAt) })
-        : say("promised-open", { beat, looks: String(at.looks) }),
-    );
-    const due = entries.some(([, at]) => !at.seenAt && at.looks >= 2);
-    const note = (await beats.lookup(id))?.note;
-    return say("promised", {
-      lines: [
-        ...lines,
-        ...(due ? [say("promised-due", {})] : []),
-        ...(note
-          ? [say("promised-note", { time: clockOf(note.at), note: note.text })]
-          : []),
-      ].join("\n"),
-    });
-  };
-
-  // The promised beats: when each was promised, how many looks it has gone
-  // unseen, and when it was seen on the page. Judged by the decision model
-  // from the watched conversations, never by the director itself.
-  const beats = api.runtime.state.openKeyedStore<{
-    readonly beats: Readonly<Record<string, Beat>>;
-    /** The latest note on the beats not yet seen, and when it was written. */
-    readonly note?: { readonly text: string; readonly at: number };
-  }>({ namespace: "director-beats", retention: "retained" });
-  const complete =
-    deps.complete ??
-    (async (prompt: string): Promise<string | undefined> => {
-      const result = await api.runtime.llm.complete({
-        messages: [{ role: "user", content: prompt }],
-        purpose: "kazusa: the note on the director's open beats",
-        // A reasoning model spends its budget thinking first: room for both.
-        maxTokens: 4_000,
-        reasoning: "low",
-        signal: AbortSignal.timeout(NOTE_TIMEOUT_MS),
-      });
-      return result.text;
-    });
-  const beatsOf = async (id: string): Promise<Record<string, Beat>> => {
-    const promised = (await notebook())?.promised ?? [];
-    const kept = (await beats.lookup(id))?.beats ?? {};
-    const now = deps.clock.time();
-    return Object.fromEntries(
-      promised.map((beat) => [beat, kept[beat] ?? { since: now, looks: 0 }]),
-    );
-  };
-  /** The latest lines of every conversation a watched character is in. */
-  const scenes = async (windowMs = SCENE_WINDOW_MS): Promise<string> => {
-    const who = (await watches()).map((watch) => watch.who);
-    const chats = new Set<string>();
-    for (const one of who) {
-      const huddle = await deps.huddleOf?.(one).catch(() => undefined);
-      if (huddle) chats.add(huddle.id);
-    }
-    for (const chat of (await deps
-      .recentChats?.(who, deps.clock.time() - windowMs)
-      .catch(() => [])) ?? [])
-      chats.add(chat);
-    const parts: string[] = [];
-    for (const chat of chats) {
-      const lines = await deps.latest?.(chat, BEAT_LINES).catch(() => []);
-      if (lines?.length) parts.push(lines.join("\n"));
-    }
-    return parts.join("\n\n");
-  };
-  /**
-   * Checks the beats not yet seen against the watched conversations; a look
-   * also counts against each of them.
-   */
-  const checkBeats = async (id: string, look: boolean): Promise<void> => {
-    const state = await beatsOf(id);
-    const open = Object.keys(state).filter((beat) => !state[beat]?.seenAt);
-    if (look)
-      for (const beat of open)
-        state[beat] = { ...state[beat], looks: state[beat].looks + 1 };
-    const conversation = open.length && deps.evaluate ? await scenes() : "";
-    if (conversation && deps.evaluate) {
-      const outcome = await deps
-        .evaluate(
-          {
-            state: text("kazusa-director#beat-state", { conversation }, {}),
-            questions: Object.fromEntries(
-              open.map((beat, at) => [
-                `b${at + 1}`,
-                {
-                  type: "boolean" as const,
-                  instructions: text(
-                    "kazusa-director#beat-question",
-                    { beat },
-                    {},
-                  ),
-                },
-              ]),
-            ),
-          },
-          {
-            agentId: id,
-            purpose: "director.beats",
-            rubricVersion: "director-1",
-            timeoutMs: BEAT_TIMEOUT_MS,
-            signal: AbortSignal.timeout(BEAT_TIMEOUT_MS),
-          },
-        )
-        .catch(() => undefined);
-      if (outcome?.status === "ok")
-        open.forEach((beat, at) => {
-          const answer = outcome.result.answers[`b${at + 1}`];
-          if (answer?.type === "boolean" && answer.probabilityTrue >= 0.5)
-            state[beat] = { ...state[beat], seenAt: deps.clock.time() };
-        });
-      api.logger.info(
-        `Director: beats ${open.map((beat) => (state[beat]?.seenAt ? "seen" : "open")).join(", ")}`,
-      );
-    }
-    // At a look, beats still open get a note from outside: where each
-    // stands, what is in the way, and the push most likely to help.
-    let note = (await beats.lookup(id))?.note;
-    const still = Object.keys(state).filter((beat) => !state[beat]?.seenAt);
-    // The note reads the last day: an outside eye matters most when the
-    // scenes have gone quiet.
-    const day = look && still.length ? await scenes(NOTE_WINDOW_MS) : "";
-    if (day) {
-      const written = await complete(
-        text(
-          "kazusa-director#note-prompt",
-          {
-            beats: still.map((beat) => `- ${beat}`).join("\n"),
-            conversation: day,
-          },
-          {},
-        ),
-      ).catch((error: unknown) => {
-        api.logger.warn(`Director: no note: ${String(error)}`);
-        return undefined;
-      });
-      const clean = written?.trim().slice(0, NOTE_CHARS);
-      if (clean) note = { text: clean, at: deps.clock.time() };
-      api.logger.info(
-        clean ? "Director: note written" : "Director: note came back empty",
-      );
-    }
-    if (!still.length) note = undefined;
-    await beats.register(id, { beats: state, ...(note ? { note } : {}) });
-  };
-
   /** One character as they are now, in the director's words. */
   const lineOf = async (agentId: string, why?: string): Promise<string> => {
     const who = `${await nameOf(agentId)} (${agentId})`;
@@ -697,9 +516,6 @@ export function registerDirector(
       if (last !== undefined && now - last < CUE_GAP_MS) return;
       lastCue.set(agentId, now);
       api.logger.info(`Director: cue for ${agentId}`);
-      await checkBeats(id, false).catch((error: unknown) => {
-        api.logger.warn(`Director: beats unchecked: ${String(error)}`);
-      });
       await deps.receive(id, {
         id: `director-cue:${agentId}:${now}`,
         sessionKey: `agent:${id}:tasks`,
@@ -729,14 +545,12 @@ export function registerDirector(
       const id = director();
       if (!id || agentId !== id) return undefined;
       const watched = await watches();
-      const promised = await promiseView(id);
       const cast = await castView(id);
       // Even watching nobody, its turns name how to direct.
       if (!watched.length)
         return [
           cast,
           text("kazusa-director#watching-none", {}, { agentId: id }),
-          promised,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -750,7 +564,6 @@ export function registerDirector(
           { lines: lines.join("\n") },
           { agentId: id },
         ),
-        promised,
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -761,9 +574,6 @@ export function registerDirector(
       if (!id || agentId !== id) return undefined;
       const now = deps.clock.time();
       const since = (await looks.lookup(id))?.at ?? now - FIRST_LOOK_MS;
-      await checkBeats(id, true).catch((error: unknown) => {
-        api.logger.warn(`Director: beats unchecked: ${String(error)}`);
-      });
       await looks.register(id, { at: now });
       const { shown, more } = digestOf(happenings, {
         since,

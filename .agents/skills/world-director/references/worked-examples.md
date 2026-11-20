@@ -11,6 +11,20 @@ honestly happen
 
 ## A. "I want to see Ren and Aki have a huge fight"
 
+### 0. Talk it over
+
+One message, before any planning:
+
+```
+send_message: "A real fight between those two, ooh. Tell me a bit more?",
+  "Should it end with them making up, or leave it raw for a while?",
+  "Over a day, or a slow burn over the week?",
+  "And do you want to be in the middle of it, or just watch?"
+```
+
+The user: "Make it hurt, make up by the weekend. I'll just watch." That is the
+script: the fight, then a make-up before Saturday, without the user in it.
+
 ### 1. Read the cast
 
 From their pages and `MEMORY.md` files:
@@ -76,7 +90,7 @@ which no phone call undoes.
 6. **The distance** (the weekend). They answer each other in one word; Kei is
    caught between them.
 
-### 5. The block
+### 5. The notebook
 
 ```markdown
 ---
@@ -89,10 +103,14 @@ watching:
     for:
       "after seeing the song in the program, he has it pulled or lets it stand;
       until Fri 07:00"
-promised:
-  - "Ren and Aki argue out loud about the song: sharp words, and one of them
-    walks out"
 ---
+
+## The script (agreed Tue: "make it hurt, make up by the weekend; I'll watch")
+
+- [open] Ren and Aki argue out loud about the song: sharp words, and one of them
+  walks out.
+- [open] They make up in person before Saturday, and it costs one of them
+  something.
 ```
 
 ### 6. First moves
@@ -141,6 +159,27 @@ To the user: nothing about any of it.
 - After the peak: rest. Watch Kei. No new trouble, and nobody planted to patch
   it up, for a day.
 
+### 8. Judging the take
+
+Thursday's practice, under Watching:
+
+> Ren: Since when is "Paper Lanterns" a band song? Aki: Since it got picked.
+> You'd never have let it in. Ren: ...Maybe. Let's just run the set. Aki: Fine.
+
+Failed. A question, a fair answer and a truce: no sharp words, nobody walks out,
+and "let's just run the set" undoes it. Log: "Thu 17:20 take 1 failed: he let it
+go." Climb: his answer as a plant (step 7 above).
+
+Friday, before rehearsal:
+
+> Aki: You PULLED it? Without a word to me? Ren: You put it in without a word to
+> me! Aki: Because you'd have buried it like you bury everything I make. Ren:
+> You're doing exactly what my last singer did. Aki (does): grabs her bag and
+> walks out, slamming the door.
+
+Seen: both wrongs said out loud, the cruel line, a walk-out. Log the line that
+proves it, mark it seen, and rest the thread.
+
 ## B. "Now I'd like to see them make up"
 
 The fight is on the page; both are cold. A make-up is earned by a cost.
@@ -169,8 +208,8 @@ edit workspaces/kei/MEMORY.md
 ```
 
 At the moment Ren starts playing, nothing from you. If Aki walks out anyway: an
-aside ("It's your song. He's playing your song"). Promised beat: "Ren and Aki
-make up in person: one of them gives up something for the other, and they play
+aside ("It's your song. He's playing your song"). Script beat: "Ren and Aki make
+up in person: one of them gives up something for the other, and they play
 together again".
 
 ## C. "I'd like Yui and Mei to become friends"
@@ -189,7 +228,7 @@ other, a new state.
   when they are in the room: "On Mei's desk, half out of her bag, a faded
   picture book with a fox on the cover." Then nothing. Watch the fork: does
   either mention the book?
-- **Promised**: "Yui and Mei spend time together by choice and talk about
+- **The script**: "Yui and Mei spend time together by choice and talk about
   something they both love".
 
 ## D. "I want someone to find out Taro's secret"
@@ -205,7 +244,7 @@ friend Sana (his memory says why: his family's shop is failing).
   confront him? The reveal is best when someone works it out.
 - **Who knows what**, on the board: Taro knows; the classmate saw; Sana suspects
   after clue two.
-- **Promised**: "Sana learns Taro's secret and says so to him".
+- **The script**: "Sana learns Taro's secret and says so to him".
 
 ## E. A request that can't honestly happen
 

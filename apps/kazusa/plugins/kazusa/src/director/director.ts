@@ -15,20 +15,15 @@ export interface Watch {
 
 const NOTEBOOK = z.object({
   watching: z.array(z.unknown()).optional(),
-  promised: z.array(z.unknown()).optional(),
 });
-/** How many promised beats are checked at once, at most. */
-export const MAX_PROMISED = 4;
-/** How long a promised beat may be, as the decision model reads it. */
-const MAX_BEAT = 300;
 /**
  * The director's settings in its notebook: the `---` block that holds
- * `watching:` or `promised:`. Front matter by rule, but a model editing the
- * file may leave it anywhere, so the first such block counts wherever it is.
+ * `watching:`. Front matter by rule, but a model editing the file may leave it
+ * anywhere, so the first such block counts wherever it is.
  */
 function settingsBlock(notebook: string): string | undefined {
   for (const block of notebook.matchAll(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*$/gm))
-    if (/^(?:watching|promised):/m.test(block[1] ?? "")) return block[1];
+    if (/^watching:/m.test(block[1] ?? "")) return block[1];
   return undefined;
 }
 
@@ -106,47 +101,6 @@ function looseWatching(notebook: string): unknown[] {
       last.for = `${last.for ?? ""} ${line.trim()}`;
   }
   return entries;
-}
-
-/**
- * The beats the director promised the user (front matter `promised:`, each a
- * line one could see happen), the first `MAX_PROMISED` only. Code checks them
- * against the page, so the director doesn't grade its own plan.
- */
-export function promisedIn(notebook: string): string[] {
-  const data = settingsOf(notebook);
-  // "They argue: raised voices" is a mapping to YAML: read such lists as lines.
-  const entries = data.promised?.every((entry) => typeof entry === "string")
-    ? data.promised
-    : looseList(notebook, "promised");
-  const beats: string[] = [];
-  for (const entry of entries) {
-    const beat = (typeof entry === "string" ? entry : "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_BEAT);
-    if (beat && !beats.includes(beat)) beats.push(beat);
-    if (beats.length >= MAX_PROMISED) break;
-  }
-  return beats;
-}
-
-/** A front matter list of strings, read line by line (`- text`). */
-function looseList(notebook: string, key: string): string[] {
-  const front = settingsBlock(notebook);
-  if (!front) return [];
-  const lines = front.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === `${key}:`);
-  if (start < 0) return [];
-  const items: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^\S/.test(line)) break;
-    const item = line.match(/^\s*-\s+(.+?)\s*$/);
-    if (item) items.push(item[1].replace(/^["']|["']$/g, ""));
-    else if (items.length && line.trim())
-      items[items.length - 1] += ` ${line.trim()}`;
-  }
-  return items;
 }
 
 /** Something that happened in the world, as the director's digest lists it. */

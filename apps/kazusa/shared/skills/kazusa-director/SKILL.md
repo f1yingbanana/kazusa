@@ -4,17 +4,16 @@ description:
   "What Kazusa tells the world's director (the system agent) and asks the
   decision model on its behalf: the digest of what happened, the cast, whom it
   watches, the cue when a watched moment comes up and the question that decides
-  it, and its promised beats as judged from outside. Each section is one piece,
-  read by code. Override only the sections you change."
+  it. Each section is one piece, read by code. Override only the sections you
+  change."
 user-invocable: false
 disable-model-invocation: true
 ---
 
 `{placeholders}` are filled by code. The digest comes with each check-in of the
-system agent's own activities, and each check-in is a look, when its promised
-beats are judged; a cue reaches it when a character its `MEMORY.md` settings
-block watches (`watching:`) meets the moment it watches for. How the director
-works is the `world-director` skill.
+system agent's own activities; a cue reaches it when a character its `MEMORY.md`
+settings block watches (`watching:`) meets the moment it watches for. How the
+director works is the `world-director` skill.
 
 ## digest
 
@@ -25,19 +24,21 @@ what they set out to do, not proof it happened; only lines in a conversation
 
 {happenings}
 
-Before this turn ends, for each unchecked beat under Promised beats: name the
-rung you climbed last and the next, stronger one (`world-director`, Holding the
-line), and climb it now, unless the drift passes all three tests there; write
-which you did in the arc.
+Before this turn ends, judge the take against your script: for each beat that
+was due, did it happen on the page, said or done out loud by the people it
+names, as strongly as scripted? Planned, hinted, softened or "in spirit" is not
+happened. If it didn't, name the move you made last and the next, stronger one
+(`world-director`, Holding the line), and make it now; write which in your log.
 
 ## digest-quiet
 
 Nothing of note happened in the world since you last looked ({since}).
 
-Before this turn ends, for each unchecked beat under Promised beats: name the
-rung you climbed last and the next, stronger one (`world-director`, Holding the
-line), and climb it now, unless the drift passes all three tests there; write
-which you did in the arc.
+Before this turn ends, judge the take against your script: for each beat that
+was due, did it happen on the page, said or done out loud by the people it
+names, as strongly as scripted? Planned, hinted, softened or "in spirit" is not
+happened. If it didn't, name the move you made last and the next, stronger one
+(`world-director`, Holding the line), and make it now; write which in your log.
 
 ## digest-line
 
@@ -67,10 +68,11 @@ What just reached them:
 
 Decide whether to step in (`world-director`), and keep your notebook current.
 
-Before this turn ends, for each unchecked beat under Promised beats: name the
-rung you climbed last and the next, stronger one (`world-director`, Holding the
-line), and climb it now, unless the drift passes all three tests there; write
-which you did in the arc.
+Before this turn ends, judge the take against your script: for each beat that
+was due, did it happen on the page, said or done out loud by the people it
+names, as strongly as scripted? Planned, hinted, softened or "in spirit" is not
+happened. If it didn't, name the move you made last and the next, stronger one
+(`world-director`, Holding the line), and make it now; write which in your log.
 
 ## before-replying
 
@@ -130,68 +132,6 @@ not in a conversation
 Nobody yet. How you direct is the `world-director` skill, in your instructions;
 its references are in
 `workspaces/<your id>/.agents/skills/world-director/references/`.
-
-## promised
-
-### Promised beats
-
-What you promised the user (front matter `promised:`), checked against the
-watched conversations by someone other than you:
-
-{lines}
-
-## promised-seen
-
-- [x] {beat}: seen on the page at {time}.
-
-## promised-open
-
-- [ ] {beat}: not seen on the page; {looks} looks since you promised it.
-
-## promised-due
-
-Two looks or more without a promised beat: whatever you planned, it hasn't
-worked. Climb a rung of the ladder now, a stronger kind of move than the last
-one (`world-director`, Holding the line).
-
-## beat-state
-
-The latest lines of the conversations the director is watching, newest last:
-
-{conversation}
-
-## beat-question
-
-Did this happen in these lines, plainly, said or done on the page by the people
-it names (not only planned, thought, hinted or narrated around them, and not
-something milder): {beat}
-
-## promised-note
-
-Note on the open beats, from someone reading the scenes for you ({time}):
-
-{note}
-
-## note-prompt
-
-You read scenes for the director of a world that plays like a visual novel. The
-director promised the audience these beats, and they haven't happened yet:
-
-{beats}
-
-The latest lines of the conversations the director is watching, newest last:
-
-{conversation}
-
-In three short lines, plainly, no dialogue for anyone:
-
-1. Where each beat stands in these lines.
-2. What is keeping it from happening: who smooths it over, gives way, avoids the
-   subject or isn't there, and why, in the scene's own terms.
-3. The one push most likely to make it happen next: whose want to sharpen and
-   how, what should happen to them, or what the director should stop doing.
-
-Reply with the three lines only.
 
 ## cast
 

@@ -1331,18 +1331,18 @@ this, and come back to it when the work is blocked.
   and every turn after, as their own thought. No plant tool. Code only gives the
   director what it can't see, and one way to act now (`narrate`).
 - **The notebook is its `MEMORY.md`.** A settings block (`---`) holds
-  `watching:` (at most four, `{who, for}`: the fork it waits for, with an end)
-  and `promised:` (at most four beats the user asked to see, as they'd look on
-  the page). Code reads only that block, found anywhere in the file and parsed
-  leniently (unquoted `: ` broke YAML live); `withSection` keeps a `---` block
-  inside a section it rewrites (a bedtime review wiped it once). Arcs, the board
-  and the log below it are prose, the director's own.
+  `watching:` (at most four, `{who, for}`: the fork it waits for, with an end).
+  Code reads only that block, found anywhere in the file and parsed leniently
+  (unquoted `: ` broke YAML live); `withSection` keeps a `---` block inside a
+  section it rewrites (a bedtime review wiped it once). The script (the beats
+  agreed with the user), the board, the episode and the log below it are prose,
+  the director's own.
 - **Its turns** (`context-engine`, `director: true`): `director-conventions`
   instead of a character's conventions (no needs, feelings, lifecycle or company
   guidance); the `world-director` skill body in the system prompt every turn (it
   stopped rereading a skill it had read once); the **Cast** (everyone onstage by
   place and activity), **Watching** (each watched character as they are, with
-  their latest lines) and **Promised beats**; its own closing reminder
+  their latest lines); its own closing reminder
   `kazusa-director#before-replying` (no spoilers: the show is the report).
 - **A digest** in each check-in of its own activities: what started or changed
   plans since its last look. Activities are what people set out to do, not
@@ -1351,13 +1351,17 @@ this, and come back to it when the work is blocked.
   character only, Perception's Jev call gets one more boolean (`director`, the
   `for:` line), and a yes sends the director a cue on its tasks session, at most
   once per character per 10 sim minutes.
-- **Beats are judged from outside.** The director (a model like the characters)
-  declared beats done "in spirit"; so at each look and cue the decision model
-  asks, per beat, whether it happened plainly on the page in the watched
-  conversations, and keeps looks-without counts (`director-beats` store); after
-  two, its turn says to climb a rung. A text model (`api.runtime.llm.complete`)
-  writes a short note on open beats from the last day: where it stands, what's
-  in the way, one push. The director never ticks a beat.
+- **The director is the referee, with taste.** No second model judges its
+  scenes. An outside check of promised beats (a decision-model yes/no per beat
+  at each look, and a text model's note) was built and removed: the fault was
+  the director being too easily satisfied, which a better director fixes, not a
+  supervisor. The `world-director` skill's "Your taste: judging a take" sets the
+  bar (on the page, at full strength, not undone, theirs) with examples of takes
+  it wrongly accepted; the cue and check-in close with "judge the take".
+- **The user shapes the script.** Before planning, the director talks the
+  request over in one short message (size, tone, length, who, ending, how much
+  the user wants to be in it; for a mystery, the kind, never the answer); the
+  answers are the script. How it happens stays a surprise.
 - **`narrate`** (system agent only, `{who, text, aside?}`): an event where a
   character is, signed `narrator`, the one exception to chat membership
   (`Messaging.narrate`); everyone in their huddle and the player see it. Alone,

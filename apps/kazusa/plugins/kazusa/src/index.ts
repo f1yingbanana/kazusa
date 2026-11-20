@@ -151,7 +151,6 @@ export default definePluginEntry({
     });
     const location = registerLocation(api, {
       clock,
-      evaluate: decide,
       broadcaster,
       stage,
       rememberedPlaces: memory.places,
@@ -262,7 +261,6 @@ export default definePluginEntry({
     });
     const director = registerDirector(api, {
       clock,
-      evaluate: decide,
       broadcaster,
       receive: (agentId, stimulus) => perception.receive(agentId, stimulus),
       huddleOf: async (agentId) => messagingRef.current?.huddleOf(agentId),

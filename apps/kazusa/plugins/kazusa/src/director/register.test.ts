@@ -30,7 +30,7 @@ type Tool = {
   ) => Promise<{ content: { text: string }[] }>;
 };
 
-function setup(notebook: string, seen: readonly boolean[] = []) {
+function setup(notebook: string) {
   const root = mkdtempSync(path.join(os.tmpdir(), "director-"));
   roots.push(root);
   const director = path.join(root, "boss");
@@ -67,24 +67,7 @@ function setup(notebook: string, seen: readonly boolean[] = []) {
   } as unknown as OpenClawPluginApi;
   const received: [string, Stimulus][] = [];
   const narrated: string[] = [];
-  const evaluate = vi.fn(async () => ({
-    status: "ok" as const,
-    result: {
-      answers: Object.fromEntries(
-        seen.map((yes, at) => [
-          `b${at + 1}`,
-          { type: "boolean" as const, probabilityTrue: yes ? 0.9 : 0.1 },
-        ]),
-      ),
-    },
-  }));
-  const complete = vi.fn(
-    async (_prompt: string) =>
-      "1. Not yet.\n2. Ann gives way.\n3. Give Ann a reason to hold.",
-  );
   const service = registerDirector(api, {
-    evaluate: evaluate as never,
-    complete,
     clock: { time: () => Date.UTC(2026, 0, 1, 17) },
     broadcaster: new KazusaRealtimeBroadcaster(),
     receive: async (agentId, stimulus) => {
@@ -114,8 +97,6 @@ function setup(notebook: string, seen: readonly boolean[] = []) {
     received,
     narrated,
     narrate,
-    evaluate,
-    complete,
   };
 }
 
@@ -181,35 +162,6 @@ describe("the director", () => {
     expect(received[0]?.[0]).toBe("boss");
     expect(received[0]?.[1].text).toContain("Ben: let's go");
     expect(received[0]?.[1].text).toContain("Ann asks Ben");
-  });
-
-  it("checks promised beats against the page, and says when they are due", async () => {
-    const notebook = WATCHING.replace(
-      "---\n# Notes",
-      "promised:\n  - They argue: raised voices\n  - They make up\n---\n# Notes",
-    );
-    const { service, evaluate, complete } = setup(notebook, [false, false]);
-    let view = await service.view("boss");
-    expect(view).toContain(
-      "- [ ] They argue: raised voices: not seen on the page; 0 looks",
-    );
-    await service.digest("boss");
-    await service.digest("boss");
-    expect(evaluate).toHaveBeenCalledTimes(2);
-    expect(JSON.stringify(evaluate.mock.calls[0])).toContain("Ben: hi");
-    view = await service.view("boss");
-    expect(view).toContain("2 looks since you promised it");
-    expect(view).toMatch(/Climb a rung of the ladder now/);
-    expect(view).toContain("Give Ann a reason to hold.");
-    expect(String(complete.mock.calls[0]?.[0])).toContain("They make up");
-    const seen = setup(notebook, [true, false]);
-    await seen.service.cue("ann", "Ben: no!");
-    view = await seen.service.view("boss");
-    expect(view).toContain(
-      "- [x] They argue: raised voices: seen on the page at 17:00",
-    );
-    expect(view).not.toMatch(/Climb a rung/);
-    expect(view).not.toMatch(/Note on the open beats/);
   });
 
   it("tells an aside to one character only, even mid-conversation", async () => {

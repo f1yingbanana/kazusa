@@ -139,14 +139,12 @@ and nobody's words (`context-conventions`).
    needs or feelings), `kazusa-director` (what code tells it), and in
    `context-conventions` the narrator line and "Disagree, and stay hurt".
 2. Its turns: the `world-director` skill in its system prompt every turn; the
-   Cast, Watching and Promised beats sections; its own closing reminder (no
-   spoilers to the user); a digest of what happened in each check-in of its own
-   activities.
+   Cast and Watching sections; its own closing reminder (no spoilers to the
+   user); a digest of what happened in each check-in of its own activities.
 3. Tools for the system agent: `narrate` (the one exception to chat membership;
    `aside: true` for one character alone) and `cast`.
-4. The feedback loop: `watching:` riding on attention decisions with a cue;
-   `promised:` beats judged by the decision model at every look and cue, and a
-   written note on the open ones from a text model.
+4. The feedback loop: `watching:` riding on attention decisions with a cue; the
+   director judges each take itself, by the skill's taste ("judging a take").
 5. A bugfix: a memory section rewrite keeps a `---` block inside it.
 6. Planting, requests, rhythm, the notebook itself: no code.
 
@@ -512,3 +510,16 @@ director's first turn, graded blind.
   the cast's average of record-keeping words; Noa's quotes are nearly all about
   recording), the morning's first exchange, and the director copying it into
   plants. Not Kazusa's skills.
+
+### After review (2026-11-19): the director is the referee
+
+The user's call: a director looks at a scene and is satisfied or not; Arona was
+too easily satisfied. That is her taste, fixed in her prompt, not by a second
+model watching her. Removed: `promised:` in the settings block, the
+decision-model check of beats at each look and cue, the text model's note, the
+`director-beats` store and the Promised beats section. Added to
+`world-director`: "Your taste: judging a take" (on the page, at full strength,
+not undone, theirs; real takes it wrongly accepted), a step to judge the take at
+each look, the script as prose in the notebook, and talking a request over with
+the user before planning (the shape, never the surprise). The cue and check-in
+close with "judge the take".

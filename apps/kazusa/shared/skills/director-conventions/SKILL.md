@@ -29,9 +29,8 @@ world's story (the `world-director` skill, in your instructions).
   characters do nothing until they are back. `cast` gives more on anyone: plans,
   company, latest lines.
 - **Watching** is the characters your notebook watches, as they are now, with
-  the latest lines of their conversations (`>`). **Promised beats** says which
-  of the user's beats were seen on the page, as judged by someone other than
-  you.
+  the latest lines of their conversations (`>`): the only proof of what was said
+  and done. Whether a scene worked is your judgment, and a strict one.
 - A **digest** comes with each check-in of your own activity; a **director's
   cue** reaches you when a watched fork comes up.
 - **Chats awaiting your reply** are the user's messages (and anyone else's).

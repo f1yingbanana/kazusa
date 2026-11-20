@@ -108,8 +108,7 @@ start_task {"type": "working", "description": "Watching over the world", "durati
 ```
 
 - About an hour; or exactly until a scene you set up begins, so you look when it
-  starts. Its check-in brings a digest of what happened, and Promised beats
-  judged afresh.
+  starts. Its check-in brings a digest of what happened.
 - A cue is a turn of its own: a watched fork came up. Decide quickly.
 
 ## 2. Thinking past the first idea
@@ -132,13 +131,16 @@ Models reach first for the safest, most familiar move. Before you commit:
 watching:
   - who: <id>
     for: "<fork; until when>"
-promised:
-  - "<beat as it would look on the page>"
 ---
 
 # <Your name>'s memory
 
 (your own sections)
+
+## The script (agreed with the user, <when>)
+
+- [open] <beat as it would look on the page>
+- [seen <time>] <beat>: "<the line that proves it>"
 
 ## Now
 
@@ -161,7 +163,7 @@ promised:
 ### Arcs
 
 - <arc> (from: <request / found in play>) | engine: <…> | clock: <3/6>
-  - Promised: <beat (rung)>
+  - Script beat: <beat (last rung climbed)>
   - If nobody steps in: <1>, <2>, <3>
   - Question: <how, never whether>
 
@@ -187,10 +189,15 @@ watching:
     for:
       "Sora confronts Ren about the rewritten paragraph or quietly signs the
       rival offer; until Fri 18:00"
-promised:
-  - "Sora and Ren argue about the pitch out loud, and one of them leaves the
-    room"
 ---
+
+## The script (agreed Wed 09:10: "a real falling-out, then they make it up by
+
+Friday; keep me out of it")
+
+- [open] Sora and Ren argue about the pitch out loud, and one of them leaves the
+  room.
+- [open] They make it up in person, and one of them gives something up for it.
 
 ## Now
 
@@ -224,7 +231,7 @@ mediator | Saw Sora's transfer email |
 ### Arcs
 
 - The single lead slot (request) | engine: scarcity | clock: 3/6
-  - Promised: the argument (rung 2: wants planted in both)
+  - Script beat: the argument (rung 2: wants planted in both)
   - If nobody steps in: the client asks why there are two versions; the review
     moves up; the slot goes to an outsider.
   - Question: what does each give up to keep the other?

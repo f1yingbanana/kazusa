@@ -99,8 +99,8 @@ hiding from the mob in disguise, where dropping it means death.)
 You set up a confrontation and someone laughs it off, walks out or invents a
 third way.
 
-- **On a promised beat**: hold the line (SKILL.md): accept the drift only if it
-  delivers what the beat is for, is truer to them and is more interesting;
+- **On a beat of your script**: hold the line (SKILL.md): accept the drift only
+  if it delivers what the beat is for, is truer to them and is more interesting;
   otherwise climb the ladder. Their kindness is not a reason.
 - **On anything else**: treat their choice as canon. Ask who offscreen is now
   affected. Retire the obsolete beat; move a clock to reflect the new state (she

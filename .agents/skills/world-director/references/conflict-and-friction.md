@@ -80,11 +80,11 @@ owns it, most soften. That gives a falling-out its shape:
 6. **The distance.** It stands overnight, or for days. They avoid each other,
    answer short, take it out on someone else, tell a friend their side. Rest the
    thread; let the world notice.
-7. **The make-up** (when promised). A separate scene, earned: an apology that
-   costs the one who gives it (pride swallowed, a public correction, giving back
-   what was taken), or an act that proves it, often at the place of the first
-   wound. Plant the want to repair in the one who must give way; give the other
-   a reason to hear it.
+7. **The make-up** (when the script has one). A separate scene, earned: an
+   apology that costs the one who gives it (pride swallowed, a public
+   correction, giving back what was taken), or an act that proves it, often at
+   the place of the first wound. Plant the want to repair in the one who must
+   give way; give the other a reason to hear it.
 
 **A huge fight needs two wrongs that cross.** With one wrong, the other holds
 the high ground, scolds, and the one in the wrong gives in: a scene, not a
