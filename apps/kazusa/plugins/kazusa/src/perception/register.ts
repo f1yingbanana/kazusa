@@ -83,6 +83,8 @@ export function registerPerception(
     readonly onRunStarted?: (agentId: string) => void;
     /** A brain run of theirs is over, however it went. */
     readonly onRunEnded?: (agentId: string) => Promise<void>;
+    /** The world's director, for the characters it watches. */
+    readonly director?: PerceptionDeps["director"];
   },
 ): Perception {
   const lifetime = new AbortController();
@@ -121,6 +123,7 @@ export function registerPerception(
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
     ...(deps.realtime ? { realtime: deps.realtime } : {}),
     ...(deps.warm ? { warm: deps.warm } : {}),
+    ...(deps.director ? { director: deps.director } : {}),
   });
   // =========================================================================
   // 1. LIFECYCLE: onDispose (Generational Isolation & Teardown)

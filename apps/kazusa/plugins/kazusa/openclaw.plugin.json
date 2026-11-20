@@ -693,6 +693,8 @@
       "memory_consolidate",
       "memory_restore",
       "refresh_skills",
+      "narrate",
+      "cast",
       "world_update",
       "grep"
     ],

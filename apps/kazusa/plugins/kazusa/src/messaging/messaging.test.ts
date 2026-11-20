@@ -2868,3 +2868,68 @@ describe("the floor", () => {
     );
   });
 });
+
+describe("narration", () => {
+  it("tells everyone in a conversation in person, from no member of it", async () => {
+    const h = setup();
+    h.places.set("alice", "park");
+    h.places.set("bob", "park");
+    const huddle = await h.send({ aloud: true, text: "nice day" });
+    expect(await h.messaging.huddleOf("bob")).toEqual({
+      id: huddle.chatId,
+      members: ["alice", "bob"],
+    });
+    h.receive.mockClear();
+    await h.messaging.narrate(
+      huddle.chatId,
+      { id: "narrator", name: "Narrator" },
+      "Rain starts to fall.",
+      "rain-1",
+    );
+    await vi.waitFor(() => expect(h.receive).toHaveBeenCalledTimes(2));
+    expect(h.receive.mock.calls.map(([who]) => who).sort()).toEqual([
+      "alice",
+      "bob",
+    ]);
+    expect(h.receive.mock.calls[0]?.[1]).toMatchObject({
+      sender: "narrator",
+      senderName: "Narrator",
+    });
+    const { messages } = await h.messaging.observeChatHistory({
+      chatId: huddle.chatId,
+    });
+    expect(messages.at(-1)).toMatchObject({
+      senderId: "narrator",
+      type: "action",
+      text: "Rain starts to fall.",
+    });
+    // The narrator joined nothing, and a replay is the same line.
+    expect((await h.messaging.huddleOf("alice"))?.members).toEqual([
+      "alice",
+      "bob",
+    ]);
+    await h.messaging.narrate(
+      huddle.chatId,
+      { id: "narrator", name: "Narrator" },
+      "Rain starts to fall.",
+      "rain-1",
+    );
+    expect(
+      (await h.messaging.observeChatHistory({ chatId: huddle.chatId })).messages
+        .length,
+    ).toBe(messages.length);
+  });
+
+  it("refuses a conversation that isn't there", async () => {
+    const h = setup();
+    await expect(
+      h.messaging.narrate(
+        "huddle:none",
+        { id: "narrator", name: "N" },
+        "x",
+        "r",
+      ),
+    ).rejects.toThrow(/No conversation/);
+    expect(await h.messaging.huddleOf("alice")).toBeUndefined();
+  });
+});

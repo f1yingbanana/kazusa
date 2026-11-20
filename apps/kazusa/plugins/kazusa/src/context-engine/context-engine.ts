@@ -71,6 +71,16 @@ export async function assembleContext(params: {
   readonly feelings?: string;
   /** The world's states as this character reads them, already rendered. */
   readonly states?: string;
+  /** The world's director: the characters it watches, as they are now. */
+  readonly watching?: string;
+  /** The world's director, while it directs: how to, every turn. */
+  readonly directing?: string;
+  /**
+   * The system agent's turn: it reads the director's conventions instead of a
+   * character's, and no activity lifecycle or company guidance; it has no life
+   * of its own to keep up.
+   */
+  readonly director?: boolean;
   /** Position and travel times, rendered verbatim. */
   readonly whereabouts?: string;
   /** Someone else is here, so the in-person skill applies. */
@@ -114,7 +124,9 @@ export async function assembleContext(params: {
         ? Math.min(hostBudget, maximum)
         : hostBudget - Math.max(0, params.contextWindow - maximum),
   );
-  const conventionsSkill = config.skills.conventions;
+  const conventionsSkill = params.director
+    ? config.skills.director
+    : config.skills.conventions;
   const lifecycleSkill = config.skills.lifecycle;
   const interruptSkill = config.skills.interrupt;
 
@@ -124,13 +136,16 @@ export async function assembleContext(params: {
   );
   const task = params.activeTask;
   const needsActivity = !task || Date.parse(task.endAt) <= params.simTime;
-  const behavior = await skillLoader.loadSkill(
-    needsActivity ? lifecycleSkill : interruptSkill,
-    resolutionContext,
-  );
-  const inPerson = params.inCompany
-    ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
-    : undefined;
+  const behavior = params.director
+    ? undefined
+    : await skillLoader.loadSkill(
+        needsActivity ? lifecycleSkill : interruptSkill,
+        resolutionContext,
+      );
+  const inPerson =
+    !params.director && params.inCompany
+      ? await skillLoader.loadSkill(config.skills.inPerson, resolutionContext)
+      : undefined;
   const text = createSkillText(skillLoader);
   const deliveries = (
     section: string,
@@ -142,6 +157,7 @@ export async function assembleContext(params: {
   // never here.
   const systemPromptAddition = [
     baseConventions,
+    params.directing,
     buildMemorySystemPromptAddition({
       availableTools: run.availableTools ?? new Set(),
       citationsMode: run.citationsMode,
@@ -193,6 +209,7 @@ export async function assembleContext(params: {
       ...(params.roster ? ["", "### People you know", params.roster] : []),
       ...(params.feelings ? ["", "### How you feel", params.feelings] : []),
       ...(params.states ? ["", "### Your state", params.states] : []),
+      ...(params.watching ? ["", params.watching] : []),
       ...(params.awaitingReplies?.length
         ? [
             "",
@@ -286,7 +303,7 @@ export async function assembleContext(params: {
   // prompt after every tool result, and the model answers all over again.
   const messages = [
     ...context,
-    guidance,
+    ...(behavior || inPerson ? [guidance] : []),
     ...toolHistoryMessages,
     ...brain.summaries,
     situation,

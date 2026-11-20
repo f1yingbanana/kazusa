@@ -1271,6 +1271,22 @@ export class Messaging {
   }
 
   /** The huddles going on at a place, for sightings and `With you`. */
+  /** The conversation in person a character is in now, if any. */
+  async huddleOf(
+    agentId: string,
+  ): Promise<{ readonly id: string; readonly members: string[] } | undefined> {
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      const chat = [...this.chats.values()].find(
+        (one) =>
+          one.kind === "huddle" &&
+          one.members.length > 1 &&
+          one.members.includes(agentId),
+      );
+      return chat ? { id: chat.id, members: [...chat.members] } : undefined;
+    });
+  }
+
   async huddlesAt(placeId: string): Promise<Huddle[]> {
     return await this.serial.enqueue("messages", async () => {
       await this.init();
@@ -1351,12 +1367,13 @@ export class Messaging {
     id: string,
     params: SendMessageParams,
     assertInvocationCurrent?: () => void,
+    /** From outside the chat (the narrator): only its members hold a copy. */
+    outsider = false,
   ): Promise<MessageDelivery> {
     const timestamp = this.deps.clock.time();
-    const owners = [
-      sender,
-      ...chat.members.filter((member) => member !== sender),
-    ];
+    const owners = outsider
+      ? [...chat.members]
+      : [sender, ...chat.members.filter((member) => member !== sender)];
     const copies: MessageCopy[] = owners
       .filter((agentId) => !isUser(agentId))
       .map((agentId) => ({
@@ -1519,6 +1536,53 @@ export class Messaging {
           (member) => member !== delivery.sender,
         ),
       };
+    });
+    this.notify();
+    this.scheduleRetry();
+    return result;
+  }
+
+  /**
+   * A line of narration into a conversation from outside it: what happens
+   * around its members, told as an action by `narrator`, who is no member and
+   * holds no copy. Each member hears it like any line; it changes nothing but
+   * what they know. A replay of the same `requestId` is the same line.
+   */
+  async narrate(
+    chatId: string,
+    narrator: { readonly id: string; readonly name: string },
+    text: string,
+    requestId: string,
+  ): Promise<{ readonly messageId: string; readonly members: string[] }> {
+    PARTICIPANT_ID.parse(narrator.id);
+    const id = messagingId([narrator.id, requestId]);
+    const result = await this.serial.enqueue("messages", async () => {
+      await this.init();
+      this.assertCurrent();
+      const chat = this.chats.get(chatId);
+      if (!chat || chat.members.includes(narrator.id))
+        throw new Error(`No conversation ${chatId} to narrate into.`);
+      const member = chat.members.find((one) => !isUser(one));
+      if (!member) throw new Error(`Nobody in ${chatId} to hear it.`);
+      if (!(this.deliveries.get(id) ?? (await this.deps.store.lookup(id))))
+        await this.accept(
+          narrator.id,
+          narrator.name,
+          chat,
+          id,
+          {
+            sessionKey: chatSummary(chat, member).sessionKey,
+            text,
+            type: "action",
+            requestId,
+            title: null,
+          },
+          undefined,
+          true,
+        );
+      await this.projectChats();
+      await this.flushLedgers();
+      return { messageId: id, members: [...chat.members] };
     });
     this.notify();
     this.scheduleRetry();

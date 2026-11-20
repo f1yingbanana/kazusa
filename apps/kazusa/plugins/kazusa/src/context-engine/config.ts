@@ -70,12 +70,15 @@ export const CONTEXT_ENGINE_CONFIG = z.strictObject({
       lifecycle: z.string().default("task-lifecycle"),
       interrupt: z.string().default("task-interrupt"),
       inPerson: z.string().default("in-person"),
+      /** The system agent's conventions, in place of a character's. */
+      director: z.string().default("director-conventions"),
     })
     .default({
       conventions: "context-conventions",
       lifecycle: "task-lifecycle",
       interrupt: "task-interrupt",
       inPerson: "in-person",
+      director: "director-conventions",
     }),
 });
 

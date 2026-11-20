@@ -1514,6 +1514,12 @@ Visitor caching and SSE fan-out belong to a deferred OpenRP PR.
 
 Load these reference files on demand when working on their specific subsystem:
 
+- `references/director.md` — The director: the system agent keeps the world's
+  arcs in its `MEMORY.md`, watches a few characters, and plants ideas so a world
+  is written as it plays. Read before working on world progression, drama, arcs
+  or the director, and **come back to it whenever that work is blocked**, so the
+  big picture isn't lost.
+
 - `references/auth.md` — Read before changing browser authentication, roles,
   permissions, HTTP/SSE route guards, or the OSS/Cloud boundary. Local owner,
   public visitor, and the planned trusted-proxy adapter share one UI; progress

@@ -10,6 +10,7 @@ import {
   withNoteCap,
   plansOn,
   withPlan,
+  withSection,
 } from "./writes.ts";
 
 const note = {
@@ -106,5 +107,35 @@ describe("applyOperation", () => {
     const file = path.join(root, "deep", "er", "page.md");
     applyOperation(file, (current) => current ?? "new");
     expect(readFileSync(file, "utf8")).toBe("new");
+  });
+});
+
+describe("rewriting a section of MEMORY.md", () => {
+  it("replaces the section and keeps a settings block left inside it", () => {
+    const raw = [
+      "# Memory",
+      "",
+      "## Long-Term Goals",
+      "",
+      "- old goal",
+      "",
+      "---",
+      "watching:",
+      "  - who: ann",
+      "---",
+      "",
+      "## Arcs",
+      "",
+      "- an arc",
+      "",
+    ].join("\n");
+    const next = withSection(raw, "Long-Term Goals", "- new goal");
+    expect(next).toContain("- new goal");
+    expect(next).not.toContain("- old goal");
+    expect(next).toContain("---\nwatching:\n  - who: ann\n---");
+    expect(next).toContain("## Arcs\n\n- an arc");
+    expect(withSection("# M\n\n## Lately\n\nold\n", "Lately", "new")).toBe(
+      "# M\n\n## Lately\n\nnew\n",
+    );
   });
 });

@@ -25,6 +25,8 @@ export function engineSkills(
     "kazusa-tools",
     "kazusa-results",
     "kazusa-deliveries",
+    "kazusa-director",
+    "director-conventions",
   ]);
 }
 

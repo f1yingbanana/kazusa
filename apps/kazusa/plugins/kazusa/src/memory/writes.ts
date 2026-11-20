@@ -129,7 +129,14 @@ export function withSection(raw: string, title: string, body: string): string {
   if (at >= 0) {
     const after = raw.slice(at + 3).search(/^## /m);
     const end = after < 0 ? raw.length : at + 3 + after;
-    return `${raw.slice(0, at)}${block}${after < 0 ? "" : "\n"}${raw.slice(end)}`;
+    // A `---` block inside the section (a director's settings, wherever it
+    // left them) isn't the section's to lose.
+    const kept = (
+      raw.slice(at, end).match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*$/gm) ?? []
+    )
+      .map((settings) => `\n${settings}\n`)
+      .join("");
+    return `${raw.slice(0, at)}${block}${kept}${after < 0 ? "" : "\n"}${raw.slice(end)}`;
   }
   const notes = raw.search(/^## Notes[ \t]*$/m);
   return notes >= 0
