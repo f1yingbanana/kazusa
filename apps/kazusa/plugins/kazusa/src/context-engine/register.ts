@@ -52,6 +52,10 @@ interface ContextEngineDeps {
     here: readonly string[],
     prompt: string,
   ) => Promise<string | undefined>;
+  /** For the world's director: the characters it watches, as they are now. */
+  readonly watching?: (agentId: string) => Promise<string | undefined>;
+  /** For the world's director, while it directs: its skill, every turn. */
+  readonly directing?: (agentId: string) => Promise<string | undefined>;
   /** Whether someone else is where the character is: face to face. */
   readonly inCompany?: (agentId: string, at: number) => Promise<boolean>;
   /** Who and what is in front of them, for recognition. */
@@ -155,6 +159,8 @@ function createContextEngine(
     awaitingReplies,
     feelings,
     states,
+    watching,
+    directing,
     whereabouts,
     inCompany,
     presence,
@@ -359,6 +365,10 @@ function createContextEngine(
         exclude: recollection?.ids ?? [],
       });
       const state = await states?.(brainAgentId, here, prompt);
+      const director =
+        getConfig().agents?.defaults?.systemAgent?.agentId === brainAgentId;
+      const watched = await watching?.(brainAgentId).catch(() => undefined);
+      const guide = await directing?.(brainAgentId).catch(() => undefined);
       const brainTurns = await pastTurns;
       // Every build assembles afresh, for its own token budget: each model
       // call leaves less, as the turn's own messages grow.
@@ -371,8 +381,11 @@ function createContextEngine(
         onYourMind: recollection?.onYourMind,
         roster: recollection?.roster,
         awaitingReplies: awaiting,
-        feelings: feeling,
+        // The system agent has no needs of its own to tend.
+        ...(director ? { director: true } : { feelings: feeling }),
         states: state,
+        ...(watched ? { watching: watched } : {}),
+        ...(guide ? { directing: guide } : {}),
         whereabouts: place,
         inCompany: company,
         simTime: now,

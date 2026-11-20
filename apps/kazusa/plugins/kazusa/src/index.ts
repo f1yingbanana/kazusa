@@ -23,6 +23,7 @@ import { registerDecisionModelsHttp } from "./decisions/http.ts";
 import { modelsConfig } from "./models/config.ts";
 import { modelSelection } from "./models/selection.ts";
 import { registerPerception } from "./perception/register.ts";
+import { registerDirector, type DirectorService } from "./director/register.ts";
 import { roomForSleep } from "./perception/run-limits.ts";
 import { beginGatewayLifetime, followGatewayLifetime } from "./shutdown.ts";
 import {
@@ -150,7 +151,6 @@ export default definePluginEntry({
     });
     const location = registerLocation(api, {
       clock,
-      evaluate: decide,
       broadcaster,
       stage,
       rememberedPlaces: memory.places,
@@ -190,10 +190,14 @@ export default definePluginEntry({
       stage,
     });
     const messagingRef: { current?: ReturnType<typeof registerMessaging> } = {};
+    // The director exists once Perception does; its turns read whom it watches.
+    const directorRef: { current?: DirectorService } = {};
     registerContextEngine(api, {
       clock,
       feelings: desires.feelings,
       states: stats.situation,
+      watching: async (agentId) => directorRef.current?.view(agentId),
+      directing: async (agentId) => directorRef.current?.guide(agentId),
       whereabouts: location.whereabouts,
       inCompany: location.inCompany,
       presence: location.presence,
@@ -213,8 +217,13 @@ export default definePluginEntry({
         (await messagingRef.current?.chatFacts(agentId, sessionKeys)) ?? [],
       recollections: memory.recollections,
     });
+    // The director hands its cues to Perception, which asks on its behalf.
     const perception = registerPerception(api, {
       clock,
+      director: {
+        watching: async (agentId) => directorRef.current?.watching(agentId),
+        cue: async (agentId, lines) => directorRef.current?.cue(agentId, lines),
+      },
       evaluateDecision: decide,
       assembleDecisionContext,
       broadcaster,
@@ -250,6 +259,37 @@ export default definePluginEntry({
           });
       },
     });
+    const director = registerDirector(api, {
+      clock,
+      broadcaster,
+      receive: (agentId, stimulus) => perception.receive(agentId, stimulus),
+      huddleOf: async (agentId) => messagingRef.current?.huddleOf(agentId),
+      placeOf: (agentId) => location.placeOf(agentId),
+      recentChats: async (agentIds, since) => {
+        const log =
+          (await messagingRef.current?.messageLog({
+            after: since,
+            actors: agentIds,
+            limit: 200,
+          })) ?? [];
+        return [...new Set(log.map((delivery) => delivery.chatId))];
+      },
+      onstage: (agentId) => stage.isOnstage(agentId),
+      latest: async (chatId, limit) => {
+        const history = await messagingRef.current?.observeChatHistory({
+          chatId,
+          limit,
+        });
+        return (history?.messages ?? []).map(
+          (message) =>
+            `${message.senderName}${message.type === "action" ? " (does)" : ""}: ${message.text}`,
+        );
+      },
+      activity: (agentId) => taskman.store.lookup(agentId),
+      narrate: async (chatId, narrator, text, requestId) =>
+        messagingRef.current?.narrate(chatId, narrator, text, requestId),
+    });
+    directorRef.current = director;
     registerBrainHttp(api);
     registerBrainTraceHttp(
       api,
@@ -283,7 +323,15 @@ export default definePluginEntry({
               api.logger.warn(`Location settle: ${String(error)}`);
               return undefined;
             });
-          await perception.deadline(agentId, note);
+          // The director's own activities end with what happened meanwhile.
+          const digest = await director.digest(agentId).catch((error) => {
+            api.logger.warn(`Director digest: ${String(error)}`);
+            return undefined;
+          });
+          await perception.deadline(
+            agentId,
+            [note, digest].filter(Boolean).join("\n\n") || undefined,
+          );
         },
         (error) =>
           api.logger.warn(

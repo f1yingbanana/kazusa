@@ -361,12 +361,23 @@ export interface PerceptionDeps {
   ) => Promise<Stimulus | undefined>;
   /** Where its wording comes from. Absent: the Gateway's skills, else Kazusa's. */
   readonly text?: SkillText;
+  /**
+   * The world's director (`director/`): for a character it watches, attention
+   * also asks whether the lines call for it, and a yes is its cue.
+   */
+  readonly director?: {
+    readonly watching: (
+      agentId: string,
+    ) => Promise<{ readonly for?: string } | undefined>;
+    readonly cue: (agentId: string, lines: string) => Promise<void>;
+  };
 }
 
 /**
  * What a delivery says, with no words of its own: chat lines carry their
  * `chat:` address, things seen have none, check-ins are their own skill text,
- * and the closing reminder is `kazusa-deliveries#before-replying`.
+ * and the closing reminder is `kazusa-deliveries#before-replying` (the system
+ * agent's, `kazusa-director#before-replying`).
  */
 function formatDeliveryMessage(
   bundle: PendingItem[],
@@ -1538,7 +1549,7 @@ export class Perception {
       let quietIn: string | undefined;
       const work = async (): Promise<DecisionOutcome> => {
         const speech = busy ? this.speech?.current(agentId) : undefined;
-        const batch = await assemble(agentId, {
+        let batch = await assemble(agentId, {
           activeTask: task,
           brainStatus: busy ? "busy_thinking" : "idle",
           brainContext: state.brainContext,
@@ -1560,6 +1571,25 @@ export class Perception {
           signal,
         });
         signal.throwIfAborted();
+        // Watched by the director: one more question, riding along.
+        const watch = await this.deps.director
+          ?.watching(agentId)
+          .catch(() => undefined);
+        if (watch)
+          batch = {
+            ...batch,
+            questions: {
+              ...batch.questions,
+              director: {
+                type: "boolean",
+                instructions: this.text(
+                  "kazusa-director#watch-question",
+                  { for: watch.for ?? "-" },
+                  { agentId },
+                ),
+              },
+            },
+          };
         quietIn = batch.questions.still_following
           ? quietConversationOf(batch)
           : undefined;
@@ -1578,6 +1608,19 @@ export class Perception {
         });
       };
       const outcome = await Promise.race([work(), aborted]);
+      const cue =
+        outcome.status === "ok" ? outcome.result.answers.director : undefined;
+      if (cue?.type === "boolean" && cue.probabilityTrue >= 0.5)
+        void this.deps.director
+          ?.cue(
+            agentId,
+            bundle
+              .map((item) => `${item.senderName ?? item.sender}: ${item.text}`)
+              .join("\n"),
+          )
+          .catch((error: unknown) => {
+            this.warn(error);
+          });
       const following =
         outcome.status === "ok"
           ? outcome.result.answers.still_following
@@ -1811,7 +1854,14 @@ export class Perception {
       message: formatDeliveryMessage(
         bundle,
         this.deps.clock.time(),
-        this.text("kazusa-deliveries#before-replying", {}, { agentId }),
+        this.text(
+          this.deps.api?.runtime.config.current().agents?.defaults?.systemAgent
+            ?.agentId === agentId
+            ? "kazusa-director#before-replying"
+            : "kazusa-deliveries#before-replying",
+          {},
+          { agentId },
+        ),
       ),
     };
   }

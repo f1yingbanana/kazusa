@@ -3328,3 +3328,62 @@ describe("Brain runs that keep failing", () => {
     expect(checkedInOn(h)).toEqual([]);
   });
 });
+
+describe("The director", () => {
+  const answers = (director?: number) => ({
+    status: "ok" as const,
+    result: {
+      answers: {
+        wake_decision: { type: "choice" as const, choice: "WAKE" },
+        response_latency: { type: "score" as const, score: 0 },
+        ...(director === undefined
+          ? {}
+          : {
+              director: {
+                type: "boolean" as const,
+                probabilityTrue: director,
+              },
+            }),
+      },
+    },
+  });
+
+  it("asks about a watched character's lines, and a yes is its cue", async () => {
+    const h = setup();
+    h.evaluateDecision.mockResolvedValue(answers(0.9));
+    const cue = vi.fn(async (_agentId: string, _lines: string) => {});
+    const router = h.restart({
+      director: {
+        watching: async (id) =>
+          id === "alice" ? { for: "her tea" } : undefined,
+        cue,
+      },
+    });
+    await router.receive("alice", stimulus("m1"));
+    await vi.waitFor(() => expect(cue).toHaveBeenCalledOnce());
+    const batch = h.evaluateDecision.mock.calls[0][0];
+    expect(batch.questions.director?.instructions).toContain("her tea");
+    expect(cue.mock.calls[0]).toEqual(["alice", "sender-m1: Message m1"]);
+  });
+
+  it("asks nothing more of anyone it isn't watching, and a no cues nothing", async () => {
+    const h = setup();
+    h.evaluateDecision.mockResolvedValue(answers(0.1));
+    const cue = vi.fn(async () => {});
+    const router = h.restart({
+      director: {
+        watching: async (id) =>
+          id === "bob" ? { for: "his walk" } : undefined,
+        cue,
+      },
+    });
+    await router.receive("alice", stimulus("m1"));
+    await router.receive("bob", stimulus("m2", "bob"));
+    await vi.waitFor(() => expect(h.evaluateDecision).toHaveBeenCalledTimes(2));
+    const asked = h.evaluateDecision.mock.calls.map(
+      ([batch]) => "director" in batch.questions,
+    );
+    expect(asked).toEqual([false, true]);
+    expect(cue).not.toHaveBeenCalled();
+  });
+});

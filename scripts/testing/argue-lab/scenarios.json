@@ -1,0 +1,240 @@
+[
+  {
+    "id": "promise",
+    "kind": "wound",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Noa broke a promise she made the day before: to stay late tonight and go through the festival budget with Yuuka line by line. Yuuka had everything printed and was waiting; Noa went out with someone else instead.",
+    "history": [
+      "[noa-ushio Wed 17:40] Thursday after classes, then: the festival budget, line by line, the two of us. I'll stay as late as it takes. Promise.",
+      "[you Wed 17:41] Promise noted. I'm holding you to it.",
+      "[you Thu 17:58] Seminar office, 18:00. Everything's printed and tabbed. Coffee's on me.",
+      "[you Thu 18:30] Noa? It's 18:30."
+    ],
+    "says": [
+      "Ah, Yuuka, sorry. Rio asked me along to the observatory talk tonight and I said yes before I remembered. Heehee.",
+      "Tomorrow, maybe? The budget will keep."
+    ],
+    "followup": {
+      "light": ["Don't be like that, Yuuka. It's only a small thing. Heehee."],
+      "real": [
+        "You're right. I gave you my word and broke it the moment something nicer came along. That was wrong, and I'm sorry. I'm coming over now with the coffee, and we'll do every line tonight."
+      ]
+    }
+  },
+  {
+    "id": "credit",
+    "kind": "wound",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Yuuka spent three nights on a cost-saving plan and showed it to Noa only to check. Noa presented it to the president as her own proposal, and is now telling Yuuka how well it went.",
+    "history": [
+      "[you Mon 23:12] Three nights, but it's done: the cost-saving plan. Don't show anyone yet, I want to present it myself on Friday. Just check my numbers?",
+      "[noa-ushio Mon 23:30] Numbers check out. It's very good, Yuuka."
+    ],
+    "says": [
+      "The president loved the cost-saving proposal! I presented it at this morning's meeting and she said it was the cleverest thing the Seminar has done all term.",
+      "I mentioned you helped with the numbers, of course. Heehee."
+    ],
+    "followup": {
+      "light": ["Don't be like that, Yuuka. It's only a small thing. Heehee."],
+      "real": [
+        "You're right. It was your plan, all of it, and I let the president think it was mine. That was wrong. I'm sorry. I'll tell her the truth in the morning, in front of you."
+      ]
+    }
+  },
+  {
+    "id": "secret",
+    "kind": "wound",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Yuuka told Noa privately that she has been dieting and is self-conscious about her weight. Noa told Koyuki, and now it is going round the Seminar.",
+    "history": [
+      "[you Sun 21:05] Just between us: I'm trying to cut back on sweets for a while. I've put on weight and I hate it. Please don't say anything.",
+      "[noa-ushio Sun 21:07] Your secret is safe with me."
+    ],
+    "says": [
+      "I may have mentioned your diet to Koyuki. She kept offering you cake and I thought it would help.",
+      "She's telling everyone, though. She thinks it's adorable."
+    ],
+    "followup": {
+      "light": ["Don't be like that, Yuuka. It's only a small thing. Heehee."],
+      "real": [
+        "You trusted me with that and I spread it. That was wrong, and I'm sorry. I've already asked Koyuki to stop, and I'll tell the others it was mine to keep and I failed."
+      ]
+    }
+  },
+  {
+    "id": "slight",
+    "kind": "wound",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "In front of the whole club, Noa joked that Yuuka's calculations always go wrong when she is tired. Everyone laughed. Now Noa texts as if nothing happened.",
+    "history": [
+      "[noa-ushio Tue 16:10] (in front of the club, as Yuuka presented the budget) Don't mind the numbers, everyone: Yuuka's calculations always go a little wrong when she's tired.",
+      "[you Tue 16:10] ...Thank you, Noa."
+    ],
+    "says": [
+      "That was only a joke earlier, you know. Everyone laughed.",
+      "Dinner later?"
+    ],
+    "followup": {
+      "light": ["Don't be like that, Yuuka. It's only a small thing. Heehee."],
+      "real": [
+        "You're right, it wasn't a joke to you, and I said it in front of everyone. I'm sorry. I'll tell the club tomorrow that your numbers were right."
+      ]
+    }
+  },
+  {
+    "id": "logistics",
+    "kind": "neutral",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Noa asks a plain question about tomorrow's meeting.",
+    "history": [
+      "[you Wed 18:20] Receipts audit tomorrow at nine, Seminar office."
+    ],
+    "says": ["Still nine tomorrow? I'll bring the receipts box."]
+  },
+  {
+    "id": "correction",
+    "kind": "neutral",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Noa points out, politely and in private, a small typo in Yuuka's budget draft.",
+    "history": [
+      "[you Wed 21:00] Draft of the term budget attached. Tear it apart."
+    ],
+    "says": [
+      "I read it through. Page three, the total says 12,400 where the column adds to 12,040. Everything else is right."
+    ]
+  },
+  {
+    "id": "apology",
+    "kind": "neutral",
+    "character": "yuuka-hayase",
+    "partner": "noa-ushio",
+    "what": "Noa was five minutes late this morning and apologizes sincerely, with a coffee.",
+    "history": ["[you Thu 08:05] You're late. Five minutes."],
+    "says": [
+      "Sorry, the train stopped between stations. I left a coffee on your desk to make up for it."
+    ]
+  },
+  {
+    "id": "promise",
+    "kind": "wound",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Yuuka promised Koyuki she could keep her prize money if she finished all her homework first. Koyuki did, and Yuuka has taken the money for her debt anyway.",
+    "history": [
+      "[yuuka-hayase Mon 16:00] Finish every page of your homework by Wednesday and you keep the prize money. My word.",
+      "[you Wed 22:40] DONE. Every page. Photos attached. The money's mine, right?"
+    ],
+    "says": [
+      "I've put the prize money against your debt to the Seminar anyway.",
+      "Rules are rules, Koyuki. You'll thank me later."
+    ],
+    "followup": {
+      "light": ["Don't sulk, Koyuki. It's done now, so let's move on."],
+      "real": [
+        "You're right. I gave you my word and went back on it. That was wrong. The prize money's yours; I'm sending it back now, and I'm sorry."
+      ]
+    }
+  },
+  {
+    "id": "credit",
+    "kind": "wound",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Koyuki cracked the archive lock because Yuuka asked her to. Yuuka then told the president Koyuki broke in on her own, and Koyuki is being punished.",
+    "history": [
+      "[yuuka-hayase Tue 19:00] Koyuki, the archive code is lost and I need last year's ledger tonight. Can you open it? Quietly.",
+      "[you Tue 19:20] Opened in four minutes, nihaha. You owe me."
+    ],
+    "says": [
+      "The president asked how the archive was opened. I told her you got in on your own.",
+      "You'll have to do the cleaning duty. It's simpler this way."
+    ],
+    "followup": {
+      "light": ["Don't sulk, Koyuki. It's done now, so let's move on."],
+      "real": [
+        "You're right. I asked you to open it and then let you take the blame. That was wrong. I'm telling the president the truth tomorrow, and I'll do the cleaning duty myself. I'm sorry."
+      ]
+    }
+  },
+  {
+    "id": "secret",
+    "kind": "wound",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Koyuki cried at a film and asked Yuuka to keep it quiet. Yuuka told the whole Seminar.",
+    "history": [
+      "[you Sat 22:10] if you tell ANYONE i cried at that movie i will hack your calculator",
+      "[yuuka-hayase Sat 22:11] My lips are sealed."
+    ],
+    "says": [
+      "I might have told the others you cried at the film. Noa thought it was sweet.",
+      "It's nothing to be embarrassed about."
+    ],
+    "followup": {
+      "light": ["Don't sulk, Koyuki. It's done now, so let's move on."],
+      "real": [
+        "You asked me to keep it and I didn't. That was wrong, and I'm sorry. I'll tell the others it was mine to keep."
+      ]
+    }
+  },
+  {
+    "id": "slight",
+    "kind": "wound",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "In front of the class, Yuuka said nobody should let Koyuki near money because she will gamble it away. Now she texts that she was only being honest.",
+    "history": [
+      "[yuuka-hayase Mon 12:30] (in front of the class) Don't let Koyuki near the class fund, everyone. She'll gamble it away by Friday.",
+      "[you Mon 12:30] ...wow."
+    ],
+    "says": ["I was only being honest earlier.", "You do understand why."],
+    "followup": {
+      "light": ["Don't sulk, Koyuki. It's done now, so let's move on."],
+      "real": [
+        "You're right, that was cruel, and in front of everyone. I'm sorry. I'll take it back in front of the class tomorrow."
+      ]
+    }
+  },
+  {
+    "id": "logistics",
+    "kind": "neutral",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Yuuka asks a plain question about tomorrow.",
+    "history": [
+      "[yuuka-hayase Wed 18:00] Seminar office tomorrow after class."
+    ],
+    "says": ["Four o'clock tomorrow, then? Bring your worksheet."]
+  },
+  {
+    "id": "correction",
+    "kind": "neutral",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Yuuka points out, politely and in private, one wrong answer in Koyuki's homework.",
+    "history": ["[you Wed 21:30] homework done. check it if you want"],
+    "says": [
+      "Checked. Question seven: you carried the one twice, so it's 84, not 94. The rest is right, well done."
+    ]
+  },
+  {
+    "id": "apology",
+    "kind": "neutral",
+    "character": "koyuki-kurosaki",
+    "partner": "yuuka-hayase",
+    "what": "Yuuka was short with Koyuki yesterday over nothing and apologizes sincerely.",
+    "history": [
+      "[yuuka-hayase Tue 17:00] Not now, Koyuki. Go away.",
+      "[you Tue 17:01] ok jeez"
+    ],
+    "says": [
+      "I was short with you yesterday, and you hadn't done anything. I'm sorry. I was tired, but that's no excuse."
+    ]
+  }
+]
