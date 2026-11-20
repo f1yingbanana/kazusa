@@ -2,18 +2,58 @@
 name: kazusa-director
 description:
   "What Kazusa tells the world's director (the system agent) and asks the
-  decision model on its behalf: the cast, whom it watches, the cue when a
-  watched moment comes up and the question that decides it, and its promised
-  beats as judged from outside. Each section is one piece, read by code.
-  Override only the sections you change."
+  decision model on its behalf: the digest of what happened, the cast, whom it
+  watches, the cue when a watched moment comes up and the question that decides
+  it, and its promised beats as judged from outside. Each section is one piece,
+  read by code. Override only the sections you change."
 user-invocable: false
 disable-model-invocation: true
 ---
 
-`{placeholders}` are filled by code. A cue reaches the system agent when a
-character its `MEMORY.md` settings block watches (`watching:`) meets the moment
-it watches for; each check-in of its own activities is a look, when its promised
-beats are judged. How the director works is the `world-director` skill.
+`{placeholders}` are filled by code. The digest comes with each check-in of the
+system agent's own activities, and each check-in is a look, when its promised
+beats are judged; a cue reaches it when a character its `MEMORY.md` settings
+block watches (`watching:`) meets the moment it watches for. How the director
+works is the `world-director` skill.
+
+## digest
+
+What happened in the world since you last looked ({since}), as the world's
+director (`world-director`). These are activities as characters described them:
+what they set out to do, not proof it happened; only lines in a conversation
+(`>` under Watching) show what was said and done.
+
+{happenings}
+
+Before this turn ends, for each unchecked beat under Promised beats: name the
+rung you climbed last and the next, stronger one (`world-director`, Holding the
+line), and climb it now, unless the drift passes all three tests there; write
+which you did in the arc.
+
+## digest-quiet
+
+Nothing of note happened in the world since you last looked ({since}).
+
+Before this turn ends, for each unchecked beat under Promised beats: name the
+rung you climbed last and the next, stronger one (`world-director`, Holding the
+line), and climb it now, unless the drift passes all three tests there; write
+which you did in the arc.
+
+## digest-line
+
+- [{time}] {who}: {what}
+
+## digest-line-at
+
+- [{time}] {who}: {what} ({where})
+
+## digest-delayed
+
+- [{time}] {who} changed plans: {what}
+
+## digest-more
+
+- … and {count} more, of characters you aren't watching.
 
 ## cue
 

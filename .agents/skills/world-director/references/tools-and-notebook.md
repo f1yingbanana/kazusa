@@ -108,7 +108,8 @@ start_task {"type": "working", "description": "Watching over the world", "durati
 ```
 
 - About an hour; or exactly until a scene you set up begins, so you look when it
-  starts. At each look, Promised beats is judged afresh.
+  starts. Its check-in brings a digest of what happened, and Promised beats
+  judged afresh.
 - A cue is a turn of its own: a watched fork came up. Decide quickly.
 
 ## 2. Thinking past the first idea

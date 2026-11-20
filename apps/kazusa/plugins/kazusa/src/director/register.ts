@@ -4,15 +4,27 @@ import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { DecisionRuntimeV1 } from "openclaw/plugin-sdk/decisions";
 import type { Clock } from "../clock/clock.ts";
+import { formatSimTime } from "../context-engine/format.ts";
 import { currentConfig } from "../current-config.ts";
 import { characterName } from "../identity.ts";
 import { plansOn } from "../memory/writes.ts";
+import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { pluginSkillText } from "../skill-text.ts";
 import type { Stimulus } from "../stimulus.ts";
-import { promisedIn, watchingIn, type Watch } from "./director.ts";
+import {
+  digestOf,
+  happeningOf,
+  promisedIn,
+  recordHappening,
+  sharedHappenings,
+  watchingIn,
+  type Watch,
+} from "./director.ts";
 
 /** The fewest sim minutes between two cues about one character. */
 const CUE_GAP_MS = 10 * 60_000;
+/** How many happenings one digest lists, at most. */
+const DIGEST_LINES = 60;
 /** A promised beat: since when, looks without it, and when it was seen. */
 interface Beat {
   readonly since: number;
@@ -37,6 +49,8 @@ const CAST_DEPTH = 8;
 const DAY_MS = 24 * 60 * 60_000;
 /** How many of a watched conversation's latest lines the director reads. */
 const SCENE_LINES = 6;
+/** How far back a first digest looks, with no look before it. */
+const FIRST_LOOK_MS = 60 * 60_000;
 
 export interface DirectorService {
   /** What the director is watching this character for, if it is. */
@@ -47,10 +61,10 @@ export interface DirectorService {
    */
   readonly cue: (agentId: string, lines: string) => Promise<void>;
   /**
-   * The director's activity check-in, a look: the promised beats are checked
-   * against the page before its turn reads them. Nothing for anyone else.
+   * For the director's activity check-in: what happened in the world since it
+   * last looked. Nothing for anyone else.
    */
-  readonly look: (agentId: string) => Promise<void>;
+  readonly digest: (agentId: string) => Promise<string | undefined>;
   /**
    * For the director's own turns: each character it watches as they are now
    * (where, doing what, with whom). Nothing for anyone else.
@@ -64,6 +78,7 @@ export interface DirectorService {
   readonly guide: (agentId: string) => Promise<string | undefined>;
 }
 
+const SUBSCRIBED = Symbol.for("kazusa.director.subscribed");
 /** Who narration comes from: no character, never a member of a chat. */
 export const NARRATOR = "narrator";
 /** The system agent's skill for directing, read into its turns while it does. */
@@ -72,15 +87,17 @@ const DIRECTOR_SKILL = "world-director";
 /**
  * The director: the system agent keeps the world's arcs in its `MEMORY.md` and
  * steers by planting ideas in characters' own `MEMORY.md` (no code) and by
- * narrating. Code gives it what it can't see: the cast, the few characters its
- * notebook's settings block names (`watching:`) with a cue when the moment it
- * watches for comes up, and whether the beats it promised the user are on the
+ * narrating. Code gives it what it can't see: the cast; a digest of what
+ * happened with each check-in of its own activities; the few characters its
+ * notebook's settings block names (`watching:`), with a cue when the moment it
+ * watches for comes up; and whether the beats it promised the user are on the
  * page yet, judged by someone other than itself. `references/director.md`.
  */
 export function registerDirector(
   api: OpenClawPluginApi,
   deps: {
     readonly clock: Pick<Clock, "time">;
+    readonly broadcaster: KazusaRealtimeBroadcaster;
     /**
      * A text model's one reply to a prompt, for the note on beats not yet seen.
      * By default OpenClaw's default model (`api.runtime.llm.complete`).
@@ -136,6 +153,21 @@ export function registerDirector(
   },
 ): DirectorService {
   const text = pluginSkillText(api);
+  const looks = api.runtime.state.openKeyedStore<{ readonly at: number }>({
+    namespace: "director",
+    retention: "retained",
+  });
+  const happenings = sharedHappenings();
+  const scope = globalThis as { [SUBSCRIBED]?: boolean };
+  if (!scope[SUBSCRIBED]) {
+    scope[SUBSCRIBED] = true;
+    deps.broadcaster.subscribe((event) => {
+      if (event.type !== "journal") return;
+      const happening = happeningOf(event.event);
+      if (happening) recordHappening(happenings, happening);
+    });
+  }
+
   const director = () =>
     currentConfig(api).agents?.defaults?.systemAgent?.agentId;
 
@@ -724,11 +756,49 @@ export function registerDirector(
         .join("\n\n");
     },
 
-    async look(agentId) {
+    async digest(agentId) {
       const id = director();
-      if (!id || agentId !== id) return;
+      if (!id || agentId !== id) return undefined;
+      const now = deps.clock.time();
+      const since = (await looks.lookup(id))?.at ?? now - FIRST_LOOK_MS;
       await checkBeats(id, true).catch((error: unknown) => {
         api.logger.warn(`Director: beats unchecked: ${String(error)}`);
+      });
+      await looks.register(id, { at: now });
+      const { shown, more } = digestOf(happenings, {
+        since,
+        until: now,
+        watched: new Set((await watches()).map((watch) => watch.who)),
+        skip: new Set([id]),
+        limit: DIGEST_LINES,
+      });
+      const say = (section: string, values: Record<string, string>) =>
+        text(`kazusa-director#${section}`, values, { agentId: id });
+      if (!shown.length)
+        return say("digest-quiet", { since: formatSimTime(since) });
+      const lines = await Promise.all(
+        shown.map(async (happening) =>
+          say(
+            happening.kind === "delayed"
+              ? "digest-delayed"
+              : happening.where
+                ? "digest-line-at"
+                : "digest-line",
+            {
+              time: clockOf(happening.at),
+              who: `${await nameOf(happening.who)} (${happening.who})`,
+              what: happening.text,
+              where: happening.where ?? "",
+            },
+          ),
+        ),
+      );
+      return say("digest", {
+        since: formatSimTime(since),
+        happenings: [
+          ...lines,
+          ...(more ? [say("digest-more", { count: String(more) })] : []),
+        ].join("\n"),
       });
     },
   };

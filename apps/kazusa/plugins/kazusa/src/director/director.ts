@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { JournalEvent } from "@kazusa/client";
 import YAML from "yaml";
 
 /** How many characters the director watches at once, at most. */
@@ -146,4 +147,90 @@ function looseList(notebook: string, key: string): string[] {
       items[items.length - 1] += ` ${line.trim()}`;
   }
   return items;
+}
+
+/** Something that happened in the world, as the director's digest lists it. */
+export interface Happening {
+  readonly at: number;
+  readonly who: string;
+  /** `started` an activity, or `delayed` it. */
+  readonly kind: "started" | "delayed";
+  readonly text: string;
+  readonly where?: string;
+}
+
+/** What a journal event says happened, for the digest, if anything. */
+export function happeningOf(event: JournalEvent): Happening | undefined {
+  const who = event.actors[0];
+  if (!who) return undefined;
+  if (event.kind === "task.started")
+    return {
+      at: event.simTime,
+      who,
+      kind: "started",
+      text: event.payload.description,
+      ...(event.payload.where ? { where: event.payload.where } : {}),
+    };
+  if (event.kind === "task.delayed" && event.payload.reason)
+    return {
+      at: event.simTime,
+      who,
+      kind: "delayed",
+      text: event.payload.reason,
+    };
+  return undefined;
+}
+
+/** How much the digest keeps, at most: a day of a busy world. */
+const KEPT = 4_000;
+
+/**
+ * The world's happenings since the process started, newest last, shared by
+ * every copy of the plugin in the process (each copy may broadcast).
+ */
+const SHARED = Symbol.for("kazusa.director.happenings");
+export function sharedHappenings(): Happening[] {
+  const scope = globalThis as { [SHARED]?: Happening[] };
+  return (scope[SHARED] ??= []);
+}
+
+export function recordHappening(
+  happenings: Happening[],
+  happening: Happening,
+): void {
+  happenings.push(happening);
+  if (happenings.length > KEPT) happenings.splice(0, happenings.length - KEPT);
+}
+
+/**
+ * The happenings in `(since, until]` the digest shows: every one of the
+ * watched, then the newest of the rest up to `limit` in all, oldest first; and
+ * how many of the rest were left out.
+ */
+export function digestOf(
+  happenings: readonly Happening[],
+  options: {
+    readonly since: number;
+    readonly until: number;
+    readonly watched: ReadonlySet<string>;
+    readonly skip: ReadonlySet<string>;
+    readonly limit: number;
+  },
+): { readonly shown: Happening[]; readonly more: number } {
+  const window = happenings.filter(
+    (happening) =>
+      happening.at > options.since &&
+      happening.at <= options.until &&
+      !options.skip.has(happening.who),
+  );
+  const watched = window.filter((happening) =>
+    options.watched.has(happening.who),
+  );
+  const rest = window.filter(
+    (happening) => !options.watched.has(happening.who),
+  );
+  const room = Math.max(0, options.limit - watched.length);
+  const kept = rest.slice(Math.max(0, rest.length - room));
+  const shown = [...watched, ...kept].sort((a, b) => a.at - b.at);
+  return { shown, more: rest.length - kept.length };
 }

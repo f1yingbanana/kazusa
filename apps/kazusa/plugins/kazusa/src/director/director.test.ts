@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { MAX_WATCHED, promisedIn, watchingIn } from "./director.ts";
+import {
+  MAX_WATCHED,
+  promisedIn,
+  digestOf,
+  happeningOf,
+  recordHappening,
+  watchingIn,
+  type Happening,
+} from "./director.ts";
 
 describe("the notebook's watch list", () => {
   it("reads who and what for, ids alone too, at most four", () => {
@@ -51,6 +59,78 @@ describe("the notebook's watch list", () => {
     expect(watchingIn("---\nwatching: [\n---\n")).toEqual([]);
     expect(watchingIn("---\nother: x\n---\n")).toEqual([]);
     expect(watchingIn("---\nwatching: serina\n---\n")).toEqual([]);
+  });
+});
+
+describe("the digest", () => {
+  it("takes activities started and plans changed from the journal", () => {
+    expect(
+      happeningOf({
+        seq: 1,
+        simTime: 5,
+        kind: "task.started",
+        actors: ["serina"],
+        payload: {
+          taskId: "t",
+          type: "eating",
+          description: "Tea at the ward",
+          duration: 30,
+          endAt: 10,
+          where: "ward",
+        },
+      }),
+    ).toEqual({
+      at: 5,
+      who: "serina",
+      kind: "started",
+      text: "Tea at the ward",
+      where: "ward",
+    });
+    expect(
+      happeningOf({
+        seq: 2,
+        simTime: 6,
+        kind: "task.delayed",
+        actors: ["serina"],
+        payload: { taskId: "t", endAt: 20, reason: "Staying for supper" },
+      }),
+    ).toMatchObject({ kind: "delayed", text: "Staying for supper" });
+    expect(
+      happeningOf({
+        seq: 2,
+        simTime: 6,
+        kind: "task.delayed",
+        actors: ["serina"],
+        payload: { taskId: "t", endAt: 20 },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("shows everything of the watched and the newest of the rest", () => {
+    const happenings: Happening[] = [];
+    const add = (at: number, who: string) =>
+      recordHappening(happenings, {
+        at,
+        who,
+        kind: "started",
+        text: `${who}@${at}`,
+      });
+    add(1, "old");
+    add(2, "a");
+    add(3, "watched");
+    add(4, "b");
+    add(5, "c");
+    add(6, "director");
+    add(7, "d");
+    const { shown, more } = digestOf(happenings, {
+      since: 1,
+      until: 7,
+      watched: new Set(["watched"]),
+      skip: new Set(["director"]),
+      limit: 3,
+    });
+    expect(shown.map((h) => h.text)).toEqual(["watched@3", "c@5", "d@7"]);
+    expect(more).toBe(2);
   });
 });
 

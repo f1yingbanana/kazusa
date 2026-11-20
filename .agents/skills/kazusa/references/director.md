@@ -91,11 +91,12 @@ talk to it.
 - **Rhythm = its own tasks.** It starts "keeping an eye on the world" for about
   an hour of sim time; when that ends it wakes, reviews, starts the next. To
   tune in at 17:00, it ends its task at 17:00. No code.
-- **What is happening = the Cast and Watching sections** on each of its turns:
-  everyone onstage by place and activity, the watched with their latest lines;
-  `cast` gives anyone in depth (plans, company, latest lines). A digest of
-  started activities in its check-in was tried (D1–D4) and cut from the first
-  PR: activities are what people set out to do, and the lines say what happened.
+- **What is happening = the Cast and Watching sections** on each of its turns
+  (everyone onstage by place and activity, the watched with their latest lines;
+  `cast` gives anyone in depth), and a **digest in its task check-in**: what
+  started or changed plans since its last look, from the journal the timeline
+  reads. Activities are what people set out to do, not proof; the lines say what
+  happened.
 
 ### Characters: unchanged, except a planted line
 
@@ -139,7 +140,8 @@ and nobody's words (`context-conventions`).
    `context-conventions` the narrator line and "Disagree, and stay hurt".
 2. Its turns: the `world-director` skill in its system prompt every turn; the
    Cast, Watching and Promised beats sections; its own closing reminder (no
-   spoilers to the user).
+   spoilers to the user); a digest of what happened in each check-in of its own
+   activities.
 3. Tools for the system agent: `narrate` (the one exception to chat membership;
    `aside: true` for one character alone) and `cast`.
 4. The feedback loop: `watching:` riding on attention decisions with a cue;
@@ -148,9 +150,8 @@ and nobody's words (`context-conventions`).
 5. A bugfix: a memory section rewrite keeps a `---` block inside it.
 6. Planting, requests, rhythm, the notebook itself: no code.
 
-Cut before the first PR: the digest of started activities in its check-in. Not
-yet: event CGs under the director (they stay with the beat check and the drawing
-step on `feat/event-cg`), a UI for arcs, a separate director agent.
+Not yet: event CGs under the director (they stay with the beat check and the
+drawing step on `feat/event-cg`), a UI for arcs, a separate director agent.
 
 ## To verify first
 

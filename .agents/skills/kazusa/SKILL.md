@@ -232,6 +232,7 @@ apps/kazusa/
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       ├── stickers/                   # Per-character sticker sets, GET /kazusa/sticker
 │       ├── scene/                      # Scene art: portraits, backdrop sets, scene.times, GET /kazusa/portraits|portrait|backdrop
+│       ├── director/                   # The system agent as the world's director: notebook block, cast, watch cues, digest, judged beats, narrate
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
 ├── worlds/                             # Read-only templates: base.json, <id>/{package.json,shared,workspaces}
@@ -1312,6 +1313,76 @@ connect these modules in process.
   `GET /kazusa/stats` and SSE `stats`.
 - A state can also be `on: "player"`: only the player holds and sets it, and
   characters with the player read it.
+
+### 3.10 `src/director/` — The World's Director
+
+The system agent directs the world's story on request ("I want to see these two
+fall out"): a world written as it plays. Design, every lab run and why each
+piece exists: [director](references/director.md); read it before changing any of
+this, and come back to it when the work is blocked.
+
+- **The director is the system agent, in its own session.** Directing, building
+  and the user's chat stay one mind; no separate director agent, no new session.
+  A character can't direct (it only knows what it lived).
+- **As few mechanics as possible.** Steering is the characters' own files and
+  tools: a **plant** is the director's `edit` of a character's `MEMORY.md` (an
+  intention under `## Plans recorded for YYYY-MM-DD` as `- [SOFT_GOAL] ...`, the
+  heading `withPlan` and `plansOn` use, or a memory), read on their next turn
+  and every turn after, as their own thought. No plant tool. Code only gives the
+  director what it can't see, and one way to act now (`narrate`).
+- **The notebook is its `MEMORY.md`.** A settings block (`---`) holds
+  `watching:` (at most four, `{who, for}`: the fork it waits for, with an end)
+  and `promised:` (at most four beats the user asked to see, as they'd look on
+  the page). Code reads only that block, found anywhere in the file and parsed
+  leniently (unquoted `: ` broke YAML live); `withSection` keeps a `---` block
+  inside a section it rewrites (a bedtime review wiped it once). Arcs, the board
+  and the log below it are prose, the director's own.
+- **Its turns** (`context-engine`, `director: true`): `director-conventions`
+  instead of a character's conventions (no needs, feelings, lifecycle or company
+  guidance); the `world-director` skill body in the system prompt every turn (it
+  stopped rereading a skill it had read once); the **Cast** (everyone onstage by
+  place and activity), **Watching** (each watched character as they are, with
+  their latest lines) and **Promised beats**; its own closing reminder
+  `kazusa-director#before-replying` (no spoilers: the show is the report).
+- **A digest** in each check-in of its own activities: what started or changed
+  plans since its last look. Activities are what people set out to do, not
+  proof; only conversation lines show what happened (the skill says so).
+- **Cues ride on attention decisions**, never a new call: for a watched
+  character only, Perception's Jev call gets one more boolean (`director`, the
+  `for:` line), and a yes sends the director a cue on its tasks session, at most
+  once per character per 10 sim minutes.
+- **Beats are judged from outside.** The director (a model like the characters)
+  declared beats done "in spirit"; so at each look and cue the decision model
+  asks, per beat, whether it happened plainly on the page in the watched
+  conversations, and keeps looks-without counts (`director-beats` store); after
+  two, its turn says to climb a rung. A text model (`api.runtime.llm.complete`)
+  writes a short note on open beats from the last day: where it stands, what's
+  in the way, one push. The director never ticks a beat.
+- **`narrate`** (system agent only, `{who, text, aside?}`): an event where a
+  character is, signed `narrator`, the one exception to chat membership
+  (`Messaging.narrate`); everyone in their huddle and the player see it. Alone,
+  or with `aside: true`, it reaches only that character, on their tasks session:
+  a feeling or impulse, never a decision or their words. Refused for offstage
+  characters. Characters read narrator lines as events, nobody's words
+  (`context-conventions`).
+- **`cast`** (system agent only): anyone onstage in depth: place, activity,
+  company, plans for three days, latest lines. Only onstage characters act; the
+  skill and the Cast say so, because the director planted offstage characters.
+- **Characters can fight.** `context-conventions` "Disagree, and stay hurt, like
+  a person": measured in `scripts/testing/argue-lab` (replayed real turns, blind
+  labels), characters wronged plainly push back and stay hurt when brushed off;
+  without a wrong done, no push makes them argue. So the craft skill designs
+  around acts (two wrongs that cross), not moods.
+- **Wording lives in skills**: `kazusa-director` (what code tells it and asks
+  Jev), `director-conventions`, and `world-director` with its references (in
+  `.agents/skills`, copied to the system agent's workspace). All world-agnostic:
+  no canon names, "the user", placeholders in examples.
+- **Plants in plain words.** Plants written in a report's voice spread that
+  voice through the cast within a day; the skill forbids forms, audits and exact
+  sums in plants.
+- **How it's tested**: planning trials on a clean copy of the world's template
+  (its first turn only, five kinds of request in parallel worlds, every prompt
+  captured, a blind grader), then live runs with the clock going.
 
 ## 4. Engineering & Zero-Build Conventions
 

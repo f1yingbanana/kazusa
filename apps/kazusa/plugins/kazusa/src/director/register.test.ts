@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { Stimulus } from "../stimulus.ts";
 import { registerDirector } from "./register.ts";
 
@@ -85,6 +86,7 @@ function setup(notebook: string, seen: readonly boolean[] = []) {
     evaluate: evaluate as never,
     complete,
     clock: { time: () => Date.UTC(2026, 0, 1, 17) },
+    broadcaster: new KazusaRealtimeBroadcaster(),
     receive: async (agentId, stimulus) => {
       received.push([agentId, stimulus]);
     },
@@ -191,8 +193,8 @@ describe("the director", () => {
     expect(view).toContain(
       "- [ ] They argue: raised voices: not seen on the page; 0 looks",
     );
-    await service.look("boss");
-    await service.look("boss");
+    await service.digest("boss");
+    await service.digest("boss");
     expect(evaluate).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(evaluate.mock.calls[0])).toContain("Ben: hi");
     view = await service.view("boss");

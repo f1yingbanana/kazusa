@@ -263,6 +263,7 @@ export default definePluginEntry({
     const director = registerDirector(api, {
       clock,
       evaluate: decide,
+      broadcaster,
       receive: (agentId, stimulus) => perception.receive(agentId, stimulus),
       huddleOf: async (agentId) => messagingRef.current?.huddleOf(agentId),
       placeOf: (agentId) => location.placeOf(agentId),
@@ -324,10 +325,15 @@ export default definePluginEntry({
               api.logger.warn(`Location settle: ${String(error)}`);
               return undefined;
             });
-          // A check-in of the director's own activity is a look: its promised
-          // beats are judged before its turn reads them.
-          await director.look(agentId);
-          await perception.deadline(agentId, note);
+          // The director's own activities end with what happened meanwhile.
+          const digest = await director.digest(agentId).catch((error) => {
+            api.logger.warn(`Director digest: ${String(error)}`);
+            return undefined;
+          });
+          await perception.deadline(
+            agentId,
+            [note, digest].filter(Boolean).join("\n\n") || undefined,
+          );
         },
         (error) =>
           api.logger.warn(
