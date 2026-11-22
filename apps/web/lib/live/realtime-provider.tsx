@@ -247,6 +247,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());
+          // Who is played may have changed while disconnected: a `player`
+          // event is not replayed.
+          void mutate(WORLD_KEY);
           // Refresh the recent window; durable history remains in SWR.
           void refreshJournal();
           void mutate(

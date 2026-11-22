@@ -2,6 +2,7 @@
 
 import { ChevronRightIcon, MousePointerClickIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Empty,
   EmptyDescription,
@@ -96,34 +97,48 @@ export function Inspector() {
     else void select(null);
   };
 
+  // The keyboard and screen readers get a real tab list: arrows move between
+  // tabs, each panel says which tab it belongs to.
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <Tabs
+      value={showing}
+      onValueChange={(next: "you" | EntityKind) => show(next)}
+      className="flex min-h-0 flex-1 flex-col gap-0"
+    >
       {open.length > 1 ? (
-        <div
-          role="tablist"
+        <TabsList
+          variant="line"
           aria-label="Inspector"
-          className="flex shrink-0 gap-1 border-b px-2 py-1.5"
+          className="h-9! w-full shrink-0 justify-start gap-4 rounded-none border-b px-4"
         >
           {open.map((one) => (
-            <TabButton
+            <TabsTrigger
               key={one}
-              selected={showing === one}
-              onClick={() => show(one)}
+              value={one}
+              className="flex-none px-0 text-xs"
             >
               {one === "you" ? "You" : KIND_LABEL[one]}
-            </TabButton>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
       ) : null}
-      {showing === "you" ? (
-        <EntitySections entity={{ kind: "character", id: player.id }} />
-      ) : (
-        <EntitySections
-          entity={{ kind: showing, id: tabs[showing]! }}
-          onClose={() => close(showing)}
-        />
-      )}
-    </div>
+      {open.map((one) => (
+        <TabsContent
+          key={one}
+          value={one}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          {one !== showing ? null : one === "you" ? (
+            <EntitySections entity={{ kind: "character", id: player.id }} />
+          ) : (
+            <EntitySections
+              entity={{ kind: one, id: tabs[one]! }}
+              onClose={() => close(one)}
+            />
+          )}
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 }
 
@@ -140,31 +155,6 @@ function EmptyInspector() {
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
-  );
-}
-
-function TabButton({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={selected}
-      onClick={onClick}
-      className={cn(
-        "min-w-0 truncate rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
-        selected && "bg-muted text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

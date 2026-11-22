@@ -42,6 +42,11 @@ export function ChatsView() {
   const docked = useMediaQuery("(min-width: 1024px)");
   const { player, operator } = useSources();
   const selfOf = useSelfIn();
+  // Who is played now, read when a send comes back.
+  const playing = useRef(player.id);
+  useEffect(() => {
+    playing.current = player.id;
+  }, [player.id]);
   const { canPlay, isLoading: isAccessLoading } = useAccess();
   const { chats } = useChats();
   const { byId } = useCharacters();
@@ -204,13 +209,18 @@ export function ChatsView() {
   ]);
 
   if (selected) {
+    // Who sends here is part of the view: switching starts it afresh, so a
+    // failed line kept for retry never goes out as the next character.
+    const sentAs = player.id;
     return (
       <div className="flex min-h-0 flex-1">
         <ChatView
-          key={selected.id}
+          key={`${selected.id}:${selfOf(selected)}`}
           chat={selected}
           onBack={() => void setParams({ "chats.id": null })}
           onSent={(chat) => {
+            // A first send that lands after a switch doesn't bring it back.
+            if (playing.current !== sentAs) return;
             setDraftChat(chat);
             void setParams({ "chats.id": chat.id });
           }}

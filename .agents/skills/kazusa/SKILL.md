@@ -1347,15 +1347,16 @@ connect these modules in process.
   drains to the person. Each step after the record is best-effort: a failure is
   logged, never half a switch.
 - **While played**: Perception judges nothing and hands the model nothing
-  (`toPlayer`): what happened is confirmed (sightings land in the ledger and
-  `noticed`), marked read (read receipts; after hand-back "Chats awaiting your
-  reply" lists what the person left unanswered) and dropped, their own check-ins
-  included. No wake, no idle check-in (`simulated`). Desires hold still. HTTP
-  sends go out as the character (`messaging.send(..., byPlayer)`), unpaced, into
-  their own ledgers as if their model had said them. `actorFor` decides who a
-  request acts as: the operator for their console (its session key, which has no
-  owner; or a new chat naming them among its members; or one to the system agent
-  alone while watching), else the character played, whose own
+  (`toPlayer`): what arrives is marked read (read receipts; after hand-back
+  "Chats awaiting your reply" lists what the person left unanswered) and
+  dropped, their own check-ins included. Sightings are not confirmed: who
+  arrived while they were played is in no ledger and not in `noticed` (still to
+  do). No wake, no idle check-in (`simulated`). Desires hold still. HTTP sends
+  go out as the character (`messaging.send(..., byPlayer)`), unpaced, into their
+  own ledgers as if their model had said them. `actorFor` decides who a request
+  acts as: the operator for their console (its session key, which has no owner;
+  or a new chat naming them among its members; or one to the system agent alone
+  while watching), else the character played, whose own
   `members: [system agent]` is their own chat with her. `byPlayer` rides on the
   delivery and the stimulus (what Perception keeps for the timeline).
 - **Handing back** (`release`): the hold lifts, desires resume from

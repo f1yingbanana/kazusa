@@ -7,6 +7,7 @@ import { useSWRConfig } from "swr";
 import { useAccess } from "@/hooks/use-access";
 import { playAs } from "@/lib/source/player/http";
 import { CHARACTERS_KEY, useSources, WORLD_KEY } from "@/lib/source/provider";
+import { useChats } from "@/hooks/use-chats";
 import { useSelection } from "@/hooks/use-selection";
 import { setDraftChat, useChatDraftStore } from "@/lib/state/chat-draft";
 import { closeInspectorTab } from "@/lib/state/ui-store";
@@ -39,12 +40,18 @@ export function usePlay() {
 }
 
 /**
- * Who you play changed (here, in another tab, or by anyone): an unsent chat was
- * written as the one before, so it goes, and is left if it was open, rather
- * than be sent as someone else. Mounted once, in the shell.
+ * Who you play changed (here, in another tab, or by anyone): what was written
+ * but not sent was written as the one before, so it goes (an unsent chat, left
+ * if it was open, and text in any chat's box but the console's), rather than be
+ * sent as someone else. Mounted once, in the shell.
  */
 export function useSwitchResets(): void {
-  const { player } = useSources();
+  const { player, operator } = useSources();
+  const { chats } = useChats();
+  // The person's own chats with the system agent: theirs whoever they play.
+  const consoles = chats
+    .filter((chat) => chat.members.includes(operator.id))
+    .map((chat) => chat.id);
   const [chatId, setChatId] = useQueryState(
     "chats.id",
     chatsParsers["chats.id"],
@@ -55,6 +62,12 @@ export function useSwitchResets(): void {
   useEffect(() => {
     if (before.current === player.id) return;
     before.current = player.id;
+    // What was typed in any chat but the console was typed as the one before.
+    useChatDraftStore.setState((state) => ({
+      messages: Object.fromEntries(
+        Object.entries(state.messages).filter(([id]) => consoles.includes(id)),
+      ),
+    }));
     const { draft } = useChatDraftStore.getState();
     if (!draft) return;
     setDraftChat(null);
@@ -63,5 +76,5 @@ export function useSwitchResets(): void {
       closeInspectorTab("chat");
       void select(null);
     }
-  }, [player.id, chatId, setChatId, selected, select]);
+  }, [player.id, chatId, setChatId, selected, select, consoles]);
 }

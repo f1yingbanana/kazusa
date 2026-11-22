@@ -3,6 +3,7 @@
 import { useQueryStates, parseAsString } from "nuqs";
 import { chatsParsers } from "@/components/views/chats/search-params";
 import { timelineParsers } from "@/components/views/timeline/search-params";
+import { wikiParsers } from "@/components/views/wiki/search-params";
 import { useState } from "react";
 import {
   BookOpenIcon,
@@ -55,6 +56,9 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
     character: parseAsString,
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
+    "wiki.part": wikiParsers["wiki.part"],
+    "wiki.edit": wikiParsers["wiki.edit"],
+    "wiki.raw": wikiParsers["wiki.raw"],
   });
   const { resolved, watching, operator } = useSources();
   const { canPlay, canManage } = useAccess();
@@ -201,8 +205,15 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
       group: "look",
       label: "Wiki page",
       icon: BookOpenIcon,
+      // Their page itself, not a tab or an edit left open from before.
       onSelect: () =>
-        void setParams({ view: "characters", character: character.id }),
+        void setParams({
+          view: "characters",
+          character: character.id,
+          "wiki.part": null,
+          "wiki.edit": null,
+          "wiki.raw": null,
+        }),
     },
     ...(isAgent
       ? [
