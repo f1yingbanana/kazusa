@@ -623,6 +623,17 @@ describe("conversation routing and management", () => {
     expect(await h.messaging.listChats("bob")).toHaveLength(1);
   });
 
+  it("keeps an untitled group untitled and labels its ledgers by who else is in it", async () => {
+    const h = setup();
+    const group = await h.send({ members: ["bob", "carol"] });
+    const [chat] = await h.messaging.listChats("bob");
+    expect(chat).toMatchObject({ kind: "group", title: null });
+    expect(h.ensureSession).toHaveBeenCalledWith(
+      { agentId: "alice", sessionKey: group.sessionKey },
+      "bob, carol",
+    );
+  });
+
   it("sends to the direct chat when a title names only one other person", async () => {
     const h = setup();
     const direct = await h.send();
@@ -1117,7 +1128,7 @@ describe("observing chats from outside", () => {
     const emitted: unknown[] = [];
     h.messaging.onEvent((event) => emitted.push(event));
 
-    await h.messaging.observeChats("user:sensei");
+    await h.messaging.observeChats(["user:sensei"]);
     await h.messaging.observeChatHistory({ chatId: first.chatId });
 
     expect([...h.chats]).toEqual(chatsBefore);
@@ -1141,7 +1152,7 @@ describe("observing chats from outside", () => {
       "user:sensei",
     );
 
-    const observed = await h.messaging.observeChats("user:sensei");
+    const observed = await h.messaging.observeChats(["user:sensei"]);
     expect(observed.map(({ chat }) => chat.id)).toEqual([
       newer.chatId,
       older.chatId,
@@ -1160,7 +1171,7 @@ describe("observing chats from outside", () => {
     const huddle = await h.send({ aloud: true, text: "nice day" });
     await h.messaging.leavePlace("alice", "Alice", "park", { at: 1 });
 
-    const [ended] = await h.messaging.observeChats("user:sensei");
+    const [ended] = await h.messaging.observeChats(["user:sensei"]);
     expect(ended).toMatchObject({
       ended: true,
       members: ["alice", "bob"],
@@ -1217,7 +1228,15 @@ describe("composition presence", () => {
       title: "Club",
     });
     const humanKey = result.sessionKey.replace("agent:alice:", "");
-    await h.messaging.setTyping("user:sensei", "Sensei", humanKey, "typing");
+    await h.messaging.setTyping(
+      "user:sensei",
+      "Sensei",
+      humanKey,
+      "typing",
+      undefined,
+      undefined,
+      true,
+    );
     const time = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 8001);
     expect(await h.messaging.getTyping("alice")).toEqual([]);
     time.mockRestore();

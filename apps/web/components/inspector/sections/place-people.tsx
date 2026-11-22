@@ -14,12 +14,14 @@ import { headingTo, peopleWithin } from "@/lib/location/places";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import { useWatchlist } from "@/lib/state/preferences-store";
 import { formatSimDuration } from "@/lib/time/sim";
+import { SECTION_TITLE } from "@/components/inspector/parts";
+import { cn } from "@/lib/utils";
 
 const MAX_ROWS = 12;
 
 function Subheading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="flex items-center justify-between font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+    <h4 className={cn("flex items-center justify-between", SECTION_TITLE)}>
       {children}
     </h4>
   );

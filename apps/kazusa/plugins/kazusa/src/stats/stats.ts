@@ -83,7 +83,7 @@ export interface StatsView {
   readonly toward: readonly LabelledPerson[];
   /**
    * People standing with them, whose visible states they can see. Each catalog
-   * is that person's own, so the player's has the player's states.
+   * is that person's own.
    */
   readonly present: readonly {
     readonly label: string;
@@ -94,8 +94,8 @@ export interface StatsView {
 
 /**
  * What a character reads of the world's states this turn: their own, those
- * toward the people at hand, what shows on the people with them (the player's
- * own states among them), and the world's. Nothing when there is none to see.
+ * toward the people at hand, what shows on the people with them, and the
+ * world's. Nothing when there is none to see.
  */
 export function statsText(view: StatsView): string | undefined {
   const shown = view.catalog.filter(({ shown }) => shown !== "nobody");
@@ -121,11 +121,7 @@ export function statsText(view: StatsView): string | undefined {
   // On others, only what stands out: everyone at their initial says nothing.
   for (const { label, catalog, record } of view.present) {
     const visible = catalog
-      .filter(
-        (stat) =>
-          (stat.on === "character" || stat.on === "player") &&
-          stat.shown === "everyone",
-      )
+      .filter((stat) => stat.on === "character" && stat.shown === "everyone")
       .flatMap((stat) => {
         const value = statValue(stat, record?.own[stat.name]);
         return value === stat.initial ? [] : [says(stat, value, false)];

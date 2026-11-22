@@ -89,7 +89,13 @@ export const TimelineRow = memo(function TimelineRow({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Inline flow, not flex-wrap, so chips and fact text read as one sentence when they wrap. */}
-        <p className="min-w-0 text-sm leading-relaxed text-pretty">
+        <p
+          className={cn(
+            "min-w-0 text-sm leading-relaxed text-pretty",
+            // A glance, in the inspector: the stream has the whole of it.
+            compact && "line-clamp-3",
+          )}
+        >
           {actors.slice(0, MAX_CHIPS).map((id, index) => (
             <CharacterChip
               key={id}

@@ -4,7 +4,7 @@ import { useQueryStates, parseAsString } from "nuqs";
 import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { chatsParsers } from "@/components/views/chats/search-params";
 import { useEffect, useMemo } from "react";
-import { MapPinIcon } from "lucide-react";
+import { ArrowLeftRightIcon, MapPinIcon } from "lucide-react";
 import { chatIcon } from "@/components/entities/chips";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
 import {
@@ -26,7 +26,7 @@ import { STAGE_VIEWS } from "@/lib/registry/views";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { useSources } from "@/lib/source/provider";
-import { markQuietSelection } from "@/lib/state/ui-store";
+import { markQuietSelection, openPlayDialog } from "@/lib/state/ui-store";
 
 /** The palette isn't virtualized; only the latest of others' chats are listed. */
 const MAX_OBSERVED = 100;
@@ -82,10 +82,7 @@ export function CommandPalette({
   }
 
   const people = useMemo(
-    () =>
-      characters
-        .filter((c) => c.kind !== "player")
-        .sort((a, b) => a.name.localeCompare(b.name)),
+    () => characters.toSorted((a, b) => a.name.localeCompare(b.name)),
     [characters],
   );
 
@@ -115,6 +112,18 @@ export function CommandPalette({
                 {view.label}
               </CommandItem>
             ))}
+            {hasPermission("play") ? (
+              <CommandItem
+                value="play as someone switch character watch"
+                onSelect={() => {
+                  onOpenChange(false);
+                  openPlayDialog();
+                }}
+              >
+                <ArrowLeftRightIcon />
+                Play as…
+              </CommandItem>
+            ) : null}
           </CommandGroup>
           {chats.length > 0 ? (
             <CommandGroup heading="Chats">

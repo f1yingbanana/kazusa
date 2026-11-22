@@ -112,3 +112,10 @@ export function formatBytes(bytes: number): string {
   const digits = unit === 0 || value >= 10 ? 0 : 1;
   return `${value.toFixed(digits)} ${BYTE_UNITS[unit]}`;
 }
+
+/** "Airi", "Airi and Natsu", "Airi, Natsu and Yoshimi": how a line names them. */
+export function andList(names: readonly string[]): string {
+  return names.length < 2
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}

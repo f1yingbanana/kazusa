@@ -17,7 +17,11 @@ import {
   statLabel,
   statProvenance,
 } from "@/components/stats/stat-control";
-import { Button } from "@/components/ui/button";
+import {
+  SECTION_TITLE,
+  SectionAction,
+  SectionActions,
+} from "@/components/inspector/parts";
 import {
   Command,
   CommandEmpty,
@@ -39,21 +43,15 @@ import {
 import { settingsParsers } from "@/components/views/settings/search-params";
 import { useCharacters } from "@/hooks/use-characters";
 import { useStats } from "@/hooks/use-stats";
-import { useSources } from "@/lib/source/provider";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import { cn } from "@/lib/utils";
 
 /** The states that exist for them, their own apart from those toward others. */
-function statesOf(data: StatsResponse, id: string, player: boolean) {
-  // The player's for the player alone, and their outfit if any.
-  const theirs = statsOf(data.catalog, {
-    player,
-    outfits: data.outfits[id],
-  });
+function statesOf(data: StatsResponse, id: string) {
+  // With their outfit, if they have any.
+  const theirs = statsOf(data.catalog, { outfits: data.outfits[id] });
   return {
-    own: theirs.filter(
-      (stat) => stat.on === "character" || stat.on === "player",
-    ),
+    own: theirs.filter((stat) => stat.on === "character"),
     pair: theirs.filter((stat) => stat.on === "pair"),
   };
 }
@@ -68,35 +66,21 @@ function words(
     .join(" · ");
 }
 
-/**
- * The player sets their own states by hand, so theirs start open. A character's
- * are meters to read, and start folded.
- */
-export function useIsPlayer(entity: EntityRef): boolean {
-  return useSources().player.id === entity.id;
-}
-export function useIsNotPlayer(entity: EntityRef): boolean {
-  return !useIsPlayer(entity);
-}
-
 /** Folded: where their own states stand. */
 export function CharacterStatesSummary({ entity }: { entity: EntityRef }) {
   const { data } = useStats();
-  const { player } = useSources();
   if (!data) return null;
-  const { own } = statesOf(data, entity.id, entity.id === player.id);
+  const { own } = statesOf(data, entity.id);
   return <>{words(own, data.records[entity.id]?.own)}</>;
 }
 
 /**
  * The world's states as they stand for this character: their own, then whoever
  * they hold something toward. Each has the control that changes it, for whoever
- * may. For the player, opened by You in the status bar, their own include the
- * states only the player has.
+ * may.
  */
 export function CharacterStatesSection({ entity }: { entity: EntityRef }) {
   const { data, error, canManage, set } = useStats();
-  const { player } = useSources();
   const [, setParams] = useQueryStates({
     view: parseAsString,
     "settings.tab": settingsParsers["settings.tab"],
@@ -106,26 +90,25 @@ export function CharacterStatesSection({ entity }: { entity: EntityRef }) {
     return <p className="text-sm text-destructive">{error.message}</p>;
   if (!data) return <Skeleton className="h-4" aria-hidden />;
 
-  const { own, pair } = statesOf(data, entity.id, entity.id === player.id);
+  const { own, pair } = statesOf(data, entity.id);
   const record = data.records[entity.id];
 
   if (!own.length && !pair.length) {
     return (
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2">
         <p className="text-sm text-muted-foreground">
           This world defines no states for characters.
         </p>
         {canManage ? (
-          <Button
-            variant="ghost"
-            size="xs"
-            className="-mr-2 shrink-0 text-muted-foreground"
-            onClick={() =>
-              void setParams({ view: "settings", "settings.tab": "states" })
-            }
-          >
-            Define states
-          </Button>
+          <SectionActions>
+            <SectionAction
+              onClick={() =>
+                void setParams({ view: "settings", "settings.tab": "states" })
+              }
+            >
+              Define states
+            </SectionAction>
+          </SectionActions>
         ) : null}
       </div>
     );
@@ -189,7 +172,7 @@ function StatRow({
         </TooltipTrigger>
         <TooltipContent className="flex max-w-64 flex-col gap-1">
           <span>{stat.description}</span>
-          <span className="font-mono text-[11px] tabular-nums opacity-80">
+          <span className="font-mono text-xs tabular-nums opacity-80">
             {statProvenance(entry)}
           </span>
         </TooltipContent>
@@ -228,7 +211,7 @@ function Toward({
 
   return (
     <div className="flex flex-col gap-1.5 border-t pt-3">
-      <span className="text-xs font-medium text-muted-foreground">Toward</span>
+      <span className={SECTION_TITLE}>Toward</span>
       {held.length ? (
         <ul className="-mx-2 flex flex-col">
           {held.map(({ id, name }) => (
@@ -281,33 +264,33 @@ function Toward({
       )}
       {onSet && rest.length ? (
         // Everyone else in the world: found by name, not by scrolling.
-        <Popover open={picking} onOpenChange={setPicking}>
-          <PopoverTrigger
-            render={<Button variant="outline" size="xs" className="w-fit" />}
-          >
-            Someone else
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 gap-0 p-0">
-            <Command>
-              <CommandInput placeholder={`Search ${rest.length} people`} />
-              <CommandList className="max-h-64">
-                <CommandEmpty>Nobody by that name.</CommandEmpty>
-                {rest.map(({ id, name }) => (
-                  <CommandItem
-                    key={id}
-                    value={`${name} ${id}`}
-                    onSelect={() => {
-                      setOpen(id);
-                      setPicking(false);
-                    }}
-                  >
-                    <span className="truncate">{name}</span>
-                  </CommandItem>
-                ))}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <SectionActions>
+          <Popover open={picking} onOpenChange={setPicking}>
+            <PopoverTrigger render={<SectionAction />}>
+              Someone else
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 gap-0 p-0">
+              <Command>
+                <CommandInput placeholder={`Search ${rest.length} people`} />
+                <CommandList className="max-h-64">
+                  <CommandEmpty>Nobody by that name.</CommandEmpty>
+                  {rest.map(({ id, name }) => (
+                    <CommandItem
+                      key={id}
+                      value={`${name} ${id}`}
+                      onSelect={() => {
+                        setOpen(id);
+                        setPicking(false);
+                      }}
+                    >
+                      <span className="truncate">{name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </SectionActions>
       ) : null}
     </div>
   );

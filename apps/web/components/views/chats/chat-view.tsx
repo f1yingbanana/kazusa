@@ -1,5 +1,7 @@
 "use client";
 
+import { useSelfIn } from "@/hooks/use-self";
+import { useSources } from "@/lib/source/provider";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useBrainTrace } from "@/hooks/use-brain";
@@ -43,6 +45,8 @@ export function ChatView({
   const { byId } = useCharacters();
   const { canPlay } = useAccess();
   const { player, send, commitSentMessage, refreshChats } = useChatActions();
+  const { operator } = useSources();
+  const selfOf = useSelfIn();
   const messagesState = useMessages(chat.draft ? null : chat.id);
   const [pending, setPending] = useState<PendingMessage[]>([]);
 
@@ -59,9 +63,12 @@ export function ChatView({
       adminTrace ? brainActivity(adminTrace.turns, messagesState.messages) : [],
     [adminTrace, messagesState.messages],
   );
+  // In the console, "you" is the person; elsewhere, who they play.
+  const self = selfOf(chat);
+  const selfName = self === operator.id ? operator.name : player.name;
   const others = useMemo(
-    () => chat.members.filter((id) => id !== player.id),
-    [chat.members, player.id],
+    () => chat.members.filter((id) => id !== self),
+    [chat.members, self],
   );
 
   const resolve = useParticipantResolver();
@@ -136,8 +143,8 @@ export function ChatView({
     const message: PendingMessage = {
       id: requestId,
       requestId,
-      senderId: player.id,
-      senderName: player.name,
+      senderId: self,
+      senderName: selfName,
       text,
       ...(type === "action" ? { type } : {}),
       timestamp: readSimNow(),
@@ -203,7 +210,7 @@ export function ChatView({
       onLoadOlder={messagesState.loadOlder}
       onRetry={handleRetry}
       resolve={resolve}
-      userId={player.id}
+      userId={self}
       activity={activity}
       activityRunning={adminThinking}
     />
@@ -217,7 +224,7 @@ export function ChatView({
       <ChatHeader
         chat={chat}
         own={chat.draft ? undefined : chat}
-        userId={player.id}
+        userId={self}
         typists={typists}
         onBack={onBack}
         rendering={rendering}

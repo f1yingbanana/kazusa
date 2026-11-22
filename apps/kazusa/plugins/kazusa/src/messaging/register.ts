@@ -1,3 +1,4 @@
+import { isUser } from "../identity.ts";
 import { currentConfig } from "../current-config.ts";
 import { inBackground } from "../background.ts";
 import path from "node:path";
@@ -11,6 +12,7 @@ import {
 import { publishSessionTranscriptUpdateByIdentity } from "openclaw/plugin-sdk/session-transcript-runtime";
 import type { Agent } from "@kazusa/client";
 import { registerMessagingHttp } from "./http.ts";
+import type { Player } from "../player.ts";
 import { characterName, personName } from "../identity.ts";
 import { localAvatarUrl } from "../characters/avatar.ts";
 import { z } from "zod";
@@ -44,7 +46,6 @@ import {
   TALK,
   chatAddress,
   MANAGE_CHAT,
-  isUser,
   heardAs,
   sendMessageSchema,
   written,
@@ -197,6 +198,8 @@ export function registerMessaging(
       >;
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
+    /** The person at the keyboard and the character they play. */
+    readonly player: Player;
     /** Let the player read chats they aren't in (`observer.enabled`). */
     readonly observer?: boolean;
     /** The outfit word a character wears, or nothing in the usual clothes. */
@@ -393,23 +396,23 @@ export function registerMessaging(
         });
       }
       if (!deps.observer) return;
-      // The player's own chats already reach them by the audience-filtered
-      // stream. A chat-list change goes both ways: joining one leaves this list.
+      // The person's own chats, and those of the character they play, already
+      // reach them by the audience-filtered stream. A chat-list change goes
+      // both ways: joining one leaves this list.
+      const theirs = (audience: readonly string[]) =>
+        deps.player.owns(audience);
       if (event.type === "chats") {
         deps.broadcaster?.broadcast({
           type: "observed",
           event: { type: "chats" },
         });
       } else if (event.type === "typing") {
-        if (!event.audience.some(isUser))
+        if (!theirs(event.audience))
           deps.broadcaster?.broadcast({
             type: "observed",
             event: event.typing,
           });
-      } else if (
-        event.type === "message" &&
-        !event.delivery.audience.some(isUser)
-      ) {
+      } else if (event.type === "message" && !theirs(event.delivery.audience)) {
         deps.broadcaster?.broadcast({
           type: "observed",
           event: {
@@ -709,6 +712,7 @@ export function registerMessaging(
     api,
     messaging,
     (id) => rosterAgent(api, id, getConfig()),
+    deps.player,
     {
       broadcaster: deps.broadcaster,
       getStatuses: deps.getStatuses,

@@ -12,6 +12,18 @@ export function listNames(names: readonly string[], max = 3): string {
 }
 
 /**
+ * Who "you" are in a chat: the person themselves in their console with the
+ * system agent, and the character they play everywhere else.
+ */
+export function selfIn(
+  chat: { readonly members: readonly string[] },
+  player: string,
+  operator: string,
+): string {
+  return operator && chat.members.includes(operator) ? operator : player;
+}
+
+/**
  * The player's own direct chat: one other voice, so it needs no names. A direct
  * chat between two others, read from outside, has two.
  */

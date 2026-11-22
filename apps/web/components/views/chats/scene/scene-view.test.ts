@@ -190,7 +190,8 @@ const huddle = (members: string[], placeId = "cafe"): Chat => ({
 /** The player's chat list says this huddle is as given: members, place. */
 const listed = (chat: Chat) =>
   vi.mocked(fetchChats).mockResolvedValue({
-    user: { id: PLAYER, name: "Player Name" },
+    operator: { id: "user:owner", name: "Owner" },
+    player: { id: PLAYER, name: "Player Name" },
     chats: [chat],
   });
 /** A character with portraits, by id. */
@@ -202,7 +203,8 @@ const drawn = (id: string) => ({
   portraitUrl: `/kazusa/portrait?id=${id}&name=neutral&v=1`,
 });
 const world: WorldResponse = {
-  user: { id: PLAYER, name: "Player Name" },
+  operator: { id: "user:owner", name: "Owner" },
+  player: { id: PLAYER, name: "Player Name" },
   serverNow: Date.now(),
   clock: { simTime: DAY + 12 * HOUR, speed: 0, updatedAt: Date.now() },
   world: { title: "Test world" },
@@ -331,7 +333,8 @@ beforeEach(() => {
     ...["carol", "dave", "erin", "fay"].map(drawn),
   ]);
   vi.mocked(fetchChats).mockResolvedValue({
-    user: { id: PLAYER, name: "Player Name" },
+    operator: { id: "user:owner", name: "Owner" },
+    player: { id: PLAYER, name: "Player Name" },
     chats: [huddle([PLAYER, "alice", "bob"])],
   });
   vi.mocked(fetchMessages).mockResolvedValue({ messages: [], hasMore: false });

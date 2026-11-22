@@ -148,11 +148,11 @@ describe("taskman wakes", () => {
     const taskman = registerTaskman(api, {
       clock,
       stage: {
-        isOnstage: async (id) => {
+        isSimulated: async (id) => {
           await stage.gate;
           return !offstage.has(id);
         },
-        onstage: async (ids) => ids.filter((id) => !offstage.has(id)),
+        simulated: async (ids) => ids.filter((id) => !offstage.has(id)),
       },
     });
     const woken: string[] = [];

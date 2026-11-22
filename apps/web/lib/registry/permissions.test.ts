@@ -53,7 +53,7 @@ describe("registry permissions", () => {
     expect(visitorSections).not.toContain("character.model");
     expect(visitorSections).not.toContain("character.context");
     expect(visitorSections).toContain("character.header");
-    expect(visitorSections).toContain("character.profile");
+    expect(visitorSections).toContain("character.now");
   });
 
   it("restricts the update status item to managers", () => {

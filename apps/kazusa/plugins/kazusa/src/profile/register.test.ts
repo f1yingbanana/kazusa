@@ -13,20 +13,21 @@ type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 
 async function setup() {
   const root = await mkdtemp(path.join(tmpdir(), "kazusa-profile-"));
-  const wikiDir = path.join(root, "shared", "wiki");
-  const characters = path.join(wikiDir, "entities", "characters");
-  await mkdir(characters, { recursive: true });
-  const file = path.join(characters, "player.md");
-  await writeFile(
-    file,
-    "---\ncharacter_id: user:player\nhome: hall\nname: Player\n---\n\n# Player\n\nNew here.\n",
-  );
+  const workspace = path.join(root, "workspaces", "arona");
+  await mkdir(workspace, { recursive: true });
+  const file = path.join(workspace, "USER.md");
+  await writeFile(file, "New here.\n");
+  const config = {
+    gateway: { auth: { token: "test-service-token" } },
+    agents: { defaults: { systemAgent: { agentId: "arona" } } },
+  };
   const routes: Record<string, Handler> = {};
   registerProfile({
-    config: { gateway: { auth: { token: "test-service-token" } } },
-    pluginConfig: {
-      user: { id: "user:player", name: "Player" },
-      location: { wikiDir },
+    config,
+    pluginConfig: { user: { id: "user:player", name: "Player" } },
+    runtime: {
+      config: { current: () => config },
+      agent: { resolveAgentWorkspaceDir: () => workspace },
     },
     registerHttpRoute: (route: { path: string; handler: Handler }) => {
       routes[route.path] = route.handler;
@@ -64,11 +65,10 @@ describe("registerProfile", () => {
       id: "user:player",
       name: "Player",
       about: "New here.",
-      wikiPage: path.join("wiki", "entities", "characters", "player.md"),
     });
   });
 
-  it("saves the description to the wiki and nothing else", async () => {
+  it("saves the description to the system agent's USER.md and nothing else", async () => {
     const { call, file } = await setup();
     const { status, body } = await call("/kazusa/profile/save", {
       id: "user:other",
@@ -81,8 +81,6 @@ describe("registerProfile", () => {
       name: "Player",
       about: "Night shift.",
     });
-    expect(await readFile(file, "utf8")).toBe(
-      "---\ncharacter_id: user:player\nhome: hall\nname: Player\n---\n\n# Player\n\nNight shift.\n",
-    );
+    expect(await readFile(file, "utf8")).toBe("Night shift.\n");
   });
 });

@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../characters/card.ts";
 import { currentConfig } from "../current-config.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import {
@@ -23,6 +24,9 @@ import type { AwaitingReply } from "../messaging/messaging.ts";
 import type { MemoryPrefetch } from "../memory/register.ts";
 import { brainRequest, type RetrievalRequest } from "../memory/retrieve.ts";
 import { openTaskStore } from "../taskman/store.ts";
+import { personLabel } from "../person-label.ts";
+import type { Player } from "../player.ts";
+import { pluginSkillText } from "../skill-text.ts";
 
 interface ContextEngineDeps {
   readonly clock: Clock;
@@ -70,6 +74,8 @@ interface ContextEngineDeps {
   ) => Promise<Pick<MemoryPrefetch, "onYourMind" | "roster" | "ids">>;
   /** The character's brain run under way, if any (`currentBrainRun`). */
   readonly runOf?: (agentId: string) => string | undefined;
+  /** The person at the keyboard and who they play, for the system agent. */
+  readonly player?: Pick<Player, "operator" | "playing">;
 }
 
 /**
@@ -160,6 +166,7 @@ function createContextEngine(
     presence,
     memory,
     runOf = currentBrainRun,
+    player,
   }: ContextEngineDeps,
   getConfig: () => OpenClawConfig,
   { turns, windows }: TurnCaches,
@@ -168,6 +175,7 @@ function createContextEngine(
     api.pluginConfig?.contextEngine ?? {},
   );
   const skillLoader = pluginSkillLoader(api);
+  const text = pluginSkillText(api);
   const tasks = openTaskStore(api);
   const settings = contextSettings(api);
   // Where each character's records started last turn, so the start holds and
@@ -360,6 +368,33 @@ function createContextEngine(
       });
       const state = await states?.(brainAgentId, here, prompt);
       const brainTurns = await pastTurns;
+      const systemAgent = systemAgentOf(getConfig()) === brainAgentId;
+      // She talks with the person, never with who they play; she needs to know
+      // who that is to do what they ask for themselves in the world.
+      const operator =
+        systemAgent && player
+          ? await player.playing().then(
+              (playing) =>
+                text(
+                  playing
+                    ? "kazusa-deliveries#operator-playing"
+                    : "kazusa-deliveries#operator-watching",
+                  {
+                    operator: player.operator.name,
+                    ...(playing
+                      ? { character: personLabel(playing.name, playing.id) }
+                      : {}),
+                  },
+                  { agentId: brainAgentId },
+                ),
+              (error: unknown) => {
+                api.logger.warn(
+                  `Context engine: can't read who is being played: ${String(error)}`,
+                );
+                return undefined;
+              },
+            )
+          : undefined;
       // Every build assembles afresh, for its own token budget: each model
       // call leaves less, as the turn's own messages grow.
       const assembled = await assembleContext({
@@ -375,14 +410,14 @@ function createContextEngine(
         states: state,
         whereabouts: place,
         inCompany: company,
+        ...(operator ? { operator } : {}),
         simTime: now,
         config: turnConfig,
         ...(window ? { contextWindow: window } : {}),
         skillLoader,
-        toolHistoryMaxTokens:
-          getConfig().agents?.defaults?.systemAgent?.agentId === brainAgentId
-            ? config.systemAgentToolHistoryMaxTokens
-            : turnConfig.toolHistoryMaxTokens,
+        toolHistoryMaxTokens: systemAgent
+          ? config.systemAgentToolHistoryMaxTokens
+          : turnConfig.toolHistoryMaxTokens,
         runId,
         ...(recordsStart ? { recordsFrom: recordsStart.from } : {}),
         brainTurns,

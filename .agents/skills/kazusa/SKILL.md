@@ -203,9 +203,9 @@ file-parsing overhead.
 | **Machine Working State**             | `api.runtime.state.openKeyedStore` (`"clock"`, `"tasks"`, `"desires"`, `"stats"`, `"location"`, `"inbox"`) | Virtual clock state/speed, active task leases, desire anchors, positions and trips (one record per character or player), and Perception's inbox/custody state, one per character (key `<agentId>`). Attention decisions are in Kazusa's own `<stateDir>/kazusa/decisions.sqlite`, uncapped. Each store belongs to one module: tasks to Taskman, stimuli and attention to Perception. Never store in Markdown.                                                                                                                                                             |
 | **Cognitive Brain Queue**             | OpenClaw Session `agent:<id>:brain`                                                                        | Single-threaded execution; Perception gates explicitly submitted stimuli before wake/steer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **Chat Membership & Canonical Store** | `api.runtime.state.openKeyedStore` (`"chats"`); Kazusa's own `kazusa/messages.sqlite`                      | Group chat memberships and titles (keyed store), and canonical messages with frozen audiences (Kazusa's database, indexed by who received what). Serves human chat queries and cursor pagination via Gateway HTTP endpoints (`/kazusa/messages`, `/kazusa/chats`, `/kazusa/send`). Session-orchestration tools are denied (`tools.deny: ["group:sessions", "message"]`).                                                                                                                                                                                                  |
-| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`                | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Supports agent peers and human players (`user:` prefix). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes.                                                                                                                        |
+| **Stream Ledgers**                    | OpenClaw Sessions `agent:<id>:tasks`, `agent:<id>:chat:direct:*`, `agent:<id>:chat:group:*`                | Append-only chronological transcripts of settled/started tasks, thoughts, and chats. Maintained for AI agents to feed the 3-Tier Context Engine. Egress tools (`send_message`, `start_task`) project copies to agent ledgers. Peers are characters; the only `user:` peer is the operator, in the system agent's console (§3.10). `before_dispatch` claims messages (`{ handled: true }`) to prevent raw auto-replies and forwards stimuli to Perception without performing duplicate writes.                                                                             |
 | **Agent Identity & Memory**           | `shared/wiki/characters/<id>.md`, `workspaces/<id>/MEMORY.md` + `memory/`                                  | Who they are is their World Wiki page, read whole at the start of their turns in place of `IDENTITY.md`/`SOUL.md` (an `agent:bootstrap` hook, `characters/card.ts`; those files are no longer read for world characters once their world is in the new layout; a character who still has them, in an older world, keeps reading them, and the system agent keeps hers); `MEMORY.md` holds qualitative reflections, `memory/YYYY-MM-DD.md` daily summaries. **Strict Invariant**: Never place `AGENTS.md` in character workspaces; behavior is injected purely via Skills. |
-| **Objective Canon**                   | `shared/wiki/`                                                                                             | Ground-truth places, character roster (including human player `user:sensei`), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Objective Canon**                   | `shared/wiki/`                                                                                             | Ground-truth places, character roster (the person at the keyboard plays one of them, or none: §3.10), world rules, and compiled global reports.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **Subjective Beliefs**                | `workspaces/<id>/wiki/`                                                                                    | Agent-specific impressions of peers/places, personal theories, syntheses, and contradiction reports. Relationships live only here, one page per person, never in `IDENTITY.md` or `SOUL.md`.                                                                                                                                                                                                                                                                                                                                                                              |
 
 ### Directory Map (`apps/kazusa/`)
@@ -727,8 +727,8 @@ connect these modules in process.
 - **People are "Name `id`"** everywhere a character reads them (deliveries,
   Chats awaiting your reply, Location's lines; `personLabel`): the name to read
   and say, the id to address. Background records show the id alone. Names come
-  from `personName` (the character's own identity, the player's config), never a
-  transcript's display label, which is not trusted.
+  from `personName` (the character's own identity, the operator's config), never
+  a transcript's display label, which is not trusted.
 - **Chats awaiting your reply**: The situation message lists, from Messaging's
   canonical store, current chats where someone spoke after the character (within
   the short-term window) and the brain was shown that message: address, sender,
@@ -1207,14 +1207,16 @@ connect these modules in process.
   their activity and huddle; `inCompany` (in a huddle, or someone noticed here)
   selects the `in-person` skill. Noted for optimization: busy places mean many
   `notice` judgments, uncapped for now. Overhearing is a later feature.
-- **RPC** operator `location.place`; **player moves** `POST /kazusa/move`
-  `{ placeId }` (who moves comes from config; the player has no tasks, so they
-  go straight there through the same `place()`: seen arriving and leaving, out
-  of their huddles); **read models** `GET /kazusa/places`,
-  `GET /kazusa/locations`; **SSE** `location` on every record write (place, trip
-  start, arrival, `noticed` change) and `journal` for each confirmed sighting
-  (`location.noticed`; the timeline reads it back from the observer's `:tasks`
-  ledger metadata like any task row).
+- **RPC** operator `location.place`; **the played character moves**
+  `POST /kazusa/move` `{ placeId }` (who moves is whoever the person plays,
+  never the request; with no activity of record they go straight there through
+  the same `place()`: seen arriving and leaving, out of their huddles; 409 while
+  watching); taking someone over stops a trip at the place being passed
+  (`halt`); a played character shows no activity in others' **With you**; **read
+  models** `GET /kazusa/places`, `GET /kazusa/locations`; **SSE** `location` on
+  every record write (place, trip start, arrival, `noticed` change) and
+  `journal` for each confirmed sighting (`location.noticed`; the timeline reads
+  it back from the observer's `:tasks` ledger metadata like any task row).
 - **Known gap**: a lease started before Location existed has no `where`, so its
   holder is treated as at `home` until their next `start_task`.
 
@@ -1222,8 +1224,10 @@ connect these modules in process.
 
 - A character is **offstage** when they aren't simulated, to save cost with a
   large cast. One retained `"stage"` keyed store, `{ onstage, since }` per
-  character; no record means `stage.defaultOnstage` (default `true`). Players
-  are always onstage. Every registration reads the same store; no mirror.
+  character; no record means `stage.defaultOnstage` (default `true`). The record
+  also says who plays them (`playedBy`, `playedSince`; §3.10): `isOnstage` is
+  "in the world", `isSimulated` "their own model plays them". Every registration
+  reads the same store; no mirror.
 - `stage.cast` lists who starts onstage when `defaultOnstage` is `false`; the
   setup guide writes the player's pick there, and `clock.startAt` and
   `clock.speed` for when and how a new world's time begins.
@@ -1310,8 +1314,69 @@ connect these modules in process.
   (`stats.wearing`).
 - Characters read `### Your state` in the situation message; the client reads
   `GET /kazusa/stats` and SSE `stats`.
-- A state can also be `on: "player"`: only the player holds and sets it, and
-  characters with the player read it.
+- There is no `on: "player"` any more: the person is nobody in the world, and
+  the character they play holds ordinary character states.
+
+### 3.10 Playing a character (`src/player.ts`, `stage/register.ts` `playControl`)
+
+- **Two kinds of id.** Every in-world person is a character agent (Sensei
+  included: a `workspaces/sensei/` makes them one). The person at the keyboard
+  is the **operator**, `user:<id>` from `config.user` (`operatorOf`, with
+  `isUser` and `personName`, in `identity.ts`), outside the world: they talk
+  only to the system agent, one to one, in their **console** (`validateMembers`
+  refuses any other chat with a `user:` id), and nobody in the world reads or
+  reaches them. A character may still have a chat of their own with the system
+  agent (someone talking to the admin), apart from the console. Auth still knows
+  only a role; the operator id becomes per-person with the collaborator PR (auth
+  §PR 4).
+- **Who plays whom** is the Stage record (`playedBy`), one character per person
+  and one person per character, never the system agent. `createPlayer` reads it
+  (`playing()`; `playingNow()` and `owns(audience)` synchronously, from
+  `stage.playingNow`, for stream filtering, warmed at `gateway_start`).
+  `POST /kazusa/player { characterId | null }` (permission `play`) switches; SSE
+  `player` follows; `GET /kazusa/world` and `GET /kazusa/chats` carry `operator`
+  and `player` (`null` while watching).
+- **Taking over** (`playControl.take`): offstage ones come on already played
+  (`stageControl(..., person)`), then the running turn is stopped
+  (`stopBrainRuns`: its abort signal cancels the model request in OpenClaw,
+  later tool calls are refused, speech stops between bubbles; and the character
+  is held, so a turn handed over a moment before that starts after it stops at
+  once, until `release` lets them run again with `allowBrainRuns`), the activity
+  ends (`taskman.end`: a `task.stopped` row and journal event; `desires.settle`
+  holds levels with no effects; `location.halt`), the wake goes, and the inbox
+  drains to the person. Each step after the record is best-effort: a failure is
+  logged, never half a switch.
+- **While played**: Perception judges nothing and hands the model nothing
+  (`toPlayer`): what happened is confirmed (sightings land in the ledger and
+  `noticed`), marked read (read receipts; after hand-back "Chats awaiting your
+  reply" lists what the person left unanswered) and dropped, their own check-ins
+  included. No wake, no idle check-in (`simulated`). Desires hold still. HTTP
+  sends go out as the character (`messaging.send(..., byPlayer)`), unpaced, into
+  their own ledgers as if their model had said them. `actorFor` decides who a
+  request acts as: the operator for their console (its session key, which has no
+  owner; or a new chat naming them among its members; or one to the system agent
+  alone while watching), else the character played, whose own
+  `members: [system agent]` is their own chat with her. `byPlayer` rides on the
+  delivery and the stimulus (what Perception keeps for the timeline).
+- **Handing back** (`release`): the hold lifts, desires resume from
+  `playedSince`, the wake returns, and `handBack` (`stage/hand-back.ts`): when
+  the person said or moved something as them, a turn to look back
+  (`sleep.lookBack`, the by-hand night with `sleep-consolidation#looking-back`,
+  and `#played` with what they said when the stretch outruns the records:
+  `shortTermHours` less one `ledgerGridHours` step): they `remember` promises
+  into `MEMORY.md` plans and `reflect`. It is kept as a `review` run: it moves
+  where the next pages start but is no night, so bedtime still goes over the
+  day. Otherwise an idle check-in. Either way, with no activity,
+  `task-lifecycle` picks what is next.
+- **Going offstage**: a group sent off skips whoever is played (they stay on); a
+  played character can't be sent off or deleted on their own.
+- **No states of the player**: `on: "player"` entries left in an older
+  `shared/stats.json` are skipped with a warning (status.md §6), and a file that
+  doesn't read refuses a save from the States page rather than erase it.
+- **The system agent** knows the operator from her own `USER.md` (Settings →
+  Profile, `GET/POST /kazusa/profile`, `manage`), OpenClaw's file for who the
+  user is, and who they play from one situation line
+  (`kazusa-deliveries#operator-playing` / `#operator-watching`).
 
 ## 4. Engineering & Zero-Build Conventions
 

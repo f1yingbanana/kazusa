@@ -159,7 +159,7 @@ function Task({ task, now }: { task: TaskSummary; now: number }) {
         </span>
         <span
           title={span}
-          className="shrink-0 font-mono text-[11px] text-foreground tabular-nums"
+          className="shrink-0 font-mono text-xs text-foreground tabular-nums"
         >
           {now > 0 && task.endAt > now
             ? `${formatSimDuration(task.endAt - now)} left`
@@ -248,7 +248,9 @@ function Where({
   return (
     <div className="flex flex-col gap-1.5">
       <Line icon={MapPinIcon} trailing={stay}>
-        <span title={area || undefined} className="min-w-0">
+        {/* Pulled back by the chip's padding, so its text lines up with plain
+            text; on the wrapper, so the chip keeps its whole width. */}
+        <span title={area || undefined} className="-ml-1 min-w-0">
           <PlaceChip
             id={position.placeId}
             bare
@@ -304,46 +306,49 @@ function People({
       : `${first} and ${people.length - 1} others`;
   return (
     <div className="flex flex-col gap-1.5">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="-mx-1 flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm outline-none hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
-      >
-        <span aria-hidden className="flex shrink-0 items-center pl-0.5">
-          {people.slice(0, MAX_FACES).map((other, index) => {
-            const character = byId.get(other);
-            return (
-              <PresenceAvatar
-                key={other}
-                id={other}
-                name={nameOf(other)}
-                avatarUrl={character?.avatarUrl}
-                kind={character?.kind}
-                size="xs"
-                className={cn(
-                  "ring-2 ring-background",
-                  index > 0 && "-ml-1.5",
-                  !seen.has(other) && "opacity-50",
-                )}
-              />
-            );
-          })}
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          <span className="text-muted-foreground">With </span>
-          {label}
-        </span>
-        <ChevronDownIcon
-          aria-hidden
-          className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
-            open && "rotate-180",
-          )}
-        />
-      </button>
+      <Line icon={UsersIcon}>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm outline-none hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <span aria-hidden className="flex shrink-0 items-center">
+            {people.slice(0, MAX_FACES).map((other, index) => {
+              const character = byId.get(other);
+              return (
+                <PresenceAvatar
+                  key={other}
+                  id={other}
+                  name={nameOf(other)}
+                  avatarUrl={character?.avatarUrl}
+                  kind={character?.kind}
+                  size="xs"
+                  className={cn(
+                    "ring-2 ring-background",
+                    index > 0 && "-ml-1.5",
+                    !seen.has(other) && "opacity-50",
+                  )}
+                />
+              );
+            })}
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-muted-foreground">With </span>
+            {label}
+          </span>
+          <ChevronDownIcon
+            aria-hidden
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </Line>
       {open ? (
-        <div className="flex flex-wrap gap-1 pl-0.5">
+        // Under the line's text, past its icon.
+        <div className="ml-4 flex flex-wrap gap-1">
           {people.map((other) => (
             <span
               key={other}
@@ -361,7 +366,8 @@ function People({
 
 /**
  * One fact line: icon, a wrapping value, and an optional mono readout on the
- * right.
+ * right. Every part sits in a 24px row, a chip's height, centered: plain text
+ * and chips line up with the icon alike.
  */
 function Line({
   icon: Icon,
@@ -374,15 +380,14 @@ function Line({
 }) {
   return (
     <div className="flex min-w-0 items-start gap-1.5 text-sm">
-      <Icon
-        aria-hidden
-        className="mt-1 size-3.5 shrink-0 text-muted-foreground"
-      />
-      <div className="-my-0.5 flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5">
+      <span className="flex h-6 shrink-0 items-center">
+        <Icon aria-hidden className="size-3.5 text-muted-foreground" />
+      </span>
+      <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5">
         {children}
       </div>
       {trailing ? (
-        <span className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
+        <span className="flex h-6 shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
           {trailing}
         </span>
       ) : null}

@@ -1,9 +1,10 @@
 ---
 name: sleep-consolidation
 description:
-  "What a character is told as they go to sleep for the night: how to go over
-  the day. Each section is filled by code (`memory/sleep.ts`) and given with
-  `start_task`'s result, never loaded as a skill."
+  "What a character is told as they go to sleep for the night, or as they look
+  back on the last hours: how to go over the day. Each section is filled by code
+  (`memory/sleep.ts`) and given with `start_task`'s result or as a turn of its
+  own, never loaded as a skill."
 user-invocable: false
 ---
 
@@ -41,6 +42,35 @@ dream, is one or two strange sentences recombining the day.
 
 Touch only what the day gave you a reason to; most days change little. Say
 nothing to anyone, and do nothing else: you are falling asleep.
+
+## looking-back
+
+Before you go on, look back over the last hours: everything in your records
+since you last went over things. What you keep now is what you will remember
+later; what you leave goes the way of any passing hour.
+
+Keep what would hurt to forget: a promise you made or were made, plans you
+agreed to, someone new, something that changed how you see someone. Keep the
+gist in your own voice, and only what you could know.
+
+- `remember` what you learned or decided, one line each, with how you know and
+  how sure you are. A plan or promise goes on `me`, on the day it is for.
+- `reflect` on each person, place or thing these hours changed your mind about.
+  A `view` replaces your old one whole, so keep what still holds. Name them as
+  your pages below do.
+- `reflect` about `me` if who you are these days, or what you want, changed.
+- If the day so far is worth keeping, `reflect` about `today`: `view` is how it
+  has gone, `summary` one line. No dream: you are awake.
+
+Touch only what these hours gave you a reason to; often that is nothing. Then
+carry on: choose what you do next.
+
+## played
+
+What you said and did in that time, oldest first, as it reaches back further
+than your records:
+
+{lines}
 
 ## pages
 

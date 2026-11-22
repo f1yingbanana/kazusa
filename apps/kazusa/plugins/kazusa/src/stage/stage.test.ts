@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { stageControl, type StageEffects } from "./register.ts";
+import {
+  playControl,
+  stageControl,
+  type PlayEffects,
+  type StageEffects,
+} from "./register.ts";
 import { createStage, type StageRecord, type StageStore } from "./stage.ts";
 
 const T0 = Date.parse("2026-10-24T12:00:00Z");
@@ -36,13 +41,42 @@ describe("stage", () => {
       cast: [],
     });
     expect(await stage.isOnstage("airi")).toBe(false);
-    expect(await stage.isOnstage("user:sensei")).toBe(true);
     await stage.set("airi", true, T0);
-    expect(await stage.onstage(["natsu", "airi", "user:sensei"])).toEqual([
-      "airi",
-      "user:sensei",
-    ]);
-    await expect(stage.set("user:sensei", false, T0)).rejects.toThrow();
+    expect(await stage.onstage(["natsu", "airi"])).toEqual(["airi"]);
+  });
+
+  it("keeps a played character onstage but out of their model's hands", async () => {
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: true,
+      cast: [],
+    });
+    await stage.setPlayer("airi", "user:sensei", T0);
+    expect(await stage.isOnstage("airi")).toBe(true);
+    expect(await stage.isSimulated("airi")).toBe(false);
+    expect(await stage.simulated(["airi", "natsu"])).toEqual(["natsu"]);
+    expect(await stage.playing("user:sensei")).toBe("airi");
+    await expect(stage.set("airi", false, T0)).rejects.toThrow(/played/);
+    await expect(stage.setPlayer("airi", "user:other", T0)).rejects.toThrow(
+      /already/,
+    );
+    await expect(stage.setPlayer("natsu", "user:sensei", T0)).rejects.toThrow(
+      /someone else/,
+    );
+    await stage.setPlayer("airi", undefined, T0 + HOUR);
+    expect(await stage.isSimulated("airi")).toBe(true);
+    expect(await stage.playing("user:sensei")).toBeUndefined();
+  });
+
+  it("finds who plays whom from the records, once", async () => {
+    const store = memoryStore();
+    await store.register("airi", {
+      onstage: true,
+      since: T0,
+      playedBy: "user:sensei",
+      playedSince: T0,
+    });
+    const stage = createStage(store, { defaultOnstage: true, cast: [] });
+    expect(await stage.playing("user:sensei")).toBe("airi");
   });
 
   it("knows who was present at a moment around the last change", async () => {
@@ -130,5 +164,140 @@ describe("stageControl", () => {
     const h = setup();
     await h.set("airi", true);
     expect(h.calls).toEqual([]);
+  });
+});
+
+describe("playControl", () => {
+  function setup(defaultOnstage = true) {
+    const stage = createStage(memoryStore(), { defaultOnstage, cast: [] });
+    let now = T0;
+    const calls: string[] = [];
+    const effects: PlayEffects = {
+      stage,
+      clock: { init: async () => {}, time: () => now },
+      bringOn: async (id, person) => {
+        await stage.set(id, true, now, person);
+        calls.push(`on ${id}`);
+      },
+      stop: (id) => {
+        calls.push(`stop ${id}`);
+      },
+      allow: (id) => {
+        calls.push(`allow ${id}`);
+      },
+      endActivity: async (id, at) => {
+        calls.push(`end ${id} ${at}`);
+      },
+      reschedule: async (id) => {
+        calls.push(`reschedule ${id} ${String(await stage.isSimulated(id))}`);
+      },
+      resumeDesires: async (id, from, to) => {
+        calls.push(`desires ${id} ${from}->${to}`);
+      },
+      drain: async (id) => {
+        calls.push(`drain ${id}`);
+      },
+      handBack: async (id, since) => {
+        calls.push(`hand back ${id} ${since}`);
+      },
+      changed: (person, id) => {
+        calls.push(`changed ${person} ${id ?? "-"}`);
+      },
+    };
+    return {
+      play: playControl(effects),
+      stage,
+      calls,
+      advance: (ms: number) => {
+        now += ms;
+      },
+    };
+  }
+
+  it("takes a character over: stops them, ends their activity, no wake", async () => {
+    const h = setup();
+    await h.play("user:sensei", "airi");
+    expect(h.calls).toEqual([
+      "stop airi",
+      `end airi ${T0}`,
+      "reschedule airi false",
+      "drain airi",
+      "changed user:sensei airi",
+    ]);
+  });
+
+  it("hands the one left back before taking the next", async () => {
+    const h = setup();
+    await h.play("user:sensei", "airi");
+    h.calls.length = 0;
+    h.advance(HOUR);
+    await h.play("user:sensei", "natsu");
+    expect(h.calls).toEqual([
+      "allow airi",
+      `desires airi ${T0}->${T0 + HOUR}`,
+      "reschedule airi true",
+      `hand back airi ${T0}`,
+      "stop natsu",
+      `end natsu ${T0 + HOUR}`,
+      "reschedule natsu false",
+      "drain natsu",
+      "changed user:sensei natsu",
+    ]);
+  });
+
+  it("watches: hands back and plays nobody", async () => {
+    const h = setup();
+    await h.play("user:sensei", "airi");
+    h.calls.length = 0;
+    await h.play("user:sensei", undefined);
+    expect(h.calls.at(-1)).toBe("changed user:sensei -");
+    expect(await h.stage.playing("user:sensei")).toBeUndefined();
+  });
+
+  it("brings an offstage character on already played", async () => {
+    const h = setup(false);
+    await h.play("user:sensei", "airi");
+    expect(h.calls[0]).toBe("on airi");
+    expect(await h.stage.isSimulated("airi")).toBe(false);
+  });
+
+  it("finishes a switch whose effect fails, and says so", async () => {
+    const stage = createStage(memoryStore(), {
+      defaultOnstage: true,
+      cast: [],
+    });
+    const warned: string[] = [];
+    const calls: string[] = [];
+    const play = playControl({
+      stage,
+      clock: { init: async () => {}, time: () => T0 },
+      bringOn: async () => {},
+      stop: () => {},
+      allow: () => {},
+      endActivity: async () => {
+        throw new Error("database still starting");
+      },
+      reschedule: async (id) => {
+        calls.push(`reschedule ${id}`);
+      },
+      resumeDesires: async () => {},
+      drain: async (id) => {
+        calls.push(`drain ${id}`);
+      },
+      handBack: async () => {},
+      warn: (message) => warned.push(message),
+    });
+    await play("user:sensei", "airi");
+    expect(await stage.playing("user:sensei")).toBe("airi");
+    expect(calls).toEqual(["reschedule airi", "drain airi"]);
+    expect(warned).toEqual([
+      "Playing airi: ending their activity failed: Error: database still starting",
+    ]);
+  });
+
+  it("never puts two people in one character", async () => {
+    const h = setup();
+    await h.play("user:sensei", "airi");
+    await expect(h.play("user:other", "airi")).rejects.toThrow(/already/);
   });
 });

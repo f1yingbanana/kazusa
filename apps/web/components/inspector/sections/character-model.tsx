@@ -2,11 +2,10 @@
 
 import { useQueryStates, parseAsString } from "nuqs";
 import { settingsParsers } from "@/components/views/settings/search-params";
-import { ArrowUpRightIcon } from "lucide-react";
 import { refName, thinkingLabel } from "@/components/models/model-labels";
 import { ModelPicker } from "@/components/models/model-picker";
 import { ThinkingPicker } from "@/components/models/thinking-picker";
-import { Button } from "@/components/ui/button";
+import { SectionAction, SectionActions } from "@/components/inspector/parts";
 import { useCharacter } from "@/hooks/use-characters";
 import { useModels } from "@/hooks/use-models";
 import type { EntityRef } from "@/lib/state/entity-ref";
@@ -23,18 +22,13 @@ function FieldHeader({
 }) {
   return (
     <div className="flex h-6 items-center justify-between gap-2">
-      <label htmlFor={htmlFor} className="text-sm font-medium">
+      <label htmlFor={htmlFor} className="text-sm">
         {label}
       </label>
       {onReset ? (
-        <Button
-          variant="ghost"
-          size="xs"
-          className="text-muted-foreground"
-          onClick={onReset}
-        >
+        <SectionAction className="-mr-2" onClick={onReset}>
           Use world default
-        </Button>
+        </SectionAction>
       ) : null}
     </div>
   );
@@ -106,17 +100,15 @@ export function CharacterModelSection({ entity }: { entity: EntityRef }) {
         </div>
       ) : null}
 
-      <Button
-        variant="link"
-        size="xs"
-        className="self-start px-0 text-muted-foreground"
-        onClick={() =>
-          void setParams({ view: "settings", "settings.tab": "models" })
-        }
-      >
-        World defaults in Settings
-        <ArrowUpRightIcon />
-      </Button>
+      <SectionActions>
+        <SectionAction
+          onClick={() =>
+            void setParams({ view: "settings", "settings.tab": "models" })
+          }
+        >
+          World defaults
+        </SectionAction>
+      </SectionActions>
     </div>
   );
 }

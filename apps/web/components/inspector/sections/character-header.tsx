@@ -5,31 +5,31 @@ import { chatsParsers } from "@/components/views/chats/search-params";
 import { timelineParsers } from "@/components/views/timeline/search-params";
 import { useState } from "react";
 import {
+  BookOpenIcon,
   BrainIcon,
   CircleAlertIcon,
-  EllipsisIcon,
-  EyeIcon,
   HistoryIcon,
+  LoaderCircleIcon,
   MapPinIcon,
   MessageCircleIcon,
+  MessagesSquareIcon,
+  NotebookPenIcon,
+  PowerIcon,
   SpeechIcon,
+  SquareIcon,
   StarIcon,
 } from "lucide-react";
 import { CharacterBrainSheet } from "./character-brain";
-import { CharacterStopButton } from "./character-stop";
+import { CharacterMemorySheet } from "./character-memory";
+import { RichText, usePlainText } from "@/components/views/wiki/page-link";
+import { useStopBrain } from "./character-stop";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
-import { Button } from "@/components/ui/button";
+import { Toolbar, type ToolbarAction } from "@/components/inspector/toolbar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  CastDialog,
+  type CastRequest,
+} from "@/components/views/world/cast-dialog";
+import { useStage } from "@/hooks/use-stage";
 import { useCharacter, useCharacterStatus } from "@/hooks/use-characters";
 import { useAccess } from "@/hooks/use-access";
 import { usePlace, usePlayer, usePosition } from "@/hooks/use-location";
@@ -41,7 +41,7 @@ import type { EntityRef } from "@/lib/state/entity-ref";
 import { toggleWatch, useWatchlist } from "@/lib/state/preferences-store";
 import { cn } from "@/lib/utils";
 
-const KIND_NOTE = { agent: undefined, npc: "NPC", player: "Player" } as const;
+const KIND_NOTE = { agent: undefined, npc: "NPC" } as const;
 
 export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id);
@@ -52,10 +52,11 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
     "chats.dm": chatsParsers["chats.dm"],
     "chats.talk": chatsParsers["chats.talk"],
     "chats.member": chatsParsers["chats.member"],
+    character: parseAsString,
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
   });
-  const { resolved } = useSources();
+  const { resolved, watching, operator } = useSources();
   const { canPlay, canManage } = useAccess();
   const starred = watchlist.includes(entity.id);
   const player = usePlayer();
@@ -64,9 +65,16 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   const there = usePlace(standing);
   const status = useCharacterStatus(entity.id);
   const offstage = status?.onstage === false;
+  // Yourself: nothing to message, talk to or walk over to.
+  const yourself = entity.id === player.id;
   const failure = status?.brain === "thinking" ? undefined : status?.failure;
   const { available: canObserve } = useObservedChat(null);
   const [brainOpen, setBrainOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [cast, setCast] = useState<CastRequest | null>(null);
+  const stopper = useStopBrain(entity.id, character?.name ?? entity.id);
+  const stageLive = Boolean(useStage().apply);
+  const plain = usePlainText();
   // Message is redundant while their direct chat is the one open, and Talk in
   // person while you are already talking with them there.
   const view = queryState["view"];
@@ -78,7 +86,12 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
       ? (chats.find((chat) => chat.id === openChatId) ??
         (draft?.id === openChatId ? draft : undefined))
       : undefined;
-  const inTheirDm = open?.type === "direct" && open.members.includes(entity.id);
+  // Your console with the system agent is not the chat the one you play has
+  // with her.
+  const inTheirDm =
+    open?.type === "direct" &&
+    open.members.includes(entity.id) &&
+    open.members.includes(player.id || operator.id);
   const inTheirHuddle =
     open?.type === "huddle" && open.members.includes(entity.id);
 
@@ -89,24 +102,177 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
   }
 
   // Only the unusual kinds are worth a word; most of the roster is simulated.
-  const subtitle = [
-    character.summary,
-    KIND_NOTE[character.kind],
-    offstage && "Offstage",
-  ]
+  const notes = [KIND_NOTE[character.kind], offstage && "Offstage"]
     .filter(Boolean)
     .join(" · ");
-  const canMessage = character.kind === "agent" && resolved.chats === "live";
+  const summary = character.summary;
+  // Watching, only the console is yours to write in.
+  const canMessage =
+    character.kind === "agent" &&
+    resolved.chats === "live" &&
+    !yourself &&
+    (!watching || Boolean(character.isSystemAgent));
   // Face to face needs both of you standing in the same place.
   const together = standing !== undefined && standing === player.placeId;
 
   const isAgent = character.kind === "agent";
-  const canGo = isAgent && there && !together && player.live;
+  const canGo = isAgent && there && !together && player.live && !yourself;
   const showBrain =
     isAgent &&
     resolved.brain === "live" &&
     (!character.isSystemAgent || canManage);
   const showChats = canMessage && canObserve;
+  // A played character stays onstage until nobody plays them.
+  const canStage =
+    canManage &&
+    isAgent &&
+    !character.isSystemAgent &&
+    stageLive &&
+    !status?.playedBy;
+
+  /**
+   * Most used first, alike together: talking to them, going to them, stopping
+   * their turn, following them, looking into them, and the cast. Each only when
+   * it applies; what doesn't fit goes into More in the same order.
+   */
+  const actions: ToolbarAction[] = [
+    ...(canMessage && !inTheirDm
+      ? [
+          {
+            id: "message",
+            group: "talk",
+            label: "Message",
+            icon: MessageCircleIcon,
+            disabled: !canPlay,
+            onSelect: () =>
+              void setParams({ view: "chats", "chats.dm": character.id }),
+          },
+        ]
+      : []),
+    ...(canMessage && together && !inTheirHuddle
+      ? [
+          {
+            id: "talk",
+            group: "talk",
+            label: "Talk in person",
+            icon: SpeechIcon,
+            disabled: !canPlay,
+            onSelect: () =>
+              void setParams({ view: "chats", "chats.talk": character.id }),
+          },
+        ]
+      : canGo
+        ? [
+            {
+              id: "go",
+              group: "move",
+              label: `Go to ${there.name}`,
+              icon: MapPinIcon,
+              disabled: !player.moveTo,
+              onSelect: () => void player.moveTo?.(there.id),
+            },
+          ]
+        : []),
+    ...(stopper.shown
+      ? [
+          {
+            id: "stop",
+            group: "run",
+            label: stopper.stopping ? "Stopping" : "Stop thinking",
+            icon: stopper.stopping ? LoaderCircleIcon : SquareIcon,
+            busy: stopper.stopping,
+            disabled: stopper.stopping,
+            onSelect: stopper.stop,
+          },
+        ]
+      : []),
+    {
+      id: "watch",
+      inMenu: true,
+      group: "follow",
+      label: starred ? "Unwatch" : "Watch",
+      icon: StarIcon,
+      pressed: starred,
+      onSelect: () => toggleWatch(character.id),
+    },
+    {
+      id: "wiki",
+      inMenu: true,
+      group: "look",
+      label: "Wiki page",
+      icon: BookOpenIcon,
+      onSelect: () =>
+        void setParams({ view: "characters", character: character.id }),
+    },
+    ...(isAgent
+      ? [
+          {
+            id: "memory",
+            group: "look",
+            label: "Memory",
+            icon: NotebookPenIcon,
+            onSelect: () => setMemoryOpen(true),
+          },
+        ]
+      : []),
+    ...(showChats
+      ? [
+          {
+            id: "chats",
+            inMenu: true,
+            group: "look",
+            label: "Chats",
+            icon: MessagesSquareIcon,
+            onSelect: () =>
+              void setParams({
+                view: "chats",
+                "chats.member": character.id,
+                "chats.id": null,
+              }),
+          },
+        ]
+      : []),
+    {
+      id: "timeline",
+      inMenu: true,
+      group: "look",
+      label: "Timeline",
+      icon: HistoryIcon,
+      onSelect: () =>
+        void setParams({
+          view: "timeline",
+          "tl.actors": [character.id],
+          "tl.watch": null,
+        }),
+    },
+    ...(showBrain
+      ? [
+          {
+            id: "brain",
+            group: "look",
+            label: "Brain",
+            icon: BrainIcon,
+            onSelect: () => setBrainOpen(true),
+          },
+        ]
+      : []),
+    ...(canStage
+      ? [
+          {
+            id: "stage",
+            group: "cast",
+            label: offstage ? "Enable" : "Disable",
+            icon: PowerIcon,
+            onSelect: () =>
+              setCast({
+                label: character.name,
+                cast: [character],
+                intent: offstage ? "onstage" : "offstage",
+              }),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="flex flex-col gap-3">
@@ -125,12 +291,17 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
           >
             {character.name}
           </h2>
-          {subtitle ? (
+          {summary || notes ? (
             <p
-              title={subtitle}
+              title={[summary ? plain(summary) : "", notes]
+                .filter(Boolean)
+                .join(" · ")}
               className="line-clamp-2 text-sm leading-snug text-muted-foreground"
             >
-              {subtitle}
+              {/* Its [[links]] live, as on their page. */}
+              {summary ? <RichText text={summary} /> : null}
+              {summary && notes ? " · " : null}
+              {notes}
             </p>
           ) : null}
         </div>
@@ -138,117 +309,23 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
 
       {failure ? <FailureLine error={failure.error} /> : null}
 
-      {/* The buttons wrap rather than push Watch and More out of the panel. */}
-      <div className="flex items-start gap-1.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          {canMessage && !inTheirDm ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPlay}
-              onClick={() =>
-                void setParams({ view: "chats", "chats.dm": character.id })
-              }
-            >
-              <MessageCircleIcon data-icon="inline-start" />
-              Message
-            </Button>
-          ) : null}
-          {canMessage && together && !inTheirHuddle ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPlay}
-              onClick={() =>
-                void setParams({ view: "chats", "chats.talk": character.id })
-              }
-            >
-              <SpeechIcon data-icon="inline-start" />
-              Talk in person
-            </Button>
-          ) : canGo ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!player.moveTo}
-              title={`Go to ${there.name}`}
-              onClick={() => void player.moveTo?.(there.id)}
-            >
-              <MapPinIcon data-icon="inline-start" />
-              Go there
-            </Button>
-          ) : null}
-          {isAgent ? (
-            <CharacterStopButton id={character.id} name={character.name} />
-          ) : null}
-        </div>
+      {/* Pulled out by a button's padding: the first icon lines up with the
+          avatar, More with the close button above it. */}
+      <Toolbar
+        actions={actions}
+        moreLabel={`More for ${character.name}`}
+        className="-mr-1 -ml-1.5"
+      />
 
-        <span className="flex shrink-0 items-center">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-pressed={starred}
-                  onClick={() => toggleWatch(character.id)}
-                />
-              }
-            >
-              <StarIcon className={cn(starred && "fill-current")} />
-              <span className="sr-only">
-                {starred ? "Remove from watchlist" : "Add to watchlist"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {starred ? "On your watchlist" : "Watch"}
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon-sm" />}
-            >
-              <EllipsisIcon />
-              <span className="sr-only">{`More for ${character.name}`}</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {showBrain ? (
-                <DropdownMenuItem onClick={() => setBrainOpen(true)}>
-                  <BrainIcon />
-                  Peek at brain
-                </DropdownMenuItem>
-              ) : null}
-              {showChats ? (
-                <DropdownMenuItem
-                  onClick={() =>
-                    void setParams({
-                      view: "chats",
-                      "chats.member": character.id,
-                      "chats.id": null,
-                    })
-                  }
-                >
-                  <EyeIcon />
-                  Their chats
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem
-                onClick={() =>
-                  void setParams({
-                    view: "timeline",
-                    "tl.actors": [character.id],
-                    "tl.watch": null,
-                  })
-                }
-              >
-                <HistoryIcon />
-                Open in Timeline
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </span>
-      </div>
-
+      {isAgent ? (
+        <CharacterMemorySheet
+          id={character.id}
+          name={character.name}
+          open={memoryOpen}
+          onOpenChange={setMemoryOpen}
+        />
+      ) : null}
+      <CastDialog request={cast} onOpenChange={() => setCast(null)} />
       {showBrain ? (
         <CharacterBrainSheet
           id={character.id}

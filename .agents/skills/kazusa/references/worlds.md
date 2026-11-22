@@ -291,8 +291,8 @@ creator's) can sharpen this later if the review needs it; it isn't built.
 **Publish is a review**: ARONA lists the changes in the three kinds and the
 creator moves any of them. Promoting to timeless has ARONA rewrite it as undated
 or `always known`; promoting to story moves it into the checkpoint; the rest
-stays private. Pages about the player (`user:...`) are flagged: in a checkpoint
-they become a relationship the player inherits.
+stays private. Pages about whoever the person mostly played (Sensei, say) are
+flagged: in a checkpoint they become a relationship that character inherits.
 
 ### 4.5 Repositories
 

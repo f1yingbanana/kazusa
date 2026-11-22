@@ -3,7 +3,7 @@
 import { useQueryStates, parseAsString } from "nuqs";
 import { chatsParsers } from "./search-params";
 import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SquarePenIcon, UnplugIcon, XIcon } from "lucide-react";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
 import { NeedsLine } from "@/components/entities/source-state";
@@ -13,12 +13,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAccess } from "@/hooks/use-access";
+import { usePlay } from "@/hooks/use-play";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { openChatPatch } from "@/lib/source/chats/display";
+import { useSelfIn } from "@/hooks/use-self";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { setDraftChat } from "@/lib/state/chat-draft";
 import { markQuietSelection } from "@/lib/state/ui-store";
@@ -28,7 +29,7 @@ import {
   useObservedCollapsed,
 } from "@/lib/state/preferences-store";
 import { ChatList } from "./chat-list";
-import { NewGroupDialog } from "./new-group-dialog";
+import { NewChatDialog } from "./new-chat-dialog";
 import { ObservedChatList } from "./observed-chat-list";
 
 /**
@@ -38,13 +39,16 @@ import { ObservedChatList } from "./observed-chat-list";
  */
 export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const { player } = useSources();
-  const { canPlay } = useAccess();
+  const selfOf = useSelfIn();
+  // Watching, there is nobody of yours to start a chat as.
+  const { canAct } = usePlay();
   const { chats: allMine, error, isLoading, reload } = useChats();
   const observed = useObservedChats();
   const { byId } = useCharacters();
   const [queryState, setParams] = useQueryStates({
     "chats.id": chatsParsers["chats.id"],
     "chats.member": chatsParsers["chats.member"],
+    "chats.dm": chatsParsers["chats.dm"],
     view: parseAsString,
     sel: entityRefParser,
   });
@@ -53,7 +57,14 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const collapsed = useObservedCollapsed();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
-  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  // Picked as whoever you played: switching closes it.
+  const playedBefore = useRef(player.id);
+  useEffect(() => {
+    if (playedBefore.current === player.id) return;
+    playedBefore.current = player.id;
+    setNewChatOpen(false);
+  }, [player.id]);
 
   const chats = useMemo(
     () =>
@@ -94,7 +105,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   // Opening a chat also points the inspector at it, in the same URL change,
   // including the one already open (after looking at someone else).
   function openChat(chat: ChatInfo) {
-    const patch = openChatPatch(chat, player.id);
+    const patch = openChatPatch(chat, selfOf(chat));
     if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     void setParams(patch);
     onOpened?.();
@@ -122,15 +133,15 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                disabled={!canPlay}
-                onClick={() => setNewGroupOpen(true)}
+                disabled={!canAct}
+                onClick={() => setNewChatOpen(true)}
               />
             }
           >
             <SquarePenIcon />
-            <span className="sr-only">New group</span>
+            <span className="sr-only">New chat</span>
           </TooltipTrigger>
-          <TooltipContent>New group</TooltipContent>
+          <TooltipContent>New chat</TooltipContent>
         </Tooltip>
       </PanelToolbar>
 
@@ -163,12 +174,11 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
           <ChatList
             chats={chats}
             agentsById={byId}
-            userId={player.id}
             isLoading={isLoading}
             query={query}
             selectedChatId={chatId}
             onSelect={openChatById}
-            onNewGroup={() => setNewGroupOpen(true)}
+            onNewChat={() => setNewChatOpen(true)}
             quietWhenEmpty={hasOthers || Boolean(memberName)}
           />
           {hasOthers ? (
@@ -214,10 +224,12 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
         </div>
       )}
 
-      <NewGroupDialog
-        open={newGroupOpen}
-        onOpenChange={setNewGroupOpen}
-        onCreated={(chat) => {
+      <NewChatDialog
+        open={newChatOpen}
+        onOpenChange={setNewChatOpen}
+        // Your direct chat with them: the one there is, or a new one.
+        onDirect={(id) => void setParams({ view: "chats", "chats.dm": id })}
+        onGroup={(chat) => {
           setDraftChat(chat);
           openChat(chat);
         }}

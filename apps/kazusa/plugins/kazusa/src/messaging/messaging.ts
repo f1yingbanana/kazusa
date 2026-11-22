@@ -1,3 +1,4 @@
+import { isUser } from "../identity.ts";
 import { inBackground } from "../background.ts";
 import { bundledSkillText, type SkillText } from "../skill-text.ts";
 import type {
@@ -37,7 +38,6 @@ import {
   PARTICIPANT_ID,
   chatSummary,
   conversationId,
-  isUser,
   messagingId,
   newChatId,
   ownChatSession,
@@ -102,6 +102,8 @@ export interface MessageDelivery {
    * it keeps no ledger ids, so its copies can't show that themselves.
    */
   readonly settled?: true;
+  /** Said by a person playing the sender, not by the sender's own model. */
+  readonly byPlayer?: true;
 }
 
 export interface SendMessageResult {
@@ -506,6 +508,11 @@ export class Messaging {
     assertInvocationCurrent?: () => void,
     /** The line being said aloud and its sim-time window; never typed text. */
     speech?: TypingStreamEvent["speech"],
+    /**
+     * A person's typing, from their client: it lapses unless renewed, since
+     * nothing tells the server when they walk away.
+     */
+    lapses?: boolean,
   ): Promise<void> {
     await this.serial.enqueue("messages", async () => {
       await this.init();
@@ -519,9 +526,7 @@ export class Messaging {
         senderName: name,
         isTyping: composing !== false,
         mode: composing || "typing",
-        ...(composing && isUser(participantId)
-          ? { expiresAt: Date.now() + 8000 }
-          : {}),
+        ...(composing && lapses ? { expiresAt: Date.now() + 8000 } : {}),
         ...(composing === "speaking" && speech ? { speech } : {}),
       };
       if (composing) this.typing.set(key, event);
@@ -679,6 +684,22 @@ export class Messaging {
           throw new Error(`Unknown character agent: ${member}.`);
       }
     }
+    // A person is outside the world: only the system agent talks with them,
+    // one to one. Nobody in the world can reach them, or be reached as them.
+    const people = members.filter(isUser);
+    const console =
+      this.deps.api.runtime?.config?.current?.().agents?.defaults?.systemAgent
+        ?.agentId;
+    if (
+      people.length &&
+      console &&
+      (members.length !== 2 ||
+        people.length !== 1 ||
+        !members.includes(console))
+    )
+      throw new Error(
+        "Only the system agent talks with people outside the world.",
+      );
   }
 
   /**
@@ -768,7 +789,8 @@ export class Messaging {
       id: chatId,
       kind,
       members,
-      title: kind === "group" ? (title ?? "Group chat") : null,
+      // Untitled, a group is shown by who is in it.
+      title: kind === "group" ? (title ?? null) : null,
       needsProjection: true,
     };
     await this.saveChat(chat, assertInvocationCurrent);
@@ -917,15 +939,26 @@ export class Messaging {
     };
   }
 
+  /** Who is in a chat now; nobody when there is no such chat. */
+  async membersOf(chatId: string): Promise<readonly string[]> {
+    await this.ready();
+    return this.chats.get(chatId)?.members ?? [];
+  }
+
   /**
-   * Every conversation `viewer` is not in, newest first. A dissolved huddle
-   * stays readable, named by who took part. Two indexed reads per chat.
+   * Every conversation none of `viewers` is in (the operator, and whoever they
+   * play), newest first: what an observer reads. A dissolved huddle stays
+   * readable, named by who took part. Two indexed reads per chat.
    */
-  async observeChats(viewer: string): Promise<ObservedConversation[]> {
-    PARTICIPANT_ID.parse(viewer);
+  async observeChats(
+    viewers: readonly string[],
+  ): Promise<ObservedConversation[]> {
+    for (const viewer of viewers) PARTICIPANT_ID.parse(viewer);
     await this.ready();
     return [...this.chats.values()]
-      .filter((chat) => !chat.members.includes(viewer))
+      .filter(
+        (chat) => !viewers.some((viewer) => chat.members.includes(viewer)),
+      )
       .flatMap((chat) => {
         const latest = this.deps.store.latest(chat.id)?.value;
         const ended = chat.members.length === 0;
@@ -1351,6 +1384,7 @@ export class Messaging {
     id: string,
     params: SendMessageParams,
     assertInvocationCurrent?: () => void,
+    byPlayer?: boolean,
   ): Promise<MessageDelivery> {
     const timestamp = this.deps.clock.time();
     const owners = [
@@ -1374,6 +1408,7 @@ export class Messaging {
       params,
       timestamp,
       copies,
+      ...(byPlayer ? { byPlayer: true as const } : {}),
     };
     // A failed acceptance performs no ledger writes. Once accepted, delivery
     // survives the invoking turn and can be completed by the plugin service.
@@ -1468,6 +1503,8 @@ export class Messaging {
     input: SendMessageParams,
     assertInvocationCurrent?: () => void,
     configuredAgents?: ReadonlySet<string>,
+    /** A person typed it, as the sender they play (`byPlayer`). */
+    byPlayer?: boolean,
   ): Promise<SendMessageResult> {
     const params = deliveryParams(sender, input);
     const id = messagingId([sender, params.requestId]);
@@ -1500,6 +1537,7 @@ export class Messaging {
           id,
           params,
           assertInvocationCurrent,
+          byPlayer,
         );
       }
       await this.projectChats();
@@ -2214,6 +2252,18 @@ export class Messaging {
     }
   }
 
+  /** A ledger's label: the chat's title, or else who else is in it. */
+  private async ledgerTitle(
+    chat: ChatConversation,
+    agentId: string,
+  ): Promise<string> {
+    const title = chatSummary(chat, agentId).title;
+    if (title !== null) return title;
+    const others = chat.members.filter((member) => member !== agentId);
+    const names = await Promise.all(others.map((id) => this.nameOf(id)));
+    return names.join(", ");
+  }
+
   /**
    * Project titles and empty member views into native sessions. The registry is
    * authoritative; a failed projection remains pending and never rolls back an
@@ -2229,7 +2279,7 @@ export class Messaging {
           const summary = chatSummary(chat, agentId);
           await this.deps.ensureSession(
             { agentId, sessionKey: summary.sessionKey },
-            summary.title,
+            await this.ledgerTitle(chat, agentId),
           );
         }
         await this.saveChat({ ...chat, needsProjection: false });
@@ -2256,7 +2306,7 @@ export class Messaging {
               throw new Error("Delivery has no conversation metadata.");
             const sessionId = await this.deps.ensureSession(
               copy,
-              chatSummary(chat, copy.agentId).title,
+              await this.ledgerTitle(chat, copy.agentId),
             );
             await this.updateCopy(delivery, copy, { sessionId });
           }
@@ -2326,6 +2376,7 @@ export class Messaging {
         senderName: delivery.senderName,
         text: heardAs(delivery.params),
         timestamp: delivery.timestamp,
+        ...(delivery.byPlayer ? { byPlayer: true } : {}),
       });
       await this.serial.enqueue("messages", async () => {
         await this.updateCopy(delivery, copy, { notified: true });

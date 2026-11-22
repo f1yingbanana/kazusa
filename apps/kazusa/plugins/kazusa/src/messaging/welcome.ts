@@ -3,8 +3,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import { inBackground } from "../background.ts";
 import { currentConfig } from "../current-config.ts";
-import { characterName } from "../identity.ts";
-import { USER } from "./http.ts";
+import { characterName, operatorOf } from "../identity.ts";
 import type { Messaging } from "./messaging.ts";
 
 /** `plugins.entries.kazusa.config.welcome`: a world's first words to the player. */
@@ -57,7 +56,7 @@ export function registerWelcome(
           await sendWelcome(messaging, {
             agentId,
             agentName: await characterName(api, config, agentId),
-            userId: USER.parse(api.pluginConfig?.user ?? {}).id,
+            userId: operatorOf(api).id,
             messages,
             agents: new Set(listAgentIds(config)),
           });

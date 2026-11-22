@@ -9,6 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { loadCharacterData, registerCharactersHttp } from "./http.ts";
 import { KazusaRealtimeBroadcaster } from "../realtime.ts";
+import { fakePlayer } from "../player-fake.ts";
+
+const watching = fakePlayer();
 import {
   CharactersResponseSchema,
   CharacterDetailResponseSchema,
@@ -95,6 +98,8 @@ describe("registerCharactersHttp", () => {
         lookup: vi.fn(async () => undefined),
       },
       setOnstage: vi.fn(async () => {}),
+      player: watching,
+      play: vi.fn(async () => {}),
     });
 
     expect(api.registerHttpRoute).toHaveBeenCalledWith(
@@ -132,14 +137,10 @@ describe("registerCharactersHttp", () => {
         (c) => c.id === "kazusa",
       )?.isSystemAgent,
     ).toBe(true);
+    // The person at the keyboard is nobody in the world: not on the roster.
     expect(
-      CharactersResponseSchema.parse(parsed).characters.find(
-        (c) => c.kind === "player",
-      )?.isSystemAgent,
-    ).toBeUndefined();
-    expect(
-      parsed.characters.some((c: { kind: string }) => c.kind === "player"),
-    ).toBe(true);
+      parsed.characters.some((c: { id: string }) => c.id.startsWith("user:")),
+    ).toBe(false);
     expect(
       parsed.characters.some((c: { id: string }) => c.id === "kazusa"),
     ).toBe(true);
@@ -165,7 +166,7 @@ describe("registerCharactersHttp", () => {
       JSON.parse(charactersJson ?? "{}").characters.map(
         (c: { id: string }) => c.id,
       ),
-    ).toEqual(["arona", "user:sensei"]);
+    ).toEqual(["arona"]);
     await routes["/kazusa/character"]?.(
       {
         method: "GET",
@@ -217,7 +218,7 @@ describe("registerCharactersHttp", () => {
     const api = {
       config: {
         gateway: { auth: { token: "test-service-token" } },
-        agents: { entries: { kazusa: {} } },
+        agents: { entries: { kazusa: {}, airi: {} } },
       },
       pluginConfig: {},
       registerHttpRoute: vi.fn((opts) => routes.set(opts.path, opts.handler)),
@@ -249,9 +250,15 @@ describe("registerCharactersHttp", () => {
       stage: {
         isOnstage: async (id) => onstage.get(id) ?? true,
         lookup: async (id) =>
-          onstage.has(id) ? { onstage: onstage.get(id)!, since: 7 } : undefined,
+          id === "airi"
+            ? { onstage: true, since: 1, playedBy: "user:sensei" }
+            : onstage.has(id)
+              ? { onstage: onstage.get(id)!, since: 7 }
+              : undefined,
       },
       setOnstage,
+      player: watching,
+      play: vi.fn(async () => {}),
     });
 
     const post = async (body: unknown) => {
@@ -301,6 +308,15 @@ describe("registerCharactersHttp", () => {
       (await post({ ids: ["kazusa", "nobody"], onstage: true })).status,
     ).toBe(404);
     expect(setOnstage).toHaveBeenCalledTimes(1);
+    // The one being played stays on while the rest go off.
+    const group = await post({ ids: ["airi", "kazusa"], onstage: false });
+    expect(group.status).toBe(200);
+    expect(setOnstage).toHaveBeenLastCalledWith("kazusa", false, ["kazusa"]);
+    expect(setOnstage).not.toHaveBeenCalledWith(
+      "airi",
+      expect.anything(),
+      expect.anything(),
+    );
   });
 });
 
@@ -371,6 +387,8 @@ describe("making and deleting a character", () => {
       broadcaster: new KazusaRealtimeBroadcaster(),
       stage: { isOnstage: async () => true, lookup: async () => undefined },
       setOnstage,
+      player: watching,
+      play: vi.fn(async () => {}),
     });
     const post = async (route: string, body: unknown) => {
       const req = Object.assign(

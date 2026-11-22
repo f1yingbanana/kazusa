@@ -1,10 +1,12 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  allowBrainRuns,
   beginBrainRun,
   brainRunLimits,
   registerBrainRunLimits,
   roomForSleep,
+  stopBrainRuns,
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
 import type { Clock } from "../clock/clock.ts";
@@ -80,6 +82,37 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("brain run hard budgets", () => {
+  it("stops a run under way when a person takes them, and any that starts until handed back", () => {
+    const h = setup();
+    const running = beginBrainRun(
+      h.api,
+      "alice",
+      "run-1",
+      new AbortController().signal,
+    );
+    stopBrainRuns("alice", "a person took them over");
+    expect(running.signal.aborted).toBe(true);
+    // Handed over a moment before the takeover, it starts after it.
+    const late = beginBrainRun(
+      h.api,
+      "alice",
+      "run-2",
+      new AbortController().signal,
+    );
+    expect(late.signal.aborted).toBe(true);
+    expect(h.tool("t")).toMatchObject({ block: true });
+    allowBrainRuns("alice");
+    const after = beginBrainRun(
+      h.api,
+      "alice",
+      "run-3",
+      new AbortController().signal,
+    );
+    expect(after.signal.aborted).toBe(false);
+    running.dispose();
+    late.dispose();
+    after.dispose();
+  });
   it("blocks an excess tool before its side effects, without counting duplicate hook deliveries", () => {
     const h = setup();
     const budget = beginBrainRun(

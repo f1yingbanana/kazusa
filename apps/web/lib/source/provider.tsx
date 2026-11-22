@@ -42,13 +42,22 @@ interface SourcesValue {
   readonly reachable: boolean;
   readonly backendError?: Error;
   readonly retryBackend: () => void;
+  /**
+   * The character the person plays; an empty id while they watch. Chats, moving
+   * and "you" all mean this one.
+   */
   readonly player: { readonly id: string; readonly name: string };
+  /** Whether the person is watching, playing nobody. */
+  readonly watching: boolean;
+  /** The person at the keyboard: who the system agent talks with. */
+  readonly operator: { readonly id: string; readonly name: string };
   readonly world?: WorldMeta;
   readonly worldResource: SWRResponse<WorldResponse, Error>;
   readonly probing: boolean;
 }
 
 const NO_PLAYER = { id: "", name: "You" };
+const NO_OPERATOR = { id: "", name: "You" };
 export const WORLD_KEY = ["kazusa/world"] as const;
 const WORLD_CACHE_KEY = unstable_serialize(WORLD_KEY);
 export const CHARACTERS_KEY = ["kazusa/characters"] as const;
@@ -138,7 +147,10 @@ export function useSources(): SourcesValue {
     reachable,
     backendError: worldResource.error,
     retryBackend: () => void worldResource.mutate(),
-    player: worldResource.data?.user ?? NO_PLAYER,
+    player: worldResource.data?.player ?? NO_PLAYER,
+    // Unknown until the world loads: not watching yet, so nothing flickers.
+    watching: worldResource.data ? worldResource.data.player === null : false,
+    operator: worldResource.data?.operator ?? NO_OPERATOR,
     world: worldResource.data?.world,
     worldResource,
     probing: worldResource.isLoading && !worldResource.error,

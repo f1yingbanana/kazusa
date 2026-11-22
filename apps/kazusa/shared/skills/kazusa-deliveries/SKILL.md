@@ -90,3 +90,12 @@ you
 ## record-unknown
 
 unknown
+
+## operator-playing
+
+{operator} is playing {character} in the world now: what they ask for themselves
+there is for {character}.
+
+## operator-watching
+
+{operator} is watching the world now, playing nobody.

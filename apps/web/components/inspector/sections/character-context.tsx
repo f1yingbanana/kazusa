@@ -8,7 +8,7 @@ import {
   describeSetting,
   SETTING_LABELS,
 } from "@/components/context/context-form";
-import { Button } from "@/components/ui/button";
+import { SectionAction, SectionActions } from "@/components/inspector/parts";
 import {
   Dialog,
   DialogContent,
@@ -58,19 +58,15 @@ export function CharacterContextSection({ entity }: { entity: EntityRef }) {
               className="flex items-baseline justify-between gap-3"
             >
               <dt className="text-muted-foreground">{SETTING_LABELS[key]}</dt>
-              <dd className="font-mono tabular-nums">
-                {describeSetting(key, data.effective[key])}
-              </dd>
+              <dd>{describeSetting(key, data.effective[key])}</dd>
             </div>
           ))}
         </dl>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger
-          render={<Button variant="outline" size="sm" className="self-start" />}
-        >
-          Customize
-        </DialogTrigger>
+        <SectionActions>
+          <DialogTrigger render={<SectionAction />}>Customize</DialogTrigger>
+        </SectionActions>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Memory and context for {name}</DialogTitle>

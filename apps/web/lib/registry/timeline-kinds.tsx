@@ -8,6 +8,7 @@ import {
   MoonIcon,
   PencilLineIcon,
   PlayIcon,
+  SquareIcon,
   TimerResetIcon,
   UserCogIcon,
   UsersRoundIcon,
@@ -94,6 +95,25 @@ export const TIMELINE_KINDS: KindMap = {
         .join(" ");
       return text ? { by: event.actors[0], text } : undefined;
     },
+    target: (event) => ({ kind: "character", id: event.actors[0] }),
+  },
+  "task.stopped": {
+    kind: "task.stopped",
+    label: "Task stopped",
+    icon: SquareIcon,
+    facet: "task",
+    salience: "low",
+    // Only ever because a person took them over: their activity stops there.
+    fact: (event) => (
+      <>
+        <span className="text-muted-foreground">{`${taskLabel(event.payload.type)} · `}</span>
+        <span>{event.payload.description}</span>
+        <span className="text-muted-foreground">
+          {" "}
+          · stopped when taken over
+        </span>
+      </>
+    ),
     target: (event) => ({ kind: "character", id: event.actors[0] }),
   },
   "message.sent": {

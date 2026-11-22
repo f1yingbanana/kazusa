@@ -11,7 +11,7 @@ import {
 } from "@/lib/source/chats/http";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
-import { chatTitle } from "@/lib/source/chats/display";
+import { chatTitle, selfIn } from "@/lib/source/chats/display";
 import { observedChatsKey } from "@/lib/source/observe/http";
 import { messagesKeyGetter } from "@/lib/source/chats/pagination";
 import { useSources } from "@/lib/source/provider";
@@ -50,20 +50,22 @@ export function useChatsResource() {
 
 /** The player's chats, newest first, titled for display. */
 export function useChats() {
-  const { player } = useSources();
+  const { player, operator } = useSources();
   const { data, error, isLoading, mutate } = useChatsResource();
   const { byId } = useCharacters();
   const chats = useMemo(() => {
-    const userId = player.id;
     const nameOf = (id: string) =>
-      byId.get(id)?.name ?? (id === userId ? player.name : undefined) ?? id;
+      byId.get(id)?.name ??
+      (id === operator.id ? operator.name : undefined) ??
+      id;
+    // The console is the person's own; every other chat the character's.
     return sortChats(
       (data?.chats ?? []).map((chat) => ({
         ...chat,
-        name: chatTitle(chat, userId, nameOf),
+        name: chatTitle(chat, selfIn(chat, player.id, operator.id), nameOf),
       })),
     );
-  }, [data, byId, player.id, player.name]);
+  }, [data, byId, player.id, operator.id, operator.name]);
 
   return {
     chats,
@@ -154,7 +156,7 @@ export function useChatActions() {
             requestId,
             text,
             members: chat.members.filter((id) => id !== player.id),
-            ...(chat.type === "group" ? { title: chat.name } : {}),
+
             // Face to face: it joins or starts a huddle where you stand.
             ...(chat.type === "huddle"
               ? { aloud: true, ...(type === "action" ? { type } : {}) }
@@ -179,17 +181,24 @@ export function useChatActions() {
     );
   }
 
-  function createChat(input: {
-    type: ChatType;
-    name: string;
-    members: string[];
-    placeId?: string;
-  }): Chat {
+  /**
+   * A chat not sent yet, written as `self`: the one played, or the person in
+   * their console with the system agent.
+   */
+  function createChat(
+    input: {
+      type: ChatType;
+      name: string;
+      members: string[];
+      placeId?: string;
+    },
+    self: string = player.id,
+  ): Chat {
     return {
       ...input,
       id: `draft:${crypto.randomUUID()}`,
       sessionKey: "",
-      members: [...new Set([player.id, ...input.members])],
+      members: [...new Set([self, ...input.members])],
       draft: true,
     };
   }

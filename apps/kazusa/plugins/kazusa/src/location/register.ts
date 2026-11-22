@@ -25,7 +25,7 @@ import type { TaskExtension } from "../taskman/types.ts";
 import type { Huddle } from "../messaging/messaging.ts";
 import { crossings } from "./encounters.ts";
 import { clientRecord } from "./http.ts";
-import { LOCATION_CONFIG, USER, type LocationConfig } from "./config.ts";
+import { LOCATION_CONFIG, type LocationConfig } from "./config.ts";
 import { judge, type JudgeDeps } from "./judgment.ts";
 import {
   placesNamedIn,
@@ -171,10 +171,15 @@ export interface LocationService {
     together?: readonly string[],
   ) => Promise<void>;
   /**
-   * Puts someone at a place now, without travel. Operators place characters;
-   * the player, who has no tasks, moves only this way.
+   * Puts someone at a place now, without travel. Operators place characters; a
+   * character a person plays moves only this way.
    */
   readonly place: (id: string, placeId: string) => Promise<LocationRecord>;
+  /**
+   * Stops them where they are: on a trip, at the place they are passing. A
+   * person taking a character over stops whatever they were on their way to.
+   */
+  readonly halt: (id: string) => Promise<void>;
   /** Whether the character is talking with or has noticed someone here. */
   readonly inCompany: (agentId: string, at: number) => Promise<boolean>;
   /** Their place and the people they know are here, for recognition. */
@@ -262,7 +267,10 @@ export function registerLocation(
       at: number,
     ) => Promise<void>;
     /** Offstage characters are nowhere. Absent: everyone is onstage. */
-    readonly stage?: Pick<Stage, "isOnstage" | "onstage" | "presentAt">;
+    readonly stage?: Pick<
+      Stage,
+      "isOnstage" | "isSimulated" | "onstage" | "presentAt"
+    >;
     /** The decision model; absent: OpenClaw's (`api.runtime.decisions`). */
     readonly evaluate?: JudgeDeps["evaluate"];
   },
@@ -324,20 +332,12 @@ export function registerLocation(
     atStart = undefined;
   });
   const skillLoader = pluginSkillLoader(api);
-  /** Configured characters and the player, onstage or not. */
-  const everyone = (): string[] => [
-    ...new Set([
-      ...listAgentIds(getConfig()),
-      USER.parse(api.pluginConfig?.user ?? {}).id,
-    ]),
-  ];
+  /** Configured characters, onstage or not. */
+  const everyone = (): string[] => [...new Set(listAgentIds(getConfig()))];
   const participants = async (): Promise<string[]> =>
     deps.stage ? await deps.stage.onstage(everyone()) : everyone();
-  const isUser = (id: string): boolean => id.startsWith("user:");
   const workspaceOf = (id: string): string | undefined =>
-    isUser(id)
-      ? undefined
-      : api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), id);
+    api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), id);
   const record = async (id: string): Promise<LocationRecord | undefined> => {
     const stored = await store.lookup(id);
     if (stored) return stored;
@@ -367,14 +367,17 @@ export function registerLocation(
     );
   }
   const tasks = openTaskStore(api);
-  const userConfig = USER.parse(api.pluginConfig?.user ?? {});
+  /**
+   * What someone is seen doing. A person playing them does what they do with no
+   * activity of record, so none is shown.
+   */
+  const activityOf = async (id: string) =>
+    !deps.stage || (await deps.stage.isSimulated(id))
+      ? await tasks.lookup(id)
+      : undefined;
   /** The name others know them by, never their id. */
   const displayName = async (id: string): Promise<string> =>
-    isUser(id)
-      ? id === userConfig.id
-        ? userConfig.name
-        : id
-      : await characterName(api, getConfig(), id).catch(() => id);
+    await characterName(api, getConfig(), id).catch(() => id);
 
   /** Who someone is and where they are, as evidence for a judgment. */
   const person = async (map: WorldMap, id: string, at: number) => {
@@ -388,7 +391,7 @@ export function registerLocation(
     const position = await record(id).then((current) =>
       current ? positionAt(current, at) : undefined,
     );
-    const task = await tasks.lookup(id);
+    const task = await activityOf(id);
     const home = currentWorld()?.homes.get(id);
     return {
       id,
@@ -494,8 +497,7 @@ export function registerLocation(
     at: number,
     between?: string,
   ): Promise<void> => {
-    // A human player has no brain to notice with.
-    if (!perception || isUser(observer)) return;
+    if (!perception) return;
     try {
       await perception.receive(observer, {
         id: [
@@ -551,7 +553,7 @@ export function registerLocation(
       if (other === who || !theirs?.noticed?.includes(who)) continue;
       await setNoticed(other, (noticed) => noticed.filter((id) => id !== who));
       // Those talking with them hear them go in the huddle itself.
-      if (huddled.has(other) || isUser(other) || !perception) continue;
+      if (huddled.has(other) || !perception) continue;
       await perception.receive(other, {
         id: ["departure", who, placeId, at].join("|"),
         sessionKey: `agent:${other}:tasks`,
@@ -1223,6 +1225,13 @@ export function registerLocation(
     record,
     participants,
     place,
+    halt: async (id) => {
+      const current = await record(id);
+      if (!current) return;
+      await clock.init();
+      const position = positionAt(current, clock.time());
+      if (position.kind === "traveling") await place(id, position.near);
+    },
     exit: async (id, at) => {
       const world = currentWorld();
       if (!world) return;
@@ -1266,7 +1275,7 @@ export function registerLocation(
           here
             .filter((id) => id !== agentId && known.has(id))
             .map(async (id) => {
-              const task = await tasks.lookup(id);
+              const task = await activityOf(id);
               const huddle = huddleOf(id);
               return {
                 id,

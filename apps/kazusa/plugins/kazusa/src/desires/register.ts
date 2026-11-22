@@ -34,8 +34,16 @@ export interface DesiresService {
   readonly taskExtension: TaskExtension;
   /** The `How you feel` line for a brain turn. */
   readonly feelings: (agentId: string, at: number) => Promise<string>;
-  /** Back from offstage: levels pick up from where they were at `from`. */
+  /**
+   * Back from offstage, or from being played: levels pick up from where they
+   * were at `from`.
+   */
   readonly resume: (agentId: string, from: number, to: number) => Promise<void>;
+  /**
+   * Their activity was cut short at `at` (a person took them over): levels hold
+   * there, with no activity's effects carried on.
+   */
+  readonly settle: (agentId: string, at: number) => Promise<void>;
 }
 
 /** Validators bound to one world's catalog and states. */
@@ -223,6 +231,12 @@ export function registerDesires(
       if (!record) return;
       const resumed = resumeAfter(config, record, from, to);
       if (resumed !== record) await write(agentId, resumed);
+    },
+    settle: async (agentId, at): Promise<void> => {
+      const record = await store.lookup(agentId);
+      if (!record) return;
+      const { effects: _ended, ...held } = anchorAt(config, record, at);
+      await write(agentId, held);
     },
   };
 }

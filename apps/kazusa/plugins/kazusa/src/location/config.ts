@@ -41,11 +41,3 @@ export const LOCATION_CONFIG = z.strictObject({
 });
 
 export type LocationConfig = z.infer<typeof LOCATION_CONFIG>;
-
-export const USER = z.object({
-  id: z
-    .string()
-    .regex(/^user:[a-z0-9][a-z0-9_-]*$/)
-    .default("user:sensei"),
-  name: z.string().trim().min(1).default("Sensei"),
-});

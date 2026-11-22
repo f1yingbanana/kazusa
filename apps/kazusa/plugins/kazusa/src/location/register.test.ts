@@ -709,14 +709,18 @@ describe("location registration", () => {
   it("places participants through the operator RPC", async () => {
     const { call, location } = setup();
     expect(
-      await call("location.place", { id: "user:sensei", placeId: "school" }),
+      await call("location.place", { id: "kazusa", placeId: "school" }),
     ).toMatchObject({
       ok: true,
       payload: { position: { kind: "at", placeId: "school", since: T0 } },
     });
-    expect(await location.record("user:sensei")).toMatchObject({
+    expect(await location.record("kazusa")).toMatchObject({
       placeId: "school",
     });
+    // A person outside the world is nobody here.
+    expect(
+      await call("location.place", { id: "user:sensei", placeId: "school" }),
+    ).toMatchObject({ ok: false });
     expect(
       await call("location.place", { id: "nobody", placeId: "school" }),
     ).toMatchObject({ ok: false });
@@ -725,7 +729,7 @@ describe("location registration", () => {
     ).toMatchObject({ ok: false });
   });
 
-  it("moves the player straight there, seen arriving, out of the huddles they left", async () => {
+  it("moves a played character straight there, seen arriving, out of the huddles they left", async () => {
     const { call, location } = setup();
     const received: Stimulus[] = [];
     location.attachPerception({
@@ -744,19 +748,21 @@ describe("location registration", () => {
     await call("location.place", { id: "kurimura-airi", placeId: "club" });
     received.length = 0;
 
-    const placed = await location.place("user:sensei", "club");
+    const placed = await location.place("yutori-natsu", "club");
     expect(placed).toEqual({ placeId: "club", since: T0 });
-    // Airi may notice Sensei come in; Sensei has no brain to notice with.
-    expect(received.map(({ id }) => id)).toEqual([
-      `sighting|comes|user:sensei|club|${T0}`,
+    // Airi may notice Natsu come in, and Natsu Airi: the person playing her
+    // is shown what she sees.
+    expect(received.map(({ id }) => id).sort()).toEqual([
+      `sighting|arrive|kurimura-airi|club|${T0}`,
+      `sighting|comes|yutori-natsu|club|${T0}`,
     ]);
     // Already there: nothing moves, nobody sees it again.
-    expect(await location.place("user:sensei", "club")).toBe(placed);
-    expect(received).toHaveLength(1);
+    expect(await location.place("yutori-natsu", "club")).toBe(placed);
+    expect(received).toHaveLength(2);
 
-    await location.place("user:sensei", "library");
-    expect(left).toEqual([{ who: "user:sensei", placeId: "club" }]);
-    await expect(location.place("user:sensei", "nowhere")).rejects.toThrow(
+    await location.place("yutori-natsu", "library");
+    expect(left).toEqual([{ who: "yutori-natsu", placeId: "club" }]);
+    await expect(location.place("yutori-natsu", "nowhere")).rejects.toThrow(
       "No place called nowhere.",
     );
   });

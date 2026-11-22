@@ -38,10 +38,7 @@ const LABELS: Record<PresenceState, string> = {
   unknown: "State unknown",
 };
 
-/**
- * The signature element: one ring encoding reused everywhere an avatar appears.
- * The player has no ring; nobody simulates them.
- */
+/** The signature element: one ring encoding reused everywhere an avatar appears. */
 export function PresenceAvatar({
   id,
   name,
@@ -59,7 +56,6 @@ export function PresenceAvatar({
 }) {
   const status = useCharacterStatus(kind === "agent" ? id : undefined);
   const state = presenceState(kind, status);
-  const showRing = kind !== "player";
   const queued = status?.queued ?? 0;
 
   return (
@@ -70,7 +66,7 @@ export function PresenceAvatar({
         className,
       )}
       role="img"
-      aria-label={showRing ? `${name}, ${LABELS[state].toLowerCase()}` : name}
+      aria-label={`${name}, ${LABELS[state].toLowerCase()}`}
     >
       <Avatar
         className={cn(
@@ -83,45 +79,40 @@ export function PresenceAvatar({
           {initials(name)}
         </AvatarFallback>
       </Avatar>
-      {showRing ? (
-        <>
-          <span
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute -inset-0.5 rounded-full border",
-              state === "idle" && "border-muted-foreground/35",
-              state === "unknown" && "border-dashed border-muted-foreground/50",
-              state === "offstage" &&
-                "border-dotted border-muted-foreground/60",
-              state === "thinking" && "border-primary/25",
-              state === "composing" && "border-2 border-primary",
-            )}
-          />
-          {state === "thinking" ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -inset-0.5 animate-spin rounded-full border-2 border-transparent border-t-primary animation-duration-[2.4s] motion-reduce:animate-none motion-reduce:border-primary"
-            />
-          ) : null}
-          {state === "composing" && size !== "xs" ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-px rounded-full bg-primary px-1 py-0.5"
-            >
-              <span className="size-0.5 rounded-full bg-primary-foreground" />
-              <span className="size-0.5 rounded-full bg-primary-foreground" />
-              <span className="size-0.5 rounded-full bg-primary-foreground" />
-            </span>
-          ) : null}
-          {queued > 0 && size !== "xs" ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -right-1 -bottom-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-background bg-foreground px-0.5 font-mono text-[9px] leading-none text-background tabular-nums"
-            >
-              {queued}
-            </span>
-          ) : null}
-        </>
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute -inset-0.5 rounded-full border",
+          state === "idle" && "border-muted-foreground/35",
+          state === "unknown" && "border-dashed border-muted-foreground/50",
+          state === "offstage" && "border-dotted border-muted-foreground/60",
+          state === "thinking" && "border-primary/25",
+          state === "composing" && "border-2 border-primary",
+        )}
+      />
+      {state === "thinking" ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -inset-0.5 animate-spin rounded-full border-2 border-transparent border-t-primary animation-duration-[2.4s] motion-reduce:animate-none motion-reduce:border-primary"
+        />
+      ) : null}
+      {state === "composing" && size !== "xs" ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-px rounded-full bg-primary px-1 py-0.5"
+        >
+          <span className="size-0.5 rounded-full bg-primary-foreground" />
+          <span className="size-0.5 rounded-full bg-primary-foreground" />
+          <span className="size-0.5 rounded-full bg-primary-foreground" />
+        </span>
+      ) : null}
+      {queued > 0 && size !== "xs" ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-1 -bottom-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-background bg-foreground px-0.5 font-mono text-[9px] leading-none text-background tabular-nums"
+        >
+          {queued}
+        </span>
       ) : null}
     </span>
   );

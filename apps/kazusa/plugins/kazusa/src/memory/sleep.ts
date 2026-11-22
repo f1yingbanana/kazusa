@@ -69,6 +69,11 @@ export interface SleepRun {
   readonly preimages: Readonly<Record<string, string | null>>;
   /** And as the night left it. */
   readonly postimages: Readonly<Record<string, string>>;
+  /**
+   * Gone over awake, handed back by a person who played them: the next pages
+   * shown start after it, but it is no night's sleep.
+   */
+  readonly review?: true;
 }
 export interface SleepState {
   /** Newest first; the newest is when they last slept on things. */
@@ -79,6 +84,11 @@ export interface SleepState {
 export interface Night {
   /** Its run, once kept. */
   readonly id: string;
+  /**
+   * Awake, looking back on what a person said and did as them (`lookBack`):
+   * kept like a night, but it counts as no sleep.
+   */
+  readonly review?: true;
   /**
    * Asked for by hand and not begun: it waits for the turn that goes over it,
    * and a run that ends meanwhile leaves it be. Their first call begins it.
@@ -350,6 +360,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     }
   };
 
+  /** When they last went over things, asleep or looking back awake. */
   const lastNight = async (agentId: string): Promise<number> => {
     await settle(agentId);
     return Math.max(
@@ -357,12 +368,29 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       owed.get(agentId)?.at ?? 0,
     );
   };
+  /** When they last slept on things: a look back awake is no night. */
+  const lastSlept = async (agentId: string): Promise<number> => {
+    await settle(agentId);
+    const slept = (run: SleepRun | undefined) =>
+      run && !run.review ? run.at : 0;
+    return Math.max(
+      ((await deps.store.lookup(agentId))?.runs ?? []).find(
+        (run) => !run.review,
+      )?.at ?? 0,
+      slept(owed.get(agentId)),
+    );
+  };
 
   /**
    * What going to bed says: how to go over the day, their own pages on what the
    * day touched, notes about to fade, and the states a night reviews.
    */
-  const offer = async (agentId: string, night: Night): Promise<string> => {
+  const offer = async (
+    agentId: string,
+    night: Night,
+    /** What they said and did, shown when it reaches past their records. */
+    played?: string,
+  ): Promise<string> => {
     const personal = deps.index.personal(agentId);
     const world = deps.index.world();
     const touched = await deps.touched(agentId, night.since);
@@ -383,7 +411,8 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       values: Readonly<Record<string, string>> = {},
     ): string => deps.text(`sleep-consolidation#${name}`, values, agentId);
     const lead = [
-      section("night"),
+      section(night.review ? "looking-back" : "night"),
+      ...(played ? [section("played", { lines: played })] : []),
       ...(states ? [section("states", { states })] : []),
     ];
     const pages: string[] = [];
@@ -437,11 +466,18 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
     ].join("\n\n");
   };
 
-  const begin = (at: number, since: number, wakeAt: number): Night => ({
+  const begin = (
+    at: number,
+    since: number,
+    wakeAt: number,
+    review = false,
+  ): Night => ({
     id: randomUUID(),
+    ...(review ? { review: true as const } : {}),
     at,
     since,
-    day: iso(at - HALF_DAY_MS),
+    // Awake, the day is today; going to bed after midnight, it is yesterday.
+    day: iso(review ? at : at - HALF_DAY_MS),
     wakeDay: iso(wakeAt),
     shown: new Set(),
     whole: new Set(),
@@ -469,6 +505,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
       at: night.at,
       preimages: night.preimages,
       postimages,
+      ...(night.review ? { review: true as const } : {}),
     };
     const waiting = owed.get(agentId);
     try {
@@ -521,13 +558,15 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         notes: night.notes,
         ...(night.dream ? { dream: night.dream } : {}),
       },
-      night.dream
-        ? deps.text(
-            "kazusa-results#night-dreamt",
-            { dream: night.dream },
-            agentId,
-          )
-        : deps.text("kazusa-results#night-slept", {}, agentId),
+      night.review
+        ? deps.text("kazusa-results#looked-back", {}, agentId)
+        : night.dream
+          ? deps.text(
+              "kazusa-results#night-dreamt",
+              { dream: night.dream },
+              agentId,
+            )
+          : deps.text("kazusa-results#night-slept", {}, agentId),
     );
   };
 
@@ -719,12 +758,11 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
           // run does not offer the day a second time. One asked for by hand
           // and not begun gives way to this one.
           const going = nights.get(agentId);
-          const since = await lastNight(agentId);
           if (
             (!going || going.waiting) &&
-            at - since >= deps.everyMinutes * 60_000
+            at - (await lastSlept(agentId)) >= deps.everyMinutes * 60_000
           ) {
-            night = begin(at, since, Date.parse(task.endAt));
+            night = begin(at, await lastNight(agentId), Date.parse(task.endAt));
             aside = await offer(agentId, night);
           }
         }
@@ -792,6 +830,27 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
         await deps.deliver(agentId, text);
       } catch (error: unknown) {
         // No turn is coming to go over it.
+        if (nights.get(agentId) === night) nights.delete(agentId);
+        throw error;
+      }
+    },
+    /**
+     * Handed back by a person who played them: a turn of their own to look back
+     * on what was said and done as them, and keep what matters, over the pages
+     * the time since they last went over things touched. `played` is what they
+     * said and did, for a stretch longer than their records reach.
+     */
+    lookBack: async (agentId: string, played?: string): Promise<void> => {
+      if (!deps.deliver) throw new Error("Nothing can hand them a turn yet.");
+      await end(agentId);
+      const at = deps.now();
+      const night = begin(at, await lastNight(agentId), at, true);
+      night.waiting = true;
+      const text = await offer(agentId, night, played);
+      nights.set(agentId, night);
+      try {
+        await deps.deliver(agentId, text);
+      } catch (error: unknown) {
         if (nights.get(agentId) === night) nights.delete(agentId);
         throw error;
       }

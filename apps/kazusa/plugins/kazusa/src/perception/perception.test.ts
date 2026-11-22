@@ -49,6 +49,7 @@ type SetupOptions = Partial<PerceptionConfig> & {
   assembleDecisionContext?: PerceptionDeps["assembleDecisionContext"];
   confirm?: PerceptionDeps["confirm"];
   onstage?: PerceptionDeps["onstage"];
+  played?: PerceptionDeps["played"];
   realtime?: PerceptionDeps["realtime"];
   systemAgentId?: string;
 };
@@ -117,6 +118,7 @@ function setup(options: SetupOptions = {}) {
     backgroundWork = async (run) => run(),
     confirm,
     onstage,
+    played,
     realtime,
     systemAgentId,
     ...configOptions
@@ -185,6 +187,7 @@ function setup(options: SetupOptions = {}) {
     assembleDecisionContext,
     ...(confirm ? { confirm } : {}),
     ...(onstage ? { onstage } : {}),
+    ...(played ? { played } : {}),
     ...(realtime ? { realtime } : {}),
     api: {
       lifecycle: { runInBackgroundContext: backgroundWork },
@@ -2575,11 +2578,12 @@ describe("Human reply timing and task boundaries", () => {
       ...stimulus("aside"),
       sessionKey: "agent:alice:chat:huddle:cafe",
     });
-    // The player's is.
+    // What a person said, playing someone there, is.
     await h.router.receive("alice", {
       ...stimulus("hey"),
       sessionKey: "agent:alice:chat:huddle:cafe",
-      sender: "user:sensei",
+      sender: "natsu",
+      byPlayer: true,
     });
 
     expect(h.judged.map(({ action }) => action)).toEqual([
@@ -2633,7 +2637,7 @@ describe("Human reply timing and task boundaries", () => {
           expect.objectContaining({
             messageId: "hey",
             chatId: "huddle:cafe",
-            sender: "user:sensei",
+            sender: "natsu",
           }),
         ],
       }),
@@ -2991,6 +2995,43 @@ describe("Foreseen stimuli", () => {
       "peer-held",
     ]);
     expect(h.evaluateDecision).not.toHaveBeenCalled();
+  });
+
+  it("hands a played character's input to the person, never to the model", async () => {
+    const h = setupWake({ played: async (id) => id === "alice" });
+    h.setSpeed(0);
+    const read: PerceptionDelivery[] = [];
+    h.router.onRead((delivery) => {
+      read.push(delivery);
+    });
+    await h.router.receive("alice", stimulus("text"));
+    await h.router.receive("alice", {
+      ...stimulus("sighting", "alice", "Bob is here."),
+      sessionKey: "agent:alice:tasks",
+      timestamp: NOW + 60_000,
+      foreseen: true,
+    });
+    await h.router.deadline("alice");
+    // Paused or not, nothing is judged or handed over, and nothing waits:
+    // what happened is read, the rest goes.
+    expect(h.deliveries).toEqual([]);
+    expect(h.evaluateDecision).not.toHaveBeenCalled();
+    expect(read.flatMap(({ ids }) => ids)).toEqual(["text"]);
+    expect(h.snapshot().pending).toEqual([]);
+  });
+
+  it("clears the queue on takeover, even when a stopped turn halted it", async () => {
+    const h = setupWake();
+    h.setSpeed(0);
+    await h.router.receive("alice", stimulus("waiting"));
+    h.states.set("alice", { ...h.snapshot(), stopped: true });
+    const read: PerceptionDelivery[] = [];
+    h.router.onRead((delivery) => {
+      read.push(delivery);
+    });
+    await h.router.takeOver("alice");
+    expect(h.snapshot().pending).toEqual([]);
+    expect(read.flatMap(({ ids }) => ids)).toEqual(["waiting"]);
   });
 
   it("keeps the system agent's offstage gate", async () => {

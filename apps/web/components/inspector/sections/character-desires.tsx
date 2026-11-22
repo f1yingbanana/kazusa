@@ -7,7 +7,7 @@ import type {
   DesiresConfig,
 } from "@kazusa/client";
 import { Fact } from "@/components/entities/fact";
-import { Button } from "@/components/ui/button";
+import { SectionAction, SectionActions } from "@/components/inspector/parts";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -32,10 +32,10 @@ import { formatSimDuration, formatSimTime } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 
 /**
- * How the character feels, as the brain reads it, kept quiet: only desires
- * below the state everyone starts in, or ones the current task is moving, get a
- * row. The rest are one "Show all" away (remembered for every character). When
- * each will change is in the row's hover, not on screen.
+ * How the character feels, as the brain reads it, kept quiet: desires below the
+ * state everyone starts in, or ones the current task is moving, get a row; when
+ * none do, the three lowest. The rest are one "Show all" away (remembered for
+ * every character). When each will change is in the row's hover.
  */
 export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
   const character = useCharacter(entity.id);
@@ -72,8 +72,17 @@ export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
   const notable = config.catalog.filter((desire) =>
     isNotable(config, record, desire, at, offstage),
   );
-  const shown = showAll ? config.catalog : notable;
-  const hidden = config.catalog.length - notable.length;
+  // Nothing stands out: the lowest few, so the section always says something.
+  const lowest = notable.length
+    ? notable
+    : config.catalog
+        .toSorted(
+          (a, b) =>
+            levelAt(config, record, a, at) - levelAt(config, record, b, at),
+        )
+        .slice(0, QUIET_ROWS);
+  const shown = showAll ? config.catalog : lowest;
+  const hidden = config.catalog.length - lowest.length;
 
   return (
     <div className="flex flex-col gap-2">
@@ -92,31 +101,22 @@ export function CharacterDesiresSection({ entity }: { entity: EntityRef }) {
           ))}
         </ul>
       ) : null}
-      <div className="flex items-center justify-between gap-2">
-        {notable.length === 0 && !showAll ? (
-          <p className="text-sm text-muted-foreground">{`Nothing pressing. All ${config.initial} or better.`}</p>
-        ) : (
-          <span />
-        )}
-        {hidden > 0 ? (
-          <Button
-            variant="ghost"
-            size="xs"
-            className="-mr-2 shrink-0 text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted"
+      {hidden > 0 ? (
+        <SectionActions>
+          <SectionAction
             aria-expanded={showAll}
             onClick={() => setSectionOpen(SHOW_ALL, !showAll)}
           >
-            {showAll
-              ? "Show less"
-              : notable.length
-                ? `${hidden} more`
-                : `Show all ${config.catalog.length}`}
-          </Button>
-        ) : null}
-      </div>
+            {showAll ? "Show less" : `${hidden} more`}
+          </SectionAction>
+        </SectionActions>
+      ) : null}
     </div>
   );
 }
+
+/** Rows shown when no desire stands out. */
+const QUIET_ROWS = 3;
 
 /** The viewer's choice to see every desire, kept with the inspector folds. */
 const SHOW_ALL = "character.desires.all";
@@ -165,7 +165,7 @@ function DesireRow({
         <TooltipContent className="flex max-w-64 flex-col gap-1">
           <span>{desire.description}</span>
           {when ? (
-            <span className="font-mono text-[11px] tabular-nums opacity-80">
+            <span className="font-mono text-xs tabular-nums opacity-80">
               {when}
             </span>
           ) : null}
@@ -181,7 +181,7 @@ function DesireRow({
       />
       <span
         className={cn(
-          "flex w-18 shrink-0 items-center justify-end gap-1 font-mono text-xs",
+          "flex w-18 shrink-0 items-center justify-end gap-1 text-xs",
           index === 0
             ? "font-medium text-foreground"
             : index < initialIndex

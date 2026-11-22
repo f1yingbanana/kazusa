@@ -1,3 +1,4 @@
+import { createHandBack } from "./stage/hand-back.ts";
 import { inBackground, rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
 import { currentConfig } from "./current-config.ts";
@@ -59,7 +60,11 @@ import {
 } from "./realtime.ts";
 import { registerTimelineHttp } from "./timeline/http.ts";
 import { registerUsageHttp } from "./usage/http.ts";
-import { registerStage, stageControl } from "./stage/register.ts";
+import { playControl, registerStage, stageControl } from "./stage/register.ts";
+import { createPlayer } from "./player.ts";
+import { CONTEXT_ENGINE_CONFIG } from "./context-engine/config.ts";
+import { allowBrainRuns, stopBrainRuns } from "./perception/run-limits.ts";
+import { characterName } from "./identity.ts";
 import { registerStickerHttp } from "./stickers/http.ts";
 import { registerScene } from "./scene/http.ts";
 import { createRouteRegistrar } from "./http/helpers.ts";
@@ -130,6 +135,14 @@ export default definePluginEntry({
     );
 
     const stage = registerStage(api);
+    // The person at the keyboard and who they play; read once at start-up so
+    // a stream's events can be filtered synchronously from then on.
+    const player = createPlayer(api, stage);
+    api.on("gateway_start", () => {
+      void player.playing().catch((error: unknown) => {
+        api.logger.warn(`Who is played couldn't be read: ${String(error)}`);
+      });
+    });
     const models = registerModels(api);
     registerProvidersHttp(api);
     const desires = registerDesires(api, { clock });
@@ -161,7 +174,7 @@ export default definePluginEntry({
     });
     placesRef.current = location.pages;
     const scene = registerScene(api, createRouteRegistrar(api));
-    registerLocationHttp(api, { location, times: scene.times });
+    registerLocationHttp(api, { location, times: scene.times, player });
     registerWorldUpdate(api, { clock, location, broadcaster });
     registerRepoSearch(api);
     // On unless a world turns it off: observing is what the client is for.
@@ -170,6 +183,7 @@ export default definePluginEntry({
         ?.enabled !== false;
     // A world without places has no positions to serve.
     registerClockHttp(api, clock, {
+      player,
       getCapabilities: () => ({
         ...DEFAULT_CAPABILITIES,
         ...(observer ? {} : ({ observe: "unavailable" } as const)),
@@ -202,6 +216,7 @@ export default definePluginEntry({
       // shown, and a deferred one has not been yet.
       awaitingReplies: async (agentId, since) =>
         (await messagingRef.current?.awaitingReplies(agentId, since)) ?? [],
+      player,
     });
     registerContextHttp(api);
     registerSkills(api);
@@ -223,6 +238,7 @@ export default definePluginEntry({
       onRunEnded: memory.sleep.runEnded,
       confirm: location.confirm,
       onstage: (agentId) => stage.isOnstage(agentId),
+      played: (agentId) => stage.isPlayed(agentId),
       realtime: async (agentId, item) =>
         item.sessionKey.includes(":chat:") &&
         ((await messagingRef.current?.isHuddle(agentId, item.sessionKey)) ??
@@ -329,6 +345,7 @@ export default definePluginEntry({
       getStatuses,
       observer,
       wearing: stats.wearing,
+      player,
     });
     messagingRef.current = messaging;
     // Talking with someone is what makes them familiar (`usesOfMessage`).
@@ -356,25 +373,69 @@ export default definePluginEntry({
     location.attachConversations(messaging);
 
     registerProfile(api);
+    const setOnstage = stageControl({
+      stage,
+      clock,
+      interrupt: (id) => {
+        messaging.interrupt(id);
+      },
+      exit: location.exit,
+      forgetSightings: (id) => perception.forgetForeseen(id),
+      enter: location.enter,
+      reschedule: (id) => taskman.reschedule(id),
+      resumeDesires: desires.resume,
+      drain: (id) => perception.drain(id),
+    });
+    const contextConfig = CONTEXT_ENGINE_CONFIG.parse(
+      api.pluginConfig?.contextEngine ?? {},
+    );
+    const play = playControl({
+      stage,
+      clock,
+      bringOn: (id, person) => setOnstage(id, true, [], person),
+      stop: (id) => {
+        stopBrainRuns(id, "a person took them over");
+        messaging.interrupt(id);
+      },
+      allow: allowBrainRuns,
+      endActivity: async (id, at) => {
+        await location.halt(id);
+        await taskman.end(id, at);
+        await desires.settle(id, at);
+      },
+      reschedule: (id) => taskman.reschedule(id),
+      resumeDesires: desires.resume,
+      drain: (id) => perception.takeOver(id),
+      handBack: createHandBack({
+        messageLog: (window) => messaging.messageLog(window),
+        nameOf: (id) => characterName(api, getConfig(), id).catch(() => id),
+        time: () => clock.time(),
+        movedSince: async (id, since) =>
+          ((await location.record(id))?.since ?? 0) > since,
+        idleWake: (id) => perception.idleWake(id),
+        lookBack: (id, lines) => memory.sleep.lookBack(id, lines),
+        recordsReachMs:
+          (contextConfig.shortTermHours - contextConfig.ledgerGridHours) *
+          3_600_000,
+      }),
+      changed: () => {
+        void player
+          .playing()
+          .then((actor) =>
+            broadcaster.broadcast({ type: "player", player: actor ?? null }),
+          );
+      },
+      warn: (message) => api.logger.warn(message),
+    });
     registerCharactersHttp(api, {
       taskman,
       perception,
       messaging,
       broadcaster,
       stage,
-      setOnstage: stageControl({
-        stage,
-        clock,
-        interrupt: (id) => {
-          messaging.interrupt(id);
-        },
-        exit: location.exit,
-        forgetSightings: (id) => perception.forgetForeseen(id),
-        enter: location.enter,
-        reschedule: (id) => taskman.reschedule(id),
-        resumeDesires: desires.resume,
-        drain: (id) => perception.drain(id),
-      }),
+      setOnstage,
+      player,
+      play,
     });
     registerStickerHttp(api, createRouteRegistrar(api));
   },

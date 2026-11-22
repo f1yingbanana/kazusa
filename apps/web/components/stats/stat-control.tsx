@@ -77,10 +77,15 @@ export function StatControl({
 
   if (!onSet) {
     return (
-      <span className="font-mono text-xs text-muted-foreground">
-        {stat.kind === "number" && typeof value === "number"
-          ? `${statBand(stat, value) ?? ""} ${value}/${stat.max}`.trim()
-          : value}
+      <span className="text-xs text-muted-foreground">
+        {stat.kind === "number" && typeof value === "number" ? (
+          <>
+            {statBand(stat, value) ? `${statBand(stat, value)} ` : ""}
+            <span className="font-mono tabular-nums">{`${value}/${stat.max}`}</span>
+          </>
+        ) : (
+          value
+        )}
       </span>
     );
   }

@@ -134,7 +134,8 @@ const huddle = (members: string[]): Chat => ({
   placeId: "cafe",
 });
 const world = (scene: "live" | "unavailable"): WorldResponse => ({
-  user: { id: PLAYER, name: "Player Name" },
+  operator: { id: "user:owner", name: "Owner" },
+  player: { id: PLAYER, name: "Player Name" },
   serverNow: Date.now(),
   clock: { simTime: DAY + 12 * HOUR, speed: 0, updatedAt: Date.now() },
   world: { title: "Test world" },
@@ -205,7 +206,8 @@ beforeEach(() => {
     { id: "bob", name: "Bob", kind: "agent", aliases: [] },
   ]);
   vi.mocked(fetchChats).mockResolvedValue({
-    user: { id: PLAYER, name: "Player Name" },
+    operator: { id: "user:owner", name: "Owner" },
+    player: { id: PLAYER, name: "Player Name" },
     chats: [huddle([PLAYER, "alice", "bob"])],
   });
   vi.mocked(fetchMessages).mockResolvedValue({ messages: [], hasMore: false });
@@ -320,7 +322,8 @@ describe("scene wiring", () => {
     expect(useSceneStore.getState().scenes.huddle?.speakers).toEqual(["bob"]);
     // Alice walks off: the chat list changes, its refetch carries it.
     vi.mocked(fetchChats).mockResolvedValue({
-      user: { id: PLAYER, name: "Player Name" },
+      operator: { id: "user:owner", name: "Owner" },
+      player: { id: PLAYER, name: "Player Name" },
       chats: [huddle([PLAYER, "bob"])],
     });
     await act(async () => source?.emit({ type: "chats" }));

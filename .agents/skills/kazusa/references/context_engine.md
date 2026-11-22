@@ -460,10 +460,11 @@ salience:
        [chat:direct:bob]
      - Hifumi Ajitani (@hifumi, acquaintance): Trinity library committee member.
        [chat:direct:hifumi]
-     - Sensei (@user:sensei, mentor): SCHALE Advisor who guides students across
-       Kivotos. [chat:direct:user:sensei]
+     - Sensei (@sensei, mentor): SCHALE Advisor who guides students across
+       Kivotos. [chat:direct:sensei]
      ```
-   - Supports both agent peers and human players (`user:` prefix).
+   - Contacts are characters, Sensei included (played or not); the operator,
+     outside the world, is never one.
    - **Economics & Performance**: A 20-contact list costs only ~150 tokens. This
      completely eliminates the double-turn latency penalty of an agent calling
      `list_chats` or `wiki_search` before sending a message, avoids ID

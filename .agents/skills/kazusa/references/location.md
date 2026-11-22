@@ -5,9 +5,10 @@ current design. §6 is the decision log of how it got here, and §7 reviews it
 against our principles. Designed in the order set by the kazusa skill §0:
 simulation, then player, then prompt.
 
-Goal: characters and the player live on one abstract map, so meetups are real
-(both people have to get there), commutes take time and can be interrupted, and
-people bump into each other by accident, the way they do in a real school.
+Goal: characters (the one the person plays among them) live on one abstract map,
+so meetups are real (both people have to get there), commutes take time and can
+be interrupted, and people bump into each other by accident, the way they do in
+a real school.
 
 ## 0. Principles applied
 
@@ -236,8 +237,8 @@ are in.
 
 - **Location** (`src/location/`): map, positions, knowledge, judgments,
   sightings, `where`, `placeOf`, `settle`, `confirm`, `whereabouts`,
-  `inCompany`, operator RPC `location.place`, `POST /kazusa/move` (the player),
-  `GET /kazusa/places`, `GET /kazusa/locations`.
+  `inCompany`, operator RPC `location.place`, `POST /kazusa/move` (the character
+  the person plays), `GET /kazusa/places`, `GET /kazusa/locations`.
 - **Taskman** knows no places: extensions `prepare` (validate, maybe
   `checkInAt`) and `commit(task)` against the final lease; one wake per
   character.
@@ -262,12 +263,12 @@ are in.
   groups with someone the observer has a card for first.
 - **Relevance**: better than literal matching for **Places you know**, through
   the memory retriever ([memory](memory.md) §7.2).
-- **Player trips**: the player has no lease, so for now they go straight there
-  (`POST /kazusa/move`, the same `place()` as the operator's `location.place`):
-  those there may notice them come in, and leaving takes them out of their
-  huddles. Speaking aloud (`/kazusa/send` with `aloud`) then turns to the people
-  addressed the way `talk` does. Walking (a trip without a lease, settled by a
-  timer or the next request) is still open.
+- **Played trips**: a played character has no lease, so for now they go straight
+  there (`POST /kazusa/move`, the same `place()` as the operator's
+  `location.place`): those there may notice them come in, and leaving takes them
+  out of their huddles. Speaking aloud (`/kazusa/send` with `aloud`) then turns
+  to the people addressed the way `talk` does. Walking (a trip without a lease,
+  settled by a timer or the next request) is still open.
 - **Walking together**: sharing a trip and talking on the way.
 - **Client** (Phase 5): place tree, in-transit, place inspector, huddle threads,
   map renderer, Player lens, an SSE `location` event, and the `location.noticed`

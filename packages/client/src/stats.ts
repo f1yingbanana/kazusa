@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /*
  * States: named values a world defines for its characters, for one character's
- * view of another, for the player, or for the world as a whole
+ * view of another, or for the world as a whole
  * (`GET /kazusa/stats`, SSE `stats`). "State" is what people call them; the code says `stats`, because
  * `state` and `status` already mean other things here.
  */
@@ -44,16 +44,8 @@ export const StatBandSchema = z.object({
 });
 export type StatBand = z.infer<typeof StatBandSchema>;
 
-/**
- * What a state sits on. A pair is one character's private view of another; a
- * `player` state is one only the human player has, and sets themselves.
- */
-export const StatSubjectSchema = z.enum([
-  "character",
-  "pair",
-  "world",
-  "player",
-]);
+/** What a state sits on. A pair is one character's private view of another. */
+export const StatSubjectSchema = z.enum(["character", "pair", "world"]);
 export type StatSubject = z.infer<typeof StatSubjectSchema>;
 
 /**
@@ -123,13 +115,6 @@ export const StatDefinitionSchema = z
       );
     if (stat.on === "pair" && stat.shown === "everyone")
       issue("shown", "a state toward someone is private to whoever holds it");
-    if (stat.on === "player" && stat.changedBy !== "manual")
-      issue("changedBy", "a state of the player is only set by hand");
-    if (stat.on === "player" && stat.shown === "self")
-      issue(
-        "shown",
-        "a state of the player is read by the people with them, or by nobody",
-      );
     if (stat.kind === "choice") {
       const names = stat.values.map(({ name }) => name);
       if (!unique(names)) issue("values", "values must be unique");
@@ -193,8 +178,6 @@ export function outfitStat(outfits: readonly StatValueDef[]): ChoiceStat {
 
 /** Whoever a set of states is for, as far as which of them they have goes. */
 export interface StatHolder {
-  /** The human player, who alone has the `player` states. */
-  readonly player?: boolean;
   /** Their outfits besides the usual clothes. */
   readonly outfits?: readonly StatValueDef[];
 }
@@ -204,12 +187,9 @@ export interface StatHolder {
  * if any.
  */
 export function statsOf(catalog: StatCatalog, holder: StatHolder): StatCatalog {
-  const theirs = catalog.filter(
-    (stat) => stat.on !== "player" || holder.player === true,
-  );
   return holder.outfits?.length
-    ? [outfitStat(holder.outfits), ...theirs]
-    : theirs;
+    ? [outfitStat(holder.outfits), ...catalog]
+    : catalog;
 }
 
 /** The outfit word worn, or nothing in the usual clothes. */
@@ -282,9 +262,9 @@ export type StatCatalogSavePayload = z.infer<
 >;
 
 /**
- * POST /kazusa/stats/set. `characterId` is absent for a state of the world and
- * the player's id for one of theirs, `toward` present for one toward someone; a
- * `null` value puts it back to its initial.
+ * POST /kazusa/stats/set. `characterId` is absent for a state of the world,
+ * `toward` present for one toward someone; a `null` value puts it back to its
+ * initial.
  */
 export const StatSetPayloadSchema = z.object({
   name: NAME,

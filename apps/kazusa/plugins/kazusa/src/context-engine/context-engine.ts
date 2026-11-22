@@ -75,6 +75,11 @@ export async function assembleContext(params: {
   readonly whereabouts?: string;
   /** Someone else is here, so the in-person skill applies. */
   readonly inCompany?: boolean;
+  /**
+   * For the system agent: who the person she talks with plays now, already
+   * worded. Nobody in the world reads it.
+   */
+  readonly operator?: string;
   readonly config: ContextEngineConfig;
   readonly skillLoader: SkillLoader;
   /** Past turns' tool calls in a turn: the system agent gets more. */
@@ -186,6 +191,7 @@ export async function assembleContext(params: {
             `Planned check-in: ${formatSimTime(Date.parse(task.endAt))}`,
           ].join("\n")
         : "No activity has been chosen yet.",
+      ...(params.operator ? ["", params.operator] : []),
       ...(params.whereabouts
         ? ["", "### Where you are", params.whereabouts]
         : []),

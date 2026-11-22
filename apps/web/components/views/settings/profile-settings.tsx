@@ -20,7 +20,7 @@ import { SettingsSection } from "./settings-section";
 
 function ProfileForm({ profile }: { profile: ProfileResponse }) {
   const { save } = useProfile();
-  const { canPlay } = useAccess();
+  const { canManage } = useAccess();
   const [edit, setEdit] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -29,7 +29,7 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canPlay || !dirty) return;
+    if (!canManage || !dirty) return;
     setSaving(true);
     try {
       await save(about);
@@ -47,12 +47,14 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
       <fieldset
-        disabled={!canPlay}
+        disabled={!canManage}
         className="m-0 flex flex-col gap-6 border-0 p-0"
       >
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="profile-about">About you</FieldLabel>
+            <FieldLabel htmlFor="profile-about">
+              What the system agent knows about you
+            </FieldLabel>
             <Textarea
               id="profile-about"
               rows={6}
@@ -60,9 +62,10 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
               onChange={(event) => setEdit(event.target.value)}
             />
             <FieldDescription>
-              Markdown. Saved straight to{" "}
-              <code className="font-mono text-xs">{profile.wikiPage}</code> in
-              the World Wiki.
+              Who you are to her, and how she should address you. Only the
+              system agent reads it: you are nobody in the world, whoever you
+              play there. Saved to her{" "}
+              <code className="font-mono text-xs">USER.md</code>.
             </FieldDescription>
           </Field>
           <div className="flex flex-col gap-6 sm:flex-row">
@@ -105,8 +108,8 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
 }
 
 /**
- * Who the player is in this world. Saving writes their World Wiki page straight
- * away.
+ * The person at the keyboard, as the system agent knows them. Saving writes her
+ * `USER.md` straight away.
  */
 export function ProfileSettings() {
   const { enabled, data, error } = useProfile();

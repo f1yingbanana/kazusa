@@ -159,16 +159,19 @@ pushed as SSE `desires`. The timeline route skips reading chat ledgers when
   `backdrop` naming no set is a `wiki_lint` problem and the place uses its
   area's.
 
-### Built: profile
+### Built: profile, playing
 
-- `GET /kazusa/profile` returns `{ id, name, about, wikiPage }`.
-- `POST /kazusa/profile/save` takes `{ about }` and returns the same.
-
-`about` is the body of the player's World Wiki page under
-`shared/wiki/entities/characters/`; the front matter and title are left as
-written, and a missing page is created. `id` and `name` stay read-only: they
-come from `plugins.entries.kazusa.config.user`, because chats, personal wiki
-pages and the stored position are all keyed by the id.
+- `GET /kazusa/profile` returns `{ id, name, about }`;
+  `POST /kazusa/profile/save` takes `{ about }` and returns the same (`manage`).
+  `about` is the system agent's `USER.md`: who the person at the keyboard is to
+  her. `id` and `name` are the operator's, from
+  `plugins.entries.kazusa.config.user`, read-only.
+- `POST /kazusa/player { characterId | null }` → `{ player }`: who the person
+  plays, or `null` to watch (`play`). SSE `player { player }`; the world
+  response and `GET /kazusa/chats` carry `operator` and `player`.
+  `CharacterStatus.playedBy` marks a played character. Acting routes (`send`,
+  `typing`, `chats/manage`, `move`) act as the played character, and answer 409
+  while watching; the console with the system agent acts as the operator.
 
 ### Built: context settings
 

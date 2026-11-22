@@ -156,9 +156,15 @@ export function createRouteRegistrar(
         } catch (error) {
           if (res.headersSent) res.end();
           else
-            sendJson(res, 400, {
-              error: error instanceof Error ? error.message : String(error),
-            });
+            // Watching, there is nobody of theirs to act as: a conflict with
+            // how things stand, not a bad request.
+            sendJson(
+              res,
+              error instanceof Error && error.name === "WatchingError"
+                ? 409
+                : 400,
+              { error: error instanceof Error ? error.message : String(error) },
+            );
         }
         return true;
       },

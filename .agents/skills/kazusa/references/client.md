@@ -1,7 +1,8 @@
 # Kazusa client: requirements and integration
 
-`apps/web` is the human player's in-world chat interface. It uses the Kazusa
-conversation API, with shared wire schemas in `packages/client`
+`apps/web` is the person's interface to the world: they talk with the system
+agent as themselves and play any character, or none (SKILL.md §3.10). It uses
+the Kazusa conversation API, with shared wire schemas in `packages/client`
 (`@kazusa/client`). Native WebChat sessions are not group conversations. Do not
 send group messages through native `chat.send` or read UI history through native
 `chat.history`.
@@ -35,7 +36,8 @@ send group messages through native `chat.send` or read UI history through native
   `ChatMessage.receipts` carry each character's `readAt`, the moment Perception
   showed their brain the message (SSE `read` updates it live). The client shows
   one check for sent and two for read by every character ("observed" face to
-  face). The player sends no receipts.
+  face). The operator sends no receipts; a played character's messages are
+  marked read as they reach the person (Perception's `toPlayer`).
 
 ## API and client behavior
 
@@ -56,9 +58,9 @@ PRs; no browser supplies a trusted identity itself.
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /kazusa/agents`                             | Roster IDs, display names and optional avatars.                                                                                                                                                |
 | `GET /kazusa/avatar`                             | `id` (roster agent) and cache-busting `v`; streams `<workspace>/avatar.<ext>` with an immutable cache header. Characters and roster entries point here when `IDENTITY.md` sets no `avatarUrl`. |
-| `GET /kazusa/chats`                              | Configured human and conversations with canonical `id`, viewer `sessionKey`, `type`, `name`, members and latest preview.                                                                       |
+| `GET /kazusa/chats`                              | `operator`, `player` (`null` while watching), and their conversations with canonical `id`, viewer `sessionKey`, `type`, `name`, members and latest preview.                                    |
 | `GET /kazusa/messages`                           | `chatId`, optional sequence `before`, optional `limit`; returns `messages`, `nextCursor`, `hasMore`.                                                                                           |
-| `GET /kazusa/observe/chats`, `/observe/messages` | Read-only: chats the player is not in, and any chat's full history. Mutates nothing; gated by `observer.enabled` (default on).                                                                 |
+| `GET /kazusa/observe/chats`, `/observe/messages` | Read-only: chats neither the operator nor the played character is in, and any chat's full history. Mutates nothing; gated by `observer.enabled` (default on).                                  |
 | `POST /kazusa/send`                              | Stable automatic `requestId`, text and either `sessionKey` or new-chat members/title; returns canonical message and delivery status.                                                           |
 | `POST /kazusa/chats/manage`                      | `sessionKey` plus `rename`, `add_members`, `remove_members` or `leave`.                                                                                                                        |
 | `POST /kazusa/typing`                            | `sessionKey` and `isTyping` for the configured human.                                                                                                                                          |

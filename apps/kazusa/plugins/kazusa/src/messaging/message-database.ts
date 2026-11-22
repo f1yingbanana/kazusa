@@ -161,6 +161,7 @@ interface Body {
   readonly audience: readonly string[];
   readonly params: MessageDelivery["params"];
   readonly copies: readonly (MessageCopy | SlimCopy)[];
+  readonly byPlayer?: true;
 }
 
 /**
@@ -191,6 +192,7 @@ function encode(delivery: MessageDelivery): { body: string; settled: boolean } {
     audience: delivery.audience,
     params: delivery.params,
     copies,
+    ...(delivery.byPlayer ? { byPlayer: true as const } : {}),
   };
   return { body: JSON.stringify(body), settled };
 }
@@ -241,6 +243,7 @@ function decode(row: MessageRow): MessageDelivery {
     params: body.params,
     timestamp: row.timestamp,
     copies,
+    ...(body.byPlayer ? { byPlayer: true as const } : {}),
     ...(settled ? { settled: true as const } : {}),
   };
 }
@@ -339,9 +342,9 @@ export function openMessageDatabase(
 }
 
 /**
- * Opens the file, creates its schema, prepares every statement
- * once, and returns the store over them. Use `openMessageDatabase`, which keeps
- * one per file.
+ * Opens the file, creates its schema, prepares every statement once, and
+ * returns the store over them. Use `openMessageDatabase`, which keeps one per
+ * file.
  */
 function createStore({
   path: file,

@@ -87,6 +87,11 @@ export interface TaskmanService {
   /** Re-reads one character's wake from their lease and stage. */
   reschedule(agentId: string): Promise<void>;
   /**
+   * Cuts their activity short at `at`: a person took them over. Its row says
+   * they stopped; whatever they do next is theirs, or their model's again.
+   */
+  end(agentId: string, at: number): Promise<void>;
+  /**
    * What waking someone at the end of their activity does. The first caller in
    * the process keeps it; returns a disposer.
    */
@@ -101,8 +106,11 @@ export function registerTaskman(
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     /** Modules that add `start_task` parameters and see leases first. */
     readonly extensions?: readonly TaskExtension[];
-    /** Offstage characters have no wake. Absent: everyone is onstage. */
-    readonly stage?: Pick<Stage, "isOnstage" | "onstage">;
+    /**
+     * Only characters their own model plays have a wake: none offstage or while
+     * a person plays them. Absent: everyone is simulated.
+     */
+    readonly stage?: Pick<Stage, "isSimulated" | "simulated">;
   },
 ): TaskmanService {
   const getConfig = () => currentConfig(api);
@@ -169,9 +177,12 @@ export function registerTaskman(
     const sync = (wakes.syncs.get(agentId) ?? 0) + 1;
     wakes.syncs.set(agentId, sync);
     const task = await store.lookup(agentId);
-    const onstage = !deps.stage || (await deps.stage.isOnstage(agentId));
+    const simulated = !deps.stage || (await deps.stage.isSimulated(agentId));
     if (wakes.syncs.get(agentId) !== sync) return;
-    schedule.set(agentId, task && onstage ? Date.parse(task.endAt) : undefined);
+    schedule.set(
+      agentId,
+      task && simulated ? Date.parse(task.endAt) : undefined,
+    );
   };
 
   // A clock edit (play, pause, a jump) moves every end in wall-clock time;
@@ -388,6 +399,45 @@ export function registerTaskman(
     },
     async reschedule(agentId) {
       await synchronize(agentId);
+    },
+    async end(agentId, at) {
+      const task = await store.lookup(agentId);
+      if (!task || Date.parse(task.endAt) <= at) return;
+      const ended: ActiveTask = {
+        ...task,
+        endAt: new Date(at).toISOString(),
+        duration: Math.max(0, (at - Date.parse(task.startedAt)) / 60_000),
+      };
+      const payload = {
+        taskId: task.id,
+        type: task.type,
+        description: task.description,
+      };
+      await appendLedgerEntry(api, {
+        agentId,
+        stream: "tasks",
+        text: text(
+          "kazusa-results#task-stopped",
+          { type: task.type, description: task.description },
+          { agentId },
+        ),
+        timestamp: at,
+        metadata: { kind: "task.stopped", payload },
+      });
+      // The row first: if it can't be written, the activity stands, and the
+      // next try stops it with its row.
+      await store.register(agentId, ended);
+      await synchronize(agentId);
+      notifyTaskChange(agentId, ended);
+      deps.broadcaster?.broadcast({
+        type: "journal",
+        event: withJournalSeq({
+          simTime: at,
+          kind: "task.stopped",
+          actors: [agentId],
+          payload,
+        }),
+      });
     },
     wakeWith(wake) {
       wakes.handlers.push(wake);
