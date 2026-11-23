@@ -28,6 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import {
+  allowNewBundledPlugins,
   allowNewCharacterTools,
   denyImpliedTools,
   loadNewPlugins,
@@ -336,6 +337,7 @@ if (!stopping) {
   }
   try {
     for (const line of loadNewPlugins(ROOT)) console.log(line);
+    for (const line of allowNewBundledPlugins(ROOT)) console.log(line);
   } catch (error) {
     console.warn(`Couldn't add new plugins to this world: ${error.message}`);
   }
