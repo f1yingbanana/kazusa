@@ -139,8 +139,12 @@ async function forward(request: Request, context: Context): Promise<Response> {
         request,
       );
     } catch {
-      // Not a 200, or no answer: asked again below, so the reader gets the
-      // Gateway's own refusal, and nothing of it is kept.
+      // No answer at all: one try is shared by everyone asking, so a
+      // struggling Gateway isn't asked again per reader.
+      return Response.json(
+        { error: "Could not reach the Kazusa Gateway." },
+        { status: 502 },
+      );
     }
   }
   try {

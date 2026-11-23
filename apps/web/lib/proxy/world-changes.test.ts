@@ -41,4 +41,22 @@ describe("world changes", () => {
     // The name split across chunks was still read; the greeting wasn't counted.
     expect([liveChanges(), slowChanges()]).toEqual([2, 1]);
   });
+
+  it("reads lines however SSE ends them: CRLF, LF or a lone CR", async () => {
+    const encoder = new TextEncoder();
+    const text = "event: a\r\ndata: 1\r\n\r\nevent: b\rdata: 2\r\revent: c\r";
+    // Split so a CRLF straddles two chunks.
+    const passed = watchEvents(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(text.slice(0, 9)));
+          controller.enqueue(encoder.encode(text.slice(9)));
+          controller.enqueue(encoder.encode("\n"));
+          controller.close();
+        },
+      }),
+    );
+    expect(await new Response(passed).text()).toBe(`${text}\n`);
+    expect(liveChanges()).toBe(3);
+  });
 });

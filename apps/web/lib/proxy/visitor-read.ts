@@ -11,8 +11,11 @@ import { cacheLife } from "next/cache";
  *
  * An answer is kept under the count of changes it was read at
  * (`world-changes.ts`), so nothing read before a change is handed out after it.
- * The lifetimes below only bound what no event announces. Only a 200 is kept:
- * anything else throws, and the caller asks the Gateway directly.
+ * The lifetimes below only bound what no event announces. A refusal is an
+ * answer too, kept no longer than live data, so a crowd asking a failing
+ * Gateway is still one read a second. No answer at all (a timeout, a refused
+ * connection) throws, and the reader gets a 502: never a second try per reader
+ * at a Gateway already struggling.
  *
  * Never for an owner: theirs differ, and they must see what they just did. Each
  * function asks as a visitor whatever its caller is.
@@ -20,6 +23,8 @@ import { cacheLife } from "next/cache";
 
 /** A whole answer: what to send, and what tells a browser it already has it. */
 export interface Kept {
+  /** The Gateway's own: 200, or its refusal, passed on as it is. */
+  readonly status: number;
   readonly contentType: string;
   readonly body: string;
   readonly etag: string;
@@ -42,10 +47,9 @@ async function ask(path: string, changes: number): Promise<Kept> {
     cache: "no-store",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (response.status !== 200)
-    throw new Error(`The Gateway answered ${response.status}.`);
   const body = await response.text();
   return {
+    status: response.status,
     contentType: response.headers.get("content-type") ?? "application/json",
     body,
     etag: `"${createHash("sha1").update(body).digest("base64url")}"`,
@@ -59,9 +63,11 @@ async function ask(path: string, changes: number): Promise<Kept> {
  */
 export async function readLive(path: string, changes: number): Promise<Kept> {
   "use cache";
-  cacheLife({ revalidate: 1, expire: 2 });
+  cacheLife(LIVE);
   return ask(path, changes);
 }
+
+const LIVE = { revalidate: 1, expire: 2 };
 
 /**
  * What only an edit changes: the map, pages, the cast's names and looks. Ended
@@ -69,13 +75,29 @@ export async function readLive(path: string, changes: number): Promise<Kept> {
  */
 export async function readSlow(path: string, changes: number): Promise<Kept> {
   "use cache";
-  cacheLife({ revalidate: 30, expire: 60 });
-  return ask(path, changes);
+  const kept = await ask(path, changes);
+  // A refusal is kept no longer than live data.
+  cacheLife(kept.status === 200 ? { revalidate: 30, expire: 60 } : LIVE);
+  return kept;
+}
+
+/**
+ * Whether a browser's `If-None-Match` names this answer: `*`, or the tag in its
+ * strong or weak form (RFC 9110 §13.1.2 compares weakly). Our tags are
+ * base64url, so no comma can split one.
+ */
+function alreadyHas(known: string | null, etag: string): boolean {
+  if (!known) return false;
+  return known
+    .split(",")
+    .map((tag) => tag.trim())
+    .some((tag) => tag === "*" || tag.replace(/^W\//, "") === etag);
 }
 
 /**
  * Sends a kept answer to one reader: whole, or nothing when their browser still
- * has it. The body goes out as it is, for Next to compress.
+ * has it; a refusal as the Gateway gave it. The body goes out as it is, for
+ * Next to compress.
  */
 export function respond(kept: Kept, request: Request): Response {
   const headers = new Headers({
@@ -85,10 +107,11 @@ export function respond(kept: Kept, request: Request): Response {
     "Cache-Control": "no-cache",
     // Who is signed in decides what the same address answers.
     Vary: "Cookie",
-    ETag: kept.etag,
   });
-  const known = request.headers.get("if-none-match");
-  if (known?.split(",").some((tag) => tag.trim() === kept.etag))
+  if (kept.status !== 200)
+    return new Response(kept.body, { status: kept.status, headers });
+  headers.set("ETag", kept.etag);
+  if (alreadyHas(request.headers.get("if-none-match"), kept.etag))
     return new Response(null, { status: 304, headers });
   return new Response(kept.body, { status: 200, headers });
 }

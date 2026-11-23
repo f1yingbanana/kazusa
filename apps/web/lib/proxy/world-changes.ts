@@ -38,7 +38,8 @@ export function slowChanges(): number {
 
 /**
  * Passes an event stream through untouched while counting each event. A name
- * split across chunks is still read.
+ * split across chunks is still read, and lines may end as SSE allows: CRLF, LF
+ * or a lone CR.
  */
 export function watchEvents(
   stream: ReadableStream<Uint8Array>,
@@ -50,7 +51,7 @@ export function watchEvents(
       transform(chunk, controller) {
         controller.enqueue(chunk);
         const lines = (tail + decoder.decode(chunk, { stream: true })).split(
-          "\n",
+          /\r\n|\r|\n/,
         );
         tail = lines.pop() ?? "";
         for (const line of lines)

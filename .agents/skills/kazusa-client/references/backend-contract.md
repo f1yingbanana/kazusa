@@ -96,8 +96,9 @@ event asks under a later count than anything read before it. Tags can't do this:
 neither throws nor invalidates. `cacheLife` only bounds what no event announces:
 `readLive` a second (two at most), `readSlow` (the map, wiki pages, the cast:
 its count moves on `places`/`world` and on writes) half a minute (one at most).
-Only a 200 is kept; anything else throws and the route asks the Gateway
-directly, so the reader gets its own refusal.
+A refusal is passed on as the Gateway gave it and kept no longer than live data;
+no answer at all (a timeout, a dropped connection) is a 502, never a second try
+per reader.
 
 Answers carry an `ETag` and `Cache-Control: no-cache`, so an unchanged refetch
 is a 304. Bodies go out uncompressed for Next to compress (one compressed ahead

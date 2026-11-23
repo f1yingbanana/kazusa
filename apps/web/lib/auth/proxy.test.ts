@@ -151,6 +151,16 @@ describe("Kazusa browser proxy", () => {
     });
     expect(again.status).toBe(304);
     expect(await again.text()).toBe("");
+    // Compared weakly, as RFC 9110 has it, and `*` names any answer.
+    for (const known of [`W/${etag}`, `"other", ${etag}`, "*"])
+      expect(
+        (await call("characters?limit=5", "GET", { "If-None-Match": known }))
+          .status,
+      ).toBe(304);
+    expect(
+      (await call("characters?limit=5", "GET", { "If-None-Match": '"other"' }))
+        .status,
+    ).toBe(200);
 
     // An event on anyone's stream: what is read next is read anew. Someone
     // talking isn't an edit to the map; a write through here is.
@@ -168,7 +178,7 @@ describe("Kazusa browser proxy", () => {
     expect(vi.mocked(readSlow).mock.calls.at(-1)).toEqual(["places", 0]);
   });
 
-  it("keeps nothing but a 200, and passes the Gateway's refusal on", async () => {
+  it("passes the Gateway's refusal on, and never asks it twice", async () => {
     upstream.mockImplementation(
       async () =>
         new Response('{"error":"No chat called x."}', {
@@ -180,6 +190,14 @@ describe("Kazusa browser proxy", () => {
     expect(refused.status).toBe(400);
     expect(await refused.json()).toEqual({ error: "No chat called x." });
     expect(refused.headers.has("etag")).toBe(false);
+    expect(upstream).toHaveBeenCalledTimes(1);
+
+    // No answer at all: a 502, after one try, not a second per reader.
+    upstream.mockReset();
+    upstream.mockRejectedValue(new Error("connect ECONNREFUSED"));
+    const unreachable = await call("timeline?limit=5");
+    expect(unreachable.status).toBe(502);
+    expect(upstream).toHaveBeenCalledTimes(1);
   });
 
   it("never holds the world's clock, a stream or a picture", async () => {
