@@ -1,3 +1,4 @@
+import { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -912,7 +913,13 @@ describe("send_message SDK integration", () => {
   });
 
   it("makes a visitor an observer of every chat but a person's", async () => {
-    const h = await setup({}, { observer: true });
+    // A real broadcaster: messaging forwards other people's chats through it
+    // as `observed` events, which must not carry a person's chat either.
+    const broadcaster = new KazusaRealtimeBroadcaster();
+    const h = await setup(
+      { user: { id: "user:sensei", name: "Sensei" } },
+      { observer: true, broadcaster },
+    );
     const visitor = {
       authorization: "Bearer test-service-token",
       "x-kazusa-role": "visitor",
@@ -961,6 +968,22 @@ describe("send_message SDK integration", () => {
       members: ["bob"],
       text: "as carol",
     });
+    // A group a person left: what is said there after is theirs too, though
+    // its audience no longer names them.
+    const left = await h.messaging.send("user:sensei", "Sensei", {
+      requestId: "group",
+      members: ["alice", "bob"],
+      text: "hello both",
+    });
+    await h.messaging.manageChat("user:sensei", {
+      sessionKey: left.sessionKey,
+      action: "leave",
+    });
+    await h.messaging.send("alice", "Alice", {
+      requestId: "after-they-left",
+      sessionKey: `chat:${left.chatId}`,
+      text: "said after they left",
+    });
     stream.emit("close");
 
     async function get(routePath: string, url = routePath) {
@@ -1006,9 +1029,13 @@ describe("send_message SDK integration", () => {
           (await get(route, `${route}?chatId=${played.chatId}`)).body,
         ).messages.map((message) => message.text),
       ).toEqual(["as carol"]);
-      const refused = await get(route, `${route}?chatId=${persons.chatId}`);
-      expect(refused.status).toBe(400);
-      expect(JSON.stringify(refused.body)).not.toContain("for her eyes only");
+      for (const chatId of [persons.chatId, left.chatId]) {
+        const refused = await get(route, `${route}?chatId=${chatId}`);
+        expect(refused.status).toBe(400);
+        expect(JSON.stringify(refused.body)).not.toMatch(
+          /for her eyes only|said after they left/,
+        );
+      }
     }
 
     // Live, the played character's chat arrives as anyone's does, and nothing
@@ -1017,7 +1044,9 @@ describe("send_message SDK integration", () => {
     expect(sent).toContain("event: observed");
     expect(sent).toContain("as carol");
     expect(sent).not.toContain("event: message\n");
-    expect(sent).not.toContain("for her eyes only");
+    expect(sent).not.toMatch(
+      /for her eyes only|hello both|said after they left/,
+    );
   });
 
   it("keeps an event stream open through backpressure", async () => {

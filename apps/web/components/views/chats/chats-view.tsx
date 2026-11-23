@@ -56,6 +56,7 @@ export function ChatsView() {
     "chats.id": chatsParsers["chats.id"],
     "chats.dm": chatsParsers["chats.dm"],
     "chats.talk": chatsParsers["chats.talk"],
+    "chats.member": chatsParsers["chats.member"],
     sel: entityRefParser,
   });
   const chatId = queryState["chats.id"];
@@ -212,8 +213,9 @@ export function ChatsView() {
   // Arriving to watch with nothing picked: open where something is happening,
   // once, so the stage isn't an empty "pick a conversation". On a narrow screen
   // the list is the first screen, and in a quiet world it waits for the first
-  // conversation.
+  // conversation. A link narrowed to one character opens one of theirs.
   const everyone = useObservedChats();
+  const member = queryState["chats.member"];
   const arrived = useRef(false);
   useEffect(() => {
     if (arrived.current) return;
@@ -228,7 +230,12 @@ export function ChatsView() {
         (id) => (typingByChat[id]?.length ?? 0) > 0,
       ),
     );
-    const pick = liveliestChat(everyone.chats, composingIn);
+    const pick = liveliestChat(
+      member
+        ? everyone.chats.filter((chat) => chat.members.includes(member))
+        : everyone.chats,
+      composingIn,
+    );
     if (!pick) return;
     arrived.current = true;
     void setParams({ "chats.id": pick.id }, { history: "replace" });
@@ -239,6 +246,7 @@ export function ChatsView() {
     watching,
     docked,
     everyone.chats,
+    member,
     setParams,
   ]);
 

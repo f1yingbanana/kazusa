@@ -45,6 +45,27 @@ describe("openDecisionDatabase", () => {
     expect(ids(store.window({ limit: 10, actors: ["bob"] }))).toEqual(["b"]);
     expect(store.window({ limit: 10, actors: [] })).toEqual([]);
   });
+
+  it("leaves out decisions about some chats before cutting the window", () => {
+    const store = openDecisionDatabase({ path: ":memory:" });
+    store.record("alice", decision(100, "a"));
+    store.record("alice", {
+      ...decision(200),
+      lines: [line("b", "group:theirs")],
+    });
+    store.record("alice", {
+      ...decision(300),
+      lines: [line("c", "group:other"), line("c2", "direct:console")],
+    });
+    store.record("alice", { ...decision(400), tunedOut: "direct:console" });
+    store.record("alice", decision(500, "e"));
+    const without = { withoutChats: ["direct:console", "group:theirs"] };
+    // A line in one, or one tuned out of, leaves the decision out; the page
+    // still fills from what is older.
+    expect(ids(store.window({ limit: 2, ...without }))).toEqual(["e", "a"]);
+    expect(store.window({ limit: 10, ...without })).toHaveLength(2);
+    expect(store.window({ limit: 10, withoutChats: [] })).toHaveLength(5);
+  });
 });
 
 describe("decisionEvent", () => {

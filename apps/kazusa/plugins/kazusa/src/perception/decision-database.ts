@@ -19,6 +19,8 @@ export interface DecisionWindow {
   readonly limit: number;
   /** Only these characters' decisions. */
   readonly actors?: readonly string[];
+  /** None about these chats: a line in one, or one tuned out of. */
+  readonly withoutChats?: readonly string[];
 }
 
 /**
@@ -143,16 +145,28 @@ function createStore({ path: file }: DecisionDatabaseOptions): DecisionStore {
     after,
     limit,
     actors,
+    withoutChats,
   }: DecisionWindow): RecordedDecision[] {
     const where = [
       before === undefined ? "" : "AND sim_time < :before",
       after === undefined ? "" : "AND sim_time > :after",
       actors ? "AND agent_id IN (SELECT value FROM json_each(:actors))" : "",
+      withoutChats?.length
+        ? `AND NOT EXISTS (
+             SELECT 1 FROM json_each(record, '$.lines') AS line
+             WHERE json_extract(line.value, '$.chatId')
+               IN (SELECT value FROM json_each(:withoutChats)))
+           AND coalesce(json_extract(record, '$.tunedOut'), '')
+             NOT IN (SELECT value FROM json_each(:withoutChats))`
+        : "",
     ].join(" ");
     const params = {
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
       ...(actors ? { actors: JSON.stringify(actors) } : {}),
+      ...(withoutChats?.length
+        ? { withoutChats: JSON.stringify(withoutChats) }
+        : {}),
     };
     const edge = db
       .prepare(

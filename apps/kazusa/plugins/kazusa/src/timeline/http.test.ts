@@ -114,6 +114,7 @@ describe("registerTimelineHttp", () => {
     const windows: unknown[] = [];
     registerTimelineHttp(api, {
       clock,
+      personsChats: async () => ["direct:abc"],
       messages: async (window) => {
         windows.push(window);
         return [
@@ -250,8 +251,8 @@ describe("registerTimelineHttp", () => {
       res,
     );
     expect(resStatus).toBe(200);
-    expect(windows.at(-1)).toMatchObject({ without: ["user:sensei"] });
-    expect(windows[0]).not.toHaveProperty("without");
+    expect(windows.at(-1)).toMatchObject({ withoutChats: ["direct:abc"] });
+    expect(windows[0]).not.toHaveProperty("withoutChats");
     expect(
       (
         JSON.parse(resJson ?? "{}") as { events: { kind: string }[] }
