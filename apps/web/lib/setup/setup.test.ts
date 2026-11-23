@@ -353,6 +353,20 @@ describe("setup", () => {
     expect((await setup.status()).configured).toBe(true);
   });
 
+  it("puts whoever is picked to play onstage, played from the first start", async () => {
+    await createSetupHere(app, folderCatalog(app)).apply({
+      world: "cast-world",
+      cast: ["ann"],
+      play: "bo",
+    });
+    const kazusa = config().plugins.entries.kazusa.config;
+    expect(kazusa.stage).toEqual({
+      defaultOnstage: false,
+      cast: ["admin", "ann", "bo"],
+    });
+    expect(kazusa.user).toMatchObject({ defaultCharacter: "bo" });
+  });
+
   it("leaves a world without a cast running with everyone onstage", async () => {
     await createSetupHere(app).apply({ world: "starter", cast: [] });
     const kazusa = config().plugins.entries.kazusa.config;

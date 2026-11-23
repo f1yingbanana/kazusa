@@ -2,7 +2,16 @@ import { createHandBack } from "./stage/hand-back.ts";
 import { inBackground, rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
 import { currentConfig } from "./current-config.ts";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
+import { runMigrations, type MigrationRecord } from "./migrations/index.ts";
+import { playAsMigration } from "./migrations/0082-play-as.ts";
+import { systemAgentOf, worldWikiDir } from "./characters/card.ts";
+import { cachedStore } from "./state.ts";
+import type { StatRecord } from "@kazusa/client";
+import type { LocationRecord } from "./location/location.ts";
+import type { FamiliarityRecord } from "./memory/familiarity.ts";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
@@ -434,6 +443,82 @@ export default definePluginEntry({
           );
       },
       warn: (message) => api.logger.warn(message),
+    });
+    // The world's first start: who the setup guide picked to play, once. Any
+    // later start leaves who is played (nobody included) as it was.
+    api.on("gateway_start", () => {
+      const first = player.operator.defaultCharacter;
+      if (!first) return;
+      void (async () => {
+        if (!(await stage.untouched())) return;
+        await play(player.operator.id, first);
+      })().catch((error: unknown) => {
+        api.logger.warn(`Couldn't start as ${first}: ${String(error)}`);
+      });
+    });
+    // What this world's data needs from earlier releases, once each, in order
+    // (`migrations/`, one file per pull request).
+    api.on("gateway_start", () => {
+      const config = getConfig();
+      const console = systemAgentOf(config);
+      void runMigrations(
+        [
+          playAsMigration({
+            operator: player.operator,
+            worldWiki: worldWikiDir(api),
+            // Every workspace on disk, in the cast or not yet.
+            ownWikis: () => {
+              const homes = new Set(
+                listAgentIds(getConfig()).map((id) =>
+                  path.dirname(
+                    api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), id),
+                  ),
+                ),
+              );
+              return [...homes].flatMap((home) =>
+                readdirSync(home, { withFileTypes: true })
+                  .filter((entry) => entry.isDirectory())
+                  .map((entry) => path.join(home, entry.name, "wiki")),
+              );
+            },
+            isAgent: (id) => listAgentIds(getConfig()).includes(id),
+            stats: api.runtime.state.openKeyedStore<StatRecord>({
+              namespace: "stats",
+              retention: "retained",
+            }),
+            locations: cachedStore(
+              "location",
+              api.runtime.state.openKeyedStore<LocationRecord>({
+                namespace: "location",
+                retention: "retained",
+              }),
+            ),
+            familiarity: cachedStore(
+              "familiarity",
+              api.runtime.state.openKeyedStore<FamiliarityRecord>({
+                namespace: "familiarity",
+                retention: "retained",
+              }),
+            ),
+            oldChats: async () =>
+              (await messaging.listChats(player.operator.id)).filter(
+                (chat) =>
+                  !(
+                    chat.members.length === 2 &&
+                    console &&
+                    chat.members.includes(console)
+                  ),
+              ).length,
+            playing: () => stage.playing(player.operator.id),
+            play: (id) => play(player.operator.id, id),
+          }),
+        ],
+        api.runtime.state.openKeyedStore<MigrationRecord>({
+          namespace: "migrations",
+          retention: "retained",
+        }),
+        api.logger,
+      );
     });
     registerCharactersHttp(api, {
       taskman,

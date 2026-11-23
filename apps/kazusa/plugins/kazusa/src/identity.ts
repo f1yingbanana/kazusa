@@ -15,6 +15,11 @@ import { readCharacterCard, worldWikiDir } from "./characters/card.ts";
 const OPERATOR = z.object({
   id: z.string().regex(/^user:[a-z0-9][a-z0-9_-]*$/),
   name: z.string().trim().min(1),
+  /**
+   * Who they play when the world first starts (the setup guide's pick, from the
+   * template's `defaultUserCharacter`); absent, nobody.
+   */
+  defaultCharacter: z.string().min(1).optional(),
 });
 
 export type Operator = z.infer<typeof OPERATOR>;

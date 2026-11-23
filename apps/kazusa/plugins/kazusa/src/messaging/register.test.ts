@@ -853,7 +853,8 @@ describe("send_message SDK integration", () => {
       members: ["bob"],
       text: "between us",
     });
-    await h.messaging.send("user:sensei", "Sensei", {
+    // From before the person played characters: read-only history now.
+    const older = await h.messaging.send("user:sensei", "Sensei", {
       requestId: "player",
       members: ["alice"],
       text: "hello",
@@ -885,6 +886,10 @@ describe("send_message SDK integration", () => {
     );
     expect(parsedChats.chats).toEqual([
       expect.objectContaining({
+        id: older.chatId,
+        members: ["alice", "user:sensei"],
+      }),
+      expect.objectContaining({
         id: theirs.chatId,
         type: "direct",
         name: "",
@@ -895,7 +900,7 @@ describe("send_message SDK integration", () => {
         }),
       }),
     ]);
-    expect(parsedChats.chats[0]).not.toHaveProperty("sessionKey");
+    expect(parsedChats.chats[1]).not.toHaveProperty("sessionKey");
     expect(
       MessagesResponseSchema.parse(
         await get(

@@ -263,9 +263,12 @@ apps/kazusa/
   slug, `displayName`, semver `version` raised with each release, `author`,
   `homepage`, `repository`, `private: true`) with Kazusa's under `kazusa`:
   `title` (the setup guide's label, else `displayName`), `systemAgent`,
-  `defaultGroup`, `renames`, and `config` (merged into the plugin's config at
-  setup). Schema: `WorldPackageSchema` in `@kazusa/client`; the plugin reads it
-  in `src/world/package.ts` (the credit on `GET /kazusa/world`). Field rules:
+  `defaultGroup`, `defaultUserCharacter` (who the setup guide picks for the
+  person to play; saved as `config.user.defaultCharacter`, played on the world's
+  first start), `renames`, and `config` (merged into the plugin's config at
+  setup; it must name the operator, `config.user`, which has no default).
+  Schema: `WorldPackageSchema` in `@kazusa/client`; the plugin reads it in
+  `src/world/package.ts` (the credit on `GET /kazusa/world`). Field rules:
   [worlds](references/worlds.md). The setup guide
   (`apps/web/lib/setup/setup.ts`) clones the picked world's newest release into
   the git-ignored `world/` (`scripts/world.mjs clone`, over `src/world/repo.ts`;
@@ -1381,6 +1384,21 @@ connect these modules in process.
   (`kazusa-deliveries#operator-playing` / `#operator-watching`).
 
 ## 4. Engineering & Zero-Build Conventions
+
+### Migrations (`src/migrations/`)
+
+A change to a world's existing data that a release needs runs once per world
+when the Gateway starts (`runMigrations`, the `"migrations"` store records each
+that finished; one that fails is logged and tried again next start, and the ones
+after it wait). One file per pull request, named for it: `0082-play-as.ts` is
+#82. Migrate what can be moved safely; history that would mean rewriting the
+message database or OpenClaw's session ledgers is left as read-only history
+rather than re-keyed. `0082-play-as` moves `user:<x>` (the operator) onto the
+character `<x>` whose World Wiki page was theirs: wiki `peer_id` lines and
+`[[user:<x>]]` links in every workspace, states held toward them, their map
+position, familiarity, and the person plays `<x>` when the world was played the
+old way. Their old chats with characters stay readable among other people's
+(`/kazusa/observe/chats`), not as their own.
 
 ### Browser authentication and permissions
 

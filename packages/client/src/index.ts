@@ -414,6 +414,11 @@ export const WorldPackageSchema = z.looseObject({
      * `groups`.
      */
     defaultGroup: z.string().optional(),
+    /**
+     * The character the setup guide picks for the person to play (they can pick
+     * another, or nobody). Saved as `config.user.defaultCharacter`.
+     */
+    defaultUserCharacter: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
     /** Merged into the plugin's config when the world is set up. */

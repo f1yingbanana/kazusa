@@ -73,6 +73,8 @@ export interface Stage {
   playingNow(person: string): string | undefined;
   /** Whether a person plays them now. */
   isPlayed(id: string): Promise<boolean>;
+  /** Nobody has come on, gone off or been played yet: a world's first start. */
+  untouched(): Promise<boolean>;
   lookup(id: string): Promise<StageRecord | undefined>;
 }
 
@@ -139,6 +141,7 @@ export function createStage(
     isSimulated,
     playingNow: (person) => index.byPerson?.get(person),
     isPlayed: async (id) => Boolean((await store.lookup(id))?.playedBy),
+    untouched: async () => (await store.entries()).length === 0,
     async presentAt(id, at) {
       const record = await store.lookup(id);
       if (!record) return startsOnstage(id);

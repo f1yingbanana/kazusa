@@ -153,6 +153,16 @@ export function registerMessagingHttp(
     const members = await messaging.membersOf(chatId);
     return (await player.actorIn(members))?.id ?? operator.id;
   };
+  /** The operator's console: them and the system agent, alone. */
+  const isConsole = (members: readonly string[]): boolean => {
+    const console = systemAgent();
+    return (
+      members.length === 2 &&
+      members.includes(operator.id) &&
+      console !== undefined &&
+      members.includes(console)
+    );
+  };
   /** The people whose chats the person sees as their own, given who they play. */
   const viewersOf = (playing: Actor | undefined): string[] =>
     playing ? [operator.id, playing.id] : [operator.id];
@@ -169,9 +179,12 @@ export function registerMessagingHttp(
       ),
     );
     // A chat both of them are in is listed once, from the operator's side, as
-    // `viewerOf` reads it.
+    // `viewerOf` reads it. The operator's own are only their console: a chat
+    // with characters from before they played characters is read-only history,
+    // with everyone else's.
     const seen = new Set<string>();
     const once = listed.flat().filter(({ summary, viewer }) => {
+      if (viewer === operator.id && !isConsole(summary.members)) return false;
       const id = conversationId(viewer, summary.sessionKey);
       if (seen.has(id)) return false;
       seen.add(id);
@@ -221,9 +234,12 @@ export function registerMessagingHttp(
   });
   if (options?.observer) {
     route("observe/chats", "GET", async (_req, res) => {
-      const chats = await messaging.observeChats(
-        viewersOf(await player.playing()),
-      );
+      // Not the played character's, and not the console; the operator's older
+      // chats with characters are read here.
+      const playing = await player.playing();
+      const chats = (
+        await messaging.observeChats(playing ? [playing.id] : [])
+      ).filter(({ chat }) => !isConsole(chat.members));
       sendJson(res, 200, {
         chats: chats.map(observedChat),
       } satisfies ObservedChatsResponse);

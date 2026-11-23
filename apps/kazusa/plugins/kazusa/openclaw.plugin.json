@@ -523,6 +523,11 @@
             "type": "string",
             "minLength": 1,
             "description": "What the system agent calls them."
+          },
+          "defaultCharacter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The character they play when the world first starts; absent, nobody."
           }
         }
       },

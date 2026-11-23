@@ -37,6 +37,13 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import type { SetupStatus, WorldOption } from "@/lib/setup/setup";
 import { useSetupDownload } from "@/hooks/use-setup-download";
@@ -302,6 +309,48 @@ function Starting({
   );
 }
 
+/** The Play as choice for nobody: no character id starts with a colon. */
+const OBSERVER = ":observer";
+
+/** Who the person plays from the start: one of the cast, or nobody. */
+function PlayAsPicker({
+  world,
+  value,
+  onChange,
+}: {
+  world: WorldOption;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const options = [
+    { value: OBSERVER, label: "Nobody: just watch" },
+    ...world.characters.map(({ id, name }) => ({ value: id, label: name })),
+  ];
+  return (
+    <Field>
+      <FieldLabel htmlFor="setup-play-as" className="sr-only">
+        Play as
+      </FieldLabel>
+      <Select
+        items={options}
+        value={value}
+        onValueChange={(next) => next && onChange(next)}
+      >
+        <SelectTrigger id="setup-play-as" className="w-full sm:w-72">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
 /**
  * The first thing a new player sees. It only ever asks what's still missing, so
  * reloading or restarting partway is harmless (`lib/setup/setup.ts`).
@@ -309,6 +358,7 @@ function Starting({
 export function SetupGuide({ status }: { status: SetupStatus }) {
   const [worldId, setWorldId] = useState<string | null>(null);
   const [cast, setCast] = useState<ReadonlySet<string>>(new Set());
+  const [playAs, setPlayAs] = useState(OBSERVER);
   const [now] = useState(() => new Date());
   const [date, setDate] = useState(now);
   const [time, setTime] = useState(() => format(now, "HH:mm"));
@@ -336,7 +386,9 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
         required: true,
         choices: worlds.map(({ id }) => ({ value: id })),
       },
-      ...(pickingCast ? [{ name: "cast" }, { name: "time" }] : []),
+      ...(pickingCast
+        ? [{ name: "cast" }, { name: "play" }, { name: "time" }]
+        : []),
       {
         name: "keys",
         ...(status.savedKey
@@ -351,6 +403,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
     if (downloading) return;
     setWorldId(option.id);
     setCast(new Set(option.defaultCast));
+    setPlayAs(option.defaultUserCharacter ?? OBSERVER);
     setWorldError(null);
     if (option.downloaded) return;
     setDownloading(true);
@@ -370,6 +423,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
         ),
       );
       setCast(new Set(downloaded.defaultCast));
+      setPlayAs(downloaded.defaultUserCharacter ?? OBSERVER);
     } else
       setWorldError(
         body?.error ?? `Couldn't download ${option.title}. Check the terminal.`,
@@ -399,6 +453,7 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
       body: JSON.stringify({
         world: world.id,
         cast: [...cast],
+        ...(pickingCast && playAs !== OBSERVER ? { play: playAs } : {}),
         ...(pickingCast
           ? { startAt: `${format(date, "yyyy-MM-dd")}T${time}` }
           : {}),
@@ -480,6 +535,21 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                     later.
                   </QuestionnaireDescription>
                   <CastPicker world={world} cast={cast} onChange={setCast} />
+                </QuestionnaireItem>
+              ) : null}
+
+              {world && pickingCast ? (
+                <QuestionnaireItem name="play">
+                  <QuestionnaireTitle>Who do you play?</QuestionnaireTitle>
+                  <QuestionnaireDescription>
+                    You talk and act as them; they stay onstage. You can switch
+                    to anyone, or just watch, from the bottom bar.
+                  </QuestionnaireDescription>
+                  <PlayAsPicker
+                    world={world}
+                    value={playAs}
+                    onChange={setPlayAs}
+                  />
                 </QuestionnaireItem>
               ) : null}
 
