@@ -33,12 +33,9 @@ export function operatorOf(api: OpenClawPluginApi): Operator {
   return parsed.data;
 }
 
-/** What every person outside the world's id starts with. */
-export const USER_PREFIX = "user:";
-
 /** Whether an id is a person outside the world (`user:`), not a character. */
 export function isUser(id: string): boolean {
-  return id.startsWith(USER_PREFIX);
+  return id.startsWith("user:");
 }
 
 /**

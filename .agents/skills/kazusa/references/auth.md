@@ -48,16 +48,14 @@ they are an observer, whoever the operator plays. Who "you" are is the
 operator's, so every route that answers it reads the role: `world` and `chats`
 give `player: null` and no chats of their own, `observe/chats` lists the played
 character's chats with everyone else's, and both history routes read any chat as
-an observer does. A chat a person outside the world (`user:<id>`: the operator's
-console with the system agent, or an older chat of theirs) is in or ever took
-part in is never shown to a watcher, also what is said there after they left,
-whose audience no longer names them: one answer, `Messaging.isPersonsChat`
-(current members, or anyone `user:` who ever sent or received there). Not
-listed, its history refused, its messages and the attention decisions about it
-left out of the timeline's windows themselves (`withoutChats`, from
-`personsChats()`, so a page still fills), and out of the event stream,
-`journal`, `observed` and `player` events included. Add a route or event that
-carries chat text or the player's identity and it must do the same.
+an observer does. A chat a person outside the world is or was in (`user:<id>`:
+the operator's console with the system agent, or a chat with characters from
+before #82, kept as history) is never shown to a watcher: not listed, its
+history refused (its members and everyone it reached), its messages and the
+attention decisions about its lines left out of the timeline's windows
+themselves (`without`, so a page still fills), and kept out of the event stream,
+`journal` and `player` events included. Add a route or event that carries chat
+text or the player's identity and it must do the same.
 
 - `trusted-proxy`: the cloud wrapper authenticates the user, checks membership
   for the destination world, overwrites identity headers, and passes a

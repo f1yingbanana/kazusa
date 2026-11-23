@@ -1,4 +1,4 @@
-import { isUser, USER_PREFIX } from "../identity.ts";
+import { isUser } from "../identity.ts";
 import { inBackground } from "../background.ts";
 import { bundledSkillText, type SkillText } from "../skill-text.ts";
 import type {
@@ -945,26 +945,10 @@ export class Messaging {
     return this.chats.get(chatId)?.members ?? [];
   }
 
-  /**
-   * Whether a person outside the world (`user:`) is in the chat or ever took
-   * part in it: everything in it is theirs, also what is said after they left.
-   * Synchronous for a stream's filter; the chat list is right once start-up has
-   * read it.
-   */
-  isPersonsChat(chatId: string): boolean {
-    return (
-      (this.chats.get(chatId)?.members ?? []).some(isUser) ||
-      this.deps.store.reachedBy(chatId, USER_PREFIX)
-    );
-  }
-
-  /** Every chat a person outside the world is in or ever took part in. */
-  async personsChats(): Promise<string[]> {
+  /** Everyone a chat's messages ever reached, its past members included. */
+  async audienceOf(chatId: string): Promise<readonly string[]> {
     await this.ready();
-    const chats = new Set(this.deps.store.chatsReachedBy(USER_PREFIX));
-    for (const chat of this.chats.values())
-      if (chat.members.some(isUser)) chats.add(chat.id);
-    return [...chats];
+    return this.deps.store.audienceOf(chatId);
   }
 
   /**

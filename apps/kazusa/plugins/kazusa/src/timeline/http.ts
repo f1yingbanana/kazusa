@@ -25,7 +25,7 @@ import {
   sendJson,
   watchesOnly,
 } from "../http/helpers.ts";
-import { involvesUser } from "../identity.ts";
+import { involvesUser, operatorOf } from "../identity.ts";
 import {
   journalKey,
   ledgerJournal,
@@ -54,8 +54,6 @@ export function registerTimelineHttp(
     readonly decisions?: (
       window: DecisionWindow,
     ) => Promise<readonly RecordedDecision[]>;
-    /** Every chat a person outside the world is in or ever took part in. */
-    readonly personsChats?: () => Promise<readonly string[]>;
     /** Messages in a sim-time window, newest first (`MessageStore.log`). */
     readonly messages?: (
       window: LogWindow,
@@ -183,11 +181,9 @@ export function registerTimelineHttp(
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
       ...(actorsFilter ? { actors: targetAgents } : {}),
-      // Left out of the windows themselves, so they can't crowd a page out:
-      // every message and decision in a chat a person took part in.
-      ...(watching
-        ? { withoutChats: [...((await deps.personsChats?.()) ?? [])] }
-        : {}),
+      // Left out of the windows themselves (messages and decisions), so they
+      // can't crowd a page out.
+      ...(watching ? { without: [operatorOf(api).id] } : {}),
     };
 
     if (wantsMessages) {

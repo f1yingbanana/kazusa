@@ -47,8 +47,8 @@ export interface LogWindow {
   readonly limit: number;
   /** Only messages one of these sent or received. */
   readonly actors?: readonly string[];
-  /** No message in these chats. */
-  readonly withoutChats?: readonly string[];
+  /** No message one of these sent or received. */
+  readonly without?: readonly string[];
 }
 
 /**
@@ -99,13 +99,6 @@ export interface MessageStore {
   latest(chatId: string, participant?: string): StoredMessage | undefined;
   /** Everyone who received any message in the chat. */
   audienceOf(chatId: string): string[];
-  /**
-   * Whether anyone whose id starts with `prefix` ever sent or received a
-   * message in the chat. Two index reads.
-   */
-  reachedBy(chatId: string, prefix: string): boolean;
-  /** Every chat anyone whose id starts with `prefix` ever took part in. */
-  chatsReachedBy(prefix: string): string[];
   /** Messages for the timeline, newest first. */
   log(window: LogWindow): MessageDelivery[];
   /**
@@ -316,14 +309,6 @@ CREATE TABLE IF NOT EXISTS unsettled (
 
 const VERSION = 2;
 
-/** The first string after every string that starts with `prefix`. */
-function rangeEnd(prefix: string): string {
-  return (
-    prefix.slice(0, -1) +
-    String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)
-  );
-}
-
 const DATABASES = Symbol.for("kazusa.messageDatabases");
 
 export interface MessageDatabaseOptions {
@@ -462,19 +447,6 @@ function createStore({
   const audience = db.prepare(
     "SELECT DISTINCT participant FROM received WHERE chat = ? ORDER BY participant",
   );
-  // Ids starting with a prefix are the range [prefix, prefix with its last
-  // character bumped), which both indexes below can seek.
-  const receivedInRange = db.prepare(
-    `SELECT 1 FROM received WHERE chat = ? AND participant >= ? AND participant < ? LIMIT 1`,
-  );
-  const sentInRange = db.prepare(
-    `SELECT 1 FROM messages WHERE sender >= ? AND sender < ? AND chat = ? LIMIT 1`,
-  );
-  const chatsInRange = db.prepare(
-    `SELECT chat_id FROM chats WHERE n IN (
-       SELECT chat FROM received WHERE participant >= :low AND participant < :high
-       UNION SELECT chat FROM messages WHERE sender >= :low AND sender < :high)`,
-  );
   const oldestUnread = db.prepare(
     "SELECT min(sequence) AS n FROM unread WHERE agent_id = ? AND chat = ?",
   );
@@ -586,7 +558,7 @@ function createStore({
     after,
     limit,
     actors,
-    withoutChats,
+    without,
   }: LogWindow): MessageDelivery[] {
     const range = [
       before === undefined ? "" : "AND m.timestamp < :before",
@@ -597,17 +569,16 @@ function createStore({
           OR m.n IN (SELECT r.n FROM received r
                      WHERE r.participant IN (SELECT value FROM json_each(:actors))))`
       : "";
-    const notWho = withoutChats?.length
-      ? `AND m.chat NOT IN (SELECT n FROM chats
-                            WHERE chat_id IN (SELECT value FROM json_each(:withoutChats)))`
+    const notWho = without?.length
+      ? `AND m.sender NOT IN (SELECT value FROM json_each(:without))
+         AND m.n NOT IN (SELECT r.n FROM received r
+                         WHERE r.participant IN (SELECT value FROM json_each(:without)))`
       : "";
     const params = {
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
       ...(actors ? { actors: JSON.stringify(actors) } : {}),
-      ...(withoutChats?.length
-        ? { withoutChats: JSON.stringify(withoutChats) }
-        : {}),
+      ...(without?.length ? { without: JSON.stringify(without) } : {}),
     };
     const newest = db
       .prepare(
@@ -690,24 +661,6 @@ function createStore({
             (row) => row.participant,
           );
     },
-    reachedBy: (chatId, prefix) => {
-      const chat = numberOf(chatId);
-      if (chat === undefined) return false;
-      const high = rangeEnd(prefix);
-      return (
-        receivedInRange.get(chat, prefix, high) !== undefined ||
-        sentInRange.get(prefix, high, chat) !== undefined
-      );
-    },
-    chatsReachedBy: (prefix) =>
-      (
-        chatsInRange.all({
-          low: prefix,
-          high: rangeEnd(prefix),
-        }) as unknown as {
-          chat_id: string;
-        }[]
-      ).map((row) => row.chat_id),
     log,
     // Their oldest unread message in the chat, from `unread`, then every
     // message they received from there on: read receipts need the read ones in

@@ -212,9 +212,8 @@ describe("message database", () => {
           [290_000, undefined],
         ] as const)
           for (const limit of [1, 5, 50, 500]) {
-            // Every other window also leaves some chats out.
-            const withoutChats =
-              limit === 5 || limit === 500 ? CHATS.slice(0, 1) : undefined;
+            // Every other window also leaves one participant's messages out.
+            const without = limit === 5 || limit === 500 ? ["bob"] : undefined;
             const all = messages.filter(
               (m) =>
                 (before === undefined || m.timestamp < before) &&
@@ -223,18 +222,21 @@ describe("message database", () => {
                   [m.sender, ...m.audience].some((id) =>
                     actors.includes(id),
                   )) &&
-                (!withoutChats || !withoutChats.includes(m.chatId)),
+                (!without ||
+                  ![m.sender, ...m.audience].some((id) =>
+                    without.includes(id),
+                  )),
             );
             const window = {
               limit,
               ...(before === undefined ? {} : { before }),
               ...(after === undefined ? {} : { after }),
               ...(actors ? { actors } : {}),
-              ...(withoutChats ? { withoutChats } : {}),
+              ...(without ? { without } : {}),
             };
             const log = store.log(window);
             expect(new Set(log.map((m) => m.id)).size).toBe(log.length);
-            // Nothing outside the window or the actors, and no chat left out.
+            // Nothing outside the window or the actors, and nobody left out.
             const ids = new Set(all.map((m) => m.id));
             expect(log.every((m) => ids.has(m.id))).toBe(true);
             // And not everything: about `limit`, plus any sharing its last time.
@@ -247,29 +249,6 @@ describe("message database", () => {
           }
     },
   );
-
-  it("knows every chat anyone with a prefix ever took part in", async () => {
-    const store = openMessageDatabase({ path: ":memory:" });
-    const messages = history(7, 200);
-    for (const delivery of messages)
-      await store.register(delivery.id, delivery);
-    for (const prefix of ["b", "bob", "da", "carol", "zed", "a"]) {
-      const expected = new Set(
-        messages
-          .filter((m) =>
-            [m.sender, ...m.audience].some((id) => id.startsWith(prefix)),
-          )
-          .map((m) => m.chatId),
-      );
-      expect(new Set(store.chatsReachedBy(prefix)), `${prefix}`).toEqual(
-        expected,
-      );
-      for (const chatId of [...CHATS, "group:none"])
-        expect(store.reachedBy(chatId, prefix), `${prefix} ${chatId}`).toBe(
-          expected.has(chatId),
-        );
-    }
-  });
 
   it("slims a delivered message, keeping what readers use", async () => {
     const store = openMessageDatabase({ path: ":memory:" });

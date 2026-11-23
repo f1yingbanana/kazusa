@@ -321,8 +321,6 @@ export default definePluginEntry({
     registerTimelineHttp(api, {
       clock,
       decisions: (window) => perception.decisions(window),
-      personsChats: async () =>
-        (await messagingRef.current?.personsChats()) ?? [],
       messages: async (window) =>
         (await messagingRef.current?.messageLog(window)) ?? [],
     });

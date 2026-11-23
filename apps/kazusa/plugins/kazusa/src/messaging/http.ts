@@ -173,25 +173,28 @@ export function registerMessagingHttp(
   /** The people whose chats the person sees as their own, given who they play. */
   const viewersOf = (playing: Actor | undefined): string[] =>
     playing ? [operator.id, playing.id] : [operator.id];
-  /**
-   * A chat a person outside the world is in, or ever took part in: theirs alone
-   * to read, also what is said after they left.
-   */
-  const isPersons = (chatId: string): boolean =>
-    messaging.isPersonsChat(chatId);
+  /** A chat a person outside the world is in, or was: theirs alone to read. */
+  const isPersons = async (chatId: string): Promise<boolean> =>
+    [
+      ...(await messaging.membersOf(chatId)),
+      ...(await messaging.audienceOf(chatId)),
+    ].some(isUser);
   /** A page of any chat for someone watching; a person's chat isn't there. */
   const watchHistory = async (
     params: z.infer<typeof HISTORY>,
   ): Promise<Awaited<ReturnType<Messaging["observeChatHistory"]>>> => {
-    // Read first: what `isPersons` checks is known once messaging has started.
-    const page = await messaging.observeChatHistory(params);
-    if (isPersons(params.chatId))
+    if (await isPersons(params.chatId))
       throw new Error(`No chat called ${params.chatId}.`);
-    return page;
+    return await messaging.observeChatHistory(params);
   };
   /** Who is composing where, less the chats a person is in. */
-  const watchedTyping = async () =>
-    (await messaging.getTyping()).filter((event) => !isPersons(event.chatId));
+  const watchedTyping = async () => {
+    const typing = await messaging.getTyping();
+    const shown = await Promise.all(
+      typing.map(async (event) => !(await isPersons(event.chatId))),
+    );
+    return typing.filter((_, index) => shown[index]);
+  };
   route("chats", "GET", async (req, res, role) => {
     if (watchesOnly(role)) {
       sendJson(res, 200, {
@@ -278,8 +281,10 @@ export function registerMessagingHttp(
       const playing = watchesOnly(role) ? undefined : await player.playing();
       const chats = (
         await messaging.observeChats(playing ? [playing.id] : [])
-      ).filter(({ chat }) =>
-        watchesOnly(role) ? !isPersons(chat.id) : !isConsole(chat.members),
+      ).filter(({ chat, members }) =>
+        watchesOnly(role)
+          ? ![...chat.members, ...members].some(isUser)
+          : !isConsole(chat.members),
       );
       sendJson(res, 200, {
         chats: chats.map(observedChat),
@@ -397,13 +402,7 @@ export function registerMessagingHttp(
         // The played character's chats are someone else's to a watcher: they
         // arrive as everyone else's do. The broadcaster skips them as the
         // operator's own, and already says when the chat list changed.
-        const chatId =
-          event.type === "message"
-            ? event.delivery.chatId
-            : event.type === "typing"
-              ? event.typing.chatId
-              : undefined;
-        if (audience.some(isUser) || (chatId && isPersons(chatId))) return;
+        if (audience.some(isUser)) return;
         if (event.type === "message")
           write({
             type: "observed",
@@ -433,25 +432,12 @@ export function registerMessagingHttp(
         );
       }
     });
-    // Who the operator plays, and what they say or are told, stays theirs:
-    // also what is said in a chat of theirs after they left it, whose
-    // audience no longer names them.
+    // Who the operator plays, and what they say or are told, stays theirs.
     const unsubscribeBroadcaster = options?.broadcaster?.subscribe(
       watching
         ? (event) => {
             if (event.type === "player") return;
-            if (
-              event.type === "journal" &&
-              (involvesUser(event.event) ||
-                (event.event.chatId && isPersons(event.event.chatId)))
-            )
-              return;
-            if (
-              event.type === "observed" &&
-              "chatId" in event.event &&
-              isPersons(event.event.chatId)
-            )
-              return;
+            if (event.type === "journal" && involvesUser(event.event)) return;
             write(event);
           }
         : write,
