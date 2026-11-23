@@ -40,7 +40,10 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -322,17 +325,29 @@ function PlayAsPicker({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const options = [
+  // The world's own pick and nobody first, then everyone else by name.
+  const suggested = world.characters.find(
+    ({ id }) => id === world.defaultUserCharacter,
+  );
+  const top = [
+    ...(suggested ? [{ value: suggested.id, label: suggested.name }] : []),
     { value: OBSERVER, label: "Nobody: just watch" },
-    ...world.characters.map(({ id, name }) => ({ value: id, label: name })),
   ];
+  const rest = world.characters
+    .filter(({ id }) => id !== suggested?.id)
+    .map(({ id, name }) => ({ value: id, label: name }));
+  const item = (option: { value: string; label: string }) => (
+    <SelectItem key={option.value} value={option.value}>
+      {option.label}
+    </SelectItem>
+  );
   return (
     <Field>
       <FieldLabel htmlFor="setup-play-as" className="sr-only">
         Play as
       </FieldLabel>
       <Select
-        items={options}
+        items={[...top, ...rest]}
         value={value}
         onValueChange={(next) => next && onChange(next)}
       >
@@ -340,11 +355,12 @@ function PlayAsPicker({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
+          <SelectGroup>{top.map(item)}</SelectGroup>
+          <SelectSeparator />
+          <SelectGroup>
+            <SelectLabel>Everyone else</SelectLabel>
+            {rest.map(item)}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </Field>
@@ -542,8 +558,8 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                 <QuestionnaireItem name="play">
                   <QuestionnaireTitle>Who do you play?</QuestionnaireTitle>
                   <QuestionnaireDescription>
-                    You talk and act as them; they stay onstage. You can switch
-                    to anyone, or just watch, from the bottom bar.
+                    You talk and act as them. You can switch to anyone at any
+                    time.
                   </QuestionnaireDescription>
                   <PlayAsPicker
                     world={world}
