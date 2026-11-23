@@ -97,6 +97,16 @@ export function sharedPlayerIndex(): PlayerIndex {
   return (scope[PLAYER_INDEX] ??= {});
 }
 
+/**
+ * Whether a person plays them now, read synchronously from the shared index,
+ * for checks that can't wait on the store (a brain run as it starts). Right
+ * once anything has asked who plays whom; the Gateway's start does.
+ */
+export function playedNow(id: string): boolean {
+  const byPerson = sharedPlayerIndex().byPerson;
+  return byPerson !== undefined && [...byPerson.values()].includes(id);
+}
+
 export function createStage(
   store: StageStore,
   config: StageConfig,

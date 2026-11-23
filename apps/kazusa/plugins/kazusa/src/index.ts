@@ -72,7 +72,7 @@ import { registerUsageHttp } from "./usage/http.ts";
 import { playControl, registerStage, stageControl } from "./stage/register.ts";
 import { createPlayer } from "./player.ts";
 import { CONTEXT_ENGINE_CONFIG } from "./context-engine/config.ts";
-import { allowBrainRuns, stopBrainRuns } from "./perception/run-limits.ts";
+import { stopBrainRuns } from "./perception/run-limits.ts";
 import { characterName } from "./identity.ts";
 import { registerStickerHttp } from "./stickers/http.ts";
 import { registerScene } from "./scene/http.ts";
@@ -406,7 +406,6 @@ export default definePluginEntry({
         stopBrainRuns(id, "a person took them over");
         messaging.interrupt(id);
       },
-      allow: allowBrainRuns,
       // In order, each on its own: one failing (a database still starting)
       // never leaves the others undone; the failures are said together.
       endActivity: async (id, at) => {

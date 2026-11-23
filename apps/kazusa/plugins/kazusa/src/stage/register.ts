@@ -91,12 +91,10 @@ export interface PlayEffects {
   /** Brings an offstage character on, already played by `person`. */
   readonly bringOn: (id: string, person: string) => Promise<void>;
   /**
-   * Stops the turn they are in and anything they are saying, and any turn that
-   * starts while they are played.
+   * Stops the turn they are in and anything they are saying; a turn that starts
+   * while they are played stops as it starts.
    */
   readonly stop: (id: string) => void | Promise<void>;
-  /** Lets their turns run again: undoes `stop`'s hold. */
-  readonly allow: (id: string) => void;
   /** Ends what they were doing: their activity, its effects, a trip. */
   readonly endActivity: (id: string, at: number) => Promise<void>;
   /** Brings their wake in line: none while a person plays them. */
@@ -152,7 +150,6 @@ export function playControl(
     const at = clock.time();
     const previous = await stage.setPlayer(id, undefined, at);
     const since = previous?.playedSince ?? at;
-    effects.allow(id);
     await step("resuming desires", id, () =>
       effects.resumeDesires(id, since, at),
     );

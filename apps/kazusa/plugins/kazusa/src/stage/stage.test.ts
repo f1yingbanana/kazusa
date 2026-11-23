@@ -182,9 +182,6 @@ describe("playControl", () => {
       stop: (id) => {
         calls.push(`stop ${id}`);
       },
-      allow: (id) => {
-        calls.push(`allow ${id}`);
-      },
       endActivity: async (id, at) => {
         calls.push(`end ${id} ${at}`);
       },
@@ -233,7 +230,6 @@ describe("playControl", () => {
     h.advance(HOUR);
     await h.play("user:sensei", "natsu");
     expect(h.calls).toEqual([
-      "allow airi",
       `desires airi ${T0}->${T0 + HOUR}`,
       "reschedule airi true",
       `hand back airi ${T0}`,
@@ -273,7 +269,6 @@ describe("playControl", () => {
       clock: { init: async () => {}, time: () => T0 },
       bringOn: async () => {},
       stop: () => {},
-      allow: () => {},
       endActivity: async () => {
         throw new Error("database still starting");
       },

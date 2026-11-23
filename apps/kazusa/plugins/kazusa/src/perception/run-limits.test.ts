@@ -1,7 +1,6 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  allowBrainRuns,
   beginBrainRun,
   brainRunLimits,
   registerBrainRunLimits,
@@ -9,6 +8,12 @@ import {
   stopBrainRuns,
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
+import { sharedPlayerIndex } from "../stage/stage.ts";
+
+/** A person plays `id` (the stage's shared index), or nobody. */
+function playing(id?: string) {
+  sharedPlayerIndex().byPerson = new Map(id ? [["user:sensei", id]] : []);
+}
 import type { Clock } from "../clock/clock.ts";
 
 const native = vi.hoisted(() => ({
@@ -87,11 +92,12 @@ describe("brain run hard budgets", () => {
       { maxModelCalls: 5, maxToolCalls: 2, maxThinkingSeconds: 5 },
       "queued-run",
     );
+    playing("alice");
     stopBrainRuns("alice", "a person took them over");
     h.start("model-1");
     expect(native.abort).toHaveBeenCalledWith("session-1");
     expect(h.tool("t")).toMatchObject({ block: true });
-    allowBrainRuns("alice");
+    playing();
   });
   it("stops a run under way when a person takes them, and any that starts until handed back", () => {
     const h = setup();
@@ -101,6 +107,7 @@ describe("brain run hard budgets", () => {
       "run-1",
       new AbortController().signal,
     );
+    playing("alice");
     stopBrainRuns("alice", "a person took them over");
     expect(running.signal.aborted).toBe(true);
     // Handed over a moment before the takeover, it starts after it.
@@ -112,7 +119,7 @@ describe("brain run hard budgets", () => {
     );
     expect(late.signal.aborted).toBe(true);
     expect(h.tool("t")).toMatchObject({ block: true });
-    allowBrainRuns("alice");
+    playing();
     const after = beginBrainRun(
       h.api,
       "alice",

@@ -1,3 +1,4 @@
+import { playedNow } from "../stage/stage.ts";
 import {
   abortAgentHarnessRun,
   resolveActiveEmbeddedRunSessionId,
@@ -87,12 +88,6 @@ function activeRuns(): Map<string, BrainRun> {
   const scope = globalThis as { [RUNS]?: Map<string, BrainRun> };
   return (scope[RUNS] ??= new Map<string, BrainRun>());
 }
-/** Characters a person plays: a run of theirs that starts anyway stops. */
-const HELD = Symbol.for("kazusa.brain.run-limit-held");
-function heldAgents(): Set<string> {
-  const scope = globalThis as { [HELD]?: Set<string> };
-  return (scope[HELD] ??= new Set<string>());
-}
 
 /**
  * How long a run has spent thinking: its model calls, ended and under way.
@@ -162,8 +157,9 @@ export function beginBrainRun(
   };
   const runs = activeRuns();
   runs.set(runId, state);
-  // Handed over just before a person took them: it never gets to think.
-  if (heldAgents().has(agentId)) expire("a person plays them");
+  // A person plays them (a turn handed over just before they took them that
+  // starts just after): it never gets to think.
+  if (playedNow(agentId)) expire("a person plays them");
   return {
     signal: AbortSignal.any([lifetime, controller.signal]),
     dispose: () => {
@@ -206,19 +202,12 @@ export function roomForSleep(agentId: string): void {
 
 /**
  * A person took them over: every brain run of theirs under way stops (its model
- * call is cancelled, what it would still say or do is refused), and so does any
- * that starts before `allowBrainRuns`, such as a turn handed over a moment
- * before.
+ * call is cancelled, what it would still say or do is refused). One that starts
+ * while they are played stops as it starts (`playedNow`).
  */
 export function stopBrainRuns(agentId: string, reason: string): void {
-  heldAgents().add(agentId);
   for (const run of [...activeRuns().values()])
     if (run.agentId === agentId) run.expire(reason);
-}
-
-/** Their own model plays them again. */
-export function allowBrainRuns(agentId: string): void {
-  heldAgents().delete(agentId);
 }
 
 /** The id of a character's brain run under way, from before it starts. */

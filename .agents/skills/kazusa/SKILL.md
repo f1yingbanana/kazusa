@@ -1343,13 +1343,13 @@ connect these modules in process.
 - **Taking over** (`playControl.take`): offstage ones come on already played
   (`stageControl(..., person)`), then the running turn is stopped
   (`stopBrainRuns`: its abort signal cancels the model request in OpenClaw,
-  later tool calls are refused, speech stops between bubbles; and the character
-  is held, so a turn handed over a moment before that starts after it stops at
-  once, until `release` lets them run again with `allowBrainRuns`), the activity
-  ends (`taskman.end`: a `task.stopped` row and journal event; `desires.settle`
-  holds levels with no effects; `location.halt`), the wake goes, and the inbox
-  drains to the person. Each step after the record is best-effort: a failure is
-  logged, never half a switch.
+  later tool calls are refused, speech stops between bubbles; a turn handed over
+  a moment before that starts after it stops as it starts, since a run checks
+  the stage's index of who plays whom, `playedNow`, which also holds after a
+  restart), the activity ends (`taskman.end`: a `task.stopped` row and journal
+  event; `desires.settle` holds levels with no effects; `location.halt`), the
+  wake goes, and the inbox drains to the person. Each step after the record is
+  best-effort: a failure is logged, never half a switch.
 - **While played**: Perception judges nothing and hands the model nothing
   (`toPlayer`): what arrives is marked read (read receipts; after hand-back
   "Chats awaiting your reply" lists what the person left unanswered) and
@@ -1363,16 +1363,15 @@ connect these modules in process.
   while watching), else the character played, whose own
   `members: [system agent]` is their own chat with her. `byPlayer` rides on the
   delivery and the stimulus (what Perception keeps for the timeline).
-- **Handing back** (`release`): the hold lifts, desires resume from
-  `playedSince`, the wake returns, and `handBack` (`stage/hand-back.ts`): when
-  the person said or moved something as them, a turn to look back
-  (`sleep.lookBack`, the by-hand night with `sleep-consolidation#looking-back`,
-  and `#played` with what they said when the stretch outruns the records:
-  `shortTermHours` less one `ledgerGridHours` step): they `remember` promises
-  into `MEMORY.md` plans and `reflect`. It is kept as a `review` run: it moves
-  where the next pages start but is no night, so bedtime still goes over the
-  day. Otherwise an idle check-in. Either way, with no activity,
-  `task-lifecycle` picks what is next.
+- **Handing back** (`release`): desires resume from `playedSince`, the wake
+  returns, and `handBack` (`stage/hand-back.ts`): when the person said or moved
+  something as them, a turn to look back (`sleep.lookBack`, the by-hand night
+  with `sleep-consolidation#looking-back`, and `#played` with what they said
+  when the stretch outruns the records: `shortTermHours` less one
+  `ledgerGridHours` step): they `remember` promises into `MEMORY.md` plans and
+  `reflect`. It is kept as a `review` run: it moves where the next pages start
+  but is no night, so bedtime still goes over the day. Otherwise an idle
+  check-in. Either way, with no activity, `task-lifecycle` picks what is next.
 - **Going offstage**: a group sent off skips whoever is played (they stay on); a
   played character can't be sent off or deleted on their own.
 - **No states of the player**: `on: "player"` entries left in an older
