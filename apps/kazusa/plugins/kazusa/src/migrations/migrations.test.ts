@@ -120,6 +120,37 @@ describe("0082-play-as", () => {
     expect(play).toHaveBeenCalledWith("sensei");
   });
 
+  it("still finds them by their page's claim when a retry follows a failure", async () => {
+    const { wiki, deps } = world();
+    writeFileSync(
+      path.join(wiki, "characters/protagonist.md"),
+      "---\nname: Me\ncharacter_id: user:me\n---\n\n# Me\n",
+    );
+    const flaky = { ...deps.stats, register: deps.stats.register };
+    let fail = true;
+    flaky.register = async (key, value) => {
+      if (fail) throw new Error("database still starting");
+      await deps.stats.register(key, value);
+    };
+    deps.stats.values.set("ann", {
+      own: {},
+      toward: { "user:me": { regard: { value: 7, at: 1, by: "reviewed" } } },
+    });
+    const migration = playAsMigration({
+      ...deps,
+      operator: { id: "user:me", name: "Me" },
+      stats: flaky,
+      isAgent: (id) => id === "protagonist",
+    });
+    await expect(migration.run()).rejects.toThrow("database still starting");
+    fail = false;
+    expect(await migration.run()).toMatch(/user:me is protagonist/);
+    expect(deps.stats.values.get("ann")?.toward).toHaveProperty("protagonist");
+    expect(
+      readFileSync(path.join(wiki, "characters/protagonist.md"), "utf8"),
+    ).not.toContain("character_id");
+  });
+
   it("plays nobody in a world never played the old way", async () => {
     const { deps, play } = world(0);
     deps.locations.values.clear();

@@ -634,11 +634,13 @@ export function createSetup(
               ...world.config,
               memory,
               ...chosen,
-              ...(played
+              // Who is played comes from the pick alone: nobody clears any
+              // the template's config named.
+              ...(world.config.user || played
                 ? {
                     user: {
-                      ...(world.config.user as object | undefined),
-                      defaultCharacter: played,
+                      ...withoutDefaultCharacter(world.config.user),
+                      ...(played ? { defaultCharacter: played } : {}),
                     },
                   }
                 : {}),
@@ -734,3 +736,10 @@ export function createSetup(
 export const setup = createSetup(
   path.resolve(/* turbopackIgnore: true */ process.cwd(), "../kazusa"),
 );
+
+/** The template's `config.user`, less any character it would start as. */
+function withoutDefaultCharacter(user: unknown): Record<string, unknown> {
+  if (!user || typeof user !== "object") return {};
+  const { defaultCharacter: _set, ...rest } = user as Record<string, unknown>;
+  return rest;
+}

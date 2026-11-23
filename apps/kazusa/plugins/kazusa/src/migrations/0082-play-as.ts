@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { StatRecord } from "@kazusa/client";
+import { writeWhole } from "../editor/files.ts";
 import type { Operator } from "../identity.ts";
 import type { LocationRecord } from "../location/location.ts";
 import type { FamiliarityRecord, Uses } from "../memory/familiarity.ts";
@@ -77,9 +78,6 @@ async function migrate(deps: PlayAsDeps): Promise<string | undefined> {
   if (!id) return undefined;
   const done: string[] = [];
 
-  const pages = rewriteWikis([deps.worldWiki, ...deps.ownWikis()], old, id);
-  if (pages) done.push(`${pages} wiki pages`);
-
   let held = 0;
   for (const { key, value } of await deps.stats.entries()) {
     const toward = value.toward[old];
@@ -122,6 +120,12 @@ async function migrate(deps: PlayAsDeps): Promise<string | undefined> {
     done.push(`the person plays ${id}`);
   }
 
+  // Last: a page claiming `character_id: user:<x>` is how `<x>` is found, so
+  // until everything above is done the claim stays, and a retry after a
+  // failure finds them again.
+  const pages = rewriteWikis([deps.worldWiki, ...deps.ownWikis()], old, id);
+  if (pages) done.push(`${pages} wiki pages`);
+
   return done.length ? `${old} is ${id}: ${done.join(", ")}` : undefined;
 }
 
@@ -152,7 +156,7 @@ function rewriteWikis(
         .replace(claim, "")
         .replace(link, `[[${id}$1`);
       if (next === text) continue;
-      writeFileSync(file, next);
+      writeWhole(file, next);
       changed++;
     }
   return changed;
