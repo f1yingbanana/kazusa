@@ -11,8 +11,57 @@ import {
   isAllowedHost,
   resolveViewer,
 } from "../../../lib/auth/access";
+import { readLive, readSlow, respond } from "../../../lib/proxy/visitor-read";
+import {
+  liveChanges,
+  noteEvent,
+  slowChanges,
+  watchEvents,
+} from "../../../lib/proxy/world-changes";
 import { isSameOrigin } from "../../../lib/same-origin";
 
+/**
+ * Never kept: streams and pictures go straight through, and the world's answer
+ * carries the server's reading of the clock.
+ */
+const PASSED_THROUGH: ReadonlySet<string> = new Set([
+  "events",
+  "avatar",
+  "sticker",
+  "portrait",
+  "backdrop",
+  "world",
+]);
+/** What only an edit changes: the map, pages, the cast's names and looks. */
+const SLOW: ReadonlySet<string> = new Set([
+  "places",
+  "wiki",
+  "wiki/page",
+  "wiki/character",
+  "wiki/lint",
+  "wiki/reach",
+  "agents",
+  "portraits",
+  "memory/runs",
+]);
+/**
+ * The query a visitor's read may carry. Anything else is dropped, so a made-up
+ * parameter can't make each request a new thing to read.
+ */
+const READ_PARAMS: readonly string[] = [
+  "actors",
+  "after",
+  "agent",
+  "agentId",
+  "before",
+  "chatId",
+  "id",
+  "kind",
+  "kinds",
+  "limit",
+  "name",
+  "query",
+];
 type Context = { params: Promise<{ path: string[] }> };
 
 async function forward(request: Request, context: Context): Promise<Response> {
@@ -67,6 +116,33 @@ async function forward(request: Request, context: Context): Promise<Response> {
     return accessError(503, "The Kazusa Gateway credential is missing.");
   headers.set("Authorization", `Bearer ${token}`);
   headers.set(VIEWER_ROLE_HEADER, viewer.role);
+  // Every visitor is shown the same, so one read, kept in Next's cache,
+  // answers all of them (`visitor-read`).
+  if (
+    method === "GET" &&
+    viewer.role === "visitor" &&
+    !PASSED_THROUGH.has(route)
+  ) {
+    const asked = new URL(request.url).searchParams;
+    const query = new URLSearchParams();
+    for (const name of READ_PARAMS) {
+      const value = asked.get(name);
+      if (value !== null) query.set(name, value);
+    }
+    target.search = query.toString();
+    const path = query.size > 0 ? `${route}?${query}` : route;
+    try {
+      return respond(
+        SLOW.has(route)
+          ? await readSlow(path, slowChanges())
+          : await readLive(path, liveChanges()),
+        request,
+      );
+    } catch {
+      // Not a 200, or no answer: asked again below, so the reader gets the
+      // Gateway's own refusal, and nothing of it is kept.
+    }
+  }
   try {
     const response = await fetch(target, {
       method,
@@ -80,16 +156,28 @@ async function forward(request: Request, context: Context): Promise<Response> {
             ? await request.arrayBuffer()
             : await request.text(),
     });
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("content-type") ?? "application/json",
-        "Cache-Control":
-          response.headers.get("cache-control") ?? "no-cache, no-transform",
-        "X-Accel-Buffering": "no",
+    const contentType =
+      response.headers.get("content-type") ?? "application/json";
+    // Only the event stream must reach the browser untouched, chunk by chunk.
+    // `no-transform` on anything else just stops this server and any CDN in
+    // front of it from compressing JSON that runs to hundreds of kilobytes.
+    const stream = contentType.startsWith("text/event-stream");
+    // A write changes the world before any stream says so.
+    if (method === "POST" && response.ok) noteEvent("write");
+    return new Response(
+      // Each event counts as a change to the world (`world-changes`).
+      stream && response.body ? watchEvents(response.body) : response.body,
+      {
+        status: response.status,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control":
+            response.headers.get("cache-control") ??
+            (stream ? "no-cache, no-transform" : "no-cache"),
+          ...(stream ? { "X-Accel-Buffering": "no" } : {}),
+        },
       },
-    });
+    );
   } catch {
     return Response.json(
       { error: "Could not reach the Kazusa Gateway." },

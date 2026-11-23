@@ -76,6 +76,38 @@ gets the same `Clock` module through HTTP (§3).
   `/kazusa/characters`), refactor the plugin, the schemas, the proxy and the web
   app in one atomic change. No aliases or dual shapes.
 
+### Visitor reads in Next's cache
+
+Every visitor is shown the same, so a visitor's GET (not a stream, a picture or
+`world`, which carries `serverNow`) goes through `readLive` or `readSlow` in
+`apps/web/lib/proxy/visitor-read.ts`, cached with `use cache` (`cacheComponents`
+and `partialPrefetching` are on in `next.config.mjs`). Next shares the read
+among everyone asking while it is under way and keeps the answer in this
+server's memory (`cacheMaxMemorySize`, 50 MB by default). Measured on 16.4.6:
+100 requests at once on a cold entry made one upstream call, and a hit on a 700
+KB answer costs about 0.2 ms. An owner's reads are never kept.
+
+An answer is kept under the count of changes it was read at
+(`lib/proxy/world-changes.ts`), passed as an argument, so it is part of the
+cache key: each event on any proxied stream counts (`watchEvents` → `noteEvent`;
+`connected` is a greeting, not a change), and a browser refetching because of an
+event asks under a later count than anything read before it. Tags can't do this:
+`revalidateTag` only takes effect inside a request, and called from a stream it
+neither throws nor invalidates. `cacheLife` only bounds what no event announces:
+`readLive` a second (two at most), `readSlow` (the map, wiki pages, the cast:
+its count moves on `places`/`world` and on writes) half a minute (one at most).
+Only a 200 is kept; anything else throws and the route asks the Gateway
+directly, so the reader gets its own refusal.
+
+Answers carry an `ETag` and `Cache-Control: no-cache`, so an unchanged refetch
+is a 304. Bodies go out uncompressed for Next to compress (one compressed ahead
+is compressed twice), and only the event stream carries `no-transform`. Unknown
+query parameters are dropped (`READ_PARAMS`): add a route's new parameter there.
+A new stream event needs nothing; a new route is live unless listed in `SLOW`.
+Under Cache Components the page reads who is looking inside `<Suspense>` after
+`await connection()`, and no route sets `dynamic`. In unit tests `use cache` is
+an ordinary call: mock `next/cache`.
+
 ## 3. Routes
 
 ### Existing (messaging; authoritative spec in `kazusa/references/client.md`)

@@ -92,6 +92,9 @@ class CloudWrapperProxy {
   }
 }
 
+// `use cache` is Next's; outside it the visitor reads are ordinary calls.
+vi.mock("next/cache", () => ({ cacheLife: () => undefined }));
+
 describe("trusted-proxy end-to-end wrapper integration", () => {
   const proxy = new CloudWrapperProxy();
 
