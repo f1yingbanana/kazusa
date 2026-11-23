@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  allowNewBundledPlugins,
   allowNewCharacterTools,
   CHARACTER_DENIED_TOOLS,
   denyImpliedTools,
@@ -157,6 +158,38 @@ describe("loadNewPlugins", () => {
     expect(read().plugins).toEqual({
       load: { paths: ["../plugins/kazusa", OPENRP] },
     });
+  });
+});
+
+describe("allowNewBundledPlugins", () => {
+  /** Base allows Kazusa, zai and LM Studio; OpenClaw ships zai and LM Studio. */
+  const withBundled = (root) => {
+    const file = path.join(root, "apps/kazusa/base.json");
+    const base = JSON.parse(readFileSync(file, "utf8"));
+    base.config.plugins.allow = ["kazusa", "zai", "lmstudio", "openrp"];
+    writeFileSync(file, JSON.stringify(base));
+    for (const id of ["zai", "lmstudio"]) {
+      const dir = path.join(root, "node_modules/openclaw/dist/extensions", id);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "openclaw.plugin.json"), "{}");
+    }
+    return root;
+  };
+
+  it("allows a plugin OpenClaw ships that base.json allows since, once", () => {
+    const { root, read } = repo({ plugins: { allow: ["kazusa", "zai"] } });
+    expect(allowNewBundledPlugins(withBundled(root))).toEqual([
+      "This world now allows new plugins: lmstudio.",
+    ]);
+    // One loaded by path is `loadNewPlugins`' to add.
+    expect(read().plugins.allow).toEqual(["kazusa", "zai", "lmstudio"]);
+    expect(allowNewBundledPlugins(root)).toEqual([]);
+  });
+
+  it("leaves a world without an allowlist allowing everything", () => {
+    const { root, read } = repo({ plugins: {} });
+    expect(allowNewBundledPlugins(withBundled(root))).toEqual([]);
+    expect(read().plugins).toEqual({});
   });
 });
 

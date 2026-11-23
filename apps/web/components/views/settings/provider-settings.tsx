@@ -58,7 +58,8 @@ function describe(error: unknown) {
 function keyLine(provider: ProviderSummary) {
   switch (provider.key) {
     case "profile":
-      return "Key saved";
+      // A local one may hold only the "no key" word Kazusa saved for it.
+      return provider.local ? "Connected" : "Key saved";
     case "env":
       return "Key from the environment";
     case "config":
@@ -145,7 +146,7 @@ function KeyForm({
         <p id={`${field}-error`} className="text-xs text-destructive">
           {error}
         </p>
-      ) : provider.keysUrl ? (
+      ) : provider.keysUrl && !provider.local ? (
         <a
           href={provider.keysUrl}
           target="_blank"
@@ -178,6 +179,7 @@ function ConnectedRow({
   onRemove: () => void;
 }) {
   const { provider, models, status } = row;
+  const local = provider.local === true;
   const rejected = status === "auth-rejected";
   const unreachable = status === "unavailable";
   // Some providers report a bad key only by listing nothing.
@@ -201,7 +203,25 @@ function ConnectedRow({
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-medium">{provider.label}</span>
           <span className="truncate text-xs text-muted-foreground">
-            {empty ? "No models found. Check the key." : keyLine(provider)}
+            {!empty ? (
+              keyLine(provider)
+            ) : local ? (
+              <>
+                {`No models found. Is ${provider.label} running? `}
+                {provider.keysUrl ? (
+                  <a
+                    href={provider.keysUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline-offset-4 hover:text-foreground hover:underline focus-visible:text-foreground"
+                  >
+                    {`Get ${provider.label}`}
+                  </a>
+                ) : null}
+              </>
+            ) : (
+              "No models found. Check the key."
+            )}
           </span>
         </div>
         {empty ? (
@@ -230,9 +250,11 @@ function ConnectedRow({
               <EllipsisIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onEdit}>Replace key</DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                {local ? "Set a key" : "Replace key"}
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={onRemove}>
-                Remove key
+                {local ? "Disconnect" : "Remove key"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -253,13 +275,29 @@ function AddRow({
   onEdit,
   onCancel,
   onSave,
+  onConnect,
 }: {
   provider: ProviderSummary;
   editing: boolean;
   onEdit: () => void;
   onCancel: () => void;
   onSave: (key: string) => Promise<void>;
+  /** A local provider connects in one click, without a key. */
+  onConnect: () => Promise<void>;
 }) {
+  const [connecting, setConnecting] = useState(false);
+  const connect = async () => {
+    setConnecting(true);
+    try {
+      await onConnect();
+    } catch (error) {
+      toast.error(`Couldn't connect ${provider.label}`, {
+        description: describe(error),
+      });
+    } finally {
+      setConnecting(false);
+    }
+  };
   return (
     <li className="px-3 py-2.5">
       <div className="flex items-center gap-3">
@@ -271,7 +309,17 @@ function AddRow({
             </span>
           ) : null}
         </div>
-        {editing ? null : (
+        {editing ? null : provider.local ? (
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={connecting}
+            onClick={() => void connect()}
+          >
+            {connecting ? <Spinner /> : null}
+            {connecting ? "Connecting…" : "Connect"}
+          </Button>
+        ) : (
           <Button variant="outline" size="xs" onClick={onEdit}>
             Add key
           </Button>
@@ -285,12 +333,13 @@ function AddRow({
 }
 
 /**
- * Connect a model provider by pasting its key. The key becomes an OpenClaw auth
- * profile and the catalog is asked again, so the provider's models are in the
- * pickers before the form closes, with no reload of the page or the Gateway: a
- * profile lives outside `openclaw.json`. Keys wired up by hand (an environment
- * variable, a key in `openclaw.json`) show where they come from and stay the
- * user's to change.
+ * Connect a model provider by pasting its key, or one on this computer (Ollama,
+ * LM Studio) in a click: a placeholder key, which is what turns its model
+ * discovery on. The key becomes an OpenClaw auth profile and the catalog is
+ * asked again, so the provider's models are in the pickers before the form
+ * closes, with no reload of the page or the Gateway: a profile lives outside
+ * `openclaw.json`. Keys wired up by hand (an environment variable, a key in
+ * `openclaw.json`) show where they come from and stay the user's to change.
  */
 export function ProviderSettings() {
   const providers = useProviders();
@@ -335,8 +384,8 @@ export function ProviderSettings() {
         ),
     );
 
-  const save = (provider: ProviderSummary) => async (key: string) => {
-    await providers.saveKey({ provider: provider.id, key });
+  const save = (provider: ProviderSummary) => async (key?: string) => {
+    await providers.saveKey({ provider: provider.id, ...(key ? { key } : {}) });
     setEditing(undefined);
     setFresh(provider.id);
   };
@@ -346,9 +395,14 @@ export function ProviderSettings() {
     try {
       await providers.removeKey(provider.id);
     } catch (error) {
-      toast.error(`Couldn't remove ${provider.label}'s key`, {
-        description: describe(error),
-      });
+      toast.error(
+        provider.local
+          ? `Couldn't disconnect ${provider.label}`
+          : `Couldn't remove ${provider.label}'s key`,
+        {
+          description: describe(error),
+        },
+      );
     }
   };
 
@@ -426,6 +480,7 @@ export function ProviderSettings() {
                   onEdit={() => setEditing(provider.id)}
                   onCancel={() => setEditing(undefined)}
                   onSave={save(provider)}
+                  onConnect={() => save(provider)()}
                 />
               ))}
             </ul>
@@ -446,7 +501,11 @@ export function ProviderSettings() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {removing ? `Remove ${removing.label}'s key?` : "Remove key?"}
+              {!removing
+                ? "Remove key?"
+                : removing.local
+                  ? `Disconnect ${removing.label}?`
+                  : `Remove ${removing.label}'s key?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Characters using its models will stop working.
@@ -458,7 +517,7 @@ export function ProviderSettings() {
               variant="destructive"
               onClick={() => removing && void remove(removing)}
             >
-              Remove key
+              {removing?.local ? "Disconnect" : "Remove key"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

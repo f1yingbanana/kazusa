@@ -128,6 +128,27 @@ describe("registerProvidersHttp", () => {
     expect(profiles.get("typesafe")).toBe("ts");
   });
 
+  it("connects a server on this computer without a key", async () => {
+    const { routes, profiles } = setup({
+      plugins: { allow: ["kazusa", "ollama", "venice"] },
+    });
+    const { body } = await call(routes["/kazusa/providers/key"], "POST", {
+      provider: "ollama",
+    });
+    expect(ProviderSummarySchema.parse(body)).toMatchObject({
+      key: "profile",
+      local: true,
+    });
+    expect(profiles.get("ollama")).toBe("local");
+
+    const keyless = await call(routes["/kazusa/providers/key"], "POST", {
+      provider: "venice",
+      key: " ",
+    });
+    expect(keyless.status).toBe(400);
+    expect(profiles.has("venice")).toBe(false);
+  });
+
   it("leaves a key set by hand in openclaw.json alone", async () => {
     const { routes, deps } = setup(WORLD);
     const { status } = await call(routes["/kazusa/providers/key"], "POST", {

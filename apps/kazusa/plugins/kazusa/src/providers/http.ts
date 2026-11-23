@@ -66,10 +66,18 @@ function summary(
     ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
     keyName: entry.keyName,
     key: keySource(config, entry, env, keys),
+    ...(entry.local ? { local: true } : {}),
   };
 }
 
 const REQUEST_TIMEOUT_MS = 3_000;
+
+/**
+ * What connecting a local provider without a key saves. Not the plugin's own
+ * "no key" marker (`ollama-local`): saved as a profile, that leaves its models
+ * unavailable (live, 2026-11-23).
+ */
+export const LOCAL_KEY = "local";
 
 /**
  * `models.authRefresh` and `secrets.*` need `operator.admin`, which a
@@ -167,7 +175,12 @@ export function registerProvidersHttp(
       });
       return;
     }
-    await deps.keys.save(entry.id, payload.key);
+    const key = payload.key || (entry.local ? LOCAL_KEY : undefined);
+    if (!key) {
+      sendJson(res, 400, { error: `Paste a ${entry.label} key.` });
+      return;
+    }
+    await deps.keys.save(entry.id, key);
     await refreshAuth(
       deps.call,
       (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),

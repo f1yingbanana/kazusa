@@ -580,11 +580,13 @@ export const ProviderSummarySchema = z.object({
   label: z.string(),
   /** One line on what it offers. */
   hint: z.string().optional(),
-  /** Where to create a key. */
+  /** Where to create a key; for a `local` provider, where to download it. */
   keysUrl: z.string().url().optional(),
   /** The environment variable it reads when no profile holds a key. */
   keyName: z.string(),
   key: ProviderKeySourceSchema,
+  /** A server on the user's own computer, which connects without a key. */
+  local: z.boolean().optional(),
 });
 export type ProviderSummary = z.infer<typeof ProviderSummarySchema>;
 
@@ -597,11 +599,12 @@ export type ProvidersResponse = z.infer<typeof ProvidersResponseSchema>;
 /**
  * POST /kazusa/providers/key. Saves `key` as the provider's auth profile, so
  * nothing in `openclaw.json` changes and nothing reloads. Answers with the
- * provider; its models need a catalog refresh.
+ * provider; its models need a catalog refresh. A `local` provider may leave
+ * `key` out.
  */
 export const ProviderKeyPayloadSchema = z.object({
   provider: z.string().min(1),
-  key: z.string().trim().min(1),
+  key: z.string().trim().optional(),
 });
 export type ProviderKeyPayload = z.infer<typeof ProviderKeyPayloadSchema>;
 
@@ -612,12 +615,13 @@ export const ProviderRemovePayloadSchema = z.object({
 export type ProviderRemovePayload = z.infer<typeof ProviderRemovePayloadSchema>;
 
 /**
- * Model providers that take one pasted API key, from OpenClaw's bundled
- * plugins, the official `@openclaw/*-provider` packages this app ships, and
- * OpenRP's own. Settings and the setup guide both list from it. Ids, plugins
- * and variables come from each plugin's manifest (`providerAuthChoices`,
- * `setup.providers[].envVars`); a provider shows only when its plugin is
- * allowed in `openclaw.json`. Alphabetical by label.
+ * Model providers that take one pasted API key (or none, for a server on this
+ * computer), from OpenClaw's bundled plugins, the official
+ * `@openclaw/*-provider` packages this app ships, and OpenRP's own. Settings
+ * and the setup guide both list from it. Ids, plugins and variables come from
+ * each plugin's manifest (`providerAuthChoices`, `setup.providers[].envVars`);
+ * a provider shows only when its plugin is allowed in `openclaw.json`.
+ * Alphabetical by label.
  */
 export interface ProviderEntry {
   /** OpenClaw's provider id, as in model refs. */
@@ -626,6 +630,12 @@ export interface ProviderEntry {
   readonly label: string;
   readonly hint?: string;
   readonly keysUrl?: string;
+  /**
+   * A server on the user's own computer, found at its usual port, that needs no
+   * key. Any saved key turns its model discovery on, and none is sent to a
+   * server at a local address.
+   */
+  readonly local?: boolean;
   /** The variable OpenClaw reads first when no auth profile holds a key. */
   readonly keyName: string;
   /** Every variable the plugin reads a key from, `keyName` included. */
@@ -696,6 +706,16 @@ export const PROVIDERS: readonly ProviderEntry[] = [
     keyName: "HF_TOKEN",
     envVars: ["HUGGINGFACE_HUB_TOKEN", "HF_TOKEN"],
   }),
+  entry("litellm", "LiteLLM", {
+    hint: "Your own LiteLLM proxy",
+    keyName: "LITELLM_API_KEY",
+  }),
+  entry("lmstudio", "LM Studio", {
+    hint: "Models on this computer",
+    keysUrl: "https://lmstudio.ai/download",
+    keyName: "LM_API_TOKEN",
+    local: true,
+  }),
   entry("mistral", "Mistral AI", {
     hint: "Mistral's own models",
     keysUrl: "https://console.mistral.ai/api-keys",
@@ -716,6 +736,12 @@ export const PROVIDERS: readonly ProviderEntry[] = [
     hint: "Open models on NVIDIA's servers",
     keysUrl: "https://build.nvidia.com/settings/api-keys",
     keyName: "NVIDIA_API_KEY",
+  }),
+  entry("ollama", "Ollama", {
+    hint: "Models on this computer",
+    keysUrl: "https://ollama.com/download",
+    keyName: "OLLAMA_API_KEY",
+    local: true,
   }),
   entry("ollama-cloud", "Ollama Cloud", {
     plugin: "ollama",

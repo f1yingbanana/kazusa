@@ -69,6 +69,8 @@
         "google",
         "groq",
         "huggingface",
+        "litellm",
+        "lmstudio",
         "mistral",
         "moonshot",
         "novita",
@@ -211,6 +213,18 @@
           }
         },
         "nvidia": {
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
+        },
+        "litellm": {
+          "enabled": true,
+          "hooks": {
+            "allowPromptInjection": true
+          }
+        },
+        "lmstudio": {
           "enabled": true,
           "hooks": {
             "allowPromptInjection": true
