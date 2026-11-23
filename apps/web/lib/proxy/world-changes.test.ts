@@ -1,62 +1,51 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  liveChanges,
   noteEvent,
   resetWorldChanges,
-  slowChanges,
   watchEvents,
+  worldChanges,
 } from "./world-changes";
 
 beforeEach(() => resetWorldChanges());
 
+const stream = (chunks: readonly string[]) => {
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+  });
+};
+
 describe("world changes", () => {
   it("counts every event but a stream's greeting", () => {
     noteEvent("connected");
-    expect([liveChanges(), slowChanges()]).toEqual([0, 0]);
+    expect(worldChanges()).toBe(0);
     noteEvent("status");
-    noteEvent("observed");
-    expect([liveChanges(), slowChanges()]).toEqual([2, 0]);
-  });
-
-  it("counts an edit for what only an edit changes", () => {
-    for (const name of ["places", "world", "write"]) noteEvent(name);
-    expect([liveChanges(), slowChanges()]).toEqual([3, 3]);
+    noteEvent("write");
+    expect(worldChanges()).toBe(2);
   });
 
   it("reads event names off a stream it leaves untouched", async () => {
-    const encoder = new TextEncoder();
     const chunks = [
       "event: connected\ndata: {}\n\nev",
-      'ent: journal\ndata: {"a":1}\n\n: keepalive\n\nevent: places\ndata: {}\n\n',
+      'ent: journal\ndata: {"a":1}\n\n: keepalive\n\n',
     ];
-    const passed = watchEvents(
-      new ReadableStream<Uint8Array>({
-        start(controller) {
-          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
-          controller.close();
-        },
-      }),
+    expect(await new Response(watchEvents(stream(chunks))).text()).toBe(
+      chunks.join(""),
     );
-    expect(await new Response(passed).text()).toBe(chunks.join(""));
     // The name split across chunks was still read; the greeting wasn't counted.
-    expect([liveChanges(), slowChanges()]).toEqual([2, 1]);
+    expect(worldChanges()).toBe(1);
   });
 
   it("reads lines however SSE ends them: CRLF, LF or a lone CR", async () => {
-    const encoder = new TextEncoder();
     const text = "event: a\r\ndata: 1\r\n\r\nevent: b\rdata: 2\r\revent: c\r";
     // Split so a CRLF straddles two chunks.
-    const passed = watchEvents(
-      new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(encoder.encode(text.slice(0, 9)));
-          controller.enqueue(encoder.encode(text.slice(9)));
-          controller.enqueue(encoder.encode("\n"));
-          controller.close();
-        },
-      }),
+    const chunks = [text.slice(0, 9), text.slice(9), "\n"];
+    expect(await new Response(watchEvents(stream(chunks))).text()).toBe(
+      chunks.join(""),
     );
-    expect(await new Response(passed).text()).toBe(`${text}\n`);
-    expect(liveChanges()).toBe(3);
+    expect(worldChanges()).toBe(3);
   });
 });

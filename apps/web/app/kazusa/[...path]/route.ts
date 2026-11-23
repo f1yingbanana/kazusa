@@ -11,12 +11,11 @@ import {
   isAllowedHost,
   resolveViewer,
 } from "../../../lib/auth/access";
-import { readLive, readSlow, respond } from "../../../lib/proxy/visitor-read";
+import { readShared } from "../../../lib/proxy/visitor-read";
 import {
-  liveChanges,
   noteEvent,
-  slowChanges,
   watchEvents,
+  worldChanges,
 } from "../../../lib/proxy/world-changes";
 import { isSameOrigin } from "../../../lib/same-origin";
 
@@ -32,36 +31,6 @@ const PASSED_THROUGH: ReadonlySet<string> = new Set([
   "backdrop",
   "world",
 ]);
-/** What only an edit changes: the map, pages, the cast's names and looks. */
-const SLOW: ReadonlySet<string> = new Set([
-  "places",
-  "wiki",
-  "wiki/page",
-  "wiki/character",
-  "wiki/lint",
-  "wiki/reach",
-  "agents",
-  "portraits",
-  "memory/runs",
-]);
-/**
- * The query a visitor's read may carry. Anything else is dropped, so a made-up
- * parameter can't make each request a new thing to read.
- */
-const READ_PARAMS: readonly string[] = [
-  "actors",
-  "after",
-  "agent",
-  "agentId",
-  "before",
-  "chatId",
-  "id",
-  "kind",
-  "kinds",
-  "limit",
-  "name",
-  "query",
-];
 type Context = { params: Promise<{ path: string[] }> };
 
 async function forward(request: Request, context: Context): Promise<Response> {
@@ -116,30 +85,27 @@ async function forward(request: Request, context: Context): Promise<Response> {
     return accessError(503, "The Kazusa Gateway credential is missing.");
   headers.set("Authorization", `Bearer ${token}`);
   headers.set(VIEWER_ROLE_HEADER, viewer.role);
-  // Every visitor is shown the same, so one read, kept in Next's cache,
-  // answers all of them (`visitor-read`).
+  // Every visitor is shown the same: one read, kept in Next's cache, answers
+  // all of them (`visitor-read`).
   if (
     method === "GET" &&
     viewer.role === "visitor" &&
     !PASSED_THROUGH.has(route)
   ) {
-    const asked = new URL(request.url).searchParams;
-    const query = new URLSearchParams();
-    for (const name of READ_PARAMS) {
-      const value = asked.get(name);
-      if (value !== null) query.set(name, value);
-    }
-    target.search = query.toString();
-    const path = query.size > 0 ? `${route}?${query}` : route;
     try {
-      return respond(
-        SLOW.has(route)
-          ? await readSlow(path, slowChanges())
-          : await readLive(path, liveChanges()),
-        request,
+      const answer = await readShared(
+        `${route}${target.search}`,
+        worldChanges(),
       );
+      return new Response(answer.body, {
+        status: answer.status,
+        headers: {
+          "Content-Type": answer.contentType,
+          "Cache-Control": "no-cache",
+        },
+      });
     } catch {
-      // No answer at all: one try is shared by everyone asking, so a
+      // No answer at all: the one try was shared by everyone asking, so a
       // struggling Gateway isn't asked again per reader.
       return Response.json(
         { error: "Could not reach the Kazusa Gateway." },
