@@ -95,10 +95,10 @@ export function SectionRail({ onOpenPalette }: { onOpenPalette: () => void }) {
           className="flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <SearchIcon className="size-5" />
-          <span className="sr-only">Jump to anything</span>
+          <span className="sr-only">Search</span>
         </TooltipTrigger>
         <TooltipContent side="right" className="flex items-center gap-2">
-          Jump to anything
+          Search
           <Kbd>⌘K</Kbd>
         </TooltipContent>
       </Tooltip>
