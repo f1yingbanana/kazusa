@@ -140,21 +140,25 @@ bypass that mocks had missed. See the messaging and Perception references for
 their ownership fixes. This is not full browser rendering or multi-agent group
 validation.
 
-For a complete acceptance pass, use disposable state and two agents:
+For a complete acceptance pass, use disposable state, three agents, and play one
+of them (A); the other two are B and C:
 
 1. Send a unique direct message. Check one canonical record, one recipient copy,
    `__openclaw` sender, Perception intake and actual native adoption separately.
-2. Send to a human/two-agent group. Check two projections/intakes and distinct
-   replies in the same conversation; there must be no human agent session.
+2. As A, send to a group with B and C. Check two projections/intakes, the line
+   marked `byPlayer` in A's own ledger, and distinct replies in the same
+   conversation; A's model does not run while played.
 3. Freeze time and paginate multiple pages, then reconnect SSE. Check sequence
    order and convergence to the same message IDs without duplicates or gaps.
-4. Remove/re-add the human around an agent-only message. The absence stays
+4. Remove/re-add A (played) around a message between B and C. The absence stays
    hidden; old received history remains readable, and removal prevents
    sends/management.
-5. Restart after acceptance but before all projections. Retry the same
+5. In the console, send to the system agent as the operator: one recipient copy,
+   sender `user:<id>`, and the operator alone with her in that chat.
+6. Restart after acceptance but before all projections. Retry the same
    submission ID and verify one canonical record, unchanged audience/time and no
    duplicate copy.
-6. Observe composing true, send/cancel/end false, and no typing for an ignored
+7. Observe composing true, send/cancel/end false, and no typing for an ignored
    input. Exercise busy steering and queued attention separately from idle wake.
 
 Record message/chat IDs, audience, simulation time, copy receipts and adoption;

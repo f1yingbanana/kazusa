@@ -129,11 +129,13 @@ export function registerMessagingHttp(
       // The operator's keys carry no owner: theirs is only ever the console.
       if (parseChatSession(target.sessionKey).owner === undefined)
         return { actor: operator, target };
-    } else if (target.members) {
+    }
+    // Read once: a switch landing mid-request never mixes two of them.
+    const playing = await player.playing();
+    if (!target.sessionKey && target.members) {
       const named = target.members.includes(operator.id);
       const others = target.members.filter((id) => id !== operator.id);
       const console = systemAgent();
-      const playing = await player.playing();
       if (
         console &&
         others.length === 1 &&
@@ -143,27 +145,24 @@ export function registerMessagingHttp(
         return { actor: operator, target: { ...target, members: others } };
       if (named) throw new Error("Only the system agent talks with you.");
     }
-    const actor = await player.playing();
-    if (!actor) throw new WatchingError();
-    return { actor, target };
+    if (!playing) throw new WatchingError();
+    return { actor: playing, target };
   };
   /** Whoever of the operator and their character is in this chat. */
   const viewerOf = async (chatId: string): Promise<string> => {
     const members = await messaging.membersOf(chatId);
     return (await player.actorIn(members))?.id ?? operator.id;
   };
-  /** The people whose chats the person sees as their own. */
-  const viewers = async (): Promise<string[]> => {
-    const playing = await player.playing();
-    return playing ? [operator.id, playing.id] : [operator.id];
-  };
+  /** The people whose chats the person sees as their own, given who they play. */
+  const viewersOf = (playing: Actor | undefined): string[] =>
+    playing ? [operator.id, playing.id] : [operator.id];
   route("chats", "GET", async (req, res) => {
     const query =
       new URL(req.url ?? "/", "http://localhost").searchParams.get("query") ??
       undefined;
     const playing = await player.playing();
     const listed = await Promise.all(
-      (await viewers()).map(async (viewer) =>
+      viewersOf(playing).map(async (viewer) =>
         (await messaging.listChats(viewer, LIST_CHATS.parse({ query }))).map(
           (summary) => ({ summary, viewer }),
         ),
@@ -222,7 +221,9 @@ export function registerMessagingHttp(
   });
   if (options?.observer) {
     route("observe/chats", "GET", async (_req, res) => {
-      const chats = await messaging.observeChats(await viewers());
+      const chats = await messaging.observeChats(
+        viewersOf(await player.playing()),
+      );
       sendJson(res, 200, {
         chats: chats.map(observedChat),
       } satisfies ObservedChatsResponse);
@@ -367,7 +368,9 @@ export function registerMessagingHttp(
         ? await messaging.getTyping()
         : (
             await Promise.all(
-              (await viewers()).map((viewer) => messaging.getTyping(viewer)),
+              viewersOf(await player.playing()).map((viewer) =>
+                messaging.getTyping(viewer),
+              ),
             )
           ).flat();
       const statuses = options?.getStatuses

@@ -398,10 +398,18 @@ export default definePluginEntry({
         messaging.interrupt(id);
       },
       allow: allowBrainRuns,
+      // In order, each on its own: one failing (a database still starting)
+      // never leaves the others undone; the failures are said together.
       endActivity: async (id, at) => {
-        await location.halt(id);
-        await taskman.end(id, at);
-        await desires.settle(id, at);
+        const failed: unknown[] = [];
+        for (const end of [
+          () => location.halt(id),
+          () => taskman.end(id, at),
+          () => desires.settle(id, at),
+        ])
+          await end().catch((error: unknown) => failed.push(error));
+        if (failed.length)
+          throw new AggregateError(failed, failed.map(String).join("; "));
       },
       reschedule: (id) => taskman.reschedule(id),
       resumeDesires: desires.resume,

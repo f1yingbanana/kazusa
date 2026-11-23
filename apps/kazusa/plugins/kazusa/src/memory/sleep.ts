@@ -315,7 +315,7 @@ export function createSleep(deps: SleepDeps, nights: Map<string, Night>) {
 
   /**
    * The ids a page's person may go by where states are kept: the player's page
-   * is `sensei`, the player `user:sensei`. Whoever keeps states knows which of
+   * is `sensei`, the operator `user:<id>`. Whoever keeps states knows which of
    * them is a person.
    */
   const personsOf = (agentId: string, id: string): string[] => {

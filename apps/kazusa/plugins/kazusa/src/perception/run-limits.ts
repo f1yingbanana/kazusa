@@ -66,6 +66,11 @@ interface BrainRun {
   readonly models: Set<string>;
   readonly tools: Set<string>;
   readonly expire: (reason: string) => void;
+  /**
+   * Cancels OpenClaw's run of this session, while this run still owns it. Once
+   * stopped, it is asked again when the session is known (`brainRun`).
+   */
+  readonly cancelHost: () => void;
   sessionKey?: string;
   sessionId?: string;
   readonly dispose: () => void;
@@ -120,12 +125,9 @@ export function beginBrainRun(
 ): { readonly signal: AbortSignal; readonly dispose: () => void } {
   const controller = new AbortController();
   const limits = brainRunLimits(api, agentId);
-  const expire = (reason: string): void => {
-    if (controller.signal.aborted) return;
-    api.logger.warn(`Brain run ${runId} stopped: ${reason}`);
-    controller.abort(new Error(`Brain run limit: ${reason}`));
-    // A queued host turn can outlive its dispatch call. Cancel the public
-    // harness too, while this exact tracked run still owns the session.
+  // A queued host turn can outlive its dispatch call. Cancel the public
+  // harness too, while this exact tracked run still owns the session.
+  const cancelHost = (): void => {
     if (
       runs.get(runId) === state &&
       state.sessionKey &&
@@ -134,6 +136,12 @@ export function beginBrainRun(
       resolveActiveEmbeddedRunSessionId(state.sessionKey) === state.sessionId
     )
       abortAgentHarnessRun(state.sessionId);
+  };
+  const expire = (reason: string): void => {
+    if (controller.signal.aborted) return;
+    api.logger.warn(`Brain run ${runId} stopped: ${reason}`);
+    controller.abort(new Error(`Brain run limit: ${reason}`));
+    cancelHost();
   };
   const state: BrainRun = {
     agentId,
@@ -144,6 +152,7 @@ export function beginBrainRun(
     models: new Set(),
     tools: new Set(),
     expire,
+    cancelHost,
     dispose: () => {
       clearTimeout(state.timer);
       if (runs.get(runId) === state) runs.delete(runId);
@@ -232,6 +241,10 @@ function brainRun(
     state.sessionKey = sessionKey;
     state.sessionId = sessionId;
     sessionOwners().set(sessionKey, runId);
+    // Stopped before its session was known (a turn OpenClaw started from its
+    // own queue while they are played): OpenClaw's run goes too, not only its
+    // tools.
+    if (state.controller.signal.aborted) state.cancelHost();
   }
   return state;
 }

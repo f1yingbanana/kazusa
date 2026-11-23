@@ -84,7 +84,7 @@ export interface Page {
   readonly parent?: string;
   readonly home?: string;
   readonly relation?: string;
-  /** How a person is addressed, when it differs from the id (`user:sensei`). */
+  /** How a person is addressed, when it differs from the id (an operator's `user:<id>`). */
   readonly personId?: string;
   readonly seen?: string;
   readonly touched: readonly string[];

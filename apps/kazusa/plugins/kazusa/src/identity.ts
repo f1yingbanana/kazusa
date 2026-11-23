@@ -8,20 +8,24 @@ import { readCharacterCard, worldWikiDir } from "./characters/card.ts";
 /**
  * The person at the keyboard, outside the world (`plugins.entries.kazusa.config
  * .user`). They talk to the system agent as themselves and play any character,
- * or none. Nobody in the world ever talks to them.
+ * or none. Nobody in the world ever talks to them. Each world names them (its
+ * template does): there is no default, so no setting's names leak into
+ * another.
  */
 const OPERATOR = z.object({
-  id: z
-    .string()
-    .regex(/^user:[a-z0-9][a-z0-9_-]*$/)
-    .default("user:sensei"),
-  name: z.string().trim().min(1).default("Sensei"),
+  id: z.string().regex(/^user:[a-z0-9][a-z0-9_-]*$/),
+  name: z.string().trim().min(1),
 });
 
 export type Operator = z.infer<typeof OPERATOR>;
 
 export function operatorOf(api: OpenClawPluginApi): Operator {
-  return OPERATOR.parse(api.pluginConfig?.user ?? {});
+  const parsed = OPERATOR.safeParse(api.pluginConfig?.user);
+  if (!parsed.success)
+    throw new Error(
+      'Kazusa needs `plugins.entries.kazusa.config.user`: { "id": "user:<name>", "name": "<name>" }, the person at the keyboard.',
+    );
+  return parsed.data;
 }
 
 /** Whether an id is a person outside the world (`user:`), not a character. */

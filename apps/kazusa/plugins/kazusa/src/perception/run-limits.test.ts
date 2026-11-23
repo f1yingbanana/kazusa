@@ -82,6 +82,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("brain run hard budgets", () => {
+  it("cancels OpenClaw's own run of a turn it starts from its queue while they are played", () => {
+    const h = setup(
+      { maxModelCalls: 5, maxToolCalls: 2, maxThinkingSeconds: 5 },
+      "queued-run",
+    );
+    stopBrainRuns("alice", "a person took them over");
+    h.start("model-1");
+    expect(native.abort).toHaveBeenCalledWith("session-1");
+    expect(h.tool("t")).toMatchObject({ block: true });
+    allowBrainRuns("alice");
+  });
   it("stops a run under way when a person takes them, and any that starts until handed back", () => {
     const h = setup();
     const running = beginBrainRun(

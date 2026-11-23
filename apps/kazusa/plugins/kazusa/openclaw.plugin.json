@@ -512,17 +512,17 @@
       "user": {
         "type": "object",
         "additionalProperties": false,
+        "required": ["id", "name"],
         "properties": {
           "id": {
             "type": "string",
-            "default": "user:sensei",
             "pattern": "^user:[a-z0-9][a-z0-9_-]*$",
-            "description": "Default human player identity for single-user MVP."
+            "description": "The person at the keyboard, outside the world: they talk with the system agent and play any character, or none."
           },
           "name": {
             "type": "string",
-            "default": "Sensei",
-            "description": "Display name of the human player."
+            "minLength": 1,
+            "description": "What the system agent calls them."
           }
         }
       },
