@@ -117,14 +117,12 @@ export const refreshAuth = async (
 
 /**
  * Why a provider can't be used with the key it now has, from a fresh catalog;
- * undefined when it can. TypeSafe serves only Jev, which no catalog lists, so
- * Kazusa's own providers go unchecked.
+ * undefined when it can.
  */
 export function keyProblem(
   entry: ProviderEntry,
   catalog: unknown,
 ): string | undefined {
-  if (entry.plugin === "kazusa") return undefined;
   const { status, models } = providerInCatalog(catalog, entry.id);
   if (status === "auth-rejected") return `${entry.label} rejected this key.`;
   if (status === "unavailable")
@@ -161,6 +159,50 @@ export function registerProvidersHttp(
   const gatewayRoute = createRouteRegistrar(api, { auth: "gateway" });
   const warn = (msg: string) => api.logger?.warn?.(msg) ?? console.warn(msg);
 
+  /**
+   * Key writes run one at a time, so a failed save putting the old key back
+   * can't undo a save or removal that came in meanwhile.
+   */
+  let writes: Promise<unknown> = Promise.resolve();
+  const oneAtATime = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = writes.then(work, work);
+    writes = run.catch(() => undefined);
+    return run;
+  };
+
+  /**
+   * Saves `key` and keeps it only if the provider then serves models with it:
+   * otherwise puts back the key it had before (or none) and says why. A check
+   * that can't run counts as a failed one. TypeSafe serves only Jev, which no
+   * catalog lists, so Kazusa's own providers go unchecked.
+   */
+  const saveChecked = async (
+    entry: ProviderEntry,
+    key: string,
+  ): Promise<string | undefined> => {
+    const before = deps.keys.read(entry.id);
+    await deps.keys.save(entry.id, key);
+    await refreshAuth(deps.call, warn);
+    if (entry.plugin === "kazusa") return undefined;
+    let problem: string | undefined;
+    try {
+      problem = keyProblem(entry, await deps.catalog());
+    } catch (error) {
+      problem = `Couldn't check ${entry.label}'s models: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    if (!problem) return undefined;
+    if (before === undefined) {
+      await deps.keys.remove(entry.id, deps.readConfig());
+      await refreshAuth(deps.call, warn);
+    } else {
+      await deps.keys.save(entry.id, before);
+      await refreshAuth(deps.call, warn);
+      // The catalog holds the failure; ask again for the old key's models.
+      await deps.catalog().catch(() => undefined);
+    }
+    return problem;
+  };
+
   const find = (id: string): ProviderEntry | undefined =>
     availableProviders(deps.readConfig()).find((entry) => entry.id === id);
 
@@ -189,10 +231,6 @@ export function registerProvidersHttp(
     } satisfies ProvidersResponse);
   });
 
-  /**
-   * A key is kept only if the provider then serves models with it: otherwise
-   * the key it had before goes back (or none), and the answer says why.
-   */
   gatewayRoute("providers/key", "POST", async (req, res) => {
     const payload = ProviderKeyPayloadSchema.parse(await readJsonBody(req));
     const entry = find(payload.provider);
@@ -213,20 +251,8 @@ export function registerProvidersHttp(
       sendJson(res, 400, { error: `Paste a ${entry.label} key.` });
       return;
     }
-    const before = deps.keys.read(entry.id);
-    await deps.keys.save(entry.id, key);
-    await refreshAuth(deps.call, warn);
-    const problem = keyProblem(entry, await deps.catalog());
+    const problem = await oneAtATime(() => saveChecked(entry, key));
     if (problem) {
-      if (before === undefined) {
-        await deps.keys.remove(entry.id, deps.readConfig());
-        await refreshAuth(deps.call, warn);
-      } else {
-        await deps.keys.save(entry.id, before);
-        await refreshAuth(deps.call, warn);
-        // The catalog holds the failure; ask again for the old key's models.
-        await deps.catalog().catch(() => undefined);
-      }
       sendJson(res, 422, { error: problem });
       return;
     }
@@ -242,8 +268,10 @@ export function registerProvidersHttp(
       sendJson(res, 404, { error: `Unknown provider: ${provider}.` });
       return;
     }
-    await deps.keys.remove(entry.id, deps.readConfig());
-    await refreshAuth(deps.call, warn);
+    await oneAtATime(async () => {
+      await deps.keys.remove(entry.id, deps.readConfig());
+      await refreshAuth(deps.call, warn);
+    });
     respond(res, entry);
   });
 }

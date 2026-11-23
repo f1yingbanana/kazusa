@@ -61,7 +61,7 @@ function setup(
     catalog: vi.fn(async () => catalog()),
   } satisfies ProvidersDeps;
   registerProvidersHttp(api, deps);
-  return { routes, deps, profiles, down };
+  return { routes, deps, profiles, down, catalog };
 }
 
 async function call(
@@ -196,6 +196,49 @@ describe("registerProvidersHttp", () => {
     expect(profiles.get("openrouter")).toBe("k");
     // Once to check the new key, once to list the old key's models again.
     expect(deps.catalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("puts the old key back when the check itself fails", async () => {
+    const { routes, deps, profiles } = setup(WORLD, {}, ["openrouter"]);
+    vi.mocked(deps.catalog).mockRejectedValueOnce(new Error("Gateway busy"));
+    const { status, body } = await call(
+      routes["/kazusa/providers/key"],
+      "POST",
+      {
+        provider: "openrouter",
+        key: "unchecked",
+      },
+    );
+    expect(status).toBe(422);
+    expect(body).toEqual({
+      error: "Couldn't check OpenRouter's models: Gateway busy",
+    });
+    expect(profiles.get("openrouter")).toBe("k");
+  });
+
+  it("never lets a failed save undo a save that came in meanwhile", async () => {
+    const { routes, deps, profiles, catalog } = setup(WORLD, {}, [
+      "openrouter",
+    ]);
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // The first check waits until the second save has been sent.
+    vi.mocked(deps.catalog).mockImplementationOnce(async () => {
+      await gate;
+      return catalog();
+    });
+    const first = call(routes["/kazusa/providers/key"], "POST", {
+      provider: "openrouter",
+      key: "bad",
+    });
+    const second = call(routes["/kazusa/providers/key"], "POST", {
+      provider: "openrouter",
+      key: "good",
+    });
+    release();
+    expect((await first).status).toBe(422);
+    expect((await second).status).toBe(200);
+    expect(profiles.get("openrouter")).toBe("good");
   });
 
   it("takes back a server on this computer that doesn't answer", async () => {
