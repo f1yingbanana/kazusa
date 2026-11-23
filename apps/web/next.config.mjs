@@ -1,5 +1,9 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  // `use cache`: what visitors read is kept in this server's memory
+  // (`lib/proxy/visitor-read.ts`).
+  cacheComponents: true,
+  partialPrefetching: true,
   transpilePackages: ["@kazusa/client"],
   typescript: {
     ignoreBuildErrors: true,

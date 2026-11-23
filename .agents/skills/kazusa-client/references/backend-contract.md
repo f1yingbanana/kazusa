@@ -76,6 +76,27 @@ gets the same `Clock` module through HTTP (§3).
   `/kazusa/characters`), refactor the plugin, the schemas, the proxy and the web
   app in one atomic change. No aliases or dual shapes.
 
+### Visitor reads in Next's cache
+
+Every visitor is shown the same, so a visitor's GET (not a stream, a picture or
+`world`, which carries `serverNow`) goes through `readShared` in
+`apps/web/lib/proxy/visitor-read.ts`: a `use cache` function (Cache Components
+is on in `next.config.mjs`) with `cacheLife({ revalidate: 1, expire: 2 })`. Next
+shares the read among everyone asking and keeps the answer in memory; 100
+readers at once make one Gateway read. A refusal is passed on as the Gateway
+gave it; no answer at all is a 502, never a second try per reader. An owner's
+reads are never kept.
+
+The one thing Next can't do is learn from the Gateway that the world changed:
+`revalidateTag` only works inside a request, and a stream outlives the request
+that opened it. So `lib/proxy/world-changes.ts` counts the events on every
+proxied stream (`connected` excepted) and on writes through the proxy, and the
+count is an argument of `readShared`, part of its cache key: a browser
+refetching because of an event never gets the answer from before it. Under Cache
+Components the page reads who is looking inside `<Suspense>` after
+`await connection()`, and no route sets `dynamic`. In unit tests `use cache` is
+an ordinary call: mock `next/cache`.
+
 ## 3. Routes
 
 ### Existing (messaging; authoritative spec in `kazusa/references/client.md`)

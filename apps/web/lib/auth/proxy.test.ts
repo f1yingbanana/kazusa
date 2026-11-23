@@ -1,6 +1,20 @@
 import { KAZUSA_ROUTES } from "@kazusa/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "../../app/kazusa/[...path]/route";
+import { readShared } from "../proxy/visitor-read";
+import { resetWorldChanges } from "../proxy/world-changes";
+
+// Next's cache only exists inside Next: here `use cache` is an ordinary call,
+// so these tests cover what is asked for and under which count, not the
+// keeping itself (measured against a real server; see `visitor-read.ts`).
+vi.mock("next/cache", () => ({ cacheLife: () => undefined }));
+vi.mock("../proxy/visitor-read", async (original) => {
+  const actual = await original<typeof import("../proxy/visitor-read")>();
+  return {
+    ...actual,
+    readShared: vi.fn(actual.readShared),
+  };
+});
 
 const upstream = vi.fn<typeof fetch>();
 
@@ -10,6 +24,8 @@ beforeEach(() => {
   vi.stubEnv("KAZUSA_GATEWAY_URL", "http://127.0.0.1:18789");
   vi.stubGlobal("fetch", upstream);
   upstream.mockReset();
+  resetWorldChanges();
+  vi.mocked(readShared).mockClear();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -99,10 +115,85 @@ describe("Kazusa browser proxy", () => {
       }),
     );
     const response = await call("events");
-    expect(response.body).toBe(stream);
     expect(response.headers.get("x-accel-buffering")).toBe("no");
+    expect(response.headers.get("cache-control")).toBe(
+      "no-cache, no-transform",
+    );
     expect(upstream.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
     expect(await response.text()).toContain("event: connected");
+  });
+
+  it("reads for a visitor under the count of changes seen so far", async () => {
+    upstream.mockImplementation(
+      async () =>
+        new Response('{"characters":[]}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const first = await call("characters?limit=5&token=attacker");
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe("no-cache");
+    // Kept under the route, its query (less any token) and the count.
+    expect(vi.mocked(readShared).mock.calls).toEqual([
+      ["characters?limit=5", 0],
+    ]);
+    const [url, init] = upstream.mock.calls[0];
+    expect(url instanceof URL ? url.search : url).toBe("?limit=5");
+    expect(new Headers(init?.headers).get("x-kazusa-role")).toBe("visitor");
+
+    // An event on anyone's stream: what is read next is read anew.
+    upstream.mockImplementationOnce(
+      async () =>
+        new Response(
+          new TextEncoder().encode('event: status\ndata: {"a":1}\n\n'),
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+    );
+    await (await call("events")).text();
+    await call("characters");
+    expect(vi.mocked(readShared).mock.calls.at(-1)).toEqual(["characters", 1]);
+  });
+
+  it("passes the Gateway's refusal on, and never asks it twice", async () => {
+    upstream.mockImplementation(
+      async () =>
+        new Response('{"error":"No chat called x."}', {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const refused = await call("messages?chatId=x");
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "No chat called x." });
+    expect(upstream).toHaveBeenCalledTimes(1);
+
+    // No answer at all: a 502, after one try, not a second per reader.
+    upstream.mockReset();
+    upstream.mockRejectedValue(new Error("connect ECONNREFUSED"));
+    const unreachable = await call("timeline?limit=5");
+    expect(unreachable.status).toBe(502);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it("never holds the world's clock, a stream or a picture", async () => {
+    upstream.mockImplementation(async () => new Response("{}"));
+    for (const path of ["world", "avatar?id=a", "portrait?id=a&name=b"])
+      await call(path);
+    expect(readShared).not.toHaveBeenCalled();
+    expect(upstream).toHaveBeenCalledTimes(3);
+  });
+
+  it("never keeps an owner's reads", async () => {
+    vi.stubEnv("KAZUSA_AUTH_MODE", "local");
+    const local = "http://localhost:3000";
+    upstream.mockImplementation(async () => new Response("{}"));
+    await call("characters", "GET", undefined, local);
+    await call("characters?junk=1", "GET", undefined, local);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(readShared).not.toHaveBeenCalled();
+    // And what they ask is passed on as asked.
+    const [url] = upstream.mock.calls[1];
+    expect(url instanceof URL ? url.search : url).toBe("?junk=1");
   });
 
   it("preserves local writes and same-origin checks", async () => {

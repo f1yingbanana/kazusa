@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { parseAuthMode } from "@kazusa/client";
 import { OwnerGate } from "@/components/auth/owner-sign-in";
 import { SetupGuide } from "@/components/setup/setup-guide";
@@ -8,9 +9,22 @@ import { Shell } from "@/components/shell/shell";
 import { setup } from "@/lib/setup/setup";
 import { AuthError, isAllowedHost, resolveViewer } from "@/lib/auth/access";
 
-export const dynamic = "force-dynamic";
+/**
+ * Who is looking decides everything here, so all of it is read per request,
+ * inside the boundary; the shell around it is the same for everyone.
+ */
+export default function Page() {
+  return (
+    <Suspense>
+      <Entry />
+    </Suspense>
+  );
+}
 
-export default async function Page() {
+async function Entry() {
+  // Only ever for the request at hand: who is signed in is checked against the
+  // time, and whether a world is set up is read off the disk.
+  await connection();
   let viewer;
   try {
     const reqHeaders = await headers();
@@ -36,9 +50,5 @@ export default async function Page() {
     if (setup.outdated()) return <StartOver />;
     return <SetupGuide status={await setup.status()} />;
   }
-  return (
-    <Suspense>
-      <Shell />
-    </Suspense>
-  );
+  return <Shell />;
 }
