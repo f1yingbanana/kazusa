@@ -1022,6 +1022,7 @@ export function registerMemory(
     id: page.id,
     kind: page.kind,
     name: page.name,
+    aliases: [...page.aliases],
     summary: page.summary,
     ...(page.parent ? { parent: page.parent } : {}),
     ...(page.place ? { place: true } : {}),
@@ -1063,7 +1064,6 @@ export function registerMemory(
   };
   const fullPage = (page: Page): WikiPage => ({
     ...listItem(page),
-    aliases: [...page.aliases],
     lead: page.lead,
     sections: page.sections.map((section) => ({
       ...section,

@@ -51,6 +51,7 @@ export function ShowOnMapButton({ id }: { id: string }) {
     "world.by": worldParsers["world.by"],
     "world.in": worldParsers["world.in"],
     "world.as": worldParsers["world.as"],
+    "world.plane": worldParsers["world.plane"],
     sel: entityRefParser,
   });
   return (
@@ -63,6 +64,8 @@ export function ShowOnMapButton({ id }: { id: string }) {
           "world.by": "place",
           "world.in": `${PLACE_PREFIX}${id}`,
           "world.as": "map",
+          // The place picks its map; a plane left from before would win.
+          "world.plane": null,
           sel: { kind: "place", id },
         })
       }
