@@ -370,7 +370,18 @@ apps/kazusa/
   OpenRP has no plugin from OpenClaw; OpenRP publishes its own,
   `@openrp-ai/openclaw-provider` (from the openrp repo), a dependency of
   `apps/kazusa` loaded by path from `base.json` like the official
-  `@openclaw/*-provider` packages.
+  `@openclaw/*-provider` packages. Servers on the user's computer (Ollama, LM
+  Studio) are OpenClaw's bundled plugins, which list a server's live models at
+  its usual port once any key is saved; their key may be left empty, which saves
+  the word `local` (`LOCAL_KEY`). Not the plugin's own marker, `ollama-local`:
+  as a profile it leaves the models unavailable. Another address is a
+  `models.providers.<id>.baseUrl` in `openclaw.json`, by hand.
+  `scripts/plugin-startup.mjs` (`allowNewBundledPlugins`, also called from
+  `dev.mjs`) allows a bundled plugin `base.json` allows in an older world. A
+  save is kept only if a fresh catalog then shows the provider serving models
+  (`keyProblem`): otherwise the old key goes back, or none, and the route
+  answers 422 with why. It uses Gateway auth, since `models.list` runs as the
+  caller. TypeSafe (Jev only, in no catalog) isn't checked.
 - **Gateway token**: required even on loopback, because without it any website
   can POST to the Gateway. `scripts/dev.mjs` makes it once, keeps it in that
   `.env`, and hands it to the frontend's proxy. Plugin routes read it from

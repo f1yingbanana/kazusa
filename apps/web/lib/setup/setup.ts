@@ -32,10 +32,7 @@ import {
 export const SYSTEM_AGENT_INCLUDE = "./.state/kazusa/system-agent.json";
 
 /** A provider the setup guide offers a key for, from the shared catalog. */
-export type SetupProvider = Pick<
-  ProviderEntry,
-  "id" | "label" | "hint" | "keysUrl"
->;
+export type SetupProvider = Pick<ProviderEntry, "id" | "label" | "keysUrl">;
 
 const setupProvider = (id: string): SetupProvider | undefined => {
   const entry = PROVIDERS.find((candidate) => candidate.id === id);
@@ -43,7 +40,6 @@ const setupProvider = (id: string): SetupProvider | undefined => {
     entry && {
       id: entry.id,
       label: entry.label,
-      ...(entry.hint ? { hint: entry.hint } : {}),
       ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
     }
   );

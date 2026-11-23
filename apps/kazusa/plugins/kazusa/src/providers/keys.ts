@@ -23,6 +23,8 @@ export const profileIdFor = (provider: string): string => `${provider}:manual`;
  */
 export interface ProviderKeys {
   readonly has: (provider: string) => boolean;
+  /** The key Kazusa saved, to put back if a new one fails. */
+  readonly read: (provider: string) => string | undefined;
   readonly save: (provider: string, key: string) => Promise<void>;
   readonly remove: (provider: string, config: OpenClawConfig) => Promise<void>;
 }
@@ -34,6 +36,11 @@ const has = (provider: string): boolean =>
 
 export const authProfileKeys: ProviderKeys = {
   has,
+  read: (provider) => {
+    const credential =
+      ensureAuthProfileStore().profiles[profileIdFor(provider)];
+    return credential?.type === "api_key" ? credential.key : undefined;
+  },
   save: async (provider, key) => {
     const saved = await upsertAuthProfileWithLock({
       profileId: profileIdFor(provider),

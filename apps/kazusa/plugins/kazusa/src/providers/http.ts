@@ -22,6 +22,7 @@ import {
   resolveAuthToken,
   sendJson,
 } from "../http/helpers.ts";
+import { listCatalog, providerInCatalog } from "../models/http.ts";
 import { authProfileKeys, type ProviderKeys } from "./keys.ts";
 
 export interface ProvidersDeps {
@@ -31,6 +32,8 @@ export interface ProvidersDeps {
   readonly keys: ProviderKeys;
   /** Calls a Gateway method with the Gateway's own token (admin scope). */
   readonly call: (method: string, params: unknown) => Promise<unknown>;
+  /** The model catalog, asked of every provider again (`models.list`). */
+  readonly catalog: () => Promise<unknown>;
 }
 
 /** Providers whose plugin this world allows. No allowlist allows them all. */
@@ -62,14 +65,21 @@ function summary(
   return {
     id: entry.id,
     label: entry.label,
-    ...(entry.hint ? { hint: entry.hint } : {}),
     ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
     keyName: entry.keyName,
     key: keySource(config, entry, env, keys),
+    ...(entry.local ? { local: true } : {}),
   };
 }
 
 const REQUEST_TIMEOUT_MS = 3_000;
+
+/**
+ * What connecting a local provider without a key saves. Not the plugin's own
+ * "no key" marker (`ollama-local`): saved as a profile, that leaves its models
+ * unavailable (live, 2026-11-23).
+ */
+export const LOCAL_KEY = "local";
 
 /**
  * `models.authRefresh` and `secrets.*` need `operator.admin`, which a
@@ -106,6 +116,27 @@ export const refreshAuth = async (
 };
 
 /**
+ * Why a provider can't be used with the key it now has, from a fresh catalog;
+ * undefined when it can.
+ */
+export function keyProblem(
+  entry: ProviderEntry,
+  catalog: unknown,
+): string | undefined {
+  const { status, models } = providerInCatalog(catalog, entry.id);
+  if (status === "auth-rejected") return `${entry.label} rejected this key.`;
+  if (status === "unavailable")
+    return entry.local
+      ? `Couldn't reach ${entry.label} on this computer. Is it running?`
+      : `Couldn't reach ${entry.label}. Try again later.`;
+  if (models === 0)
+    return entry.local
+      ? `${entry.label} has no models yet. Download one in ${entry.label} first.`
+      : `${entry.label} offers no models for this key.`;
+  return undefined;
+}
+
+/**
  * Provider keys live in OpenClaw auth profiles (`keys.ts`). Saving or removing
  * one changes only the shared auth store, then asks the Gateway to read it
  * again, so `openclaw.json` never changes and no plugin reloads. A key the user
@@ -120,9 +151,57 @@ export function registerProvidersHttp(
     env: () => process.env,
     keys: authProfileKeys,
     call: adminCall(api),
+    catalog: () => listCatalog({ refresh: true }),
     ...overrides,
   };
   const route = createRouteRegistrar(api);
+  // `models.list` is dispatched as the caller, so the Gateway must authenticate.
+  const gatewayRoute = createRouteRegistrar(api, { auth: "gateway" });
+  const warn = (msg: string) => api.logger?.warn?.(msg) ?? console.warn(msg);
+
+  /**
+   * Key writes run one at a time, so a failed save putting the old key back
+   * can't undo a save or removal that came in meanwhile.
+   */
+  let writes: Promise<unknown> = Promise.resolve();
+  const oneAtATime = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = writes.then(work, work);
+    writes = run.catch(() => undefined);
+    return run;
+  };
+
+  /**
+   * Saves `key` and keeps it only if the provider then serves models with it:
+   * otherwise puts back the key it had before (or none) and says why. A check
+   * that can't run counts as a failed one. TypeSafe serves only Jev, which no
+   * catalog lists, so Kazusa's own providers go unchecked.
+   */
+  const saveChecked = async (
+    entry: ProviderEntry,
+    key: string,
+  ): Promise<string | undefined> => {
+    const before = deps.keys.read(entry.id);
+    await deps.keys.save(entry.id, key);
+    await refreshAuth(deps.call, warn);
+    if (entry.plugin === "kazusa") return undefined;
+    let problem: string | undefined;
+    try {
+      problem = keyProblem(entry, await deps.catalog());
+    } catch (error) {
+      problem = `Couldn't check ${entry.label}'s models: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    if (!problem) return undefined;
+    if (before === undefined) {
+      await deps.keys.remove(entry.id, deps.readConfig());
+      await refreshAuth(deps.call, warn);
+    } else {
+      await deps.keys.save(entry.id, before);
+      await refreshAuth(deps.call, warn);
+      // The catalog holds the failure; ask again for the old key's models.
+      await deps.catalog().catch(() => undefined);
+    }
+    return problem;
+  };
 
   const find = (id: string): ProviderEntry | undefined =>
     availableProviders(deps.readConfig()).find((entry) => entry.id === id);
@@ -152,7 +231,7 @@ export function registerProvidersHttp(
     } satisfies ProvidersResponse);
   });
 
-  route("providers/key", "POST", async (req, res) => {
+  gatewayRoute("providers/key", "POST", async (req, res) => {
     const payload = ProviderKeyPayloadSchema.parse(await readJsonBody(req));
     const entry = find(payload.provider);
     if (!entry) {
@@ -167,11 +246,16 @@ export function registerProvidersHttp(
       });
       return;
     }
-    await deps.keys.save(entry.id, payload.key);
-    await refreshAuth(
-      deps.call,
-      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
-    );
+    const key = payload.key || (entry.local ? LOCAL_KEY : undefined);
+    if (!key) {
+      sendJson(res, 400, { error: `Paste a ${entry.label} key.` });
+      return;
+    }
+    const problem = await oneAtATime(() => saveChecked(entry, key));
+    if (problem) {
+      sendJson(res, 422, { error: problem });
+      return;
+    }
     respond(res, entry);
   });
 
@@ -184,11 +268,10 @@ export function registerProvidersHttp(
       sendJson(res, 404, { error: `Unknown provider: ${provider}.` });
       return;
     }
-    await deps.keys.remove(entry.id, deps.readConfig());
-    await refreshAuth(
-      deps.call,
-      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
-    );
+    await oneAtATime(async () => {
+      await deps.keys.remove(entry.id, deps.readConfig());
+      await refreshAuth(deps.call, warn);
+    });
     respond(res, entry);
   });
 }

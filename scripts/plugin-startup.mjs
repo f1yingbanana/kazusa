@@ -82,6 +82,34 @@ export function loadNewPlugins(root) {
 }
 
 /**
+ * A plugin OpenClaw ships (LM Studio's) loads without a path, so
+ * `loadNewPlugins` can't see one `base.json` allows since the world was made.
+ * Any such plugin missing from the world's allowlist is allowed here: providers
+ * are chosen in Settings, by key, so the allowlist follows Kazusa's. Run before
+ * `startProviderPlugins`.
+ */
+export function allowNewBundledPlugins(root) {
+  const configFile = path.join(root, "apps/kazusa/world/openclaw.json");
+  if (!existsSync(configFile)) return [];
+  const base = JSON.parse(
+    readFileSync(path.join(root, "apps/kazusa/base.json"), "utf8"),
+  );
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const allow = config.plugins?.allow;
+  if (!allow) return [];
+  const bundled = path.join(root, "node_modules/openclaw/dist/extensions");
+  const added = (base.config?.plugins?.allow ?? []).filter(
+    (id) =>
+      !allow.includes(id) &&
+      existsSync(path.join(bundled, id, "openclaw.plugin.json")),
+  );
+  if (!added.length) return [];
+  allow.push(...added);
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return [`This world now allows new plugins: ${added.join(", ")}.`];
+}
+
+/**
  * The tools OpenClaw once granted for `tools.exec` and `tools.fs` being set. It
  * no longer does, but warns about it on every tool-policy check of every
  * character (#47487): six lines per turn, 40% of a long run's log.
@@ -252,6 +280,7 @@ export function raiseDecisionLimits(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   for (const line of loadNewPlugins(root)) console.log(line);
+  for (const line of allowNewBundledPlugins(root)) console.log(line);
   for (const line of startProviderPlugins(root)) console.log(line);
   for (const line of denyImpliedTools(root)) console.log(line);
   for (const line of allowNewCharacterTools(root)) console.log(line);

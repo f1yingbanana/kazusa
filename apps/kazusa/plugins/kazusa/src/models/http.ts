@@ -12,6 +12,7 @@ import {
   ThinkingLevelSchema,
   ThinkingSelectPayloadSchema,
   type ModelOption,
+  type ModelProviderStatus,
   type ModelSelectResponse,
   type ModelsResponse,
   type ThinkingOption,
@@ -138,6 +139,28 @@ export function catalogModels(
     });
 }
 
+/**
+ * What a catalog says about one provider: OpenClaw's verdict on it, if any, and
+ * how many of its models a character could run now.
+ */
+export function providerInCatalog(
+  payload: unknown,
+  provider: string,
+): {
+  readonly status?: ModelProviderStatus["status"];
+  readonly models: number;
+} {
+  const outcome = ModelsListResultSchema.parse(payload).providerOutcomes?.find(
+    (entry) => entry.provider === provider,
+  );
+  return {
+    ...(outcome ? { status: outcome.status } : {}),
+    models: catalogModels(payload).filter(
+      (model) => model.provider === provider && model.available,
+    ).length,
+  };
+}
+
 const gatewayDeps: Omit<ModelsDeps, "selection" | "starting"> = {
   list: async ({ agentId, refresh }) => {
     const response = await dispatchGatewayMethod(
@@ -158,6 +181,9 @@ const gatewayDeps: Omit<ModelsDeps, "selection" | "starting"> = {
   },
   readConfig: () => getRuntimeConfig(),
 };
+
+/** `models.list` as the caller: only from a route with Gateway auth. */
+export const listCatalog = gatewayDeps.list;
 
 /**
  * World defaults plus per-agent choices, kept in Kazusa's selection
