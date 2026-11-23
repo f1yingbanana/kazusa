@@ -45,6 +45,28 @@ describe("openDecisionDatabase", () => {
     expect(ids(store.window({ limit: 10, actors: ["bob"] }))).toEqual(["b"]);
     expect(store.window({ limit: 10, actors: [] })).toEqual([]);
   });
+
+  it("leaves out decisions about someone's lines before cutting the window", () => {
+    const store = openDecisionDatabase({ path: ":memory:" });
+    const from = (sender: string) => ({ ...line("x"), sender });
+    store.record("alice", decision(100, "a"));
+    store.record("alice", { ...decision(200), lines: [from("bob")] });
+    store.record("alice", {
+      ...decision(300),
+      lines: [from("bob"), { ...from("user:sensei"), messageId: "c" }],
+    });
+    store.record("alice", decision(400, "d"));
+    // The fixture's lines are the operator's; Bob's are kept.
+    const ids2 = (rows: { record: PerceptionDecisionRecord }[]) =>
+      rows.map(({ record }) => record.lines[0]?.sender);
+    expect(ids2(store.window({ limit: 1, without: ["user:sensei"] }))).toEqual([
+      "bob",
+    ]);
+    expect(store.window({ limit: 10, without: ["user:sensei"] })).toHaveLength(
+      1,
+    );
+    expect(store.window({ limit: 10, without: [] })).toHaveLength(4);
+  });
 });
 
 describe("decisionEvent", () => {

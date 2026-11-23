@@ -2,11 +2,13 @@
 
 import { useCallback, useRef, useState } from "react";
 import { EyeIcon } from "lucide-react";
+import { useAccess } from "@/hooks/use-access";
 import { useObservedMessages } from "@/hooks/use-observed-chats";
 import { useParticipantResolver } from "@/hooks/use-participants";
 import { useTyping } from "@/lib/live/realtime-state";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { useSources } from "@/lib/source/provider";
+import { openVisitorWelcome } from "@/lib/state/ui-store";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { Backlog } from "./scene/backlog";
@@ -51,6 +53,9 @@ export function ObservedChatView({
   const openBacklog = useCallback(() => setBacklog(true), []);
   const closeBacklog = useCallback(() => setBacklog(false), []);
 
+  // A visitor can't join in here at all: this is where they'd want to.
+  const { isReadOnly, isLoading: accessLoading } = useAccess();
+  const visitor = isReadOnly && !accessLoading;
   const readOnly = chat.ended
     ? "Observing a conversation that has ended."
     : "Observing, read-only. Nobody here can tell.";
@@ -129,6 +134,15 @@ export function ObservedChatView({
             <footer className="flex shrink-0 items-center justify-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
               <EyeIcon aria-hidden className="size-3.5 shrink-0" />
               <span>{readOnly}</span>
+              {visitor ? (
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:text-foreground"
+                  onClick={() => openVisitorWelcome()}
+                >
+                  Talk to them in a world of your own
+                </button>
+              ) : null}
             </footer>
           </>
         )}

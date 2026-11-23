@@ -41,8 +41,21 @@ collaborator accounts.
   `127.0.0.1`, `[::1]`) on the page, proxy and host routes, so a DNS-rebound
   name cannot borrow the owner's proxy; that check only rejects, never grants.
 - `public`: every browser is a visitor. Operators manage the demo through a
-  private path. Keep existing chat reads and the observer feed unfiltered for
-  this demo; no chat sends, typing, movement, or other mutations are allowed.
+  private path. No chat sends, typing, movement, or other mutations are allowed.
+
+A viewer without `play` only watches (`watchesOnly(role)` in `http/helpers.ts`):
+they are an observer, whoever the operator plays. Who "you" are is the
+operator's, so every route that answers it reads the role: `world` and `chats`
+give `player: null` and no chats of their own, `observe/chats` lists the played
+character's chats with everyone else's, and both history routes read any chat as
+an observer does. A chat a person outside the world is in (`user:<id>`: only
+ever the operator's console with the system agent) is never shown to a watcher:
+not listed, its history refused, its messages and the attention decisions about
+its lines left out of the timeline's windows themselves (`without`, so a page
+still fills), and kept out of the event stream, `journal` and `player` events
+included. Add a route or event that carries chat text or the player's identity
+and it must do the same.
+
 - `trusted-proxy`: the cloud wrapper authenticates the user, checks membership
   for the destination world, overwrites identity headers, and passes a
   normalized identity/role through an authenticated private connection using

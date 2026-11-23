@@ -100,20 +100,18 @@ export function ChatList({
           </EmptyMedia>
           <EmptyTitle>No conversations yet</EmptyTitle>
           <EmptyDescription>
-            Message a character from the inspector, or gather a few into a
-            group.
+            {canAct
+              ? "Message a character from the inspector, or gather a few into a group."
+              : "They show up here as people start talking and texting."}
           </EmptyDescription>
         </EmptyHeader>
-        <EmptyContent className="flex-row justify-center">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canAct}
-            onClick={onNewChat}
-          >
-            New chat
-          </Button>
-        </EmptyContent>
+        {canAct ? (
+          <EmptyContent className="flex-row justify-center">
+            <Button size="sm" variant="outline" onClick={onNewChat}>
+              New chat
+            </Button>
+          </EmptyContent>
+        ) : null}
       </Empty>
     );
   }

@@ -14,6 +14,8 @@ interface UiState {
   readonly inspectorTab: "you" | EntityKind;
   /** The Play as dialog. */
   readonly playDialog: { readonly open: boolean };
+  /** What a visitor is told on arriving, and can open again. */
+  readonly visitorWelcome: { readonly open: boolean };
   readonly quietKey: string | null;
   readonly dismissedFailures: ReadonlySet<string>;
 }
@@ -28,6 +30,7 @@ export const useUiStore = create<UiState>()(() => ({
   inspectorTabs: {},
   inspectorTab: "character",
   playDialog: { open: false },
+  visitorWelcome: { open: false },
   quietKey: null,
   dismissedFailures: new Set(),
 }));
@@ -78,6 +81,14 @@ export function openPlayDialog(): void {
 
 export function closePlayDialog(): void {
   useUiStore.setState({ playDialog: { open: false } });
+}
+
+export function openVisitorWelcome(): void {
+  useUiStore.setState({ visitorWelcome: { open: true } });
+}
+
+export function closeVisitorWelcome(): void {
+  useUiStore.setState({ visitorWelcome: { open: false } });
 }
 
 export function clearInspectorRequest(): void {

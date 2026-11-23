@@ -39,6 +39,26 @@ export function isUser(id: string): boolean {
 }
 
 /**
+ * Whether a journal event shows what a person outside the world said or was
+ * told: they are among its actors, or a line it quotes is theirs. Such an event
+ * is the operator's own, never for someone who only watches.
+ */
+export function involvesUser(event: {
+  readonly actors: readonly string[];
+  readonly payload: Readonly<Record<string, unknown>>;
+}): boolean {
+  if (event.actors.some(isUser)) return true;
+  const { lines } = event.payload;
+  return (
+    Array.isArray(lines) &&
+    lines.some(
+      (line: { sender?: unknown } | null) =>
+        typeof line?.sender === "string" && isUser(line.sender),
+    )
+  );
+}
+
+/**
  * Resolve a character's display label from native identity or their World Wiki
  * page. Authorship always comes from the tool context; neither this label nor
  * file metadata can change which character is sending the message.

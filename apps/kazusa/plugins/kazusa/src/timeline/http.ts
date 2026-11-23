@@ -20,7 +20,12 @@ import {
   type RecordedDecision,
 } from "../perception/decision-database.ts";
 import type { LogWindow } from "../messaging/message-database.ts";
-import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
+import {
+  createRouteRegistrar,
+  sendJson,
+  watchesOnly,
+} from "../http/helpers.ts";
+import { operatorOf } from "../identity.ts";
 import {
   journalKey,
   ledgerJournal,
@@ -58,7 +63,9 @@ export function registerTimelineHttp(
   const getConfig = () => currentConfig(api);
   const route = createRouteRegistrar(api);
 
-  route("timeline", "GET", async (req, res) => {
+  route("timeline", "GET", async (req, res, role) => {
+    // What a person outside the world says or is told is theirs alone.
+    const watching = watchesOnly(role);
     await deps.clock.init();
     const url = new URL(req.url ?? "/", "http://localhost");
     const query = url.searchParams;
@@ -174,6 +181,9 @@ export function registerTimelineHttp(
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
       ...(actorsFilter ? { actors: targetAgents } : {}),
+      // Left out of the windows themselves (messages and decisions), so they
+      // can't crowd a page out.
+      ...(watching ? { without: [operatorOf(api).id] } : {}),
     };
 
     if (wantsMessages) {

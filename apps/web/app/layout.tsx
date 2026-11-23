@@ -44,7 +44,11 @@ export default function RootLayout({
           <TooltipProvider>{children}</TooltipProvider>
         </NuqsAdapter>
         <Toaster position="top-center" />
-        {process.env.NODE_ENV === "production" && <Analytics />}
+        {/* Vercel serves its script only to its own deployments; anywhere
+            else (a desktop install, a tunnel) asking for it is a 404. */}
+        {process.env.NODE_ENV === "production" && process.env.VERCEL && (
+          <Analytics />
+        )}
       </body>
     </html>
   );

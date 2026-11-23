@@ -14,6 +14,7 @@ import {
   createRouteRegistrar,
   readJsonBody,
   sendJson,
+  watchesOnly,
 } from "../http/helpers.ts";
 import { operatorOf } from "../identity.ts";
 import type { Player } from "../player.ts";
@@ -64,7 +65,7 @@ export function registerClockHttp(
   const operator = options?.player?.operator ?? operatorOf(api);
   const route = createRouteRegistrar(api);
 
-  route("world", "GET", async (_req, res) => {
+  route("world", "GET", async (_req, res, role) => {
     await clock.init();
     const clockState = toClockState(clock);
     const worldMeta: WorldMeta = options?.getWorldMeta
@@ -90,7 +91,10 @@ export function registerClockHttp(
 
     sendJson(res, 200, {
       operator,
-      player: (await options?.player?.playing()) ?? null,
+      // Who the operator plays is theirs: someone watching plays nobody.
+      player: watchesOnly(role)
+        ? null
+        : ((await options?.player?.playing()) ?? null),
       serverNow: Date.now(),
       clock: clockState,
       capabilities,
