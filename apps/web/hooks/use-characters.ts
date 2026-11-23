@@ -17,6 +17,26 @@ import {
 import { WIKI_KEY } from "@/lib/source/wiki/http";
 
 const EMPTY_CHARACTERS: readonly CharacterSummary[] = [];
+
+/** One of the world's cast: a character, not an NPC or the system agent. */
+export function isCast(
+  character: Pick<CharacterSummary, "kind" | "isSystemAgent"> | undefined,
+): boolean {
+  return character?.kind === "agent" && !character.isSystemAgent;
+}
+
+/** The cast by name. */
+export function useCast(): readonly CharacterSummary[] {
+  const { characters } = useCharacters();
+  return useMemo(
+    () =>
+      characters
+        .filter(isCast)
+        .toSorted((a, b) => a.name.localeCompare(b.name)),
+    [characters],
+  );
+}
+
 export function useCharacters() {
   const { resolved } = useSources();
   const resource = useCharactersResource();

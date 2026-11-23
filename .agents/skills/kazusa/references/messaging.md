@@ -41,13 +41,14 @@ Write one record to each participant's private view of the conversation:
 Authorship is the `senderIdentity`, never the role. The same rule applies to
 direct and group chats:
 
-| Actual speaker | Alice's native ledger         | Bob's native ledger          |
-| -------------- | ----------------------------- | ---------------------------- |
-| Alice          | `user`, sender `alice` (self) | `user`, sender `alice`       |
-| Bob            | `user`, sender `bob`          | `user`, sender `bob` (self)  |
-| Human Sensei   | `user`, sender `user:sensei`  | `user`, sender `user:sensei` |
+| Actual speaker | Alice's native ledger         | Bob's native ledger         |
+| -------------- | ----------------------------- | --------------------------- |
+| Alice          | `user`, sender `alice` (self) | `user`, sender `alice`      |
+| Bob            | `user`, sender `bob`          | `user`, sender `bob` (self) |
+| Sensei, played | `user`, sender `sensei`       | `user`, sender `sensei`     |
 
-The human row describes the required group projection; current WebChat ingress
+A played character's lines are theirs: the person at the keyboard sends as them
+(`byPlayer` on the delivery), never as a `user:` id. Current WebChat ingress
 only reaches the owner of its selected session. Native roles are a persistence
 adapter detail. The production chat UI should render stable sender identities
 and mark the viewer's own messages as self; it should not choose one character
@@ -180,7 +181,9 @@ fresh server-owned UUID for every send, independent of the provider's reusable
 tool-call IDs. A new group or huddle gets a random 10-character id
 (`newChatId`), short enough to copy into every reply; each `create_group` makes
 a new group. Titles are labels, not identities; changing a title never changes a
-key.
+key. A group made without a title stays untitled (`title: null`, no "Group chat"
+default): clients name it by its members, and each ledger's label lists the
+others in it.
 
 `list_chats({ query? })` returns only the caller's current memberships with its
 own session keys, titles, and member IDs. It reads routing metadata, not
@@ -226,19 +229,25 @@ routing metadata; an internal retry with the retained request ID reuses it.
 Re-executing the tool starts a new send. There is no cross-store atomic
 transaction.
 
-## Human player integration (`user:`)
+## People at the keyboard (`user:`)
 
-Human players (such as Sensei) participate directly in the Kivotos simulation
-without consuming agent runner processes or brain sessions:
+Since 2026-11-21 a person is nobody in the world (`SKILL.md` §3.10). They play a
+character, whose sends are that character's own (`messaging.send` with
+`byPlayer`: unpaced, into the character's ledgers, `byPlayer` on the delivery
+and the stimulus), or nobody. A `user:` id, the operator, appears in exactly one
+kind of chat: a direct chat with the system agent, the console
+(`validateMembers` refuses any other). What follows describes how that `user:`
+participant is carried; the in-world Sensei is now a character agent.
 
 - **Namespace & Addressing**: Human IDs use the `user:` prefix (e.g.
   `user:sensei` or `user:abc123`). Validated by
   `PARTICIPANT_ID = z.string().regex(/^(?:user:)?[a-z0-9][a-z0-9_-]*$/)`. Direct
   chats use the session key `agent:<agentId>:chat:direct:user:<userId>` (e.g.
   `agent:kazusa-kyouyama:chat:direct:user:sensei`).
-- **Configuration**: For the single-user MVP, the active human identity is
-  configured in `openclaw.json` under `plugins.entries.kazusa.config.user`
-  (`id: "user:sensei"`, `name: "Sensei"`), declared in `openclaw.plugin.json`.
+- **Configuration**: the operator is configured in `openclaw.json` under
+  `plugins.entries.kazusa.config.user` (`{ id: "user:<name>", name }`, usually
+  from the world's template), declared in `openclaw.plugin.json`. It is
+  required, with no default, so no setting's names leak into another.
 - **Human delivery**: Humans belong to the canonical message's frozen
   `audience`. `copies` contains actual agent projections only; there are no fake
   settled human copies, human agent directories or human brains. Human history
@@ -250,31 +259,30 @@ without consuming agent runner processes or brain sessions:
   fallback, and sends a simulation-timestamped stimulus to that owner's
   Perception. Generic input into `chat:direct:bob` can therefore be attributed
   to Bob; this development-only limitation is currently accepted.
-- **Current Group Limitation**: Outgoing agent messages support human members,
-  but native human ingress reaches only the selected session owner. It does not
-  apply Kazusa group membership checks or copy the input to the other members.
-  Do not post human messages into native WebChat group sessions, even when the
-  human is a member. Use the Kazusa conversation ingress after client wiring is
-  validated; native WebChat remains a direct-chat development bridge.
-- **Wiki Grounding**: Canonical human character data is documented in the World
-  Wiki (`shared/wiki/entities/characters/sensei.md` with
-  `is_simulated_agent: false`), while characters track their subjective
-  relationship cards in their Personal Wiki
-  (`workspaces/<id>/wiki/entities/characters/sensei.md` with
-  `peer_id: "user:sensei"`, `name: "Sensei"`, `relation_type: "mentor"`, and
-  concise `summary`).
+- **People take part as characters**: a person is in groups, huddles and direct
+  chats as the character they play, like anyone in the world; several people
+  would each be there as their own character. Their `user:` id itself is outside
+  the world and is never a member of any chat but their console with the system
+  agent (`validateMembers`), by design. Native WebChat remains a direct-chat
+  development bridge only.
+- **Wiki Grounding**: Sensei is a character like any other: their World Wiki
+  page is `shared/wiki/characters/sensei.md`, and characters keep their own page
+  of them under that id. The operator has no page; the system agent knows them
+  from her `USER.md`.
 
 ### Human conversations and the custom client
 
-Human sends must use the same acceptance and agent fan-out policy as agent
-speech. `Messaging.send()` supports human participant IDs and writes each agent
-copy before notifying that agent's Perception. It never creates a human brain.
-The HTTP adapter exposes `/kazusa/chats`, `/kazusa/messages`, `/kazusa/send`,
-`/kazusa/chats/manage`, `/kazusa/agents`, `/kazusa/typing` and `/kazusa/events`.
-These are Kazusa routes, not native `chat.send`. Wire schemas are shared through
-`@kazusa/client`; the backend binds the configured single human. See
-[the client reference](client.md) for typing, sequence pagination and live
-verification. End-user authentication is deferred.
+Sends from the client use the same acceptance and agent fan-out policy as agent
+speech. `Messaging.send()` writes each agent copy before notifying that agent's
+Perception. It never creates a human brain. Who a request acts as is `actorFor`
+(SKILL.md §3.10): the operator in their console, the played character everywhere
+else, unpaced and marked `byPlayer`. The HTTP adapter exposes `/kazusa/chats`,
+`/kazusa/messages`, `/kazusa/send`, `/kazusa/chats/manage`, `/kazusa/agents`,
+`/kazusa/typing` and `/kazusa/events`. These are Kazusa routes, not native
+`chat.send`. Wire schemas are shared through `@kazusa/client`; the backend binds
+the configured operator and whoever they play (`ChatsResponse.operator` /
+`.player`). See [the client reference](client.md) for typing, sequence
+pagination and live verification. End-user authentication is deferred.
 
 Native WebChat's claimed-dispatch fallback may persist a human message with
 wall-clock time and native input identity after the Perception hook runs. It
@@ -460,8 +468,9 @@ audiences, ledger copies and notifications are unchanged per bubble.
   the client's reveal. A send emits its message before the stop that clears its
   indicator, so a client can tell a line that landed from one that was dropped.
   Reading a message or thinking about a reply sets nothing: read receipts and
-  the brain's status show those. A character's indicator has no expiry; a
-  player's lapses after 8 s unless the composer renews it.
+  the brain's status show those. A character's indicator has no expiry; one set
+  from the client (as the played character, or in the console) lapses after 8 s
+  unless the composer renews it.
 - **Face to face** (a huddle), every spoken line also waits for the huddle's
   floor; actions never do. A steer that stops a line mid-way commits what was
   heard of it, ending in "—"; a text stopped while being typed is never sent.

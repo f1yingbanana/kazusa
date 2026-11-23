@@ -241,10 +241,10 @@ After-School Sweets Club.
 - **Simulation Mapping**:
   - **Active Simulated Agents**: Have a workspace in `workspaces/<id>/` and an
     entry in `openclaw.json`.
-  - **Human Players (`user:`)**: Represented with `character_id: user:<id>`
-    (e.g. `user:sensei`) and `is_simulated_agent: false`. They participate
-    directly in in-world chats through client interfaces without consuming
-    runner processes.
+  - **Played characters**: any active agent, Sensei included, can be played by
+    the person at the keyboard (the operator, `user:<id>`, who has no page and
+    stays outside the world); their page is the same as anyone's (SKILL.md
+    §3.10).
   - **Background NPCs**: Exist only as World Wiki entity cards. Active agents
     can search for them, talk about them, and reference their canonical bio
     without spawning runner processes.
@@ -254,7 +254,7 @@ After-School Sweets Club.
 pageType: entity
 entityType: person
 id: entity.character.sensei
-character_id: user:sensei
+character_id: sensei
 name: Sensei
 canonicalId: schale.sensei
 aliases: [Teacher, Advisor]
@@ -262,7 +262,7 @@ affiliation: Federal Investigation Club SCHALE
 role: SCHALE Advisor / Teacher
 personality_traits: [patient, empathetic, observant, dedicated]
 status: ACTIVE_IN_WORLD
-is_simulated_agent: false # Human player
+is_simulated_agent: true # played or not
 home: schale_office # where they are until they first move
 ---
 
@@ -355,8 +355,7 @@ talkative, though he procrastinates on assignments.
 ### Field Specifications
 
 - `peer_id` (string, required): Canonical peer identifier matching an agent ID
-  (e.g. `bob`) or a human player identifier with the `user:` prefix (e.g.
-  `user:sensei`).
+  (e.g. `bob`, `sensei`). Never a `user:` id: the operator is outside the world.
 - `name` (string, required): Full display name (e.g. `Bob Moreno`).
 - `relation_type` (string, required): Qualitative relationship label
   (`close_friend`, `friend`, `classmate`, `acquaintance`, `rival`, `mentor`,

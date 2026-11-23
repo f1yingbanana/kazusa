@@ -3,6 +3,8 @@ import {
   CharacterContextSummary,
 } from "@/components/inspector/sections/character-context";
 import { CharacterDesiresSection } from "@/components/inspector/sections/character-desires";
+import { useCharacterStatus } from "@/hooks/use-characters";
+import type { EntityRef } from "@/lib/state/entity-ref";
 import { CharacterHeaderSection } from "@/components/inspector/sections/character-header";
 import {
   CharacterModelSection,
@@ -10,18 +12,12 @@ import {
 } from "@/components/inspector/sections/character-model";
 import { CharacterNowSection } from "@/components/inspector/sections/character-now";
 import {
-  CharacterProfileSection,
-  CharacterProfileSummary,
-} from "@/components/inspector/sections/character-profile";
-import {
   CharacterRecentSection,
   CharacterRecentSummary,
 } from "@/components/inspector/sections/character-recent";
 import {
   CharacterStatesSection,
   CharacterStatesSummary,
-  useIsNotPlayer,
-  useIsPlayer,
 } from "@/components/inspector/sections/character-states";
 import { ChatSummarySection } from "@/components/inspector/sections/chat-summary";
 import { PlaceHeaderSection } from "@/components/inspector/sections/place-header";
@@ -29,6 +25,11 @@ import { PlacePeopleSection } from "@/components/inspector/sections/place-people
 import { PlaceWaysSection } from "@/components/inspector/sections/place-ways";
 import { useRunsOnModel } from "@/hooks/use-models";
 import type { InspectorSection } from "./types";
+
+/** Nobody plays them: their own model does, or nobody (offstage). */
+function useIsNotPlayed(entity: EntityRef): boolean {
+  return !useCharacterStatus(entity.id)?.playedBy;
+}
 
 /**
  * Header sections render without a title. Each section answers one question a
@@ -60,6 +61,8 @@ const SECTIONS: readonly InspectorSection[] = [
     order: 15,
     requires: ["characters", "desires"],
     component: CharacterDesiresSection,
+    // Played, their body holds still: nothing to read.
+    useApplies: useIsNotPlayed,
   },
   {
     id: "character.states",
@@ -69,20 +72,7 @@ const SECTIONS: readonly InspectorSection[] = [
     requires: ["characters", "stats"],
     component: CharacterStatesSection,
     // Meters to read: a character is changed by what happens to them.
-    useApplies: useIsNotPlayer,
     fold: "closed",
-    summary: CharacterStatesSummary,
-  },
-  {
-    // The player's own are theirs to set, so these start open.
-    id: "player.states",
-    entity: "character",
-    title: "States",
-    order: 17,
-    requires: ["characters", "stats"],
-    component: CharacterStatesSection,
-    useApplies: useIsPlayer,
-    fold: "open",
     summary: CharacterStatesSummary,
   },
   {
@@ -94,16 +84,6 @@ const SECTIONS: readonly InspectorSection[] = [
     component: CharacterRecentSection,
     fold: "closed",
     summary: CharacterRecentSummary,
-  },
-  {
-    id: "character.profile",
-    entity: "character",
-    title: "About",
-    order: 40,
-    requires: ["characters"],
-    component: CharacterProfileSection,
-    fold: "closed",
-    summary: CharacterProfileSummary,
   },
   {
     id: "character.model",

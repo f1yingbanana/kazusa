@@ -14,6 +14,8 @@ import {
   CharacterCreatePayloadSchema,
   CharacterDeletePayloadSchema,
   type CharacterCreateResponse,
+  PlayPayloadSchema,
+  type PlayResponse,
   StagePayloadSchema,
   type StageResponse,
 } from "@kazusa/client";
@@ -27,7 +29,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { z } from "zod";
 import type { Perception } from "../perception/perception.ts";
 import type { TaskStore } from "../taskman/types.ts";
 import type { Messaging } from "../messaging/messaging.ts";
@@ -43,15 +44,7 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-import { playerWikiDir, readPlayerPage } from "../profile/page.ts";
-
-const USER = z.object({
-  id: z
-    .string()
-    .regex(/^user:[a-z0-9][a-z0-9_-]*$/)
-    .default("user:sensei"),
-  name: z.string().trim().min(1).default("Sensei"),
-});
+import type { Player } from "../player.ts";
 
 /**
  * What the roster shows of a character, from their World Wiki page: its name,
@@ -143,22 +136,26 @@ export async function resolveCharacterStatus(
     deps.stage.lookup(agentId),
   ]);
   const composingIn = deps.messaging.getComposingChats(agentId);
+  const playedBy = stageRecord?.playedBy;
 
   return {
-    task: task
-      ? {
-          id: task.id,
-          type: task.type,
-          description: task.description,
-          startedAt: new Date(task.startedAt).getTime(),
-          endAt: new Date(task.endAt).getTime(),
-        }
-      : undefined,
+    // A person playing them does what they do, with no activity of record.
+    task:
+      task && !playedBy
+        ? {
+            id: task.id,
+            type: task.type,
+            description: task.description,
+            startedAt: new Date(task.startedAt).getTime(),
+            endAt: new Date(task.endAt).getTime(),
+          }
+        : undefined,
     brain: brainState.brain,
     composingIn,
     queued: brainState.queued,
     onstage,
     ...(!onstage && stageRecord ? { offstageSince: stageRecord.since } : {}),
+    ...(playedBy ? { playedBy } : {}),
     ...(brainState.failure
       ? {
           failure: {
@@ -184,10 +181,13 @@ export function registerCharactersHttp(
       onstage: boolean,
       together: readonly string[],
     ) => Promise<void>;
+    /** The person at the keyboard and who they play. */
+    readonly player: Player;
+    /** Plays a character, or nobody (`undefined`), with every effect. */
+    readonly play: (person: string, id: string | undefined) => Promise<void>;
   },
 ): void {
   const getConfig = () => currentConfig(api);
-  const user = USER.parse(api.pluginConfig?.user ?? {});
   const route = createRouteRegistrar(api);
   registerAvatarHttp(api, route);
   const statusDeps = {
@@ -245,14 +245,6 @@ export function registerCharactersHttp(
       }),
     );
 
-    // Append Player summary
-    characters.push({
-      id: user.id,
-      name: user.name,
-      kind: "player",
-      aliases: [],
-    });
-
     sendJson(res, 200, { characters } satisfies CharactersResponse);
   });
 
@@ -267,7 +259,20 @@ export function registerCharactersHttp(
       return;
     }
     // One at a time: each change moves people and conversations others see.
-    const group = [...new Set(ids)];
+    // Someone being played stays on while a group goes off around them.
+    const asked = [...new Set(ids)];
+    const played = onstage
+      ? new Set<string>()
+      : new Set(
+          (
+            await Promise.all(
+              asked.map(async (id) =>
+                (await statusDeps.stage.lookup(id))?.playedBy ? id : null,
+              ),
+            )
+          ).filter((id) => id !== null),
+        );
+    const group = asked.filter((id) => !played.has(id));
     const statuses: Record<string, CharacterStatus> = {};
     for (const id of group) {
       await deps.setOnstage(id, onstage, group);
@@ -278,6 +283,29 @@ export function registerCharactersHttp(
     sendJson(res, 200, { statuses } satisfies StageResponse);
   });
 
+  // Who the person plays: a character of the cast, or nobody (watching). The
+  // character they leave goes back to their own model first.
+  route("player", "POST", async (req, res) => {
+    const { characterId } = PlayPayloadSchema.parse(await readJsonBody(req));
+    const config = getConfig();
+    if (characterId !== null) {
+      if (!listAgentIds(config).includes(characterId)) {
+        sendJson(res, 404, { error: `Character not found: ${characterId}` });
+        return;
+      }
+      if (characterId === systemAgentOf(config)) {
+        sendJson(res, 400, { error: "The system agent isn't in the world." });
+        return;
+      }
+    }
+    const before = await deps.player.playing();
+    await deps.play(deps.player.operator.id, characterId ?? undefined);
+    const after = await deps.player.playing();
+    for (const id of new Set([before?.id, after?.id]))
+      if (id) await broadcastStatus(id);
+    sendJson(res, 200, { player: after ?? null } satisfies PlayResponse);
+  });
+
   route("character/create", "POST", async (req, res) => {
     const { id, name } = CharacterCreatePayloadSchema.parse(
       await readJsonBody(req),
@@ -286,10 +314,7 @@ export function registerCharactersHttp(
     const cast = listAgentIds(config);
     const wikiDir = worldWikiDir(api);
     // Characters, places and concepts share one namespace of ids.
-    const taken =
-      cast.includes(id) ||
-      id === user.id.replace(/^user:/, "") ||
-      wikiPageIds(wikiDir).has(id);
+    const taken = cast.includes(id) || wikiPageIds(wikiDir).has(id);
     const someone = cast.find((one) => one !== systemAgentOf(config));
     const anchorAgent = someone ?? cast[0];
     const workspaces = anchorAgent
@@ -368,22 +393,6 @@ export function registerCharactersHttp(
     const id = url.searchParams.get("id");
     if (!id) {
       sendJson(res, 400, { error: "Missing required id query parameter." });
-      return;
-    }
-
-    if (id === user.id) {
-      sendJson(res, 200, {
-        character: {
-          id: user.id,
-          name: user.name,
-          kind: "player",
-          aliases: [],
-          groups: [],
-          bodyMarkdown:
-            (await readPlayerPage(playerWikiDir(api), user.id))?.about ||
-            `The player, ${user.name}.`,
-        },
-      } satisfies CharacterDetailResponse);
       return;
     }
 

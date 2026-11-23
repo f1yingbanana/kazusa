@@ -66,7 +66,7 @@ export function BandScale({ stat }: { stat: NumberStat }) {
             style={{ flexGrow: width }}
           >
             <span className="truncate">{name}</span>
-            <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+            <span className="font-mono text-xs text-muted-foreground tabular-nums">
               {from}
             </span>
           </span>

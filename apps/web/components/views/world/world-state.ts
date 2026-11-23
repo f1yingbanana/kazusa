@@ -216,10 +216,7 @@ export function useWorldFolders(by: Dimension, kind: KindFilter) {
   const offstage = useOffstage();
 
   const pool = useMemo(
-    () =>
-      filterCharacters(characters, kind, "", (id) => offstage.has(id)).filter(
-        (c) => c.kind !== "player",
-      ),
+    () => filterCharacters(characters, kind, "", (id) => offstage.has(id)),
     [characters, kind, offstage],
   );
   const poolIds = useMemo(

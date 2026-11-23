@@ -2,6 +2,11 @@
 
 import { useQueryStates, parseAsString } from "nuqs";
 import { chatsParsers } from "@/components/views/chats/search-params";
+import {
+  CastPickList,
+  useCastPicks,
+  type CastPick,
+} from "@/components/views/chats/cast-pick-list";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   CheckIcon,
@@ -12,7 +17,6 @@ import {
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PresenceAvatar } from "@/components/entities/presence-avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,13 +29,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -48,10 +45,9 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChatActions } from "@/hooks/use-chats";
 import { useOccupancy } from "@/hooks/use-location";
 import { useObservedChats } from "@/hooks/use-observed-chats";
-import { useOffstage } from "@/hooks/use-stage";
 import { useAccess } from "@/hooks/use-access";
+import { andList } from "@/lib/format";
 import type { Chat } from "@/lib/source/chats/types";
-import { cn } from "@/lib/utils";
 
 /*
  * The player's own group chats are theirs to run: rename, add, remove, leave.
@@ -177,53 +173,25 @@ export function ChatTitle({
   );
 }
 
-/** "Airi", "Airi and Natsu", "Airi, Natsu and Yoshimi": how a line names them. */
-function andList(names: readonly string[]): string {
-  return names.length < 2
-    ? (names[0] ?? "")
-    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
-interface Candidate {
-  readonly id: string;
-  readonly name: string;
-  readonly avatarUrl?: string;
-  /** Why they can't be picked, shown in place of the check. */
-  readonly busy?: string;
-  readonly offstage?: boolean;
-}
-
 /**
  * Who can be brought in: any character for a group; for a conversation in
  * person, those standing at the same place (someone talking with others there
  * would have to be walked over to, not called over, so they are shown but can't
  * be picked).
  */
-function useCandidates(chat: Chat): readonly Candidate[] {
+function useCandidates(chat: Chat): readonly CastPick[] {
   const { characters, byId } = useCharacters();
-  const offstage = useOffstage();
   const agentIds = useMemo(
     () => characters.filter((c) => c.kind === "agent").map((c) => c.id),
     [characters],
   );
   const occupied = useOccupancy(agentIds);
   const { chats: observed } = useObservedChats();
+  const others = useCastPicks(chat.members);
 
   return useMemo(() => {
-    const byName = (a: Candidate, b: Candidate) => a.name.localeCompare(b.name);
-    if (chat.type !== "huddle") {
-      return characters
-        .filter((c) => c.kind === "agent" && !chat.members.includes(c.id))
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          avatarUrl: c.avatarUrl,
-          offstage: offstage.has(c.id),
-        }))
-        .sort(
-          (a, b) => Number(a.offstage) - Number(b.offstage) || byName(a, b),
-        );
-    }
+    const byName = (a: CastPick, b: CastPick) => a.name.localeCompare(b.name);
+    if (chat.type !== "huddle") return others;
     const talking = new Map<string, readonly string[]>();
     for (const other of observed) {
       if (other.type !== "huddle" || other.placeId !== chat.placeId) continue;
@@ -251,7 +219,7 @@ function useCandidates(chat: Chat): readonly Candidate[] {
         (a, b) =>
           Number(Boolean(a.busy)) - Number(Boolean(b.busy)) || byName(a, b),
       );
-  }, [chat, characters, offstage, occupied, observed, byId]);
+  }, [chat, others, occupied, observed, byId]);
 }
 
 /**
@@ -380,56 +348,17 @@ export function AddPeople({
           </p>
         ) : (
           <>
-            <Command>
-              <CommandInput
-                placeholder={
-                  inPerson
-                    ? `Search ${candidates.length} here`
-                    : `Search ${candidates.length} characters`
-                }
-              />
-              <CommandList className="max-h-72">
-                <CommandEmpty>Nobody by that name.</CommandEmpty>
-                {candidates.map((candidate) => (
-                  <CommandItem
-                    key={candidate.id}
-                    value={`${candidate.name} ${candidate.id}`}
-                    data-checked={picked.has(candidate.id)}
-                    aria-checked={picked.has(candidate.id)}
-                    disabled={Boolean(candidate.busy)}
-                    onSelect={() => toggle(candidate.id)}
-                  >
-                    <PresenceAvatar
-                      id={candidate.id}
-                      name={candidate.name}
-                      avatarUrl={candidate.avatarUrl}
-                      kind="agent"
-                      size="xs"
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span
-                        className={cn(
-                          "truncate",
-                          candidate.offstage && "text-muted-foreground",
-                        )}
-                      >
-                        {candidate.name}
-                      </span>
-                      {candidate.busy ? (
-                        <span className="truncate text-xs text-muted-foreground">
-                          {candidate.busy}
-                        </span>
-                      ) : null}
-                    </span>
-                    {candidate.offstage ? (
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        Offstage
-                      </span>
-                    ) : null}
-                  </CommandItem>
-                ))}
-              </CommandList>
-            </Command>
+            <CastPickList
+              cast={candidates}
+              picked={picked}
+              onToggle={toggle}
+              placeholder={
+                inPerson
+                  ? `Search ${candidates.length} here`
+                  : `Search ${candidates.length} characters`
+              }
+              listClassName="max-h-72"
+            />
             <div className="flex items-center gap-2 border-t p-2">
               <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 {chosen.length === 0 ? hint : andList(names)}

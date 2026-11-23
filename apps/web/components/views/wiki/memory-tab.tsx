@@ -11,9 +11,15 @@ import { DocumentField } from "./parts";
 export function MemoryTab({
   character,
   onSaved,
+  headed = true,
+  readOnly = false,
 }: {
   character: WikiCharacterResponse;
   onSaved: () => Promise<unknown>;
+  /** Off in a panel whose header already names it. */
+  headed?: boolean;
+  /** For someone who can read it but not edit it. */
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -29,6 +35,8 @@ export function MemoryTab({
           return next;
         }}
         onReload={onSaved}
+        headed={headed}
+        readOnly={readOnly}
       />
     </div>
   );

@@ -105,12 +105,19 @@ export const AgentsResponseSchema = z.object({
 });
 export type AgentsResponse = z.infer<typeof AgentsResponseSchema>;
 
-/** GET /kazusa/chats */
+/** Someone, by id and the name others know them by. */
+export const ActorSchema = z.object({ id: z.string(), name: z.string() });
+export type Actor = z.infer<typeof ActorSchema>;
+
+/**
+ * GET /kazusa/chats: the operator's own (their console with the system agent)
+ * and those of the character they play, each from its owner's side.
+ */
 export const ChatsResponseSchema = z.object({
-  user: z.object({
-    id: z.string(),
-    name: z.string(),
-  }),
+  /** The person at the keyboard, outside the world. */
+  operator: ActorSchema,
+  /** The character they play, or `null` while watching. */
+  player: ActorSchema.nullable(),
   chats: z.array(ChatSchema),
 });
 export type ChatsResponse = z.infer<typeof ChatsResponseSchema>;
@@ -407,6 +414,11 @@ export const WorldPackageSchema = z.looseObject({
      * `groups`.
      */
     defaultGroup: z.string().optional(),
+    /**
+     * The character the setup guide picks for the person to play (they can pick
+     * another, or nobody). Saved as `config.user.defaultCharacter`.
+     */
+    defaultUserCharacter: z.string().optional(),
     /** Place ids the creator renamed, `{ "old_id": "new_id" }`, for updates. */
     renames: z.record(z.string(), z.string()).optional(),
     /** Merged into the plugin's config when the world is set up. */
@@ -425,7 +437,10 @@ export function authorName(author: WorldPackage["author"]): string | undefined {
 
 /** GET /kazusa/world. Missing capability keys mean "unavailable". */
 export const WorldResponseSchema = z.object({
-  user: z.object({ id: z.string(), name: z.string() }),
+  /** The person at the keyboard, outside the world. */
+  operator: ActorSchema,
+  /** The character they play, or `null` while watching. */
+  player: ActorSchema.nullable(),
   serverNow: z.number(),
   clock: ClockStateSchema,
   capabilities: z.partialRecord(DomainSchema, CapabilitySchema),
@@ -839,14 +854,15 @@ export type EmbeddingModelSelectPayload = z.infer<
   typeof EmbeddingModelSelectPayloadSchema
 >;
 
-/** GET /kazusa/profile: who the player is. Only `about` can be edited. */
+/**
+ * GET /kazusa/profile: the person at the keyboard, as the system agent knows
+ * them. Only `about` can be edited; it is how she addresses them.
+ */
 export const ProfileResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
-  /** Their World Wiki page, under its title. */
+  /** What the system agent knows of them (her `USER.md`). */
   about: z.string(),
-  /** That page, relative to the world's `shared` folder. */
-  wikiPage: z.string(),
 });
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 
@@ -956,7 +972,7 @@ export type ContextSettingsSavePayload = z.infer<
 /* ========================================================================== */
 
 /** Agent = has a workspace + roster entry; npc = World Wiki card only. */
-export const CharacterKindSchema = z.enum(["agent", "player", "npc"]);
+export const CharacterKindSchema = z.enum(["agent", "npc"]);
 export type CharacterKind = z.infer<typeof CharacterKindSchema>;
 
 /** Taskman `ActiveTask`, with ISO times converted to epoch-ms sim time. */
@@ -1104,6 +1120,11 @@ export const CharacterStatusSchema = z.object({
    * then: clients compute levels at this moment, not now.
    */
   offstageSince: z.number().optional(),
+  /**
+   * The person playing them (`user:<id>`), while one does. They are onstage but
+   * think nothing of their own: no activity, desires holding still.
+   */
+  playedBy: z.string().optional(),
   /** Why the latest run failed, until one gets through. `at` is real time. */
   failure: z.object({ error: z.string(), at: z.number() }).optional(),
 });
@@ -1164,6 +1185,21 @@ export const StageResponseSchema = z.object({
   statuses: z.record(z.string(), CharacterStatusSchema),
 });
 export type StageResponse = z.infer<typeof StageResponseSchema>;
+
+/**
+ * POST /kazusa/player. Who the person plays: a character, or `null` to watch.
+ * The character they leave goes back to their own model, after looking back on
+ * what was said and done as them.
+ */
+export const PlayPayloadSchema = z.object({
+  characterId: z.string().min(1).nullable(),
+});
+export type PlayPayload = z.infer<typeof PlayPayloadSchema>;
+
+export const PlayResponseSchema = z.object({
+  player: ActorSchema.nullable(),
+});
+export type PlayResponse = z.infer<typeof PlayResponseSchema>;
 
 /** A character's id: a page id, like `airi-kurimura`. */
 export const CharacterIdSchema = WikiIdSchema;
@@ -1579,6 +1615,17 @@ export const TaskDelayedEventSchema = z.object({
   }),
 });
 
+/** A person took the character over and their activity stopped there. */
+export const TaskStoppedEventSchema = z.object({
+  ...JournalBase,
+  kind: z.literal("task.stopped"),
+  payload: z.object({
+    taskId: z.string(),
+    type: z.string(),
+    description: z.string(),
+  }),
+});
+
 export const MessageSentEventSchema = z.object({
   ...JournalBase,
   kind: z.literal("message.sent"),
@@ -1710,6 +1757,7 @@ export const MemoryConsolidatedEventSchema = z.object({
 export const JournalEventSchema = z.discriminatedUnion("kind", [
   TaskStartedEventSchema,
   TaskDelayedEventSchema,
+  TaskStoppedEventSchema,
   MessageSentEventSchema,
   ChatCreatedEventSchema,
   ChatRenamedEventSchema,
@@ -1823,6 +1871,13 @@ export type PlacesStreamEvent = z.infer<typeof PlacesStreamEventSchema>;
 export const WorldStreamEventSchema = z.object({ type: z.literal("world") });
 export type WorldStreamEvent = z.infer<typeof WorldStreamEventSchema>;
 
+/** The person switched who they play: refetch the world and the chats. */
+export const PlayerStreamEventSchema = z.object({
+  type: z.literal("player"),
+  player: ActorSchema.nullable(),
+});
+export type PlayerStreamEvent = z.infer<typeof PlayerStreamEventSchema>;
+
 /**
  * What happens in chats the player isn't in, wrapped so it is never applied as
  * the player's own: a message, someone composing, or a change to the chat
@@ -1861,6 +1916,7 @@ export const StreamEventSchema = z.discriminatedUnion("type", [
   LocationStreamEventSchema,
   PlacesStreamEventSchema,
   WorldStreamEventSchema,
+  PlayerStreamEventSchema,
   ObservedStreamEventSchema,
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;

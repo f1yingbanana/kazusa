@@ -1,9 +1,9 @@
 # States: Values a World Keeps
 
 Status (2026-11-17): built, `src/stats/`. Player states (§6) were added on
-2026-11-17 and are covered by unit tests only. §0 says what a state is for,
-rewritten the same day from what §5 measured; §5 says what was checked, what was
-measured and what was left out.
+2026-11-17 and removed on 2026-11-21, when the person stopped being anyone in
+the world. §0 says what a state is for, rewritten the same day from what §5
+measured; §5 says what was checked, what was measured and what was left out.
 
 People say **state**; the code says **`stats`** (`src/stats/`, store `"stats"`,
 SSE `stats`, domain `stats`, `shared/stats.json`), because `state` (keyed
@@ -12,9 +12,10 @@ stores, desire state words) and `status` (presence) already mean other things.
 ## 0. What it is, and what it is for
 
 A state is a named value on a character, on one character's view of another (a
-pair: directed and private to its owner), on the world, or on the human player
-alone (§6). A world defines its own in Settings → States; `outfit` is built in
-(§3). The user can always set any of them.
+pair: directed and private to its owner), or on the world. The person plays a
+character, whose states are that character's (§6). A world defines its own in
+Settings → States; `outfit` is built in (§3). The user can always set any of
+them.
 
 **A state records where things stand. It never tells a character who to be.**
 Personality and memory decide what a character does, and a state that pulls
@@ -217,12 +218,12 @@ reads a process-wide copy of each character's outfit entry, filled at
 - **Client**: Settings → States defines them (with examples, advice under a
   field where a state would work badly as defined, and a number's words drawn to
   scale, §2); a value is set where its subject lives: the world's beside the
-  clock in the top bar, a character's in the inspector's States section, the
-  player's own in the same section, opened by You in the status bar. A
-  character's section is folded, its summary where their states stand, because
-  they are read far more than set; Toward lists who they hold something toward.
-  Nothing in the client puts a value back to its initial: `value: null` on
-  `/stats/set` still does. See the `kazusa-client` skill.
+  clock in the top bar, a character's in the inspector's States section (the one
+  you play included, on the inspector's You tab). A character's section is
+  folded, its summary where their states stand, because they are read far more
+  than set; Toward lists who they hold something toward. Nothing in the client
+  puts a value back to its initial: `value: null` on `/stats/set` still does.
+  See the `kazusa-client` skill.
 
 ## 5. Checked live, and not built
 
@@ -293,30 +294,16 @@ Not built:
 - A state with bands moves one step per answer, but nothing in code stops two
   answers in one night; a number without bands moves as far as the answer says.
   The description is the rule for both.
-- Player states (§6) have not been run with a model or in the client against a
-  live Gateway: unit tests only.
 
-## 6. A state only the player has (`on: "player"`)
+## 6. No states of the player (removed 2026-11-21)
 
-The human player has a body too: how tired they are, what they carry. A `player`
-state is a value only the player has and only the player sets (the system agent
-can as well), which the characters with them read.
+There was an `on: "player"` subject: values only the human player had and set.
+Since the person at the keyboard plays a character, or nobody, and is never
+anyone in the world themselves (`SKILL.md` §3.10), it is gone: the character
+they play has ordinary `character` states, set by hand like anyone's.
 
-- **Schema**: `changedBy` is `manual`; `shown` is `everyone` (people with the
-  player read it) or `nobody` (client only). There is no `self`: no model reads
-  the player's own prompt.
-- **Whose it is** (`statsOf(catalog, { player, outfits })`): the player's states
-  are the `character` states, as before, plus the `player` ones. A character's
-  never include them: not as their own in `Your state`, not in `changes`,
-  `change_state` or the sleep review, and `set_state` and `/stats/set` refuse
-  one on a character ("a state of the player"). The value is in the player's
-  record under `own`, set with the player's id as `characterId`.
-- **Prompt**: a character with the player reads it the way they read anyone's
-  `everyone` state: on the player's line (`Name: tired: worn out (…)`), only
-  while it differs from its initial, and described once under `What these are:`.
-  So write the description about the player as others see them. A character
-  whose own catalog shows nothing still gets `### Your state` when someone with
-  them has something that shows.
-- **Client**: Settings → States offers "You, the player" under Who has it; the
-  values are set in the inspector's States section opened by You in the status
-  bar.
+A world written before still has such entries in `shared/stats.json`: the
+catalog leaves them out with a warning (`withoutPlayer` in `stats/catalog.ts`)
+and keeps the rest, rather than fail the whole file. A file that doesn't read at
+all shows as no states, and `saveCatalog` refuses a save from the States page
+(`UnreadableCatalogError`, 409) so it can't be overwritten with nothing.

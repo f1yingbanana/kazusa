@@ -1,9 +1,19 @@
 import { create } from "zustand";
 import { createLoader, parseAsString } from "nuqs/server";
+import type { EntityKind } from "./entity-ref";
 
 interface UiState {
   readonly sidebarOpen: boolean;
   readonly inspectorRequested: boolean;
+  /**
+   * The inspector's open tabs: the last character, place and chat selected, one
+   * of each, kept while the selection moves on.
+   */
+  readonly inspectorTabs: Partial<Record<EntityKind, string>>;
+  /** The tab shown: one of those, or You, the character played. */
+  readonly inspectorTab: "you" | EntityKind;
+  /** The Play as dialog. */
+  readonly playDialog: { readonly open: boolean };
   readonly quietKey: string | null;
   readonly dismissedFailures: ReadonlySet<string>;
 }
@@ -15,6 +25,9 @@ let linkHonored = false;
 export const useUiStore = create<UiState>()(() => ({
   sidebarOpen: false,
   inspectorRequested: false,
+  inspectorTabs: {},
+  inspectorTab: "character",
+  playDialog: { open: false },
   quietKey: null,
   dismissedFailures: new Set(),
 }));
@@ -37,6 +50,34 @@ export function requestSidebar(): void {
 /** Explicit selection reopens the inspector even if the URL didn't change. */
 export function requestInspector(): void {
   useUiStore.setState({ inspectorRequested: true });
+}
+
+export function setInspectorTab(inspectorTab: "you" | EntityKind): void {
+  useUiStore.setState({ inspectorTab });
+}
+
+/** Something selected opens, or takes over, its kind's tab, and shows it. */
+export function openInspectorTab(kind: EntityKind, id: string): void {
+  useUiStore.setState((state) => ({
+    inspectorTabs: { ...state.inspectorTabs, [kind]: id },
+    inspectorTab: kind,
+  }));
+}
+
+/** Closes one kind's tab. */
+export function closeInspectorTab(kind: EntityKind): void {
+  useUiStore.setState((state) => {
+    const { [kind]: _closed, ...rest } = state.inspectorTabs;
+    return { inspectorTabs: rest };
+  });
+}
+
+export function openPlayDialog(): void {
+  useUiStore.setState({ playDialog: { open: true } });
+}
+
+export function closePlayDialog(): void {
+  useUiStore.setState({ playDialog: { open: false } });
 }
 
 export function clearInspectorRequest(): void {

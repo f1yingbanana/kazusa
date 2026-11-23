@@ -89,6 +89,10 @@ You dreamt: {dream}
 
 You slept on it.
 
+## looked-back
+
+You looked back on the last hours.
+
 ## reflect-awake
 
 You only go over things like this as you fall asleep for the night.
@@ -138,6 +142,10 @@ is none of them, say it again with `new`: true.
 ## task-finished
 
 Finished {type}. {started}
+
+## task-stopped
+
+Stopped {type}: "{description}".
 
 ## task-finished-summary
 

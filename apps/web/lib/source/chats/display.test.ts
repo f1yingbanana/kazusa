@@ -7,6 +7,7 @@ import {
   messagePreview,
   messageReceipt,
   receiptLabel,
+  selfIn,
 } from "./display";
 import type { Chat } from "./types";
 
@@ -28,6 +29,18 @@ function chat(patch: Partial<Chat>): Chat {
     ...patch,
   };
 }
+
+describe("selfIn", () => {
+  it("is the person in their console, and who they play elsewhere", () => {
+    const console = { members: ["arona", "user:sensei"] };
+    expect(selfIn(console, "airi", "user:sensei")).toBe("user:sensei");
+    // Observing, there is nobody played; the console is still theirs.
+    expect(selfIn(console, "", "user:sensei")).toBe("user:sensei");
+    expect(selfIn({ members: ["airi", "natsu"] }, "airi", "user:sensei")).toBe(
+      "airi",
+    );
+  });
+});
 
 describe("chatTitle", () => {
   it("names a direct chat after the partner, not their id", () => {
@@ -102,6 +115,15 @@ describe("chatTitle", () => {
       members: ["kazusa", "user:me"],
     });
     expect(chatTitle(group, "user:me", nameOf)).toBe("Sweets Club");
+  });
+
+  it("names an untitled group by the others in it", () => {
+    const group = chat({
+      type: "group",
+      name: "",
+      members: ["kazusa", "user:me", "yutori-natsu"],
+    });
+    expect(chatTitle(group, "user:me", nameOf)).toBe("Kazusa, Yutori Natsu");
   });
 });
 

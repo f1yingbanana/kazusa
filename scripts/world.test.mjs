@@ -209,6 +209,20 @@ describe("checkLiveWorld and downloadLiveWorld", () => {
     });
   });
 
+  it("doesn't offer the version the world is on again when its tag moved", async () => {
+    const { root, source, live } = kazusa();
+    await cloneWorld(root, "demo");
+    const here = git(live, "rev-parse", PLAY);
+    // The creator re-releases 0.2.0 on another commit.
+    git(source, "commit", "--quiet", "--allow-empty", "-m", "Redo");
+    git(source, "tag", "-f", "v0.2.0");
+    expect(await checkLiveWorld(root)).toMatchObject({
+      current: { commit: here, version: "0.2.0" },
+      latest: { version: "0.2.0" },
+      newer: false,
+    });
+  });
+
   it("counts a release as downloaded only once its tag is here", async () => {
     const { root, source, live } = kazusa();
     await cloneWorld(root, "demo");

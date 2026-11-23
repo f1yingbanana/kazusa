@@ -116,7 +116,7 @@ Each column narrows the one before it: **rail** (where) → **section sidebar**
 
 **Chats sidebar:** rows show a presence avatar for DMs (so you see who is
 thinking about a reply), last message or a typing shimmer, time, unread.
-Trailing action: New group. Observed chats will appear below as a section (needs
+Trailing action: New chat. Observed chats will appear below as a section (needs
 `observe`).
 
 **World sidebar (folders):**
@@ -390,13 +390,15 @@ doing and how they feel. Everything else folds under its title (the inspector
 frame's `fold`), with its key fact beside the folded title, and the viewer's
 open or folded choice carries over to every character.
 
-1. **Header:** presence avatar (large), name (id on hover), occupation ·
-   affiliation (two lines at most), and "NPC"/"Player" only for those kinds. A
-   failed turn is one red line, "Latest turn failed: …", whose whole error opens
-   on click. Then one row: labeled Message (hidden while their direct chat is
-   the one open), and Talk in person (same place) or Go there; Stop only while
-   they are thinking; star and a ⋯ menu (Peek at brain, Their chats, Open in
-   Timeline) at the end.
+1. **Header:** presence avatar (large), name (id on hover), their description
+   (two lines at most, its `[[links]]` live), and "NPC"/"Offstage" only when so.
+   A failed turn is one red line, "Latest turn failed: …", whose whole error
+   opens on click. Then one toolbar of icon buttons with tooltips, most used
+   first, as many as fit, the rest in More: Message (hidden while your direct
+   chat with them is open), Talk in person (same place) or Go to <place>, Stop
+   thinking (only while they are), Memory, Brain, Enable/Disable (manage);
+   Watch, Wiki page, Chats and Timeline always live in More. Who you play is
+   chosen from the status bar, not here.
 2. **Now:** the task as one line (category icon and label, `34m left`; the
    start–end times on hover), the description clamped to two lines (tap to
    expand), the progress bar; then the place on one line (`2h here`, the area on
@@ -408,17 +410,18 @@ open or folded choice carries over to every character.
 3. **Desires:** background pressure, so it stays quiet: only desires below the
    world's initial state, or ones the current task is moving (accent, target
    tick, trend arrow), get a row: prettified name, a bar segmented at the
-   world's state boundaries, and the state word the brain reads. "Nothing
-   pressing. All fine or better." when none do; "4 more" / "Show all 7" shows
-   the rest (remembered). When each changes ("Rising to full by 07:00", "Turns
-   low in 38m") is in the name's hover with the description, never a line of its
-   own. Levels are computed on the client from the closed-form record; no
-   numbers are shown (they are in the meter's ARIA value).
+   world's state boundaries, and the state word the brain reads. When none do,
+   the three lowest, so the section always says something; "N more" shows the
+   rest (remembered). Hidden for the one you play. When each changes ("Rising to
+   full by 07:00", "Turns low in 38m") is in the name's hover with the
+   description, never a line of its own. Levels are computed on the client from
+   the closed-form record; no numbers are shown (they are in the meter's ARIA
+   value).
 4. **Recent** (folded; "Task started at 23:15"): the last 3 journal events for
    this actor (`RECENT_KINDS`: the Timeline's defaults minus the `mind` facet,
    so neither messages nor attention bookkeeping), plus "Open in Timeline".
-5. **About** (folded; their role): role, traits and aliases (not ones equal to
-   the id or name), plus `bodyMarkdown` rendered verbatim in a collapsed block.
+5. There is no About section: the header's description and the Wiki page (in
+   More) cover who they are.
 6. **Model** (live agents only; folded; the model's name, "(world)" when it
    follows the default): chat model and reasoning level, each saying whether it
    follows the world default or was chosen for this character, with "Use world

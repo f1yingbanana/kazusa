@@ -24,7 +24,7 @@ import { useWikiList } from "@/hooks/use-wiki";
 import { NewCharacterDialog } from "./new-character-dialog";
 import { WorldPage } from "@/components/views/wiki/wiki-view";
 import { wikiParsers } from "@/components/views/wiki/search-params";
-import { useCharacters } from "@/hooks/use-characters";
+import { useCast, useCharacters } from "@/hooks/use-characters";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { useSources } from "@/lib/source/provider";
 import { requestSidebar } from "@/lib/state/ui-store";
@@ -33,16 +33,6 @@ import { cn } from "@/lib/utils";
 const characterParser = parseAsString;
 
 /** The cast this world simulates: the system agent isn't one of them. */
-function useCast() {
-  const { characters } = useCharacters();
-  return useMemo(
-    () =>
-      characters
-        .filter((one) => one.kind === "agent" && !one.isSystemAgent)
-        .toSorted((a, b) => a.name.localeCompare(b.name)),
-    [characters],
-  );
-}
 
 /** Each character of the cast, by name, with the line people know them by. */
 export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {

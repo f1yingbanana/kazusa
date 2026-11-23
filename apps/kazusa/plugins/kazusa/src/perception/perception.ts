@@ -1,3 +1,4 @@
+import { isUser } from "../identity.ts";
 import { resetContinuations } from "./continue.ts";
 import { deadlineSignal } from "../deadline.ts";
 import { inBackground } from "../background.ts";
@@ -22,7 +23,7 @@ import {
   type DecisionContextAssembler,
 } from "../context-engine/decision-context.ts";
 import { paceAt } from "../messaging/composing.ts";
-import { conversationId, isUser } from "../messaging/conversations.ts";
+import { conversationId } from "../messaging/conversations.ts";
 import {
   FLOOR_CHOICES,
   type SpeechFacts,
@@ -102,7 +103,7 @@ const isChatLine = (item: Stimulus): boolean =>
  * said in person. Others' talk in person is mostly overheard, and not caught.
  */
 const worthShowing = (item: Stimulus): boolean =>
-  isChatLine(item) && (!isHuddle(item) || isUser(item.sender));
+  isChatLine(item) && (!isHuddle(item) || item.byPlayer === true);
 
 /** How much of a line the timeline shows. */
 const EXCERPT_CHARS = 100;
@@ -348,6 +349,11 @@ export interface PerceptionDeps {
   readonly adopted?: (delivery: PerceptionDelivery) => Promise<boolean>;
   /** Whether the character is simulated. Absent: everyone is. */
   readonly onstage?: (agentId: string) => Promise<boolean>;
+  /**
+   * Whether a person plays them. Then what reaches them goes to that person,
+   * who sees it in their client; their model is handed nothing.
+   */
+  readonly played?: (agentId: string) => Promise<boolean>;
   /** Live in-person conversation, validated against current membership. */
   readonly realtime?: (agentId: string, item: Stimulus) => Promise<boolean>;
   /**
@@ -486,7 +492,7 @@ export class Perception {
 
   async receive(agentId: string, input: Stimulus): Promise<void> {
     const stimulus = STIMULUS.parse(input);
-    if (stimulus.sender.startsWith("user:")) resetContinuations(agentId);
+    if (isUser(stimulus.sender)) resetContinuations(agentId);
     if (
       !stimulus.sessionKey.startsWith(`agent:${agentId}:chat:`) &&
       stimulus.sessionKey !== `agent:${agentId}:tasks`
@@ -1043,6 +1049,60 @@ export class Perception {
     await Promise.all(agents.map((agentId) => this.drain(agentId)));
   }
 
+  /**
+   * A person plays them: nothing waits for their model. Everything queued is
+   * cleared; what has already happened is marked read, since the person sees it
+   * in their client, so senders see it read and, handed back, the model finds
+   * what the person left unanswered among chats awaiting a reply. A handoff in
+   * custody is left for its run to settle.
+   */
+  private async toPlayer(
+    agentId: string,
+    state: PerceptionState,
+  ): Promise<undefined> {
+    const read = this.clearFor(agentId, state);
+    await this.save(agentId, state);
+    // Read receipts go through Messaging's own queue, never this lock.
+    if (read) void this.notifyRead(read);
+    return undefined;
+  }
+
+  /** Empties the inbox but for what is in custody; returns what was read. */
+  private clearFor(
+    agentId: string,
+    state: PerceptionState,
+  ): PerceptionDelivery | undefined {
+    const reserved = inCustody(state);
+    const now = this.deps.clock.time();
+    const cleared = state.pending.filter(
+      (item) => !reserved.has(stimulusKey(item)),
+    );
+    state.pending = state.pending.filter((item) =>
+      reserved.has(stimulusKey(item)),
+    );
+    const seen = cleared.filter(
+      (item) =>
+        item.timestamp <= now && !item.foreseen && !item.deadline && !item.idle,
+    );
+    return seen.length ? this.deliveryOf(agentId, seen, "followup") : undefined;
+  }
+
+  /**
+   * A person takes them over: their queue goes, even when a stopped turn left
+   * the inbox halted.
+   */
+  async takeOver(agentId: string): Promise<void> {
+    let read: PerceptionDelivery | undefined;
+    await this.change(
+      agentId,
+      (state) => {
+        read = this.clearFor(agentId, state);
+      },
+      false,
+    );
+    if (read) await this.notifyRead(read);
+  }
+
   private batch(items: PendingItem[]): PendingItem[] {
     const selected: PendingItem[] = [];
     let chars = 0;
@@ -1169,6 +1229,9 @@ export class Perception {
       // A paused world is frozen: nothing is judged or handed over until the
       // clock runs again (`resume`). Live, a paused meeting of four ran a
       // hundred bubbles at one sim instant.
+      // A person plays them: nothing waits for a model, paused or not.
+      if (this.deps.played && (await this.deps.played(agentId)))
+        return await this.toPlayer(agentId, state);
       const systemAgent =
         this.deps.api?.runtime.config.current().agents?.defaults?.systemAgent
           ?.agentId === agentId;

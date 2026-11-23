@@ -128,7 +128,7 @@ describe("startIdleSupervisor", () => {
         perception,
         intervalMs: 10_000,
         stage: {
-          onstage: async (ids) => ids.filter((id) => id !== "alice"),
+          simulated: async (ids) => ids.filter((id) => id !== "alice"),
         },
       });
 

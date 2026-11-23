@@ -1,37 +1,46 @@
 "use client";
 
-import { MapPinIcon } from "lucide-react";
+import { useAccess } from "@/hooks/use-access";
 import { usePlace, usePlayer } from "@/hooks/use-location";
 import { useSelection } from "@/hooks/use-selection";
+import { useSources } from "@/lib/source/provider";
+import { openPlayDialog } from "@/lib/state/ui-store";
+
+const LINK = "hover:text-foreground disabled:hover:text-inherit";
 
 /**
- * The player and where they stand. "You" opens the player themselves, who is on
- * no list: their own states are set there. The place opens that place, where
- * "Go here" lives too.
+ * Who the person is, and where: who they play (or "an observer") opens Play as,
+ * the place opens that place.
  */
 export function PlayerPlaceItem() {
+  const { player: who, watching } = useSources();
   const player = usePlayer();
   const place = usePlace(player.placeId);
   const [, select] = useSelection();
-  if (!player.id) return null;
+  const { canPlay } = useAccess();
+  if (!watching && !who.id) return null;
   return (
-    <span className="flex items-center gap-1">
+    <span>
+      {"You are "}
       <button
         type="button"
-        className="hover:text-foreground"
-        onClick={() => void select({ kind: "character", id: player.id })}
+        className={LINK}
+        disabled={!canPlay}
+        onClick={() => openPlayDialog()}
       >
-        You
+        {watching ? "an observer" : who.name}
       </button>
-      {place ? (
-        <button
-          type="button"
-          className="flex items-center gap-1 hover:text-foreground"
-          onClick={() => void select({ kind: "place", id: place.id })}
-        >
-          <MapPinIcon className="size-3" aria-hidden />
-          {`at ${place.name}`}
-        </button>
+      {!watching && place ? (
+        <>
+          {" at "}
+          <button
+            type="button"
+            className={LINK}
+            onClick={() => void select({ kind: "place", id: place.id })}
+          >
+            {place.name}
+          </button>
+        </>
       ) : null}
     </span>
   );

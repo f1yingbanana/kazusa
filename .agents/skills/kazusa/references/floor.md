@@ -99,8 +99,9 @@ whether something heard makes their own speech moot or worth stopping for
 - **Biting their tongue.** Airi has a line ready, Natsu says it first, Airi lets
   it go. Unsaid bubbles reach no ledger; the observer could see them (§5).
 - **Being cut off.** "And another thing—", then someone else's line.
-- **The player is unpaced.** Sensei types in real time, so their line is said as
-  sent, over anyone: they can interrupt, and see who stops.
+- **The played character is unpaced.** The person types in real time, so a line
+  they send as whoever they play is said as sent, over anyone: they can
+  interrupt, and see who stops.
 - **Client.** The floor holder shows as speaking (the typing event with
   `mode: "speaking"`, set while a line is said); two at once show two. Waiting
   speakers show nothing: you can't see someone about to speak.
@@ -254,7 +255,7 @@ over them, `STEER` to stop or drop it, `QUEUE_NEXT` to finish anyway.
 | Speaking time + floor                                   | Short lines get in sooner; monologues cost the whole table.         |
 | Brain busy while waiting + `QUEUE_NEXT`                 | What is heard while waiting comes in one consolidated next turn.    |
 | Actions skip the floor                                  | Nodding, eating and reacting while someone talks.                   |
-| Unpaced player + `STEER`                                | The player can talk over anyone and see who stops.                  |
+| Unpaced played character + `STEER`                      | The person can talk over anyone and see who stops.                  |
 
 ### 4.6 Expected effect, and what to watch
 
@@ -320,7 +321,7 @@ talk cuts in often, the rubric is wrong, and the table is back to today.
   the floor, and "do I cut _her_ off with _this_" needs both. One call per
   contested send is still far below today's decision count.
 - **Overlap only by choice.** `CUT_IN` is the only way two lines are said at
-  once; the player is the other.
+  once; the played character, unpaced, is the other.
 - **Heard when finished, cut off where it stopped.** The person talked over
   notices a cut-in when it lands, through the existing gate, with no new
   stimulus kind; the broken-off text makes the interruption visible to everyone.

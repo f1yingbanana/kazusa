@@ -18,23 +18,6 @@ describe("state drafts", () => {
     }
   });
 
-  it("keeps a state of the player", () => {
-    const stat = StatDefinitionSchema.parse({
-      name: "tired",
-      description: "How tired you are.",
-      on: "player",
-      kind: "choice",
-      values: [{ name: "rested" }, { name: "worn out" }],
-      initial: "rested",
-      changedBy: "manual",
-      shown: "everyone",
-    });
-    expect(fromDraft(toDraft(stat)).stat).toEqual(stat);
-    expect(
-      fromDraft({ ...toDraft(stat), shown: "self" }).errors,
-    ).toHaveProperty("shown");
-  });
-
   it("reads lists a line at a time", () => {
     const { stat } = fromDraft({
       ...EMPTY_DRAFT,

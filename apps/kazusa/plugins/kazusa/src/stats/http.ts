@@ -15,7 +15,11 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import { catalogRevision } from "./catalog.ts";
-import { StaleCatalogError, type StatsService } from "./register.ts";
+import {
+  StaleCatalogError,
+  UnreadableCatalogError,
+  type StatsService,
+} from "./register.ts";
 
 /**
  * Serves the world's states and what each stands at (`GET /kazusa/stats`), and
@@ -28,15 +32,9 @@ export function registerStatsHttp(
 ): void {
   const route = createRouteRegistrar(api);
   const { stats, clock } = deps;
-  const user = api.pluginConfig?.user as { readonly id?: string } | undefined;
 
   const read = async (): Promise<StatsResponse> => {
-    const ids = [
-      ...new Set([
-        ...listAgentIds(currentConfig(api)),
-        user?.id ?? "user:sensei",
-      ]),
-    ];
+    const ids = [...new Set(listAgentIds(currentConfig(api)))];
     const records: Record<string, StatRecord> = {};
     await Promise.all(
       ids.map(async (id) => {
@@ -80,7 +78,11 @@ export function registerStatsHttp(
     try {
       stats.saveCatalog(parsed.data.catalog, parsed.data.base);
     } catch (error) {
-      if (!(error instanceof StaleCatalogError)) throw error;
+      if (
+        !(error instanceof StaleCatalogError) &&
+        !(error instanceof UnreadableCatalogError)
+      )
+        throw error;
       sendJson(res, 409, { error: error.message });
       return;
     }

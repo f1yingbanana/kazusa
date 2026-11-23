@@ -20,6 +20,7 @@ import { useAccess } from "@/hooks/use-access";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { setActiveChat } from "@/lib/live/realtime-state";
 import { chatSubject } from "@/lib/source/chats/display";
+import { useSelfIn } from "@/hooks/use-self";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
 import { keepsLinkedSelection, markQuietSelection } from "@/lib/state/ui-store";
 import { useSources } from "@/lib/source/provider";
@@ -39,7 +40,13 @@ import { ObservedChatView } from "./observed-chat-view";
  */
 export function ChatsView() {
   const docked = useMediaQuery("(min-width: 1024px)");
-  const { player } = useSources();
+  const { player, operator } = useSources();
+  const selfOf = useSelfIn();
+  // Who is played now, read when a send comes back.
+  const playing = useRef(player.id);
+  useEffect(() => {
+    playing.current = player.id;
+  }, [player.id]);
   const { canPlay, isLoading: isAccessLoading } = useAccess();
   const { chats } = useChats();
   const { byId } = useCharacters();
@@ -72,7 +79,7 @@ export function ChatsView() {
   // at it (the partner of a DM), whatever was selected before; picking
   // something else afterwards sticks. A page loaded from a link that names a
   // selection too keeps it.
-  const subject = open ? chatSubject(open, player.id) : null;
+  const subject = open ? chatSubject(open, selfOf(open)) : null;
   const subjectKey = subject ? serializeEntityRef(subject) : null;
   const selParam = queryState["sel"];
   const followed = useRef<string | null>(null);
@@ -101,13 +108,16 @@ export function ChatsView() {
     if (isAccessLoading) return;
     if (handledDm.current === dmTarget) return;
     handledDm.current = dmTarget;
+    // You and them: the one you play, or you yourself while playing nobody (to
+    // the system agent: your console). A character's own chat with the system
+    // agent is theirs, apart from your console.
+    const self = player.id || operator.id;
     const existing = chats.find(
       (chat) =>
         chat.type === "direct" &&
+        chat.members.length === 2 &&
         chat.members.includes(dmTarget) &&
-        chat.members.every(
-          (member) => member === dmTarget || member === player.id,
-        ),
+        chat.members.includes(self),
     );
     if (existing) {
       void setParams(
@@ -120,11 +130,14 @@ export function ChatsView() {
       void setParams({ "chats.dm": null }, { history: "replace" });
       return;
     }
-    const next = createChat({
-      type: "direct",
-      name: byId.get(dmTarget)?.name ?? dmTarget,
-      members: [dmTarget],
-    });
+    const next = createChat(
+      {
+        type: "direct",
+        name: byId.get(dmTarget)?.name ?? dmTarget,
+        members: [dmTarget],
+      },
+      self,
+    );
     setDraftChat(next);
     void setParams(
       { "chats.id": next.id, "chats.dm": null },
@@ -134,6 +147,7 @@ export function ChatsView() {
     dmTarget,
     chats,
     player.id,
+    operator.id,
     byId,
     createChat,
     setParams,
@@ -195,13 +209,18 @@ export function ChatsView() {
   ]);
 
   if (selected) {
+    // Who sends here is part of the view: switching starts it afresh, so a
+    // failed line kept for retry never goes out as the next character.
+    const sentAs = player.id;
     return (
       <div className="flex min-h-0 flex-1">
         <ChatView
-          key={selected.id}
+          key={`${selected.id}:${selfOf(selected)}`}
           chat={selected}
           onBack={() => void setParams({ "chats.id": null })}
           onSent={(chat) => {
+            // A first send that lands after a switch doesn't bring it back.
+            if (playing.current !== sentAs) return;
             setDraftChat(chat);
             void setParams({ "chats.id": chat.id });
           }}

@@ -10,8 +10,13 @@ import { SCENE_CONFIG } from "../scene/config.ts";
 import { registerLocationHttp } from "./http.ts";
 import type { LocationService } from "./register.ts";
 import { loadWorld } from "./world.ts";
+import { fakePlayer } from "../player-fake.ts";
 
 const { times } = SCENE_CONFIG.parse({});
+
+/** The person at the keyboard, playing `id` or watching. */
+const playing = (id?: string) =>
+  fakePlayer(id, { id: "user:player", name: "Player" });
 
 type Handler = (req: unknown, res: unknown) => Promise<boolean>;
 
@@ -31,6 +36,7 @@ function setup() {
   registerLocationHttp(api, {
     location: { place } as unknown as LocationService,
     times,
+    player: playing("natsu"),
   });
   const post = async (body: unknown) => {
     const req = Object.assign(
@@ -59,14 +65,49 @@ function setup() {
 }
 
 describe("POST /kazusa/move", () => {
-  it("moves the configured player, whoever the body names", async () => {
+  it("moves the character played, whoever the body names", async () => {
     const { place, post } = setup();
     const response = await post({ placeId: "library", id: "kazusa" });
     expect(response.status).toBe(200);
     expect(MoveResponseSchema.parse(response.body)).toEqual({
       record: { placeId: "library", since: 1_000 },
     });
-    expect(place).toHaveBeenCalledWith("user:player", "library");
+    expect(place).toHaveBeenCalledWith("natsu", "library");
+  });
+
+  it("refuses while watching: nobody is there to move", async () => {
+    const routes: Record<string, Handler> = {};
+    const api = {
+      config: { gateway: { auth: { token: "test-service-token" } } },
+      registerHttpRoute: vi.fn((opts: { path: string; handler: Handler }) => {
+        routes[opts.path] = opts.handler;
+      }),
+    } as unknown as OpenClawPluginApi;
+    const place = vi.fn();
+    registerLocationHttp(api, {
+      location: { place } as unknown as LocationService,
+      times,
+      player: playing(),
+    });
+    const req = Object.assign(
+      Readable.from([Buffer.from(JSON.stringify({ placeId: "library" }))]),
+      {
+        method: "POST",
+        url: "/kazusa/move",
+        headers: { authorization: "Bearer test-service-token" },
+        socket: new Socket(),
+      },
+    );
+    let status = 0;
+    await routes["/kazusa/move"]?.(req, {
+      writeHead: (code: number) => {
+        status = code;
+      },
+      setHeader: () => {},
+      end: () => {},
+    });
+    expect(status).toBe(409);
+    expect(place).not.toHaveBeenCalled();
   });
 
   it("refuses a place that is not on the map", async () => {
@@ -96,6 +137,7 @@ describe("POST /kazusa/places/positions", () => {
         },
       } as unknown as LocationService,
       times,
+      player: playing(),
     });
     return async (body: unknown) => {
       const req = Object.assign(
@@ -180,6 +222,7 @@ describe("GET /kazusa/places", () => {
     registerLocationHttp(api, {
       location: { world } as unknown as LocationService,
       times,
+      player: playing(),
     });
     let json = "";
     await handler?.(

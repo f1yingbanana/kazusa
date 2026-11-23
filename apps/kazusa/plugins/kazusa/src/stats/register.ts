@@ -140,6 +140,13 @@ function worn(): Map<string, StatEntry | undefined> {
 }
 
 /** A save made from a catalog that has changed since. */
+export class UnreadableCatalogError extends Error {
+  constructor() {
+    super("shared/stats.json doesn't read; fix it by hand before saving here.");
+    this.name = "UnreadableCatalogError";
+  }
+}
+
 export class StaleCatalogError extends Error {
   constructor() {
     super("The states changed since you opened them.");
@@ -168,11 +175,9 @@ export function createStats(deps: {
   readonly file: CatalogFile;
   readonly store: StateStore<StatRecord>;
   readonly now: () => number;
-  /** Characters and players a state can be on or toward. */
+  /** Characters a state can be on or toward. */
   readonly isPerson: (id: string) => boolean;
-  /** The human player, who alone has the `player` states. */
-  readonly isPlayer: (id: string) => boolean;
-  /** A character's outfits besides the usual clothes; none for a player. */
+  /** A character's outfits besides the usual clothes. */
   readonly outfitsOf?: (id: string) => readonly StatValueDef[];
   readonly labelOf: (id: string) => Promise<string>;
   /** A section of a skill, filled. */
@@ -191,10 +196,7 @@ export function createStats(deps: {
   const { file, store, now, isPerson } = deps;
   const outfits = (id: string) => deps.outfitsOf?.(id) ?? [];
   const statsFor = (id: string) =>
-    statsOf(file.read(), {
-      player: deps.isPlayer(id),
-      outfits: outfits(id),
-    });
+    statsOf(file.read(), { outfits: outfits(id) });
   /** The people a holder's states are toward. */
   const towardThem = (holder: string, ids: readonly string[]): StatPerson[] =>
     [...new Set(ids)]
@@ -317,6 +319,8 @@ export function createStats(deps: {
         worn().set(key, value.own[OUTFIT]);
     },
     saveCatalog(catalog, base) {
+      // A file that doesn't read shows as no states: saving would erase it.
+      if (!file.readable()) throw new UnreadableCatalogError();
       if (base !== catalogRevision(file.read())) throw new StaleCatalogError();
       file.write(catalog);
       deps.onCatalog?.();
@@ -327,7 +331,6 @@ export function createStats(deps: {
       const { name, characterId, toward, value } = change;
       // Everything defined: who it exists for is said below, not hidden.
       const stat = statsOf(file.read(), {
-        player: true,
         ...(characterId ? { outfits: outfits(characterId) } : {}),
       }).find((entry) => entry.name === name);
       if (!stat)
@@ -351,14 +354,6 @@ export function createStats(deps: {
       for (const id of [characterId, toward])
         if (id !== undefined && !isPerson(id))
           throw new Error(`Nobody here is ${id}.`);
-      if (
-        stat.on === "player" &&
-        characterId !== undefined &&
-        !deps.isPlayer(characterId)
-      )
-        throw new Error(
-          `${name} is a state of the player, not of a character.`,
-        );
       if (toward !== undefined && toward === characterId)
         throw new Error(`${name} is toward someone else.`);
       const key = characterId ?? WORLD_KEY;
@@ -512,8 +507,6 @@ export function registerStats(
   },
 ): StatsService {
   const text = pluginSkillText(api);
-  const user = api.pluginConfig?.user as { readonly id?: string } | undefined;
-  const playerId = user?.id ?? "user:sensei";
   const isAgent = (id: string) => listAgentIds(currentConfig(api)).includes(id);
   const stats = createStats({
     file: catalogFile(statsFile(), (message) => api.logger.warn(message)),
@@ -522,8 +515,7 @@ export function registerStats(
       retention: "retained",
     }),
     now: () => deps.clock.time(),
-    isPerson: (id) => id === playerId || isAgent(id),
-    isPlayer: (id) => id === playerId,
+    isPerson: isAgent,
     outfitsOf: (id) =>
       isAgent(id)
         ? [
@@ -603,7 +595,7 @@ export function registerStats(
     name: "set_state",
     label: "Set State",
     description:
-      "Set one of the world's states (defined in `shared/stats.json`) to a value: `characterId` for a state on a character (the player's id for a state of the player), `toward` as well for one character's state toward another, neither for a state of the world. A `null` value puts it back to its initial. To define, change or remove states, edit `shared/stats.json`.",
+      "Set one of the world's states (defined in `shared/stats.json`) to a value: `characterId` for a state on a character, `toward` as well for one character's state toward another, neither for a state of the world. A `null` value puts it back to its initial. To define, change or remove states, edit `shared/stats.json`.",
     parameters: {
       type: "object",
       properties: {

@@ -167,6 +167,8 @@ const BaseSchema = z.object({
 export const SetupRequestSchema = z.object({
   world: z.string(),
   cast: z.array(z.string()).default([]),
+  /** The character the person plays from the first start; absent, nobody. */
+  play: z.string().min(1).optional(),
   /**
    * Wall clock (`YYYY-MM-DDTHH:mm`) as picked. Sim time is shown in UTC, so it
    * is kept as UTC.
@@ -207,6 +209,8 @@ export interface WorldOption {
     readonly groups: readonly CharacterGroup[];
   }[];
   readonly defaultCast: readonly string[];
+  /** The template's `defaultUserCharacter`, when it is one of `characters`. */
+  readonly defaultUserCharacter?: string;
 }
 
 /** A world on offer: `scripts/world.mjs list` gives one per source. */
@@ -436,6 +440,7 @@ export function createSetup(
       fields
         .flatMap(({ groups }) => groups)
         .find(({ value }) => value === world.kazusa.defaultGroup)?.ids ?? [];
+    const playAs = world.kazusa.defaultUserCharacter;
     return {
       id,
       downloaded: true,
@@ -451,6 +456,9 @@ export function createSetup(
         })),
       })),
       defaultCast,
+      ...(playAs && characters.some(({ id: one }) => one === playAs)
+        ? { defaultUserCharacter: playAs }
+        : {}),
     };
   }
 
@@ -580,13 +588,22 @@ export function createSetup(
       ...(kazusa.memory as object),
       ...(world.config.memory as object | undefined),
     };
-    // A chosen cast starts paused, so nobody spends anything before the player is ready.
+    // A chosen cast starts paused, so nobody spends anything before the player
+    // is ready. Whoever they play is onstage with it, played from the start.
+    const played =
+      request.play && agents.includes(request.play) ? request.play : undefined;
     const chosen =
       agents.length > 1
         ? {
             stage: {
               defaultOnstage: false,
-              cast: [world.systemAgent, ...request.cast],
+              cast: [
+                ...new Set([
+                  world.systemAgent,
+                  ...request.cast,
+                  ...(played ? [played] : []),
+                ]),
+              ],
             },
             clock: {
               speed: 0,
@@ -612,7 +629,22 @@ export function createSetup(
           ...base.config.plugins.entries,
           kazusa: {
             ...base.config.plugins.entries.kazusa,
-            config: { ...kazusa, ...world.config, memory, ...chosen },
+            config: {
+              ...kazusa,
+              ...world.config,
+              memory,
+              ...chosen,
+              // Who is played comes from the pick alone: nobody clears any
+              // the template's config named.
+              ...(world.config.user || played
+                ? {
+                    user: {
+                      ...withoutDefaultCharacter(world.config.user),
+                      ...(played ? { defaultCharacter: played } : {}),
+                    },
+                  }
+                : {}),
+            },
           },
         },
       },
@@ -704,3 +736,10 @@ export function createSetup(
 export const setup = createSetup(
   path.resolve(/* turbopackIgnore: true */ process.cwd(), "../kazusa"),
 );
+
+/** The template's `config.user`, less any character it would start as. */
+function withoutDefaultCharacter(user: unknown): Record<string, unknown> {
+  if (!user || typeof user !== "object") return {};
+  const { defaultCharacter: _set, ...rest } = user as Record<string, unknown>;
+  return rest;
+}

@@ -34,7 +34,8 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     id: "player-place",
     side: "end",
     order: -10,
-    requires: ["places", "location"],
+    // Who you are shows even in a world without places.
+    requires: [],
     component: PlayerPlaceItem,
   },
   {

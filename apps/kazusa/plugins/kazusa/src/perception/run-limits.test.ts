@@ -5,8 +5,15 @@ import {
   brainRunLimits,
   registerBrainRunLimits,
   roomForSleep,
+  stopBrainRuns,
 } from "./run-limits.ts";
 import { beginTurn } from "../turn.ts";
+import { sharedPlayerIndex } from "../stage/stage.ts";
+
+/** A person plays `id` (the stage's shared index), or nobody. */
+function playing(id?: string) {
+  sharedPlayerIndex().byPerson = new Map(id ? [["user:sensei", id]] : []);
+}
 import type { Clock } from "../clock/clock.ts";
 
 const native = vi.hoisted(() => ({
@@ -80,6 +87,50 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("brain run hard budgets", () => {
+  it("cancels OpenClaw's run of a turn handed over just before a takeover that starts after it", () => {
+    const h = setup(
+      { maxModelCalls: 5, maxToolCalls: 2, maxThinkingSeconds: 5 },
+      "queued-run",
+    );
+    playing("alice");
+    stopBrainRuns("alice", "a person took them over");
+    h.start("model-1");
+    expect(native.abort).toHaveBeenCalledWith("session-1");
+    expect(h.tool("t")).toMatchObject({ block: true });
+    playing();
+  });
+  it("stops a run under way when a person takes them, and any that starts until handed back", () => {
+    const h = setup();
+    const running = beginBrainRun(
+      h.api,
+      "alice",
+      "run-1",
+      new AbortController().signal,
+    );
+    playing("alice");
+    stopBrainRuns("alice", "a person took them over");
+    expect(running.signal.aborted).toBe(true);
+    // Handed over a moment before the takeover, it starts after it.
+    const late = beginBrainRun(
+      h.api,
+      "alice",
+      "run-2",
+      new AbortController().signal,
+    );
+    expect(late.signal.aborted).toBe(true);
+    expect(h.tool("t")).toMatchObject({ block: true });
+    playing();
+    const after = beginBrainRun(
+      h.api,
+      "alice",
+      "run-3",
+      new AbortController().signal,
+    );
+    expect(after.signal.aborted).toBe(false);
+    running.dispose();
+    late.dispose();
+    after.dispose();
+  });
   it("blocks an excess tool before its side effects, without counting duplicate hook deliveries", () => {
     const h = setup();
     const budget = beginBrainRun(

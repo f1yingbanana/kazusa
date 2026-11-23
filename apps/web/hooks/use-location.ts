@@ -71,9 +71,10 @@ export function useOccupancy(ids: readonly string[]): Occupancy {
 }
 
 /**
- * Where the player stands now, and `moveTo` for going straight to a place (live
- * worlds only; `undefined` otherwise). Characters there may notice the player
- * come in; leaving takes the player out of their huddles.
+ * Where the character the person plays stands now, and `moveTo` for going
+ * straight to a place (live worlds only, and never while watching; `undefined`
+ * otherwise). Characters there may notice them come in; leaving takes them out
+ * of their huddles.
  */
 export function usePlayer() {
   const { resolved, player } = useSources();
@@ -99,6 +100,6 @@ export function usePlayer() {
     id: player.id,
     placeId: position?.kind === "at" ? position.placeId : undefined,
     live,
-    moveTo: live && canPlay ? moveTo : undefined,
+    moveTo: live && canPlay && player.id ? moveTo : undefined,
   };
 }

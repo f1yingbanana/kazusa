@@ -32,7 +32,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAccess } from "@/hooks/use-access";
-import { useCharacter, useCharacters } from "@/hooks/use-characters";
+import { isCast, useCharacter, useCharacters } from "@/hooks/use-characters";
 import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
 import { useWikiCharacter, useWikiReach } from "@/hooks/use-wiki-editor";
 import { CHARACTERS_KEY, useSources } from "@/lib/source/provider";
@@ -299,10 +299,7 @@ export function WorldPage({ id }: { id: string }) {
   const [, setCharacter] = useQueryState("character", parseAsString);
   const { canManage } = useAccess();
   const character = useCharacter(id);
-  const cast =
-    character?.kind === "agent" && !character.isSystemAgent
-      ? character
-      : undefined;
+  const cast = isCast(character) ? character : undefined;
   const editing = canManage && params["wiki.edit"] === "world";
   const plain = usePlainText();
   const { data: reach } = useWikiReach(id);

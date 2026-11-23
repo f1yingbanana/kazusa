@@ -28,6 +28,7 @@ npm's own fields say what the world is; everything Kazusa needs sits under one
   "kazusa": {
     "systemAgent": "arona",
     "defaultGroup": "After-School Sweets Club",
+    "defaultUserCharacter": "sensei",
     "renames": { "black_market": "black_market_district" },
     "config": {
       "welcome": ["…"],
@@ -42,21 +43,22 @@ npm's own fields say what the world is; everything Kazusa needs sits under one
 }
 ```
 
-| Field                 | Meaning                                                                                                 |
-| :-------------------- | :------------------------------------------------------------------------------------------------------ |
-| `name`                | npm's lowercase slug: the world's lasting identity. Never renamed once released.                        |
-| `displayName`         | The name people read (setup guide, screenshot credit). Not npm's own field; editors use it this way.    |
-| `version`             | Semver, raised with every template release. On a live world: the release it is on.                      |
-| `description`         | One or two sentences for the setup guide.                                                               |
-| `author`              | npm's author, `"Name <email> (url)"` or `{ name, email, url }`. Credited on shared screenshots.         |
-| `homepage`            | Where the world lives; the screenshot credit's link.                                                    |
-| `private`             | Always `true`: a world is never published to the npm registry.                                          |
-| `kazusa.title`        | The setup guide's label when it shouldn't be `displayName` (the starter: "Start from scratch").         |
-| `kazusa.systemAgent`  | The system admin's agent id.                                                                            |
-| `kazusa.defaultGroup` | The group the setup guide picks to start with: a value of one of the world's anchors.                   |
-| `kazusa.renames`      | Place and concept ids the creator renamed, `{ "old_id": "new_id" }`, so copies follow on update.        |
-| `kazusa.config`       | Merged into the plugin's config (`openclaw.json`) once, at setup. Later edits here don't reach a world. |
-| `repository`          | Npm's: where the world lives and its updates come from (`{ type: "git", url }`).                        |
+| Field                         | Meaning                                                                                                                                                                           |
+| :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                        | npm's lowercase slug: the world's lasting identity. Never renamed once released.                                                                                                  |
+| `displayName`                 | The name people read (setup guide, screenshot credit). Not npm's own field; editors use it this way.                                                                              |
+| `version`                     | Semver, raised with every template release. On a live world: the release it is on.                                                                                                |
+| `description`                 | One or two sentences for the setup guide.                                                                                                                                         |
+| `author`                      | npm's author, `"Name <email> (url)"` or `{ name, email, url }`. Credited on shared screenshots.                                                                                   |
+| `homepage`                    | Where the world lives; the screenshot credit's link.                                                                                                                              |
+| `private`                     | Always `true`: a world is never published to the npm registry.                                                                                                                    |
+| `kazusa.title`                | The setup guide's label when it shouldn't be `displayName` (the starter: "Start from scratch").                                                                                   |
+| `kazusa.systemAgent`          | The system admin's agent id.                                                                                                                                                      |
+| `kazusa.defaultGroup`         | The group the setup guide picks to start with: a value of one of the world's anchors.                                                                                             |
+| `kazusa.defaultUserCharacter` | The character the setup guide picks for the person to play (they can pick another, or nobody).                                                                                    |
+| `kazusa.renames`              | Place and concept ids the creator renamed, `{ "old_id": "new_id" }`, so copies follow on update.                                                                                  |
+| `kazusa.config`               | Merged into the plugin's config (`openclaw.json`) once, at setup. Later edits here don't reach a world. Must name the operator: `user: { id: "user:<name>", name }` (no default). |
+| `repository`                  | Npm's: where the world lives and its updates come from (`{ type: "git", url }`).                                                                                                  |
 
 Rules:
 
@@ -291,8 +293,8 @@ creator's) can sharpen this later if the review needs it; it isn't built.
 **Publish is a review**: ARONA lists the changes in the three kinds and the
 creator moves any of them. Promoting to timeless has ARONA rewrite it as undated
 or `always known`; promoting to story moves it into the checkpoint; the rest
-stays private. Pages about the player (`user:...`) are flagged: in a checkpoint
-they become a relationship the player inherits.
+stays private. Pages about whoever the person mostly played (Sensei, say) are
+flagged: in a checkpoint they become a relationship that character inherits.
 
 ### 4.5 Repositories
 

@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../characters/card.ts";
 import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -26,6 +27,7 @@ import {
   LIST_CHATS,
   MANAGE_CHAT,
   conversationId,
+  parseChatSession,
   type ChatSummary,
 } from "./conversations.ts";
 import {
@@ -33,14 +35,8 @@ import {
   type Messaging,
   type ObservedConversation,
 } from "./messaging.ts";
+import { WatchingError, type Actor, type Player } from "../player.ts";
 
-export const USER = z.object({
-  id: z
-    .string()
-    .regex(/^user:[a-z0-9][a-z0-9_-]*$/)
-    .default("user:sensei"),
-  name: z.string().trim().min(1).default("Sensei"),
-});
 const HISTORY = z.object({
   chatId: z.string().min(1),
   before: z.coerce.number().int().positive().optional(),
@@ -52,7 +48,8 @@ function clientChat(summary: ChatSummary, viewer: string): Chat {
     id: conversationId(viewer, summary.sessionKey),
     sessionKey: summary.sessionKey,
     type: summary.kind,
-    name: summary.title,
+    // Untitled, the client names it by its members.
+    name: summary.title ?? "",
     members: [...summary.members],
     ...(summary.placeId ? { placeId: summary.placeId } : {}),
   };
@@ -92,11 +89,16 @@ function observedChat({
 
 const MAX_STREAM_BACKLOG_BYTES = 8 * 1024 * 1024;
 
-/** Single-player HTTP adapter. Caller identity comes from config, never JSON. */
+/**
+ * The person's HTTP adapter. Who acts comes from the server, never JSON: the
+ * operator in their console with the system agent, and everywhere else the
+ * character they play. Watching, they read and send nothing of their own.
+ */
 export function registerMessagingHttp(
   api: OpenClawPluginApi,
   messaging: Messaging,
   agent: (id: string) => Promise<Agent>,
+  player: Player,
   options?: {
     readonly broadcaster?: KazusaRealtimeBroadcaster;
     readonly getStatuses?: () => Promise<Record<string, CharacterStatus>>;
@@ -105,23 +107,95 @@ export function registerMessagingHttp(
   },
 ): void {
   const getConfig = () => currentConfig(api);
-  const user = USER.parse(api.pluginConfig?.user ?? {});
+  const { operator } = player;
   const roster = (): ReadonlySet<string> => new Set(listAgentIds(getConfig()));
   const route = createRouteRegistrar(api);
+  const systemAgent = () => systemAgentOf(getConfig());
+  /**
+   * Who a request acts as, and the members it names besides them. The operator
+   * in their console with the system agent: its session, a new one naming them
+   * among its members, or one to her alone while they play nobody. Everywhere
+   * else the character they play, who may have a chat with her of their own.
+   */
+  const actorFor = async <
+    T extends {
+      readonly sessionKey?: string;
+      readonly members?: readonly string[];
+    },
+  >(
+    target: T,
+  ): Promise<{ readonly actor: Actor; readonly target: T }> => {
+    if (target.sessionKey) {
+      // The operator's keys carry no owner: theirs is only ever the console.
+      if (parseChatSession(target.sessionKey).owner === undefined)
+        return { actor: operator, target };
+    }
+    // Read once: a switch landing mid-request never mixes two of them.
+    const playing = await player.playing();
+    if (!target.sessionKey && target.members) {
+      const named = target.members.includes(operator.id);
+      const others = target.members.filter((id) => id !== operator.id);
+      const console = systemAgent();
+      if (
+        console &&
+        others.length === 1 &&
+        others[0] === console &&
+        (named || !playing)
+      )
+        return { actor: operator, target: { ...target, members: others } };
+      if (named) throw new Error("Only the system agent talks with you.");
+    }
+    if (!playing) throw new WatchingError();
+    return { actor: playing, target };
+  };
+  /** Whoever of the operator and their character is in this chat. */
+  const viewerOf = async (chatId: string): Promise<string> => {
+    const members = await messaging.membersOf(chatId);
+    return (await player.actorIn(members))?.id ?? operator.id;
+  };
+  /** The operator's console: them and the system agent, alone. */
+  const isConsole = (members: readonly string[]): boolean => {
+    const console = systemAgent();
+    return (
+      members.length === 2 &&
+      members.includes(operator.id) &&
+      console !== undefined &&
+      members.includes(console)
+    );
+  };
+  /** The people whose chats the person sees as their own, given who they play. */
+  const viewersOf = (playing: Actor | undefined): string[] =>
+    playing ? [operator.id, playing.id] : [operator.id];
   route("chats", "GET", async (req, res) => {
     const query =
       new URL(req.url ?? "/", "http://localhost").searchParams.get("query") ??
       undefined;
-    const summaries = await messaging.listChats(
-      user.id,
-      LIST_CHATS.parse({ query }),
+    const playing = await player.playing();
+    const listed = await Promise.all(
+      viewersOf(playing).map(async (viewer) =>
+        (await messaging.listChats(viewer, LIST_CHATS.parse({ query }))).map(
+          (summary) => ({ summary, viewer }),
+        ),
+      ),
     );
+    // A chat both of them are in is listed once, from the operator's side, as
+    // `viewerOf` reads it. The operator's own are only their console: a chat
+    // with characters from before they played characters is read-only history,
+    // with everyone else's.
+    const seen = new Set<string>();
+    const once = listed.flat().filter(({ summary, viewer }) => {
+      if (viewer === operator.id && !isConsole(summary.members)) return false;
+      const id = conversationId(viewer, summary.sessionKey);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
     const chats = await Promise.all(
-      summaries.map(async (summary) => {
-        const chat = clientChat(summary, user.id);
+      once.map(async ({ summary, viewer }) => {
+        const chat = clientChat(summary, viewer);
         const history = await messaging.getChatHistory({
           chatId: chat.id,
-          userId: user.id,
+          userId: viewer,
           limit: 1,
         });
         const latest = history.messages[0];
@@ -137,7 +211,11 @@ export function registerMessagingHttp(
         return chat;
       }),
     );
-    sendJson(res, 200, { user, chats } satisfies ChatsResponse);
+    sendJson(res, 200, {
+      operator,
+      player: playing ?? null,
+      chats,
+    } satisfies ChatsResponse);
   });
   route("messages", "GET", async (req, res) => {
     const params = HISTORY.parse(
@@ -148,12 +226,20 @@ export function registerMessagingHttp(
     sendJson(
       res,
       200,
-      await messaging.getChatHistory({ ...params, userId: user.id }),
+      await messaging.getChatHistory({
+        ...params,
+        userId: await viewerOf(params.chatId),
+      }),
     );
   });
   if (options?.observer) {
     route("observe/chats", "GET", async (_req, res) => {
-      const chats = await messaging.observeChats(user.id);
+      // Not the played character's, and not the console; the operator's older
+      // chats with characters are read here.
+      const playing = await player.playing();
+      const chats = (
+        await messaging.observeChats(playing ? [playing.id] : [])
+      ).filter(({ chat }) => !isConsole(chat.members));
       sendJson(res, 200, {
         chats: chats.map(observedChat),
       } satisfies ObservedChatsResponse);
@@ -173,13 +259,16 @@ export function registerMessagingHttp(
     });
   }
   route("send", "POST", async (req, res) => {
-    const params = DELIVERY_REQUEST.parse(await readJsonBody(req));
+    const { actor, target: params } = await actorFor(
+      DELIVERY_REQUEST.parse(await readJsonBody(req)),
+    );
     const result = await messaging.send(
-      user.id,
-      user.name,
+      actor.id,
+      actor.name,
       params,
       undefined,
       roster(),
+      actor.id !== operator.id,
     );
     sendJson(res, 200, {
       chatId: result.chatId,
@@ -189,14 +278,17 @@ export function registerMessagingHttp(
     } satisfies SendResponse);
   });
   route("chats/manage", "POST", async (req, res) => {
+    const params = MANAGE_CHAT.parse(await readJsonBody(req));
+    const actor = await player.playing();
+    if (!actor) throw new WatchingError();
     const summary = await messaging.manageChat(
-      user.id,
-      MANAGE_CHAT.parse(await readJsonBody(req)),
+      actor.id,
+      params,
       undefined,
       roster(),
     );
     sendJson(res, 200, {
-      chat: clientChat(summary, user.id),
+      chat: clientChat(summary, actor.id),
     } satisfies ManageChatResponse);
   });
   route("agents", "GET", async (_req, res) => {
@@ -221,11 +313,15 @@ export function registerMessagingHttp(
   });
   route("typing", "POST", async (req, res) => {
     const params = TYPING.parse(await readJsonBody(req));
+    const { actor } = await actorFor(params);
     await messaging.setTyping(
-      user.id,
-      user.name,
+      actor.id,
+      actor.name,
       params.sessionKey,
       params.isTyping && "typing",
+      undefined,
+      undefined,
+      true,
     );
     sendJson(res, 200, { success: true });
   });
@@ -248,15 +344,17 @@ export function registerMessagingHttp(
       }
       send(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
     };
+    // Who they see as themselves, read per event: they may switch mid-stream.
+    const own = (audience: readonly string[]) => player.owns(audience);
     const unsubscribeMessaging = messaging.onAnyEvent((event) => {
       if (event.type === "message") {
-        if (event.delivery.audience.includes(user.id))
+        if (own(event.delivery.audience))
           write({
             type: "message",
             chatId: event.delivery.chatId,
             message: clientMessage(event.delivery),
           });
-      } else if (event.audience.includes(user.id)) {
+      } else if (own(event.audience)) {
         write(
           event.type === "typing"
             ? event.typing
@@ -282,9 +380,15 @@ export function registerMessagingHttp(
       clearInterval(heartbeat);
     });
     try {
-      const typing = await messaging.getTyping(
-        options?.observer ? undefined : user.id,
-      );
+      const typing = options?.observer
+        ? await messaging.getTyping()
+        : (
+            await Promise.all(
+              viewersOf(await player.playing()).map((viewer) =>
+                messaging.getTyping(viewer),
+              ),
+            )
+          ).flat();
       const statuses = options?.getStatuses
         ? await options.getStatuses()
         : undefined;

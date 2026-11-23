@@ -69,7 +69,8 @@ describe("registerClockHttp", () => {
 
     expect(worldStatus).toBe(200);
     const parsedWorld = JSON.parse(worldJson ?? "{}");
-    expect(parsedWorld.user.name).toBe("Tester");
+    expect(parsedWorld.operator.name).toBe("Tester");
+    expect(parsedWorld.player).toBeNull();
     expect(parsedWorld.world.title).toBe("Test World");
     expect(parsedWorld.clock.speed).toBe(1);
     expect(parsedWorld.capabilities.clock).toBe("live");

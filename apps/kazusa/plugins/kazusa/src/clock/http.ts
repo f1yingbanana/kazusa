@@ -8,7 +8,6 @@ import {
   type WorldMeta,
   type WorldResponse,
 } from "@kazusa/client";
-import { z } from "zod";
 import type { Clock } from "./clock.ts";
 import { availableUpdate, worldCredit } from "../world/package.ts";
 import {
@@ -16,14 +15,8 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
-
-const USER = z.object({
-  id: z
-    .string()
-    .regex(/^user:[a-z0-9][a-z0-9_-]*$/)
-    .default("user:sensei"),
-  name: z.string().trim().min(1).default("Sensei"),
-});
+import { operatorOf } from "../identity.ts";
+import type { Player } from "../player.ts";
 
 /** Domains every Kazusa world serves; others depend on the world's data. */
 export const DEFAULT_CAPABILITIES: Readonly<
@@ -64,9 +57,11 @@ export function registerClockHttp(
     readonly getWorldMeta?: () => Promise<WorldMeta> | WorldMeta;
     /** Where the world's `package.json` is: the Gateway's working directory. */
     readonly worldDir?: string;
+    /** The person at the keyboard and who they play; else nobody's played. */
+    readonly player?: Player;
   },
 ): void {
-  const user = USER.parse(api.pluginConfig?.user ?? {});
+  const operator = options?.player?.operator ?? operatorOf(api);
   const route = createRouteRegistrar(api);
 
   route("world", "GET", async (_req, res) => {
@@ -94,7 +89,8 @@ export function registerClockHttp(
         : DEFAULT_CAPABILITIES;
 
     sendJson(res, 200, {
-      user,
+      operator,
+      player: (await options?.player?.playing()) ?? null,
       serverNow: Date.now(),
       clock: clockState,
       capabilities,

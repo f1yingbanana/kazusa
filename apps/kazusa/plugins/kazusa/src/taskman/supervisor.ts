@@ -14,8 +14,8 @@ export interface IdleSupervisorDeps {
   readonly maxAgentsPerTick?: number;
   /** Shared by every registration in the process; each test gets its own. */
   readonly cell?: SupervisorCell;
-  /** Offstage characters are never checked in on. */
-  readonly stage?: Pick<Stage, "onstage">;
+  /** Only characters their own model plays are checked in on. */
+  readonly stage?: Pick<Stage, "simulated">;
 }
 
 /**
@@ -60,7 +60,7 @@ export function startIdleSupervisor(
 
       const configured = [...new Set(listAgentIds(getConfig()))];
       const agentIds = deps.stage
-        ? await deps.stage.onstage(configured)
+        ? await deps.stage.simulated(configured)
         : configured;
       if (!agentIds.length) return;
 

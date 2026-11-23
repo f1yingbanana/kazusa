@@ -27,12 +27,14 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAccess } from "@/hooks/use-access";
+import { usePlay } from "@/hooks/use-play";
+import { useSources } from "@/lib/source/provider";
 import { useSimNow } from "@/hooks/use-clock";
 import { usePlace } from "@/hooks/use-location";
 import { formatListTimestamp } from "@/lib/format";
 import type { Agent } from "@kazusa/client";
 import { messagePreview } from "@/lib/source/chats/display";
+import { useSelfIn } from "@/hooks/use-self";
 import type { Chat, ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
 import { ChatAvatar } from "./chat-avatar";
@@ -41,40 +43,53 @@ import { useRealtimeStore, useTyping } from "@/lib/live/realtime-state";
 export function ChatList({
   chats,
   agentsById,
-  userId,
   isLoading,
   query,
   selectedChatId,
   onSelect,
-  onNewGroup,
+  onNewChat,
   quietWhenEmpty = false,
 }: {
   chats: Chat[];
   agentsById: ReadonlyMap<string, Agent>;
-  userId: string;
   isLoading: boolean;
   query: string;
   selectedChatId: string | null;
   onSelect: (chatId: string) => void;
-  onNewGroup: () => void;
+  onNewChat: () => void;
   /** Something follows this list, so an empty one needn't fill the panel. */
   quietWhenEmpty?: boolean;
 }) {
-  const { canPlay } = useAccess();
+  // Watching, there is nobody of yours to start a chat as.
+  const { canAct } = usePlay();
+  const { operator } = useSources();
+  const selfOf = useSelfIn();
   const simNow = useSimNow();
 
   if (isLoading) return <ListSkeleton />;
 
+  // Your console with the system agent is pinned on top, whatever is searched:
+  // it is yours, not the character's you play (who may have a chat with her
+  // of their own, listed with the rest).
+  const pinned = chats.find(
+    (chat) =>
+      chat.type === "direct" &&
+      chat.members.length === 2 &&
+      chat.members.includes(operator.id) &&
+      chat.members.some((id) => agentsById.get(id)?.isSystemAgent),
+  );
   const normalized = query.trim().toLowerCase();
-  const filtered = normalized
-    ? chats.filter(
-        (chat) =>
-          chat.name.toLowerCase().includes(normalized) ||
-          chat.lastMessage?.text.toLowerCase().includes(normalized),
-      )
-    : chats;
+  const filtered = (
+    normalized
+      ? chats.filter(
+          (chat) =>
+            chat.name.toLowerCase().includes(normalized) ||
+            chat.lastMessage?.text.toLowerCase().includes(normalized),
+        )
+      : chats
+  ).filter((chat) => chat !== pinned);
 
-  if (filtered.length === 0 && quietWhenEmpty) return null;
+  if (filtered.length === 0 && !pinned && quietWhenEmpty) return null;
 
   if (chats.length === 0) {
     return (
@@ -93,23 +108,45 @@ export function ChatList({
           <Button
             size="sm"
             variant="outline"
-            disabled={!canPlay}
-            onClick={onNewGroup}
+            disabled={!canAct}
+            onClick={onNewChat}
           >
-            New group
+            New chat
           </Button>
         </EmptyContent>
       </Empty>
     );
   }
 
+  const nameOf = (id: string) => agentsById.get(id)?.name ?? id;
+  const row = (chat: Chat) => (
+    <ChatRow
+      key={chat.id}
+      chat={chat}
+      agentsById={agentsById}
+      userId={selfOf(chat)}
+      nameOf={nameOf}
+      isActive={chat.id === selectedChatId}
+      simNow={simNow}
+      onSelect={onSelect}
+    />
+  );
+  const top = pinned ? (
+    <ItemGroup className="gap-0.5 px-2">{row(pinned)}</ItemGroup>
+  ) : null;
+
   if (filtered.length === 0) {
     return (
-      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-        {"No conversations match “"}
-        {query}
-        {"”."}
-      </p>
+      <div className="flex flex-col gap-3 pb-2">
+        {top}
+        {normalized ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            {"No conversations match “"}
+            {query}
+            {"”."}
+          </p>
+        ) : null}
+      </div>
     );
   }
 
@@ -121,28 +158,19 @@ export function ChatList({
     byPlace.set(key, [...(byPlace.get(key) ?? []), chat]);
   }
   const texts = filtered.filter((chat) => chat.type !== "huddle");
-  const nameOf = (id: string) => agentsById.get(id)?.name ?? id;
-  const row = (chat: Chat) => (
-    <ChatRow
-      key={chat.id}
-      chat={chat}
-      agentsById={agentsById}
-      userId={userId}
-      nameOf={nameOf}
-      isActive={chat.id === selectedChatId}
-      simNow={simNow}
-      onSelect={onSelect}
-    />
-  );
 
   if (huddles.length === 0) {
     return (
-      <ItemGroup className="gap-0.5 px-2 pb-2">{texts.map(row)}</ItemGroup>
+      <div className="flex flex-col gap-3 pb-2">
+        {top}
+        <ItemGroup className="gap-0.5 px-2">{texts.map(row)}</ItemGroup>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 pb-2">
+      {top}
       {[...byPlace].map(([placeId, atPlace]) => (
         <ListSection
           key={`place:${placeId}`}

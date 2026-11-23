@@ -18,7 +18,7 @@ import { usePlace } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
 import { useSelection } from "@/hooks/use-selection";
 import { listNames } from "@/lib/source/chats/display";
-import { useSources } from "@/lib/source/provider";
+import { useSelfIn } from "@/hooks/use-self";
 import { useWatchlist } from "@/lib/state/preferences-store";
 import type { EntityRef } from "@/lib/state/entity-ref";
 import {
@@ -53,7 +53,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
   const isOpen = view === "chats" && chatParam === entity.id;
   const { byId } = useCharacters();
   const { chats } = useChats();
-  const { player } = useSources();
+  const selfOf = useSelfIn();
   const watchSet = new Set(useWatchlist());
   const [removing, setRemoving] = useState<string | null>(null);
   const {
@@ -67,7 +67,8 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
     members: everyone,
   } = useChatTitle(entity.id);
   const place = usePlace(placeId);
-  const members = everyone.filter((id) => id !== player.id);
+  const self = selfOf({ members: everyone });
+  const members = everyone.filter((id) => id !== self);
   const Icon = chatIcon(type);
 
   // Only a sent chat the player is in can be changed.

@@ -25,6 +25,8 @@ export const STIMULUS = z.object({
    * happens.
    */
   foreseen: z.boolean().optional(),
+  /** Said by a person playing the sender, not by the sender's own model. */
+  byPlayer: z.boolean().optional(),
 });
 
 /** Producer-owned identity and original simulation occurrence time. */

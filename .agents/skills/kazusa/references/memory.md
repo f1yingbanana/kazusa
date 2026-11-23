@@ -70,8 +70,8 @@ Naps shorter than `memory.sleep.minMinutes` (default 180) don't consolidate.
 
 ## 2. Player: what is fun, and where it surfaces
 
-- **Callbacks.** A character brings up something Sensei said days ago: the
-  `user:sensei` page is a seed in every direct chat with the player.
+- **Callbacks.** A character brings up something Sensei said days ago: their
+  page on `sensei` is a seed in every direct chat with Sensei, played or not.
 - **Opinions that drift.** After a fight, Kazusa's view of Yoshimi changes; the
   client shows each character's page on a peer with a per-sleep diff.
 - **Gossip with provenance.** "Natsu told me the patisserie is closing (I think

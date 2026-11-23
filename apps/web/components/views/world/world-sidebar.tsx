@@ -278,12 +278,7 @@ export function WorldSidebar({
   }
 
   const matches = useMemo(
-    () =>
-      query.trim()
-        ? filterCharacters(characters, "everyone", query).filter(
-            (c) => c.kind !== "player",
-          )
-        : [],
+    () => (query.trim() ? filterCharacters(characters, "everyone", query) : []),
     [characters, query],
   );
   const watchSet = useMemo(() => new Set(watchlist), [watchlist]);

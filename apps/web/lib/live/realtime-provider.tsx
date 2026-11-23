@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { useSources, WORLD_KEY } from "../source/provider";
+import { CHARACTERS_KEY, useSources, WORLD_KEY } from "../source/provider";
 import { recheckWorld } from "@/hooks/use-world-update";
 import {
   applyTyping,
@@ -65,6 +65,7 @@ const PLAYER_EVENTS = [
   "read",
   "connected",
   "chats",
+  "player",
 ] as const;
 const RETRY_MIN_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
@@ -75,8 +76,9 @@ const TIMELINE_PAGES_PREFIX = unstable_serialize(() => ["kazusa/timeline"]);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { cache, mutate } = useSWRConfig();
-  const { resolved, player } = useSources();
+  const { resolved, player, operator } = useSources();
   const userId = player.id;
+  const operatorId = operator.id;
   const { mutate: refreshJournal } = useSWR(
     resolved.timeline === "live" ? (["kazusa/timeline/live"] as const) : null,
     () => fetchTimeline({ limit: JOURNAL_RECENT_LIMIT }),
@@ -141,7 +143,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         if (!disposed && !knownChat) void mutate(chatsKey());
       });
 
-      receiveMessage(chatId, message.senderId !== userId);
+      receiveMessage(
+        chatId,
+        message.senderId !== userId && message.senderId !== operatorId,
+      );
     };
 
     const refreshObserved = () => {
@@ -172,7 +177,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleTyping = (event: TypingStreamEvent) => {
-      if (event.senderId === userId) return;
+      if (event.senderId === userId || event.senderId === operatorId) return;
       applyTyping(event);
       applySceneEvent(event.chatId, {
         type: "typing",
@@ -210,6 +215,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           break;
+        case "player":
+          // Someone else to be: the world says who, and the stream reconnects
+          // for them; the cast's statuses show who is played.
+          void mutate(WORLD_KEY);
+          void mutate(CHARACTERS_KEY);
+          break;
         case "world":
           // An update applied, restored or finished: the version and what's
           // offered changed.
@@ -236,6 +247,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(isPlacesKey);
           void mutate(isLocationsKey);
           void mutate(observedChatsKey());
+          // Who is played may have changed while disconnected: a `player`
+          // event is not replayed.
+          void mutate(WORLD_KEY);
           // Refresh the recent window; durable history remains in SWR.
           void refreshJournal();
           void mutate(
@@ -349,7 +363,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       disconnect();
     };
     // Only the player changes what the stream means; a new object identity must not reconnect.
-  }, [userId, cache, mutate, refreshJournal]);
+  }, [userId, operatorId, cache, mutate, refreshJournal]);
 
   useEffect(() => {
     if (!hasTypists) return;

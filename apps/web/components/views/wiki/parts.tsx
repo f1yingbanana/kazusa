@@ -102,10 +102,16 @@ export function DocumentField({
   onSave,
   onReload,
   rows = 12,
+  headed = true,
+  readOnly = false,
 }: {
   id: string;
   label: string;
   description: ReactNode;
+  /** Off where a panel's own header already says what this is. */
+  headed?: boolean;
+  /** Shown to read, for someone who can't edit it: no save bar. */
+  readOnly?: boolean;
   value: EditedText;
   disabled?: boolean;
   onSave: (text: string, base: string | null) => Promise<EditedText>;
@@ -136,17 +142,23 @@ export function DocumentField({
 
   return (
     <section className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-sm font-semibold">
+      <label
+        htmlFor={id}
+        className={headed ? "text-sm font-semibold" : "sr-only"}
+      >
         {label}
       </label>
-      <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-        {description}
-      </p>
+      {headed ? (
+        <p className="max-w-prose text-sm text-pretty text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
       <Textarea
         id={id}
         value={text}
         rows={rows}
         disabled={disabled}
+        readOnly={readOnly}
         spellCheck
         onChange={(event) =>
           setDraft({
@@ -156,18 +168,20 @@ export function DocumentField({
         }
         className="field-sizing-content min-h-48 max-w-3xl font-sans text-sm leading-relaxed"
       />
-      <SaveBar
-        dirty={dirty}
-        saving={saving}
-        conflict={conflict}
-        onSave={() => void save()}
-        onRevert={() => setDraft(undefined)}
-        onReload={() => {
-          setConflict(false);
-          setDraft(undefined);
-          void onReload();
-        }}
-      />
+      {readOnly ? null : (
+        <SaveBar
+          dirty={dirty}
+          saving={saving}
+          conflict={conflict}
+          onSave={() => void save()}
+          onRevert={() => setDraft(undefined)}
+          onReload={() => {
+            setConflict(false);
+            setDraft(undefined);
+            void onReload();
+          }}
+        />
+      )}
     </section>
   );
 }

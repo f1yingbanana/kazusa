@@ -23,6 +23,7 @@ import type { Messaging, MessageDelivery } from "./messaging.ts";
 import type { ConversationSource } from "../perception/types.ts";
 import { registerMessaging, speechReply } from "./register.ts";
 import { mirroredStore } from "./message-store.fake.ts";
+import { fakePlayer } from "../player-fake.ts";
 
 vi.mock("openclaw/plugin-sdk/session-transcript-runtime", () => ({
   appendSessionTranscriptMessageByIdentityStrict: vi.fn(),
@@ -148,6 +149,7 @@ async function setup(
     },
     perception: { receive },
     messages: mirroredStore(retained),
+    player: fakePlayer("carol"),
     ...options,
   });
   instances.push(messaging);
@@ -851,7 +853,8 @@ describe("send_message SDK integration", () => {
       members: ["bob"],
       text: "between us",
     });
-    await h.messaging.send("user:sensei", "Sensei", {
+    // From before the person played characters: read-only history now.
+    const older = await h.messaging.send("user:sensei", "Sensei", {
       requestId: "player",
       members: ["alice"],
       text: "hello",
@@ -883,6 +886,10 @@ describe("send_message SDK integration", () => {
     );
     expect(parsedChats.chats).toEqual([
       expect.objectContaining({
+        id: older.chatId,
+        members: ["alice", "user:sensei"],
+      }),
+      expect.objectContaining({
         id: theirs.chatId,
         type: "direct",
         name: "",
@@ -893,7 +900,7 @@ describe("send_message SDK integration", () => {
         }),
       }),
     ]);
-    expect(parsedChats.chats[0]).not.toHaveProperty("sessionKey");
+    expect(parsedChats.chats[1]).not.toHaveProperty("sessionKey");
     expect(
       MessagesResponseSchema.parse(
         await get(
@@ -1054,29 +1061,22 @@ describe("send_message SDK integration", () => {
         status: z.literal("delivered"),
       })
       .parse(sent.body);
+    // Sent as the character played, into their own records too.
     expect(sendData.message).toMatchObject({
       requestId: "browser-submit",
-      senderId: "user:sensei",
+      senderId: "carol",
       timestamp: 123456,
     });
     expect(
       append.mock.calls.map(([params]) => params.message.__openclaw),
-    ).toEqual([
-      expect.objectContaining({
-        senderId: "user:sensei",
-        senderIdentity: expect.objectContaining({
-          id: "user:sensei",
-          senderKind: "human",
+    ).toEqual(
+      Array.from({ length: 3 }, () =>
+        expect.objectContaining({
+          senderId: "carol",
+          senderIdentity: expect.objectContaining({ id: "carol" }),
         }),
-      }),
-      expect.objectContaining({
-        senderId: "user:sensei",
-        senderIdentity: expect.objectContaining({
-          id: "user:sensei",
-          senderKind: "human",
-        }),
-      }),
-    ]);
+      ),
+    );
 
     const listed = await invoke(
       "/kazusa/chats",
@@ -1101,9 +1101,7 @@ describe("send_message SDK integration", () => {
     );
     expect(history.statusCode).toBe(200);
     expect(history.body).toMatchObject({
-      messages: [
-        { text: "Hello everyone from Sensei!", senderId: "user:sensei" },
-      ],
+      messages: [{ text: "Hello everyone from Sensei!", senderId: "carol" }],
     });
 
     const retry = await invoke("/kazusa/send", {
@@ -1114,7 +1112,7 @@ describe("send_message SDK integration", () => {
     });
     expect(retry.body).toEqual(sent.body);
     expect(h.retained.size).toBe(1);
-    expect(append).toHaveBeenCalledTimes(2);
+    expect(append).toHaveBeenCalledTimes(3);
     const spoofed = await invoke("/kazusa/send", {
       requestId: "spoof",
       sender: "alice",
@@ -1130,7 +1128,7 @@ describe("send_message SDK integration", () => {
     expect(next.statusCode).toBe(200);
     expect(next.body).toMatchObject({
       chatId,
-      message: { senderId: "user:sensei", sequence: 2 },
+      message: { senderId: "carol", sequence: 2 },
     });
     expect(h.chats.size).toBe(1);
 

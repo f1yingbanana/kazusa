@@ -71,11 +71,6 @@ const ON: readonly { value: StatSubject; label: string; hint: string }[] = [
     label: "The world",
     hint: "One value everyone shares.",
   },
-  {
-    value: "player",
-    label: "You, the player",
-    hint: "A value only you have and set, like how tired you are.",
-  },
 ];
 
 const CHANGED_BY: readonly {
@@ -123,20 +118,6 @@ const SHOWN: readonly { value: StatShown; label: string; hint: string }[] = [
   },
 ];
 
-/** A state of the player has no character on it to read it. */
-const SHOWN_OF_PLAYER: typeof SHOWN = [
-  {
-    value: "everyone",
-    label: "People with you",
-    hint: "Characters in the same place as you read it each turn.",
-  },
-  {
-    value: "nobody",
-    label: "Nobody",
-    hint: "Kept for you to see; characters never read it.",
-  },
-];
-
 const labelOf = <T extends string>(
   options: readonly { value: T; label: string }[],
   value: T,
@@ -172,8 +153,7 @@ function summary(stat: StatDefinition): string {
 
 /**
  * The world's states: what each one is. Their values are set where they belong:
- * the world's beside the clock, a character's and the player's in the
- * inspector.
+ * the world's beside the clock, a character's in the inspector.
  */
 export function StateSettings() {
   const { enabled, data, error, saveCatalog, stale, refresh } = useStats();
@@ -559,28 +539,19 @@ function StateDialog({
       draft.on === "character" ||
       (draft.on === "pair" ? value !== "character" : value === "manual"),
   );
-  const shown =
-    draft.on === "player"
-      ? SHOWN_OF_PLAYER
-      : SHOWN.filter(
-          ({ value }) => draft.on !== "pair" || value !== "everyone",
-        );
+  const shown = SHOWN.filter(
+    ({ value }) => draft.on !== "pair" || value !== "everyone",
+  );
   const setOn = (on: StatSubject) =>
     setDraft((current) => ({
       ...current,
       on,
       changedBy:
-        on === "world" ||
-        on === "player" ||
-        (on === "pair" && current.changedBy === "character")
+        on === "world" || (on === "pair" && current.changedBy === "character")
           ? "manual"
           : current.changedBy,
       shown:
-        on === "pair" && current.shown === "everyone"
-          ? "self"
-          : on === "player" && current.shown === "self"
-            ? "everyone"
-            : current.shown,
+        on === "pair" && current.shown === "everyone" ? "self" : current.shown,
     }));
 
   const number = draft.kind === "number";
@@ -656,11 +627,7 @@ function StateDialog({
                 error={errors.description}
                 rows={3}
                 placeholder="Your mood right now. It changes only when something clearly shifts it."
-                hint={
-                  draft.on === "player"
-                    ? "The one thing characters with you are told about it, so write it about you as they would see it."
-                    : "The one thing a character is told about it. If they or their sleep change it, this is the rule they go by."
-                }
+                hint="The one thing a character is told about it. If they or their sleep change it, this is the rule they go by."
               />
               <Choice
                 id="state-on"

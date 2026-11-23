@@ -28,10 +28,10 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "profile",
     label: "Profile",
-    description: "Your description in the World Wiki",
+    description: "Who you are to the system agent",
     icon: UserIcon,
     order: 5,
-    requiresPermission: "play",
+    requiresPermission: "manage",
     component: ProfileSettings,
   },
   {

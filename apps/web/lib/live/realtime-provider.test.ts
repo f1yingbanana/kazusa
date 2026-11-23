@@ -102,12 +102,14 @@ beforeEach(() => {
   useClockStore.setState(useClockStore.getInitialState(), true);
   useRealtimeStore.setState(useRealtimeStore.getInitialState(), true);
   vi.mocked(fetchChats).mockResolvedValue({
-    user: { id: "user:you", name: "You" },
+    operator: { id: "user:owner", name: "Owner" },
+    player: { id: "user:you", name: "You" },
     chats: [],
   });
   vi.mocked(fetchMessages).mockResolvedValue({ messages: [], hasMore: false });
   vi.mocked(fetchWorld).mockResolvedValue({
-    user: { id: "user:you", name: "You" },
+    operator: { id: "user:owner", name: "Owner" },
+    player: { id: "user:you", name: "You" },
     serverNow: Date.now(),
     clock: { simTime: 60_000, speed: 0, updatedAt: Date.now() },
     world: { title: "Test world" },

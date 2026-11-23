@@ -203,7 +203,8 @@ export function CharacterBrainSheet({
   const thinking = useCharacterStatus(id)?.brain === "thinking";
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 sm:max-w-xl">
+      {/* Above the inspector, which is itself a sheet on narrow screens. */}
+      <SheetContent side="right" className="z-60 w-full gap-0 sm:max-w-xl">
         <SheetHeader className="border-b">
           <SheetTitle>{`${name}'s brain`}</SheetTitle>
           <SheetDescription>

@@ -24,7 +24,8 @@ vi.mock("./location/http", async (original) => ({
 }));
 
 const world: WorldResponse = {
-  user: { id: "user:owner", name: "Owner" },
+  operator: { id: "user:owner", name: "Owner" },
+  player: { id: "user:owner", name: "Owner" },
   serverNow: 1000,
   clock: { simTime: 60_000, speed: 0, updatedAt: 1000 },
   world: { title: "Test world" },
@@ -120,7 +121,7 @@ describe("source snapshot lifecycle", () => {
     });
     expect(result.current.sources.reachable).toBe(false);
     expect(result.current.sources.resolved.characters).toBe("live");
-    expect(result.current.sources.player).toEqual(world.user);
+    expect(result.current.sources.player).toEqual(world.player);
     expect(result.current.sources.backendError?.message).toBe(
       "Gateway restarting",
     );

@@ -564,3 +564,30 @@ describe("a night asked for by hand", () => {
     ).rejects.toThrow("as you fall asleep");
   });
 });
+
+describe("looking back, handed back by a person who played them", () => {
+  it("goes over the time since, with what was said, and is no night", async () => {
+    now = NOON;
+    await memory.use(AGENT, ["tobin-vell"], NOON - HOUR);
+    await memory.sleep.lookBack(AGENT, "- [12:00] to Tobin: See you at six.");
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toContain("look back over the last hours");
+    expect(turns[0]).toContain("See you at six.");
+    expect(turns[0]).toContain("### tobin-vell");
+    expect(turns[0]).not.toContain("Before sleep takes you");
+    memory.sleep.runStarted(AGENT);
+    await call("remember", {
+      about: "me",
+      note: "Meet Tobin at six.",
+      on: "2026-03-10",
+    });
+    await memory.sleep.runEnded(AGENT);
+    expect(night()).toMatchObject({
+      text: "You looked back on the last hours.",
+    });
+    expect(await memory.sleep.runs(AGENT)).toMatchObject([{ review: true }]);
+    // Bedtime still goes over the day: a look back awake is no sleep.
+    now = BEDTIME;
+    expect(await start()).toContain("Before sleep takes you");
+  });
+});

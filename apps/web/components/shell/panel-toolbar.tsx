@@ -9,7 +9,7 @@ import {
 
 /**
  * Same shape in every sidebar tab: search on the left, the tab's own action
- * (new group, filters…) on the right. The count is in the placeholder, so it
+ * (new chat, filters…) on the right. The count is in the placeholder, so it
  * takes no space of its own.
  */
 export function PanelToolbar({

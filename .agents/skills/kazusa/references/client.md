@@ -1,7 +1,8 @@
 # Kazusa client: requirements and integration
 
-`apps/web` is the human player's in-world chat interface. It uses the Kazusa
-conversation API, with shared wire schemas in `packages/client`
+`apps/web` is the person's interface to the world: they talk with the system
+agent as themselves and play any character, or none (SKILL.md §3.10). It uses
+the Kazusa conversation API, with shared wire schemas in `packages/client`
 (`@kazusa/client`). Native WebChat sessions are not group conversations. Do not
 send group messages through native `chat.send` or read UI history through native
 `chat.history`.
@@ -35,7 +36,8 @@ send group messages through native `chat.send` or read UI history through native
   `ChatMessage.receipts` carry each character's `readAt`, the moment Perception
   showed their brain the message (SSE `read` updates it live). The client shows
   one check for sent and two for read by every character ("observed" face to
-  face). The player sends no receipts.
+  face). The operator sends no receipts; a played character's messages are
+  marked read as they reach the person (Perception's `toPlayer`).
 
 ## API and client behavior
 
@@ -56,9 +58,9 @@ PRs; no browser supplies a trusted identity itself.
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /kazusa/agents`                             | Roster IDs, display names and optional avatars.                                                                                                                                                |
 | `GET /kazusa/avatar`                             | `id` (roster agent) and cache-busting `v`; streams `<workspace>/avatar.<ext>` with an immutable cache header. Characters and roster entries point here when `IDENTITY.md` sets no `avatarUrl`. |
-| `GET /kazusa/chats`                              | Configured human and conversations with canonical `id`, viewer `sessionKey`, `type`, `name`, members and latest preview.                                                                       |
+| `GET /kazusa/chats`                              | `operator`, `player` (`null` while watching), and their conversations with canonical `id`, viewer `sessionKey`, `type`, `name`, members and latest preview.                                    |
 | `GET /kazusa/messages`                           | `chatId`, optional sequence `before`, optional `limit`; returns `messages`, `nextCursor`, `hasMore`.                                                                                           |
-| `GET /kazusa/observe/chats`, `/observe/messages` | Read-only: chats the player is not in, and any chat's full history. Mutates nothing; gated by `observer.enabled` (default on).                                                                 |
+| `GET /kazusa/observe/chats`, `/observe/messages` | Read-only: chats neither the operator nor the played character is in, and any chat's full history. Mutates nothing; gated by `observer.enabled` (default on).                                  |
 | `POST /kazusa/send`                              | Stable automatic `requestId`, text and either `sessionKey` or new-chat members/title; returns canonical message and delivery status.                                                           |
 | `POST /kazusa/chats/manage`                      | `sessionKey` plus `rename`, `add_members`, `remove_members` or `leave`.                                                                                                                        |
 | `POST /kazusa/typing`                            | `sessionKey` and `isTyping` for the configured human.                                                                                                                                          |
@@ -138,21 +140,25 @@ bypass that mocks had missed. See the messaging and Perception references for
 their ownership fixes. This is not full browser rendering or multi-agent group
 validation.
 
-For a complete acceptance pass, use disposable state and two agents:
+For a complete acceptance pass, use disposable state, three agents, and play one
+of them (A); the other two are B and C:
 
 1. Send a unique direct message. Check one canonical record, one recipient copy,
    `__openclaw` sender, Perception intake and actual native adoption separately.
-2. Send to a human/two-agent group. Check two projections/intakes and distinct
-   replies in the same conversation; there must be no human agent session.
+2. As A, send to a group with B and C. Check two projections/intakes, the line
+   marked `byPlayer` in A's own ledger, and distinct replies in the same
+   conversation; A's model does not run while played.
 3. Freeze time and paginate multiple pages, then reconnect SSE. Check sequence
    order and convergence to the same message IDs without duplicates or gaps.
-4. Remove/re-add the human around an agent-only message. The absence stays
+4. Remove/re-add A (played) around a message between B and C. The absence stays
    hidden; old received history remains readable, and removal prevents
    sends/management.
-5. Restart after acceptance but before all projections. Retry the same
+5. In the console, send to the system agent as the operator: one recipient copy,
+   sender `user:<id>`, and the operator alone with her in that chat.
+6. Restart after acceptance but before all projections. Retry the same
    submission ID and verify one canonical record, unchanged audience/time and no
    duplicate copy.
-6. Observe composing true, send/cancel/end false, and no typing for an ignored
+7. Observe composing true, send/cancel/end false, and no typing for an ignored
    input. Exercise busy steering and queued attention separately from idle wake.
 
 Record message/chat IDs, audience, simulation time, copy receipts and adoption;

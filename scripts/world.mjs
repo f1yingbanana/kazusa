@@ -36,6 +36,7 @@ import {
 } from "../apps/kazusa/plugins/kazusa/src/world/git.ts";
 import {
   commitOf,
+  compareVersions,
   contains,
   cloneRelease,
   downloaded,
@@ -232,9 +233,13 @@ export async function checkLiveWorld(root) {
   const current = { commit: head, version: versionOf(git) ?? null };
   const release = newestRemoteRelease(bin, url);
   if (!release) return { checked: true, current, latest: null, newer: false };
+  // Newer by version when the world stands on one: a release tag moved to
+  // another commit (a re-release, a local dry run) is not a new version, and
+  // couldn't be fetched over the tag here anyway.
   const newer =
     release.commit !== head &&
-    !(commitOf(git, release.commit) && contains(git, head, release.commit));
+    !(commitOf(git, release.commit) && contains(git, head, release.commit)) &&
+    (!current.version || compareVersions(release.version, current.version) > 0);
   const latest = {
     commit: release.commit,
     version: release.version,

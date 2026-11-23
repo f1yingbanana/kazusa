@@ -1,3 +1,4 @@
+import { playedNow } from "../stage/stage.ts";
 import {
   abortAgentHarnessRun,
   resolveActiveEmbeddedRunSessionId,
@@ -66,6 +67,11 @@ interface BrainRun {
   readonly models: Set<string>;
   readonly tools: Set<string>;
   readonly expire: (reason: string) => void;
+  /**
+   * Cancels OpenClaw's run of this session, while this run still owns it. Once
+   * stopped, it is asked again when the session is known (`brainRun`).
+   */
+  readonly cancelHost: () => void;
   sessionKey?: string;
   sessionId?: string;
   readonly dispose: () => void;
@@ -114,12 +120,9 @@ export function beginBrainRun(
 ): { readonly signal: AbortSignal; readonly dispose: () => void } {
   const controller = new AbortController();
   const limits = brainRunLimits(api, agentId);
-  const expire = (reason: string): void => {
-    if (controller.signal.aborted) return;
-    api.logger.warn(`Brain run ${runId} stopped: ${reason}`);
-    controller.abort(new Error(`Brain run limit: ${reason}`));
-    // A queued host turn can outlive its dispatch call. Cancel the public
-    // harness too, while this exact tracked run still owns the session.
+  // A queued host turn can outlive its dispatch call. Cancel the public
+  // harness too, while this exact tracked run still owns the session.
+  const cancelHost = (): void => {
     if (
       runs.get(runId) === state &&
       state.sessionKey &&
@@ -128,6 +131,12 @@ export function beginBrainRun(
       resolveActiveEmbeddedRunSessionId(state.sessionKey) === state.sessionId
     )
       abortAgentHarnessRun(state.sessionId);
+  };
+  const expire = (reason: string): void => {
+    if (controller.signal.aborted) return;
+    api.logger.warn(`Brain run ${runId} stopped: ${reason}`);
+    controller.abort(new Error(`Brain run limit: ${reason}`));
+    cancelHost();
   };
   const state: BrainRun = {
     agentId,
@@ -138,6 +147,7 @@ export function beginBrainRun(
     models: new Set(),
     tools: new Set(),
     expire,
+    cancelHost,
     dispose: () => {
       clearTimeout(state.timer);
       if (runs.get(runId) === state) runs.delete(runId);
@@ -147,6 +157,9 @@ export function beginBrainRun(
   };
   const runs = activeRuns();
   runs.set(runId, state);
+  // A person plays them (a turn handed over just before they took them that
+  // starts just after): it never gets to think.
+  if (playedNow(agentId)) expire("a person plays them");
   return {
     signal: AbortSignal.any([lifetime, controller.signal]),
     dispose: () => {
@@ -187,6 +200,16 @@ export function roomForSleep(agentId: string): void {
   armExpiry(run);
 }
 
+/**
+ * A person took them over: every brain run of theirs under way stops (its model
+ * call is cancelled, what it would still say or do is refused). One that starts
+ * while they are played stops as it starts (`playedNow`).
+ */
+export function stopBrainRuns(agentId: string, reason: string): void {
+  for (const run of [...activeRuns().values()])
+    if (run.agentId === agentId) run.expire(reason);
+}
+
 /** The id of a character's brain run under way, from before it starts. */
 export function currentBrainRun(agentId: string): string | undefined {
   return [...activeRuns()].findLast(([, run]) => run.agentId === agentId)?.[0];
@@ -207,6 +230,11 @@ function brainRun(
     state.sessionKey = sessionKey;
     state.sessionId = sessionId;
     sessionOwners().set(sessionKey, runId);
+    // Stopped before its session was known: a turn handed over a moment before
+    // a person took them, that OpenClaw starts in their one brain session just
+    // after. OpenClaw's run goes too, not only its tools. (A steer waiting in
+    // the turn that was stopped is taken back when that turn ends: `ended`.)
+    if (state.controller.signal.aborted) state.cancelHost();
   }
   return state;
 }

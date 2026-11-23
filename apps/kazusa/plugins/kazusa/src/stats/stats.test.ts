@@ -71,20 +71,6 @@ const CATALOG: StatCatalog = StatCatalogSchema.parse([
   },
 ]);
 
-/** A state only the player has. */
-const HALL: StatCatalog = StatCatalogSchema.parse([
-  {
-    name: "tired",
-    description: "How tired the player is.",
-    on: "player",
-    kind: "choice",
-    values: [{ name: "rested" }, { name: "worn out", description: "Yawning" }],
-    initial: "rested",
-    changedBy: "manual",
-    shown: "everyone",
-  },
-]);
-
 function world(catalog: StatCatalog = CATALOG) {
   const records = new Map<string, StatRecord>();
   let now = 1_000;
@@ -100,7 +86,6 @@ function world(catalog: StatCatalog = CATALOG) {
     },
     now: () => now,
     isPerson: (id) => ["airi", "natsu", "user:sensei"].includes(id),
-    isPlayer: (id) => id === "user:sensei",
     outfitsOf: (id) => (id === "natsu" ? OUTFITS : []),
     labelOf: async (id) => id[0].toUpperCase() + id.slice(1),
     text: (ref, values = {}) => `${ref} ${JSON.stringify(values)}`,
@@ -158,17 +143,6 @@ describe("definitions", () => {
         }).success,
       ).toBe(false);
   });
-
-  it("lets only the player set a state of theirs, read by others or nobody", () => {
-    const ok = (change: object) =>
-      StatDefinitionSchema.safeParse({ ...HALL[0], ...change }).success;
-    expect(ok({})).toBe(true);
-    expect(ok({ shown: "nobody" })).toBe(true);
-    expect(ok({ shown: "self" })).toBe(false);
-    expect(ok({ changedBy: "character" })).toBe(false);
-    expect(ok({ changedBy: "reviewed" })).toBe(false);
-  });
-
   it("reads a broken file as no states", () => {
     const file = path.join(
       mkdtempSync(path.join(tmpdir(), "stats-")),
@@ -179,6 +153,39 @@ describe("definitions", () => {
     expect(catalogFile(file, (m) => warned.push(m)).read()).toEqual([]);
     expect(warned).toHaveLength(1);
     expect(catalogFile(path.join(tmpdir(), "missing.json")).read()).toEqual([]);
+  });
+
+  it("leaves out states of the player and keeps the rest", () => {
+    const file = path.join(
+      mkdtempSync(path.join(tmpdir(), "stats-")),
+      "s.json",
+    );
+    const [mood] = CATALOG;
+    writeFileSync(
+      file,
+      JSON.stringify([
+        mood,
+        { ...mood, name: "fame", on: "player", changedBy: "manual" },
+      ]),
+    );
+    const warned: string[] = [];
+    const read = catalogFile(file, (m) => warned.push(m));
+    expect(read.read().map(({ name }) => name)).toEqual(["gear"]);
+    expect(read.readable()).toBe(true);
+    expect(warned).toEqual([expect.stringContaining('"fame"')]);
+  });
+
+  it("won't save over a file it can't read", () => {
+    const file = path.join(
+      mkdtempSync(path.join(tmpdir(), "stats-")),
+      "s.json",
+    );
+    writeFileSync(file, "{ nope");
+    const read = catalogFile(file);
+    expect(read.readable()).toBe(false);
+    expect(catalogFile(path.join(tmpdir(), "missing.json")).readable()).toBe(
+      true,
+    );
   });
 
   it("refuses a save made from states that have changed since", () => {
@@ -611,68 +618,5 @@ What these are:
         present: [],
       }),
     ).toBeUndefined();
-  });
-});
-
-describe("a state of the player", () => {
-  it("is the player's alone to have", async () => {
-    const { stats } = world(HALL);
-    expect(stats.statsOf("airi").map(({ name }) => name)).toEqual([]);
-    expect(stats.statsOf("user:sensei").map(({ name }) => name)).toEqual([
-      "tired",
-    ]);
-    await stats.set(
-      { name: "tired", characterId: "user:sensei", value: "worn out" },
-      "user",
-    );
-    expect((await stats.record("user:sensei"))?.own.tired.value).toBe(
-      "worn out",
-    );
-    await expect(
-      stats.set(
-        { name: "tired", characterId: "airi", value: "worn out" },
-        "user",
-      ),
-    ).rejects.toThrow("a state of the player");
-    await expect(
-      stats.set({ name: "tired", value: "worn out" }, "user"),
-    ).rejects.toThrow("needs who it is on");
-    // Never a character's to change or to review.
-    expect(stats.taskExtension.startTaskParametersFor?.("airi")).toEqual({});
-    await expect(stats.change("airi", "tired", "worn out")).rejects.toThrow(
-      "state-not-yours",
-    );
-    expect(await stats.review.text("airi", ["user:sensei"])).toBeUndefined();
-  });
-
-  it("is read by a character with the player, once it stands out", async () => {
-    const { stats } = world(HALL);
-    expect(await stats.situation("airi", ["user:sensei"], "")).toBeUndefined();
-    await stats.set(
-      { name: "tired", characterId: "user:sensei", value: "worn out" },
-      "user",
-    );
-    expect(await stats.situation("airi", ["user:sensei"], ""))
-      .toBe(`User:sensei \`user:sensei\`: tired: worn out (Yawning)
-What these are:
-- tired: How tired the player is.`);
-    // Not by someone elsewhere, and never as their own.
-    expect(await stats.situation("airi", ["natsu"], "")).toBeUndefined();
-    await stats.set(
-      { name: "tired", characterId: "user:sensei", value: null },
-      "user",
-    );
-    expect(await stats.situation("airi", ["user:sensei"], "")).toBeUndefined();
-  });
-
-  it("stays unread when it is shown to nobody", async () => {
-    const { stats } = world(
-      StatCatalogSchema.parse([{ ...HALL[0], shown: "nobody" }]),
-    );
-    await stats.set(
-      { name: "tired", characterId: "user:sensei", value: "worn out" },
-      "user",
-    );
-    expect(await stats.situation("airi", ["user:sensei"], "")).toBeUndefined();
   });
 });

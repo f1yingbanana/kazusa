@@ -32,19 +32,25 @@ export function catalogRevision(catalog: StatCatalog): string {
 export interface CatalogFile {
   /** The states defined, read again whenever the file changes. */
   readonly read: () => StatCatalog;
+  /** False while the file is there but can't be read: saving would lose it. */
+  readonly readable: () => boolean;
   readonly write: (catalog: StatCatalog) => void;
 }
 
 /**
  * A missing file is a world without states. A file that doesn't parse is
  * reported once per change and read as none, so a bad edit never stops a turn.
+ * States of the player, from before characters were played, are left out.
  */
 export function catalogFile(
   file: string,
   warn: (message: string) => void = () => {},
 ): CatalogFile {
-  let cached: { readonly stamp: string; readonly catalog: StatCatalog } | null =
-    null;
+  let cached: {
+    readonly stamp: string;
+    readonly catalog: StatCatalog;
+    readonly failed: boolean;
+  } | null = null;
   const stampOf = (): string | null => {
     try {
       const { mtimeMs, size } = statSync(file);
@@ -53,22 +59,26 @@ export function catalogFile(
       return null;
     }
   };
+  const load = () => {
+    const stamp = stampOf();
+    if (stamp === null) return null;
+    if (cached?.stamp === stamp) return cached;
+    let catalog: StatCatalog = [];
+    let failed = false;
+    try {
+      catalog = StatCatalogSchema.parse(
+        withoutPlayer(JSON.parse(readFileSync(file, "utf8")), warn),
+      );
+    } catch (error) {
+      failed = true;
+      warn(`States: can't read ${file}: ${String(error)}`);
+    }
+    cached = { stamp, catalog, failed };
+    return cached;
+  };
   return {
-    read() {
-      const stamp = stampOf();
-      if (stamp === null) return [];
-      if (cached?.stamp === stamp) return cached.catalog;
-      let catalog: StatCatalog = [];
-      try {
-        catalog = StatCatalogSchema.parse(
-          JSON.parse(readFileSync(file, "utf8")),
-        );
-      } catch (error) {
-        warn(`States: can't read ${file}: ${String(error)}`);
-      }
-      cached = { stamp, catalog };
-      return catalog;
-    },
+    read: () => load()?.catalog ?? [],
+    readable: () => !load()?.failed,
     write(catalog) {
       mkdirSync(path.dirname(file), { recursive: true });
       const temporary = `${file}.${randomUUID()}.tmp`;
@@ -77,4 +87,20 @@ export function catalogFile(
       cached = null;
     },
   };
+}
+
+/**
+ * Drops states `on: "player"`: the person plays a character now, whose states
+ * are the character's, so those have nobody to sit on.
+ */
+function withoutPlayer(raw: unknown, warn: (message: string) => void): unknown {
+  if (!Array.isArray(raw)) return raw;
+  return raw.filter((entry: unknown) => {
+    const { on, name } = (entry ?? {}) as { on?: unknown; name?: unknown };
+    if (on !== "player") return true;
+    warn(
+      `States: "${String(name)}" is a state of the player; it is left out, as the person plays characters now.`,
+    );
+    return false;
+  });
 }

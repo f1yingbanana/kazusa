@@ -2,7 +2,7 @@
 
 import { useQueryStates, parseAsString } from "nuqs";
 import { timelineParsers } from "@/components/views/timeline/search-params";
-import { Button } from "@/components/ui/button";
+import { SectionAction, SectionActions } from "@/components/inspector/parts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimelineRow } from "@/components/views/timeline/timeline-row";
 import { useRecentEvents } from "@/hooks/use-timeline";
@@ -49,20 +49,19 @@ export function CharacterRecentSection({ entity }: { entity: EntityRef }) {
           ))}
         </div>
       )}
-      <Button
-        variant="link"
-        size="sm"
-        className="self-start px-0"
-        onClick={() =>
-          void setParams({
-            view: "timeline",
-            "tl.actors": [entity.id],
-            "tl.watch": null,
-          })
-        }
-      >
-        Open in Timeline
-      </Button>
+      <SectionActions>
+        <SectionAction
+          onClick={() =>
+            void setParams({
+              view: "timeline",
+              "tl.actors": [entity.id],
+              "tl.watch": null,
+            })
+          }
+        >
+          Open in Timeline
+        </SectionAction>
+      </SectionActions>
     </div>
   );
 }

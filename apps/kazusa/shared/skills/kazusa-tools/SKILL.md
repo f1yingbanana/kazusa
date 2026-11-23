@@ -191,10 +191,10 @@ What to look up.
 
 ## reflect
 
-Only once going to sleep for the night has told you to go over the day, never
-before or alongside it: go over one person, place or thing the day changed your
-mind about, yourself (`me`), or the day itself (`today`). Give only what
-changed.
+Only once you have been told to go over the day (going to sleep, or looking back
+on the last hours), never before or alongside it: go over one person, place or
+thing the day changed your mind about, yourself (`me`), or the day itself
+(`today`). Give only what changed.
 
 ## reflect.about
 

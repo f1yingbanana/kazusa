@@ -15,7 +15,7 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import { backdropsOnWire } from "../scene/backdrops.ts";
-import { USER } from "./config.ts";
+import { WatchingError, type Player } from "../player.ts";
 import type { LocationRecord } from "./location.ts";
 import { backdropOf } from "./map.ts";
 import type { LocationService } from "./register.ts";
@@ -42,11 +42,12 @@ export function registerLocationHttp(
     readonly location: LocationService;
     /** The world's times of day (`scene.times`), sorted. */
     readonly times: readonly TimeOfDay[];
+    /** Who the person plays: the one who moves. */
+    readonly player: Player;
   },
 ): void {
   const route = createRouteRegistrar(api);
   const { location } = deps;
-  const player = USER.parse(api.pluginConfig?.user ?? {});
 
   route("places", "GET", async (_req, res) => {
     const world = location.world;
@@ -93,11 +94,13 @@ export function registerLocationHttp(
     sendJson(res, 200, { records } satisfies LocationsResponse);
   });
 
-  // The player has no tasks, so they go straight there. Who moves comes from
-  // config, never the request.
+  // A played character has no activity, so they go straight there. Who moves
+  // is whoever the person plays, never the request.
   route("move", "POST", async (req, res) => {
     const { placeId } = MovePayloadSchema.parse(await readJsonBody(req));
-    const record = await location.place(player.id, placeId);
+    const actor = await deps.player.playing();
+    if (!actor) throw new WatchingError();
+    const record = await location.place(actor.id, placeId);
     sendJson(res, 200, {
       record: clientRecord(record),
     } satisfies MoveResponse);

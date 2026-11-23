@@ -353,6 +353,40 @@ describe("setup", () => {
     expect((await setup.status()).configured).toBe(true);
   });
 
+  it("puts whoever is picked to play onstage, played from the first start", async () => {
+    await createSetupHere(app, folderCatalog(app)).apply({
+      world: "cast-world",
+      cast: ["ann"],
+      play: "bo",
+    });
+    const kazusa = config().plugins.entries.kazusa.config;
+    expect(kazusa.stage).toEqual({
+      defaultOnstage: false,
+      cast: ["admin", "ann", "bo"],
+    });
+    expect(kazusa.user).toMatchObject({ defaultCharacter: "bo" });
+  });
+
+  it("plays nobody when nobody is picked, whatever the template's config says", async () => {
+    const template = path.join(app, "worlds", "cast-world", "package.json");
+    const pkg = JSON.parse(readFileSync(template, "utf8")) as {
+      kazusa: { config?: Record<string, unknown> };
+    };
+    pkg.kazusa.config = {
+      ...pkg.kazusa.config,
+      user: { id: "user:me", name: "Me", defaultCharacter: "bo" },
+    };
+    writeFileSync(template, JSON.stringify(pkg));
+    await createSetupHere(app, folderCatalog(app)).apply({
+      world: "cast-world",
+      cast: ["ann"],
+    });
+    expect(config().plugins.entries.kazusa.config.user).toEqual({
+      id: "user:me",
+      name: "Me",
+    });
+  });
+
   it("leaves a world without a cast running with everyone onstage", async () => {
     await createSetupHere(app).apply({ world: "starter", cast: [] });
     const kazusa = config().plugins.entries.kazusa.config;

@@ -70,6 +70,8 @@ export function registerPerception(
     readonly confirm?: PerceptionDeps["confirm"];
     /** Whether a character is simulated; offstage, input waits. */
     readonly onstage?: PerceptionDeps["onstage"];
+    /** Whether a person plays them; their input goes to that person. */
+    readonly played?: PerceptionDeps["played"];
     readonly realtime?: PerceptionDeps["realtime"];
     /** Starts a turn's memory embedding at handoff (Memory). */
     readonly warm?: PerceptionDeps["warm"];
@@ -119,6 +121,7 @@ export function registerPerception(
     outage: sharedBrainOutage(),
     ...(deps.confirm ? { confirm: deps.confirm } : {}),
     ...(deps.onstage ? { onstage: deps.onstage } : {}),
+    ...(deps.played ? { played: deps.played } : {}),
     ...(deps.realtime ? { realtime: deps.realtime } : {}),
     ...(deps.warm ? { warm: deps.warm } : {}),
   });

@@ -30,6 +30,9 @@ import { Stage } from "./stage";
 import { StatusBar } from "./status-bar";
 import { TopBar } from "./top-bar";
 import { WorldUpdateNotice } from "./world-update-notice";
+import { PlayAsDialog } from "@/components/play/play-as-dialog";
+import { useSources } from "@/lib/source/provider";
+import { useSwitchResets } from "@/hooks/use-play";
 
 export function Shell() {
   useEffect(syncPreferences, []);
@@ -52,6 +55,11 @@ function Layout() {
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const inspectorRequested = useUiStore((state) => state.inspectorRequested);
   const quietKey = useUiStore((state) => state.quietKey);
+  // The You tab needs no selection: who you play is always there to show.
+  const { player } = useSources();
+  useSwitchResets();
+  const showingYou =
+    useUiStore((state) => state.inspectorTab) === "you" && Boolean(player.id);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selection, select] = useSelection();
   const active = useActiveView();
@@ -127,9 +135,11 @@ function Layout() {
       ) : null}
 
       <Sheet
-        open={!wide && selection !== null && sheetOpen}
+        open={!wide && (selection !== null || showingYou) && sheetOpen}
         onOpenChange={(open) => {
-          if (!open) void select(null);
+          if (open) return;
+          setSheetOpen(false);
+          if (selection !== null) void select(null);
         }}
       >
         <SheetContent
@@ -149,6 +159,7 @@ function Layout() {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <WorldUpdateNotice />
+      <PlayAsDialog />
     </div>
   );
 }

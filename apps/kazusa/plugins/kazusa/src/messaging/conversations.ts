@@ -1,15 +1,12 @@
 import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
+import { isUser } from "../identity.ts";
 import { PICTURE_NAME } from "../pictures.ts";
 
 export const AGENT_ID = z
   .string()
   .regex(/^[a-z0-9][a-z0-9_-]*$/)
   .max(128);
-
-export function isUser(id: string): boolean {
-  return id.startsWith("user:");
-}
 
 export const PARTICIPANT_ID = z
   .string()
@@ -332,7 +329,8 @@ export interface ChatConversation {
 export interface ChatSummary {
   readonly sessionKey: string;
   readonly kind: ChatKind;
-  readonly title: string;
+  /** Null for an untitled group: it is shown by who is in it. */
+  readonly title: string | null;
   readonly members: readonly string[];
   /** A huddle's place. */
   readonly placeId?: string;
@@ -431,7 +429,7 @@ export function chatSummary(
       ? `chat:${chat.kind}:${suffix}`
       : `agent:${participantId}:chat:${chat.kind}:${suffix}`,
     kind: chat.kind,
-    title: chat.title ?? peer ?? "Group chat",
+    title: chat.title ?? (chat.kind === "group" ? null : (peer ?? null)),
     members: [...chat.members],
     ...(chat.placeId ? { placeId: chat.placeId } : {}),
   };
