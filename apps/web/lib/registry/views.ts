@@ -83,4 +83,5 @@ export const STAGE_VIEWS: readonly StageView[] = [
   },
 ];
 
-export const DEFAULT_VIEW = "world";
+/** Where everyone lands: what people are saying is what there is to see. */
+export const DEFAULT_VIEW = "chats";

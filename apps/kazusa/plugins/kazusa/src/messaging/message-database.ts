@@ -47,6 +47,8 @@ export interface LogWindow {
   readonly limit: number;
   /** Only messages one of these sent or received. */
   readonly actors?: readonly string[];
+  /** No message one of these sent or received. */
+  readonly without?: readonly string[];
 }
 
 /**
@@ -551,7 +553,13 @@ function createStore({
   }
 
   /** The timeline's window: newest first, ties at the edge kept. */
-  function log({ before, after, limit, actors }: LogWindow): MessageDelivery[] {
+  function log({
+    before,
+    after,
+    limit,
+    actors,
+    without,
+  }: LogWindow): MessageDelivery[] {
     const range = [
       before === undefined ? "" : "AND m.timestamp < :before",
       after === undefined ? "" : "AND m.timestamp > :after",
@@ -561,14 +569,20 @@ function createStore({
           OR m.n IN (SELECT r.n FROM received r
                      WHERE r.participant IN (SELECT value FROM json_each(:actors))))`
       : "";
+    const notWho = without?.length
+      ? `AND m.sender NOT IN (SELECT value FROM json_each(:without))
+         AND m.n NOT IN (SELECT r.n FROM received r
+                         WHERE r.participant IN (SELECT value FROM json_each(:without)))`
+      : "";
     const params = {
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
       ...(actors ? { actors: JSON.stringify(actors) } : {}),
+      ...(without?.length ? { without: JSON.stringify(without) } : {}),
     };
     const newest = db
       .prepare(
-        `SELECT m.timestamp FROM messages m WHERE 1 ${range} ${who}
+        `SELECT m.timestamp FROM messages m WHERE 1 ${range} ${who} ${notWho}
          ORDER BY m.timestamp DESC LIMIT 1 OFFSET :skip`,
       )
       .get({ ...params, skip: Math.max(0, limit - 1) }) as
@@ -580,7 +594,7 @@ function createStore({
     return (
       db
         .prepare(
-          `SELECT ${MESSAGE} FROM ${FROM} WHERE 1 ${range} ${who} ${floor}
+          `SELECT ${MESSAGE} FROM ${FROM} WHERE 1 ${range} ${who} ${notWho} ${floor}
            ORDER BY m.timestamp DESC, m.sequence DESC`,
         )
         .all(params) as unknown as MessageRow[]

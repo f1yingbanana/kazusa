@@ -28,8 +28,8 @@ test("two tabs preserve each other's preferences and synchronize removals", asyn
 }) => {
   const other = await context.newPage();
   await Promise.all([
-    page.goto("/?world.as=list"),
-    other.goto("/?world.as=list"),
+    page.goto("/?view=world&world.as=list"),
+    other.goto("/?view=world&world.as=list"),
   ]);
   await Promise.all([expectLive(page), expectLive(other)]);
   const members = (tab: Page) =>
@@ -86,7 +86,7 @@ test("roster selection, persisted watchlist, navigation and cached resources", a
     if (new URL(request.url()).pathname === "/kazusa/world")
       worldRequests.push(request.url());
   });
-  await page.goto("/?world.as=list");
+  await page.goto("/?view=world&world.as=list");
   await expectLive(page);
   const members = page.getByRole("list", { name: "Everyone members" });
   await expect(members.getByRole("button").first()).toBeVisible();
@@ -234,7 +234,7 @@ test("mobile selection opens the inspector and section navigation stays usable",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?world.as=list");
+  await page.goto("/?view=world&world.as=list");
   await page.getByRole("button", { name: /^Everyone/ }).click();
   const members = page.getByRole("list", { name: "Everyone members" });
   await members.getByRole("button").first().click();

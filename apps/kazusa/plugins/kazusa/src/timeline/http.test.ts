@@ -75,6 +75,7 @@ describe("registerTimelineHttp", () => {
 
     const api = {
       id: "kazusa",
+      pluginConfig: { user: { id: "user:sensei", name: "Sensei" } },
       config: {
         gateway: { auth: { token: "test-service-token" } },
         agents: {
@@ -110,21 +111,25 @@ describe("registerTimelineHttp", () => {
     });
 
     const clock = createMockClock();
+    const windows: unknown[] = [];
     registerTimelineHttp(api, {
       clock,
-      messages: async () => [
-        {
-          id: "canonical-1",
-          sequence: 7,
-          sender: "alice",
-          senderName: "Alice",
-          chatId: "direct:abc",
-          audience: ["alice", "bob", "user:sensei"],
-          params: { text: "Hello Sensei!", requestId: "r", title: null },
-          timestamp: 1_000_300,
-          copies: [],
-        },
-      ],
+      messages: async (window) => {
+        windows.push(window);
+        return [
+          {
+            id: "canonical-1",
+            sequence: 7,
+            sender: "alice",
+            senderName: "Alice",
+            chatId: "direct:abc",
+            audience: ["alice", "bob", "user:sensei"],
+            params: { text: "Hello Sensei!", requestId: "r", title: null },
+            timestamp: 1_000_300,
+            copies: [],
+          },
+        ];
+      },
     });
 
     expect(api.registerHttpRoute).toHaveBeenCalledWith(
@@ -230,6 +235,28 @@ describe("registerTimelineHttp", () => {
     expect(parsed.events[1].payload.endAt).toBe(1_001_900);
     expect(parsed.events[1].payload.reason).toBe("Taking more notes");
     expect(parsed.events[1].payload.monologue).toBe("Need to write this down.");
+
+    // Someone only watching is shown nothing a person said or was told: it is
+    // left out of the window read, and of the page.
+    await routes["/kazusa/timeline"]?.(
+      {
+        method: "GET",
+        headers: {
+          authorization: "Bearer test-service-token",
+          "x-kazusa-role": "visitor",
+        },
+        url: "/kazusa/timeline",
+      },
+      res,
+    );
+    expect(resStatus).toBe(200);
+    expect(windows.at(-1)).toMatchObject({ without: ["user:sensei"] });
+    expect(windows[0]).not.toHaveProperty("without");
+    expect(
+      (
+        JSON.parse(resJson ?? "{}") as { events: { kind: string }[] }
+      ).events.map((event) => event.kind),
+    ).toEqual(["task.delayed", "task.started"]);
   });
 
   it("filters events by kind and timestamp correctly", async () => {

@@ -75,4 +75,59 @@ describe("registerClockHttp", () => {
     expect(parsedWorld.clock.speed).toBe(1);
     expect(parsedWorld.capabilities.clock).toBe("live");
   });
+
+  it("tells who the operator plays to them alone", async () => {
+    const routes: Record<
+      string,
+      (req: unknown, res: unknown) => Promise<boolean>
+    > = {};
+    const api = {
+      config: { gateway: { auth: { token: "test-service-token" } } },
+      pluginConfig: { user: { id: "user:test", name: "Tester" } },
+      registerHttpRoute: vi.fn((opts) => {
+        routes[opts.path] = opts.handler;
+      }),
+    } as unknown as OpenClawPluginApi;
+    const clock = new Clock({
+      store: createMockStore() as never,
+      initialTime: 100_000,
+      defaultSpeed: 1,
+    });
+    await clock.init();
+    const played = { id: "alice", name: "Alice" };
+    registerClockHttp(api, clock, {
+      player: {
+        operator: { id: "user:test", name: "Tester" },
+        playing: async () => played,
+        playingNow: () => played.id,
+        actorIn: async () => played,
+        owns: () => true,
+      },
+    });
+    const playerSeenBy = async (role?: string): Promise<unknown> => {
+      let json: string | undefined;
+      await routes["/kazusa/world"]?.(
+        {
+          method: "GET",
+          url: "/kazusa/world",
+          headers: {
+            authorization: "Bearer test-service-token",
+            ...(role ? { "x-kazusa-role": role } : {}),
+          },
+        },
+        {
+          writeHead: vi.fn(),
+          setHeader: vi.fn(),
+          end: (data?: string) => {
+            json = data;
+          },
+        },
+      );
+      return (JSON.parse(json ?? "{}") as { player: unknown }).player;
+    };
+    expect(await playerSeenBy()).toEqual(played);
+    expect(await playerSeenBy("owner")).toEqual(played);
+    // A visitor watches: nobody is "you" to them.
+    expect(await playerSeenBy("visitor")).toBeNull();
+  });
 });

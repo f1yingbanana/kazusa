@@ -38,7 +38,7 @@ import { ObservedChatList } from "./observed-chat-list";
  * narrows both to one character's chats.
  */
 export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
-  const { player } = useSources();
+  const { player, watching } = useSources();
   const selfOf = useSelfIn();
   // Watching, there is nobody of yours to start a chat as.
   const { canAct } = usePlay();
@@ -189,6 +189,8 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               userId={player.id}
               selectedChatId={chatId}
               open={othersOpen}
+              // Watching, these aren't "other" chats: they are the chats.
+              standalone={watching && chats.length === 0}
               onToggle={() => setObservedCollapsed(othersOpen)}
               onSelect={openChatById}
               scrollRef={scrollRef}

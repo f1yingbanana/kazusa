@@ -307,7 +307,11 @@ Consequences to design around:
 `sessionKey`; a dissolved chat has `ended` and `members` = who took part);
 `observe/messages` reads any chat; SSE `observed` wraps
 `message`/`typing`/`chats` on the one stream (there is no `scope` param);
-capability `observe`.
+capability `observe`. A viewer without `play` (a visitor) always reads as an
+observer: `world` and `chats` answer `player: null` and no chats, the played
+character's chats come with everyone's here and as `observed` events, and no
+chat a person (`user:<id>`) is in is listed, read, journalled or streamed (see
+the `kazusa` skill's `references/auth.md`).
 
 **Observer gating.** `/kazusa/observe/*` and the `observed` event are gated by
 plugin config `observer.enabled`. It defaults to `true`, because this is a local

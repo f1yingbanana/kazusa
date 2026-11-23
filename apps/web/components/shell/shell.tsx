@@ -31,6 +31,7 @@ import { StatusBar } from "./status-bar";
 import { TopBar } from "./top-bar";
 import { WorldUpdateNotice } from "./world-update-notice";
 import { PlayAsDialog } from "@/components/play/play-as-dialog";
+import { VisitorWelcome } from "./visitor-welcome";
 import { useSources } from "@/lib/source/provider";
 import { useSwitchResets } from "@/hooks/use-play";
 
@@ -160,6 +161,7 @@ function Layout() {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <WorldUpdateNotice />
       <PlayAsDialog />
+      <VisitorWelcome />
     </div>
   );
 }

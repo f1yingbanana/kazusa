@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/tooltip";
 
 /** Glyphs from Simple Icons (CC0), 24x24 viewBox. */
-const LINKS = [
+export const SOCIAL_LINKS = [
   {
     title: "GitHub",
     href: "https://github.com/f1yingbanana/kazusa",
@@ -30,11 +30,41 @@ const LINKS = [
   },
 ] as const;
 
+export type SocialLink = (typeof SOCIAL_LINKS)[number];
+
+/** One of the links by its title, for a place that names it in words. */
+export function socialLink<T extends SocialLink["title"]>(
+  title: T,
+): Extract<SocialLink, { title: T }> {
+  return SOCIAL_LINKS.find((link) => link.title === title) as Extract<
+    SocialLink,
+    { title: T }
+  >;
+}
+
+export function SocialGlyph({
+  link,
+  className = "size-4",
+}: {
+  link: SocialLink;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={`${className} shrink-0 fill-current`}
+    >
+      <path d={link.path} />
+    </svg>
+  );
+}
+
 /** Community links, shown at the end of the top bar. */
 export function SocialLinks() {
   return (
     <nav aria-label="Community" className="flex items-center">
-      {LINKS.map((link) => (
+      {SOCIAL_LINKS.map((link) => (
         <Tooltip key={link.title}>
           <TooltipTrigger
             render={
@@ -47,13 +77,7 @@ export function SocialLinks() {
             }
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden
-              className="size-4 fill-current"
-            >
-              <path d={link.path} />
-            </svg>
+            <SocialGlyph link={link} />
           </TooltipTrigger>
           <TooltipContent>{link.title}</TooltipContent>
         </Tooltip>

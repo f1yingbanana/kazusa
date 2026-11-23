@@ -19,7 +19,9 @@ import {
   createRouteRegistrar,
   readJsonBody,
   sendJson,
+  watchesOnly,
 } from "../http/helpers.ts";
+import { involvesUser, isUser } from "../identity.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import {
   TYPING,
@@ -93,6 +95,11 @@ const MAX_STREAM_BACKLOG_BYTES = 8 * 1024 * 1024;
  * The person's HTTP adapter. Who acts comes from the server, never JSON: the
  * operator in their console with the system agent, and everywhere else the
  * character they play. Watching, they read and send nothing of their own.
+ *
+ * A viewer without `play` (a visitor) is never the operator: they watch,
+ * whoever the operator plays. No chat is theirs, the played character's chats
+ * are everyone else's to them, and a chat a person outside the world is in is
+ * never shown to them, by any route or event.
  */
 export function registerMessagingHttp(
   api: OpenClawPluginApi,
@@ -166,7 +173,37 @@ export function registerMessagingHttp(
   /** The people whose chats the person sees as their own, given who they play. */
   const viewersOf = (playing: Actor | undefined): string[] =>
     playing ? [operator.id, playing.id] : [operator.id];
-  route("chats", "GET", async (req, res) => {
+  /** A chat a person outside the world is in, or was: theirs alone to read. */
+  const isPersons = async (chatId: string): Promise<boolean> =>
+    [
+      ...(await messaging.membersOf(chatId)),
+      ...(await messaging.audienceOf(chatId)),
+    ].some(isUser);
+  /** A page of any chat for someone watching; a person's chat isn't there. */
+  const watchHistory = async (
+    params: z.infer<typeof HISTORY>,
+  ): Promise<Awaited<ReturnType<Messaging["observeChatHistory"]>>> => {
+    if (await isPersons(params.chatId))
+      throw new Error(`No chat called ${params.chatId}.`);
+    return await messaging.observeChatHistory(params);
+  };
+  /** Who is composing where, less the chats a person is in. */
+  const watchedTyping = async () => {
+    const typing = await messaging.getTyping();
+    const shown = await Promise.all(
+      typing.map(async (event) => !(await isPersons(event.chatId))),
+    );
+    return typing.filter((_, index) => shown[index]);
+  };
+  route("chats", "GET", async (req, res, role) => {
+    if (watchesOnly(role)) {
+      sendJson(res, 200, {
+        operator,
+        player: null,
+        chats: [],
+      } satisfies ChatsResponse);
+      return;
+    }
     const query =
       new URL(req.url ?? "/", "http://localhost").searchParams.get("query") ??
       undefined;
@@ -217,12 +254,16 @@ export function registerMessagingHttp(
       chats,
     } satisfies ChatsResponse);
   });
-  route("messages", "GET", async (req, res) => {
+  route("messages", "GET", async (req, res, role) => {
     const params = HISTORY.parse(
       Object.fromEntries(
         new URL(req.url ?? "/", "http://localhost").searchParams,
       ),
     );
+    if (watchesOnly(role)) {
+      sendJson(res, 200, await watchHistory(params));
+      return;
+    }
     sendJson(
       res,
       200,
@@ -233,28 +274,34 @@ export function registerMessagingHttp(
     );
   });
   if (options?.observer) {
-    route("observe/chats", "GET", async (_req, res) => {
+    route("observe/chats", "GET", async (_req, res, role) => {
       // Not the played character's, and not the console; the operator's older
-      // chats with characters are read here.
-      const playing = await player.playing();
+      // chats with characters are read here. Someone watching reads the played
+      // character's with everyone's, and none a person is in.
+      const playing = watchesOnly(role) ? undefined : await player.playing();
       const chats = (
         await messaging.observeChats(playing ? [playing.id] : [])
-      ).filter(({ chat }) => !isConsole(chat.members));
+      ).filter(({ chat, members }) =>
+        watchesOnly(role)
+          ? ![...chat.members, ...members].some(isUser)
+          : !isConsole(chat.members),
+      );
       sendJson(res, 200, {
         chats: chats.map(observedChat),
       } satisfies ObservedChatsResponse);
     });
-    route("observe/messages", "GET", async (req, res) => {
+    route("observe/messages", "GET", async (req, res, role) => {
+      const params = HISTORY.parse(
+        Object.fromEntries(
+          new URL(req.url ?? "/", "http://localhost").searchParams,
+        ),
+      );
       sendJson(
         res,
         200,
-        await messaging.observeChatHistory(
-          HISTORY.parse(
-            Object.fromEntries(
-              new URL(req.url ?? "/", "http://localhost").searchParams,
-            ),
-          ),
-        ),
+        watchesOnly(role)
+          ? await watchHistory(params)
+          : await messaging.observeChatHistory(params),
       );
     });
   }
@@ -325,7 +372,8 @@ export function registerMessagingHttp(
     );
     sendJson(res, 200, { success: true });
   });
-  route("events", "GET", async (_req, res) => {
+  route("events", "GET", async (_req, res, role) => {
+    const watching = watchesOnly(role);
     // Subscribe before awaiting the snapshot, then replay changes after it.
     // This closes the connect/read race without a retained event log.
     const buffered: StreamEvent[] = [];
@@ -347,14 +395,34 @@ export function registerMessagingHttp(
     // Who they see as themselves, read per event: they may switch mid-stream.
     const own = (audience: readonly string[]) => player.owns(audience);
     const unsubscribeMessaging = messaging.onAnyEvent((event) => {
-      if (event.type === "message") {
-        if (own(event.delivery.audience))
+      const audience =
+        event.type === "message" ? event.delivery.audience : event.audience;
+      if (!own(audience)) return;
+      if (watching) {
+        // The played character's chats are someone else's to a watcher: they
+        // arrive as everyone else's do. The broadcaster skips them as the
+        // operator's own, and already says when the chat list changed.
+        if (audience.some(isUser)) return;
+        if (event.type === "message")
           write({
-            type: "message",
-            chatId: event.delivery.chatId,
-            message: clientMessage(event.delivery),
+            type: "observed",
+            event: {
+              type: "message",
+              chatId: event.delivery.chatId,
+              message: clientMessage(event.delivery),
+            },
           });
-      } else if (own(event.audience)) {
+        else if (event.type === "typing")
+          write({ type: "observed", event: event.typing });
+        return;
+      }
+      if (event.type === "message") {
+        write({
+          type: "message",
+          chatId: event.delivery.chatId,
+          message: clientMessage(event.delivery),
+        });
+      } else {
         write(
           event.type === "typing"
             ? event.typing
@@ -364,7 +432,16 @@ export function registerMessagingHttp(
         );
       }
     });
-    const unsubscribeBroadcaster = options?.broadcaster?.subscribe(write);
+    // Who the operator plays, and what they say or are told, stays theirs.
+    const unsubscribeBroadcaster = options?.broadcaster?.subscribe(
+      watching
+        ? (event) => {
+            if (event.type === "player") return;
+            if (event.type === "journal" && involvesUser(event.event)) return;
+            write(event);
+          }
+        : write,
+    );
 
     const heartbeat = setInterval(() => {
       if (ready) send(": keepalive\n\n");
@@ -380,15 +457,17 @@ export function registerMessagingHttp(
       clearInterval(heartbeat);
     });
     try {
-      const typing = options?.observer
-        ? await messaging.getTyping()
-        : (
-            await Promise.all(
-              viewersOf(await player.playing()).map((viewer) =>
-                messaging.getTyping(viewer),
-              ),
-            )
-          ).flat();
+      const typing = watching
+        ? await watchedTyping()
+        : options?.observer
+          ? await messaging.getTyping()
+          : (
+              await Promise.all(
+                viewersOf(await player.playing()).map((viewer) =>
+                  messaging.getTyping(viewer),
+                ),
+              )
+            ).flat();
       const statuses = options?.getStatuses
         ? await options.getStatuses()
         : undefined;

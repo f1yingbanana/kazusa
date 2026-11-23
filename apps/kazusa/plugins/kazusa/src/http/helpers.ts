@@ -71,6 +71,15 @@ export function checkAuth(
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+/**
+ * Whether a viewer only watches. Without `play` they are nobody in the world,
+ * whoever the operator plays: no chat is theirs, and nothing the operator says
+ * or is told is shown to them.
+ */
+export function watchesOnly(role: Role): boolean {
+  return !hasPermission(role, "play");
+}
+
 export type RouteRegistrar = (
   path: string,
   method: "GET" | "POST",

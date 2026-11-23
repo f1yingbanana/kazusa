@@ -911,6 +911,115 @@ describe("send_message SDK integration", () => {
     ).toEqual(["between us"]);
   });
 
+  it("makes a visitor an observer of every chat but a person's", async () => {
+    const h = await setup({}, { observer: true });
+    const visitor = {
+      authorization: "Bearer test-service-token",
+      "x-kazusa-role": "visitor",
+    };
+    // The stream opens first, as a browser's does.
+    const events = h.routes.get("/kazusa/events");
+    if (!events) throw new Error("Missing route: /kazusa/events");
+    const chunks: string[] = [];
+    const stream = Object.assign(new EventEmitter(), {
+      destroyed: false,
+      writableEnded: false,
+      writableLength: 0,
+      setHeader: () => {},
+      writeHead: () => {},
+      write: (chunk: string) => {
+        chunks.push(chunk);
+        return true;
+      },
+      end: () => {},
+      destroy: () => {},
+    });
+    await events.handler(
+      Object.assign(Readable.from([]), {
+        method: "GET",
+        url: "/kazusa/events",
+        headers: visitor,
+        socket: new Socket(),
+      }) as unknown as IncomingMessage,
+      stream as unknown as ServerResponse,
+    );
+
+    const theirs = await h.messaging.send("alice", "Alice", {
+      requestId: "agents-only",
+      members: ["bob"],
+      text: "between us",
+    });
+    // The operator's own: their console, or a chat from before they played.
+    const persons = await h.messaging.send("user:sensei", "Sensei", {
+      requestId: "console",
+      members: ["alice"],
+      text: "for her eyes only",
+    });
+    // The character the operator plays is one more character to a visitor.
+    const played = await h.messaging.send("carol", "Carol", {
+      requestId: "played",
+      members: ["bob"],
+      text: "as carol",
+    });
+    stream.emit("close");
+
+    async function get(routePath: string, url = routePath) {
+      const route = h.routes.get(routePath);
+      if (!route) throw new Error(`Missing route: ${routePath}`);
+      let status = 200;
+      let body = "";
+      await route.handler(
+        Object.assign(Readable.from([]), {
+          method: "GET",
+          url,
+          headers: visitor,
+          socket: new Socket(),
+        }) as unknown as IncomingMessage,
+        {
+          writeHead: (code: number) => {
+            status = code;
+          },
+          setHeader: () => {},
+          end: (data: string) => {
+            body = data;
+          },
+        } as unknown as ServerResponse,
+      );
+      return { status, body: JSON.parse(body) as unknown };
+    }
+
+    // Nobody is "you", and no chat is yours.
+    expect((await get("/kazusa/chats")).body).toMatchObject({
+      player: null,
+      chats: [],
+    });
+    const listed = ObservedChatsResponseSchema.parse(
+      (await get("/kazusa/observe/chats")).body,
+    ).chats.map((chat) => chat.id);
+    expect(listed).toHaveLength(2);
+    expect(listed).toEqual(
+      expect.arrayContaining([theirs.chatId, played.chatId]),
+    );
+    for (const route of ["/kazusa/messages", "/kazusa/observe/messages"]) {
+      expect(
+        MessagesResponseSchema.parse(
+          (await get(route, `${route}?chatId=${played.chatId}`)).body,
+        ).messages.map((message) => message.text),
+      ).toEqual(["as carol"]);
+      const refused = await get(route, `${route}?chatId=${persons.chatId}`);
+      expect(refused.status).toBe(400);
+      expect(JSON.stringify(refused.body)).not.toContain("for her eyes only");
+    }
+
+    // Live, the played character's chat arrives as anyone's does, and nothing
+    // of the person's arrives at all.
+    const sent = chunks.join("");
+    expect(sent).toContain("event: observed");
+    expect(sent).toContain("as carol");
+    expect(sent).not.toContain("event: message\n");
+    expect(sent).not.toContain("for her eyes only");
+  });
+
   it("keeps an event stream open through backpressure", async () => {
     const h = await setup();
     const route = h.routes.get("/kazusa/events");

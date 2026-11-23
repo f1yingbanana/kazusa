@@ -212,22 +212,31 @@ describe("message database", () => {
           [290_000, undefined],
         ] as const)
           for (const limit of [1, 5, 50, 500]) {
+            // Every other window also leaves one participant's messages out.
+            const without = limit === 5 || limit === 500 ? ["bob"] : undefined;
             const all = messages.filter(
               (m) =>
                 (before === undefined || m.timestamp < before) &&
                 (after === undefined || m.timestamp > after) &&
                 (!actors ||
-                  [m.sender, ...m.audience].some((id) => actors.includes(id))),
+                  [m.sender, ...m.audience].some((id) =>
+                    actors.includes(id),
+                  )) &&
+                (!without ||
+                  ![m.sender, ...m.audience].some((id) =>
+                    without.includes(id),
+                  )),
             );
             const window = {
               limit,
               ...(before === undefined ? {} : { before }),
               ...(after === undefined ? {} : { after }),
               ...(actors ? { actors } : {}),
+              ...(without ? { without } : {}),
             };
             const log = store.log(window);
             expect(new Set(log.map((m) => m.id)).size).toBe(log.length);
-            // Nothing outside the window or the actors.
+            // Nothing outside the window or the actors, and nobody left out.
             const ids = new Set(all.map((m) => m.id));
             expect(log.every((m) => ids.has(m.id))).toBe(true);
             // And not everything: about `limit`, plus any sharing its last time.

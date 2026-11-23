@@ -138,7 +138,8 @@ export const KAZUSA_ROUTES: ReadonlyMap<string, RoutePolicy> = new Map([
   ["wiki/delete", policy("POST", "manage")],
   ["memory/runs", policy("GET", "observe")],
   ["wiki/form", policy("GET", "manage")],
-  ["wiki/reach", policy("GET", "manage")],
+  // Who knows a page how well: shown on the page itself, to anyone reading it.
+  ["wiki/reach", policy("GET", "observe")],
   ["wiki/form/save", policy("POST", "manage")],
   // Memory, looks and stickers: read like the rest of a character's wiki.
   ["wiki/character", policy("GET", "observe")],

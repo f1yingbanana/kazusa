@@ -14,12 +14,13 @@ import {
 } from "@/components/ui/empty";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChatActions, useChats } from "@/hooks/use-chats";
-import { useObservedChat } from "@/hooks/use-observed-chats";
+import { useObservedChat, useObservedChats } from "@/hooks/use-observed-chats";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { setActiveChat } from "@/lib/live/realtime-state";
+import { setActiveChat, useRealtimeStore } from "@/lib/live/realtime-state";
 import { chatSubject } from "@/lib/source/chats/display";
+import { liveliestChat } from "@/lib/source/chats/sections";
 import { useSelfIn } from "@/hooks/use-self";
 import { setDraftChat, useDraftChat } from "@/lib/state/chat-draft";
 import { keepsLinkedSelection, markQuietSelection } from "@/lib/state/ui-store";
@@ -40,7 +41,7 @@ import { ObservedChatView } from "./observed-chat-view";
  */
 export function ChatsView() {
   const docked = useMediaQuery("(min-width: 1024px)");
-  const { player, operator } = useSources();
+  const { player, operator, watching } = useSources();
   const selfOf = useSelfIn();
   // Who is played now, read when a send comes back.
   const playing = useRef(player.id);
@@ -206,6 +207,39 @@ export function ChatsView() {
     setParams,
     canPlay,
     isAccessLoading,
+  ]);
+
+  // Arriving to watch with nothing picked: open where something is happening,
+  // once, so the stage isn't an empty "pick a conversation". On a narrow screen
+  // the list is the first screen, and in a quiet world it waits for the first
+  // conversation.
+  const everyone = useObservedChats();
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (arrived.current) return;
+    if (chatId || dmTarget || talkTarget) {
+      arrived.current = true;
+      return;
+    }
+    if (!watching || !docked) return;
+    const { typingByChat } = useRealtimeStore.getState();
+    const composingIn = new Set(
+      Object.keys(typingByChat).filter(
+        (id) => (typingByChat[id]?.length ?? 0) > 0,
+      ),
+    );
+    const pick = liveliestChat(everyone.chats, composingIn);
+    if (!pick) return;
+    arrived.current = true;
+    void setParams({ "chats.id": pick.id }, { history: "replace" });
+  }, [
+    chatId,
+    dmTarget,
+    talkTarget,
+    watching,
+    docked,
+    everyone.chats,
+    setParams,
   ]);
 
   if (selected) {
