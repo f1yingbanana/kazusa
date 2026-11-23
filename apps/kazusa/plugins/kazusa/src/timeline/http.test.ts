@@ -114,9 +114,10 @@ describe("registerTimelineHttp", () => {
     const windows: unknown[] = [];
     registerTimelineHttp(api, {
       clock,
+      // As the message store does: what `without` names is left out.
       messages: async (window) => {
         windows.push(window);
-        return [
+        const all = [
           {
             id: "canonical-1",
             sequence: 7,
@@ -129,6 +130,12 @@ describe("registerTimelineHttp", () => {
             copies: [],
           },
         ];
+        return all.filter(
+          (m) =>
+            ![m.sender, ...m.audience].some((id) =>
+              window.without?.includes(id),
+            ),
+        );
       },
     });
 

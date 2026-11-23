@@ -25,7 +25,7 @@ import {
   sendJson,
   watchesOnly,
 } from "../http/helpers.ts";
-import { involvesUser, operatorOf } from "../identity.ts";
+import { operatorOf } from "../identity.ts";
 import {
   journalKey,
   ledgerJournal,
@@ -211,9 +211,7 @@ export function registerTimelineHttp(
     }
 
     // Apply filtering
-    let filtered = watching
-      ? rawEvents.filter((event) => !involvesUser(event))
-      : rawEvents;
+    let filtered = rawEvents;
     if (kindsFilter?.length) {
       filtered = filtered.filter((e) => kindsFilter.includes(e.kind));
     }

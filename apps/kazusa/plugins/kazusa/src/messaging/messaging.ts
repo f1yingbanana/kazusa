@@ -945,12 +945,6 @@ export class Messaging {
     return this.chats.get(chatId)?.members ?? [];
   }
 
-  /** Everyone a chat's messages ever reached, its past members included. */
-  async audienceOf(chatId: string): Promise<readonly string[]> {
-    await this.ready();
-    return this.deps.store.audienceOf(chatId);
-  }
-
   /**
    * Every conversation none of `viewers` is in (the operator, and whoever they
    * play), newest first: what an observer reads. A dissolved huddle stays

@@ -173,12 +173,9 @@ export function registerMessagingHttp(
   /** The people whose chats the person sees as their own, given who they play. */
   const viewersOf = (playing: Actor | undefined): string[] =>
     playing ? [operator.id, playing.id] : [operator.id];
-  /** A chat a person outside the world is in, or was: theirs alone to read. */
+  /** A chat a person outside the world is in: theirs alone to read. */
   const isPersons = async (chatId: string): Promise<boolean> =>
-    [
-      ...(await messaging.membersOf(chatId)),
-      ...(await messaging.audienceOf(chatId)),
-    ].some(isUser);
+    (await messaging.membersOf(chatId)).some(isUser);
   /** A page of any chat for someone watching; a person's chat isn't there. */
   const watchHistory = async (
     params: z.infer<typeof HISTORY>,
@@ -281,9 +278,9 @@ export function registerMessagingHttp(
       const playing = watchesOnly(role) ? undefined : await player.playing();
       const chats = (
         await messaging.observeChats(playing ? [playing.id] : [])
-      ).filter(({ chat, members }) =>
+      ).filter(({ chat }) =>
         watchesOnly(role)
-          ? ![...chat.members, ...members].some(isUser)
+          ? !chat.members.some(isUser)
           : !isConsole(chat.members),
       );
       sendJson(res, 200, {
