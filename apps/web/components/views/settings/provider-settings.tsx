@@ -33,8 +33,10 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
+import { useDecisionModels, useEmbeddingModels } from "@/hooks/use-model-roles";
 import { useModels } from "@/hooks/use-models";
 import { useProviders } from "@/hooks/use-providers";
+import { failureText } from "@/components/views/wiki/parts";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -48,10 +50,6 @@ interface Row {
   /** Models characters can run on, from the catalog. */
   readonly models: number;
   readonly status: Status | undefined;
-}
-
-function describe(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** Where the key comes from, in the user's words. */
@@ -71,7 +69,7 @@ function keyLine(provider: ProviderSummary) {
 
 /**
  * One pasted key. It is sent once and never shown again: no route reads a saved
- * key back for the page.
+ * key back for the page. A server on this computer may go without one.
  */
 function KeyForm({
   provider,
@@ -79,9 +77,10 @@ function KeyForm({
   onCancel,
 }: {
   provider: ProviderSummary;
-  onSave: (key: string) => Promise<void>;
+  onSave: (key?: string) => Promise<void>;
   onCancel: () => void;
 }) {
+  const optional = provider.local === true;
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -90,13 +89,13 @@ function KeyForm({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!key.trim() || saving) return;
+    if ((!key.trim() && !optional) || saving) return;
     setSaving(true);
     setError(undefined);
     try {
-      await onSave(key.trim());
+      await onSave(key.trim() || undefined);
     } catch (failure) {
-      setError(describe(failure));
+      setError(failureText(failure));
       setSaving(false);
     }
   };
@@ -120,7 +119,7 @@ function KeyForm({
           type="password"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Paste your API key"
+          placeholder={optional ? "API key (optional)" : "Paste your API key"}
           value={key}
           disabled={saving}
           aria-invalid={error ? true : undefined}
@@ -128,9 +127,13 @@ function KeyForm({
           onChange={(event) => setKey(event.target.value)}
           className="min-w-0 flex-1 basis-56 font-mono text-xs"
         />
-        <Button type="submit" size="sm" disabled={!key.trim() || saving}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={(!key.trim() && !optional) || saving}
+        >
           {saving ? <Spinner /> : null}
-          {saving ? "Connecting…" : "Save key"}
+          {saving ? "Connecting…" : key.trim() ? "Save key" : "Connect"}
         </Button>
         <Button
           type="button"
@@ -146,14 +149,14 @@ function KeyForm({
         <p id={`${field}-error`} className="text-xs text-destructive">
           {error}
         </p>
-      ) : provider.keysUrl && !provider.local ? (
+      ) : provider.keysUrl ? (
         <a
           href={provider.keysUrl}
           target="_blank"
           rel="noreferrer"
           className="inline-flex w-fit items-center gap-0.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:text-foreground"
         >
-          {`Get a ${provider.label} key`}
+          {optional ? `Get ${provider.label}` : `Get a ${provider.label} key`}
           <ArrowUpRightIcon className="size-3" />
         </a>
       ) : null}
@@ -175,7 +178,7 @@ function ConnectedRow({
   fresh: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  onSave: (key: string) => Promise<void>;
+  onSave: (key?: string) => Promise<void>;
   onRemove: () => void;
 }) {
   const { provider, models, status } = row;
@@ -275,51 +278,20 @@ function AddRow({
   onEdit,
   onCancel,
   onSave,
-  onConnect,
 }: {
   provider: ProviderSummary;
   editing: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  onSave: (key: string) => Promise<void>;
-  /** A local provider connects in one click, without a key. */
-  onConnect: () => Promise<void>;
+  onSave: (key?: string) => Promise<void>;
 }) {
-  const [connecting, setConnecting] = useState(false);
-  const connect = async () => {
-    setConnecting(true);
-    try {
-      await onConnect();
-    } catch (error) {
-      toast.error(`Couldn't connect ${provider.label}`, {
-        description: describe(error),
-      });
-    } finally {
-      setConnecting(false);
-    }
-  };
   return (
     <li className="px-3 py-2.5">
       <div className="flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">{provider.label}</span>
-          {provider.hint ? (
-            <span className="truncate text-xs text-muted-foreground">
-              {provider.hint}
-            </span>
-          ) : null}
-        </div>
-        {editing ? null : provider.local ? (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={connecting}
-            onClick={() => void connect()}
-          >
-            {connecting ? <Spinner /> : null}
-            {connecting ? "Connecting…" : "Connect"}
-          </Button>
-        ) : (
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {provider.label}
+        </span>
+        {editing ? null : (
           <Button variant="outline" size="xs" onClick={onEdit}>
             Add key
           </Button>
@@ -333,17 +305,20 @@ function AddRow({
 }
 
 /**
- * Connect a model provider by pasting its key, or one on this computer (Ollama,
- * LM Studio) in a click: a placeholder key, which is what turns its model
- * discovery on. The key becomes an OpenClaw auth profile and the catalog is
- * asked again, so the provider's models are in the pickers before the form
- * closes, with no reload of the page or the Gateway: a profile lives outside
- * `openclaw.json`. Keys wired up by hand (an environment variable, a key in
- * `openclaw.json`) show where they come from and stay the user's to change.
+ * Connect a model provider by pasting its key; one on this computer (Ollama, LM
+ * Studio) may go without, and a placeholder turns its model discovery on. A key
+ * the provider then fails is taken back and the form says why. The key becomes
+ * an OpenClaw auth profile and the catalog is asked again, so the provider's
+ * models are in the pickers before the form closes, with no reload of the page
+ * or the Gateway: a profile lives outside `openclaw.json`. Keys wired up by
+ * hand (an environment variable, a key in `openclaw.json`) show where they come
+ * from and stay the user's to change.
  */
 export function ProviderSettings() {
   const providers = useProviders();
   const { data: catalog, refreshing, refresh } = useModels();
+  const decision = useDecisionModels();
+  const embedding = useEmbeddingModels();
   const [editing, setEditing] = useState<string>();
   const [fresh, setFresh] = useState<string>();
   const [removing, setRemoving] = useState<ProviderSummary>();
@@ -356,8 +331,13 @@ export function ProviderSettings() {
   }, [fresh]);
 
   const rows = useMemo(() => {
+    // TypeSafe serves only Jev, a decision model, so every role counts.
     const counts = new Map<string, number>();
-    for (const model of catalog?.models ?? [])
+    for (const model of [
+      ...(catalog?.models ?? []),
+      ...(decision.data?.options ?? []),
+      ...(embedding.data?.options ?? []),
+    ])
       if (model.available)
         counts.set(model.provider, (counts.get(model.provider) ?? 0) + 1);
     const statuses = new Map(
@@ -368,7 +348,7 @@ export function ProviderSettings() {
       models: counts.get(provider.id) ?? 0,
       status: statuses.get(provider.id),
     }));
-  }, [catalog, providers.data]);
+  }, [catalog, decision.data, embedding.data, providers.data]);
 
   const connected = rows.filter(
     (row) => row.provider.key !== "none" || row.models > 0,
@@ -379,7 +359,7 @@ export function ProviderSettings() {
     .filter(
       ({ provider }) =>
         !needle ||
-        [provider.label, provider.id, provider.hint ?? ""].some((text) =>
+        [provider.label, provider.id].some((text) =>
           text.toLowerCase().includes(needle),
         ),
     );
@@ -400,7 +380,7 @@ export function ProviderSettings() {
           ? `Couldn't disconnect ${provider.label}`
           : `Couldn't remove ${provider.label}'s key`,
         {
-          description: describe(error),
+          description: failureText(error),
         },
       );
     }
@@ -480,7 +460,6 @@ export function ProviderSettings() {
                   onEdit={() => setEditing(provider.id)}
                   onCancel={() => setEditing(undefined)}
                   onSave={save(provider)}
-                  onConnect={() => save(provider)()}
                 />
               ))}
             </ul>

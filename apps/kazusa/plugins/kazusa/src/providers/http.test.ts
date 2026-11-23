@@ -17,6 +17,26 @@ function setup(
 ) {
   const config = initial as OpenClawConfig;
   const profiles = new Map<string, string>(saved.map((id) => [id, "k"]));
+  /** Providers whose server doesn't answer. */
+  const down = new Set<string>();
+  /**
+   * A catalog where the key "bad" is rejected and every other one serves a
+   * model.
+   */
+  const catalog = () => ({
+    models: [...profiles]
+      .filter(([provider, key]) => key !== "bad" && !down.has(provider))
+      .map(([provider]) => ({ id: "m", name: "M", provider })),
+    providerOutcomes: [...profiles].map(([provider, key]) => ({
+      provider,
+      status:
+        key === "bad"
+          ? "auth-rejected"
+          : down.has(provider)
+            ? "unavailable"
+            : "ready",
+    })),
+  });
   const routes: Record<string, Handler> = {};
   const api = {
     config: { gateway: { auth: { token: "test-service-token" } } },
@@ -29,6 +49,7 @@ function setup(
     env: () => env,
     keys: {
       has: (provider: string) => profiles.has(provider),
+      read: (provider: string) => profiles.get(provider),
       save: vi.fn(async (provider: string, key: string) => {
         profiles.set(provider, key);
       }),
@@ -37,9 +58,10 @@ function setup(
       }),
     },
     call: vi.fn(async () => ({ refreshed: true })),
+    catalog: vi.fn(async () => catalog()),
   } satisfies ProvidersDeps;
   registerProvidersHttp(api, deps);
-  return { routes, deps, profiles };
+  return { routes, deps, profiles, down };
 }
 
 async function call(
@@ -147,6 +169,52 @@ describe("registerProvidersHttp", () => {
     });
     expect(keyless.status).toBe(400);
     expect(profiles.has("venice")).toBe(false);
+  });
+
+  it("takes back a new key the provider rejects, and says why", async () => {
+    const { routes, profiles } = setup(WORLD);
+    const { status, body } = await call(
+      routes["/kazusa/providers/key"],
+      "POST",
+      {
+        provider: "venice",
+        key: "bad",
+      },
+    );
+    expect(status).toBe(422);
+    expect(body).toEqual({ error: "Venice AI rejected this key." });
+    expect(profiles.has("venice")).toBe(false);
+  });
+
+  it("puts the old key back when its replacement fails", async () => {
+    const { routes, deps, profiles } = setup(WORLD, {}, ["openrouter"]);
+    const { status } = await call(routes["/kazusa/providers/key"], "POST", {
+      provider: "openrouter",
+      key: "bad",
+    });
+    expect(status).toBe(422);
+    expect(profiles.get("openrouter")).toBe("k");
+    // Once to check the new key, once to list the old key's models again.
+    expect(deps.catalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes back a server on this computer that doesn't answer", async () => {
+    const { routes, profiles, down } = setup({
+      plugins: { allow: ["kazusa", "ollama"] },
+    });
+    down.add("ollama");
+    const { status, body } = await call(
+      routes["/kazusa/providers/key"],
+      "POST",
+      {
+        provider: "ollama",
+      },
+    );
+    expect(status).toBe(422);
+    expect(body).toEqual({
+      error: "Couldn't reach Ollama on this computer. Is it running?",
+    });
+    expect(profiles.has("ollama")).toBe(false);
   });
 
   it("leaves a key set by hand in openclaw.json alone", async () => {

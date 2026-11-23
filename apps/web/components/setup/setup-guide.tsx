@@ -612,11 +612,6 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                               <span className="font-medium">
                                 {option.label}
                               </span>
-                              {option.hint ? (
-                                <QuestionnaireChoiceDescription>
-                                  {option.hint}
-                                </QuestionnaireChoiceDescription>
-                              ) : null}
                             </QuestionnaireChoice>
                           ))}
                         </QuestionnaireChoices>

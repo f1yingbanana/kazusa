@@ -578,8 +578,6 @@ export const ProviderSummarySchema = z.object({
   /** OpenClaw's provider id, as in model refs (`openrouter/...`). */
   id: z.string(),
   label: z.string(),
-  /** One line on what it offers. */
-  hint: z.string().optional(),
   /** Where to create a key; for a `local` provider, where to download it. */
   keysUrl: z.string().url().optional(),
   /** The environment variable it reads when no profile holds a key. */
@@ -628,7 +626,6 @@ export interface ProviderEntry {
   readonly id: string;
   readonly plugin: string;
   readonly label: string;
-  readonly hint?: string;
   readonly keysUrl?: string;
   /**
    * A server on the user's own computer, found at its usual port, that needs no
@@ -656,157 +653,127 @@ const entry = (
 
 export const PROVIDERS: readonly ProviderEntry[] = [
   entry("anthropic", "Anthropic", {
-    hint: "Claude models",
     keysUrl: "https://console.anthropic.com/settings/keys",
     keyName: "ANTHROPIC_API_KEY",
   }),
   entry("byteplus", "BytePlus", {
-    hint: "ByteDance's models, outside China",
     keyName: "BYTEPLUS_API_KEY",
   }),
   entry("cerebras", "Cerebras", {
-    hint: "Very fast open models",
     keysUrl: "https://cloud.cerebras.ai",
     keyName: "CEREBRAS_API_KEY",
   }),
   entry("chutes", "Chutes", {
-    hint: "Hosted open models",
     keysUrl: "https://chutes.ai/app/settings/api-keys",
     keyName: "CHUTES_API_KEY",
   }),
   entry("deepinfra", "DeepInfra", {
-    hint: "Hosted open models",
     keysUrl: "https://deepinfra.com/dash/api_keys",
     keyName: "DEEPINFRA_API_KEY",
   }),
   entry("deepseek", "DeepSeek", {
-    hint: "DeepSeek's own models",
     keysUrl: "https://platform.deepseek.com/api_keys",
     keyName: "DEEPSEEK_API_KEY",
   }),
   entry("fireworks", "Fireworks", {
-    hint: "Hosted open models",
     keysUrl: "https://fireworks.ai/account/api-keys",
     keyName: "FIREWORKS_API_KEY",
   }),
   entry("google", "Google Gemini", {
-    hint: "Gemini models",
     keysUrl: "https://aistudio.google.com/apikey",
     keyName: "GEMINI_API_KEY",
     envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
   }),
   entry("groq", "Groq", {
-    hint: "Very fast open models",
     keysUrl: "https://console.groq.com/keys",
     keyName: "GROQ_API_KEY",
   }),
   entry("huggingface", "Hugging Face", {
-    hint: "Open models through Inference Providers",
     keysUrl: "https://huggingface.co/settings/tokens",
     keyName: "HF_TOKEN",
     envVars: ["HUGGINGFACE_HUB_TOKEN", "HF_TOKEN"],
   }),
   entry("litellm", "LiteLLM", {
-    hint: "Your own LiteLLM proxy",
     keyName: "LITELLM_API_KEY",
   }),
   entry("lmstudio", "LM Studio", {
-    hint: "Models on this computer",
     keysUrl: "https://lmstudio.ai/download",
     keyName: "LM_API_TOKEN",
     local: true,
   }),
   entry("mistral", "Mistral AI", {
-    hint: "Mistral's own models",
     keysUrl: "https://console.mistral.ai/api-keys",
     keyName: "MISTRAL_API_KEY",
   }),
   entry("moonshot", "Moonshot AI", {
-    hint: "Kimi models",
     keysUrl: "https://platform.kimi.ai",
     keyName: "MOONSHOT_API_KEY",
     envVars: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
   }),
   entry("novita", "Novita AI", {
-    hint: "Hosted open models",
     keysUrl: "https://novita.ai/settings/key-management",
     keyName: "NOVITA_API_KEY",
   }),
   entry("nvidia", "NVIDIA", {
-    hint: "Open models on NVIDIA's servers",
     keysUrl: "https://build.nvidia.com/settings/api-keys",
     keyName: "NVIDIA_API_KEY",
   }),
   entry("ollama", "Ollama", {
-    hint: "Models on this computer",
     keysUrl: "https://ollama.com/download",
     keyName: "OLLAMA_API_KEY",
     local: true,
   }),
   entry("ollama-cloud", "Ollama Cloud", {
     plugin: "ollama",
-    hint: "Open models on Ollama's servers",
     keysUrl: "https://ollama.com/settings/keys",
     keyName: "OLLAMA_API_KEY",
   }),
   entry("openai", "OpenAI", {
-    hint: "GPT models",
     keysUrl: "https://platform.openai.com/api-keys",
     keyName: "OPENAI_API_KEY",
   }),
   entry("opencode-go", "OpenCode", {
-    hint: "OpenCode Zen and Go models",
     keyName: "OPENCODE_API_KEY",
     envVars: ["OPENCODE_API_KEY", "OPENCODE_ZEN_API_KEY"],
   }),
   entry("openrouter", "OpenRouter", {
-    hint: "Hundreds of models behind one key",
     keysUrl: "https://openrouter.ai/keys",
     keyName: "OPENROUTER_API_KEY",
   }),
   entry("openrp", "OpenRP", {
-    hint: "Popular models, paid with Diamonds",
     keysUrl: "https://openrp.ai/settings/api-keys",
     keyName: "OPENRP_API_KEY",
   }),
   entry("qwen", "Qwen Cloud", {
-    hint: "Alibaba's Qwen models",
     keysUrl: "https://home.qwencloud.com/api-keys",
     keyName: "QWEN_API_KEY",
     envVars: ["QWEN_API_KEY", "MODELSTUDIO_API_KEY", "DASHSCOPE_API_KEY"],
   }),
   entry("synthetic", "Synthetic", {
-    hint: "Hosted open models",
     keyName: "SYNTHETIC_API_KEY",
   }),
   entry("typesafe", "TypeSafe", {
     plugin: "kazusa",
-    hint: "Jev decisions, billed by TypeSafe",
     keyName: "TYPESAFE_API_KEY",
     // Only Kazusa's Jev calls it, and it reads the auth profile alone.
     envVars: [],
   }),
   entry("together", "Together AI", {
-    hint: "Hosted open models",
     keysUrl: "https://api.together.ai/settings/api-keys",
     keyName: "TOGETHER_API_KEY",
   }),
   entry("venice", "Venice AI", {
-    hint: "Private and uncensored models",
     keysUrl: "https://venice.ai/settings/api",
     keyName: "VENICE_API_KEY",
   }),
   entry("volcengine", "Volcano Engine", {
-    hint: "ByteDance's models, in China",
     keyName: "VOLCANO_ENGINE_API_KEY",
   }),
   entry("xai", "xAI", {
-    hint: "Grok models",
     keysUrl: "https://console.x.ai",
     keyName: "XAI_API_KEY",
   }),
   entry("zai", "Z.AI", {
-    hint: "GLM models",
     keysUrl: "https://z.ai/manage-apikey/apikey-list",
     keyName: "ZAI_API_KEY",
     envVars: ["ZAI_API_KEY", "Z_AI_API_KEY"],

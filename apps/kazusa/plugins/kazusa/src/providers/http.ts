@@ -22,6 +22,7 @@ import {
   resolveAuthToken,
   sendJson,
 } from "../http/helpers.ts";
+import { listCatalog, providerInCatalog } from "../models/http.ts";
 import { authProfileKeys, type ProviderKeys } from "./keys.ts";
 
 export interface ProvidersDeps {
@@ -31,6 +32,8 @@ export interface ProvidersDeps {
   readonly keys: ProviderKeys;
   /** Calls a Gateway method with the Gateway's own token (admin scope). */
   readonly call: (method: string, params: unknown) => Promise<unknown>;
+  /** The model catalog, asked of every provider again (`models.list`). */
+  readonly catalog: () => Promise<unknown>;
 }
 
 /** Providers whose plugin this world allows. No allowlist allows them all. */
@@ -62,7 +65,6 @@ function summary(
   return {
     id: entry.id,
     label: entry.label,
-    ...(entry.hint ? { hint: entry.hint } : {}),
     ...(entry.keysUrl ? { keysUrl: entry.keysUrl } : {}),
     keyName: entry.keyName,
     key: keySource(config, entry, env, keys),
@@ -114,6 +116,29 @@ export const refreshAuth = async (
 };
 
 /**
+ * Why a provider can't be used with the key it now has, from a fresh catalog;
+ * undefined when it can. TypeSafe serves only Jev, which no catalog lists, so
+ * Kazusa's own providers go unchecked.
+ */
+export function keyProblem(
+  entry: ProviderEntry,
+  catalog: unknown,
+): string | undefined {
+  if (entry.plugin === "kazusa") return undefined;
+  const { status, models } = providerInCatalog(catalog, entry.id);
+  if (status === "auth-rejected") return `${entry.label} rejected this key.`;
+  if (status === "unavailable")
+    return entry.local
+      ? `Couldn't reach ${entry.label} on this computer. Is it running?`
+      : `Couldn't reach ${entry.label}. Try again later.`;
+  if (models === 0)
+    return entry.local
+      ? `${entry.label} has no models yet. Download one in ${entry.label} first.`
+      : `${entry.label} offers no models for this key.`;
+  return undefined;
+}
+
+/**
  * Provider keys live in OpenClaw auth profiles (`keys.ts`). Saving or removing
  * one changes only the shared auth store, then asks the Gateway to read it
  * again, so `openclaw.json` never changes and no plugin reloads. A key the user
@@ -128,9 +153,13 @@ export function registerProvidersHttp(
     env: () => process.env,
     keys: authProfileKeys,
     call: adminCall(api),
+    catalog: () => listCatalog({ refresh: true }),
     ...overrides,
   };
   const route = createRouteRegistrar(api);
+  // `models.list` is dispatched as the caller, so the Gateway must authenticate.
+  const gatewayRoute = createRouteRegistrar(api, { auth: "gateway" });
+  const warn = (msg: string) => api.logger?.warn?.(msg) ?? console.warn(msg);
 
   const find = (id: string): ProviderEntry | undefined =>
     availableProviders(deps.readConfig()).find((entry) => entry.id === id);
@@ -160,7 +189,11 @@ export function registerProvidersHttp(
     } satisfies ProvidersResponse);
   });
 
-  route("providers/key", "POST", async (req, res) => {
+  /**
+   * A key is kept only if the provider then serves models with it: otherwise
+   * the key it had before goes back (or none), and the answer says why.
+   */
+  gatewayRoute("providers/key", "POST", async (req, res) => {
     const payload = ProviderKeyPayloadSchema.parse(await readJsonBody(req));
     const entry = find(payload.provider);
     if (!entry) {
@@ -180,11 +213,23 @@ export function registerProvidersHttp(
       sendJson(res, 400, { error: `Paste a ${entry.label} key.` });
       return;
     }
+    const before = deps.keys.read(entry.id);
     await deps.keys.save(entry.id, key);
-    await refreshAuth(
-      deps.call,
-      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
-    );
+    await refreshAuth(deps.call, warn);
+    const problem = keyProblem(entry, await deps.catalog());
+    if (problem) {
+      if (before === undefined) {
+        await deps.keys.remove(entry.id, deps.readConfig());
+        await refreshAuth(deps.call, warn);
+      } else {
+        await deps.keys.save(entry.id, before);
+        await refreshAuth(deps.call, warn);
+        // The catalog holds the failure; ask again for the old key's models.
+        await deps.catalog().catch(() => undefined);
+      }
+      sendJson(res, 422, { error: problem });
+      return;
+    }
     respond(res, entry);
   });
 
@@ -198,10 +243,7 @@ export function registerProvidersHttp(
       return;
     }
     await deps.keys.remove(entry.id, deps.readConfig());
-    await refreshAuth(
-      deps.call,
-      (msg) => api.logger?.warn?.(msg) ?? console.warn(msg),
-    );
+    await refreshAuth(deps.call, warn);
     respond(res, entry);
   });
 }

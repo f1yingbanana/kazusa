@@ -8,6 +8,7 @@ import type {
   ProvidersResponse,
 } from "@kazusa/client";
 import {
+  MODELS_KEY,
   PROVIDERS_KEY,
   fetchProviders,
   removeProviderKey,
@@ -30,11 +31,14 @@ function useProvidersResource() {
   return { enabled, resource, canManage };
 }
 
+const isModelsKey = (key: unknown): boolean =>
+  Array.isArray(key) && key[0] === MODELS_KEY;
+
 /**
  * Every provider the Gateway can use and where its key comes from. Saving or
- * removing a key changes which models exist, so each write also asks the
- * providers for their catalogs again; the promise settles once the new models
- * are in, and rejects with the Gateway's reason.
+ * removing a key changes which models exist, so the promise settles once the
+ * new models are in. A save the provider fails rejects with the Gateway's
+ * reason, and the Gateway has already put the key it had before back.
  */
 export function useProviders() {
   const { enabled, resource, canManage } = useProvidersResource();
@@ -43,20 +47,30 @@ export function useProviders() {
   const { mutate } = resource;
 
   const settle = useCallback(
-    async (write: Promise<ProviderSummary>): Promise<ProviderSummary> => {
-      const summary = await write;
-      await mutate(
-        (data) =>
-          data && {
-            providers: data.providers.map((entry) =>
-              entry.id === summary.id ? summary : entry,
-            ),
-          },
-        { revalidate: false },
-      );
-      // A key decides which decision and memory search models can run too.
-      await Promise.all([refresh(), mutateMatching(isRoleModelsKey)]);
-      return summary;
+    async (
+      write: Promise<ProviderSummary>,
+      // A save has asked every provider again itself; a removal hasn't.
+      refreshed: boolean,
+    ): Promise<ProviderSummary> => {
+      try {
+        const summary = await write;
+        await mutate(
+          (data) =>
+            data && {
+              providers: data.providers.map((entry) =>
+                entry.id === summary.id ? summary : entry,
+              ),
+            },
+          { revalidate: false },
+        );
+        return summary;
+      } finally {
+        // A key decides which decision and memory search models can run too.
+        await Promise.all([
+          refreshed ? mutateMatching(isModelsKey) : refresh(),
+          mutateMatching(isRoleModelsKey),
+        ]);
+      }
     },
     [mutate, mutateMatching, refresh],
   );
@@ -66,7 +80,7 @@ export function useProviders() {
       if (!canManage) {
         throw new Error("You do not have permission to manage provider keys.");
       }
-      return settle(saveProviderKey(payload));
+      return settle(saveProviderKey(payload), true);
     },
     [canManage, settle],
   );
@@ -76,7 +90,7 @@ export function useProviders() {
       if (!canManage) {
         throw new Error("You do not have permission to manage provider keys.");
       }
-      return settle(removeProviderKey(provider));
+      return settle(removeProviderKey(provider), false);
     },
     [canManage, settle],
   );
