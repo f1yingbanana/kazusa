@@ -1325,10 +1325,11 @@ connect these modules in process.
   `isUser` and `personName`, in `identity.ts`), outside the world: they talk
   only to the system agent, one to one, in their **console** (`validateMembers`
   refuses any other chat with a `user:` id), and nobody in the world reads or
-  reaches them. A character may still have a chat of their own with the system
-  agent (someone talking to the admin), apart from the console. Auth still knows
-  only a role; the operator id becomes per-person with the collaborator PR (auth
-  §PR 4).
+  reaches them. Everywhere else, groups included, they take part as the
+  character they play, by design. A character may still have a chat of their own
+  with the system agent (someone talking to the admin), apart from the console.
+  Auth still knows only a role; the operator id becomes per-person with the
+  collaborator PR (auth §PR 4).
 - **Who plays whom** is the Stage record (`playedBy`), one character per person
   and one person per character, never the system agent. `createPlayer` reads it
   (`playing()`; `playingNow()` and `owns(audience)` synchronously, from

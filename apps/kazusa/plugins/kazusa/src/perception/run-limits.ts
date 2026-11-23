@@ -241,9 +241,10 @@ function brainRun(
     state.sessionKey = sessionKey;
     state.sessionId = sessionId;
     sessionOwners().set(sessionKey, runId);
-    // Stopped before its session was known (a turn OpenClaw started from its
-    // own queue while they are played): OpenClaw's run goes too, not only its
-    // tools.
+    // Stopped before its session was known: a turn handed over a moment before
+    // a person took them, that OpenClaw starts in their one brain session just
+    // after. OpenClaw's run goes too, not only its tools. (A steer waiting in
+    // the turn that was stopped is taken back when that turn ends: `ended`.)
     if (state.controller.signal.aborted) state.cancelHost();
   }
   return state;

@@ -259,9 +259,11 @@ participant is carried; the in-world Sensei is now a character agent.
   fallback, and sends a simulation-timestamped stimulus to that owner's
   Perception. Generic input into `chat:direct:bob` can therefore be attributed
   to Bob; this development-only limitation is currently accepted.
-- **No people in groups**: a group, a huddle or a direct chat with anyone but
-  the system agent never has a `user:` member (`validateMembers`). The person
-  joins those as the character they play. Native WebChat remains a direct-chat
+- **People take part as characters**: a person is in groups, huddles and direct
+  chats as the character they play, like anyone in the world; several people
+  would each be there as their own character. Their `user:` id itself is outside
+  the world and is never a member of any chat but their console with the system
+  agent (`validateMembers`), by design. Native WebChat remains a direct-chat
   development bridge only.
 - **Wiki Grounding**: Sensei is a character like any other: their World Wiki
   page is `shared/wiki/characters/sensei.md`, and characters keep their own page

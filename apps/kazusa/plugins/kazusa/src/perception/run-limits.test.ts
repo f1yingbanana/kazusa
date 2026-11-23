@@ -82,7 +82,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("brain run hard budgets", () => {
-  it("cancels OpenClaw's own run of a turn it starts from its queue while they are played", () => {
+  it("cancels OpenClaw's run of a turn handed over just before a takeover that starts after it", () => {
     const h = setup(
       { maxModelCalls: 5, maxToolCalls: 2, maxThinkingSeconds: 5 },
       "queued-run",
