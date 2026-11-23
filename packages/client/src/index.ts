@@ -1961,6 +1961,8 @@ export const WikiListItemSchema = z.object({
   id: z.string(),
   kind: WikiKindSchema,
   name: z.string(),
+  /** Other names it goes by, so a search finds it by any of them. */
+  aliases: z.array(z.string()),
   summary: z.string(),
   /** A place's area, as written. */
   parent: z.string().optional(),
@@ -1982,7 +1984,6 @@ export const WikiListResponseSchema = z.object({
 export type WikiListResponse = z.infer<typeof WikiListResponseSchema>;
 
 export const WikiPageSchema = WikiListItemSchema.extend({
-  aliases: z.array(z.string()),
   /** The lead, verbatim Markdown. */
   lead: z.string(),
   sections: z.array(

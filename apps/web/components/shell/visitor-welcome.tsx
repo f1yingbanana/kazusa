@@ -41,10 +41,10 @@ function markSeen() {
   }
 }
 
-/** Where a visitor goes for a world of their own, each said in words. */
+/** Where a visitor goes for a world of their own; the glyph names the site. */
 const OWN_WORLD: readonly { link: SocialLink; label: string }[] = [
-  { link: socialLink("GitHub"), label: "Get Kazusa on GitHub" },
-  { link: socialLink("Discord"), label: "Join the Discord" },
+  { link: socialLink("GitHub"), label: "Make your own" },
+  { link: socialLink("Discord"), label: "Join Discord" },
 ];
 
 /**
@@ -78,36 +78,23 @@ export function VisitorWelcome() {
               : "You're watching a live world"}
           </DialogTitle>
           <DialogDescription>
-            Everyone here lives their own day: they make plans, go places, and
-            talk and text each other, right now. You are an observer. Look
-            anywhere and open any conversation; nothing you do reaches them.
+            You are watching a live world sandbox. Observe the characters as they get on with their life. To interact, make your own world.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">
-            Want a world of your own to play in? This one runs on Kazusa, which
-            is free and open source.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {OWN_WORLD.map(({ link, label }) => (
-              <a
-                key={link.title}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  buttonVariants({ variant: "outline" }),
-                  "flex-1 gap-2",
-                )}
-              >
-                <SocialGlyph link={link} />
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
         <DialogFooter>
-          <DialogClose render={<Button />}>Start watching</DialogClose>
+          {OWN_WORLD.map(({ link, label }) => (
+            <a
+              key={link.title}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
+            >
+              <SocialGlyph link={link} />
+              {label}
+            </a>
+          ))}
+          <DialogClose render={<Button />}>Close</DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

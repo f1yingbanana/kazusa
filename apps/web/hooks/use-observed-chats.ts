@@ -39,17 +39,21 @@ function useObservedResource() {
 export function useObservedChats() {
   const { resource, available } = useObservedResource();
   const { data, error, isLoading, mutate } = resource;
-  const { player } = useSources();
+  const { player, operator } = useSources();
   const { byId: charactersById } = useCharacters();
   const chats = useMemo(() => {
-    const nameOf = (id: string) => charactersById.get(id)?.name ?? id;
+    // The operator talks to characters too, and isn't on the roster.
+    const nameOf = (id: string) =>
+      charactersById.get(id)?.name ??
+      (id === operator.id ? operator.name : undefined) ??
+      id;
     return sortChats(
       (data?.chats ?? []).map((chat) => ({
         ...chat,
         name: chatTitle(chat, player.id, nameOf),
       })),
     );
-  }, [data, charactersById, player.id]);
+  }, [data, charactersById, player.id, operator.id, operator.name]);
   return { chats, error, isLoading, reload: mutate, available };
 }
 
@@ -57,7 +61,7 @@ export function useObservedChats() {
 export function useObservedChat(id: string | null | undefined) {
   const { resource, available } = useObservedResource();
   const { data } = resource;
-  const { player } = useSources();
+  const { player, operator } = useSources();
   const { byId: charactersById } = useCharacters();
   const chat = id ? data?.chats.find((candidate) => candidate.id === id) : null;
   return {
@@ -68,7 +72,10 @@ export function useObservedChat(id: string | null | undefined) {
           name: chatTitle(
             chat,
             player.id,
-            (member) => charactersById.get(member)?.name ?? member,
+            (member) =>
+              charactersById.get(member)?.name ??
+              (member === operator.id ? operator.name : undefined) ??
+              member,
           ),
         }
       : null,

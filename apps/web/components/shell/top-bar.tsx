@@ -177,7 +177,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
           onClick={onOpenPalette}
         >
           <SearchIcon />
-          <span className="sr-only">Jump to anything</span>
+          <span className="sr-only">Search</span>
         </Button>
         <SocialLinks />
       </div>

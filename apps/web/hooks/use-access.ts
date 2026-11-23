@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import useSWR from "swr";
 import {
   AccessSchema,
@@ -93,9 +94,10 @@ export function useAccess(): UseAccessResult {
     },
   );
 
-  const state = computeAccessState(data, isLoading, error);
-  return {
-    ...state,
-    mutate,
-  };
+  // One state, `hasPermission` included, until access itself changes: a
+  // memo that depends on it isn't rebuilt by every render.
+  return useMemo(
+    () => ({ ...computeAccessState(data, isLoading, error), mutate }),
+    [data, isLoading, error, mutate],
+  );
 }
