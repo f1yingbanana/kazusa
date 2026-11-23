@@ -42,7 +42,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectSeparator,
   SelectTrigger,
   SelectValue,
@@ -325,13 +324,13 @@ function PlayAsPicker({
   value: string;
   onChange: (value: string) => void;
 }) {
-  // The world's own pick and nobody first, then everyone else by name.
+  // Nobody and the world's own pick first, then everyone else by name.
   const suggested = world.characters.find(
     ({ id }) => id === world.defaultUserCharacter,
   );
   const top = [
-    ...(suggested ? [{ value: suggested.id, label: suggested.name }] : []),
     { value: OBSERVER, label: "Nobody: just watch" },
+    ...(suggested ? [{ value: suggested.id, label: suggested.name }] : []),
   ];
   const rest = world.characters
     .filter(({ id }) => id !== suggested?.id)
@@ -357,10 +356,7 @@ function PlayAsPicker({
         <SelectContent>
           <SelectGroup>{top.map(item)}</SelectGroup>
           <SelectSeparator />
-          <SelectGroup>
-            <SelectLabel>Everyone else</SelectLabel>
-            {rest.map(item)}
-          </SelectGroup>
+          <SelectGroup>{rest.map(item)}</SelectGroup>
         </SelectContent>
       </Select>
     </Field>
