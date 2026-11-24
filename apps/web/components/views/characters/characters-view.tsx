@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import type { CharacterSummary } from "@kazusa/client";
 import { toast } from "sonner";
 import {
+  ArrowLeftRightIcon,
   EllipsisIcon,
   ListFilterIcon,
   MenuIcon,
@@ -64,7 +65,7 @@ import {
 import { CastDialog, type CastRequest } from "./cast-dialog";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { useSources } from "@/lib/source/provider";
-import { requestSidebar } from "@/lib/state/ui-store";
+import { openPlayDialog, requestSidebar } from "@/lib/state/ui-store";
 import { cn } from "@/lib/utils";
 
 const characterParser = parseAsString;
@@ -102,7 +103,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [castRequest, setCastRequest] = useState<CastRequest | null>(null);
-  const { canManage } = useAccess();
+  const { canManage, canPlay } = useAccess();
   const { apply: canStage } = useStage();
   const offstage = useOffstage();
   const statuses = useLiveStore((state) => state.statuses);
@@ -237,7 +238,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
           </DropdownMenu>
         }
       >
-        {canManage || canStage ? (
+        {canManage || canStage || canPlay ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" size="icon-sm" />}
@@ -260,6 +261,12 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                 >
                   <PowerIcon />
                   Who's onstage…
+                </DropdownMenuItem>
+              ) : null}
+              {canPlay ? (
+                <DropdownMenuItem onClick={openPlayDialog}>
+                  <ArrowLeftRightIcon />
+                  Play as character…
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
@@ -435,6 +442,7 @@ const RosterRow = memo(function RosterRow({
 }) {
   const plain = usePlainText();
   const status = useCharacterStatus(character.id);
+  const { player } = useSources();
   const task = status?.onstage === false ? undefined : status?.task;
   const line =
     task?.description ?? (character.summary ? plain(character.summary) : null);
@@ -460,7 +468,7 @@ const RosterRow = memo(function RosterRow({
           <span className="truncate text-sm font-medium">{character.name}</span>
           {status?.playedBy ? (
             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] leading-4 font-medium text-primary">
-              Played
+              {player.id === character.id ? "You" : "Played"}
             </span>
           ) : null}
         </span>

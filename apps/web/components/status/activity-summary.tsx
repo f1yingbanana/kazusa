@@ -12,9 +12,10 @@ const SHOWN: readonly Status[] = ["thinking", "composing", "waiting"];
  * same counts as Characters grouped by status, which it opens.
  */
 export function ActivitySummaryItem() {
-  const [, setParams] = useQueryStates({
+  const [{ "chars.show": show }, setParams] = useQueryStates({
     view: parseAsString,
     "chars.by": parseAsString,
+    "chars.show": parseAsString,
   });
   const cast = useCast();
   const statuses = useLiveStore((state) => state.statuses);
@@ -30,7 +31,12 @@ export function ActivitySummaryItem() {
       title="Characters by status"
       className="rounded-sm px-1 tabular-nums hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       onClick={() =>
-        void setParams({ view: "characters", "chars.by": "status" })
+        void setParams({
+          view: "characters",
+          "chars.by": "status",
+          // The busy are onstage: a list of the offstage would hide them all.
+          "chars.show": show === "offstage" ? null : show,
+        })
       }
     >
       {SHOWN.map((shown) => `${counts.get(shown) ?? 0} ${shown}`).join(" · ")}
