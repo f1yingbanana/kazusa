@@ -40,8 +40,8 @@ export function isUser(id: string): boolean {
 
 /**
  * Whether an id is a guest: someone writing in from a linked chat on another
- * platform (`guest:discord-<id>`), with no brain, ledger or place in the
- * world.
+ * platform (`guest:<ten letters and digits>`), with no brain, ledger or place
+ * in the world.
  */
 export function isGuest(id: string): boolean {
   return id.startsWith("guest:");

@@ -63,9 +63,6 @@ import {
 import { BrainActivityRows, BrainThinking } from "./tool-activity";
 import type { Typist } from "@/lib/live/realtime-state";
 
-/** Someone writing in from a channel linked to the group (`guest:discord-<id>`). */
-const isGuest = (id: string): boolean => id.startsWith("guest:");
-
 export function MessageList({
   chat,
   observed = false,
@@ -409,13 +406,6 @@ export function MessageList({
                                 !run.introduced ? (
                                   <MessageHeader>
                                     {participant.name}
-                                    {isGuest(run.senderId) ? (
-                                      // Someone writing in from a linked
-                                      // channel: their id, as characters read it.
-                                      <span className="ml-1.5 font-mono text-[11px] font-normal text-muted-foreground select-all">
-                                        {run.senderId}
-                                      </span>
-                                    ) : null}
                                   </MessageHeader>
                                 ) : null}
                                 {message.type === "sticker" &&

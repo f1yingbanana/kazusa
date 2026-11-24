@@ -245,16 +245,21 @@ transaction.
 
 A group can be linked to a Discord channel
 (`POST /kazusa/bridges/link { chatId, channelId }`, owner only, from the chat
-sidebar). People writing in that channel are **guests**:
-`guest:discord-<user id>`, outsiders like `user:` (`isOutsider`), with no brain,
-no ledger, no place and no membership. Their lines come in through
-`Messaging.postAsGuest`, into the group whatever its members, so whoever is in
-it now hears them and nobody else; with nobody in it, nobody does. The audience
-is the members plus the guest; only characters get copies. The Discord message
-id is the request id, so a line received twice is taken in once. Names are
-cleaned to one plain line of at most 32 characters (`guestName`); characters
-read "Name `guest:discord-…`". Characters grow familiar with guests by id like
-anyone else.
+sidebar). People writing in that channel are **guests**: `guest:` and ten
+letters and digits (`guestId`, a hash of the platform and account, the same
+every time and as short as a group id; an 18-digit Discord id cost tokens and
+got miscopied), outsiders like `user:` (`isOutsider`), with no brain, no ledger,
+no place and no membership. Their lines come in through `Messaging.postAsGuest`,
+into the group whatever its members, so whoever is in it now hears them and
+nobody else; with nobody in it, nobody does. The audience is the members plus
+the guest; only characters get copies. The Discord message id is the request id,
+so a line received twice is taken in once. Names are kept as written on one line
+of at most 32 characters, without backticks or brackets (`guestName`).
+Characters read a guest as "Name `guest:…`" everywhere: deliveries, "Chats
+awaiting your reply", and their records, which otherwise name people by id alone
+(a guest has no page to look the id up in; the name is the transcript's
+`sender.label`). They grow familiar with guests by id like anyone else. The
+client shows a guest by name only.
 
 Everything said in a linked group goes the other way, from any instance
 (`onAnyEvent`): one webhook per channel posts it under the speaker's name, with

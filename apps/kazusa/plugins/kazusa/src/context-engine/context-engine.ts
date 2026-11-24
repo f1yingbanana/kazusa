@@ -6,6 +6,7 @@ import type { ContextEngineConfig } from "./config.ts";
 import type { SkillLoader } from "./skill-loader.ts";
 import type { ActiveTask } from "../taskman/types.ts";
 import { personLabel } from "../person-label.ts";
+import { isGuest } from "../identity.ts";
 import { createSkillText } from "../skill-text.ts";
 import { renderToolHistory } from "./tool-history.ts";
 
@@ -488,11 +489,15 @@ function ledgerRenderer(
           // sender.identity. Roles, dialogue, display names and peer keys are
           // never author evidence.
           const sender = message.sender?.identity.id;
+          // A guest has no page anyone could look their id up in, so their
+          // name comes with it, as Discord gave it.
           const who = !sender
             ? format.unknown
             : sender === sessionKey.split(":")[1]
               ? format.you
-              : sender;
+              : isGuest(sender)
+                ? personLabel(message.sender?.label, sender)
+                : sender;
           lines.push(
             fill(at === minute ? format.sameMinute : format.record, {
               who,

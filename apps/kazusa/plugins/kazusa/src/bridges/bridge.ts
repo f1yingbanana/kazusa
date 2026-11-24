@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { BridgeStatus } from "@kazusa/client";
 import { z } from "zod";
 import { isGuest } from "../identity.ts";
@@ -68,13 +69,22 @@ export interface BridgeDeps {
   readonly warn: (message: string) => void;
 }
 
-/** A guest's id from their platform account: `guest:discord-<id>`. */
-export const guestId = (platform: string, id: string): string =>
-  `guest:${platform}-${id}`;
+/**
+ * A guest's id: `guest:` and ten letters and digits, the same for one platform
+ * account every time, as short as a group's id. Characters copy it to address
+ * and remember someone; Discord's 18-digit ids cost tokens and get miscopied.
+ */
+export function guestId(platform: string, id: string): string {
+  const digest = createHash("sha256").update(`${platform}:${id}`).digest("hex");
+  // 48 bits, at most ten base-36 digits.
+  return `guest:${BigInt(`0x${digest.slice(0, 12)}`)
+    .toString(36)
+    .padStart(10, "0")}`;
+}
 
 /**
  * A platform display name as characters read it: one line, at most 32
- * characters, without what could pass for an id (``…``) or a stamp or marker
+ * characters, without what could pass for an id (`…`) or a stamp or marker
  * (`[…]`, `<…>`). Everything else stays as the person wrote it, underscores
  * included.
  */

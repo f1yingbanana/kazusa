@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { PARTICIPANT_ID } from "../messaging/conversations.ts";
 import type { MessageDelivery } from "../messaging/messaging.ts";
 import {
   Bridge,
+  guestId,
   guestName,
   type BridgeDeps,
   type BridgeTransport,
@@ -100,7 +102,7 @@ describe("Bridge", () => {
       [
         {
           chatId: "group:office",
-          guest: "guest:discord-42",
+          guest: "guest:21iy4g9bqg",
           name: "Sensei bot fan",
           text: "Is anyone on duty?",
           requestId: "discord:900",
@@ -139,7 +141,7 @@ describe("Bridge", () => {
     // A guest's own line is already in the channel; an unlinked chat isn't shown.
     h.bridge.outgoing({
       type: "message",
-      delivery: delivery({ id: "m4", sender: "guest:discord-42" }),
+      delivery: delivery({ id: "m4", sender: "guest:21iy4g9bqg" }),
     });
     h.bridge.outgoing({
       type: "message",
@@ -222,6 +224,17 @@ describe("Bridge", () => {
     await h.bridge.settled();
     expect(h.warn).toHaveBeenCalledWith(expect.stringContaining("429"));
     expect(discord.transport.post).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("guestId", () => {
+  it("is short, the same for one account every time, and a valid participant", () => {
+    expect(guestId("discord", "42")).toBe("guest:21iy4g9bqg");
+    expect(guestId("discord", "42")).toBe(guestId("discord", "42"));
+    expect(guestId("discord", "43")).not.toBe(guestId("discord", "42"));
+    expect(
+      PARTICIPANT_ID.parse(guestId("discord", "212557115179532288")),
+    ).toMatch(/^guest:[0-9a-z]{10}$/);
   });
 });
 

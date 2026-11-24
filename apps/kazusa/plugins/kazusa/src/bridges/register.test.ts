@@ -166,7 +166,7 @@ describe("registerBridges", () => {
       expect(h.messaging.postAsGuest).toHaveBeenCalledWith(
         expect.objectContaining({
           chatId: "group:office",
-          guest: "guest:discord-42",
+          guest: "guest:21iy4g9bqg",
         }),
       ),
     );
