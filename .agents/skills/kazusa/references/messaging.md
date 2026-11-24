@@ -205,17 +205,26 @@ manipulation tools to roleplay characters.
 - `rename` with `title`.
 - `add_members` or `remove_members` with only the affected `members`.
 - `leave` with no additional fields.
+- `join` with no additional fields, for a **joinable** group the caller isn't
+  in.
 
-Any current member may manage a group. Direct chats have fixed membership. Each
-change is announced in the group as a message from the actor
-(`*adds Natsu to the chat*`, `*removes …*`, `*leaves the chat*`,
-`*renames the chat to "…"*`): for those going, before they go; for those coming,
-once they are in. A replayed change is not announced twice. Changes affect
-future sends. A removed member keeps its prior private ledger but cannot
-discover, manage, or submit new messages to the group. Joining creates an empty
-native session view and never copies earlier dialogue. An accepted message still
-finishes delivery to its original recipients after removal; replaying that
-receipt is not acceptance of a new message.
+Any current member may manage a group. Direct chats have fixed membership. A
+group the owner has made joinable (`joinable: true` on the routing metadata, set
+by `POST /kazusa/chats/settings { chatId, joinable }`, permission `manage`, from
+the chat sidebar's Open to join switch, whoever the owner plays or none) can be
+joined by anyone who has its address, as people join a server channel: there is
+no listing of joinable groups, so a skill names the address. Closing it again
+keeps everyone in it. An empty joinable group is still open, not ended, in the
+observer list. Anything else refuses `join` with
+`kazusa-results#chat-not-joinable`. Each change is announced in the group as a
+message from the actor (`*adds Natsu to the chat*`, `*removes …*`,
+`*leaves the chat*`, `*joins the chat*`, `*renames the chat to "…"*`): for those
+going, before they go; for those coming, once they are in. A replayed change is
+not announced twice. Changes affect future sends. A removed member keeps its
+prior private ledger but cannot discover, manage, or submit new messages to the
+group. Joining creates an empty native session view and never copies earlier
+dialogue. An accepted message still finishes delivery to its original recipients
+after removal; replaying that receipt is not acceptance of a new message.
 
 The retained native `chats` keyed store owns only shared routing metadata:
 conversation ID, kind, members, group title, creation fingerprint, and pending

@@ -57,6 +57,10 @@ That conversation is over, so this did not run.
 
 A conversation in person can only be left, so this did not run.
 
+## chat-not-joinable
+
+That chat isn't open to join, so this did not run.
+
 ## outside-repository
 
 {path} is outside the Kazusa repository, so this did not run.

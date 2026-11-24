@@ -762,7 +762,8 @@ connect these modules in process.
   filtered by frozen message audience. `send_message` says something at an
   address (`sessionKey` is required); `create_group` starts a text group and
   `talk` a face-to-face conversation, each returning the address; `list_chats`
-  discovers memberships; any current member can `manage_chat`. **Huddles**
+  discovers memberships; any current member can `manage_chat`, and anyone with
+  its address can `join` a group the owner made joinable. **Huddles**
   (`kind: "huddle"`, `chat:huddle:<id>`, with a `placeId`) are face-to-face
   conversations, many at a place at once. `talk` turns to people at the sender's
   place (Messaging asks Location's `placeOf`) one person's move at a time, and

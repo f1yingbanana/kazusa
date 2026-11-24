@@ -82,6 +82,8 @@ export const ChatSchema = z.object({
   members: z.array(z.string()),
   /** Huddles only: the place where the conversation is happening. */
   placeId: z.string().optional(),
+  /** Groups only: anyone can join it by its address, as the owner set. */
+  joinable: z.boolean().optional(),
   lastMessage: ChatMessageSchema.pick({
     text: true,
     timestamp: true,
@@ -204,6 +206,11 @@ export const ManageChatPayloadSchema = z.discriminatedUnion("action", [
     sessionKey: z.string(),
     action: z.literal("leave"),
   }),
+  /** A joinable group the played character isn't in. */
+  z.object({
+    sessionKey: z.string(),
+    action: z.literal("join"),
+  }),
 ]);
 export type ManageChatPayload = z.infer<typeof ManageChatPayloadSchema>;
 
@@ -211,6 +218,13 @@ export const ManageChatResponseSchema = z.object({
   chat: ChatSchema,
 });
 export type ManageChatResponse = z.infer<typeof ManageChatResponseSchema>;
+
+/** POST /kazusa/chats/settings: the owner's settings for a group. */
+export const ChatSettingsPayloadSchema = z.object({
+  chatId: z.string().min(1),
+  joinable: z.boolean(),
+});
+export type ChatSettingsPayload = z.infer<typeof ChatSettingsPayloadSchema>;
 
 /** POST /kazusa/typing */
 export const TypingPayloadSchema = z.object({

@@ -226,7 +226,8 @@ export function useChatActions() {
         },
       { revalidate: true },
     );
-    if (left) await mutate(observedChatsKey());
+    // Leaving or joining moves it between the player's chats and Other chats.
+    if (left || payload.action === "join") await mutate(observedChatsKey());
     return response.chat;
   }
 

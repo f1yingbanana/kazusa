@@ -658,7 +658,13 @@ export function registerMessaging(
               properties: {
                 action: {
                   type: "string",
-                  enum: ["rename", "add_members", "remove_members", "leave"],
+                  enum: [
+                    "rename",
+                    "add_members",
+                    "remove_members",
+                    "leave",
+                    "join",
+                  ],
                 },
                 sessionKey: { type: "string" },
                 members: {

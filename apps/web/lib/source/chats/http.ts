@@ -4,6 +4,7 @@ import {
   SendResponseSchema,
   ManageChatResponseSchema,
   type ChatsResponse,
+  type ChatSettingsPayload,
   type ManageChatPayload,
   type ManageChatResponse,
   type MessagesResponse,
@@ -47,6 +48,13 @@ export async function manageChat(
     payload,
   );
   return ManageChatResponseSchema.parse(data);
+}
+
+/** The owner opens a group to anyone with its address, or closes it. */
+export async function setChatSettings(
+  payload: ChatSettingsPayload,
+): Promise<void> {
+  await postJson<unknown>(buildUrl("/kazusa/chats/settings"), payload);
 }
 
 export function eventsUrl() {

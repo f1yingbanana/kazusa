@@ -10,6 +10,7 @@ import {
 import { useMemo, useState, type ReactNode } from "react";
 import {
   CheckIcon,
+  LogInIcon,
   LogOutIcon,
   PencilIcon,
   UserMinusIcon,
@@ -36,6 +37,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -45,6 +47,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChatActions } from "@/hooks/use-chats";
 import { useOccupancy } from "@/hooks/use-location";
 import { useObservedChats } from "@/hooks/use-observed-chats";
+import { setChatSettings } from "@/lib/source/chats/http";
 import { useAccess } from "@/hooks/use-access";
 import { andList } from "@/lib/format";
 import type { Chat } from "@/lib/source/chats/types";
@@ -521,7 +524,9 @@ export function LeaveChat({
           <AlertDialogDescription>
             {inPerson
               ? `You stay ${placeName ? `at ${placeName}` : "where you are"} and the others carry on without you. Say something to them to join again.`
-              : "Everyone in it sees that you left. You can still read it under Other chats, but you can't send to it unless someone adds you back."}
+              : chat.joinable
+                ? "Everyone in it sees that you left. It's open, so you can join it again."
+                : "Everyone in it sees that you left. You can still read it under Other chats, but you can't send to it unless someone adds you back."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -537,5 +542,87 @@ export function LeaveChat({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/** Join an open group the player isn't in; everyone in it sees them come in. */
+export function JoinChat({ id, title }: { id: string; title: string }) {
+  const { manage } = useChatActions();
+  const [joining, setJoining] = useState(false);
+
+  async function join() {
+    setJoining(true);
+    try {
+      await manage({
+        // Anyone's address for a group: the shorthand, from its id.
+        sessionKey: `chat:group:${id.slice("group:".length)}`,
+        action: "join",
+      });
+      toast.success(`You joined ${title}`);
+    } catch (error) {
+      failed("Couldn't join the group", error);
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => void join()}
+      disabled={joining}
+    >
+      {joining ? (
+        <Spinner data-icon="inline-start" />
+      ) : (
+        <LogInIcon data-icon="inline-start" />
+      )}
+      Join group
+    </Button>
+  );
+}
+
+/**
+ * The owner opens a group so anyone can join it by its address, as people do a
+ * server channel, or closes it; those already in it stay.
+ */
+export function OpenToJoin({
+  id,
+  joinable,
+}: {
+  id: string;
+  joinable: boolean;
+}) {
+  const { refreshChats } = useChatActions();
+  const { reload } = useObservedChats();
+  const [saving, setSaving] = useState(false);
+
+  async function change(next: boolean) {
+    setSaving(true);
+    try {
+      await setChatSettings({ chatId: id, joinable: next });
+      await Promise.all([refreshChats(), reload()]);
+    } catch (error) {
+      failed("Couldn't change who can join", error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <label className="flex items-center justify-between gap-3 text-sm">
+      <span className="flex flex-col">
+        <span>Open to join</span>
+        <span className="text-xs text-muted-foreground">
+          Anyone with its address can join it themselves.
+        </span>
+      </span>
+      <Switch
+        checked={joinable}
+        disabled={saving}
+        onCheckedChange={(next) => void change(next)}
+      />
+    </label>
   );
 }

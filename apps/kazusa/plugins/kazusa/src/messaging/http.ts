@@ -3,17 +3,18 @@ import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
-import type {
-  Agent,
-  AgentsResponse,
-  CharacterStatus,
-  Chat,
-  ChatsResponse,
-  ManageChatResponse,
-  ObservedChat,
-  ObservedChatsResponse,
-  SendResponse,
-  StreamEvent,
+import {
+  ChatSettingsPayloadSchema,
+  type Agent,
+  type AgentsResponse,
+  type CharacterStatus,
+  type Chat,
+  type ChatsResponse,
+  type ManageChatResponse,
+  type ObservedChat,
+  type ObservedChatsResponse,
+  type SendResponse,
+  type StreamEvent,
 } from "@kazusa/client";
 import {
   createRouteRegistrar,
@@ -54,6 +55,7 @@ function clientChat(summary: ChatSummary, viewer: string): Chat {
     name: summary.title ?? "",
     members: [...summary.members],
     ...(summary.placeId ? { placeId: summary.placeId } : {}),
+    ...(summary.joinable ? { joinable: true } : {}),
   };
 }
 
@@ -71,6 +73,7 @@ function observedChat({
     name: chat.title ?? "",
     members: [...members],
     ...(chat.placeId ? { placeId: chat.placeId } : {}),
+    ...(chat.joinable ? { joinable: true } : {}),
     ...(ended ? { ended } : {}),
     ...(latest
       ? {
@@ -334,6 +337,14 @@ export function registerMessagingHttp(
     sendJson(res, 200, {
       chat: clientChat(summary, actor.id),
     } satisfies ManageChatResponse);
+  });
+  // The owner's, whoever they play or none: not a member's to change.
+  route("chats/settings", "POST", async (req, res) => {
+    const { chatId, joinable } = ChatSettingsPayloadSchema.parse(
+      await readJsonBody(req),
+    );
+    await messaging.setJoinable(chatId, joinable);
+    sendJson(res, 200, { ok: true });
   });
   route("agents", "GET", async (_req, res) => {
     const config = getConfig();
