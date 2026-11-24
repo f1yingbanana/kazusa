@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
+import { TASK_ORDER, taskLabel } from "@/components/entities/task-icon";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -55,6 +56,7 @@ import { useLiveStore } from "@/lib/live/state";
 import {
   groupByActivity,
   groupByLetter,
+  groupByStatus,
   groupByNearest,
   matchesQuery,
   NO_GROUP,
@@ -79,7 +81,7 @@ const PAGE_START = {
 /** Who the list shows, and how it heads them. Defaults: everyone, by group. */
 const rosterParsers = {
   "chars.show": parseAsStringLiteral(["onstage", "offstage"]),
-  "chars.by": parseAsStringLiteral(["name", "activity"]),
+  "chars.by": parseAsStringLiteral(["name", "activity", "status"]),
 };
 
 /**
@@ -135,8 +137,10 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
     by === "name"
       ? groupByLetter(pool)
       : by === "activity"
-        ? groupByActivity(pool, (id) => statuses.get(id))
-        : groupByNearest(pool, nameOf);
+        ? groupByActivity(pool, (id) => statuses.get(id), TASK_ORDER, taskLabel)
+        : by === "status"
+          ? groupByStatus(pool, (id) => statuses.get(id))
+          : groupByNearest(pool, nameOf);
 
   const open = useCallback(
     (id: string) => {
@@ -207,7 +211,11 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   onValueChange={(value: string) =>
                     void setRoster({
                       "chars.by":
-                        value === "name" || value === "activity" ? value : null,
+                        value === "name" ||
+                        value === "activity" ||
+                        value === "status"
+                          ? value
+                          : null,
                     })
                   }
                 >
@@ -219,6 +227,9 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="activity">
                     Activity
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="status">
+                    Status
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuGroup>
@@ -445,7 +456,14 @@ const RosterRow = memo(function RosterRow({
         size="md"
       />
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-medium">{character.name}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium">{character.name}</span>
+          {status?.playedBy ? (
+            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] leading-4 font-medium text-primary">
+              Played
+            </span>
+          ) : null}
+        </span>
         {line ? (
           <span className="truncate text-xs text-muted-foreground">{line}</span>
         ) : null}

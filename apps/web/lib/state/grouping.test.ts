@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
 import {
-  activityOf,
   groupByActivity,
+  groupByStatus,
+  statusOf,
   groupByLetter,
   groupByNearest,
   matchesQuery,
@@ -70,37 +71,67 @@ const status = (patch: Partial<CharacterStatus> = {}): CharacterStatus => ({
   ...patch,
 });
 
-describe("activity", () => {
-  it("gives each character the busiest thing they're doing", () => {
-    expect(activityOf(undefined)).toBe("idle");
-    expect(activityOf(status())).toBe("idle");
-    expect(activityOf(status({ queued: 3 }))).toBe("waiting");
-    expect(activityOf(status({ brain: "thinking", queued: 3 }))).toBe(
-      "thinking",
+describe("status and activity", () => {
+  it("gives each character the busiest status", () => {
+    expect(statusOf(undefined)).toBe("idle");
+    expect(statusOf(status())).toBe("idle");
+    expect(statusOf(status({ queued: 3 }))).toBe("waiting");
+    expect(statusOf(status({ brain: "thinking", queued: 3 }))).toBe("thinking");
+    expect(statusOf(status({ brain: "thinking", composingIn: ["chat"] }))).toBe(
+      "composing",
     );
     expect(
-      activityOf(status({ brain: "thinking", composingIn: ["chat"] })),
-    ).toBe("composing");
-    expect(activityOf(status({ playedBy: "user:me", queued: 1 }))).toBe(
-      "played",
-    );
-    expect(
-      activityOf(status({ onstage: false, brain: "thinking", queued: 2 })),
+      statusOf(status({ onstage: false, brain: "thinking", queued: 2 })),
     ).toBe("offstage");
   });
 
-  it("groups busiest first and leaves out empty activities", () => {
+  it("groups by status, busiest first, without empty ones", () => {
     const statuses: Record<string, CharacterStatus> = {
       a: status({ queued: 1 }),
       b: status({ brain: "thinking" }),
       c: status({ onstage: false }),
     };
-    const groups = groupByActivity(people, (id) => statuses[id]);
+    const groups = groupByStatus(people, (id) => statuses[id]);
     expect(groups.map((g) => g.label)).toEqual([
       "Thinking",
       "Waiting",
       "Offstage",
     ]);
     expect(groups[0].members.map((c) => c.name)).toEqual(["Bram"]);
+  });
+
+  it("groups by task in the world's order, then no task, then offstage", () => {
+    const task = (type: string) => ({
+      id: type,
+      type,
+      description: type,
+      startedAt: 0,
+      endAt: 1,
+    });
+    const statuses: Record<string, CharacterStatus> = {
+      a: status({ task: task("eating") }),
+      b: status({ task: task("sleeping") }),
+      c: status({ onstage: false, task: task("eating") }),
+      d: status({ task: task("knitting") }),
+      e: status(),
+    };
+    const more = [
+      ...people,
+      { id: "d", name: "Dov", kind: "agent", aliases: [] },
+      { id: "e", name: "Eve", kind: "agent", aliases: [] },
+    ] satisfies CharacterSummary[];
+    const groups = groupByActivity(
+      more,
+      (id) => statuses[id],
+      ["sleeping", "eating"],
+      (type) => type.toUpperCase(),
+    );
+    expect(groups.map((g) => g.label)).toEqual([
+      "SLEEPING",
+      "EATING",
+      "KNITTING",
+      "Nothing in particular",
+      "Offstage",
+    ]);
   });
 });
