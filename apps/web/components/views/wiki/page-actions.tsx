@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CopyIcon, EllipsisIcon, MapIcon, Trash2Icon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  CopyIcon,
+  EllipsisIcon,
+  MapIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { toast } from "sonner";
 import type { WikiEditResult, WikiKind } from "@kazusa/client";
@@ -25,7 +31,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { worldParsers } from "@/components/views/world/search-params";
 import { PLACE_PREFIX } from "@/components/views/world/world-state";
+import { useAccess } from "@/hooks/use-access";
 import { useCastChange } from "@/hooks/use-characters";
+import { useSources } from "@/lib/source/provider";
+import { openPlayDialog } from "@/lib/state/ui-store";
 import { useDeleteWikiPage, useWikiSource } from "@/hooks/use-wiki";
 import { deleteCharacter } from "@/lib/source/characters/http";
 import { fetchWikiSource } from "@/lib/source/wiki/http";
@@ -103,6 +112,10 @@ export function PageMenu({
 }) {
   const remove = useDeleteWikiPage();
   const castChange = useCastChange();
+  const { canPlay } = useAccess();
+  const { player, watching } = useSources();
+  // A simulated character, and not already the one played.
+  const playable = character && canPlay && (watching || player.id !== id);
   const [open, setOpen] = useState(false);
   // Read with the page, so the text is at hand when the click comes.
   const source = useWikiSource(id, agent, kind);
@@ -178,7 +191,13 @@ export function PageMenu({
           <EllipsisIcon />
           <span className="sr-only">{`More for ${name}`}</span>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-auto max-w-64">
+          {playable ? (
+            <DropdownMenuItem onClick={() => openPlayDialog(id)}>
+              <ArrowLeftRightIcon />
+              {`Play as ${name}…`}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onClick={() => void copy()}>
             <CopyIcon />
             Copy Markdown

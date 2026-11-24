@@ -260,13 +260,13 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   }
                 >
                   <PowerIcon />
-                  Who's onstage…
+                  Stage character
                 </DropdownMenuItem>
               ) : null}
               {canPlay ? (
-                <DropdownMenuItem onClick={openPlayDialog}>
+                <DropdownMenuItem onClick={() => openPlayDialog()}>
                   <ArrowLeftRightIcon />
-                  Play as character…
+                  Play as character
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>

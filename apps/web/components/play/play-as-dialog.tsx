@@ -29,11 +29,11 @@ const OBSERVER = ":observer";
 
 /** Who the person plays: any character of the cast, or nobody (observer). */
 export function PlayAsDialog() {
-  const { open } = useUiStore((state) => state.playDialog);
+  const { open, pick } = useUiStore((state) => state.playDialog);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closePlayDialog()}>
       <DialogContent className="sm:max-w-2xl">
-        {open ? <PlayAsForm /> : null}
+        {open ? <PlayAsForm {...(pick ? { pick } : {})} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -52,10 +52,12 @@ function ObserverIcon({ className }: { className: string }) {
   );
 }
 
-function PlayAsForm() {
+function PlayAsForm({ pick }: { pick?: string }) {
   const { byId } = useCharacters();
   const { player, watching, play } = usePlay();
-  const [picked, setPicked] = useState<string>(watching ? OBSERVER : player.id);
+  const [picked, setPicked] = useState<string>(
+    pick ?? (watching ? OBSERVER : player.id),
+  );
   const [switching, setSwitching] = useState(false);
   // Links read as words: following one would leave the choice half made.
   const plain = usePlainText();
