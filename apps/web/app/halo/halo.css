@@ -558,6 +558,44 @@ html[data-halo] body { font-family: var(--font-sans); }
 .halo-action[data-primary] { flex: 1; background: var(--halo-primary); color: var(--halo-on-primary); }
 .halo-action[data-primary]:hover { background: color-mix(in oklch, var(--halo-primary), black 10%); }
 .halo-action-icon { width: 2.25rem; padding: 0; flex-shrink: 0; }
+.halo-action:disabled { opacity: 0.5; pointer-events: none; }
+.halo-action:not([data-primary]):not(.halo-action-icon) { min-width: 0; }
+.halo-actions-end { display: flex; gap: 0.375rem; margin-inline-start: auto; }
+
+.halo-menu { min-width: 12rem; padding: 0.375rem; }
+.halo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: default;
+  outline: none;
+}
+.halo-menu-item[data-highlighted] { background: var(--halo-tint); }
+.halo-menu-item svg { color: var(--halo-soft); }
+.halo-menu-item svg[data-on] { color: var(--halo-primary); fill: currentColor; }
+.halo-menu-sep { height: 1px; margin: 0.25rem 0.375rem; background: var(--halo-line); }
+
+.halo-failure {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--halo-accent), transparent 88%);
+  color: var(--halo-accent);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: start;
+}
+.halo-failure > svg { margin-block-start: 0.125rem; }
+.halo-failure-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: anywhere; }
+.halo-failure[data-open] .halo-failure-text { white-space: normal; max-height: 12rem; overflow-y: auto; }
+
+.halo-desires { font-size: 0.875rem; }
 
 .halo-block-note { font-size: 0.8125rem; color: var(--halo-soft); line-height: 1.5; }
 
