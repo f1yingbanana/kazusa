@@ -23,6 +23,20 @@ function memoryStore(): StageStore {
 }
 
 describe("stage", () => {
+  it("always has the system agent on and her own, whatever is recorded", async () => {
+    const stage = createStage(
+      memoryStore(),
+      { defaultOnstage: false, cast: [] },
+      {},
+      (id) => id === "arona",
+    );
+    expect(await stage.isOnstage("arona")).toBe(true);
+    expect(await stage.isSimulated("arona")).toBe(true);
+    await stage.set("arona", false, 10);
+    expect(await stage.isOnstage("arona")).toBe(true);
+    expect(await stage.isOnstage("airi")).toBe(false);
+  });
+
   it("keeps a chosen cast onstage when others start off", async () => {
     const stage = createStage(memoryStore(), {
       defaultOnstage: false,

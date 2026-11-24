@@ -1,3 +1,8 @@
+import {
+  SYSTEM_AGENT_CONFIG,
+  systemAgent,
+  systemAgentOf,
+} from "./system-agent.ts";
 import { createHandBack } from "./stage/hand-back.ts";
 import { inBackground, rememberRegistration } from "./background.ts";
 import { registerHostPromptEdits } from "./host-prompt.ts";
@@ -7,7 +12,7 @@ import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { runMigrations, type MigrationRecord } from "./migrations/index.ts";
 import { playAsMigration } from "./migrations/0082-play-as.ts";
-import { systemAgentOf, worldWikiDir } from "./characters/card.ts";
+import { worldWikiDir } from "./characters/card.ts";
 import { cachedStore } from "./state.ts";
 import type { StatRecord } from "@kazusa/client";
 import type { LocationRecord } from "./location/location.ts";
@@ -111,10 +116,7 @@ export default definePluginEntry({
       keyConfigured: jev.keyConfigured,
       config: modelsConfig(api.pluginConfig),
     });
-    registerHostPromptEdits(
-      api,
-      currentConfig(api).agents?.defaults?.systemAgent?.agentId,
-    );
+    registerHostPromptEdits(api, systemAgentOf(currentConfig(api)));
     const getConfig = () => currentConfig(api);
     const broadcaster = sharedBroadcaster();
     const clock = registerClock(api);
@@ -143,6 +145,18 @@ export default definePluginEntry({
       }),
     );
 
+    // A console linked to someone who isn't in the cast is its own persona:
+    // said once, so a typo in the world's config doesn't pass unnoticed.
+    api.on("gateway_start", () => {
+      const { is } = SYSTEM_AGENT_CONFIG.parse(
+        (api.pluginConfig as { systemAgent?: unknown } | undefined)
+          ?.systemAgent ?? {},
+      );
+      if (is && !systemAgent(api).linked())
+        api.logger.warn(
+          `systemAgent.is names "${is}", who isn't a character in the cast: the console stays its own persona.`,
+        );
+    });
     const stage = registerStage(api);
     // The person at the keyboard and who they play; read once at start-up so
     // a stream's events can be filtered synchronously from then on.

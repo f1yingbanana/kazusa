@@ -1340,9 +1340,8 @@ connect these modules in process.
   only to the system agent, one to one, in their **console** (`validateMembers`
   refuses any other chat with a `user:` id), and nobody in the world reads or
   reaches them. Everywhere else, groups included, they take part as the
-  character they play, by design. A character may still have a chat of their own
-  with the system agent (someone talking to the admin), apart from the console.
-  Auth still knows only a role; the operator id becomes per-person with the
+  character they play, by design. Nobody in the world talks with the system
+  agent either (see below). Auth still knows only a role; the operator id becomes per-person with the
   collaborator PR (auth §PR 4).
 - **Who plays whom** is the Stage record (`playedBy`), one character per person
   and one person per character, never the system agent. `createPlayer` reads it
@@ -1370,9 +1369,8 @@ connect these modules in process.
   go out as the character (`messaging.send(..., byPlayer)`), unpaced, into their
   own ledgers as if their model had said them. `actorFor` decides who a request
   acts as: the operator for their console (its session key, which has no owner;
-  or a new chat naming them among its members; or one to the system agent alone
-  while watching), else the character played, whose own
-  `members: [system agent]` is their own chat with her. `byPlayer` rides on the
+  or a new chat naming them among its members; or one to the system agent alone,
+  whoever they play), else the character played. `byPlayer` rides on the
   delivery and the stimulus (what Perception keeps for the timeline).
 - **Handing back** (`release`): desires resume from `playedSince`, the wake
   returns, and `handBack` (`stage/hand-back.ts`): when the person said or moved
@@ -1392,6 +1390,32 @@ connect these modules in process.
   Profile, `GET/POST /kazusa/profile`, `manage`), OpenClaw's file for who the
   user is, and who they play from one situation line
   (`kazusa-deliveries#operator-playing` / `#operator-watching`).
+
+### The system agent (`src/system-agent.ts`)
+
+She is the world's console, never part of it; every check goes through
+`system-agent.ts` (`systemAgentOf`, `isSystemAgent`, `worldCast`,
+`systemAgent(api)`). Which agent she is stays OpenClaw's
+`agents.defaults.systemAgent.agentId`.
+
+- **Always, whatever a world sets:** never played, deleted or sent offstage (the
+  stage counts her on and refuses her: `createStage(..., always)`); never in the
+  cast (`worldCast`: no place, wakes, desires or tasks, `start_task` refuses);
+  she talks only with people, one to one, and nobody in the world talks with or
+  meets her (`validateMembers`, `talk`, `joinHuddle`). So every turn of hers
+  comes from a person, and her admin tools never meet a character's words.
+- **`clock.systemAgentWhilePaused`** (default on): she answers and acts while
+  paused (perception's pause gate, messaging's `untilRunning`). Her sends are
+  never paced and her turns take no attention slot, either way.
+- **`systemAgent.is: "<cast id>"`** (optional): the console wears that
+  character. `identityOf` maps it at the read sites only: the bootstrap
+  (their World Wiki page as `IDENTITY.md`, their `MEMORY.md`, both at the
+  console's own paths), the context engine (their task, place, feelings, states
+  and memory recall; nobody is with the console), name and face
+  (`characterName`, `loadCharacterData`), stickers. Its brain, tools, model,
+  admin files and writes stay in its own workspace; their own turns stay
+  theirs. Not yet: the console's chats don't reach their nights. A link to
+  someone outside the cast is warned at start and ignored.
 
 ## 4. Engineering & Zero-Build Conventions
 

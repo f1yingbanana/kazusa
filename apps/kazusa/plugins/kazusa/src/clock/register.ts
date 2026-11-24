@@ -1,7 +1,11 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import { Clock, type ClockCell } from "./clock.ts";
-import type { ClockPersistedRecord, ClockSnapshot } from "./types.ts";
+import {
+  CLOCK_CONFIG,
+  type ClockPersistedRecord,
+  type ClockSnapshot,
+} from "./types.ts";
 
 const speedParams = z
   .object({ speed: z.number().finite().nonnegative() })
@@ -30,11 +34,6 @@ function sharedClockCell(): ClockCell {
 }
 
 /** Registers Clock's tools, Gateway methods, and persistence hooks. */
-/** `plugins.entries.kazusa.config.clock`: where a new world's time begins. */
-const CLOCK_CONFIG = z.strictObject({
-  startAt: z.iso.datetime().optional(),
-  speed: z.number().nonnegative().optional(),
-});
 
 export function registerClock(api: OpenClawPluginApi): Clock {
   const store = api.runtime.state.openKeyedStore<ClockPersistedRecord>({

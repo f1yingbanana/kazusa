@@ -110,10 +110,12 @@ export function ChatsView() {
     if (isAccessLoading) return;
     if (handledDm.current === dmTarget) return;
     handledDm.current = dmTarget;
-    // You and them: the one you play, or you yourself while playing nobody (to
-    // the system agent: your console). A character's own chat with the system
-    // agent is theirs, apart from your console.
-    const self = player.id || operator.id;
+    // You and them: the one you play, or you yourself while playing nobody.
+    // To the system agent it is always you: your console, since nobody in the
+    // world talks with her.
+    const self = byId.get(dmTarget)?.isSystemAgent
+      ? operator.id
+      : player.id || operator.id;
     const existing = chats.find(
       (chat) =>
         chat.type === "direct" &&

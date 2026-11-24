@@ -236,7 +236,8 @@ character, whose sends are that character's own (`messaging.send` with
 `byPlayer`: unpaced, into the character's ledgers, `byPlayer` on the delivery
 and the stimulus), or nobody. A `user:` id, the operator, appears in exactly one
 kind of chat: a direct chat with the system agent, the console
-(`validateMembers` refuses any other). What follows describes how that `user:`
+(`validateMembers` refuses any other). The system agent appears in no other
+chat either: nobody in the world texts, groups or meets her. What follows describes how that `user:`
 participant is carried; the in-world Sensei is now a character agent.
 
 - **Namespace & Addressing**: Human IDs use the `user:` prefix (e.g.

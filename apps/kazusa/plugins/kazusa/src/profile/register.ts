@@ -1,5 +1,5 @@
 import { writeWhole } from "../editor/files.ts";
-import { systemAgentOf } from "../characters/card.ts";
+import { systemAgentOf } from "../system-agent.ts";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";

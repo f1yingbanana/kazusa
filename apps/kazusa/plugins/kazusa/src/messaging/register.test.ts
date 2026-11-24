@@ -234,7 +234,7 @@ afterEach(async () => {
 });
 
 describe("send_message SDK integration", () => {
-  it("lets the system agent send and manage chats while a peer waits for resume", async () => {
+  it("lets the system agent answer a person while a character waits for resume", async () => {
     const release = new AbortController();
     const h = await setup(
       {},
@@ -248,19 +248,18 @@ describe("send_message SDK integration", () => {
         defaults: { systemAgent: { agentId: "alice" } },
       },
     });
-    const sent = await h.inGroup("Console", ["Ready"]);
-    await h.executeTool("manage_chat", {
-      action: "rename",
-      sessionKey: sent.details.sessionKey,
-      title: "Admin",
+    const answered = await h.execute({
+      sessionKey: "chat:direct:user:sensei",
+      messages: ["Ready"],
     });
+    expect(answered.details.said).toEqual(["Ready"]);
     let finished = false;
     vi.mocked(h.api.runtime.agent.resolveAgentIdentity).mockReturnValue({
       name: "Bob",
     });
     const peer = h
       .execute(
-        { sessionKey: "chat:direct:alice", messages: ["Waiting"] },
+        { sessionKey: "chat:direct:carol", messages: ["Waiting"] },
         {
           agentId: "bob",
           sessionKey: "agent:bob:brain",
@@ -276,6 +275,34 @@ describe("send_message SDK integration", () => {
     await peer;
     expect(finished).toBe(true);
   });
+
+  it("keeps the system agent out of the world", async () => {
+    const h = await setup();
+    Object.assign(h.api.config, {
+      agents: {
+        ...h.api.config.agents,
+        defaults: { systemAgent: { agentId: "alice" } },
+      },
+    });
+    // Nobody in the world texts her, and she joins no group of theirs.
+    await expect(
+      h.execute(
+        { sessionKey: "chat:direct:alice", messages: ["Hi"] },
+        { agentId: "bob", sessionKey: "agent:bob:brain", sessionId: "b" },
+      ),
+    ).rejects.toThrow("isn't in the world");
+    await expect(
+      h.executeTool("create_group", { members: ["bob", "carol"] }),
+    ).rejects.toThrow("isn't in the world");
+    // Nor does anyone meet her in person.
+    await expect(h.messaging.talk("bob", ["alice"])).rejects.toThrow(
+      "nobody meets her in person",
+    );
+    await expect(h.messaging.talk("alice", ["bob"])).rejects.toThrow(
+      "nobody meets her in person",
+    );
+  });
+
   it("accepts new sends when the same tool instance receives a reused provider call ID", async () => {
     const h = await setup();
     const group = await h.executeTool("create_group", {
@@ -1098,6 +1125,7 @@ describe("send_message SDK integration", () => {
     const h = await setup();
     Object.assign(h.api.config.agents ?? {}, {
       defaults: { systemAgent: { agentId: "alice" } },
+      entries: { alice: {}, bob: {}, carol: {}, dave: {} },
     });
     async function invoke(routePath: string, body?: unknown, url = routePath) {
       const route = h.routes.get(routePath);
@@ -1148,11 +1176,12 @@ describe("send_message SDK integration", () => {
         { id: "alice", isSystemAgent: true },
         { id: "bob", isSystemAgent: false },
         { id: "carol", isSystemAgent: false },
+        { id: "dave", isSystemAgent: false },
       ],
     });
     const sent = await invoke("/kazusa/send", {
       requestId: "browser-submit",
-      members: ["alice", "bob"],
+      members: ["dave", "bob"],
       title: "Study Group",
       text: "Hello everyone from Sensei!",
     });
@@ -1215,7 +1244,7 @@ describe("send_message SDK integration", () => {
 
     const retry = await invoke("/kazusa/send", {
       requestId: "browser-submit",
-      members: ["alice", "bob"],
+      members: ["dave", "bob"],
       title: "Study Group",
       text: "Hello everyone from Sensei!",
     });

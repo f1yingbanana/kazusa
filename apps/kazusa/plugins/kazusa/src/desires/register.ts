@@ -1,5 +1,5 @@
+import { worldCast } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
-import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
@@ -155,7 +155,7 @@ export function registerDesires(
   };
 
   const isCharacter = (agentId: string): boolean =>
-    listAgentIds(getConfig()).includes(agentId);
+    worldCast(getConfig()).includes(agentId);
 
   api.registerGatewayMethod("desires.get", async ({ params, respond }) => {
     const parsed = schemas.get.safeParse(params);

@@ -1,6 +1,8 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
+import { currentConfig } from "../current-config.ts";
 import { cachedStore } from "../state.ts";
+import { isSystemAgent } from "../system-agent.ts";
 import {
   STAGE_CONFIG,
   createStage,
@@ -20,6 +22,7 @@ export function registerStage(api: OpenClawPluginApi): Stage {
     ),
     STAGE_CONFIG.parse(api.pluginConfig?.stage ?? {}),
     sharedPlayerIndex(),
+    (id) => isSystemAgent(currentConfig(api), id),
   );
 }
 

@@ -1,4 +1,4 @@
-import { systemAgentOf } from "../characters/card.ts";
+import { systemAgent as systemAgentRules } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
 import { estimateTokens } from "openclaw/plugin-sdk/agent-core";
 import {
@@ -177,6 +177,7 @@ function createContextEngine(
   const skillLoader = pluginSkillLoader(api);
   const text = pluginSkillText(api);
   const tasks = openTaskStore(api);
+  const system = systemAgentRules(api, getConfig);
   const settings = contextSettings(api);
   // Where each character's records started last turn, so the start holds and
   // the provider keeps them cached. Losing it costs one re-read.
@@ -309,6 +310,9 @@ function createContextEngine(
         getConfig(),
         brainAgentId,
       );
+      // The console linked to a character reads where they are, what they're
+      // doing, how they feel and what they remember; nobody is with it.
+      const self = system.identityOf(brainAgentId);
       // What a tool call can change: read again for every build.
       const [
         sessionsContext,
@@ -328,10 +332,10 @@ function createContextEngine(
           now,
           cutoff,
         }),
-        tasks.lookup(brainAgentId),
+        tasks.lookup(self),
         presence?.(brainAgentId, now) ?? [],
         awaitingReplies?.(brainAgentId, cutoff) ?? [],
-        feelings?.(brainAgentId, now),
+        feelings?.(self, now),
         inCompany?.(brainAgentId, now) ?? false,
         recordsStarts.lookup(brainAgentId).catch((error: unknown) => {
           api.logger.warn(
@@ -347,7 +351,7 @@ function createContextEngine(
           ? turn.recollection
           : await memory?.(
               brainRequest({
-                agentId: brainAgentId,
+                agentId: self,
                 prompt,
                 ...(activeTask ? { task: activeTask.description } : {}),
                 here,
@@ -362,13 +366,13 @@ function createContextEngine(
               },
             );
       // After memory: Places you know leaves out what On your mind shows.
-      const place = await whereabouts?.(brainAgentId, now, prompt, {
+      const place = await whereabouts?.(self, now, prompt, {
         listLimit: chosen.placesLimit,
         exclude: recollection?.ids ?? [],
       });
-      const state = await states?.(brainAgentId, here, prompt);
+      const state = await states?.(self, here, prompt);
       const brainTurns = await pastTurns;
-      const systemAgent = systemAgentOf(getConfig()) === brainAgentId;
+      const systemAgent = system.is(brainAgentId);
       // She talks with the person, never with who they play; she needs to know
       // who that is to do what they ask for themselves in the world.
       const operator =

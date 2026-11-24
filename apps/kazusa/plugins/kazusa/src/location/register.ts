@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Clock } from "../clock/clock.ts";
 import { readCharacterFiles } from "../context-engine/decision-sources.ts";
 import { readCharacterCard, worldWikiDir } from "../characters/card.ts";
+import { worldCast } from "../system-agent.ts";
 import { formatSimTime } from "../context-engine/format.ts";
 import { characterName } from "../identity.ts";
 import { personLabel } from "../person-label.ts";
@@ -332,8 +333,8 @@ export function registerLocation(
     atStart = undefined;
   });
   const skillLoader = pluginSkillLoader(api);
-  /** Configured characters, onstage or not. */
-  const everyone = (): string[] => [...new Set(listAgentIds(getConfig()))];
+  /** The world's characters, onstage or not: never the system agent. */
+  const everyone = (): string[] => worldCast(getConfig());
   const participants = async (): Promise<string[]> =>
     deps.stage ? await deps.stage.onstage(everyone()) : everyone();
   const workspaceOf = (id: string): string | undefined =>

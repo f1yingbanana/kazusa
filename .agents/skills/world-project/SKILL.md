@@ -389,7 +389,10 @@ If it already exists, that's the user's world: a clone of its creator's
 repository, with everything play wrote as uncommitted changes. Don't delete it
 or build on top of it without asking. Setup does nothing to an existing world.
 The system agent is named by `kazusa.systemAgent` in the world's `package.json`;
-`starter` uses `arona`.
+`starter` uses `arona`. She is the world's console, never in it. A world that
+wants her in the story too gives the console its own id and sets
+`systemAgent.is` in `kazusa.config` to her character in the cast; the console
+then reads as that character.
 
 **The tools are still there.** Call `wiki_lint`, `world_audit`, `map_route`,
 `memory_preview` and `knowledge_explain` over HTTP, once the Gateway is on port

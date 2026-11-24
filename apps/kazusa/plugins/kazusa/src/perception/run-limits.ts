@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../system-agent.ts";
 import { playedNow } from "../stage/stage.ts";
 import {
   abortAgentHarnessRun,
@@ -42,7 +43,7 @@ interface RunLimits {
 }
 
 function isSystemAgent(api: OpenClawPluginApi, agentId: string): boolean {
-  return currentConfig(api).agents?.defaults?.systemAgent?.agentId === agentId;
+  return systemAgentOf(currentConfig(api)) === agentId;
 }
 
 /** A character's limits for one brain run; the system agent has its own. */

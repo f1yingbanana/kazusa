@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../system-agent.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -210,7 +211,7 @@ export function registerWorldUpdate(
     )
       await new Promise((resolve) => setTimeout(resolve, 100));
     const config = currentConfig(api);
-    const system = config.agents?.defaults?.systemAgent?.agentId;
+    const system = systemAgentOf(config);
     const moved: { id: string; to: string; was?: string }[] = [];
     for (const id of listAgentIds(config)) {
       const home = fresh.homes.get(id);
