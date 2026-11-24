@@ -56,9 +56,28 @@ export function HaloPlaceSheet({ id, onClose }: { id: string; onClose?: () => vo
         <div className="halo-sheet-title">
           {path.length ? (
             <nav aria-label="Inside" className="halo-crumbs">
-              {path.map((pid, index) => (
+              {path.length > 2 ? (
+                <span className="halo-crumb">
+                  <span
+                    className="halo-crumb-more"
+                    title={path
+                      .slice(0, -1)
+                      .map((pid) => places.byId.get(pid)?.name ?? pid)
+                      .join(" › ")}
+                  >
+                    <span aria-hidden="true">…</span>
+                    <span className="sr-only">
+                      {path
+                        .slice(0, -1)
+                        .map((pid) => places.byId.get(pid)?.name ?? pid)
+                        .join(", ")}
+                    </span>
+                  </span>
+                </span>
+              ) : null}
+              {(path.length > 2 ? path.slice(-1) : path).map((pid, index) => (
                 <span key={pid} className="halo-crumb">
-                  {index > 0 ? <span aria-hidden="true">›</span> : null}
+                  {index > 0 || path.length > 2 ? <span aria-hidden="true">›</span> : null}
                   <PlaceChip id={pid} bare className="halo-crumb-link" />
                 </span>
               ))}
