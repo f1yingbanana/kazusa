@@ -280,7 +280,15 @@ channel the bot can't see (Discord then delivers nothing from it, though webhook
 posts still work), one that isn't a text channel, or no Manage Webhooks comes
 back as the link's `problem`, in plain words, and in the Gateway log; the
 channel's and server's names come back too (`channelName`, `server`), shown as
-"#name in Server".
+"#name in Server". A link whose group isn't in this world (kept on a load from
+another game) says so (`MISSING_GROUP`); nothing written in its channel is taken
+in, and linking a group that isn't here is refused.
+
+**Typing.** While anyone in a linked group types (not a guest, not aloud), the
+channel shows the bot typing, again every 8 s while anyone still is. Discord
+can't show a webhook's name typing nor stop it early, so it lapses up to ten
+seconds after the line is posted; naming the bot after the place ("SCHALE
+Office") reads best.
 
 **A person's own account.** Anyone who plays links their Discord account in
 Settings → Chat apps: Kazusa makes a code (`POST /kazusa/bridges/account/code`,

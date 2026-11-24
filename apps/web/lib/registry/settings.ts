@@ -39,7 +39,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "models",
     label: "Models",
-    description: "Chat, decision and memory search models",
+    description: "AI models that power the simulation",
     icon: BoxesIcon,
     order: 10,
     requiresPermission: "manage",
@@ -48,7 +48,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "context",
     label: "Context",
-    description: "How much characters remember each turn",
+    description: "Character memory and token usage",
     icon: HistoryIcon,
     order: 15,
     requiresPermission: "manage",
@@ -57,7 +57,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "states",
     label: "States",
-    description: "Values your world keeps for its characters",
+    description: "Variables on characters and the world",
     icon: SlidersHorizontalIcon,
     order: 17,
     requiresPermission: "manage",
@@ -66,7 +66,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "chat-apps",
     label: "Chat apps",
-    description: "Discord: your account and linked channels",
+    description: "Chat directly in connected apps",
     icon: MessagesSquareIcon,
     order: 18,
     requiresPermission: "play",
@@ -84,7 +84,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "updates",
     label: "Updates",
-    description: "Kazusa's version and your world's, and updating them",
+    description: "System and world updates",
     icon: CircleArrowUpIcon,
     order: 30,
     requiresPermission: "manage",

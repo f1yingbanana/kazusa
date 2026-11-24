@@ -115,6 +115,7 @@ export function registerBridges(
     deps.roster ?? (() => new Set(listAgentIds(currentConfig(api))));
   const { messaging, player } = deps;
   const bridge = sharedBridge({
+    chatExists: (chatId) => messaging.hasChat(chatId),
     postAsGuest: (input) => messaging.postAsGuest(input),
     personOf: async (accountId) => {
       const person = await settings.byDiscord(accountId);
@@ -230,6 +231,8 @@ export function registerBridges(
     );
     if (!chatId.startsWith("group:"))
       throw new Error("Only a group chat can be linked.");
+    if (channelId && !(await messaging.hasChat(chatId)))
+      throw new Error("That group isn't in this world.");
     if (channelId) {
       const taken = [...bridge.allLinks()].find(
         ([other, link]) => other !== chatId && link.channelId === channelId,

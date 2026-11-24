@@ -64,6 +64,7 @@ function setup() {
   const messaging = {
     postAsGuest: vi.fn(async () => "id"),
     membersOf: vi.fn(async (chatId: string) => members.get(chatId) ?? []),
+    hasChat: vi.fn(async (chatId: string) => chatId !== "group:gone"),
     manageChat: vi.fn(
       async (agentId: string, input: { sessionKey: string }) => {
         const chatId = `group:${input.sessionKey.split(":").at(-1)}`;
@@ -87,6 +88,7 @@ function setup() {
     },
     post: async () => {},
     remove: async (_channelId, messageId) => void removed.push(messageId),
+    typing: async () => {},
     stop: async () => {},
     check: async (channelId) =>
       channelId === "333"
@@ -225,6 +227,14 @@ describe("registerBridges", () => {
       channelId: "111",
     });
     expect(taken.status).toBeGreaterThanOrEqual(400);
+    const gone = await h.call("/kazusa/bridges/link", {
+      chatId: "group:gone",
+      channelId: "444",
+    });
+    expect(gone).toEqual({
+      status: 400,
+      body: { error: "That group isn't in this world." },
+    });
     const direct = await h.call("/kazusa/bridges/link", {
       chatId: "direct:abc",
       channelId: "222",

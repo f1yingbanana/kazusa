@@ -940,6 +940,12 @@ export class Messaging {
     };
   }
 
+  /** Whether a chat is in this world. */
+  async hasChat(chatId: string): Promise<boolean> {
+    await this.ready();
+    return this.chats.has(chatId);
+  }
+
   /** Who is in a chat now; nobody when there is no such chat. */
   async membersOf(chatId: string): Promise<readonly string[]> {
     await this.ready();

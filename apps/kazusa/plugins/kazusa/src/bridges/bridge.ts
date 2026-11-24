@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { BridgeStatus } from "@kazusa/client";
+import type { BridgeStatus, TypingStreamEvent } from "@kazusa/client";
 import { z } from "zod";
 import { isGuest } from "../identity.ts";
 import type {
@@ -60,6 +60,8 @@ export interface BridgeTransport {
   post(channelId: string, line: OutgoingLine): Promise<void>;
   /** Takes a message down, once it has been said again as a character. */
   remove(channelId: string, messageId: string): Promise<void>;
+  /** Shows the bot typing in a channel for a few seconds (Discord: ten). */
+  typing(channelId: string): Promise<void>;
   /** What the bot finds of a channel: its names, and what stops it working. */
   check(channelId: string): Promise<ChannelCheck>;
   stop(): Promise<void>;
@@ -87,6 +89,11 @@ export interface LinkedPerson {
 
 /** What the bridge needs of a group's messages and its speakers' pictures. */
 export interface BridgeDeps {
+  /**
+   * Whether a group is in this world: a link kept on a load may name one from
+   * another game.
+   */
+  readonly chatExists: (chatId: string) => Promise<boolean>;
   /** The person who linked this Discord account, if anyone did. */
   readonly personOf: (accountId: string) => Promise<LinkedPerson | undefined>;
   /**
@@ -149,6 +156,16 @@ export function guestName(name: string): string {
   return plain || "Someone";
 }
 
+/** What a link says when its group isn't in this world. */
+export const MISSING_GROUP =
+  "This group isn't in this world, so nothing written in the channel goes anywhere. Link the channel from another group, or unlink it.";
+
+/**
+ * How often to show typing again while someone still types: Discord's lasts ten
+ * seconds.
+ */
+const TYPING_EVERY_MS = 8_000;
+
 /** Discord's limit for one message. */
 const MAX_TEXT = 2_000;
 
@@ -185,6 +202,14 @@ export class Bridge {
   private readonly codes = new Map<
     string,
     { readonly person: string; readonly until: number }
+  >();
+  /** Who is typing in each linked channel's group, and the timer that shows it. */
+  private readonly typists = new Map<
+    string,
+    {
+      readonly who: Set<string>;
+      readonly timer: ReturnType<typeof setInterval>;
+    }
   >();
   /** Lines already handed to the platform, so no instance posts one twice. */
   private readonly posted = new Set<string>();
@@ -251,13 +276,17 @@ export class Bridge {
       [...this.links].map(async ([chatId, link]) => {
         const last = this.checks.get(chatId);
         if (last && now - last.at < maxAgeMs) return;
-        const check = await transport
+        const exists = await this.deps.chatExists(chatId);
+        const found = await transport
           .check(link.channelId)
           .catch((error: unknown): ChannelCheck => ({
             ...(last?.name ? { name: last.name } : {}),
             ...(last?.server ? { server: last.server } : {}),
             problem: `Couldn't ask Discord: ${String(error)}`,
           }));
+        const check: ChannelCheck = exists
+          ? found
+          : { ...found, problem: MISSING_GROUP };
         this.checks.set(chatId, { ...check, at: now });
         if (check.problem && check.problem !== last?.problem)
           this.deps.warn(
@@ -307,6 +336,8 @@ export class Bridge {
     this.transport = undefined;
     this.current = { state: "off" };
     this.checks.clear();
+    for (const { timer } of this.typists.values()) clearInterval(timer);
+    this.typists.clear();
     await transport?.stop().catch((error: unknown) => {
       this.deps.warn(`Bridge: couldn't disconnect: ${String(error)}`);
     });
@@ -319,6 +350,8 @@ export class Bridge {
     )?.[0];
     const text = line.text.trim();
     if (!chatId || !text) return;
+    // A group from another game: its link already says so.
+    if (!(await this.deps.chatExists(chatId))) return;
     const linked = await this.deps.personOf(line.author.id);
     if (linked) {
       await this.asCharacter(chatId, line, linked, text);
@@ -407,6 +440,10 @@ export class Bridge {
    * group is linked, unless a guest wrote it there.
    */
   outgoing(event: MessagingEvent): void {
+    if (event.type === "typing") {
+      this.typed(event.typing);
+      return;
+    }
     if (event.type !== "message") return;
     const { delivery } = event;
     const link = this.links.get(delivery.chatId);
@@ -427,6 +464,40 @@ export class Bridge {
         );
       });
     this.queues.set(link.channelId, next);
+  }
+
+  /**
+   * Someone in a linked group started or stopped typing: the channel shows the
+   * bot typing, again every few seconds while anyone still is. Discord can't
+   * show a webhook's name typing, nor stop it early: it lapses ten seconds
+   * after the last time it was shown. Lines said aloud aren't typed.
+   */
+  private typed(typing: TypingStreamEvent): void {
+    const link = this.links.get(typing.chatId);
+    if (!link || isGuest(typing.senderId) || typing.mode !== "typing") return;
+    const channelId = link.channelId;
+    const current = this.typists.get(channelId);
+    if (!typing.isTyping) {
+      current?.who.delete(typing.senderId);
+      if (current && current.who.size === 0) {
+        clearInterval(current.timer);
+        this.typists.delete(channelId);
+      }
+      return;
+    }
+    if (current) {
+      current.who.add(typing.senderId);
+      return;
+    }
+    const show = () => {
+      void this.transport?.typing(channelId).catch(() => {
+        // Only a hint; a refusal changes nothing that matters.
+      });
+    };
+    show();
+    const timer = setInterval(show, TYPING_EVERY_MS);
+    timer.unref?.();
+    this.typists.set(channelId, { who: new Set([typing.senderId]), timer });
   }
 
   /** Waits for every post handed over so far: for tests and shutdown. */

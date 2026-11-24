@@ -5,6 +5,7 @@ import {
   Bridge,
   guestId,
   guestName,
+  MISSING_GROUP,
   type BridgeDeps,
   type BridgeTransport,
   type ChannelCheck,
@@ -30,6 +31,7 @@ function fakeTransport(
       posts.push([channelId, line]);
     }),
     remove: vi.fn(async () => {}),
+    typing: vi.fn(async () => {}),
     stop: vi.fn(async () => {}),
     check: vi.fn(async (channelId: string): Promise<ChannelCheck> => {
       const problem = options.problems?.get(channelId);
@@ -56,12 +58,14 @@ function setup() {
   );
   const linkAccount = vi.fn<BridgeDeps["linkAccount"]>(async () => {});
   const people = new Map<string, LinkedPerson>();
+  const chats = new Set(["group:office"]);
   const warn = vi.fn();
   const bridge = new Bridge({
     postAsGuest,
     postAsCharacter,
     linkAccount,
     personOf: async (accountId) => people.get(accountId),
+    chatExists: async (chatId) => chats.has(chatId),
     avatarOf: (agentId, face) => `https://pics/${agentId}/${face ?? "rest"}`,
     stickerOf: (agentId, name) => `https://pics/${agentId}/stickers/${name}`,
     warn,
@@ -69,7 +73,15 @@ function setup() {
   bridge.setLinks(
     new Map([["group:office", { platform: "discord", channelId: "111" }]]),
   );
-  return { bridge, postAsGuest, postAsCharacter, linkAccount, people, warn };
+  return {
+    bridge,
+    postAsGuest,
+    postAsCharacter,
+    linkAccount,
+    people,
+    chats,
+    warn,
+  };
 }
 
 function delivery(
@@ -333,6 +345,74 @@ describe("Bridge", () => {
       vi.useRealTimers();
     }
     expect(h.linkAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("says a link's group is gone, and takes in nothing for it", async () => {
+    const h = setup();
+    h.chats.clear();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    expect(h.bridge.checkOf("group:office")).toEqual({
+      name: "schale-office",
+      server: "Kivotos",
+      problem: MISSING_GROUP,
+    });
+    discord.write({
+      channelId: "111",
+      messageId: "900",
+      author: { id: "42", name: "Fan" },
+      text: "Hello?",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(h.postAsGuest).not.toHaveBeenCalled();
+  });
+
+  it("shows the bot typing while anyone in the group types, and stops", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    const typing = (
+      senderId: string,
+      isTyping: boolean,
+      mode: "typing" | "speaking" = "typing",
+      chatId = "group:office",
+    ) =>
+      h.bridge.outgoing({
+        type: "typing",
+        audience: [],
+        typing: {
+          type: "typing",
+          chatId,
+          senderId,
+          senderName: senderId,
+          isTyping,
+          mode,
+        },
+      });
+    vi.useFakeTimers();
+    try {
+      // Said aloud, a guest, or another chat: nothing shows.
+      typing("hina", true, "speaking");
+      typing("guest:discord-21iy4g9bqg", true);
+      typing("hina", true, "typing", "group:elsewhere");
+      expect(discord.transport.typing).not.toHaveBeenCalled();
+
+      typing("hina", true);
+      typing("yuuka", true);
+      expect(discord.transport.typing).toHaveBeenCalledExactlyOnceWith("111");
+      // Shown again before Discord's ten seconds run out.
+      vi.advanceTimersByTime(8_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(2);
+      typing("hina", false);
+      vi.advanceTimersByTime(8_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(3);
+      // Nobody typing: it lapses.
+      typing("yuuka", false);
+      vi.advanceTimersByTime(30_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps a failed post from stopping the ones after it", async () => {

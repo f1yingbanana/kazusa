@@ -206,6 +206,9 @@ export function discordTransport(
         allowed_mentions: { parse: [] },
       });
     },
+    async typing(channelId) {
+      await client.api.channels.showTyping(channelId);
+    },
     async remove(channelId, messageId) {
       await client.api.channels.deleteMessage(channelId, messageId);
     },

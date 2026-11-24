@@ -151,9 +151,9 @@ function AccountRow({ bot }: { bot: string | null }) {
       title={linked ? linked.name : "Your account"}
       detail={
         linked
-          ? "Your account. What you write in a linked channel is said by whoever you play."
+          ? "Your account, so the bot knows which Discord user is you."
           : bot
-            ? "Link it to speak in linked channels as whoever you play."
+            ? "Link your account so the bot knows which Discord user is you."
             : "Linking needs a connected bot."
       }
       action={
@@ -243,7 +243,7 @@ function BotRow({
         status.state === "failed"
           ? status.error.replace(/^Error: /, "")
           : status.state === "connected"
-            ? "The bot. It posts for every character, under their names and pictures."
+            ? "The bot that delivers messages between Kazusa and Discord."
             : hasToken
               ? "A token is saved."
               : "No bot yet. Set one up below, then add its token."
@@ -430,7 +430,7 @@ export function ChatAppsSettings() {
     <div className="flex flex-col">
       <SettingsSection
         title="Discord"
-        description="People in a linked channel talk with whoever is in its group, and characters answer under their own names and pictures."
+        description="Send and receive messages directly in Discord."
         action={<BotState status={status} />}
       >
         {bridges.error || account.error ? (
@@ -461,7 +461,7 @@ export function ChatAppsSettings() {
               </ul>
             ) : (
               <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                No channel yet. Link one from a group&apos;s chat sidebar.
+                No channel yet. Link one from a chat sidebar.
               </p>
             )}
           </div>
