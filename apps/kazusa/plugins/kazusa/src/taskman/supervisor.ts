@@ -1,5 +1,5 @@
+import { worldCast } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
-import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { Clock } from "../clock/clock.ts";
 import type { Perception } from "../perception/perception.ts";
@@ -58,7 +58,7 @@ export function startIdleSupervisor(
       const snapshot = deps.clock.now();
       if (snapshot.speed <= 0) return;
 
-      const configured = [...new Set(listAgentIds(getConfig()))];
+      const configured = worldCast(getConfig());
       const agentIds = deps.stage
         ? await deps.stage.simulated(configured)
         : configured;

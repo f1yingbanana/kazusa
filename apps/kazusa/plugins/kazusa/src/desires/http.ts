@@ -1,5 +1,5 @@
+import { worldCast } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
-import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import type { DesireRecord, DesiresResponse } from "@kazusa/client";
 import { createRouteRegistrar, sendJson } from "../http/helpers.ts";
@@ -31,7 +31,7 @@ export function registerDesiresHttp(
   });
 
   route("desires", "GET", async (_req, res) => {
-    const agentIds = [...new Set(listAgentIds(getConfig()))];
+    const agentIds = worldCast(getConfig());
     const records: Record<string, DesireRecord> = {};
     await Promise.all(
       agentIds.map(async (agentId) => {

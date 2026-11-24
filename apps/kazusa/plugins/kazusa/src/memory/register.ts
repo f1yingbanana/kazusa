@@ -1,3 +1,4 @@
+import { systemAgentOf, worldCast } from "../system-agent.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import { homedir } from "node:os";
@@ -628,7 +629,7 @@ export function registerMemory(
         .map((entity) => renderEntity(entity, nameOf)),
     audit: () => {
       const config = currentConfig(api);
-      const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
+      const systemAgent = systemAgentOf(config);
       // Registering comes last, and applies only once its run has ended. A cast
       // still on disk has to count, or the audit passes with nobody to check.
       const onDisk = systemAgent
@@ -1115,7 +1116,7 @@ export function registerMemory(
     }
     const world = index.world();
     const config = currentConfig(api);
-    const system = config.agents?.defaults?.systemAgent?.agentId;
+    const system = systemAgentOf(config);
     const reach: WikiReachResponse = {
       well: [],
       knows: [],
@@ -1426,15 +1427,12 @@ export function registerMemory(
   // Characters are part of the wiki: one list, so the count is the whole.
   route("wiki/lint", "GET", async (_req, res) => {
     const config = currentConfig(api);
-    const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
     sendJson(res, 200, {
       findings: [
         ...service.lint(),
-        ...listAgentIds(config)
-          .filter((agent) => agent !== systemAgent)
-          .flatMap((agent) =>
-            service.lint(agent).map((finding) => ({ ...finding, agent })),
-          ),
+        ...worldCast(config).flatMap((agent) =>
+          service.lint(agent).map((finding) => ({ ...finding, agent })),
+        ),
       ],
     } satisfies WikiLintResponse);
   });

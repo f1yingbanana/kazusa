@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** Snapshot of the simulation clock at a specific moment. */
 export interface ClockSnapshot {
   /** Epoch timestamp in milliseconds. */
@@ -27,3 +29,17 @@ export type ClockChangeListener = (
   snapshot: ClockSnapshot,
   previousSnapshot: ClockSnapshot,
 ) => void | Promise<void>;
+
+/**
+ * `plugins.entries.kazusa.config.clock`: where a new world's time begins, and
+ * whether the system agent answers while it is paused.
+ */
+export const CLOCK_CONFIG = z.strictObject({
+  startAt: z.iso.datetime().optional(),
+  speed: z.number().nonnegative().optional(),
+  /**
+   * The system agent answers people and acts while the clock is paused, and
+   * sends at once. Off, she waits for the clock like everyone else.
+   */
+  systemAgentWhilePaused: z.boolean().default(true),
+});

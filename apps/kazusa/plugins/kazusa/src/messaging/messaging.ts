@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../system-agent.ts";
 import { isUser } from "../identity.ts";
 import { inBackground } from "../background.ts";
 import { bundledSkillText, type SkillText } from "../skill-text.ts";
@@ -684,22 +685,26 @@ export class Messaging {
           throw new Error(`Unknown character agent: ${member}.`);
       }
     }
-    // A person is outside the world: only the system agent talks with them,
-    // one to one. Nobody in the world can reach them, or be reached as them.
+    // A person and the system agent are both outside the world: they talk
+    // with each other, one to one, and with nobody in it.
     const people = members.filter(isUser);
-    const console =
-      this.deps.api.runtime?.config?.current?.().agents?.defaults?.systemAgent
-        ?.agentId;
-    if (
-      people.length &&
-      console &&
-      (members.length !== 2 ||
-        people.length !== 1 ||
-        !members.includes(console))
-    )
+    const console = this.consoleId();
+    if (!console) return;
+    const pair =
+      members.length === 2 && people.length === 1 && members.includes(console);
+    if (people.length && !pair)
       throw new Error(
         "Only the system agent talks with people outside the world.",
       );
+    if (members.includes(console) && !pair)
+      throw new Error(
+        "The system agent isn't in the world: only people talk with her.",
+      );
+  }
+
+  /** The system agent's id, read afresh. */
+  private consoleId(): string | undefined {
+    return systemAgentOf(this.deps.api.runtime?.config?.current?.());
   }
 
   /**
@@ -832,6 +837,11 @@ export class Messaging {
     PARTICIPANT_ID.parse(agentId);
     if (others.includes(agentId))
       throw new Error(this.refusal("aloud-self", agentId));
+    const console = this.consoleId();
+    if (console && (agentId === console || others.includes(console)))
+      throw new Error(
+        "The system agent isn't in the world: nobody meets her in person.",
+      );
     return await this.openChat(agentId, assertInvocationCurrent, () =>
       this.startHuddle(agentId, others, assertInvocationCurrent),
     );
@@ -1261,6 +1271,10 @@ export class Messaging {
     while (chat?.mergedInto) chat = this.chats.get(chat.mergedInto);
     if (!chat || chat.members.length === 0)
       throw new Error(this.refusal("conversation-over", sender));
+    if (sender === this.consoleId())
+      throw new Error(
+        "The system agent isn't in the world: nobody meets her in person.",
+      );
     if (!chat.members.includes(sender)) {
       const place = await this.deps.placeOf?.(sender);
       if (place?.placeId !== chat.placeId)

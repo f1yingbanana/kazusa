@@ -1,3 +1,8 @@
+import {
+  systemAgent as systemAgentRules,
+  systemAgentOf,
+  type SystemAgent,
+} from "../system-agent.ts";
 import { isUser } from "../identity.ts";
 import { resetContinuations } from "./continue.ts";
 import { deadlineSignal } from "../deadline.ts";
@@ -433,6 +438,8 @@ export class Perception {
   private readonly api?: OpenClawPluginApi;
   private readonly deps: PerceptionDeps;
   private readonly config: PerceptionConfig;
+  /** Whether a paused clock holds the system agent back. */
+  private readonly systemAgent: SystemAgent | undefined;
   private readonly text: SkillText;
   private readonly store: StateStore<PerceptionState>;
   private readonly decisionStore: DecisionStore;
@@ -459,6 +466,7 @@ export class Perception {
     this.text =
       deps.text ?? (this.api ? pluginSkillText(this.api) : bundledSkillText());
 
+    this.systemAgent = this.api ? systemAgentRules(this.api) : undefined;
     this.config = PERCEPTION_CONFIG.parse(
       this.deps.config ?? this.api?.pluginConfig?.perception ?? {},
     );
@@ -1233,9 +1241,12 @@ export class Perception {
       if (this.deps.played && (await this.deps.played(agentId)))
         return await this.toPlayer(agentId, state);
       const systemAgent =
-        this.deps.api?.runtime.config.current().agents?.defaults?.systemAgent
-          ?.agentId === agentId;
-      if (this.deps.clock.now().speed <= 0 && !systemAgent) return undefined;
+        systemAgentOf(this.deps.api?.runtime.config.current()) === agentId;
+      if (
+        this.deps.clock.now().speed <= 0 &&
+        !this.systemAgent?.actsWhilePaused(agentId)
+      )
+        return undefined;
       // Offstage, the same holds for one character: what reaches them waits,
       // unjudged, until they come back (`drain`).
       if (this.deps.onstage && !(await this.deps.onstage(agentId)))

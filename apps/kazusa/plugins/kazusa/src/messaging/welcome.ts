@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../system-agent.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
@@ -51,7 +52,7 @@ export function registerWelcome(
         api,
         async () => {
           const config = currentConfig(api);
-          const agentId = config.agents?.defaults?.systemAgent?.agentId;
+          const agentId = systemAgentOf(config);
           if (!agentId) return;
           await sendWelcome(messaging, {
             agentId,

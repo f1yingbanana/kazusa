@@ -1,3 +1,4 @@
+import { systemAgentOf } from "../system-agent.ts";
 import { takeContinuation } from "./continue.ts";
 import {
   BrainAbortPayloadSchema,
@@ -63,10 +64,7 @@ export function registerBrainTraceHttp(
       sendJson(res, 404, { error: `Unknown character: ${agentId}.` });
       return;
     }
-    if (
-      agentId === config.agents?.defaults?.systemAgent?.agentId &&
-      !hasPermission(role, "manage")
-    ) {
+    if (agentId === systemAgentOf(config) && !hasPermission(role, "manage")) {
       sendJson(res, 403, {
         error: "Only the owner can read the system agent's brain trace.",
       });

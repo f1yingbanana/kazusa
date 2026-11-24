@@ -1,3 +1,4 @@
+import { isSystemAgent } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
 import type {
   OpenClawPluginApi,
@@ -280,12 +281,11 @@ export function registerTaskman(
     label: "Start or Transition Task",
     async execute(_id, params: TaskToolArguments<StartTaskParams>) {
       await clock.init();
-      if (
-        !toolContext?.agentId ||
-        getConfig().agents?.defaults?.systemAgent?.agentId !==
-          toolContext.agentId
-      )
-        await untilRunning(clock, shutdownSignal());
+      if (isSystemAgent(getConfig(), toolContext?.agentId))
+        throw new Error(
+          "You aren't in the world, so you have no tasks of your own.",
+        );
+      await untilRunning(clock, shutdownSignal());
       const result = await executeStartTask(
         params,
         resolveExecutionContext(toolContext),
@@ -341,12 +341,11 @@ export function registerTaskman(
     label: "Delay Task",
     async execute(_id, params: TaskToolArguments<DelayTaskParams>) {
       await clock.init();
-      if (
-        !toolContext?.agentId ||
-        getConfig().agents?.defaults?.systemAgent?.agentId !==
-          toolContext.agentId
-      )
-        await untilRunning(clock, shutdownSignal());
+      if (isSystemAgent(getConfig(), toolContext?.agentId))
+        throw new Error(
+          "You aren't in the world, so you have no tasks of your own.",
+        );
+      await untilRunning(clock, shutdownSignal());
       const result = await executeDelayTask(
         params,
         resolveExecutionContext(toolContext),

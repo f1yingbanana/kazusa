@@ -1,4 +1,5 @@
-import { systemAgentOf } from "../characters/card.ts";
+import { systemAgentOf } from "../system-agent.ts";
+
 import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -120,9 +121,9 @@ export function registerMessagingHttp(
   const systemAgent = () => systemAgentOf(getConfig());
   /**
    * Who a request acts as, and the members it names besides them. The operator
-   * in their console with the system agent: its session, a new one naming them
-   * among its members, or one to her alone while they play nobody. Everywhere
-   * else the character they play, who may have a chat with her of their own.
+   * in their console with the system agent: its session, or a new one to her
+   * alone, whoever they play (nobody in the world talks with her). Everywhere
+   * else the character they play.
    */
   const actorFor = async <
     T extends {
@@ -143,12 +144,7 @@ export function registerMessagingHttp(
       const named = target.members.includes(operator.id);
       const others = target.members.filter((id) => id !== operator.id);
       const console = systemAgent();
-      if (
-        console &&
-        others.length === 1 &&
-        others[0] === console &&
-        (named || !playing)
-      )
+      if (console && others.length === 1 && others[0] === console)
         return { actor: operator, target: { ...target, members: others } };
       if (named) throw new Error("Only the system agent talks with you.");
     }
@@ -342,13 +338,13 @@ export function registerMessagingHttp(
         try {
           return {
             ...(await agent(id)),
-            isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+            isSystemAgent: id === systemAgentOf(config),
           };
         } catch {
           return {
             id,
             name: id,
-            isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+            isSystemAgent: id === systemAgentOf(config),
           };
         }
       }),

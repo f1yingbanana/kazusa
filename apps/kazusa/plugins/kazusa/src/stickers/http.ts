@@ -1,3 +1,4 @@
+import { systemAgent } from "../system-agent.ts";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
@@ -23,7 +24,10 @@ export function registerStickerHttp(
     const sticker =
       id && name && listAgentIds(config).includes(id)
         ? readStickers(
-            api.runtime.agent.resolveAgentWorkspaceDir(config, id),
+            api.runtime.agent.resolveAgentWorkspaceDir(
+              config,
+              systemAgent(api).identityOf(id),
+            ),
           ).stickers.get(name)
         : undefined;
     const size = sticker && (await stat(sticker.file).catch(() => undefined));

@@ -1,3 +1,4 @@
+import { isSystemAgent, systemAgent, systemAgentOf } from "../system-agent.ts";
 import { currentConfig } from "../current-config.ts";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { resolveConfigPath } from "openclaw/plugin-sdk/state-paths";
@@ -34,7 +35,7 @@ import type { TaskStore } from "../taskman/types.ts";
 import type { Messaging } from "../messaging/messaging.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { TaskmanService } from "../taskman/register.ts";
-import { readCharacterCard, systemAgentOf, worldWikiDir } from "./card.ts";
+import { readCharacterCard, worldWikiDir } from "./card.ts";
 import { characterFile } from "../wiki-layout.ts";
 import { localAvatarUrl, registerAvatarHttp } from "./avatar.ts";
 import { defaultPortraitUrl } from "../scene/portraits.ts";
@@ -111,6 +112,8 @@ export async function loadCharacterData(
   aliases: string[];
   lead: string;
 }> {
+  // The console linked to a character wears their page, name and face.
+  agentId = systemAgent(api, () => config).identityOf(agentId);
   const card = readCharacterCard(worldWikiDir(api), agentId)?.page;
   const configured = api.runtime.agent
     .resolveAgentIdentity(config, agentId)
@@ -249,7 +252,7 @@ export function registerCharactersHttp(
           id,
           name: data.name,
           kind: "agent",
-          isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+          isSystemAgent: id === systemAgentOf(config),
           avatarUrl: data.avatarUrl,
           portraitUrl: data.portraitUrl,
           ...(data.summary ? { summary: data.summary } : {}),
@@ -270,6 +273,12 @@ export function registerCharactersHttp(
     if (unknown.length) {
       sendJson(res, 404, {
         error: `Character not found: ${unknown.join(", ")}`,
+      });
+      return;
+    }
+    if (ids.some((id) => isSystemAgent(getConfig(), id))) {
+      sendJson(res, 400, {
+        error: "The system agent isn't in the world: she is never offstage.",
       });
       return;
     }
@@ -426,7 +435,7 @@ export function registerCharactersHttp(
       id,
       name: data.name,
       kind: "agent",
-      isSystemAgent: id === config.agents?.defaults?.systemAgent?.agentId,
+      isSystemAgent: id === systemAgentOf(config),
       avatarUrl: data.avatarUrl,
       portraitUrl: data.portraitUrl,
       ...(data.summary ? { summary: data.summary } : {}),

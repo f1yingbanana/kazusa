@@ -1,14 +1,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { characterFile } from "../wiki-layout.ts";
-import type {
-  OpenClawConfig,
-  OpenClawPluginApi,
-} from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
 import { MEMORY_CONFIG } from "../memory/config.ts";
 import { parsePage, type Page } from "../memory/page.ts";
 import { sharedDir } from "../shared-dir.ts";
+import { systemAgent } from "../system-agent.ts";
 
 /*
  * A character's one card is their page in the World Wiki
@@ -57,10 +55,6 @@ export function readCharacterCard(
   };
 }
 
-/** The system agent keeps her own workspace files: she isn't in the world. */
-export const systemAgentOf = (config: OpenClawConfig): string | undefined =>
-  config.agents?.defaults?.systemAgent?.agentId;
-
 /** Files OpenClaw adds to a turn that a world character's card replaces. */
 const REPLACED = new Set(["IDENTITY.md", "SOUL.md"]);
 
@@ -78,6 +72,55 @@ interface BootstrapFile {
  */
 export function registerCharacterCard(api: OpenClawPluginApi): void {
   const wikiDir = worldWikiDir(api);
+  const system = systemAgent(api);
+  /**
+   * The console linked to a character reads as them: their World Wiki page
+   * where its own IDENTITY.md was, and their MEMORY.md, read only (their nights
+   * write it). Its other files, the admin instructions, stay its own.
+   */
+  const asLinked = (
+    files: readonly BootstrapFile[],
+    linked: string,
+    workspaceDir: string,
+  ): BootstrapFile[] => {
+    const card = readCharacterCard(wikiDir, linked);
+    const memoryPath = path.join(
+      api.runtime.agent.resolveAgentWorkspaceDir(currentConfig(api), linked),
+      "MEMORY.md",
+    );
+    let memory: string | undefined;
+    try {
+      memory = readFileSync(memoryPath, "utf8");
+    } catch {
+      memory = undefined;
+    }
+    const kept = files.filter(
+      (file) => file.name !== "IDENTITY.md" && file.name !== "MEMORY.md",
+    );
+    return [
+      ...(card
+        ? [
+            {
+              name: "IDENTITY.md",
+              path: path.join(workspaceDir, "IDENTITY.md"),
+              content: card.text,
+              missing: false,
+            },
+          ]
+        : []),
+      ...kept,
+      ...(memory === undefined
+        ? []
+        : [
+            {
+              name: "MEMORY.md",
+              path: path.join(workspaceDir, "MEMORY.md"),
+              content: memory,
+              missing: false,
+            },
+          ]),
+    ];
+  };
   api.registerHook(
     "agent:bootstrap",
     (event) => {
@@ -89,7 +132,16 @@ export function registerCharacterCard(api: OpenClawPluginApi): void {
       const agentId = context.agentId;
       const files = context.bootstrapFiles;
       if (!agentId || !files || !context.workspaceDir) return;
-      if (agentId === systemAgentOf(currentConfig(api))) return;
+      if (system.is(agentId)) {
+        const linked = system.linked();
+        if (linked)
+          context.bootstrapFiles = asLinked(
+            files,
+            linked,
+            context.workspaceDir,
+          );
+        return;
+      }
       // A world not yet updated to one page per character still has its
       // cards: they stay its character's, as they were.
       if (files.some((file) => REPLACED.has(file.name) && !file.missing))

@@ -111,12 +111,15 @@ export function createStage(
   store: StageStore,
   config: StageConfig,
   index: PlayerIndex = {},
+  /** The system agent: always on and her own, whatever is recorded. */
+  always: (id: string) => boolean = () => false,
 ): Stage {
   const startsOnstage = (id: string): boolean =>
     config.defaultOnstage || config.cast.includes(id);
   const isOnstage = async (id: string): Promise<boolean> =>
-    (await store.lookup(id))?.onstage ?? startsOnstage(id);
+    always(id) || ((await store.lookup(id))?.onstage ?? startsOnstage(id));
   const isSimulated = async (id: string): Promise<boolean> => {
+    if (always(id)) return true;
     const record = await store.lookup(id);
     return record ? record.onstage && !record.playedBy : startsOnstage(id);
   };

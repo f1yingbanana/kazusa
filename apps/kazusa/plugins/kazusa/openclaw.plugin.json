@@ -633,6 +633,22 @@
             "type": "number",
             "minimum": 0,
             "description": "Speed a new world starts at; 0 starts it paused. Default: 1."
+          },
+          "systemAgentWhilePaused": {
+            "type": "boolean",
+            "default": true,
+            "description": "The system agent answers people and acts while the clock is paused. Off, she waits for the clock like everyone else."
+          }
+        }
+      },
+      "systemAgent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "is": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A character in the cast the system agent's console is: it reads as them (their page, memory, face, task and place) and keeps its own brain, tools, model and workspace. Unset, the console is its own persona outside the world."
           }
         }
       },

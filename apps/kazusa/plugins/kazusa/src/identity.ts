@@ -4,6 +4,7 @@ import type {
 } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import { readCharacterCard, worldWikiDir } from "./characters/card.ts";
+import { systemAgent } from "./system-agent.ts";
 
 /**
  * The person at the keyboard, outside the world (`plugins.entries.kazusa.config
@@ -68,11 +69,13 @@ export async function characterName(
   config: OpenClawConfig,
   agentId: string,
 ): Promise<string> {
+  // The console linked to a character is called by their name.
+  const self = systemAgent(api, () => config).identityOf(agentId);
   const configured = api.runtime.agent
-    .resolveAgentIdentity(config, agentId)
+    .resolveAgentIdentity(config, self)
     ?.name?.trim();
   if (configured) return configured;
-  return readCharacterCard(worldWikiDir(api), agentId)?.page.name ?? agentId;
+  return readCharacterCard(worldWikiDir(api), self)?.page.name ?? self;
 }
 
 /**

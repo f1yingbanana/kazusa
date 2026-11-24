@@ -1,3 +1,4 @@
+import { systemAgent, systemAgentOf } from "../system-agent.ts";
 import { isUser } from "../identity.ts";
 import { currentConfig } from "../current-config.ts";
 import { inBackground } from "../background.ts";
@@ -220,6 +221,7 @@ export function registerMessaging(
   },
 ): Messaging {
   const getConfig = () => currentConfig(api);
+  const system = systemAgent(api, getConfig);
   const release = deps.release ?? shutdownSignal();
   const messagingConfig = MESSAGING_CONFIG.parse(
     api.pluginConfig?.messaging ?? {},
@@ -472,7 +474,10 @@ export function registerMessaging(
   const stickersOf = (agentId: string | undefined) =>
     agentId
       ? readStickers(
-          api.runtime.agent.resolveAgentWorkspaceDir(getConfig(), agentId),
+          api.runtime.agent.resolveAgentWorkspaceDir(
+            getConfig(),
+            system.identityOf(agentId),
+          ),
         )
       : undefined;
   const portraitsOf = (agentId: string) =>
@@ -541,7 +546,7 @@ export function registerMessaging(
             catalogMode: "direct-only",
             async execute(_toolCallId, input: unknown, signal?: AbortSignal) {
               const { agentId, config, agents } = caller(context);
-              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              if (!system.actsWhilePaused(agentId))
                 await untilRunning(
                   deps.clock,
                   signal ? AbortSignal.any([release, signal]) : release,
@@ -582,7 +587,7 @@ export function registerMessaging(
                 { ...params, messages, requestId },
                 context.assertInvocationCurrent,
                 agents,
-                config.agents?.defaults?.systemAgent?.agentId,
+                systemAgentOf(config),
                 signal,
               );
               return {
@@ -601,8 +606,8 @@ export function registerMessaging(
             ...worded("create_group", z.toJSONSchema(CREATE_GROUP)),
             label: "Create Group Chat",
             async execute(_id, input: unknown) {
-              const { agentId, config, agents } = caller(context);
-              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              const { agentId, agents } = caller(context);
+              if (!system.actsWhilePaused(agentId))
                 await untilRunning(deps.clock, release);
               const { members, title } = CREATE_GROUP.parse(input);
               return opened(
@@ -620,8 +625,8 @@ export function registerMessaging(
             ...worded("talk", z.toJSONSchema(TALK)),
             label: "Talk",
             async execute(_id, input: unknown) {
-              const { agentId, config } = caller(context);
-              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              const { agentId } = caller(context);
+              if (!system.actsWhilePaused(agentId))
                 await untilRunning(deps.clock, release);
               return opened(
                 await messaging.talk(
@@ -675,8 +680,8 @@ export function registerMessaging(
             }),
             label: "Manage Group Chat",
             async execute(_id, input: unknown) {
-              const { agentId, config, agents } = caller(context);
-              if (config.agents?.defaults?.systemAgent?.agentId !== agentId)
+              const { agentId, agents } = caller(context);
+              if (!system.actsWhilePaused(agentId))
                 await untilRunning(deps.clock, release);
               const result = await messaging.manageChat(
                 agentId,

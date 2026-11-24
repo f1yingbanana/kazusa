@@ -17,7 +17,8 @@ pages (`characters/fold.ts`). The roster takes `name`, `aliases`, `summary` and
 the groups they are in (`groups` at `knows` or `close`) from it; the avatar is
 `avatar.{webp,png,jpg,jpeg,gif,avif}` in the workspace, served at
 `/kazusa/avatar?id=<id>&v=<mtime>`. The system agent keeps her own `IDENTITY.md`
-and `SOUL.md`.
+and `SOUL.md`, unless she is linked to a character (`systemAgent.is`): then
+she reads as their page, `MEMORY.md`, avatar and stickers.
 
 ## 2. Working Machine State (OpenClaw Plugin State Stores)
 

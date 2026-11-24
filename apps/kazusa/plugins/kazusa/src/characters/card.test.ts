@@ -99,4 +99,80 @@ describe("a world character's card", () => {
       "MEMORY.md",
     ]);
   });
+
+  it("dresses a linked console as its character, keeping its own instructions", () => {
+    const wiki = mkdtempSync(path.join(tmpdir(), "card-"));
+    mkdirSync(path.join(wiki, "entities", "characters"), { recursive: true });
+    writeFileSync(
+      path.join(wiki, "entities", "characters", "arona.md"),
+      "---\nname: Arona\n---\n\n# Arona\n\nShe lives in the Shittim Chest.\n",
+    );
+    const home = mkdtempSync(path.join(tmpdir(), "home-"));
+    mkdirSync(path.join(home, "arona"));
+    writeFileSync(path.join(home, "arona", "MEMORY.md"), "Sensei likes tea.");
+    let handler: Handler | undefined;
+    const config = {
+      agents: {
+        defaults: { systemAgent: { agentId: "shittim" } },
+        entries: { shittim: {}, arona: {} },
+      },
+    };
+    const api = {
+      pluginConfig: { memory: { wikiDir: wiki }, systemAgent: { is: "arona" } },
+      config,
+      runtime: {
+        config: { current: () => config },
+        agent: {
+          resolveAgentWorkspaceDir: (_: unknown, id: string) =>
+            path.join(home, id),
+        },
+      },
+      registerHook: vi.fn((_event: string, next: Handler) => {
+        handler = next;
+      }),
+    } as unknown as OpenClawPluginApi;
+    registerCharacterCard(api);
+    const context: Record<string, unknown> = {
+      agentId: "shittim",
+      workspaceDir: "/console",
+      bootstrapFiles: [
+        {
+          name: "AGENTS.md",
+          path: "/console/AGENTS.md",
+          content: "admin",
+          missing: false,
+        },
+        {
+          name: "IDENTITY.md",
+          path: "/console/IDENTITY.md",
+          content: "console",
+          missing: false,
+        },
+        {
+          name: "MEMORY.md",
+          path: "/console/MEMORY.md",
+          content: "scratch",
+          missing: false,
+        },
+      ],
+    };
+    handler?.({ context });
+    const files = context.bootstrapFiles as {
+      name: string;
+      path: string;
+      content: string;
+    }[];
+    expect(files.map(({ name }) => name)).toEqual([
+      "IDENTITY.md",
+      "AGENTS.md",
+      "MEMORY.md",
+    ]);
+    expect(files[0].content).toContain("Shittim Chest");
+    expect(files[1].content).toBe("admin");
+    // Her memory, read only: the console's own path, so its writes stay its.
+    expect(files[2]).toMatchObject({
+      content: "Sensei likes tea.",
+      path: "/console/MEMORY.md",
+    });
+  });
 });
