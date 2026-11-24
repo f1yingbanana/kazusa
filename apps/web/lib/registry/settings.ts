@@ -3,12 +3,14 @@ import {
   ChartColumnIcon,
   CircleArrowUpIcon,
   HistoryIcon,
+  MessagesSquareIcon,
   PlugIcon,
   SlidersHorizontalIcon,
   UserIcon,
 } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ContextSettings } from "@/components/views/settings/context-settings";
+import { DiscordSettings } from "@/components/views/settings/discord-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
 import { StateSettings } from "@/components/views/settings/state-settings";
@@ -60,6 +62,15 @@ const CATEGORIES: readonly SettingsCategory[] = [
     order: 17,
     requiresPermission: "manage",
     component: StateSettings,
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    description: "Link groups to Discord channels",
+    icon: MessagesSquareIcon,
+    order: 18,
+    requiresPermission: "manage",
+    component: DiscordSettings,
   },
   {
     id: "usage",

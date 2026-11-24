@@ -12,6 +12,9 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@discordjs/core": "2.7.0",
+    "@discordjs/rest": "2.6.3",
+    "@discordjs/ws": "2.0.4",
     "@openclaw/byteplus-provider": "2026.10.5",
     "@openclaw/cerebras-provider": "2026.10.5",
     "@openclaw/chutes-provider": "2026.10.5",

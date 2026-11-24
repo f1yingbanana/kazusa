@@ -58,6 +58,7 @@ import { registerSkills } from "./skills/register.ts";
 import { registerTaskman } from "./taskman/register.ts";
 import { registerMessaging } from "./messaging/register.ts";
 import { registerWelcome } from "./messaging/welcome.ts";
+import { registerBridges } from "./bridges/register.ts";
 import {
   registerCharactersHttp,
   resolveCharacterStatus,
@@ -371,6 +372,8 @@ export default definePluginEntry({
       }),
     );
     registerWelcome(api, messaging);
+    // Groups linked to Discord channels: guests in, the group's lines out.
+    registerBridges(api, { messaging });
 
     // A world character lives by their World Wiki page, which the Wiki edits
     // with their memory, looks, stickers and the world's backdrops.

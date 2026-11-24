@@ -48,6 +48,7 @@ import { useChatActions } from "@/hooks/use-chats";
 import { useOccupancy } from "@/hooks/use-location";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { setChatSettings } from "@/lib/source/chats/http";
+import { useBridges } from "@/hooks/use-bridges";
 import { useAccess } from "@/hooks/use-access";
 import { andList } from "@/lib/format";
 import type { Chat } from "@/lib/source/chats/types";
@@ -624,5 +625,70 @@ export function OpenToJoin({
         onCheckedChange={(next) => void change(next)}
       />
     </label>
+  );
+}
+
+/**
+ * The owner links a group to a Discord channel by the channel's ID: people
+ * writing there are guests in the group, and the group's lines show there.
+ */
+export function DiscordChannel({ id }: { id: string }) {
+  const { data, link } = useBridges();
+  const linked = data?.links.find((entry) => entry.chatId === id)?.channelId;
+  const [edit, setEdit] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const value = edit ?? linked ?? "";
+  const next = value.trim() || null;
+  if (!data) return null;
+
+  async function save(channelId: string | null) {
+    setSaving(true);
+    try {
+      await link(id, channelId);
+      setEdit(null);
+      toast.success(channelId ? "Linked to Discord" : "Unlinked from Discord");
+    } catch (error) {
+      failed("Couldn't change the Discord link", error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-1.5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save(next);
+      }}
+    >
+      <label htmlFor={`discord-${id}`} className="text-sm">
+        Discord channel
+      </label>
+      <div className="flex items-center gap-1.5">
+        <Input
+          id={`discord-${id}`}
+          inputMode="numeric"
+          className="h-8 font-mono text-xs"
+          placeholder="Channel ID"
+          value={value}
+          onChange={(event) => setEdit(event.target.value)}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={saving || next === (linked ?? null)}
+        >
+          {saving ? <Spinner data-icon="inline-start" /> : null}
+          {next ? "Link" : "Unlink"}
+        </Button>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {data.discord.status.state === "connected"
+          ? "People writing there are guests here; this group's lines show there."
+          : "Connect a bot under Settings, Discord, first."}
+      </span>
+    </form>
   );
 }

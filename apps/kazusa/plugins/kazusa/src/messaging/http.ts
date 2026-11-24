@@ -5,6 +5,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import {
   ChatSettingsPayloadSchema,
+  OpenGroupPayloadSchema,
   type Agent,
   type AgentsResponse,
   type CharacterStatus,
@@ -13,6 +14,7 @@ import {
   type ManageChatResponse,
   type ObservedChat,
   type ObservedChatsResponse,
+  type OpenGroupResponse,
   type SendResponse,
   type StreamEvent,
 } from "@kazusa/client";
@@ -337,6 +339,14 @@ export function registerMessagingHttp(
     sendJson(res, 200, {
       chat: clientChat(summary, actor.id),
     } satisfies ManageChatResponse);
+  });
+  // An open group nobody is in yet, for people to join: anyone who plays can
+  // make one, playing someone or only watching.
+  route("chats/open", "POST", async (req, res) => {
+    const { title } = OpenGroupPayloadSchema.parse(await readJsonBody(req));
+    sendJson(res, 200, {
+      chatId: await messaging.createOpenGroup(title),
+    } satisfies OpenGroupResponse);
   });
   // The owner's, whoever they play or none: not a member's to change.
   route("chats/settings", "POST", async (req, res) => {

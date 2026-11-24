@@ -25,6 +25,7 @@ import type { EntityRef } from "@/lib/state/entity-ref";
 import {
   AddPeople,
   ChatTitle,
+  DiscordChannel,
   JoinChat,
   LeaveChat,
   OpenToJoin,
@@ -173,8 +174,9 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
             </div>
           ) : null}
           {canManage && type === "group" && readable && !draft ? (
-            <div className="mt-2">
+            <div className="mt-2 flex flex-col gap-3">
               <OpenToJoin id={entity.id} joinable={!!joinable} />
+              <DiscordChannel id={entity.id} />
             </div>
           ) : null}
         </div>

@@ -1,11 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { TriangleAlertIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  DoorOpenIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
+import { useAccess } from "@/hooks/use-access";
+import { useObservedChats } from "@/hooks/use-observed-chats";
+import { createOpenGroup } from "@/lib/source/chats/http";
 import { CastPickList, useCastPicks } from "./cast-pick-list";
 import {
   Dialog,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -19,45 +39,147 @@ import type { Chat } from "@/lib/source/chats/types";
 /**
  * A chat with whoever is picked: one is your direct chat with them (the one
  * there already is, or a new one), more a new group, a draft until its first
- * message is sent.
+ * message is sent. Or, a step further, an open group: nobody in it yet, and
+ * anyone can join it (a Discord channel's group). Someone only watching can
+ * make only that, so the dialog opens on it.
  */
 export function NewChatDialog({
   open,
   onOpenChange,
   onDirect,
   onGroup,
+  onOpenGroup,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDirect: (id: string) => void;
   onGroup: (chat: Chat) => void;
+  onOpenGroup: (chatId: string) => void;
 }) {
+  const { watching } = useSources();
+  const { canPlay } = useAccess();
+  const [step, setStep] = useState<"people" | "open">("people");
+  const showOpen = watching || step === "open";
+
+  function change(next: boolean) {
+    if (!next) setStep("people");
+    onOpenChange(next);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={change}>
       <ResponsiveDialogContent className="sm:max-w-md">
-        {open ? (
+        {!open ? null : showOpen ? (
+          <OpenGroupForm
+            onBack={watching ? undefined : () => setStep("people")}
+            onCreated={(chatId) => {
+              change(false);
+              onOpenGroup(chatId);
+            }}
+            onCancel={() => change(false)}
+          />
+        ) : (
           <NewChatForm
+            onOpenGroup={canPlay ? () => setStep("open") : undefined}
             onDirect={(id) => {
-              onOpenChange(false);
+              change(false);
               onDirect(id);
             }}
             onGroup={(chat) => {
-              onOpenChange(false);
+              change(false);
               onGroup(chat);
             }}
-            onCancel={() => onOpenChange(false)}
+            onCancel={() => change(false)}
           />
-        ) : null}
+        )}
       </ResponsiveDialogContent>
     </Dialog>
   );
 }
 
+/** An open group's title; it is made at once, with nobody in it. */
+function OpenGroupForm({
+  onBack,
+  onCreated,
+  onCancel,
+}: {
+  /** Back to picking people; none when that isn't on offer. */
+  onBack?: () => void;
+  onCreated: (chatId: string) => void;
+  onCancel: () => void;
+}) {
+  const { reload } = useObservedChats();
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const named = title.trim();
+
+  async function create(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!named) return;
+    setSaving(true);
+    try {
+      const chatId = await createOpenGroup(named);
+      await reload();
+      toast.success(`Made ${named}`);
+      onCreated(chatId);
+    } catch (error) {
+      toast.error("Couldn't make the group", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={create} className="flex min-w-0 flex-col gap-4" noValidate>
+      <DialogHeader>
+        <DialogTitle>New open group</DialogTitle>
+        <DialogDescription>
+          Nobody is in it yet. Characters and people join it themselves, and you
+          can link it to a Discord channel from its sidebar.
+        </DialogDescription>
+      </DialogHeader>
+      <Field>
+        <FieldLabel htmlFor="open-group-title">Title</FieldLabel>
+        <Input
+          id="open-group-title"
+          placeholder="SCHALE Office Line"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          maxLength={160}
+          autoFocus
+        />
+        <FieldDescription>
+          How it appears in everyone&apos;s chats.
+        </FieldDescription>
+      </Field>
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack ?? onCancel}
+          disabled={saving}
+        >
+          {onBack ? "Back" : "Cancel"}
+        </Button>
+        <Button type="submit" disabled={!named || saving}>
+          {saving ? <Spinner data-icon="inline-start" /> : null}
+          Make group
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 function NewChatForm({
+  onOpenGroup,
   onDirect,
   onGroup,
   onCancel,
 }: {
+  /** Goes on to make an open group; none for someone who can't. */
+  onOpenGroup?: () => void;
   onDirect: (id: string) => void;
   onGroup: (chat: Chat) => void;
   onCancel: () => void;
@@ -101,6 +223,30 @@ function NewChatForm({
       <DialogHeader>
         <DialogTitle>New chat</DialogTitle>
       </DialogHeader>
+
+      {onOpenGroup ? (
+        <Item
+          size="xs"
+          render={<button type="button" onClick={onOpenGroup} />}
+          className="-mt-1 cursor-pointer text-left hover:bg-muted/60"
+        >
+          <ItemMedia className="size-7 rounded-full bg-muted text-muted-foreground">
+            <DoorOpenIcon aria-hidden className="size-3.5" />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>New open group</ItemTitle>
+            <ItemDescription>
+              Anyone can join it, and it can link to Discord
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <ChevronRightIcon
+              aria-hidden
+              className="size-4 text-muted-foreground"
+            />
+          </ItemActions>
+        </Item>
+      ) : null}
 
       <div className="flex min-w-0 flex-col gap-2">
         <CastPickList

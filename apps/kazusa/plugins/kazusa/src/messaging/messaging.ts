@@ -1,4 +1,4 @@
-import { isUser } from "../identity.ts";
+import { isGuest, isOutsider, isUser } from "../identity.ts";
 import { inBackground } from "../background.ts";
 import { bundledSkillText, type SkillText } from "../skill-text.ts";
 import type {
@@ -984,6 +984,30 @@ export class Messaging {
   }
 
   /**
+   * A new open group with nobody in it yet, made by the owner or a
+   * collaborator, whoever they play or none: people join it by its address (a
+   * Discord channel's group, an office line). Returns its id.
+   */
+  async createOpenGroup(title: string): Promise<string> {
+    const named = title.trim();
+    if (!named) throw new Error("An open group needs a title.");
+    return await this.serial.enqueue("messages", async () => {
+      await this.init();
+      this.assertCurrent();
+      const chat: ChatConversation = {
+        id: `group:${newChatId()}`,
+        kind: "group",
+        members: [],
+        title: named.slice(0, 160),
+        joinable: true,
+        needsProjection: false,
+      };
+      await this.saveChat(chat);
+      return chat.id;
+    });
+  }
+
+  /**
    * Open a group to anyone who has its address, or close it again: the owner's
    * setting, not a member's. Closing it keeps everyone already in.
    */
@@ -1433,7 +1457,7 @@ export class Messaging {
       ...chat.members.filter((member) => member !== sender),
     ];
     const copies: MessageCopy[] = owners
-      .filter((agentId) => !isUser(agentId))
+      .filter((agentId) => !isOutsider(agentId))
       .map((agentId) => ({
         agentId,
         sessionKey: chatSummary(chat, agentId).sessionKey,
@@ -1481,7 +1505,10 @@ export class Messaging {
     key: readonly string[],
     text: string,
   ): Promise<void> {
-    if (chat.members.length < 2 || !chat.members.includes(actor)) return;
+    // Alone in a chat, nobody hears it, unless it is open: someone outside
+    // may be reading (a linked Discord channel).
+    if (!chat.members.includes(actor)) return;
+    if (chat.members.length < 2 && !chat.joinable) return;
     const requestId = messagingId(["notice", ...key]);
     const id = messagingId([actor, requestId]);
     if (this.deliveries.has(id) || (await this.deps.store.lookup(id))) return;
@@ -1602,6 +1629,44 @@ export class Messaging {
     this.notify();
     this.scheduleRetry();
     return result;
+  }
+
+  /**
+   * A guest's line from a linked chat on another platform, into a group they
+   * are not in: whoever is in it now hears it, and nobody else; with nobody in
+   * it, nobody does. `requestId` is the platform's message id, so a line
+   * received twice is accepted once. Returns the message id.
+   */
+  async postAsGuest(input: {
+    readonly chatId: string;
+    readonly guest: string;
+    readonly name: string;
+    readonly text: string;
+    readonly requestId: string;
+  }): Promise<string> {
+    if (!isGuest(PARTICIPANT_ID.parse(input.guest)))
+      throw new Error(`Not a guest: ${input.guest}.`);
+    if (!input.chatId.startsWith("group:"))
+      throw new Error("No such group chat.");
+    const params = deliveryParams(input.guest, {
+      sessionKey: `chat:group:${input.chatId.slice("group:".length)}`,
+      text: input.text,
+      requestId: input.requestId,
+    });
+    const id = messagingId([input.guest, params.requestId]);
+    await this.serial.enqueue("messages", async () => {
+      await this.init();
+      this.assertCurrent();
+      if (this.deliveries.has(id) || (await this.deps.store.lookup(id))) return;
+      const chat = this.chats.get(input.chatId);
+      if (chat?.kind !== "group") throw new Error("No such group chat.");
+      await this.accept(input.guest, input.name, chat, id, params);
+      await this.projectChats();
+      await this.flushLedgers();
+    });
+    this.notify();
+    this.scheduleRetry();
+    return id;
   }
 
   /**
@@ -2316,7 +2381,7 @@ export class Messaging {
       try {
         for (const agentId of chat.members) {
           this.assertCurrent();
-          if (isUser(agentId)) continue;
+          if (isOutsider(agentId)) continue;
           const summary = chatSummary(chat, agentId);
           await this.deps.ensureSession(
             { agentId, sessionKey: summary.sessionKey },

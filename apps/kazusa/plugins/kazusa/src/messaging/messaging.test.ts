@@ -819,6 +819,100 @@ describe("conversation routing and management", () => {
     );
   });
 
+  it("takes a guest's line into a group they aren't in, once, for whoever is in it", async () => {
+    const h = setup();
+    const group = await h.send({ members: ["bob", "carol"], title: "Office" });
+    const guest = {
+      chatId: group.chatId,
+      guest: "guest:discord-42",
+      name: "Fan",
+      text: "Anyone on duty?",
+      requestId: "discord:900",
+    };
+    const id = await h.messaging.postAsGuest(guest);
+    // Received twice from Discord, taken in once.
+    expect(await h.messaging.postAsGuest(guest)).toBe(id);
+    const line = h.retained.get(id);
+    expect(line).toMatchObject({
+      sender: "guest:discord-42",
+      senderName: "Fan",
+    });
+    expect([...(line?.audience ?? [])].sort()).toEqual([
+      "alice",
+      "bob",
+      "carol",
+      "guest:discord-42",
+    ]);
+    // Characters get it; the guest has no ledger.
+    expect(line?.copies.map((copy) => copy.agentId).sort()).toEqual([
+      "alice",
+      "bob",
+      "carol",
+    ]);
+    await vi.waitFor(() =>
+      expect(
+        h.receive.mock.calls
+          .filter(([, stimulus]) => stimulus.sender === "guest:discord-42")
+          .map(([to, stimulus]) => [to, stimulus.senderName])
+          .sort(),
+      ).toEqual([
+        ["alice", "Fan"],
+        ["bob", "Fan"],
+        ["carol", "Fan"],
+      ]),
+    );
+    await expect(
+      h.messaging.postAsGuest({ ...guest, guest: "bob", requestId: "x" }),
+    ).rejects.toThrow("Not a guest");
+    await expect(
+      h.messaging.postAsGuest({ ...guest, chatId: "huddle:x", requestId: "y" }),
+    ).rejects.toThrow("No such group");
+  });
+
+  it("makes an open group with nobody in it, which anyone can join", async () => {
+    const h = setup();
+    const id = await h.messaging.createOpenGroup("  SCHALE Office Line ");
+    expect(h.chats.get(id)).toMatchObject({
+      kind: "group",
+      members: [],
+      title: "SCHALE Office Line",
+      joinable: true,
+    });
+    const [observed] = await h.messaging.observeChats([]);
+    expect(observed).toMatchObject({ ended: false, members: [] });
+    const joined = await h.messaging.manageChat("hina", {
+      action: "join",
+      sessionKey: `chat:group:${id.slice("group:".length)}`,
+    });
+    expect(joined).toMatchObject({
+      title: "SCHALE Office Line",
+      members: ["hina"],
+    });
+    await expect(h.messaging.createOpenGroup("   ")).rejects.toThrow(
+      "needs a title",
+    );
+  });
+
+  it("tells an open group who joins even when nobody else is in it", async () => {
+    const h = setup();
+    const group = await h.send({ members: ["bob", "carol"], title: "Office" });
+    const address = `chat:group:${group.chatId.slice("group:".length)}`;
+    await h.messaging.setJoinable(group.chatId, true);
+    for (const who of ["alice", "bob", "carol"])
+      await h.messaging.manageChat(who, {
+        action: "leave",
+        sessionKey: address,
+      });
+    await h.messaging.manageChat("dave", {
+      action: "join",
+      sessionKey: address,
+    });
+    const told = [...h.retained.values()]
+      .filter((message) => message.sender === "dave")
+      .map((message) => [message.params.text, message.audience]);
+    expect(told).toEqual([["joins the chat", ["dave"]]]);
+  });
+
   it("freezes pending recipients across membership edits, removal of the sender and restart", async () => {
     const h = setup();
     const append = h.append.getMockImplementation();

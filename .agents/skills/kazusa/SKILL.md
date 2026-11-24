@@ -232,6 +232,7 @@ apps/kazusa/
 │       ├── perception/                 # Text ingress, retained inbox, bounded attention admission
 │       ├── stickers/                   # Per-character sticker sets, GET /kazusa/sticker
 │       ├── scene/                      # Scene art: portraits, backdrop sets, scene.times, GET /kazusa/portraits|portrait|backdrop
+│       ├── bridges/                    # Groups linked to Discord channels: guests in, the group's lines out by webhook
 │       └── messaging/                  # Chat discovery/management, attributed ledgers, retained delivery
 ├── shared/skills/<skill_name>/SKILL.md # Default behavioral workflows; a world's own shared/skills wins
 ├── worlds/                             # Read-only templates: base.json, <id>/{package.json,shared,workspaces}
