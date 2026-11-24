@@ -197,9 +197,9 @@ describe("saves", () => {
     const [save] = listSaves(git);
     expect(listSaves(git)).toHaveLength(1);
     expect(save).toMatchObject({ ref: AUTOSAVE, name: null });
-    deleteSave(git, AUTOSAVE);
+    deleteSave(git, live, AUTOSAVE);
     expect(listSaves(git)).toEqual([]);
-    expect(() => deleteSave(git, "refs/saves/stray")).toThrow();
+    expect(() => deleteSave(git, live, "refs/saves/stray")).toThrow();
   });
 
   it("fills the autosave slot with a world's start, before it ever ran", () => {
@@ -231,7 +231,7 @@ describe("saves", () => {
     });
     // Once only, and never for a world that has run.
     expect(autosaveStart(git, live)).toBe(false);
-    deleteSave(git, AUTOSAVE);
+    deleteSave(git, live, AUTOSAVE);
     put(".state/agents/amy/agent/openclaw-agent.sqlite", "");
     expect(autosaveStart(git, live)).toBe(false);
   });
@@ -345,5 +345,7 @@ describe("saves", () => {
     expect(() =>
       stageRequest(git, live, { op: "load", ref: "refs/saves/none" }),
     ).toThrow(/already/);
+    // Nor is a save deleted while one is made or loaded.
+    expect(() => deleteSave(git, live, AUTOSAVE)).toThrow(/saving or loading/);
   });
 });

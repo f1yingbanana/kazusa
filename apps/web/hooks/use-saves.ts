@@ -3,9 +3,12 @@
 import useSWR from "swr";
 import {
   isRunning,
+  SaveActionResponseSchema,
+  SavesResponseSchema,
   type GameSave,
   type RunningVersions,
-  type SaveRequest,
+  type SaveAction,
+  type SavesResponse,
 } from "@kazusa/client";
 import { useAccess } from "@/hooks/use-access";
 
@@ -37,36 +40,32 @@ export function mismatchOf(
   };
 }
 
-interface SavesResponse {
-  readonly saves?: readonly GameSave[];
-  readonly request?: SaveRequest | null;
-  readonly current?: RunningVersions;
-  /** Whether something can restart the Gateway (`scripts/dev.mjs`). */
-  readonly supervised?: boolean;
-  readonly error?: string;
-}
-
 const SAVES_KEY = "saves";
 const RUNNING_POLL_MS = 1_000;
 
+/** The route's own word for what went wrong, when it gave one. */
+const errorOf = (body: unknown): string | undefined => {
+  const error = (body as { error?: unknown } | null)?.error;
+  return typeof error === "string" ? error : undefined;
+};
+
 async function fetchSaves(): Promise<SavesResponse> {
   const response = await fetch("/saves", { cache: "no-store" });
-  const body = (await response.json().catch(() => ({}))) as SavesResponse;
-  if (!response.ok) throw new Error(body.error ?? "Couldn't list the saves.");
-  return body;
+  const body: unknown = await response.json().catch(() => ({}));
+  if (!response.ok)
+    throw new Error(errorOf(body) ?? "Couldn't list the saves.");
+  return SavesResponseSchema.parse(body);
 }
 
-async function post(
-  body: Record<string, string | boolean>,
-): Promise<SavesResponse> {
+async function post(action: SaveAction) {
   const response = await fetch("/saves", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(action),
   });
-  const result = (await response.json().catch(() => ({}))) as SavesResponse;
-  if (!response.ok) throw new Error(result.error ?? "That didn't work.");
-  return result;
+  const body: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(errorOf(body) ?? "That didn't work.");
+  return SaveActionResponseSchema.parse(body);
 }
 
 /**
@@ -86,8 +85,8 @@ export function useSaves() {
         isRunning(latest?.request) ? RUNNING_POLL_MS : 0,
     },
   );
-  const act = async (body: Record<string, string | boolean>) => {
-    const result = await post(body);
+  const act = async (action: SaveAction) => {
+    const result = await post(action);
     await resource.mutate();
     return result;
   };

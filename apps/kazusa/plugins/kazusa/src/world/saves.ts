@@ -490,7 +490,10 @@ export function loadGame(git: Git, world: string, ref: string): string[] {
  * stay, so a save being written or a download under way loses nothing; they go
  * at a later delete.
  */
-export function deleteSave(git: Git, ref: string): void {
+export function deleteSave(git: Git, world: string, ref: string): void {
+  // A load may be reading this one; the frontend's route stages one at a time.
+  if (isRunning(readRequest(world)))
+    throw new Error("The world is saving or loading. Delete once it's done.");
   if (!findSave(git, ref)) throw new Error(`There's no save ${ref}.`);
   git(["update-ref", "-d", ref]);
   try {

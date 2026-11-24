@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { SaveActionSchema } from "@kazusa/client";
 import { requireMaintainer } from "../../lib/auth/access";
 import { runScript } from "../../lib/run-script";
 
@@ -7,23 +7,6 @@ const SUPERVISED = process.env.KAZUSA_SUPERVISED === "1";
 
 /** The commands this server has run on the saves, in order. */
 let queue: Promise<unknown> = Promise.resolve();
-
-const ActionSchema = z.discriminatedUnion("op", [
-  z.object({
-    op: z.literal("save"),
-    name: z.string().max(200).optional(),
-    // Into the slot kept for before a world update, named for it.
-    beforeUpdate: z.boolean().optional(),
-  }),
-  z.object({
-    op: z.literal("load"),
-    ref: z.string().startsWith("refs/saves/"),
-  }),
-  z.object({
-    op: z.literal("delete"),
-    ref: z.string().startsWith("refs/saves/"),
-  }),
-]);
 
 /**
  * The game's saves and the save or load under way (`scripts/world.mjs saves`).
@@ -49,7 +32,9 @@ export async function GET(request: Request): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   const denied = requireMaintainer(request);
   if (denied) return denied;
-  const parsed = ActionSchema.safeParse(await request.json().catch(() => null));
+  const parsed = SaveActionSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success)
     return Response.json({ error: "Unknown action." }, { status: 400 });
   const action = parsed.data;

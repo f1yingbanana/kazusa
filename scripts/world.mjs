@@ -358,8 +358,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       };
     },
     "delete-save": () => {
-      const { git } = liveGit(root);
-      deleteSave(git, id ?? "");
+      const { world, git } = liveGit(root);
+      deleteSave(git, world, id ?? "");
       return {};
     },
   };
