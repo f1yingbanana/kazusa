@@ -16,7 +16,6 @@ import { parseAsString, useQueryState } from "nuqs";
 import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
 import { PlayAsDialog } from "@/components/play/play-as-dialog";
-import { Inspector } from "@/components/shell/inspector";
 import { Stage } from "@/components/shell/stage";
 import { StatusBar } from "@/components/shell/status-bar";
 import { VisitorWelcome } from "@/components/shell/visitor-welcome";
@@ -28,13 +27,13 @@ import { useSwitchResets } from "@/hooks/use-play";
 import { useSelection } from "@/hooks/use-selection";
 import { RealtimeProvider } from "@/lib/live/realtime-provider";
 import type { SectionSidebarProps } from "@/lib/registry/types";
-import { SourcesProvider } from "@/lib/source/provider";
+import { SourcesProvider, useSources } from "@/lib/source/provider";
 import { syncPreferences } from "@/lib/state/preferences-store";
 import { HaloChatList } from "./halo-chat-list";
 import { HaloCommand } from "./halo-command";
 import { HaloGallery } from "./halo-gallery";
 import { HaloNav } from "./halo-nav";
-import { HaloSheet } from "./halo-sheet";
+import { HaloPanel } from "./halo-panel";
 import { HaloTopBar } from "./halo-top-bar";
 import { HaloWhosWhere } from "./halo-whos-where";
 import type { HaloPalette } from "./palettes";
@@ -84,6 +83,7 @@ function HaloLayout({
   useSwitchResets();
   const [commandOpen, setCommandOpen] = useState(false);
   const [selection, select] = useSelection();
+  const { player } = useSources();
   const [, setView] = useQueryState("view", parseAsString);
   const [chatId] = useQueryState("chats.id", chatsParsers["chats.id"]);
   const active = useActiveView();
@@ -114,9 +114,9 @@ function HaloLayout({
   const split = Boolean(Sidebar) && !docked;
   const showList = Boolean(Sidebar) && (docked || pane === "list");
   const showStage = !split || pane === "stage";
-  const characterId = selection?.kind === "character" ? selection.id : null;
   const [listLabel, stageLabel] = PANE_LABELS[active.id] ?? ["List", active.label];
-  const details = characterId ? <HaloSheet id={characterId} /> : <Inspector />;
+  // Docked, You is always open beside the stage; in a drawer, only a pick opens it.
+  const showDocked = wide && (Boolean(selection) || Boolean(player.id));
 
   return (
     <div className="halo-frame">
@@ -148,9 +148,9 @@ function HaloLayout({
         {showStage ? (
           <main className="halo-stage">{NativeStage ? <NativeStage /> : <Stage />}</main>
         ) : null}
-        {wide && selection ? (
+        {showDocked ? (
           <aside aria-label="Details" className="halo-inspector">
-            {details}
+            <HaloPanel docked />
           </aside>
         ) : null}
       </div>
@@ -171,7 +171,7 @@ function HaloLayout({
           <DrawerContent className="halo-drawer">
             {tablet ? null : <DrawerHandle className="halo-grip" aria-label="Resize details" />}
             <DrawerTitle className="sr-only">Details</DrawerTitle>
-            {selection ? details : null}
+            {selection ? <HaloPanel docked={false} /> : null}
           </DrawerContent>
         </Drawer>
       )}

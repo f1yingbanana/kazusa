@@ -57,7 +57,6 @@ import {
   CharacterStatesSummary,
 } from "@/components/inspector/sections/character-states";
 import { useStopBrain } from "@/components/inspector/sections/character-stop";
-import { Inspector } from "@/components/shell/inspector";
 import { CastDialog, type CastRequest } from "@/components/views/characters/cast-dialog";
 import { chatsParsers } from "@/components/views/chats/search-params";
 import { timelineParsers } from "@/components/views/timeline/search-params";
@@ -107,7 +106,7 @@ type Fold = {
  * ones (watch, wiki, chats, timeline, cast) in More. Play-as is deliberately
  * absent: it lives in the roster, not on every character.
  */
-export function HaloSheet({ id }: { id: string }) {
+export function HaloSheet({ id, onClose }: { id: string; onClose?: () => void }) {
   const { byId } = useCharacters();
   const character = byId.get(id);
   const isAgent = character?.kind === "agent";
@@ -144,7 +143,7 @@ export function HaloSheet({ id }: { id: string }) {
     "wiki.raw": wikiParsers["wiki.raw"],
   });
 
-  if (!character) return <Inspector />;
+  if (!character) return <p className="halo-panel-empty">{`Nobody called "${id}" here.`}</p>;
 
   const entity: EntityRef = { kind: "character", id };
   const state = presenceState(character.kind, status);
@@ -218,14 +217,16 @@ export function HaloSheet({ id }: { id: string }) {
             </span>
           </p>
         </div>
-        <button
-          type="button"
-          className="halo-icon-button halo-sheet-close"
-          aria-label="Close"
-          onClick={() => void setParams({ sel: null })}
-        >
-          <XIcon aria-hidden className="size-4" />
-        </button>
+        {onClose ? (
+          <button
+            type="button"
+            className="halo-icon-button halo-sheet-close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <XIcon aria-hidden className="size-4" />
+          </button>
+        ) : null}
       </header>
 
       {failure ? <FailureLine error={failure.error} /> : null}
@@ -240,7 +241,7 @@ export function HaloSheet({ id }: { id: string }) {
             onClick={() => void setParams({ view: "chats", "chats.dm": id })}
           >
             <MessageCircleIcon aria-hidden className="size-4" />
-            Message
+            <span className="truncate">Message</span>
           </button>
         ) : null}
         {canTalk ? (
@@ -474,14 +475,14 @@ function TextAction({
   return (
     <button
       type="button"
-      className="halo-action"
-      title={title}
-      aria-label={title}
+      className="halo-action halo-action-squeeze"
+      title={title ?? label}
+      aria-label={title ?? label}
       disabled={disabled}
       onClick={onClick}
     >
       {children}
-      <span className="truncate">{label}</span>
+      <span className="halo-action-label truncate">{label}</span>
     </button>
   );
 }
