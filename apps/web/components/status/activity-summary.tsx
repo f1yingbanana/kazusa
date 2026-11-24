@@ -1,52 +1,41 @@
 "use client";
 
 import { parseAsString, useQueryStates } from "nuqs";
-import { useShallow } from "zustand/react/shallow";
+import { useCast } from "@/hooks/use-characters";
 import { useLiveStore } from "@/lib/live/state";
+import { activityOf, type Activity } from "@/lib/state/grouping";
+
+const SHOWN: readonly Activity[] = ["thinking", "composing", "waiting"];
 
 /**
- * How busy the world is right now, only the parts that aren't zero. Opens
- * Characters showing who is busy.
+ * How many of the cast are thinking, composing, or have messages waiting: the
+ * same counts as Characters grouped by activity, which it opens.
  */
 export function ActivitySummaryItem() {
   const [, setParams] = useQueryStates({
     view: parseAsString,
-    "chars.show": parseAsString,
+    "chars.by": parseAsString,
   });
-  const counts = useLiveStore(
-    useShallow((state) => {
-      let thinking = 0;
-      let writing = 0;
-      let waiting = 0;
-      for (const status of state.statuses.values()) {
-        if (status.brain === "thinking") thinking += 1;
-        if (status.composingIn.length > 0) writing += 1;
-        waiting += status.queued;
-      }
-      return { thinking, writing, waiting };
-    }),
-  );
-  const parts = [
-    counts.thinking ? `${counts.thinking} thinking` : null,
-    counts.writing ? `${counts.writing} writing` : null,
-    counts.waiting
-      ? `${counts.waiting} ${counts.waiting === 1 ? "message" : "messages"} waiting`
-      : null,
-  ].filter(Boolean);
+  const cast = useCast();
+  const statuses = useLiveStore((state) => state.statuses);
+  const counts = new Map<Activity, number>();
+  for (const character of cast) {
+    const activity = activityOf(statuses.get(character.id));
+    counts.set(activity, (counts.get(activity) ?? 0) + 1);
+  }
 
   return (
     <button
       type="button"
-      title="Show who's busy"
+      title="Characters by activity"
       className="rounded-sm px-1 tabular-nums hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       onClick={() =>
-        void setParams({
-          view: "characters",
-          "chars.show": "busy",
-        })
+        void setParams({ view: "characters", "chars.by": "activity" })
       }
     >
-      {parts.length ? parts.join(" · ") : "All quiet"}
+      {SHOWN.map((activity) => `${counts.get(activity) ?? 0} ${activity}`).join(
+        " · ",
+      )}
     </button>
   );
 }

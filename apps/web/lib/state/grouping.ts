@@ -1,4 +1,4 @@
-import type { CharacterSummary } from "@kazusa/client";
+import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
 
 /** Name, id or alias contains the words typed. */
 export function matchesQuery(character: CharacterSummary, query: string) {
@@ -75,4 +75,54 @@ export function groupByLetter(
     .sort((a, b) =>
       a.key === "#" ? 1 : b.key === "#" ? -1 : a.key.localeCompare(b.key),
     );
+}
+
+/** What a character is doing now, busiest first; each has one (`activityOf`). */
+export const ACTIVITIES = [
+  { key: "thinking", label: "Thinking" },
+  { key: "composing", label: "Composing" },
+  { key: "waiting", label: "Waiting" },
+  { key: "played", label: "Played" },
+  { key: "idle", label: "Idle" },
+  { key: "offstage", label: "Offstage" },
+] as const;
+export type Activity = (typeof ACTIVITIES)[number]["key"];
+
+/**
+ * One activity per character, so the counts add up to the cast: someone
+ * thinking with messages waiting is thinking, and composing beats thinking.
+ * Waiting means messages they haven't read yet. Without a status, idle.
+ */
+export function activityOf(status: CharacterStatus | undefined): Activity {
+  if (!status) return "idle";
+  if (!status.onstage) return "offstage";
+  if (status.composingIn.length > 0) return "composing";
+  if (status.brain === "thinking") return "thinking";
+  if (status.playedBy) return "played";
+  if (status.queued > 0) return "waiting";
+  return "idle";
+}
+
+/** Characters by what they're doing, busiest first, empty activities left out. */
+export function groupByActivity(
+  characters: readonly CharacterSummary[],
+  statusOf: (id: string) => CharacterStatus | undefined,
+): Group[] {
+  const groups = new Map<Activity, CharacterSummary[]>();
+  for (const character of characters) {
+    const key = activityOf(statusOf(character.id));
+    groups.set(key, [...(groups.get(key) ?? []), character]);
+  }
+  return ACTIVITIES.flatMap(({ key, label }) => {
+    const members = groups.get(key);
+    return members
+      ? [
+          {
+            key,
+            label,
+            members: members.toSorted((x, y) => x.name.localeCompare(y.name)),
+          },
+        ]
+      : [];
+  });
 }

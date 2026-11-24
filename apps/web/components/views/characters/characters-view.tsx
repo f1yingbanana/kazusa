@@ -52,8 +52,8 @@ import {
 } from "@/hooks/use-characters";
 import { useOffstage, useStage } from "@/hooks/use-stage";
 import { useLiveStore } from "@/lib/live/state";
-import { useShallow } from "zustand/react/shallow";
 import {
+  groupByActivity,
   groupByLetter,
   groupByNearest,
   matchesQuery,
@@ -78,26 +78,9 @@ const PAGE_START = {
 
 /** Who the list shows, and how it heads them. Defaults: everyone, by group. */
 const rosterParsers = {
-  "chars.show": parseAsStringLiteral(["onstage", "offstage", "busy"]),
-  "chars.by": parseAsStringLiteral(["name"]),
+  "chars.show": parseAsStringLiteral(["onstage", "offstage"]),
+  "chars.by": parseAsStringLiteral(["name", "activity"]),
 };
-
-/** Who is thinking, writing, or has messages waiting for them. */
-function useBusy(): ReadonlySet<string> {
-  const ids = useLiveStore(
-    useShallow((state) =>
-      [...state.statuses]
-        .filter(
-          ([, status]) =>
-            status.brain === "thinking" ||
-            status.composingIn.length > 0 ||
-            status.queued > 0,
-        )
-        .map(([id]) => id),
-    ),
-  );
-  return useMemo(() => new Set(ids), [ids]);
-}
 
 /**
  * The cast like a contact list: by group (each heading stays in view while its
@@ -120,7 +103,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
   const { canManage } = useAccess();
   const { apply: canStage } = useStage();
   const offstage = useOffstage();
-  const busy = useBusy();
+  const statuses = useLiveStore((state) => state.statuses);
   const { characters } = useCharacters();
   const { data: pages } = useWikiList();
   const nameOf = usePageName();
@@ -138,10 +121,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
   const needle = query.trim().toLowerCase();
   const pool = cast.filter(
     (one) =>
-      (!show ||
-        (show === "busy"
-          ? busy.has(one.id)
-          : offstage.has(one.id) === (show === "offstage"))) &&
+      (!show || offstage.has(one.id) === (show === "offstage")) &&
       (!needle ||
         matchesQuery(one, needle) ||
         plain(one.summary ?? "")
@@ -152,7 +132,11 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
         )),
   );
   const groups =
-    by === "name" ? groupByLetter(pool) : groupByNearest(pool, nameOf);
+    by === "name"
+      ? groupByLetter(pool)
+      : by === "activity"
+        ? groupByActivity(pool, (id) => statuses.get(id))
+        : groupByNearest(pool, nameOf);
 
   const open = useCallback(
     (id: string) => {
@@ -198,9 +182,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   onValueChange={(value: string) =>
                     void setRoster({
                       "chars.show":
-                        value === "onstage" ||
-                        value === "offstage" ||
-                        value === "busy"
+                        value === "onstage" || value === "offstage"
                           ? value
                           : null,
                     })
@@ -215,9 +197,6 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   <DropdownMenuRadioItem value="offstage">
                     Offstage
                   </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="busy">
-                    Busy
-                  </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -225,9 +204,10 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                 <DropdownMenuLabel>Group by</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
                   value={by ?? "group"}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     void setRoster({
-                      "chars.by": value === "name" ? "name" : null,
+                      "chars.by":
+                        value === "name" || value === "activity" ? value : null,
                     })
                   }
                 >
@@ -236,6 +216,9 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="name">
                     Name
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="activity">
+                    Activity
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuGroup>
@@ -318,9 +301,10 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
             <section key={group.key} aria-label={group.label}>
               <GroupHeading
                 label={group.label}
-                // Letters aren't groups anyone would bring on together.
+                // Only real groups: letters and activities aren't people
+                // anyone would bring on together.
                 onCast={
-                  canStage && by !== "name"
+                  canStage && !by
                     ? (intent) =>
                         setCastRequest({
                           label:
@@ -351,13 +335,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
         })}
         {!groups.length ? (
           <div className="flex flex-col items-start gap-1 px-2 py-4 text-sm text-muted-foreground">
-            <p>
-              {show === "busy" && !needle
-                ? "Nobody is busy right now."
-                : needle || show
-                  ? "No one matches."
-                  : "No characters yet."}
-            </p>
+            <p>{needle || show ? "No one matches." : "No characters yet."}</p>
             {show ? (
               <Button
                 variant="link"

@@ -464,7 +464,7 @@ First-draft items:
 | start | Data sources     | `12 live`; click shows the domain matrix (live / unavailable)   |
 | end   | Wiki problems    | `⊗ 43 ⚠ 1` (managers; hidden at 0), opens the Wiki's Problems list; counts the open character's wiki while in their view |
 | end   | Failures         | `2 failed`: whose latest turn failed, each opening that character |
-| end   | Activity summary | `3 thinking · 1 writing · 18 messages waiting` (zeros left out, `All quiet`), opens Characters filtered to Busy |
+| end   | Activity summary | `3 thinking · 1 composing · 5 waiting`: characters, one activity each (`activityOf`), so they match Characters grouped by Activity, which it opens |
 
 Reserved for later: storyteller ticker (salient journal kinds), next scheduled
 wakes, token/cost meter (Observer debug), notifications and mentions.

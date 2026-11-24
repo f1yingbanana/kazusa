@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { CharacterSummary } from "@kazusa/client";
-import { groupByLetter, groupByNearest, matchesQuery } from "./grouping";
+import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
+import {
+  activityOf,
+  groupByActivity,
+  groupByLetter,
+  groupByNearest,
+  matchesQuery,
+} from "./grouping";
 
 const people: CharacterSummary[] = [
   {
@@ -53,5 +59,48 @@ describe("roster search and grouping", () => {
     );
     expect(groups.map((g) => g.label)).toEqual(["A", "O", "过", "#"]);
     expect(groups[1].members.map((c) => c.name)).toEqual(["Olga", "Ōta"]);
+  });
+});
+
+const status = (patch: Partial<CharacterStatus> = {}): CharacterStatus => ({
+  brain: "idle",
+  composingIn: [],
+  queued: 0,
+  onstage: true,
+  ...patch,
+});
+
+describe("activity", () => {
+  it("gives each character the busiest thing they're doing", () => {
+    expect(activityOf(undefined)).toBe("idle");
+    expect(activityOf(status())).toBe("idle");
+    expect(activityOf(status({ queued: 3 }))).toBe("waiting");
+    expect(activityOf(status({ brain: "thinking", queued: 3 }))).toBe(
+      "thinking",
+    );
+    expect(
+      activityOf(status({ brain: "thinking", composingIn: ["chat"] })),
+    ).toBe("composing");
+    expect(activityOf(status({ playedBy: "user:me", queued: 1 }))).toBe(
+      "played",
+    );
+    expect(
+      activityOf(status({ onstage: false, brain: "thinking", queued: 2 })),
+    ).toBe("offstage");
+  });
+
+  it("groups busiest first and leaves out empty activities", () => {
+    const statuses: Record<string, CharacterStatus> = {
+      a: status({ queued: 1 }),
+      b: status({ brain: "thinking" }),
+      c: status({ onstage: false }),
+    };
+    const groups = groupByActivity(people, (id) => statuses[id]);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Thinking",
+      "Waiting",
+      "Offstage",
+    ]);
+    expect(groups[0].members.map((c) => c.name)).toEqual(["Bram"]);
   });
 });
