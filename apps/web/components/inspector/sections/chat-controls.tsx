@@ -700,7 +700,7 @@ export function DiscordChannel({ id }: { id: string }) {
         <span className="text-xs text-muted-foreground">
           {data.discord.status.state === "connected"
             ? "People writing there are guests here; this group's lines show there."
-            : "Connect a bot under Settings, Discord, first."}
+            : "Connect a bot under Settings, Chat apps, first."}
         </span>
       )}
     </form>

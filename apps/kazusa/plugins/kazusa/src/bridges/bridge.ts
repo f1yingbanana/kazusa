@@ -234,7 +234,7 @@ export class Bridge {
   async checkChannel(channelId: string): Promise<ChannelCheck> {
     const transport = this.transport;
     if (!transport || this.current.state !== "connected")
-      throw new Error("Connect a bot under Settings, Discord, first.");
+      throw new Error("Connect a bot under Settings, Chat apps, first.");
     return await transport.check(channelId);
   }
 
@@ -395,7 +395,7 @@ export class Bridge {
     const entry = this.codes.get(key);
     if (!entry || entry.until < Date.now()) {
       this.codes.delete(key);
-      return "That code isn't one Kazusa made, or it's over ten minutes old. Make a new one under Settings, Discord.";
+      return "That code isn't one Kazusa made, or it's over ten minutes old. Make a new one under Settings, Chat apps.";
     }
     this.codes.delete(key);
     await this.deps.linkAccount(entry.person, account);

@@ -86,7 +86,10 @@ export function registerBridges(
   },
 ): BridgeRegistration {
   const keys = deps.keys ?? authProfileKeys;
-  const transport = deps.transport ?? discordTransport;
+  const transport =
+    deps.transport ??
+    ((token: string) =>
+      discordTransport(token, (message) => api.logger.warn(message)));
   const store =
     deps.store ??
     api.runtime.state.openKeyedStore<BridgeLink>({

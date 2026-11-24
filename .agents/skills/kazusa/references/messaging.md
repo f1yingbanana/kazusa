@@ -283,7 +283,7 @@ channel's and server's names come back too (`channelName`, `server`), shown as
 "#name in Server".
 
 **A person's own account.** Anyone who plays links their Discord account in
-Settings → Discord: Kazusa makes a code (`POST /kazusa/bridges/account/code`,
+Settings → Chat apps: Kazusa makes a code (`POST /kazusa/bridges/account/code`,
 six letters and digits, ten minutes, once) and they send it from Discord, with
 the bot's `/link` command (an ephemeral reply) or alone in a direct message. The
 account is kept in their own settings (`src/user-settings.ts`, retained store

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ContextSettings } from "@/components/views/settings/context-settings";
-import { DiscordSettings } from "@/components/views/settings/discord-settings";
+import { ChatAppsSettings } from "@/components/views/settings/chat-apps-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
 import { StateSettings } from "@/components/views/settings/state-settings";
@@ -64,13 +64,13 @@ const CATEGORIES: readonly SettingsCategory[] = [
     component: StateSettings,
   },
   {
-    id: "discord",
-    label: "Discord",
-    description: "Your Discord account, and groups linked to channels",
+    id: "chat-apps",
+    label: "Chat apps",
+    description: "Discord: your account and linked channels",
     icon: MessagesSquareIcon,
     order: 18,
     requiresPermission: "play",
-    component: DiscordSettings,
+    component: ChatAppsSettings,
   },
   {
     id: "usage",

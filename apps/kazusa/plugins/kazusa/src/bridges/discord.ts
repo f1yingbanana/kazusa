@@ -35,7 +35,7 @@ const LINK_COMMAND: RESTPostAPIChatInputApplicationCommandsJSONBody = {
     {
       type: ApplicationCommandOptionType.String,
       name: "code",
-      description: "The six-letter code from Kazusa's Settings, Discord",
+      description: "The six-letter code from Kazusa's Settings, Chat apps",
       required: true,
     },
   ],
@@ -69,7 +69,10 @@ function readable(data: GatewayMessageCreateDispatchData): string {
  * bot. Needs the Message Content intent and Manage Webhooks in linked
  * channels.
  */
-export function discordTransport(token: string): BridgeTransport {
+export function discordTransport(
+  token: string,
+  warn: (message: string) => void = () => {},
+): BridgeTransport {
   const rest = new REST({ version: "10" }).setToken(token);
   const gateway = new WebSocketManager({ token, intents: INTENTS, rest });
   const client = new Client({ rest, gateway });
@@ -110,7 +113,9 @@ export function discordTransport(token: string): BridgeTransport {
       // Made or brought up to date; a refusal leaves direct messages working.
       await client.api.applicationCommands
         .createGlobalCommand(applicationId, LINK_COMMAND)
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          warn(`Bridge: couldn't make the /link command: ${String(error)}`);
+        });
       client.on(GatewayDispatchEvents.InteractionCreate, ({ data }) => {
         if (
           data.type !== InteractionType.ApplicationCommand ||
@@ -132,7 +137,9 @@ export function discordTransport(token: string): BridgeTransport {
               flags: MessageFlags.Ephemeral,
             }),
           )
-          .catch(() => undefined);
+          .catch((error: unknown) => {
+            warn(`Bridge: couldn't answer /link: ${String(error)}`);
+          });
       });
       client.on(GatewayDispatchEvents.MessageCreate, ({ data }) => {
         // Our own posts come back as webhook messages; other bots are skipped.
@@ -151,7 +158,9 @@ export function discordTransport(token: string): BridgeTransport {
                 content: reply,
               }),
             )
-            .catch(() => undefined);
+            .catch((error: unknown) => {
+              warn(`Bridge: couldn't answer a link code: ${String(error)}`);
+            });
           return;
         }
         handlers.line({
