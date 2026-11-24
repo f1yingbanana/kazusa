@@ -54,7 +54,7 @@ import {
   peopleIn,
 } from "./levels";
 import { LinkTextarea } from "./link-textarea";
-import { slug } from "./new-page-dialog";
+import { pageId } from "@/lib/wiki/page-id";
 import { failureText } from "./parts";
 import { WhereItIs } from "./place-fields";
 
@@ -489,9 +489,7 @@ export function PageForm({
     )?.name;
   const newGroup = async (groupName: string): Promise<string> => {
     const taken = new Set((list?.pages ?? []).map((page) => page.id));
-    const base = slug(groupName) || "group";
-    let groupId = base;
-    for (let n = 2; taken.has(groupId); n += 1) groupId = `${base}_${n}`;
+    const groupId = pageId(groupName, taken, { fallback: "group" });
     await savePage({
       id: groupId,
       kind: "concept",

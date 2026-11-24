@@ -27,13 +27,11 @@ test("two tabs preserve each other's preferences and synchronize removals", asyn
   context,
 }) => {
   const other = await context.newPage();
-  await Promise.all([
-    page.goto("/?view=world&world.as=list"),
-    other.goto("/?view=world&world.as=list"),
-  ]);
+  await Promise.all([page.goto("/?view=world"), other.goto("/?view=world")]);
   await Promise.all([expectLive(page), expectLive(other)]);
+  await Promise.all([search(page, "a"), search(other, "a")]);
   const members = (tab: Page) =>
-    tab.getByRole("list", { name: "Everyone members" });
+    tab.getByRole("region", { name: "Search results" });
   const star = members(page)
     .getByRole("button", { name: /^Star / })
     .first();
@@ -60,6 +58,7 @@ test("two tabs preserve each other's preferences and synchronize removals", asyn
   await expect(starred(page)).toHaveAttribute("aria-pressed", "true");
 
   await page.reload();
+  await search(page, "a");
   await expect(starred(page)).toHaveAttribute("aria-pressed", "true");
   await expect(about(page)).toHaveAttribute("aria-expanded", "true");
   await page.evaluate(() => localStorage.removeItem("kazusa:preferences"));
@@ -71,6 +70,14 @@ test("two tabs preserve each other's preferences and synchronize removals", asyn
   ).toHaveAttribute("aria-pressed", "false");
   await expect(about(other)).toHaveAttribute("aria-expanded", "false");
 });
+
+/** Types into the World sidebar's search, which lists rows with stars. */
+async function search(page: Page, query: string): Promise<void> {
+  await page
+    .getByRole("searchbox", { name: "Search characters" })
+    .first()
+    .fill(query);
+}
 
 async function expectLive(page: Page): Promise<void> {
   await expect(
@@ -86,9 +93,10 @@ test("roster selection, persisted watchlist, navigation and cached resources", a
     if (new URL(request.url()).pathname === "/kazusa/world")
       worldRequests.push(request.url());
   });
-  await page.goto("/?view=world&world.as=list");
+  await page.goto("/?view=world");
   await expectLive(page);
-  const members = page.getByRole("list", { name: "Everyone members" });
+  await search(page, "a");
+  const members = page.getByRole("region", { name: "Search results" });
   await expect(members.getByRole("button").first()).toBeVisible();
   const star = members.getByRole("button", { name: /^Star / }).first();
   const character = (await star.innerText()).replace(/^Star /, "");
@@ -110,16 +118,10 @@ test("roster selection, persisted watchlist, navigation and cached resources", a
   expect(worldRequests).toHaveLength(1);
   await page.reload();
   await expectLive(page);
+  await search(page, "a");
   await expect(
     members.getByRole("button", { name: `Unstar ${character}`, exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page
-    .getByRole("complementary", { name: "World sidebar" })
-    .getByRole("button", { name: /^Watchlist/ })
-    .click();
-  await expect(
-    page.getByRole("list", { name: "Watchlist members" }),
-  ).toContainText(character);
 });
 
 test("real chat history renders and remains usable after reconnect", async ({
@@ -234,9 +236,10 @@ test("mobile selection opens the inspector and section navigation stays usable",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?view=world&world.as=list");
-  await page.getByRole("button", { name: /^Everyone/ }).click();
-  const members = page.getByRole("list", { name: "Everyone members" });
+  await page.goto("/?view=world");
+  await page.getByRole("button", { name: "Who's where" }).click();
+  await search(page, "a");
+  const members = page.getByRole("region", { name: "Search results" });
   await members.getByRole("button").first().click();
   const inspector = page.getByRole("dialog", { name: "Inspector" });
   await expect(inspector).toBeVisible();
@@ -255,5 +258,5 @@ test("mobile selection opens the inspector and section navigation stays usable",
     .getByRole("navigation", { name: "Sections" })
     .getByRole("button", { name: "World", exact: true })
     .click();
-  await expect(members).toBeVisible();
+  await expect(page.getByRole("button", { name: "Who's where" })).toBeVisible();
 });

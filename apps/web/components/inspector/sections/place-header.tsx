@@ -2,7 +2,7 @@
 
 import { useQueryStates, parseAsString } from "nuqs";
 import { worldParsers } from "@/components/views/world/search-params";
-import { MapPinCheckIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { MapIcon, MapPinCheckIcon, MapPinIcon } from "lucide-react";
 import { PlaceChip } from "@/components/entities/chips";
 import { Button } from "@/components/ui/button";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
@@ -15,7 +15,6 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
   const places = usePlaces();
   const [, setParams] = useQueryStates({
     view: parseAsString,
-    "world.by": worldParsers["world.by"],
     "world.in": worldParsers["world.in"],
   });
   const player = usePlayer();
@@ -100,13 +99,12 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
           onClick={() =>
             void setParams({
               view: "world",
-              "world.by": null,
               "world.in": `place:${place.id}`,
             })
           }
         >
-          <UsersIcon data-icon="inline-start" />
-          Open in World
+          <MapIcon data-icon="inline-start" />
+          Show on map
         </Button>
       </div>
     </div>

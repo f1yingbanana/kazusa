@@ -1,66 +1,24 @@
 "use client";
 
-import { useQueryState } from "nuqs";
-import { worldParsers } from "./search-params";
 import { useMemo } from "react";
-import type {
-  CharacterSummary,
-  CharacterStatus,
-  LocationRecord,
-} from "@kazusa/client";
-import { useCharacters } from "@/hooks/use-characters";
+import type { CharacterSummary } from "@kazusa/client";
+import { isCast, useCharacters } from "@/hooks/use-characters";
 import { useOccupancy, usePlaces } from "@/hooks/use-location";
 import { useOffstage } from "@/hooks/use-stage";
 import { useLiveStore } from "@/lib/live/state";
-import type { Occupancy, PlaceIndex } from "@/lib/location/places";
+import { ancestors, placeName } from "@/lib/location/places";
 import { useSources } from "@/lib/source/provider";
-import {
-  filterCharacters,
-  groupCharacters,
-  type Group,
-  type GroupBy,
-  type KindFilter,
-} from "@/lib/state/grouping";
 import { useWatchlist } from "@/lib/state/preferences-store";
 
 /*
  * URL params:
- *   world.by   – folder dimension (place | group | activity | brain).
- *                Absent means the default: place once the world has places,
- *                group before that.
- *   world.in   – open folder: `all`, `watch`, or a group key. Absent means
- *                "nothing opened yet": desktop shows `all`, narrow screens
- *                show the folder list as the section's first screen.
- *   world.kind – characters (default) | onstage | offstage | npc | everyone
- *   world.as   – map | list. Absent means map when grouping by place.
+ *   world.in    – the place the map flies to, as `place:<id>`.
  *   world.plane – which map, in worlds with several. Absent means where the
- *                open place or the player is, or else the largest.
+ *                 open place or the player is, or else the largest.
  */
-export type Dimension = Exclude<GroupBy, "none"> | "place";
-
-const ALL_DIMENSIONS: readonly { id: Dimension; label: string }[] = [
-  { id: "place", label: "Place" },
-  { id: "group", label: "Group" },
-  { id: "activity", label: "Activity" },
-  { id: "brain", label: "Brain state" },
-];
-
-export const KIND_LABELS: Record<KindFilter, string> = {
-  characters: "Characters",
-  onstage: "Onstage",
-  offstage: "Offstage",
-  npc: "NPCs",
-  everyone: "Everyone",
-};
-
-export const ALL_FOLDER = "all";
-export const WATCH_FOLDER = "watch";
 export const PLACE_PREFIX = "place:";
-export const TRANSIT_FOLDER = "__transit";
-export const UNPLACED_FOLDER = "__unplaced";
-export const OFFSTAGE_FOLDER = "__offstage";
 
-/** Place folders need both the map and positions. */
+/** The map needs both places and positions. */
 export function usePlacesAvailable() {
   const { resolved } = useSources();
   return (
@@ -68,254 +26,91 @@ export function usePlacesAvailable() {
   );
 }
 
-export function useDimensions() {
-  const placesAvailable = usePlacesAvailable();
-  return useMemo(
-    () => ALL_DIMENSIONS.filter((d) => d.id !== "place" || placesAvailable),
-    [placesAvailable],
-  );
-}
-
-export function useWorldParams() {
-  const [rawBy] = useQueryState("world.by", worldParsers["world.by"]);
-  const [rawKind] = useQueryState("world.kind", worldParsers["world.kind"]);
-  const [folderParam] = useQueryState("world.in", worldParsers["world.in"]);
-  const dimensions = useDimensions();
-  const [rawAs] = useQueryState("world.as", worldParsers["world.as"]);
-  const defaultBy: Dimension = dimensions.some((d) => d.id === "place")
-    ? "place"
-    : "group";
-  const by: Dimension =
-    rawBy && dimensions.some((d) => d.id === rawBy) ? rawBy : defaultBy;
-  const kind: KindFilter = rawKind ?? "characters";
-  const as: "map" | "list" = rawAs ?? (by === "place" ? "map" : "list");
-  return {
-    by,
-    defaultBy,
-    kind,
-    as,
-    folderParam,
-    folder: folderParam ?? ALL_FOLDER,
-  };
-}
-
-/** A run of members under one heading inside an open folder. */
-export interface FolderSection {
-  readonly key: string;
+/** A place someone stands in right now, and who. */
+export interface Room {
+  readonly placeId: string;
   readonly label: string;
-  readonly placeId?: string;
+  /** The outermost area it sits in, as the map labels it ("Trinity"). */
+  readonly area: string;
   readonly members: readonly CharacterSummary[];
-}
-
-export interface Folder {
-  readonly key: string;
-  readonly label: string;
-  readonly members: readonly CharacterSummary[];
-  /** Place folders: the place, its depth in the tree, and who is directly there. */
-  readonly placeId?: string;
-  readonly depth?: number;
-  readonly isArea?: boolean;
-  /** Place folders split members by the sub-place they stand in. */
-  readonly sections?: readonly FolderSection[];
 }
 
 const byName = (a: CharacterSummary, b: CharacterSummary) =>
   a.name.localeCompare(b.name);
 
-function placeFolders(
-  index: PlaceIndex,
-  occupied: Occupancy,
-  byId: ReadonlyMap<string, CharacterSummary>,
-  offstage: readonly CharacterSummary[],
-  locations: ReadonlyMap<string, LocationRecord>,
-): Folder[] {
-  const people = (ids: readonly string[]) =>
-    ids
-      .map((id) => byId.get(id))
-      .filter((c): c is CharacterSummary => Boolean(c))
-      .sort(byName);
-
-  const folders: Folder[] = index.order.map((placeId) => {
-    const place = index.byId.get(placeId)!;
-    const within: string[] = [];
-    const sections: FolderSection[] = [];
-    const visit = (id: string) => {
-      const here = people(occupied.at.get(id) ?? []);
-      if (here.length) {
-        within.push(...here.map((c) => c.id));
-        sections.push({
-          key: id,
-          label: index.byId.get(id)?.name ?? id,
-          placeId: id,
-          members: here,
-        });
-      }
-      for (const child of index.children.get(id) ?? []) visit(child);
-    };
-    visit(placeId);
-    return {
-      key: `${PLACE_PREFIX}${placeId}`,
-      label: place.name,
-      placeId,
-      depth: index.depth.get(placeId) ?? 0,
-      isArea: (index.children.get(placeId)?.length ?? 0) > 0,
-      members: sections.flatMap((section) => section.members),
-      sections,
-    };
-  });
-
-  // Travelers grouped by where they are headed.
-  const heading = new Map<string, CharacterSummary[]>();
-  for (const character of people(occupied.traveling)) {
-    const to = locations.get(character.id)?.trip?.to ?? "";
-    heading.set(to, [...(heading.get(to) ?? []), character]);
-  }
-  const transit = [...heading.entries()]
-    .map(([to, members]) => ({
-      key: `to:${to}`,
-      label: `To ${index.byId.get(to)?.name ?? to}`,
-      placeId: to,
-      members,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  folders.push({
-    key: TRANSIT_FOLDER,
-    label: "On the way",
-    members: transit.flatMap((section) => section.members),
-    sections: transit,
-  });
-  const unplaced = people(occupied.unplaced);
-  if (unplaced.length)
-    folders.push({
-      key: UNPLACED_FOLDER,
-      label: "Unplaced",
-      members: unplaced,
-    });
-  // Offstage characters aren't anywhere in the world.
-  if (offstage.length)
-    folders.push({
-      key: OFFSTAGE_FOLDER,
-      label: "Offstage",
-      members: [...offstage].sort(byName),
-    });
-  return folders;
-}
-
-/** The folders the World sidebar lists, and what each one contains. */
-export function useWorldFolders(by: Dimension, kind: KindFilter) {
+/**
+ * The world as it is now: only the onstage cast, since offstage characters
+ * aren't anywhere and the system agent directs rather than lives in it. Rooms
+ * are the places with someone in them, in map order.
+ */
+export function useWorldNow() {
   const { characters, byId, isLoading, error } = useCharacters();
-  const watchlist = useWatchlist();
-  const statusGrouped = by === "activity" || by === "brain";
-  const statuses = useLiveStore((state) =>
-    statusGrouped ? state.statuses : null,
-  );
-  const locations = useLiveStore((state) =>
-    by === "place" ? state.locations : null,
-  );
-  const places = usePlaces();
   const offstage = useOffstage();
+  const watchlist = useWatchlist();
+  const places = usePlaces();
+  const locations = useLiveStore((state) => state.locations);
 
-  const pool = useMemo(
-    () => filterCharacters(characters, kind, "", (id) => offstage.has(id)),
-    [characters, kind, offstage],
-  );
-  const poolIds = useMemo(
-    () => (by === "place" ? pool.map((c) => c.id) : []),
-    [pool, by],
-  );
-  const occupied = useOccupancy(poolIds);
-
-  const groups: Folder[] = useMemo(() => {
-    if (by === "place")
-      return places && locations
-        ? placeFolders(
-            places,
-            occupied,
-            byId,
-            pool.filter((c) => offstage.has(c.id)),
-            locations,
-          )
-        : [];
-    const statusGroups: Group[] = groupCharacters(pool, by, (id) =>
-      statuses?.get(id),
-    );
-    return statusGroups;
-    // Activity and brain folders regroup on live status deltas.
-  }, [pool, by, places, occupied, byId, offstage, statuses, locations]);
-
-  /*
-   * Who a folder's onstage controls act on: every character in it, whatever
-   * the Show filter hides. Only Everyone and group folders are groups
-   * worth switching; activity, brain and place folders change by the minute,
-   * and offstage characters have none of those.
-   */
-  const agents = useMemo(
-    () => characters.filter((c) => c.kind === "agent").sort(byName),
-    [characters],
-  );
-  const groupFolders = useMemo(
+  const onstage = useMemo(
     () =>
-      new Map(
-        groupCharacters(agents, "group", () => undefined).map((g) => [
-          g.key,
-          g.members,
-        ]),
-      ),
-    [agents],
+      characters.filter((c) => isCast(c) && !offstage.has(c.id)).sort(byName),
+    [characters, offstage],
   );
-  const castOf = (key: string): readonly CharacterSummary[] | undefined => {
-    if (key === ALL_FOLDER) return agents;
-    if (by === "group") return groupFolders.get(key);
-    return undefined;
-  };
+  const onstageIds = useMemo(() => onstage.map((c) => c.id), [onstage]);
+  const occupied = useOccupancy(onstageIds);
 
-  const watched = useMemo(
-    () =>
-      watchlist
+  const people = useMemo(
+    () => (ids: readonly string[]) =>
+      ids
         .map((id) => byId.get(id))
         .filter((c): c is CharacterSummary => Boolean(c))
         .sort(byName),
-    [watchlist, byId],
+    [byId],
   );
-  const everyone = useMemo(() => [...pool].sort(byName), [pool]);
 
-  const resolve = (key: string): Folder | null => {
-    if (key === ALL_FOLDER)
-      return { key, label: "Everyone", members: everyone };
-    if (key === WATCH_FOLDER)
-      return { key, label: "Watchlist", members: watched };
-    return groups.find((g) => g.key === key) ?? null;
-  };
+  const rooms: readonly Room[] = useMemo(() => {
+    if (!places) return [];
+    return places.order
+      .filter((id) => (occupied.at.get(id)?.length ?? 0) > 0)
+      .map((id) => ({
+        placeId: id,
+        label: placeName(places, id),
+        area: placeName(places, ancestors(places, id).at(-1) ?? ""),
+        members: people(occupied.at.get(id) ?? []),
+      }));
+  }, [places, occupied, people]);
+
+  const travelers = useMemo(
+    () =>
+      people(occupied.traveling).sort(
+        (a, b) =>
+          (locations.get(a.id)?.trip?.arriveAt ?? 0) -
+          (locations.get(b.id)?.trip?.arriveAt ?? 0),
+      ),
+    [people, occupied, locations],
+  );
+  const unplaced = useMemo(() => people(occupied.unplaced), [people, occupied]);
+  const watched = useMemo(() => {
+    const on = new Set(onstageIds);
+    return people(watchlist.filter((id) => on.has(id)));
+  }, [people, watchlist, onstageIds]);
+  const cast = useMemo(
+    () => ({
+      total: characters.filter(isCast).length,
+      onstage: onstage.length,
+    }),
+    [characters, onstage],
+  );
 
   return {
     characters,
-    groups,
+    onstage,
+    cast,
+    rooms,
+    travelers,
+    unplaced,
     watched,
-    everyone,
-    resolve,
-    castOf,
-    offstage,
+    places,
     isLoading,
     error,
-    places,
   };
-}
-
-/** "2 thinking · 1 composing", or null when nobody is busy. */
-export function busySummary(
-  members: readonly CharacterSummary[],
-  statuses: ReadonlyMap<string, CharacterStatus>,
-): string | null {
-  let thinking = 0;
-  let composing = 0;
-  for (const member of members) {
-    const status = statuses.get(member.id);
-    if (status?.brain === "thinking") thinking += 1;
-    if (status?.composingIn.length) composing += 1;
-  }
-  const parts = [
-    thinking ? `${thinking} thinking` : null,
-    composing ? `${composing} composing` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
 }

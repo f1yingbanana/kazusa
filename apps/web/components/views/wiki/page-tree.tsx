@@ -33,7 +33,9 @@ export function categoriesOf(page: WikiListItem): Category[] {
 const markersOf = (
   page: WikiListItem,
 ): { icon: LucideIcon; label: string }[] => [
-  ...(page.kind === "person" ? [{ icon: UserRoundIcon, label: "Person" }] : []),
+  ...(page.kind === "person"
+    ? [{ icon: UserRoundIcon, label: "Character" }]
+    : []),
   ...(page.kind === "day" ? [{ icon: CalendarIcon, label: "Diary day" }] : []),
   ...(page.place ? [{ icon: MapPinIcon, label: "Place" }] : []),
   ...(page.group ? [{ icon: UsersRoundIcon, label: "Group" }] : []),

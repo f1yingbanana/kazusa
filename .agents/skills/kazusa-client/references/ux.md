@@ -119,18 +119,40 @@ thinking about a reply), last message or a typing shimmer, time, unread.
 Trailing action: New chat. Observed chats will appear below as a section (needs
 `observe`).
 
-**World sidebar (folders):**
+**World sidebar (who is where):** only the onstage cast, since offstage
+characters aren't anywhere and the system agent directs rather than lives there.
 
-- **Fixed folders:** Watchlist (starred characters, a local UI preference) and
-  Everyone.
-- **Dimension folders:** one per group of the chosen dimension (Affiliation by
-  default, Activity, Brain state; Place once location exists). Activity folders
-  use the task icon. Each folder shows its count and a live busy hint ("2
-  thinking · 1 composing").
-- **Filter menu:** "Folders by" dimension and a kind filter (Simulated by
-  default, NPCs, Everyone).
-- **Search** lists matching characters directly, so jumping to someone never
-  needs a folder. Selecting a row sets `sel=character:<id>`.
+- **Watching:** starred characters who are onstage, as character rows.
+- **Now:** only places with someone in them, in map order: the place, its
+  outermost area, and its people's faces (presence rings show who's thinking).
+  Empty places are left to the map and to ⌘K. Clicking flies the map there and
+  opens the place.
+- **On the way** (travelers, time to arrival) and **Not on the map**, only when
+  someone is.
+- **Footer:** "N of M onstage" and "Change", which opens the cast dialog.
+- **Search** lists matching characters directly. Selecting a row sets
+  `sel=character:<id>`.
+- No folder dimensions: the presence ring and the status bar already say who is
+  thinking, and each row says what someone is doing. Groups are who someone is,
+  so they live in Characters.
+
+**Characters sidebar (the cast):** like a contact list, headings sticky while
+their people scroll. A filter menu left of the search shows Everyone, Onstage or
+Offstage and groups by Group (each character's nearest, named from its page; "No
+group" last) or Name (first letter). Rows say what someone is doing when
+onstage, else who they are; offstage avatars are greyed. A group heading's menu
+(always shown) brings the group on or sends it off, after a confirm that says
+what happens and what it costs. "⋯" right of the search: New character, and
+Who's onstage… (a fixed-height list: a lit face is onstage, rows that would
+change are tagged, and the summary under it is one line). Only the cast is
+listed: not the system agent, and not a person who is just a page (they stay in
+the Wiki, and links to them open there).
+
+**New character and New page:** Name, then Id, filled from the name until edited
+("Links use the id. It can't be changed later."). Ids are `a-z0-9_-` (OpenClaw's
+agent ids are, and they're file names); a name with no Latin letters gets a
+short hashed id (`lib/wiki/page-id.ts`). Creating a character answers once the
+Gateway has reloaded the cast, so the roster read next shows them.
 
 **Timeline sidebar (filters):** Following (Everyone / Watchlist, plus any
 specific characters from "Open in Timeline" as removable chips) and Show (one
@@ -141,32 +163,21 @@ Clear resets everything.
 
 ## 5. Stage: World
 
-The folder opened in the World sidebar, as a map or a list (a toggle in the
-header, not separate views).
+The map, always; the sidebar says who is where.
 
-- **URL params:** `world.by` (dimension), `world.in` (open folder: `all`,
-  `watch`, or a group key; absent means "nothing opened", which is `all` on
-  desktop and the folder list on narrow screens), `world.kind`, `world.as`
-  (`map` or `list`; absent means map when grouping by place), `world.plane`.
+- **URL params:** `world.in` (`place:<id>`, the place the map flies to) and
+  `world.plane`.
 - **Map:** regions stack a translucent fill, so depth reads as contour lines.
   Roads on foot are solid; anything ridden is dashed. An area's inside opens
   with zoom, and hidden places pass their roads and people to the area around
   them. What's written is decided per zoom on screen pixels (`planLabels`):
   people, then area names, then other places, then travel times, each only if it
-  fits. By place, a folder only says where to look: everyone stays on the map.
-  By other dimensions, only the folder's members show. Coordinates come from
-  each page's `map`, and each plane is its own map; roads to another plane
-  aren't drawn. Arrange is explicit, so a stray drag while panning can't move
-  anything, and it only changes the picture.
-- **Header:** folder name, then a mono summary ("15 simulated · 2 thinking").
-  The place/map NeedsLine sits on the right until `places` exists.
-- **Rows:** the shared ≈44px character row (presence avatar, name, one-line
-  activity with task icon, remaining time in mono, star). Virtualized.
-- **Buckets:** "No affiliation" and similar (no structured field) and, later,
-  "Unplaced" and "In transit". These are honest buckets, not hidden rows.
-- Once places exist, place folders set `sel=place:<id>` from the stage header.
-- Before the places and location domains are live, the view still works with
-  non-spatial groupings, so it's useful on day one.
+  fits. Everyone onstage stays on the map. Coordinates come from each page's
+  `map`, and each plane is its own map; roads to another plane aren't drawn.
+  Arrange is explicit, so a stray drag while panning can't move anything, and it
+  only changes the picture.
+- Narrow screens show the map with a "Who's where" button that opens the sidebar
+  as a sheet. A world without places shows "No map yet".
 
 ## 6. Stage: Chats
 
@@ -451,9 +462,9 @@ First-draft items:
 | ----- | ---------------- | --------------------------------------------------------------- |
 | start | Connection       | `● Live` / `◌ Reconnecting…` / `✕ Offline` with last-event time |
 | start | Data sources     | `12 live`; click shows the domain matrix (live / unavailable)   |
-| start | Activity summary | `12 thinking · 3 composing · 5 queued` from the live store      |
-| end   | New events       | `4 new events`, which jumps to the Timeline tail                |
-| end   | Shortcuts        | `⌘K` hint                                                       |
+| end   | Wiki problems    | `⊗ 43 ⚠ 1` (managers; hidden at 0), opens the Wiki's Problems list; counts the open character's wiki while in their view |
+| end   | Failures         | `2 failed`: whose latest turn failed, each opening that character |
+| end   | Activity summary | `3 thinking · 1 writing · 18 messages waiting` (zeros left out, `All quiet`), opens Characters filtered to Busy |
 
 Reserved for later: storyteller ticker (salient journal kinds), next scheduled
 wakes, token/cost meter (Observer debug), notifications and mentions.

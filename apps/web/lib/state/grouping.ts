@@ -1,19 +1,15 @@
-import type { CharacterStatus, CharacterSummary } from "@kazusa/client";
+import type { CharacterSummary } from "@kazusa/client";
 
-export type GroupBy = "none" | "group" | "activity" | "brain";
-/**
- * `characters` are all agents, onstage or not; `onstage` and `offstage` split
- * them by whether they're being simulated right now.
- */
-export type KindFilter =
-  "characters" | "onstage" | "offstage" | "npc" | "everyone";
-
-export const GROUP_LABELS: Record<GroupBy, string> = {
-  none: "None",
-  group: "Group",
-  activity: "Activity type",
-  brain: "Brain state",
-};
+/** Name, id or alias contains the words typed. */
+export function matchesQuery(character: CharacterSummary, query: string) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    character.name.toLowerCase().includes(needle) ||
+    character.id.toLowerCase().includes(needle) ||
+    character.aliases.some((alias) => alias.toLowerCase().includes(needle))
+  );
+}
 
 export interface Group {
   readonly key: string;
@@ -21,68 +17,62 @@ export interface Group {
   readonly members: readonly CharacterSummary[];
 }
 
-export function filterCharacters(
+export const NO_GROUP = "__none";
+
+/**
+ * Characters by the group nearest them on their page (their club before their
+ * school), named by `nameOf`; those in none trail as "No group".
+ */
+export function groupByNearest(
   characters: readonly CharacterSummary[],
-  kind: KindFilter,
-  query: string,
-  isOffstage: (id: string) => boolean = () => false,
-) {
-  const needle = query.trim().toLowerCase();
-  return characters.filter((character) => {
-    const agent = character.kind === "agent";
-    if (kind === "characters" && !agent) return false;
-    if (kind === "onstage" && (!agent || isOffstage(character.id)))
-      return false;
-    if (kind === "offstage" && (!agent || !isOffstage(character.id)))
-      return false;
-    if (kind === "npc" && character.kind !== "npc") return false;
-    if (!needle) return true;
-    return (
-      character.name.toLowerCase().includes(needle) ||
-      character.id.toLowerCase().includes(needle) ||
-      character.aliases.some((alias) => alias.toLowerCase().includes(needle))
+  nameOf: (id: string) => string,
+): Group[] {
+  const groups = new Map<string, CharacterSummary[]>();
+  for (const character of characters) {
+    const key = character.groups?.[0] ?? NO_GROUP;
+    groups.set(key, [...(groups.get(key) ?? []), character]);
+  }
+  return [...groups.entries()]
+    .map(([key, members]) => ({
+      key,
+      label: key === NO_GROUP ? "No group" : nameOf(key),
+      members: members.toSorted((x, y) => x.name.localeCompare(y.name)),
+    }))
+    .sort((a, b) =>
+      a.key === NO_GROUP
+        ? 1
+        : b.key === NO_GROUP
+          ? -1
+          : a.label.localeCompare(b.label),
     );
-  });
 }
 
 /**
- * Honest buckets: characters without the structured field land in a named
- * "none" group.
+ * Characters by the first letter of their name, like a contact list: Latin
+ * letters by their base letter (Ō under O), other scripts by their first
+ * character, and anything else under "#" at the end.
  */
-export function groupCharacters(
+export function groupByLetter(
   characters: readonly CharacterSummary[],
-  by: GroupBy,
-  statusOf: (id: string) => CharacterStatus | undefined,
 ): Group[] {
-  if (by === "none")
-    return [
-      {
-        key: "all",
-        label: "All",
-        members: [...characters].sort((x, y) => x.name.localeCompare(y.name)),
-      },
-    ];
   const groups = new Map<string, CharacterSummary[]>();
-  const keyOf = (character: CharacterSummary) => {
-    if (by === "group") return character.groups?.[0] ?? "";
-    const status = statusOf(character.id);
-    if (by === "activity") return status?.task?.type ?? "";
-    return status?.brain ?? "";
-  };
   for (const character of characters) {
-    const key = keyOf(character);
+    const first = [
+      ...character.name
+        .trim()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, ""),
+    ][0];
+    const key = first && /\p{L}/u.test(first) ? first.toUpperCase() : "#";
     groups.set(key, [...(groups.get(key) ?? []), character]);
   }
-  const fallback = {
-    group: "No group",
-    activity: "No current task",
-    brain: "No status",
-  }[by];
   return [...groups.entries()]
-    .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
     .map(([key, members]) => ({
-      key: key || "__none",
-      label: key ? key.charAt(0).toUpperCase() + key.slice(1) : fallback,
-      members: [...members].sort((x, y) => x.name.localeCompare(y.name)),
-    }));
+      key,
+      label: key,
+      members: members.toSorted((x, y) => x.name.localeCompare(y.name)),
+    }))
+    .sort((a, b) =>
+      a.key === "#" ? 1 : b.key === "#" ? -1 : a.key.localeCompare(b.key),
+    );
 }

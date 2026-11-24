@@ -70,6 +70,21 @@ function editCast(
   renameSync(temporary, file);
 }
 
+/**
+ * Waits for the Gateway to reload the cast written by `editCast`, so an answer
+ * means the change is in: the roster read right after shows it. Gives up after
+ * `ms` (the file is written either way; the reload lands later).
+ */
+async function castReloaded(
+  getConfig: () => Parameters<typeof listAgentIds>[0],
+  done: (ids: readonly string[]) => boolean,
+  ms = 20_000,
+): Promise<void> {
+  const until = Date.now() + ms;
+  while (!done(listAgentIds(getConfig())) && Date.now() < until)
+    await new Promise((resolve) => setTimeout(resolve, 200));
+}
+
 /** Every page id in the World Wiki, any folder. */
 function wikiPageIds(wikiDir: string): Set<string> {
   const ids = new Set<string>();
@@ -362,6 +377,7 @@ export function registerCharactersHttp(
       rmSync(workspace, { recursive: true, force: true });
       throw error;
     }
+    await castReloaded(getConfig, (ids) => ids.includes(id));
     sendJson(res, 200, { id } satisfies CharacterCreateResponse);
   });
 
@@ -382,6 +398,7 @@ export function registerCharactersHttp(
     editCast((entries) => {
       delete entries[id];
     });
+    await castReloaded(getConfig, (ids) => !ids.includes(id));
     // Gone for good: their page and their workspace.
     rmSync(characterFile(worldWikiDir(api), id), { force: true });
     rmSync(workspace, { recursive: true, force: true });

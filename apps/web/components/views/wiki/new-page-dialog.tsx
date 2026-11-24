@@ -1,7 +1,9 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
-import { WikiSavePayloadSchema, type WikiKind } from "@kazusa/client";
+import { toast } from "sonner";
+import type { WikiKind } from "@kazusa/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,8 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
+  FieldContent,
   FieldDescription,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -27,91 +29,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useCastChange } from "@/hooks/use-characters";
+import { useSaveWikiPage } from "@/hooks/use-wiki";
+import { createCharacter } from "@/lib/source/characters/http";
+import { pageId } from "@/lib/wiki/page-id";
+import { IdField, idProblem } from "./id-field";
 
 const KINDS: ReadonlyArray<{
   readonly value: WikiKind;
   readonly label: string;
 }> = [
   { value: "concept", label: "Concept" },
-  { value: "person", label: "Person" },
+  { value: "person", label: "Character" },
 ];
 
 /**
- * An id from a name, as the plugin makes one: a page's id is its file name.
- * Characters' ids take hyphens (`airi-kurimura`), other pages underscores.
+ * Names a page and makes it at once (a title and nothing else), then opens it
+ * in the editor. A person in the World Wiki can instead be simulated: they join
+ * the cast at once, offstage, and open in Characters. Characters opens this as
+ * a person, simulated by default.
  */
-export const slug = (name: string, separator: "_" | "-" = "_"): string =>
-  name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, separator)
-    .replace(/^[-_]+|[-_]+$/g, "");
-
-/**
- * The id a name makes, shown under it, and changeable: an id is for good, so it
- * is said once here, and never clashes with a page already there.
- */
-export function IdLine({
-  id,
-  typed,
-  onType,
-  error,
-  inputId,
-}: {
-  id: string;
-  /** What the user typed, once they chose to; else the id follows the name. */
-  typed: string | undefined;
-  onType: (id: string | undefined) => void;
-  error: string | undefined;
-  inputId: string;
-}) {
-  if (typed === undefined)
-    return (
-      <div className="flex min-h-5 items-center gap-1.5 text-xs text-muted-foreground">
-        {id ? (
-          <>
-            <span>Id</span>
-            <code className="rounded bg-muted px-1 font-mono">{id}</code>
-            <Button
-              type="button"
-              variant="link"
-              size="xs"
-              className="h-auto px-0 text-xs"
-              onClick={() => onType(id)}
-            >
-              Change
-            </Button>
-          </>
-        ) : (
-          <span>The id comes from the name.</span>
-        )}
-        {error ? <span className="text-destructive">{error}</span> : null}
-      </div>
-    );
-  return (
-    <Field data-invalid={error ? true : undefined}>
-      <FieldLabel htmlFor={inputId}>Id</FieldLabel>
-      <Input
-        id={inputId}
-        value={typed}
-        autoFocus
-        className="font-mono"
-        aria-invalid={error ? true : undefined}
-        onChange={(event) => onType(event.target.value)}
-      />
-      {error ? (
-        <FieldError>{error}</FieldError>
-      ) : (
-        <FieldDescription>
-          Pages link to it, and it stays once the page is made.
-        </FieldDescription>
-      )}
-    </Field>
-  );
-}
-
-/** Names a page, then opens it in the editor; nothing is written until saved. */
 export function NewPageDialog({
   open,
   onOpenChange,
@@ -119,34 +57,98 @@ export function NewPageDialog({
   personal = false,
   existing,
   onCreate,
+  onCharacter,
+  person = false,
+  agent,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** "the World Wiki" or "Airi's wiki". */
   whose: string;
-  /** A character's own wiki: pages on people and diary days too. */
+  /** A character's own wiki: its people are only ever pages. */
   personal?: boolean;
   existing: ReadonlySet<string>;
+  /** A page just made: opened in the editor. */
   onCreate: (page: { id: string; kind: WikiKind; name: string }) => void;
+  /** A simulated character, already made. Without it, nobody is simulated. */
+  onCharacter?: (id: string) => void;
+  /** Opened from Characters: a person, simulated unless turned off. */
+  person?: boolean;
+  /** Whose own wiki the page goes in; the World Wiki without one. */
+  agent?: string;
 }) {
+  const change = useCastChange();
+  const savePage = useSaveWikiPage();
   const [name, setName] = useState("");
-  const [kind, setKind] = useState<WikiKind>("concept");
+  const [kind, setKind] = useState<WikiKind>(person ? "person" : "concept");
+  const [simulated, setSimulated] = useState(person);
   const [typedId, setTypedId] = useState<string | undefined>();
-  const id = typedId ?? slug(name, kind === "person" ? "-" : "_");
-  const valid = WikiSavePayloadSchema.shape.id.safeParse(id);
-  const error = !id
-    ? undefined
-    : existing.has(id)
-      ? "Another page has this id."
-      : valid.success
-        ? undefined
-        : "Use letters, digits, _ or -, starting with a letter or digit.";
+  const [busy, setBusy] = useState(false);
+  const canSimulate = Boolean(onCharacter) && !personal && kind === "person";
+  const character = canSimulate && simulated;
+  const auto = name.trim()
+    ? pageId(name, existing, {
+        separator: kind === "person" ? "-" : "_",
+        fallback: character
+          ? "character"
+          : kind === "person"
+            ? "person"
+            : "page",
+      })
+    : "";
+  const id = typedId ?? auto;
+  const problem =
+    typedId === undefined && !name.trim()
+      ? undefined
+      : idProblem(id, existing, { character });
 
   const reset = () => {
     setName("");
-    setKind("concept");
+    setKind(person ? "person" : "concept");
+    setSimulated(person);
     setTypedId(undefined);
   };
+  const close = () => {
+    onOpenChange(false);
+    reset();
+  };
+
+  async function submit() {
+    if (busy || !name.trim() || problem) return;
+    const named = name.trim();
+    setBusy(true);
+    try {
+      if (!character) {
+        // Made now, so it is there to find, open and delete even left empty.
+        await savePage({
+          id,
+          kind,
+          base: null,
+          text: `---\nname: ${JSON.stringify(named)}\n---\n\n# ${named}\n`,
+          ...(agent ? { agent } : {}),
+        });
+        close();
+        onCreate({ id, kind, name: named });
+        return;
+      }
+      await change(() => createCharacter({ id, name: named }));
+      toast.success(`${named} joined the cast, offstage`, {
+        description: "Bring them onstage when they're ready to start thinking.",
+      });
+      close();
+      onCharacter?.(id);
+    } catch (failure) {
+      toast.error(
+        character ? "Couldn't make the character" : "Couldn't make the page",
+        {
+          description:
+            failure instanceof Error ? failure.message : String(failure),
+        },
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Dialog
@@ -161,15 +163,14 @@ export function NewPageDialog({
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!id || error) return;
-            onCreate({ id, kind, name: name.trim() || id });
-            onOpenChange(false);
-            reset();
+            void submit();
           }}
         >
           <DialogHeader>
-            <DialogTitle>New page</DialogTitle>
-            <DialogDescription>In {whose}.</DialogDescription>
+            <DialogTitle>{person ? "New character" : "New page"}</DialogTitle>
+            {personal ? (
+              <DialogDescription>In {whose}.</DialogDescription>
+            ) : null}
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -181,7 +182,15 @@ export function NewPageDialog({
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            {personal ? (
+            <IdField
+              inputId="new-page-id"
+              value={id}
+              custom={typedId !== undefined}
+              onCustom={(custom) => setTypedId(custom ? auto : undefined)}
+              onChange={setTypedId}
+              problem={problem}
+            />
+            {person ? null : (
               <Field>
                 <FieldLabel htmlFor="new-page-kind">Kind</FieldLabel>
                 <Select
@@ -192,7 +201,7 @@ export function NewPageDialog({
                   <SelectTrigger id="new-page-kind" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false}>
                     {KINDS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -201,21 +210,34 @@ export function NewPageDialog({
                   </SelectContent>
                 </Select>
               </Field>
+            )}
+            {canSimulate ? (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="new-page-simulated">Simulate</FieldLabel>
+                  <FieldDescription>
+                    For interactable, autonomous characters in the world.
+                    Otherwise, only a page is made.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="new-page-simulated"
+                  checked={simulated}
+                  onCheckedChange={setSimulated}
+                />
+              </Field>
             ) : null}
-            <IdLine
-              id={id}
-              typed={typedId}
-              onType={setTypedId}
-              error={error}
-              inputId="new-page-id"
-            />
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={!id || Boolean(error)}>
-              Write page
+            <Button
+              type="submit"
+              disabled={busy || !name.trim() || Boolean(problem)}
+            >
+              {busy && <LoaderCircle className="animate-spin" />}
+              Create
             </Button>
           </DialogFooter>
         </form>

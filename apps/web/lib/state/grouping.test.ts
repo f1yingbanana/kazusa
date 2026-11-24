@@ -1,49 +1,57 @@
 import { describe, expect, it } from "vitest";
 import type { CharacterSummary } from "@kazusa/client";
-import { filterCharacters, groupCharacters } from "./grouping";
+import { groupByLetter, groupByNearest, matchesQuery } from "./grouping";
 
 const people: CharacterSummary[] = [
   {
     id: "a",
     name: "Ada",
     kind: "agent",
-    groups: ["Archive"],
+    groups: ["sweets_club", "trinity"],
     aliases: ["Adi"],
   },
   { id: "b", name: "Bram", kind: "agent", aliases: [] },
-  { id: "n", name: "Nils", kind: "npc", groups: ["Archive"], aliases: [] },
+  {
+    id: "c",
+    name: "Cleo",
+    kind: "agent",
+    groups: ["archive"],
+    aliases: [],
+  },
 ];
 
-describe("roster filtering and grouping", () => {
-  it("filters by kind and searches name, id and aliases", () => {
-    expect(filterCharacters(people, "characters", "").map((c) => c.id)).toEqual(
-      ["a", "b"],
-    );
+const names: Record<string, string> = {
+  sweets_club: "After-School Sweets Club",
+  archive: "Archive",
+};
+
+describe("roster search and grouping", () => {
+  it("searches name, id and aliases", () => {
     expect(
-      filterCharacters(people, "everyone", "adi").map((c) => c.id),
+      people.filter((c) => matchesQuery(c, "adi")).map((c) => c.id),
     ).toEqual(["a"]);
-    expect(filterCharacters(people, "npc", "").map((c) => c.id)).toEqual(["n"]);
+    expect(people.filter((c) => matchesQuery(c, " ")).length).toBe(3);
   });
-  it("splits characters by whether they are onstage", () => {
-    const offstage = (id: string) => id === "b";
-    expect(
-      filterCharacters(people, "onstage", "", offstage).map((c) => c.id),
-    ).toEqual(["a"]);
-    expect(
-      filterCharacters(people, "offstage", "", offstage).map((c) => c.id),
-    ).toEqual(["b"]);
+  it("groups by the nearest group, named, with no group last", () => {
+    const groups = groupByNearest(people, (id) => names[id] ?? id);
+    expect(groups.map((g) => g.label)).toEqual([
+      "After-School Sweets Club",
+      "Archive",
+      "No group",
+    ]);
+    expect(groups[2].members.map((c) => c.id)).toEqual(["b"]);
   });
-  it("puts characters without the structured field in a trailing honest bucket", () => {
-    const groups = groupCharacters(people, "group", () => undefined);
-    expect(groups.map((g) => g.label)).toEqual(["Archive", "No group"]);
-    expect(groups[0].members.map((c) => c.id)).toEqual(["a", "n"]);
-  });
-  it("groups by live status fields, never by task text", () => {
-    const groups = groupCharacters(people.slice(0, 2), "brain", (id) =>
-      id === "a"
-        ? { brain: "thinking", composingIn: [], queued: 0, onstage: true }
-        : undefined,
+  it("groups by first letter, accents folded, others last", () => {
+    const named = (name: string): CharacterSummary => ({
+      id: name,
+      name,
+      kind: "agent",
+      aliases: [],
+    });
+    const groups = groupByLetter(
+      ["Ōta", "Ada", "过热", "1st", "Olga"].map(named),
     );
-    expect(groups.map((g) => g.label)).toEqual(["Thinking", "No status"]);
+    expect(groups.map((g) => g.label)).toEqual(["A", "O", "过", "#"]);
+    expect(groups[1].members.map((c) => c.name)).toEqual(["Olga", "Ōta"]);
   });
 });

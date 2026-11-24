@@ -1,13 +1,12 @@
 "use client";
 
-import { useQueryStates, type inferParserType } from "nuqs";
+import { parseAsString, useQueryStates, type inferParserType } from "nuqs";
 import { wikiParsers } from "./search-params";
 import { useMemo, useState } from "react";
-import { AlertTriangleIcon, FilePlusIcon, MoonIcon, XIcon } from "lucide-react";
+import { FilePlusIcon, MoonIcon, XIcon } from "lucide-react";
 import type { WikiListItem } from "@kazusa/client";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -15,8 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAccess } from "@/hooks/use-access";
-import { useCharacters } from "@/hooks/use-characters";
-import { useWikiLint, useWikiList } from "@/hooks/use-wiki";
+import { useCharacters, isCast } from "@/hooks/use-characters";
+import { useWikiList } from "@/hooks/use-wiki";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import { NewPageDialog } from "./new-page-dialog";
 import {
@@ -40,13 +39,16 @@ const CLOSED = {
  */
 export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const [queryState, setParams] = useQueryStates(wikiParsers);
+  const [, setView] = useQueryStates({
+    view: parseAsString,
+    character: parseAsString,
+  });
   const agent = queryState["wiki.agent"] ?? undefined;
   const open = queryState["wiki.page"];
   const tab = queryState["wiki.tab"];
   const { canManage } = useAccess();
   const { byId } = useCharacters();
   const { data } = useWikiList(agent);
-  const { data: lint } = useWikiLint(agent);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>();
   // A filter belongs to the wiki it was chosen in.
@@ -82,23 +84,23 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
       ),
     [listed],
   );
+  // A search finds every page, the cast's too: a name typed is never a dead end.
   const pages = useMemo(
     () =>
-      listed.filter(
+      (needle ? (data?.pages ?? []) : listed).filter(
         (page: WikiListItem) =>
           (!category || categoriesOf(page).includes(category)) &&
           (!needle ||
             page.name.toLowerCase().includes(needle) ||
             page.summary.toLowerCase().includes(needle)),
       ),
-    [listed, category, needle],
+    [data, listed, category, needle],
   );
 
   const go = (patch: Partial<inferParserType<typeof wikiParsers>>) => {
     void setParams({ ...CLOSED, ...patch });
     onNavigated?.();
   };
-  const problems = lint?.findings.length ?? 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -161,6 +163,7 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
         onOpenChange={setCreating}
         whose={viewer ? `${viewer.name}'s wiki` : "the World Wiki"}
         personal={Boolean(viewer)}
+        {...(agent ? { agent } : {})}
         existing={existing}
         onCreate={(page) =>
           go({
@@ -171,6 +174,20 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
             "wiki.kind": page.kind,
             "wiki.name": page.name,
           })
+        }
+        onCharacter={
+          viewer
+            ? undefined
+            : (id) => {
+                // Simulated, they are the cast's: their page opens there.
+                void setView({ view: "characters", character: id });
+                void setParams({
+                  ...CLOSED,
+                  "wiki.page": null,
+                  "wiki.edit": "world",
+                });
+                onNavigated?.();
+              }
         }
       />
       <CategoryFilter
@@ -186,11 +203,16 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
             pages={pages}
             selected={tab ? undefined : (open ?? undefined)}
             onSelect={(id) =>
-              go({
-                "wiki.page": id,
-                "wiki.tab": null,
-                "wiki.part": null,
-              })
+              // One of the cast opens where the cast lives.
+              isCast(byId.get(id)) && !agent
+                ? (void setView({ view: "characters", character: id }),
+                  void setParams({ ...CLOSED, "wiki.page": null }),
+                  onNavigated?.())
+                : go({
+                    "wiki.page": id,
+                    "wiki.tab": null,
+                    "wiki.part": null,
+                  })
             }
           />
         ) : (
@@ -199,8 +221,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
           </p>
         )}
       </div>
-      <div className="flex shrink-0 flex-col border-t p-2">
-        {agent ? (
+      {agent ? (
+        <div className="flex shrink-0 flex-col border-t p-2">
           <Button
             variant="ghost"
             size="sm"
@@ -213,23 +235,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
             <MoonIcon />
             What each night changed
           </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`w-full justify-start font-normal ${
-            tab === "lint" ? "bg-accent text-accent-foreground" : ""
-          }`}
-          aria-current={tab === "lint" ? "page" : undefined}
-          onClick={() => go({ "wiki.tab": "lint" })}
-        >
-          <AlertTriangleIcon />
-          Problems
-          <Badge variant="secondary" className="ml-auto">
-            {problems}
-          </Badge>
-        </Button>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

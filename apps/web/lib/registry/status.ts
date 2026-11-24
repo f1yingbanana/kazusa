@@ -1,6 +1,7 @@
 import { ActivitySummaryItem } from "@/components/status/activity-summary";
 import { ConnectionStatusItem } from "@/components/status/connection";
 import { FailuresItem } from "@/components/status/failures";
+import { ProblemsItem } from "@/components/status/problems";
 import { PlayerPlaceItem } from "@/components/status/player-place";
 import { UpdateAvailableItem } from "@/components/status/update-available";
 import type { StatusItem } from "./types";
@@ -22,6 +23,14 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
     requiresPermission: "manage",
     requiresMaintain: true,
     component: UpdateAvailableItem,
+  },
+  {
+    id: "problems",
+    side: "end",
+    order: -25,
+    requires: ["wiki"],
+    requiresPermission: "manage",
+    component: ProblemsItem,
   },
   {
     id: "failures",

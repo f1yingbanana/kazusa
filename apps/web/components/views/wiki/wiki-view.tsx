@@ -33,7 +33,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAccess } from "@/hooks/use-access";
 import { isCast, useCharacter, useCharacters } from "@/hooks/use-characters";
-import { useMemoryRuns, useWikiLint, useWikiPage } from "@/hooks/use-wiki";
+import {
+  useMemoryRuns,
+  useWikiLint,
+  useWikiList,
+  useWikiPage,
+} from "@/hooks/use-wiki";
 import { useWikiCharacter, useWikiReach } from "@/hooks/use-wiki-editor";
 import { CHARACTERS_KEY, useSources } from "@/lib/source/provider";
 import { uploadPicture } from "@/lib/source/wiki/editor";
@@ -43,7 +48,12 @@ import {
   serializeEntityRef,
   type EntityKind,
 } from "@/lib/state/entity-ref";
-import { markQuietSelection, requestSidebar } from "@/lib/state/ui-store";
+import {
+  closeInspectorTab,
+  markQuietSelection,
+  requestSidebar,
+  useUiStore,
+} from "@/lib/state/ui-store";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
@@ -447,6 +457,8 @@ export function WorldPage({ id }: { id: string }) {
                 onDeleted={() => {
                   // Gone: neither page nor inspector points at them.
                   void setSelection(null);
+                  if (useUiStore.getState().inspectorTabs.character === id)
+                    closeInspectorTab("character");
                   if (cast) void setCharacter(null);
                   open(null);
                 }}
@@ -727,36 +739,70 @@ function NightsPane({ agent }: { agent: string }) {
   );
 }
 
+/**
+ * What's wrong across the pages, each problem a way to its page: one of the
+ * cast opens in Characters, any other page here.
+ */
 function LintPane({ agent }: { agent?: string }) {
   const { data, isLoading } = useWikiLint(agent);
+  const { data: list } = useWikiList(agent);
+  const { byId } = useCharacters();
+  const [, setParams] = useQueryStates({
+    ...wikiParsers,
+    view: parseAsString,
+    character: parseAsString,
+  });
   if (isLoading)
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (!data?.findings.length)
     return <p className="p-6 text-sm text-muted-foreground">No problems.</p>;
+  const nameOf = (id: string) =>
+    list?.pages.find((page) => page.id === id)?.name ?? id;
+  const open = (id: string) =>
+    void setParams(
+      !agent && isCast(byId.get(id))
+        ? { view: "characters", character: id, "wiki.tab": null }
+        : { "wiki.page": id, "wiki.tab": null, "wiki.part": null },
+    );
   return (
-    <ul className="mx-auto w-full max-w-3xl divide-y p-4 lg:p-6">
-      {[...data.findings]
-        .sort((a, b) => a.level.localeCompare(b.level))
-        .map((finding) => (
-          <li
-            key={`${finding.page}${finding.message}`}
-            className="py-2 text-sm"
-          >
-            <span
-              className={cn(
-                "font-mono text-xs",
-                finding.level === "error"
-                  ? "text-destructive"
-                  : "text-muted-foreground",
-              )}
-            >
-              {finding.level}
-            </span>{" "}
-            <span className="font-mono text-xs">{finding.page}</span>
-            <span className="block">{finding.message}</span>
-          </li>
-        ))}
-    </ul>
+    <div className="mx-auto w-full max-w-3xl p-4 lg:p-6">
+      <h2 className="px-2 pb-2 text-sm font-medium">
+        {`${data.findings.length} ${data.findings.length === 1 ? "problem" : "problems"}`}
+      </h2>
+      <ul className="divide-y">
+        {[...data.findings]
+          .sort((a, b) => a.level.localeCompare(b.level))
+          .map((finding) => {
+            const id = finding.page.split("/").at(-1) ?? finding.page;
+            return (
+              <li key={`${finding.page}${finding.message}`}>
+                <button
+                  type="button"
+                  onClick={() => open(id)}
+                  className="flex w-full flex-col items-start gap-0.5 rounded-md p-2 text-left text-sm outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span
+                      className={cn(
+                        "text-xs",
+                        finding.level === "error"
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {finding.level === "error" ? "Error" : "Warning"}
+                    </span>
+                    <span className="font-medium">{nameOf(id)}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {finding.message}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+      </ul>
+    </div>
   );
 }
 

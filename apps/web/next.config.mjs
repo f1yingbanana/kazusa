@@ -1,5 +1,8 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  // A second dev server (a lab world beside the live one) needs its own build
+  // folder: Next allows one dev server per folder.
+  distDir: process.env.KAZUSA_DIST_DIR || ".next",
   // `use cache`: what visitors read is kept in this server's memory
   // (`lib/proxy/visitor-read.ts`).
   cacheComponents: true,
