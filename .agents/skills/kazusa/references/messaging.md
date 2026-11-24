@@ -280,8 +280,21 @@ channel the bot can't see (Discord then delivers nothing from it, though webhook
 posts still work), one that isn't a text channel, or no Manage Webhooks comes
 back as the link's `problem`, in plain words, and in the Gateway log; the
 channel's and server's names come back too (`channelName`, `server`), shown as
-"#name in Server". Not yet: lines said while the bot was disconnected are not
-posted later; linking a person's own Discord account to who they play.
+"#name in Server".
+
+**A person's own account.** Anyone who plays links their Discord account in
+Settings → Discord: Kazusa makes a code (`POST /kazusa/bridges/account/code`,
+six letters and digits, ten minutes, once) and they send it from Discord, with
+the bot's `/link` command (an ephemeral reply) or alone in a direct message. The
+account is kept in their own settings (`src/user-settings.ts`, retained store
+`"userSettings"`, one record per person by `user:` id, kept on a load like the
+links); an account is one person's, so linking it moves it. What a linked person
+writes in a linked channel is said by the character they play (`byPlayer`),
+joining an open group first, and their own Discord message is taken down, since
+the character's copy is posted in its place (Manage Messages; without it the
+link reports it). Watching, they play nobody: it isn't said. Unlinked, they are
+a guest again. Only the operator has settings until collaborators come. Not yet:
+lines said while the bot was disconnected are not posted later.
 
 ## People at the keyboard (`user:`)
 

@@ -189,9 +189,10 @@ const MACHINE: readonly {
       "plugin_id = 'kazusa' AND namespace IN ('@retained.models', '@retained.embedding', '@retained.contextSettings')",
   },
   {
-    what: "Discord links",
+    what: "Discord links and each person's own settings",
     table: "plugin_state_entries",
-    where: "plugin_id = 'kazusa' AND namespace = '@retained.bridges'",
+    where:
+      "plugin_id = 'kazusa' AND namespace IN ('@retained.bridges', '@retained.userSettings')",
   },
 ];
 

@@ -1,12 +1,22 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { Readable } from "node:stream";
-import { BridgesResponseSchema } from "@kazusa/client";
+import {
+  BridgeLinkCodeResponseSchema,
+  BridgesResponseSchema,
+} from "@kazusa/client";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Messaging, MessagingEvent } from "../messaging/messaging.ts";
 import type { ProviderKeys } from "../providers/keys.ts";
-import type { BridgeLink, BridgeTransport, IncomingLine } from "./bridge.ts";
+import { createUserSettings, type UserSettings } from "../user-settings.ts";
+import type {
+  BridgeLink,
+  BridgeTransport,
+  IncomingLine,
+  PlatformAccount,
+  TransportHandlers,
+} from "./bridge.ts";
 import { registerBridges, resetSharedBridge } from "./register.ts";
 
 type Handler = (req: unknown, res: unknown) => Promise<boolean>;
@@ -28,6 +38,19 @@ function setup() {
     remove: async (id) => void tokens.delete(id),
   };
   const links = new Map<string, BridgeLink>();
+  let playing: { id: string; name: string } | undefined = {
+    id: "sensei",
+    name: "Sensei",
+  };
+  const settingsRows = new Map<string, UserSettings>();
+  const settingsStore = {
+    lookup: async (key: string) => settingsRows.get(key),
+    register: async (key: string, value: UserSettings) =>
+      void settingsRows.set(key, value),
+    delete: async (key: string) => settingsRows.delete(key),
+    entries: async () =>
+      [...settingsRows].map(([key, value]) => ({ key, value, createdAt: 0 })),
+  };
   const store = {
     lookup: async (key: string) => links.get(key),
     register: async (key: string, value: BridgeLink) =>
@@ -37,21 +60,33 @@ function setup() {
       [...links].map(([key, value]) => ({ key, value, createdAt: 0 })),
   };
   let listener: ((event: MessagingEvent) => void) | undefined;
+  const members = new Map<string, string[]>();
   const messaging = {
     postAsGuest: vi.fn(async () => "id"),
+    membersOf: vi.fn(async (chatId: string) => members.get(chatId) ?? []),
+    manageChat: vi.fn(
+      async (agentId: string, input: { sessionKey: string }) => {
+        const chatId = `group:${input.sessionKey.split(":").at(-1)}`;
+        members.set(chatId, [...(members.get(chatId) ?? []), agentId]);
+        return {};
+      },
+    ),
+    send: vi.fn(async () => ({})),
     onAnyEvent: (next: (event: MessagingEvent) => void) => {
       listener = next;
       return () => (listener = undefined);
     },
   };
-  let onLine: ((line: IncomingLine) => void) | undefined;
+  let handlers: TransportHandlers | undefined;
+  const removed: string[] = [];
   const transport = vi.fn((token: string): BridgeTransport => ({
-    start: async (next) => {
+    start: async (given) => {
       if (token !== "good") throw new Error("Discord refused the token.");
-      onLine = next;
+      handlers = given;
       return { name: "Office Bot" };
     },
     post: async () => {},
+    remove: async (_channelId, messageId) => void removed.push(messageId),
     stop: async () => {},
     check: async (channelId) =>
       channelId === "333"
@@ -75,6 +110,12 @@ function setup() {
     } as unknown as OpenClawPluginApi,
     {
       messaging: messaging as unknown as Messaging,
+      player: {
+        operator: { id: "user:sensei", name: "Sensei" },
+        playing: async () => playing,
+      },
+      userSettings: createUserSettings(settingsStore),
+      roster: () => new Set(["sensei", "hina"]),
       keys,
       transport,
       store,
@@ -108,7 +149,13 @@ function setup() {
     links,
     messaging,
     starts,
-    write: (line: IncomingLine) => onLine?.(line),
+    write: (line: IncomingLine) => handlers?.line(line),
+    link: (code: string, account: PlatformAccount) =>
+      handlers?.link(code, account) ?? Promise.resolve(""),
+    watch: () => (playing = undefined),
+    removed,
+    members,
+    settingsRows,
     listening: () => listener !== undefined,
   };
 }
@@ -215,5 +262,70 @@ describe("registerBridges", () => {
       channelId: null,
     });
     expect(unlinked.body).toMatchObject({ links: [] });
+  });
+
+  it("links a person's own Discord account, and says what they write as whoever they play", async () => {
+    const h = setup();
+    expect((await h.call("/kazusa/bridges/account")).body).toEqual({
+      account: null,
+      bot: null,
+    });
+    // No bot to send a code to yet.
+    expect((await h.call("/kazusa/bridges/account/code", {})).status).toBe(400);
+
+    h.tokens.set("discord", "good");
+    h.links.set("group:office", { platform: "discord", channelId: "111" });
+    for (const start of h.starts) start({}, {});
+    await vi.waitFor(async () =>
+      expect((await h.call("/kazusa/bridges/account")).body).toMatchObject({
+        bot: "Office Bot",
+      }),
+    );
+    const made = await h.call("/kazusa/bridges/account/code", {});
+    const { code } = BridgeLinkCodeResponseSchema.parse(made.body);
+    const fan = { id: "42", name: "Flying_Banana" };
+    expect(await h.link(code, fan)).toContain("Linked");
+    expect((await h.call("/kazusa/bridges/account")).body).toMatchObject({
+      account: { name: "Flying_Banana" },
+    });
+
+    // Their line is said as Sensei, who joins the open group first.
+    h.write({
+      channelId: "111",
+      messageId: "900",
+      author: fan,
+      text: "On my way.",
+    });
+    await vi.waitFor(() => expect(h.removed).toEqual(["900"]));
+    expect(h.messaging.manageChat).toHaveBeenCalledWith(
+      "sensei",
+      { action: "join", sessionKey: "chat:group:office" },
+      undefined,
+      new Set(["sensei", "hina"]),
+    );
+    expect(h.messaging.send).toHaveBeenCalledWith(
+      "sensei",
+      "Sensei",
+      {
+        sessionKey: "chat:group:office",
+        text: "On my way.",
+        requestId: "discord:900",
+      },
+      undefined,
+      new Set(["sensei", "hina"]),
+      true,
+    );
+    expect(h.messaging.postAsGuest).not.toHaveBeenCalled();
+
+    const unlinked = await h.call("/kazusa/bridges/account/unlink", {});
+    expect(unlinked.body).toMatchObject({ account: null });
+    expect(h.settingsRows.size).toBe(0);
+    // Unlinked, they write as a guest again.
+    h.write({ channelId: "111", messageId: "901", author: fan, text: "Hi." });
+    await vi.waitFor(() =>
+      expect(h.messaging.postAsGuest).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: "discord:901" }),
+      ),
+    );
   });
 });

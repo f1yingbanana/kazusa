@@ -1,9 +1,12 @@
 import {
   BridgeLinkPayloadSchema,
   BridgeTokenPayloadSchema,
+  type BridgeAccountResponse,
+  type BridgeLinkCodeResponse,
   type BridgeLinkEntry,
   type BridgesResponse,
 } from "@kazusa/client";
+import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { currentConfig } from "../current-config.ts";
 import {
@@ -12,6 +15,8 @@ import {
   sendJson,
 } from "../http/helpers.ts";
 import type { Messaging } from "../messaging/messaging.ts";
+import type { Player } from "../player.ts";
+import { openUserSettings, type UserSettingsStore } from "../user-settings.ts";
 import { authProfileKeys, type ProviderKeys } from "../providers/keys.ts";
 import type { RemovableStateStore } from "../state.ts";
 import {
@@ -65,6 +70,12 @@ export function registerBridges(
   api: OpenClawPluginApi,
   deps: {
     readonly messaging: Messaging;
+    /** Who the person at the keyboard is, and whom they play. */
+    readonly player: Pick<Player, "operator" | "playing">;
+    /** Each person's own settings, where a linked account is kept. */
+    readonly userSettings?: UserSettingsStore;
+    /** The characters there are, for checking members. */
+    readonly roster?: () => ReadonlySet<string>;
     /** The token store; the auth profiles unless a test gives its own. */
     readonly keys?: ProviderKeys;
     /** The connection for a token; Discord unless a test gives a fake. */
@@ -96,8 +107,51 @@ export function registerBridges(
     },
   });
   const warn = (message: string) => api.logger.warn(message);
+  const settings = deps.userSettings ?? openUserSettings(api);
+  const roster =
+    deps.roster ?? (() => new Set(listAgentIds(currentConfig(api))));
+  const { messaging, player } = deps;
   const bridge = sharedBridge({
-    postAsGuest: (input) => deps.messaging.postAsGuest(input),
+    postAsGuest: (input) => messaging.postAsGuest(input),
+    personOf: async (accountId) => {
+      const person = await settings.byDiscord(accountId);
+      if (!person) return undefined;
+      // Only the operator plays anyone until collaborators come.
+      const actor =
+        person === player.operator.id ? await player.playing() : undefined;
+      return { person, ...(actor ? { actor } : {}) };
+    },
+    postAsCharacter: async ({ chatId, actor, text, requestId }) => {
+      const sessionKey = `chat:group:${chatId.slice("group:".length)}`;
+      // Writing in an open group's channel is joining it, as on Discord.
+      if (!(await messaging.membersOf(chatId)).includes(actor.id))
+        await messaging.manageChat(
+          actor.id,
+          { action: "join", sessionKey },
+          undefined,
+          roster(),
+        );
+      return await messaging.send(
+        actor.id,
+        actor.name,
+        { sessionKey, text, requestId },
+        undefined,
+        roster(),
+        true,
+      );
+    },
+    linkAccount: async (person, account) => {
+      // One account is one person's: whoever had it before loses it.
+      const before = await settings.byDiscord(account.id);
+      if (before && before !== person) {
+        const { discord: _gone, ...rest } = await settings.get(before);
+        await settings.set(before, rest);
+      }
+      await settings.set(person, {
+        ...(await settings.get(person)),
+        discord: { ...account, linkedAt: Date.now() },
+      });
+    },
     avatarOf: pictures.avatarOf,
     stickerOf: pictures.stickerOf,
     warn,
@@ -187,6 +241,32 @@ export function registerBridges(
     await loadLinks();
     await bridge.checkLinks();
     sendJson(res, 200, respond());
+  });
+
+  // Each person's own Discord account, for anyone who plays.
+  const account = async (): Promise<BridgeAccountResponse> => {
+    const { discord } = await settings.get(player.operator.id);
+    const status = bridge.status;
+    return {
+      account: discord
+        ? { name: discord.name, linkedAt: discord.linkedAt }
+        : null,
+      bot: status.state === "connected" ? status.name : null,
+    };
+  };
+  route("bridges/account", "GET", async (_req, res) => {
+    sendJson(res, 200, await account());
+  });
+  route("bridges/account/code", "POST", async (_req, res) => {
+    if (bridge.status.state !== "connected")
+      throw new Error("There's no Discord bot connected to link with yet.");
+    const { code, until } = bridge.makeCode(player.operator.id);
+    sendJson(res, 200, { code, until } satisfies BridgeLinkCodeResponse);
+  });
+  route("bridges/account/unlink", "POST", async (_req, res) => {
+    const { discord: _gone, ...rest } = await settings.get(player.operator.id);
+    await settings.set(player.operator.id, rest);
+    sendJson(res, 200, await account());
   });
 
   return { bridge };

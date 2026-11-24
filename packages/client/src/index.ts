@@ -270,6 +270,26 @@ export const BridgesResponseSchema = z.object({
 });
 export type BridgesResponse = z.infer<typeof BridgesResponseSchema>;
 
+/**
+ * GET /kazusa/bridges/account: the person's own Discord account, for anyone who
+ * plays. What they write in a linked channel is said by whoever they play.
+ */
+export const BridgeAccountResponseSchema = z.object({
+  account: z.object({ name: z.string(), linkedAt: z.number() }).nullable(),
+  /** The connected bot's name, to send a code to; null with none connected. */
+  bot: z.string().nullable(),
+});
+export type BridgeAccountResponse = z.infer<typeof BridgeAccountResponseSchema>;
+
+/** POST /kazusa/bridges/account/code: a code to link with, for ten minutes. */
+export const BridgeLinkCodeResponseSchema = z.object({
+  code: z.string(),
+  until: z.number(),
+});
+export type BridgeLinkCodeResponse = z.infer<
+  typeof BridgeLinkCodeResponseSchema
+>;
+
 /** POST /kazusa/bridges/token: the bot's token, or null to disconnect. */
 export const BridgeTokenPayloadSchema = z.object({
   token: z.string().trim().min(1).max(200).nullable(),

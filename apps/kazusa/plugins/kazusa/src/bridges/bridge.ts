@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { BridgeStatus } from "@kazusa/client";
 import { z } from "zod";
 import { isGuest } from "../identity.ts";
@@ -36,14 +36,30 @@ export interface OutgoingLine {
   readonly text: string;
 }
 
+/** A platform account, by the platform's id and its name there. */
+export interface PlatformAccount {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** What a connection hands the bridge. */
+export interface TransportHandlers {
+  /** Every line people write in a server channel the bot can read. */
+  line(line: IncomingLine): void;
+  /**
+   * Someone sent a link code (Discord's `/link`, or the code alone in a direct
+   * message); what comes back is the reply for them alone.
+   */
+  link(code: string, account: PlatformAccount): Promise<string>;
+}
+
 /** One platform's connection: what the bridge needs of Discord, or a fake. */
 export interface BridgeTransport {
-  /** Every line people write in a channel the bot can read. */
-  start(
-    onLine: (line: IncomingLine) => void,
-  ): Promise<{ readonly name: string }>;
+  start(handlers: TransportHandlers): Promise<{ readonly name: string }>;
   /** Shows a line in a channel as its speaker. */
   post(channelId: string, line: OutgoingLine): Promise<void>;
+  /** Takes a message down, once it has been said again as a character. */
+  remove(channelId: string, messageId: string): Promise<void>;
   /** What the bot finds of a channel: its names, and what stops it working. */
   check(channelId: string): Promise<ChannelCheck>;
   stop(): Promise<void>;
@@ -62,8 +78,32 @@ export interface ChannelCheck {
   readonly problem?: string;
 }
 
+/** A person who linked their account, and the character they play now. */
+export interface LinkedPerson {
+  readonly person: string;
+  /** Who they play; none while they only watch. */
+  readonly actor?: { readonly id: string; readonly name: string };
+}
+
 /** What the bridge needs of a group's messages and its speakers' pictures. */
 export interface BridgeDeps {
+  /** The person who linked this Discord account, if anyone did. */
+  readonly personOf: (accountId: string) => Promise<LinkedPerson | undefined>;
+  /**
+   * Says a linked person's line in the group as the character they play,
+   * joining it first when it is open and they aren't in it.
+   */
+  readonly postAsCharacter: (input: {
+    readonly chatId: string;
+    readonly actor: { readonly id: string; readonly name: string };
+    readonly text: string;
+    readonly requestId: string;
+  }) => Promise<unknown>;
+  /** Keeps an account as this person's: no one else's any more. */
+  readonly linkAccount: (
+    person: string,
+    account: PlatformAccount,
+  ) => Promise<void>;
   /** Takes in a guest's line, into a group they aren't in. */
   readonly postAsGuest: (input: {
     readonly chatId: string;
@@ -141,6 +181,11 @@ export function lineOf(
 export class Bridge {
   private transport: BridgeTransport | undefined;
   private links = new Map<string, BridgeLink>();
+  /** Link codes not yet used, by code: whose, and until when. */
+  private readonly codes = new Map<
+    string,
+    { readonly person: string; readonly until: number }
+  >();
   /** Lines already handed to the platform, so no instance posts one twice. */
   private readonly posted = new Set<string>();
   /** Each channel's posts in order. */
@@ -236,10 +281,13 @@ export class Bridge {
     this.transport = transport;
     this.current = { state: "connecting" };
     try {
-      const { name } = await transport.start((line) => {
-        void this.incoming(line).catch((error: unknown) => {
-          this.deps.warn(`Bridge: couldn't take in a line: ${String(error)}`);
-        });
+      const { name } = await transport.start({
+        line: (line) => {
+          void this.incoming(line).catch((error: unknown) => {
+            this.deps.warn(`Bridge: couldn't take in a line: ${String(error)}`);
+          });
+        },
+        link: (code, account) => this.redeem(code, account),
       });
       if (this.transport === transport) {
         this.current = { state: "connected", name };
@@ -271,6 +319,11 @@ export class Bridge {
     )?.[0];
     const text = line.text.trim();
     if (!chatId || !text) return;
+    const linked = await this.deps.personOf(line.author.id);
+    if (linked) {
+      await this.asCharacter(chatId, line, linked, text);
+      return;
+    }
     await this.deps.postAsGuest({
       chatId,
       guest: guestId("discord", line.author.id),
@@ -278,6 +331,75 @@ export class Bridge {
       text,
       requestId: `discord:${line.messageId}`,
     });
+  }
+
+  /**
+   * A linked person's line, said as the character they play. Their own message
+   * then comes down, since the character's copy is posted in its place, as
+   * PluralKit does. Watching, they play nobody, so it isn't said.
+   */
+  private async asCharacter(
+    chatId: string,
+    line: IncomingLine,
+    linked: LinkedPerson,
+    text: string,
+  ): Promise<void> {
+    if (!linked.actor) {
+      this.deps.warn(
+        `Bridge: ${linked.person} wrote in ${line.channelId} while watching; not said.`,
+      );
+      return;
+    }
+    await this.deps.postAsCharacter({
+      chatId,
+      actor: linked.actor,
+      text,
+      requestId: `discord:${line.messageId}`,
+    });
+    await this.transport
+      ?.remove(line.channelId, line.messageId)
+      .catch((error: unknown) => {
+        const problem =
+          "The bot can't take your own messages down after saying them as your character. In Discord, allow it Manage Messages in the channel's permissions.";
+        const last = this.checks.get(chatId);
+        if (last?.problem !== problem)
+          this.deps.warn(`Bridge: ${problem} (${String(error)})`);
+        this.checks.set(chatId, { ...last, at: Date.now(), problem });
+      });
+  }
+
+  /**
+   * A code for `person` to link their Discord account with: six letters and
+   * digits that are hard to misread, for ten minutes, replacing any they had.
+   */
+  makeCode(person: string): { readonly code: string; readonly until: number } {
+    for (const [code, entry] of this.codes)
+      if (entry.person === person || entry.until < Date.now())
+        this.codes.delete(code);
+    const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code: string;
+    do {
+      code = Array.from(
+        randomBytes(6),
+        (byte) => letters[byte % letters.length],
+      ).join("");
+    } while (this.codes.has(code));
+    const until = Date.now() + 10 * 60_000;
+    this.codes.set(code, { person, until });
+    return { code, until };
+  }
+
+  /** A code sent from the platform: links the account, or says why not. */
+  async redeem(code: string, account: PlatformAccount): Promise<string> {
+    const key = code.trim().toUpperCase();
+    const entry = this.codes.get(key);
+    if (!entry || entry.until < Date.now()) {
+      this.codes.delete(key);
+      return "That code isn't one Kazusa made, or it's over ten minutes old. Make a new one under Settings, Discord.";
+    }
+    this.codes.delete(key);
+    await this.deps.linkAccount(entry.person, account);
+    return "Linked. What you write in a linked channel is now said by whoever you play in Kazusa.";
   }
 
   /**

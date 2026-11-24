@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridges } from "@/hooks/use-bridges";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/hooks/use-access";
+import { DiscordAccount } from "./discord-account";
 import { SettingsSection } from "./settings-section";
 
 const STATUS_LABEL: Record<BridgeStatus["state"], string> = {
@@ -59,11 +61,25 @@ function Status({ status }: { status: BridgeStatus }) {
 }
 
 /**
+ * Discord: everyone who plays links their own account; the owner also sees the
+ * bot and which groups are linked.
+ */
+export function DiscordSettings() {
+  const { canManage } = useAccess();
+  return (
+    <div className="flex flex-col">
+      <DiscordAccount />
+      {canManage ? <BotSettings /> : null}
+    </div>
+  );
+}
+
+/**
  * The Discord bot that links groups to channels: its token, kept with the
  * provider keys and never shown again, and which groups are linked. A group is
  * linked from its chat sidebar.
  */
-export function DiscordSettings() {
+function BotSettings() {
   const { data, error, saveToken } = useBridges();
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
@@ -122,9 +138,9 @@ export function DiscordSettings() {
               <FieldDescription>
                 From your application&apos;s Bot page in the Discord Developer
                 Portal. Switch on the Message Content intent there, and invite
-                the bot with View Channels, Send Messages, Read Message History
-                and Manage Webhooks. Saved on this computer with your provider
-                keys, and never shown again.
+                the bot with View Channels, Send Messages, Read Message History,
+                Manage Webhooks and Manage Messages. Saved on this computer with
+                your provider keys, and never shown again.
               </FieldDescription>
             </Field>
           </FieldGroup>

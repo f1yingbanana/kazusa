@@ -1,5 +1,9 @@
 import {
+  BridgeAccountResponseSchema,
+  BridgeLinkCodeResponseSchema,
   BridgesResponseSchema,
+  type BridgeAccountResponse,
+  type BridgeLinkCodeResponse,
   type BridgeLinkPayload,
   type BridgesResponse,
   type BridgeTokenPayload,
@@ -30,5 +34,28 @@ export async function linkBridge(
 ): Promise<BridgesResponse> {
   return BridgesResponseSchema.parse(
     await postJson<unknown>(buildUrl("/kazusa/bridges/link"), payload),
+  );
+}
+
+export const BRIDGE_ACCOUNT_KEY = "kazusa:bridges:account";
+
+/** The person's own Discord account, and the bot to link it through. */
+export async function fetchBridgeAccount(): Promise<BridgeAccountResponse> {
+  return BridgeAccountResponseSchema.parse(
+    await request<unknown>(buildUrl("/kazusa/bridges/account")),
+  );
+}
+
+/** A code to link the person's Discord account with, for ten minutes. */
+export async function makeLinkCode(): Promise<BridgeLinkCodeResponse> {
+  return BridgeLinkCodeResponseSchema.parse(
+    await postJson<unknown>(buildUrl("/kazusa/bridges/account/code"), {}),
+  );
+}
+
+/** Unlinks the person's Discord account. */
+export async function unlinkAccount(): Promise<BridgeAccountResponse> {
+  return BridgeAccountResponseSchema.parse(
+    await postJson<unknown>(buildUrl("/kazusa/bridges/account/unlink"), {}),
   );
 }

@@ -66,10 +66,10 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "discord",
     label: "Discord",
-    description: "Link groups to Discord channels",
+    description: "Your Discord account, and groups linked to channels",
     icon: MessagesSquareIcon,
     order: 18,
-    requiresPermission: "manage",
+    requiresPermission: "play",
     component: DiscordSettings,
   },
   {

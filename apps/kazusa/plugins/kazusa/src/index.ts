@@ -373,7 +373,7 @@ export default definePluginEntry({
     );
     registerWelcome(api, messaging);
     // Groups linked to Discord channels: guests in, the group's lines out.
-    registerBridges(api, { messaging });
+    registerBridges(api, { messaging, player });
 
     // A world character lives by their World Wiki page, which the Wiki edits
     // with their memory, looks, stickers and the world's backdrops.

@@ -1,19 +1,45 @@
 import {
+  ApplicationCommandOptionType,
   ChannelType,
   Client,
   GatewayDispatchEvents,
   GatewayIntentBits,
+  InteractionType,
+  MessageFlags,
   type GatewayMessageCreateDispatchData,
+  type RESTPostAPIChatInputApplicationCommandsJSONBody,
 } from "@discordjs/core";
 import { REST } from "@discordjs/rest";
 import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
-import type { BridgeTransport, IncomingLine } from "./bridge.ts";
+import type { BridgeTransport, TransportHandlers } from "./bridge.ts";
 
-/** What the bot reads: servers, their messages, and what the messages say. */
+/**
+ * What the bot reads: servers, their messages and what the messages say, and
+ * direct messages, where people send it link codes.
+ */
 const INTENTS =
   GatewayIntentBits.Guilds |
   GatewayIntentBits.GuildMessages |
-  GatewayIntentBits.MessageContent;
+  GatewayIntentBits.MessageContent |
+  GatewayIntentBits.DirectMessages;
+
+/** A link code as Kazusa shows it: six letters and digits. */
+const LINK_CODE = /^\s*([A-Za-z0-9]{6})\s*$/;
+
+/** `/link`: someone proves a Discord account is theirs with Kazusa's code. */
+const LINK_COMMAND: RESTPostAPIChatInputApplicationCommandsJSONBody = {
+  name: "link",
+  description:
+    "Link your Discord account to Kazusa, with the code it shows you",
+  options: [
+    {
+      type: ApplicationCommandOptionType.String,
+      name: "code",
+      description: "The six-letter code from Kazusa's Settings, Discord",
+      required: true,
+    },
+  ],
+};
 
 /** Discord's answer to a request it refused: 403 forbidden, 404 not found. */
 const statusOf = (error: unknown): number | undefined =>
@@ -77,14 +103,58 @@ export function discordTransport(token: string): BridgeTransport {
   };
 
   return {
-    async start(onLine: (line: IncomingLine) => void) {
+    async start(handlers: TransportHandlers) {
       // A bad token fails here, before any connection is made.
       const me = await client.api.users.getCurrent();
       applicationId = (await client.api.applications.getCurrent()).id;
+      // Made or brought up to date; a refusal leaves direct messages working.
+      await client.api.applicationCommands
+        .createGlobalCommand(applicationId, LINK_COMMAND)
+        .catch(() => undefined);
+      client.on(GatewayDispatchEvents.InteractionCreate, ({ data }) => {
+        if (
+          data.type !== InteractionType.ApplicationCommand ||
+          data.data.name !== LINK_COMMAND.name
+        )
+          return;
+        const option =
+          "options" in data.data
+            ? data.data.options?.find((given) => given.name === "code")
+            : undefined;
+        const code = option && "value" in option ? String(option.value) : "";
+        const user = data.member?.user ?? data.user;
+        if (!user) return;
+        void handlers
+          .link(code, { id: user.id, name: user.global_name ?? user.username })
+          .then((reply) =>
+            client.api.interactions.reply(data.id, data.token, {
+              content: reply,
+              flags: MessageFlags.Ephemeral,
+            }),
+          )
+          .catch(() => undefined);
+      });
       client.on(GatewayDispatchEvents.MessageCreate, ({ data }) => {
         // Our own posts come back as webhook messages; other bots are skipped.
-        if (data.webhook_id || data.author.bot || !data.guild_id) return;
-        onLine({
+        if (data.webhook_id || data.author.bot) return;
+        if (!data.guild_id) {
+          // A direct message: only a link code means anything here.
+          const code = LINK_CODE.exec(data.content)?.[1];
+          if (!code) return;
+          void handlers
+            .link(code, {
+              id: data.author.id,
+              name: data.author.global_name ?? data.author.username,
+            })
+            .then((reply) =>
+              client.api.channels.createMessage(data.channel_id, {
+                content: reply,
+              }),
+            )
+            .catch(() => undefined);
+          return;
+        }
+        handlers.line({
           channelId: data.channel_id,
           messageId: data.id,
           author: {
@@ -126,6 +196,9 @@ export function discordTransport(token: string): BridgeTransport {
         // A character never pings anyone, @everyone included.
         allowed_mentions: { parse: [] },
       });
+    },
+    async remove(channelId, messageId) {
+      await client.api.channels.deleteMessage(channelId, messageId);
     },
     async check(channelId) {
       let channel;

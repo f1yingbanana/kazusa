@@ -9,23 +9,27 @@ import {
   type BridgeTransport,
   type ChannelCheck,
   type IncomingLine,
+  type LinkedPerson,
   type OutgoingLine,
+  type PlatformAccount,
+  type TransportHandlers,
 } from "./bridge.ts";
 
 function fakeTransport(
   options: { fail?: string; problems?: Map<string, string> } = {},
 ) {
-  let onLine: ((line: IncomingLine) => void) | undefined;
+  let handlers: TransportHandlers | undefined;
   const posts: [string, OutgoingLine][] = [];
   const transport: BridgeTransport = {
-    start: vi.fn(async (listener: (line: IncomingLine) => void) => {
+    start: vi.fn(async (given: TransportHandlers) => {
       if (options.fail) throw new Error(options.fail);
-      onLine = listener;
+      handlers = given;
       return { name: "Kazusa Bot" };
     }),
     post: vi.fn(async (channelId: string, line: OutgoingLine) => {
       posts.push([channelId, line]);
     }),
+    remove: vi.fn(async () => {}),
     stop: vi.fn(async () => {}),
     check: vi.fn(async (channelId: string): Promise<ChannelCheck> => {
       const problem = options.problems?.get(channelId);
@@ -36,14 +40,28 @@ function fakeTransport(
       };
     }),
   };
-  return { transport, posts, write: (line: IncomingLine) => onLine?.(line) };
+  return {
+    transport,
+    posts,
+    write: (line: IncomingLine) => handlers?.line(line),
+    link: (code: string, account: PlatformAccount) =>
+      handlers?.link(code, account) ?? Promise.resolve(""),
+  };
 }
 
 function setup() {
   const postAsGuest = vi.fn<BridgeDeps["postAsGuest"]>(async () => "id");
+  const postAsCharacter = vi.fn<BridgeDeps["postAsCharacter"]>(
+    async () => "id",
+  );
+  const linkAccount = vi.fn<BridgeDeps["linkAccount"]>(async () => {});
+  const people = new Map<string, LinkedPerson>();
   const warn = vi.fn();
   const bridge = new Bridge({
     postAsGuest,
+    postAsCharacter,
+    linkAccount,
+    personOf: async (accountId) => people.get(accountId),
     avatarOf: (agentId, face) => `https://pics/${agentId}/${face ?? "rest"}`,
     stickerOf: (agentId, name) => `https://pics/${agentId}/stickers/${name}`,
     warn,
@@ -51,7 +69,7 @@ function setup() {
   bridge.setLinks(
     new Map([["group:office", { platform: "discord", channelId: "111" }]]),
   );
-  return { bridge, postAsGuest, warn };
+  return { bridge, postAsGuest, postAsCharacter, linkAccount, people, warn };
 }
 
 function delivery(
@@ -228,6 +246,93 @@ describe("Bridge", () => {
     await h.bridge.disconnect();
     expect(h.bridge.checkOf("group:office")).toBeUndefined();
     await expect(h.bridge.checkChannel("111")).rejects.toThrow("Connect a bot");
+  });
+
+  it("says a linked person's line as whoever they play, and takes theirs down", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    h.people.set("42", {
+      person: "user:sensei",
+      actor: { id: "sensei", name: "Sensei" },
+    });
+    discord.write({
+      channelId: "111",
+      messageId: "900",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "I'm here.",
+    });
+    await vi.waitFor(() =>
+      expect(discord.transport.remove).toHaveBeenCalledWith("111", "900"),
+    );
+    expect(h.postAsCharacter).toHaveBeenCalledWith({
+      chatId: "group:office",
+      actor: { id: "sensei", name: "Sensei" },
+      text: "I'm here.",
+      requestId: "discord:900",
+    });
+    expect(h.postAsGuest).not.toHaveBeenCalled();
+
+    // Their message can't come down: the link says what to allow.
+    vi.mocked(discord.transport.remove).mockRejectedValueOnce(
+      Object.assign(new Error("Missing Permissions"), { status: 403 }),
+    );
+    discord.write({
+      channelId: "111",
+      messageId: "901",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Again.",
+    });
+    await vi.waitFor(() =>
+      expect(h.bridge.checkOf("group:office")?.problem).toContain(
+        "Manage Messages",
+      ),
+    );
+
+    // Watching, they play nobody: nothing is said, and nothing comes down.
+    h.people.set("42", { person: "user:sensei" });
+    discord.write({
+      channelId: "111",
+      messageId: "902",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Hello?",
+    });
+    await vi.waitFor(() =>
+      expect(h.warn).toHaveBeenCalledWith(
+        expect.stringContaining("while watching"),
+      ),
+    );
+    expect(h.postAsCharacter).toHaveBeenCalledTimes(2);
+    expect(h.postAsGuest).not.toHaveBeenCalled();
+  });
+
+  it("links an account with a fresh code, once, and nothing else", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    const fan = { id: "42", name: "Flying_Banana" };
+
+    const first = h.bridge.makeCode("user:sensei");
+    expect(first.code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    // A new code replaces the person's last one.
+    const { code } = h.bridge.makeCode("user:sensei");
+    expect(await discord.link(first.code, fan)).toContain("isn't one");
+    expect(await discord.link(` ${code.toLowerCase()} `, fan)).toContain(
+      "Linked",
+    );
+    expect(h.linkAccount).toHaveBeenCalledExactlyOnceWith("user:sensei", fan);
+    // Used once.
+    expect(await discord.link(code, fan)).toContain("isn't one");
+
+    vi.useFakeTimers();
+    try {
+      const late = h.bridge.makeCode("user:sensei");
+      vi.advanceTimersByTime(10 * 60_000 + 1);
+      expect(await discord.link(late.code, fan)).toContain("ten minutes");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(h.linkAccount).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a failed post from stopping the ones after it", async () => {
