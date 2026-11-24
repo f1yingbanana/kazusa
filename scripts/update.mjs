@@ -123,25 +123,36 @@ export function refOf(version) {
   return /-g([0-9a-f]{7,40})$/.exec(version)?.[1] ?? version;
 }
 
+/** This copy's version: `git describe`, or the installer's `VERSION`. */
+export function kazusaVersion(root, kind = installKind(root)) {
+  try {
+    return kind === "git"
+      ? git(root, [
+          "describe",
+          "--tags",
+          "--always",
+          "--abbrev=7",
+          "--match",
+          "[0-9]*",
+          "--match",
+          "v[0-9]*",
+        ])
+      : readOptional(path.join(root, "VERSION"))?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function current(root, kind) {
   if (kind === "git")
     return {
-      version: git(root, [
-        "describe",
-        "--tags",
-        "--always",
-        "--abbrev=7",
-        "--match",
-        "[0-9]*",
-        "--match",
-        "v[0-9]*",
-      ]),
+      version: kazusaVersion(root, kind),
       ref: git(root, ["rev-parse", "HEAD"]),
       branch: tryGit(root, ["symbolic-ref", "--short", "-q", "HEAD"]) || null,
       dirty:
         git(root, ["status", "--porcelain", "--untracked-files=no"]) !== "",
     };
-  const version = readOptional(path.join(root, "VERSION"))?.trim() || null;
+  const version = kazusaVersion(root, kind);
   return {
     version,
     ref: version && refOf(version),

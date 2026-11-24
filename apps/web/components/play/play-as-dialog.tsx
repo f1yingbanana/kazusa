@@ -12,11 +12,11 @@ import {
 } from "@/components/views/chats/cast-pick-list";
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { usePlainText } from "@/components/views/wiki/page-link";
 import { useCast, useCharacters } from "@/hooks/use-characters";
@@ -32,9 +32,9 @@ export function PlayAsDialog() {
   const { open, pick } = useUiStore((state) => state.playDialog);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closePlayDialog()}>
-      <DialogContent className="sm:max-w-2xl">
+      <ResponsiveDialogContent className="sm:max-w-2xl">
         {open ? <PlayAsForm {...(pick ? { pick } : {})} /> : null}
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   findGit,
@@ -71,6 +65,8 @@ const EXCLUDE = `# Written when the world was cloned.
 .DS_Store
 *.tmp
 `;
+/** What a world is made of: the creator's files, and the game's on top. */
+export const WORLD_FILES = ["package.json", "shared", "workspaces"] as const;
 // No delta between SQLite versions exists to find (worlds.md §4.6).
 const ATTRIBUTES = "*.sqlite binary -delta\n";
 
@@ -339,39 +335,7 @@ export function versionOf(git: Git): string | undefined {
   }
 }
 
-// ----------------------------------------------------------------- saves
-
-/** Where the world is kept before taking a release: a save (worlds.md §4.6). */
-export const saveRef = (version: string): string =>
-  `refs/saves/before-update-${version}`;
-
-/**
- * Saves the world as it is under `ref`: a commit of every world file (untracked
- * ones included, as git's exclude rules say) whose parent is the creator's
- * commit `play` stands on. No file is touched.
- */
-export function saveWorld(
-  git: Git,
-  world: string,
-  ref: string,
-  message: string,
-): string {
-  const head = commitOf(git, PLAY);
-  if (!head) throw new Error("This world isn't standing on a release.");
-  const index = path.join(world, ".git", "kazusa-save-index");
-  rmSync(index, { force: true });
-  let tree: string;
-  try {
-    git(["read-tree", head], { index });
-    git(["add", "--all"], { index });
-    tree = text(git, ["write-tree"], { index });
-  } finally {
-    rmSync(index, { force: true });
-  }
-  const save = text(git, ["commit-tree", tree, "-p", head, "-m", message]);
-  git(["update-ref", ref, save]);
-  return save;
-}
+// ------------------------------------------------------------------ play
 
 /**
  * Moves `play` to `commit` with the index there, the files untouched: what
@@ -380,18 +344,4 @@ export function saveWorld(
 export function standOn(git: Git, commit: string): void {
   git(["update-ref", `refs/heads/${PLAY}`, commit]);
   git(["read-tree", commit]);
-}
-
-/**
- * Puts the world's files back as `ref` saved them and `play` back on the commit
- * it stood on then. Files the update brought (`taken`, the release's commit)
- * that the save lacks go; the databases in `.state/` aren't touched.
- */
-export function restoreWorld(git: Git, ref: string, taken: string): void {
-  const save = commitOf(git, ref);
-  if (!save) throw new Error(`There's no save ${ref} to restore.`);
-  // From the release's files to the save's: what only the release had goes.
-  git(["read-tree", taken]);
-  git(["read-tree", "-u", "--reset", save]);
-  standOn(git, text(git, ["rev-parse", `${save}^`]));
 }

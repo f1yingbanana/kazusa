@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { AddTile, failureText, toPictureName } from "./parts";
@@ -65,7 +65,7 @@ export function AddPictureDialog({
       open={open}
       onOpenChange={(next) => (next ? onOpenChange(true) : close())}
     >
-      <DialogContent>
+      <ResponsiveDialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -114,7 +114,7 @@ export function AddPictureDialog({
             Add
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

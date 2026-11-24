@@ -10,6 +10,11 @@
  *   on, nothing fetched.
  * - `download`: that release's tag fetched, once the player says so. The system
  *   agent's `world_update` merges it.
+ * - `saves`: the game's saves, and the save or load under way, if any.
+ * - `save [name]`, `save-before-update`, `load <ref>`: asks `scripts/dev.mjs`,
+ *   which owns the Gateway, to stop it, save or load, and start it again
+ *   (`src/world/saves.ts`). The save before an update goes in its own slot.
+ * - `delete-save <ref>`: deletes a save, freeing what only it held.
  *
  * `clone` and `download` print git's progress as JSON lines
  * (`{"progress":{stage,percent}}`); every command ends with one JSON object, `{
@@ -28,6 +33,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { kazusaVersion } from "./update.mjs";
 import {
   findGit,
   repoGit,
@@ -49,6 +55,12 @@ import {
   releasePage,
   versionOf,
 } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
+import {
+  deleteSave,
+  listSaves,
+  readRequest,
+  stageRequest,
+} from "../apps/kazusa/plugins/kazusa/src/world/saves.ts";
 
 /** Which worlds there are and where each lives; later, providers such as OpenRP. */
 export const SOURCES = "apps/kazusa/world-sources.json";
@@ -292,6 +304,30 @@ export async function downloadLiveWorld(root, report) {
   }
 }
 
+/** Git on the live world, which saves need. */
+function liveGit(root) {
+  const world = path.join(root, WORLD);
+  if (!isClone(world))
+    throw new Error("This world isn't set up yet, so it has no saves.");
+  return { world, git: repoGit(gitOrFail(root), world) };
+}
+
+/**
+ * The game's saves, the save or load under way or last finished, and the
+ * versions now running, which a save made with others may not suit.
+ */
+export function liveSaves(root) {
+  const { world, git } = liveGit(root);
+  return {
+    saves: listSaves(git),
+    request: readRequest(world) ?? null,
+    current: {
+      kazusaVersion: kazusaVersion(root),
+      version: versionOf(git) ?? null,
+    },
+  };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const [command, id] = process.argv.slice(2);
@@ -302,6 +338,30 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     clone: async () => (await cloneWorld(root, id, progress), {}),
     check: () => checkLiveWorld(root),
     download: async () => (await downloadLiveWorld(root, progress), {}),
+    saves: () => liveSaves(root),
+    save: () => {
+      const { world, git } = liveGit(root);
+      return {
+        request: stageRequest(git, world, { op: "save", name: id }),
+      };
+    },
+    "save-before-update": () => {
+      const { world, git } = liveGit(root);
+      return {
+        request: stageRequest(git, world, { op: "save", beforeUpdate: true }),
+      };
+    },
+    load: () => {
+      const { world, git } = liveGit(root);
+      return {
+        request: stageRequest(git, world, { op: "load", ref: id ?? "" }),
+      };
+    },
+    "delete-save": () => {
+      const { world, git } = liveGit(root);
+      deleteSave(git, world, id ?? "");
+      return {};
+    },
   };
   if (command in commands)
     try {

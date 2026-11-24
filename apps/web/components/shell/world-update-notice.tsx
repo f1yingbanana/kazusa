@@ -13,6 +13,7 @@ import {
 } from "@/hooks/use-world-update";
 import { formatBytes } from "@/lib/format";
 import { useSources } from "@/lib/source/provider";
+import { openUpdateSaveDialog } from "@/lib/state/ui-store";
 
 /** What was last announced, so each is announced once per browser. */
 const SEEN_KEY = "kazusa.world-update.seen";
@@ -41,7 +42,7 @@ function markSeen(what: string) {
  */
 export function WorldUpdateNotice() {
   const { world } = useSources();
-  const { update, admin, known, canAsk, ask } = useWorldUpdate();
+  const { update, admin, known, canAsk } = useWorldUpdate();
   const { enabled, result } = useWorldCheck();
   const [, setParams] = useQueryStates({
     view: parseAsString,
@@ -93,13 +94,8 @@ export function WorldUpdateNotice() {
       duration: 20_000,
       action: {
         label: `Ask ${admin}`,
-        onClick: () =>
-          void ask().catch((failure: unknown) =>
-            toast.error(`Couldn't message ${admin}`, {
-              description:
-                failure instanceof Error ? failure.message : undefined,
-            }),
-          ),
+        // Whether to save first is asked, then the system agent.
+        onClick: openUpdateSaveDialog,
       },
     });
   }, [ready]);

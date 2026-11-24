@@ -11,12 +11,12 @@ import {
 import { SectionAction, SectionActions } from "@/components/inspector/parts";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCharacter } from "@/hooks/use-characters";
 import { useContextSettings } from "@/hooks/use-context-settings";
@@ -67,7 +67,7 @@ export function CharacterContextSection({ entity }: { entity: EntityRef }) {
         <SectionActions>
           <DialogTrigger render={<SectionAction />}>Customize</DialogTrigger>
         </SectionActions>
-        <DialogContent className="sm:max-w-2xl">
+        <ResponsiveDialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Memory and context for {name}</DialogTitle>
             <DialogDescription>
@@ -87,7 +87,7 @@ export function CharacterContextSection({ entity }: { entity: EntityRef }) {
             inDialog
             onDone={() => setOpen(false)}
           />
-        </DialogContent>
+        </ResponsiveDialogContent>
       </Dialog>
     </div>
   );

@@ -295,15 +295,17 @@ apps/kazusa/
   a `git fetch` of that tag once the player says so, with git's own progress as
   the bar, and the update (`world_update`, the system agent) is
   `git pull --rebase --autostash` in effect, with the page-by-page merge doing
-  the pop: save the world at `refs/saves/before-update-<version>` (`restore`
-  loads it until `finish`), merge the release in with `HEAD` as base, move
-  `play` to the release last, resolve, finish. No snapshot, cache, lock or
-  progress files of our own. The clone tracks only the creator's files;
-  `openclaw.json` and `.state/` are ignored locally. Saves come later: a commit
-  on `refs/saves/*` whose parent is `HEAD`, holding the world plus
-  `openclaw.json` and the databases (added explicitly), made with the Gateway
-  stopped; loading moves `play` back to the save's release, and "undo an update"
-  becomes loading its autosave.
+  the pop: merge the release in with `HEAD` as base, move `play` to the release
+  last, resolve, finish. Its only undo is the player's before-update save. No
+  snapshot, cache, lock or progress files of our own. The clone tracks only the
+  creator's files; `openclaw.json` and `.state/` are ignored locally. Saves
+  (built, `src/world/saves.ts`): a commit on `refs/saves/*` whose parent is
+  `HEAD`, holding the world folders plus `openclaw.json` and the databases
+  (added explicitly), made with the Gateway stopped by `scripts/dev.mjs`, which
+  owns it; loading puts the files and databases back, moves `play` to the save's
+  release and keeps this machine's keys and settings. Autosave slots: the last
+  clean stop (`refs/saves/autosave`) and before an update
+  (`refs/saves/before-update`, when the player asks). See worlds.md §4.6.
 - **World update merge rules** (`src/world-update/`: `tree.ts`, `plan.ts`,
   `merge.ts`, `apply.ts`): pages merge three-way per part (each frontmatter key,
   the lead, each `##` section, in the creator's order with a part only play has
@@ -318,11 +320,11 @@ apps/kazusa/
   `finish` refuses a map that doesn't load and re-places characters stranded on
   a missing place (or everyone, with `rehome: all`). A rename reaches every page
   that names the place, those the merge otherwise leaves alone included (a home,
-  a parent, a link in a memory), and `apply` and `restore` announce renames to
-  the map watcher (`LocationService.expectRenames`) so whoever stands there
-  follows the place rather than being moved off it. `openclaw.json` is never
-  touched: new characters are reported for registering. Every `apply`, `restore`
-  and `finish` sends SSE `world`, so clients refetch the world's version.
+  a parent, a link in a memory), and `apply` announces renames to the map
+  watcher (`LocationService.expectRenames`) so whoever stands there follows the
+  place rather than being moved off it. `openclaw.json` is never touched: new
+  characters are reported for registering. Every `apply` and `finish` sends SSE
+  `world`, so clients refetch the world's version.
 - **Repo search and the repository boundary** (`src/repo-search/`): the system
   agent's `grep` searches text files line by line for a regular expression
   (literal text when the pattern isn't valid), read-only, inside the repository

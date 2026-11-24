@@ -30,6 +30,7 @@ import { Stage } from "./stage";
 import { StatusBar } from "./status-bar";
 import { TopBar } from "./top-bar";
 import { WorldUpdateNotice } from "./world-update-notice";
+import { UpdateSaveDialog } from "./update-save-dialog";
 import { PlayAsDialog } from "@/components/play/play-as-dialog";
 import { VisitorWelcome } from "./visitor-welcome";
 import { useSources } from "@/lib/source/provider";
@@ -160,6 +161,7 @@ function Layout() {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <WorldUpdateNotice />
+      <UpdateSaveDialog />
       <PlayAsDialog />
       <VisitorWelcome />
     </div>

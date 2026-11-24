@@ -110,10 +110,10 @@ Each column narrows the one before it: **rail** (where) → **section sidebar**
   no sidebar tabs, and a sidebar never shows another section's content. Sidebars
   share one toolbar shape: search (the count lives in the placeholder) and a
   single trailing action. A dot marks non-default filters.
-- **Below `lg`** the sidebar isn't docked. Chats shows it as the section's
-  first screen until a chat is opened (with a back button on the stage). World
-  opens on the map, and "Who's where" opens its sidebar as a sheet. Timeline
-  opens it as a sheet from a Filters button.
+- **Below `lg`** the sidebar isn't docked. Chats shows it as the section's first
+  screen until a chat is opened (with a back button on the stage). World opens
+  on the map, and "Who's where" opens its sidebar as a sheet. Timeline opens it
+  as a sheet from a Filters button.
 
 **Chats sidebar:** rows show a presence avatar for DMs (so you see who is
 thinking about a reply), last message or a typing shimmer, time, unread.
@@ -124,8 +124,8 @@ Trailing action: New chat. Observed chats will appear below as a section (needs
 
 - **Watching:** starred characters who are onstage.
 - **Each occupied place** as a heading (name, outermost area), in map order,
-  with its people under it. The heading flies the map there and opens the
-  place. Empty places are left to the map and ⌘K.
+  with its people under it. The heading flies the map there and opens the place.
+  Empty places are left to the map and ⌘K.
 - **On the way** (time to arrival) and **Not on the map** (onstage, no
   position), only when someone is.
 - **Search** covers the whole cast, offstage too.
@@ -145,14 +145,14 @@ Trailing action: New chat. Observed chats will appear below as a section (needs
 - **Group headings** (Group only): Bring all onstage / Send all offstage, for
   the whole group whatever the search hides. Both open the cast list prefilled.
 - **Cast list** (`cast-dialog.tsx`): fixed height, search, All/None, a lit face
-  is onstage, a tag only on rows that would change, cost and paused-clock
-  notes, one Apply. A played character stays lit and locked.
+  is onstage, a tag only on rows that would change, cost and paused-clock notes,
+  one Apply. A played character stays lit and locked.
 - Only the cast: not the system agent, not a person who is just a page.
 
-**New page / New character** (one dialog, `new-page-dialog.tsx`): Name, Id
-(from the name, `lib/wiki/page-id.ts`; Customize to type one; "It can't be
-changed later"), Concept or Character, and in the World Wiki **Simulate**: on,
-the character joins the cast offstage and opens in Characters; off, a page only,
+**New page / New character** (one dialog, `new-page-dialog.tsx`): Name, Id (from
+the name, `lib/wiki/page-id.ts`; Customize to type one; "It can't be changed
+later"), Concept or Character, and in the World Wiki **Simulate**: on, the
+character joins the cast offstage and opens in Characters; off, a page only,
 opened in the Wiki. A page is saved at once, so an empty one can be found and
 deleted. Creating or deleting a character waits for the Gateway to reload the
 cast (up to 20 s; past that it answers anyway and the roster catches up).
@@ -179,9 +179,9 @@ The map, always; the sidebar says who is where.
   `map`, and each plane is its own map; roads to another plane aren't drawn.
   Arrange is explicit, so a stray drag while panning can't move anything, and it
   only changes the picture.
-- The map shows everyone onstage who has a position. Narrow screens show the
-  map with a "Who's where" button that opens the sidebar as a sheet. A world
-  without places shows "No map yet".
+- The map shows everyone onstage who has a position. Narrow screens show the map
+  with a "Who's where" button that opens the sidebar as a sheet. A world without
+  places shows "No map yet".
 
 ## 6. Stage: Chats
 
@@ -462,13 +462,13 @@ simulation state.
 
 Each item links to the tab that holds the detail:
 
-| Side  | Item       | Content                                                                                    |
-| ----- | ---------- | ------------------------------------------------------------------------------------------ |
-| start | Connection | `● Live` / `◌ Reconnecting…` / `✕ Offline` with last-event time                            |
-| end   | Update     | A new Kazusa release, for whoever maintains this machine: Settings → Updates                |
-| end   | Problems   | `⊗ 43 ⚠ 1` for every wiki, the characters' own included (managers; hidden at 0): Problems  |
-| end   | Failures   | `2 failed`: whose latest turn failed, each opening that character                          |
-| end   | You        | "You are <name> at <place>" or "an observer": Play as, and the place                       |
+| Side  | Item       | Content                                                                                              |
+| ----- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| start | Connection | `● Live` / `◌ Reconnecting…` / `✕ Offline` with last-event time                                      |
+| end   | Update     | A new Kazusa release, for whoever maintains this machine: Settings → Updates                         |
+| end   | Problems   | `⊗ 43 ⚠ 1` for every wiki, the characters' own included (managers; hidden at 0): Problems            |
+| end   | Failures   | `2 failed`: whose latest turn failed, each opening that character                                    |
+| end   | You        | "You are <name> at <place>" or "an observer": Play as, and the place                                 |
 | end   | Status     | `0 thinking · 1 composing · 5 waiting`, always: Characters by Status (an Offstage filter is dropped) |
 
 Reserved for later: storyteller ticker (salient journal kinds), next scheduled
@@ -504,6 +504,8 @@ wakes, token/cost meter (Observer debug), notifications and mentions.
   top bar.
 - The roster is a left sheet and the inspector a bottom sheet (snap points 50% /
   90%).
+- Dialogs open as sheets from the bottom (`ResponsiveDialogContent`), capped at
+  85% of the screen.
 - Status items fold into a top-bar overflow menu.
 - The timeline overview strip collapses to a thin scrubber. Compare mode is
   limited to 3 pins.

@@ -8,12 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import {
   InputGroup,
   InputGroupAddon,
@@ -54,7 +54,7 @@ export function CastDialog({
 }) {
   return (
     <Dialog open={request !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90dvh] flex-col gap-4 sm:max-w-md">
+      <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col gap-4 sm:max-w-md">
         {request === null ? null : (
           <ChooseForm
             key={`${request.label}:${request.intent}`}
@@ -62,7 +62,7 @@ export function CastDialog({
             onDone={() => onOpenChange(false)}
           />
         )}
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

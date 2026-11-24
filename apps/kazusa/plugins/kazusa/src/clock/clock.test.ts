@@ -40,6 +40,15 @@ describe("Clock", () => {
     await restored.close();
   });
 
+  it("starts paused when asked, at the time it kept", async () => {
+    const store = createInMemoryStore();
+    await store.register("primary", { simTime: 1_000, speed: 10 });
+    const clock = new Clock({ store, startPaused: true });
+    await clock.init();
+    expect(clock.now()).toMatchObject({ simTime: 1_000, speed: 0 });
+    expect(await store.lookup("primary")).toEqual({ simTime: 1_000, speed: 0 });
+  });
+
   it("only advances simulated time forward", async () => {
     const clock = new Clock({ store: createInMemoryStore() });
 

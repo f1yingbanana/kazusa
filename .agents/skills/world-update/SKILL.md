@@ -160,6 +160,11 @@ Ask the user once how characters should experience the update:
      renamed or contested) needs no framing or layout question: if the user
      asked for this update, tell them what it brings and go on to apply in the
      same turn. If they didn't ask, ask whether to.
+   - `saved` is the save the user made before this update (Kazusa offers one
+     when they ask from Settings or the notice), or null when they didn't make
+     one. That save is the only way back. With none, say so in the message you
+     send anyway (they can still save first, from Saves beside the clock), but
+     don't stop for it: asked in a chat, you just update.
 4. **Pause for the user's choices** in `ask`, all in one message: what the
    update brings and what it keeps, then only the questions you don't already
    have answers to for this update:
@@ -180,9 +185,9 @@ Ask the user once how characters should experience the update:
    time runs, and no time may pass while the world changes. Never start it again
    yourself: when the update is done it stays paused, and starting time, which
    costs money, is the user's call.
-2. `world_update` with `action: "apply"` and the chosen `layout`. It first saves
-   the world exactly as it is (`saved` names the save), then merges the release
-   in. Until `finish`, `restore` can put it all back (below).
+2. `world_update` with `action: "apply"` and the chosen `layout`. It merges the
+   release into the world's files. You have no undo of your own: the way back is
+   the user's save (below).
 
 ## 3. Resolve, then ask what only the user can say
 
@@ -275,23 +280,20 @@ the existing one and delete the orphan.
    until they start it. An update the user hears nothing about looks stuck. Mark
    the job file done.
 
-## If it goes wrong: restore, then carry on
+## If it goes wrong: the user loads their save
 
-`apply` saves the world before it changes anything, and `world_update`
-`action: "restore"` (clock paused) puts every world file back as that save kept
-it and closes the update. Nothing from play is lost: everything since `apply`
-happened with the clock paused. Characters' databases aren't restored: anyone
-the update moved off a place it removed stays where they were put, though those
-at a renamed place follow it back.
+You can't undo an update. The way back is the save the user made before it
+(`saved` in `check` and `apply`): loading it, in Saves beside the clock, puts
+the whole world back as it was then, chats and positions included, and closes
+the update. Only the user loads; you ask them to, and say which save.
 
 - **`apply` was cut short** (Kazusa stopped, an error mid-way): every other
-  action then says so. Restore, `check` again, and `apply` again with the same
-  choices from your job file. No need to ask the user again; tell them it was
-  interrupted and redone.
+  action then says so. If there's a save, tell the user and offer both: load it,
+  or let you `apply` again, which merges what's left with the same choices from
+  your job file. With no save, `apply` again and tell them it was interrupted
+  and finished.
 - **The update went badly** (a resolution you can't make work, the user changed
-  their mind): tell the user what happened and offer to restore. Once they
-  agree, restore, and note in the job file that the update was abandoned and
-  why. They can update again later from a clean start.
-
-Restore only works until `finish`. After that there is no undo, so get it right
-before you finish.
+  their mind), before or after `finish`: tell the user what happened and ask
+  them to load their save. Note in the job file that the update was abandoned
+  and why; they can update again later. With no save there is no way back: say
+  so, and make the best of the update with them.

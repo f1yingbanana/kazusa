@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -197,7 +197,7 @@ export function NewBackdropDialog({
   const clash = taken.has(name);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <ResponsiveDialogContent>
         <DialogHeader>
           <DialogTitle>New backdrop set</DialogTitle>
           <DialogDescription>
@@ -236,7 +236,7 @@ export function NewBackdropDialog({
             Make set
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

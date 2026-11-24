@@ -17,12 +17,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import {
   Field,
   FieldDescription,
@@ -559,7 +559,7 @@ function StateDialog({
   return (
     // Held open while a save is under way: its result belongs to this form.
     <Dialog open onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
+      <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
         <form
           className="flex min-h-0 flex-col gap-4"
           noValidate
@@ -792,7 +792,7 @@ function StateDialog({
             </DialogFooter>
           </fieldset>
         </form>
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

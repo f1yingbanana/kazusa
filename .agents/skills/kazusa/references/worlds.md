@@ -88,11 +88,12 @@ Where it lives, by layer:
 | Layer                   | Files                                                               | What                                                                                                                                                                                                   |
 | :---------------------- | :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Git                     | `src/world/git.ts`                                                  | The one way to run git: which binary (`findGit`), its environment, pinned to a repository (`repoGit`) or none (`plainGit`), and long commands with their progress (`streamGit`).                       |
-| The world's repository  | `src/world/repo.ts`                                                 | `play`, releases (newest on the remote, downloaded here, the world's version), `isClone`, clone and fetch of a release, saves (`saveWorld`, `restoreWorld`, `standOn`).                                |
+| The world's repository  | `src/world/repo.ts`                                                 | `play`, releases (newest on the remote, downloaded here, the world's version), `isClone`, clone and fetch of a release, `standOn`.                                                                     |
 | The manifest            | `src/world/package.ts`                                              | `package.json`, the credit and the Ready signal.                                                                                                                                                       |
 | The update              | `src/world-update/`                                                 | `tree.ts` reads a commit or folder as one side, `plan.ts` decides file by file (`merge.ts`, `parts.ts` per page), `apply.ts` writes it and keeps the report, `register.ts` is the system agent's tool. |
 | The frontend's commands | `scripts/world.mjs`                                                 | `list`, `clone`, `check`, `download`, each its own process through `runScript`, importing `src/world/` as it is (Node runs TypeScript).                                                                |
 | The frontend            | `apps/web/lib/setup/`, `app/update/world/`, `app/setup/start-over/` | Setup, the check and download, Start a new world.                                                                                                                                                      |
+| Saves                   | `src/world/saves.ts`, `scripts/dev.mjs`, `app/saves/`               | Saving, loading, listing and deleting a game (§4.6): the save module, the Gateway restart around it, the frontend's route and the top bar's dialog (`components/shell/saves-dialog.tsx`).              |
 
 `git.ts` and `repo.ts` import only Node's own modules, so the plugin,
 `scripts/world.mjs`, `scripts/dev.mjs` and the frontend all use them directly:
@@ -136,29 +137,28 @@ them that way: a plain Node script can't import a package's TypeScript.
   the highest local version tag isn't in `play`'s history. The client announces
   it once and Settings offers Ask <system agent>.
 - **Updating** (`src/world-update/`, the system agent's `world_update`: `check`,
-  `apply`, `conflicts`, `show`, `restore`, `finish`). The release and the base
-  (`play`'s commit) are read straight from git (`commitTree`, text in one
-  `cat-file --batch`). `apply`, clock paused, in this order:
-  1. Saves the world (`saveWorld`): a commit of every world file through a
-     temporary index, parent `play`'s commit, at
-     `refs/saves/before-update-<version>` (§4.6's autosave). No file touched.
-  2. Writes `.state/kazusa/world-update/report.json` (conflicts, orphans, the
-     commits from and to, the save): the update is open from here on.
-  3. Writes the page-by-page merge into the files (pictures with
-     `git restore --source`, paths literal): new files first, then what goes, so
-     nothing is ever only in the save.
-  4. Moves `play` to the release with the index there (`standOn`). Last, so an
+  `apply`, `conflicts`, `show`, `finish`). The release and the base (`play`'s
+  commit) are read straight from git (`commitTree`, text in one
+  `cat-file --batch`). `check` and `apply` say whether the player saved first
+  (`saved`: the before-update save standing where the update starts, `play` or
+  an open update's `from`, with when it was made: `saveBeforeUpdate`), the only
+  way back (§4.6). `apply`, clock paused, in this order:
+  1. Writes `.state/kazusa/world-update/report.json` (conflicts, orphans, the
+     commits from and to): the update is open from here on.
+  2. Writes the page-by-page merge into the files (pictures with
+     `git restore --source`, paths literal): new files first, then what goes.
+  3. Moves `play` to the release with the index there (`standOn`). Last, so an
      open report with `play` not on `to` means `apply` was cut short: every
-     action but `show` and `restore` then refuses.
+     action but `show` and `apply` then refuses. `apply` again merges what's
+     left: a part both sides now agree on merges as it is.
 
-  `restore` puts the save's files back (`read-tree -u --reset` from the
-  release's index, so what only the release brought goes) and `play` on the
-  save's parent, and closes the report. `show` reads a file at either commit.
-  `finish` checks the map, re-homes and deletes the report; the save stays. The
-  live `package.json` becomes the creator's as is; renames come from it, reach
-  every page naming the place (merged or not), and are announced to the map
-  watcher before files move so whoever is there follows. `apply`, `restore` and
-  `finish` each send SSE `world`; clients refetch the world and the check.
+  `show` reads a file at either commit. `finish` checks the map, re-homes and
+  deletes the report. Undoing, before or after `finish`, is the player loading
+  their before-update save, which also drops an open report. The live
+  `package.json` becomes the creator's as is; renames come from it, reach every
+  page naming the place (merged or not), and are announced to the map watcher
+  before files move so whoever is there follows. `apply` and `finish` each send
+  SSE `world`; clients refetch the world and the check.
 
 - **Repository**: setup's clone sets the config every world repository has
   (§4.5), `.git/info/exclude` (only `package.json`, `shared/`, `workspaces/`)
@@ -400,59 +400,121 @@ Kazusa's own worlds live in `f1yingbanana/kazusa-<name>` on GitHub.
 **Git itself**: the real `git` binary (shipped in the installers; macOS needs
 the developer tools). Without git, a world can't be set up or updated.
 
-### 4.6 Saves and loading (later)
+### 4.6 Saves and loading
 
-Not built, apart from one: an update saves the world's files first, at
-`refs/saves/before-update-<version>` (§4.7), and `world_update restore` loads it
-until the update is finished. When saves come, they fit the clone model without
-changing it.
+Built 2026-11-23 (below). Decided with the user: no autosave before a load
+(loading is a choice the player made); one autosave slot for the last clean stop
+and one for before an update. Asking the system agent to update from the client
+(the notice or Settings → Updates) first asks whether to save into that slot
+("Before update to <version>", named from the downloaded release); asking them
+in a chat updates without one. That save is the only undo of an update (§4.7):
+`world_update` keeps nothing of its own.
 
-- **A save is a commit off to the side** on its own ref (`refs/saves/<name>`,
-  `refs/saves/auto-<n>`): its **parent is `HEAD`**, the creator's commit the
-  world stands on, and its tree is the whole local state: the world as it is
-  (every tracked and untracked world file), `openclaw.json`, and the databases
-  (`.state/**/*.sqlite`, minus caches and temporary ones), the last two added
-  with `git add --force` since the clone ignores them. Built with a temporary
-  index (`GIT_INDEX_FILE`), so `play`, the real index and the files are
-  untouched. `play` itself never gets a local commit, so the base of an update
-  stays `HEAD`.
+- **A save is a commit off to the side** on its own ref
+  (`refs/saves/<UTC time>`, `refs/saves/autosave`, `refs/saves/before-update`):
+  its **parent is `play`**, the creator's commit the world stands on, and its
+  tree is the whole local state: the world folders as they are (`package.json`,
+  `shared/`, `workspaces/`, added by name so nothing else of the folder, such as
+  `.state/.env`, can get in whatever git ignores), `openclaw.json`, and the
+  databases (every `.state/**/*.sqlite` outside `cache/`, `logs/`, `media/`,
+  `tmp/` and `worktree-projections/`, but not the memory search's cache), the
+  last two added with `git add --force`. Built with a temporary index
+  (`saveGame`), so `play`, the real index and the files are untouched. What the
+  save is lives in trailers of its message: `Kind: save|autosave`, `Name` (only
+  when the player gave one), `Sim-Time: <ms>` (the clock as the Gateway kept
+  it), `World-Version`, `Branch` (the line of the creator's history followed:
+  `main` until checkpoints, §4.7) and `Kazusa-Version` (`git describe` or the
+  installer's `VERSION`); the subject is only for `git log`. A ref without
+  `Kind` isn't a save and isn't listed. The dialog shows both versions and warns
+  before a load when they differ from what runs: a save from another Kazusa
+  release (commits past it don't count) may not load correctly, and one from
+  another world version takes the world back to it. `play` itself never gets a
+  local commit, so an update's base stays `HEAD`.
 - **Only with the Gateway stopped**, run by the process that owns it
-  (`scripts/dev.mjs`; the cloud host later), never on a timer or per turn. The
-  plugin pauses the clock, waits for every brain to be idle and stages a
-  request; the owner stops the Gateway (it drains), runs the operation and
-  starts it again (about 13 s), like Settings → Updates and
-  `.update/pending.json`. Never copy a database from outside a running Gateway:
-  its own checkpoints write the main file while the copy reads it.
-- **Before committing**: the Gateway exited cleanly; a leftover `-wal` is
-  checkpointed (`PRAGMA wal_checkpoint(TRUNCATE)` through `node:sqlite`).
-  `-wal`, `-shm` and lock files are never saved.
-- **Load**: autosave first, then check out the save's tree into the world (files
-  and databases, every `-wal` and `-shm` deleted: an old log over a different
-  database corrupts it), move `play` to the save's parent with the index at that
-  commit (so the save's differences are working changes again), carry the
-  current provider keys over, and start with the clock paused.
+  (`scripts/dev.mjs`; the cloud host later). The frontend's command
+  (`scripts/world.mjs save|load`, `POST /saves`, the owner only) writes
+  `.state/kazusa/save-request.json`; `dev.mjs` sees it and moves it through its
+  phases (`waiting`, `pausing`, `stopping`, `saving` or `loading`, `starting`,
+  `done` or `failed`), which `GET /saves` reports. A save pauses the clock first
+  (through the Gateway's own `/kazusa/clock`), then stops only the Gateway as a
+  full stop would (its stdin lifeline: running turns finish, anything frozen on
+  the paused clock lets go), saves, starts it again (with every start-up step,
+  since a loaded save's config is from then) and puts the old speed back. A load
+  starts it paused (`KAZUSA_START_PAUSED`, read by the clock). Done means
+  Kazusa's routes answer, not just the port: about 20 s on a small world. The
+  frontend stays up throughout. Requests are picked up once the Gateway has
+  started; one that Kazusa stopped in the middle of is finished at the next
+  start (a load or save done again) or marked failed. A load that fails after it
+  began replacing files stops Kazusa rather than run half one game and half
+  another; the next start loads it again. Done only once the world answers;
+  otherwise failed. Never copy a database from outside a running Gateway: its
+  own checkpoints write the main file while the copy reads it.
+- **Before committing**: the Gateway exited with code 0 (otherwise nothing is
+  saved or loaded); every leftover `-wal` is checkpointed
+  (`PRAGMA wal_checkpoint(TRUNCATE)` through `node:sqlite`). `-wal`, `-shm` and
+  lock files are never saved. Read the clock before checkpointing: even a
+  read-only open leaves a new log beside the file.
+- **Load**: every database of the game being left goes with its logs (an old log
+  over another database corrupts it, and one the save lacks isn't the save's),
+  untracked world files go (`git clean` of the world folders), the save's tree
+  is checked out over them (`read-tree -u --reset` from `play`'s index), `play`
+  moves to the save's parent with the index there (the save's differences are
+  working changes again), and what belongs to the machine, read before, is
+  written back over the save's: all of `config_machine_state` (provider keys and
+  their health, model catalogs, update checks) and Kazusa's settings stores
+  (`models`, `embedding`, `contextSettings`). What can't be written back is
+  reported as a warning, shown once after the reload. The memory search's
+  vectors (`kazusa/memory-vectors.sqlite`, keyed by each text and model) are
+  neither saved nor touched. No autosave first. Not split yet: `openclaw.json`
+  comes back whole from the save, the cast (`agents.entries`) with this
+  machine's Gateway, provider and tool settings.
+- **Not while an update is open** (its report exists): saving and staging
+  refuse, and a load drops a leftover report, since no save holds one.
 - **Saves stay on their version.** A save made before an update sits on the old
   release; loading it puts the world back there, and the update is offered
   again. Saves are never rebased: there's nothing to rebase.
-- **Updating with saves**: an autosave first. "Undo the update" is then "load
-  that autosave", databases included (positions, chats), so undo comes with
-  saves and needs nothing of its own.
-- **Deleting a save** deletes its ref and runs `git gc --prune=now`: database
-  versions no other save holds are freed. Autosaves are a ring (the last few
-  kept). **When**: an autosave on every clean stop, and "Save now".
-- **Several playthroughs** (a chapter started fresh beside a game in progress):
-  saves are named per playthrough (`refs/saves/<playthrough>/<name>`); switching
-  autosaves the current one and loads the other's latest.
+- **Updating with saves**: the before-update save first, if the player wants it.
+  "Undo the update", before or after `finish`, is then "load that save",
+  databases included (positions, chats); loading also drops an open update's
+  report. Saving waits while an update is open; loading doesn't.
+- **Deleting a save** deletes its ref and runs `git gc --prune=1.hour.ago`:
+  database versions no other save holds are freed (about 7 s on a 1 GB
+  repository; the Gateway may run); an hour's grace keeps a save being written
+  or a download under way whole, and what it spares goes at a later delete.
+  Requests from two tabs at once are queued by the frontend's route; git's own
+  locks keep its refs and index safe. **When**: the autosave slot holds the
+  world's start until its first clean stop (`autosaveStart`, from `dev.mjs`
+  before the first Gateway start of a world that never ran: the release, the
+  config, and the shared database holding only the keys setup saved), then every
+  clean stop writes over it (a Windows Ctrl+C may not exit 0); and "Save now". A
+  world that ran before this was built has no start save.
+- **The dialog** (top bar, beside the clock, the owner only): one click opens
+  it; Save takes an optional name. Autosaves come first, titled Autosave with
+  which one beside it (World start, Last stop, Before update to <version>), and
+  can't be deleted: they're slots, written over. The player's saves follow,
+  newest first, titled by their name, else by the simulation time then. The
+  simulation time (a globe) and when it was saved (a clock) each say which they
+  are in a tooltip; then the world version, branch and Kazusa version. Load and
+  Delete are confirmed in place. A list, not slots: there's no limit to fill.
+  While a save or load runs the dialog can't be dismissed, shows the phases, and
+  a page opened meanwhile opens it too. After a save everything is refetched;
+  after a load the page reloads.
+- **Several playthroughs** (later; a chapter started fresh beside a game in
+  progress): saves are named per playthrough
+  (`refs/saves/<playthrough>/<name>`); switching autosaves the current one and
+  loads the other's latest.
 - **Storage**: git stores each distinct database once and each changed one as a
   full compressed copy (`.gitattributes`: `*.sqlite binary -delta`; git finds no
   delta between SQLite versions, and repacking them is slow for nothing). Agent
   and shared databases gzip about 4:1; a save of a world with every database
   changed (51 characters, 573 MB of SQLite) is about 150 MB.
 - **Never saved**: `.env*`, `*.key`, `logs/`, `cache/`, `tmp/`, `media/`,
-  `worktree-projections/`, `kazusa/system-agent.json` (rebuilt each start).
+  `worktree-projections/`, `kazusa/system-agent.json` (rebuilt each start),
+  `openclaw.json.bak*` and anything else at the top of the folder, and
+  `kazusa/memory-vectors.sqlite` (a cache).
 - **Provider keys** are one row of the shared database (`config_machine_state`,
-  `authProfiles.store` in `state/openclaw.sqlite`). Load reads that row before
-  and writes it back after; a save keeps them, and nothing with a save in it is
+  `authProfiles.store` in `state/openclaw.sqlite`), kept over a load with the
+  rest of that table; a save holds them too, and nothing with a save in it is
   ever pushed.
 
 ### 4.7 Updates and chapters
@@ -485,9 +547,8 @@ Agreed 2026-11-14.
 - **Updating** (`world_update`, the system agent, clock paused) is
   `git pull --rebase --autostash` in effect, with our page merge doing the
   "pop":
-  1. Save the world: a commit of every world file (a temporary index; no file
-     touched), parent `HEAD`, at `refs/saves/before-update-<version>`. That's
-     the recovery point; `restore` loads it until `finish`.
+  1. The player's save first, if they want one (§4.6): the client offers it;
+     asked in a chat, the system agent updates without one.
   2. Merge **page by page** (`merge.ts`: each frontmatter key, the lead, each
      `##` section; `## Notes` and `## History` union; a character's own fields
      win on her pages), base = `HEAD`, theirs = the release, ours = the files,
@@ -499,9 +560,9 @@ Agreed 2026-11-14.
      the game again.
   4. The system agent resolves conflicts and orphans in the world's files
      (`show` reads either version of a file), then `finish`: the map must load,
-     and stranded characters are re-homed. Nothing committed on `play`. A crash
-     at any step leaves the save; `play` moving last tells an interrupted
-     `apply` apart, and `restore` then puts everything back to apply again.
+     and stranded characters are re-homed. Nothing committed on `play`. `play`
+     moving last tells an interrupted `apply` apart: loading the save, or
+     applying again, settles it.
 - **The base is `HEAD`**, so a creator rebasing a checkpoint stack doesn't
   matter: the old `HEAD` is exactly the commit the files were built on, and it's
   in the world's own repository even after the remote drops it.
@@ -525,8 +586,8 @@ Agreed 2026-11-14.
 1. **Worlds as clones, updates over git** (§4.5, §4.7): setup clones; check,
    download and update as above; older worlds start again.
 2. **Saves and loading, locally** (§4.6): the Gateway-only restart on request,
-   saves on their own refs, autosave on stop and before updates, Settings →
-   Saves, load.
+   saves on their own refs, autosave on stop and before updates, the top bar's
+   dialog, load. Built.
 3. **Publish and checkpoints** (§4.3–§4.5): the review, releasing (version, tag,
    rebasing the stack), consolidation and `scene.json`, "Start Chapter N".
 4. **The cloud**: the host owns the Gateway and runs the same module and
@@ -540,15 +601,20 @@ Agreed 2026-11-14.
 ### 4.10 Status
 
 Built 2026-11-14 (PR #70) for `main` only: setup clones, checking, downloading
-with git's progress, the update (save, merge, move `play`, `restore` until
-`finish`), Start a new world for an older Kazusa's world (§3), and the release
-notes link (§2). One difference from §4.7's wording: an update doesn't check out
-the release; it writes the merge into the files and moves `play` and the index
-to the release, which leaves the same result without rewriting every file.
+with git's progress, the update (merge, move `play`, `finish`; its own
+files-only save and `restore` were replaced by the player's save on 2026-11-23),
+Start a new world for an older Kazusa's world (§3), and the release notes link
+(§2). One difference from §4.7's wording: an update doesn't check out the
+release; it writes the merge into the files and moves `play` and the index to
+the release, which leaves the same result without rewriting every file.
 
-**Later**: checkpoint branches and a playthrough's followed line, "start it
-fresh", saves (§4.6, which bring undo after `finish`), publishing, the disk
-savings, and worlds off GitHub (no size shown).
+Saves and loading built 2026-11-23 (§4.6): Save now, load, delete, one autosave
+slot at every clean stop, one before an update when the player asks for it, this
+machine's keys and settings kept over a load.
+
+**Later**: splitting `openclaw.json` between the save and the machine (§4.6),
+checkpoint branches and a playthrough's followed line, "start it fresh",
+publishing, the disk savings, and worlds off GitHub (no size shown).
 
 ## 5. Known edges
 

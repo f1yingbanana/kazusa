@@ -17,6 +17,8 @@ interface UiState {
   readonly playDialog: { readonly open: boolean; readonly pick?: string };
   /** What a visitor is told on arriving, and can open again. */
   readonly visitorWelcome: { readonly open: boolean };
+  /** Asking whether to save before the system agent updates the world. */
+  readonly updateSaveDialog: { readonly open: boolean };
   readonly quietKey: string | null;
   readonly dismissedFailures: ReadonlySet<string>;
 }
@@ -32,6 +34,7 @@ export const useUiStore = create<UiState>()(() => ({
   inspectorTab: "character",
   playDialog: { open: false },
   visitorWelcome: { open: false },
+  updateSaveDialog: { open: false },
   quietKey: null,
   dismissedFailures: new Set(),
 }));
@@ -92,6 +95,14 @@ export function openVisitorWelcome(): void {
 
 export function closeVisitorWelcome(): void {
   useUiStore.setState({ visitorWelcome: { open: false } });
+}
+
+export function openUpdateSaveDialog(): void {
+  useUiStore.setState({ updateSaveDialog: { open: true } });
+}
+
+export function closeUpdateSaveDialog(): void {
+  useUiStore.setState({ updateSaveDialog: { open: false } });
 }
 
 export function clearInspectorRequest(): void {
