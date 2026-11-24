@@ -12,7 +12,7 @@ const LABELS = {
   unknown: "",
 } as const;
 
-/** The halo above a face carries the same presence states as the app's rings. */
+/** A ring around the face carries the same presence states as the app's avatars. */
 export function HaloFace({
   id,
   name,
@@ -36,7 +36,7 @@ export function HaloFace({
     .toUpperCase();
   return (
     <span className="halo-face" data-size={size} data-state={state}>
-      <span className="halo-ring" aria-hidden="true" />
+      <span className="halo-presence" aria-hidden="true" />
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={avatarUrl} alt="" className="halo-face-img" />
