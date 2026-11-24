@@ -122,6 +122,21 @@ function AccountRow({ bot }: { bot: string | null }) {
     toast.success(`Linked to ${linked.name}`);
   }, [code, linked]);
 
+  // A code works for ten minutes: after that it's gone, and so is the wait.
+  useEffect(() => {
+    if (!code) return;
+    const left = code.until - Date.now();
+    if (left <= 0) {
+      setCode(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCode(null);
+      toast.message("The code ran out. Make a new one to link.");
+    }, left);
+    return () => clearTimeout(timer);
+  }, [code]);
+
   async function start() {
     setBusy(true);
     try {
@@ -392,8 +407,8 @@ function BotSetup() {
           <li>
             Under OAuth2, URL Generator, tick the bot and applications.commands
             scopes, and the View Channels, Send Messages, Read Message History,
-            Manage Webhooks and Manage Messages permissions. Open the link to
-            add the bot to your server.
+            Manage Webhooks, Manage Messages and Add Reactions permissions. Open
+            the link to add the bot to your server.
           </li>
           <li>Add the token here.</li>
           <li>

@@ -14,6 +14,7 @@ import {
   readJsonBody,
   sendJson,
 } from "../http/helpers.ts";
+import { inBackground } from "../background.ts";
 import type { Messaging } from "../messaging/messaging.ts";
 import type { Player } from "../player.ts";
 import { openUserSettings, type UserSettingsStore } from "../user-settings.ts";
@@ -22,6 +23,7 @@ import type { RemovableStateStore } from "../state.ts";
 import {
   Bridge,
   BridgeLinkSchema,
+  NotDelivered,
   type BridgeDeps,
   type BridgeLink,
   type BridgeTransport,
@@ -39,13 +41,25 @@ interface BridgeCell {
   unsubscribe?: () => void;
 }
 
-/** The one bridge in the process, whichever registration made it. */
-function sharedBridge(deps: BridgeDeps): Bridge {
+/**
+ * The one bridge in the process, whichever registration made it, hearing every
+ * Messaging instance's events once. A registration's dependencies are used
+ * while it is the oldest live one, and let go when it is disposed.
+ */
+function sharedBridge(
+  api: Pick<OpenClawPluginApi, "lifecycle">,
+  deps: BridgeDeps,
+  messaging: Pick<Messaging, "onAnyEvent">,
+): Bridge {
   const scope = globalThis as { [CELL]?: BridgeCell };
   const cell = (scope[CELL] ??= {});
-  if (cell.bridge) cell.bridge.attach(deps);
-  else cell.bridge = new Bridge(deps);
-  return cell.bridge;
+  if (cell.bridge) {
+    const detach = cell.bridge.attach(deps);
+    api.lifecycle?.onDispose?.(detach);
+  } else cell.bridge = new Bridge(deps);
+  const bridge = cell.bridge;
+  cell.unsubscribe ??= messaging.onAnyEvent((event) => bridge.outgoing(event));
+  return bridge;
 }
 
 /** Lets a test start from no bridge. */
@@ -60,11 +74,12 @@ export interface BridgeRegistration {
 }
 
 /**
- * Links groups to Discord channels (`bridges/`): a bot token kept as an auth
- * profile beside the provider keys, the links in the retained `"bridges"`
- * store, and one connection per process, made when the Gateway starts or a
- * token is saved. People writing in a linked channel are guests in the group;
- * what the group says shows in the channel as its speakers.
+ * Links group and direct chats to Discord channels (`bridges/`): a bot token
+ * kept as an auth profile beside the provider keys, the links in the retained
+ * `"bridges"` store, and one connection per process, made when the Gateway
+ * starts or a token is saved. What a chat says shows in its channel as its
+ * speakers; people writing there are guests in a group, and a linked account
+ * speaks as whoever its person plays.
  */
 export function registerBridges(
   api: OpenClawPluginApi,
@@ -114,69 +129,74 @@ export function registerBridges(
   const roster =
     deps.roster ?? (() => new Set(listAgentIds(currentConfig(api))));
   const { messaging, player } = deps;
-  const bridge = sharedBridge({
-    chatExists: (chatId) => messaging.hasChat(chatId),
-    postAsGuest: (input) => messaging.postAsGuest(input),
-    personOf: async (accountId) => {
-      const person = await settings.byDiscord(accountId);
-      if (!person) return undefined;
-      // Only the operator plays anyone until collaborators come.
-      const actor =
-        person === player.operator.id ? await player.playing() : undefined;
-      return { person, ...(actor ? { actor } : {}) };
+  const bridge = sharedBridge(
+    api,
+    {
+      chatExists: (chatId) => messaging.hasChat(chatId),
+      postAsGuest: (input) => messaging.postAsGuest(input),
+      personOf: async (accountId) => {
+        const person = await settings.byDiscord(accountId);
+        if (!person) return undefined;
+        // Only the operator plays anyone until collaborators come.
+        const actor =
+          person === player.operator.id ? await player.playing() : undefined;
+        return { person, ...(actor ? { actor } : {}) };
+      },
+      postAsCharacter: async ({ chatId, actor, text, requestId }) => {
+        const members = await messaging.membersOf(chatId);
+        let sessionKey: string;
+        if (chatId.startsWith("direct:")) {
+          // A direct chat is addressed by the other person in it.
+          const peer = members.find((member) => member !== actor.id);
+          if (!peer || !members.includes(actor.id))
+            throw new NotDelivered(
+              `${actor.name}, whom you play in Kazusa, isn't in the chat this channel is linked to, so nobody heard that.`,
+            );
+          sessionKey = `chat:direct:${peer}`;
+        } else {
+          sessionKey = `chat:group:${chatId.slice("group:".length)}`;
+          // Writing in an open group's channel is joining it, as on Discord.
+          if (!members.includes(actor.id))
+            await messaging
+              .manageChat(
+                actor.id,
+                { action: "join", sessionKey },
+                undefined,
+                roster(),
+              )
+              .catch(() => {
+                throw new NotDelivered(
+                  `${actor.name}, whom you play in Kazusa, isn't in the chat this channel is linked to, and it isn't open to join, so nobody heard that.`,
+                );
+              });
+        }
+        return await messaging.send(
+          actor.id,
+          actor.name,
+          { sessionKey, text, requestId },
+          undefined,
+          roster(),
+          true,
+        );
+      },
+      linkAccount: async (person, account) => {
+        // One account is one person's: whoever had it before loses it.
+        const before = await settings.byDiscord(account.id);
+        if (before && before !== person) {
+          const { discord: _gone, ...rest } = await settings.get(before);
+          await settings.set(before, rest);
+        }
+        await settings.set(person, {
+          ...(await settings.get(person)),
+          discord: { ...account, linkedAt: Date.now() },
+        });
+      },
+      avatarOf: pictures.avatarOf,
+      stickerOf: pictures.stickerOf,
+      warn,
     },
-    postAsCharacter: async ({ chatId, actor, text, requestId }) => {
-      const members = await messaging.membersOf(chatId);
-      let sessionKey: string;
-      if (chatId.startsWith("direct:")) {
-        // A direct chat is addressed by the other person in it.
-        const peer = members.find((member) => member !== actor.id);
-        if (!peer || !members.includes(actor.id))
-          throw new Error(`${actor.name} isn't in this direct chat.`);
-        sessionKey = `chat:direct:${peer}`;
-      } else {
-        sessionKey = `chat:group:${chatId.slice("group:".length)}`;
-        // Writing in an open group's channel is joining it, as on Discord.
-        if (!members.includes(actor.id))
-          await messaging.manageChat(
-            actor.id,
-            { action: "join", sessionKey },
-            undefined,
-            roster(),
-          );
-      }
-      return await messaging.send(
-        actor.id,
-        actor.name,
-        { sessionKey, text, requestId },
-        undefined,
-        roster(),
-        true,
-      );
-    },
-    linkAccount: async (person, account) => {
-      // One account is one person's: whoever had it before loses it.
-      const before = await settings.byDiscord(account.id);
-      if (before && before !== person) {
-        const { discord: _gone, ...rest } = await settings.get(before);
-        await settings.set(before, rest);
-      }
-      await settings.set(person, {
-        ...(await settings.get(person)),
-        discord: { ...account, linkedAt: Date.now() },
-      });
-    },
-    avatarOf: pictures.avatarOf,
-    stickerOf: pictures.stickerOf,
-    warn,
-  });
-  // Every instance's messages, once for the process.
-  const scope = globalThis as { [CELL]?: BridgeCell };
-  const cell = scope[CELL];
-  if (cell && !cell.unsubscribe)
-    cell.unsubscribe = deps.messaging.onAnyEvent((event) =>
-      bridge.outgoing(event),
-    );
+    messaging,
+  );
 
   const loadLinks = async () => {
     const links = new Map<string, BridgeLink>();
@@ -187,16 +207,34 @@ export function registerBridges(
     bridge.setLinks(links);
   };
 
-  const connect = async () => {
-    const token = keys.read(TOKEN);
-    if (!token) {
-      await bridge.disconnect();
-      return;
-    }
-    await bridge.connect(transport(token));
-    const status = bridge.status;
-    if (status.state === "failed") warn(`Bridge: ${status.error}`);
-  };
+  /**
+   * Connects with the saved token, or disconnects without one. Started as
+   * background work: the connection's events run in the context they start in,
+   * and the Gateway's start or a settings request is long over by then.
+   */
+  const connect = () =>
+    new Promise<void>((resolve) => {
+      inBackground(
+        api,
+        async () => {
+          try {
+            const token = keys.read(TOKEN);
+            if (!token) await bridge.disconnect();
+            else {
+              await bridge.connect(transport(token));
+              const status = bridge.status;
+              if (status.state === "failed") warn(`Bridge: ${status.error}`);
+            }
+          } finally {
+            resolve();
+          }
+        },
+        (error) => {
+          warn(`Bridge: ${String(error)}`);
+          resolve();
+        },
+      );
+    });
 
   api.on("gateway_start", (_event, ctx) => {
     void (async () => {
@@ -249,7 +287,7 @@ export function registerBridges(
         ([other, link]) => other !== chatId && link.channelId === channelId,
       );
       if (taken)
-        throw new Error("That channel is already linked to another group.");
+        throw new Error("That channel is already linked to another chat.");
       // A channel the bot can't use is refused, with why, before it is kept.
       const { problem } = await bridge.checkChannel(channelId);
       if (problem) throw new Error(problem);

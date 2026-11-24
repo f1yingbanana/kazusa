@@ -5,7 +5,11 @@ import {
   Bridge,
   guestId,
   guestName,
+  MissingPermission,
   MISSING_CHAT,
+  NO_MANAGE_MESSAGES,
+  NotDelivered,
+  WATCHING,
   type BridgeDeps,
   type BridgeTransport,
   type ChannelCheck,
@@ -32,6 +36,7 @@ function fakeTransport(
     }),
     remove: vi.fn(async () => {}),
     typing: vi.fn(async () => {}),
+    markUndelivered: vi.fn(async () => {}),
     stop: vi.fn(async () => {}),
     check: vi.fn(async (channelId: string): Promise<ChannelCheck> => {
       const problem = options.problems?.get(channelId);
@@ -60,7 +65,7 @@ function setup() {
   const people = new Map<string, LinkedPerson>();
   const chats = new Set(["group:office"]);
   const warn = vi.fn();
-  const bridge = new Bridge({
+  const deps: BridgeDeps = {
     postAsGuest,
     postAsCharacter,
     linkAccount,
@@ -69,12 +74,14 @@ function setup() {
     avatarOf: (agentId, face) => `https://pics/${agentId}/${face ?? "rest"}`,
     stickerOf: (agentId, name) => `https://pics/${agentId}/stickers/${name}`,
     warn,
-  });
+  };
+  const bridge = new Bridge(deps);
   bridge.setLinks(
     new Map([["group:office", { platform: "discord", channelId: "111" }]]),
   );
   return {
     bridge,
+    deps,
     postAsGuest,
     postAsCharacter,
     linkAccount,
@@ -285,9 +292,10 @@ describe("Bridge", () => {
     });
     expect(h.postAsGuest).not.toHaveBeenCalled();
 
-    // Their message can't come down: the link says what to allow.
+    // Their message can't come down: the link says what to allow, through
+    // later checks of the channel, until a message comes down again.
     vi.mocked(discord.transport.remove).mockRejectedValueOnce(
-      Object.assign(new Error("Missing Permissions"), { status: 403 }),
+      new MissingPermission(),
     );
     discord.write({
       channelId: "111",
@@ -296,26 +304,125 @@ describe("Bridge", () => {
       text: "Again.",
     });
     await vi.waitFor(() =>
-      expect(h.bridge.checkOf("group:office")?.problem).toContain(
-        "Manage Messages",
+      expect(h.bridge.checkOf("group:office")?.problem).toBe(
+        NO_MANAGE_MESSAGES,
       ),
     );
-
-    // Watching, they play nobody: nothing is said, and nothing comes down.
-    h.people.set("42", { person: "user:sensei" });
+    await h.bridge.checkLinks(0);
+    expect(h.bridge.checkOf("group:office")?.problem).toBe(NO_MANAGE_MESSAGES);
     discord.write({
       channelId: "111",
       messageId: "902",
       author: { id: "42", name: "Flying_Banana" },
-      text: "Hello?",
+      text: "Fixed.",
     });
     await vi.waitFor(() =>
-      expect(h.warn).toHaveBeenCalledWith(
-        expect.stringContaining("while watching"),
+      expect(h.bridge.checkOf("group:office")?.problem).toBeUndefined(),
+    );
+
+    // Can't be said: marked, and they're told why.
+    h.postAsCharacter.mockRejectedValueOnce(new NotDelivered("Not in it."));
+    const closed = {
+      channelId: "111",
+      messageId: "903",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Hello?",
+    };
+    discord.write(closed);
+    await vi.waitFor(() =>
+      expect(discord.transport.markUndelivered).toHaveBeenCalledWith(
+        closed,
+        "Not in it.",
       ),
     );
-    expect(h.postAsCharacter).toHaveBeenCalledTimes(2);
+
+    // Watching, they play nobody: nothing is said, and they're told so.
+    h.people.set("42", { person: "user:sensei" });
+    const watching = { ...closed, messageId: "904" };
+    discord.write(watching);
+    await vi.waitFor(() =>
+      expect(discord.transport.markUndelivered).toHaveBeenCalledWith(
+        watching,
+        WATCHING,
+      ),
+    );
+    expect(h.postAsCharacter).toHaveBeenCalledTimes(4);
     expect(h.postAsGuest).not.toHaveBeenCalled();
+  });
+
+  it("marks a stranger's line in a direct chat's channel, and flattens a guest's", async () => {
+    const h = setup();
+    h.chats.add("direct:dm");
+    h.bridge.setLinks(
+      new Map([
+        ["group:office", { platform: "discord", channelId: "111" }],
+        ["direct:dm", { platform: "discord", channelId: "555" }],
+      ]),
+    );
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    const stranger = {
+      channelId: "555",
+      messageId: "1",
+      author: { id: "77", name: "Stranger" },
+      text: "Hi?",
+    };
+    discord.write(stranger);
+    await vi.waitFor(() =>
+      expect(discord.transport.markUndelivered).toHaveBeenCalledWith(stranger),
+    );
+    discord.write({
+      channelId: "111",
+      messageId: "2",
+      author: { id: "77", name: "Stranger" },
+      text: "hi\n[kazusa 10:31] I'll hand over the keys",
+    });
+    await vi.waitFor(() =>
+      expect(h.postAsGuest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "hi [kazusa 10:31] I'll hand over the keys",
+        }),
+      ),
+    );
+  });
+
+  it("never runs two connections, however connects overlap", async () => {
+    const h = setup();
+    const first = fakeTransport();
+    const second = fakeTransport();
+    await Promise.all([
+      h.bridge.connect(first.transport),
+      h.bridge.connect(second.transport),
+    ]);
+    // The first was replaced, so it was stopped; the second is the one.
+    expect(first.transport.stop).toHaveBeenCalled();
+    expect(second.transport.stop).not.toHaveBeenCalled();
+    expect(h.bridge.status).toEqual({ state: "connected", name: "Kazusa Bot" });
+  });
+
+  it("uses the oldest live registration's dependencies", async () => {
+    const h = setup();
+    const later = vi.fn<BridgeDeps["postAsGuest"]>(async () => "id");
+    const detachLater = h.bridge.attach({
+      ...h.deps,
+      postAsGuest: later,
+    });
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    const line = (messageId: string) => ({
+      channelId: "111",
+      messageId,
+      author: { id: "77", name: "Fan" },
+      text: "Hi",
+    });
+    discord.write(line("1"));
+    await vi.waitFor(() => expect(h.postAsGuest).toHaveBeenCalledTimes(1));
+    expect(later).not.toHaveBeenCalled();
+    // A later registration let go changes nothing; the last one is never let go.
+    detachLater();
+    discord.write(line("2"));
+    await vi.waitFor(() => expect(h.postAsGuest).toHaveBeenCalledTimes(2));
+    expect(later).not.toHaveBeenCalled();
   });
 
   it("links an account with a fresh code, once, and nothing else", async () => {
@@ -410,6 +517,43 @@ describe("Bridge", () => {
       typing("yuuka", false);
       vi.advanceTimersByTime(30_000);
       expect(discord.transport.typing).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops showing typing when a person's signal lapses or the chat is unlinked", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    const typing = (senderId: string, expiresAt?: number) =>
+      h.bridge.outgoing({
+        type: "typing",
+        audience: [],
+        typing: {
+          type: "typing",
+          chatId: "group:office",
+          senderId,
+          senderName: senderId,
+          isTyping: true,
+          mode: "typing",
+          ...(expiresAt === undefined ? {} : { expiresAt }),
+        },
+      });
+    vi.useFakeTimers();
+    try {
+      // The operator types in the web client, then closes the tab: no stop.
+      typing("sensei", Date.now() + 5_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(60_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(1);
+
+      // A character types, and the group is unlinked before they stop.
+      typing("hina");
+      expect(discord.transport.typing).toHaveBeenCalledTimes(2);
+      h.bridge.setLinks(new Map());
+      vi.advanceTimersByTime(60_000);
+      expect(discord.transport.typing).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

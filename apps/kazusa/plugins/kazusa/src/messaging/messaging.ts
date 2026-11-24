@@ -676,9 +676,20 @@ export class Messaging {
   private validateMembers(
     members: readonly string[],
     configuredAgents?: ReadonlySet<string>,
+    /** Who is asking, for a refusal in their words. */
+    actor?: string,
   ): void {
     if (members.length > 100)
       throw new Error("A chat supports at most 100 members.");
+    // A guest is only in the chats linked to where they write: nobody can
+    // bring them into another, or text them.
+    const guest = members.find(isGuest);
+    if (guest)
+      throw new Error(
+        actor
+          ? this.refusal("guest-unreachable", actor, { who: guest })
+          : `${guest} can't be in this chat.`,
+      );
     if (configuredAgents) {
       for (const member of members) {
         if (!isUser(member) && !configuredAgents.has(member))
@@ -732,7 +743,7 @@ export class Messaging {
             "Exclude yourself from members; the sender is added automatically.",
           );
         const members = [sender, peer].sort();
-        this.validateMembers(members, configuredAgents);
+        this.validateMembers(members, configuredAgents, sender);
         const chat: ChatConversation = {
           id: chatId,
           kind: "direct",
@@ -772,7 +783,7 @@ export class Messaging {
         "Exclude yourself from members; the sender is added automatically.",
       );
     const members = [sender, ...others].sort();
-    this.validateMembers(members, configuredAgents);
+    this.validateMembers(members, configuredAgents, sender);
     // A group of two is a direct chat with a name: one other person is always
     // the direct chat, whatever the title.
     const kind = others.length === 1 ? "direct" : "group";
@@ -1093,7 +1104,7 @@ export class Messaging {
       let change: { readonly text: string; readonly going: boolean } | null =
         null;
       if (params.action === "add_members") {
-        this.validateMembers(params.members, configuredAgents);
+        this.validateMembers(params.members, configuredAgents, agentId);
         const added = params.members.filter((id) => !members.includes(id));
         members = [...new Set([...members, ...params.members])].sort();
         if (added.length)

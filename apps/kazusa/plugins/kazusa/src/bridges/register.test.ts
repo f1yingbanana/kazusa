@@ -68,6 +68,8 @@ function setup() {
     manageChat: vi.fn(
       async (agentId: string, input: { sessionKey: string }) => {
         const chatId = `group:${input.sessionKey.split(":").at(-1)}`;
+        if (chatId === "group:closed")
+          throw new Error("That chat isn't open to join, so this did not run.");
         members.set(chatId, [...(members.get(chatId) ?? []), agentId]);
         return {};
       },
@@ -80,6 +82,7 @@ function setup() {
   };
   let handlers: TransportHandlers | undefined;
   const removed: string[] = [];
+  const undelivered: [string, string | undefined][] = [];
   const transport = vi.fn((token: string): BridgeTransport => ({
     start: async (given) => {
       if (token !== "good") throw new Error("Discord refused the token.");
@@ -89,6 +92,8 @@ function setup() {
     post: async () => {},
     remove: async (_channelId, messageId) => void removed.push(messageId),
     typing: async () => {},
+    markUndelivered: async (line, reason) =>
+      void undelivered.push([line.messageId, reason]),
     stop: async () => {},
     check: async (channelId) =>
       channelId === "333"
@@ -156,6 +161,7 @@ function setup() {
       handlers?.link(code, account) ?? Promise.resolve(""),
     watch: () => (playing = undefined),
     removed,
+    undelivered,
     members,
     settingsRows,
     listening: () => listener !== undefined,
@@ -388,5 +394,37 @@ describe("registerBridges", () => {
     );
     expect(h.messaging.postAsGuest).not.toHaveBeenCalled();
     expect(h.messaging.manageChat).not.toHaveBeenCalled();
+  });
+
+  it("marks a line that can't be said, and tells its writer why", async () => {
+    const h = setup();
+    h.tokens.set("discord", "good");
+    h.links.set("group:closed", { platform: "discord", channelId: "666" });
+    for (const start of h.starts) start({}, {});
+    await vi.waitFor(async () =>
+      expect((await h.call("/kazusa/bridges/account")).body).toMatchObject({
+        bot: "Office Bot",
+      }),
+    );
+    const { code } = BridgeLinkCodeResponseSchema.parse(
+      (await h.call("/kazusa/bridges/account/code", {})).body,
+    );
+    await h.link(code, { id: "42", name: "Flying_Banana" });
+    h.write({
+      channelId: "666",
+      messageId: "1",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Hello?",
+    });
+    await vi.waitFor(() =>
+      expect(h.undelivered).toEqual([
+        [
+          "1",
+          "Sensei, whom you play in Kazusa, isn't in the chat this channel is linked to, and it isn't open to join, so nobody heard that.",
+        ],
+      ]),
+    );
+    expect(h.messaging.send).not.toHaveBeenCalled();
+    expect(h.removed).toEqual([]);
   });
 });

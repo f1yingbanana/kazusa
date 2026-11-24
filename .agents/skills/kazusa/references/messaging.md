@@ -284,7 +284,7 @@ posts still work), one that isn't a text channel, or no Manage Webhooks comes
 back as the link's `problem`, in plain words, and in the Gateway log; the
 channel's and server's names come back too (`channelName`, `server`), shown as
 "#name in Server". A link whose group isn't in this world (kept on a load from
-another game) says so (`MISSING_GROUP`); nothing written in its channel is taken
+another game) says so (`MISSING_CHAT`); nothing written in its channel is taken
 in, and linking a group that isn't here is refused.
 
 **Typing.** While anyone in a linked group types (not a guest, not aloud), the
@@ -303,9 +303,13 @@ links); an account is one person's, so linking it moves it. What a linked person
 writes in a linked channel is said by the character they play (`byPlayer`),
 joining an open group first, and their own Discord message is taken down, since
 the character's copy is posted in its place (Manage Messages; without it the
-link reports it). Watching, they play nobody: it isn't said. Unlinked, they are
-a guest again. Only the operator has settings until collaborators come. Not yet:
-lines said while the bot was disconnected are not posted later.
+link reports it). A line that can't be said (watching, or a character who isn't
+in the chat and can't join it) gets a 🚫 reaction, and its writer a direct
+message saying why (Add Reactions); so does a stranger's line in a linked direct
+chat's channel, without the message. A guest's line comes in as one line: their
+own line break could start what reads as someone else's record. Unlinked, they
+are a guest again. Only the operator has settings until collaborators come. Not
+yet: lines said while the bot was disconnected are not posted later.
 
 ## People at the keyboard (`user:`)
 

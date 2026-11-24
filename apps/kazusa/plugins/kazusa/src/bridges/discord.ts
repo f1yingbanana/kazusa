@@ -11,7 +11,11 @@ import {
 } from "@discordjs/core";
 import { REST } from "@discordjs/rest";
 import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
-import type { BridgeTransport, TransportHandlers } from "./bridge.ts";
+import {
+  MissingPermission,
+  type BridgeTransport,
+  type TransportHandlers,
+} from "./bridge.ts";
 
 /**
  * What the bot reads: servers, their messages and what the messages say, and
@@ -24,7 +28,33 @@ const INTENTS =
   GatewayIntentBits.DirectMessages;
 
 /** A link code as Kazusa shows it: six letters and digits. */
-const LINK_CODE = /^\s*([A-Za-z0-9]{6})\s*$/;
+export const LINK_CODE = /^\s*([A-Za-z0-9]{6})\s*$/;
+
+/** The mark on a message nobody in Kazusa heard. */
+const UNDELIVERED = "🚫";
+
+/**
+ * Close codes Discord ends a connection with for good: a bad token (4004),
+ * intents it doesn't know (4013) or won't give this bot (4014).
+ */
+const REFUSALS: Readonly<Record<number, string>> = {
+  4004: "Discord refused the token.",
+  4013: "Discord refused the bot's intents.",
+  4014: "Discord refused the Message Content intent: switch it on under Bot in the Developer Portal.",
+};
+
+/**
+ * A webhook name Discord takes: at most 80 characters, and never "discord" or
+ * "clyde", which it refuses outright (so a character named for one would post
+ * nothing). A zero-width joiner breaks the word up without changing how it
+ * reads.
+ */
+export function webhookName(name: string): string {
+  const safe = name
+    .replace(/discord|clyde/gi, (word) => `${word[0]}\u200d${word.slice(1)}`)
+    .trim();
+  return Array.from(safe).slice(0, 80).join("") || "Someone";
+}
 
 /** `/link`: someone proves a Discord account is theirs with Kazusa's code. */
 const LINK_COMMAND: RESTPostAPIChatInputApplicationCommandsJSONBody = {
@@ -51,7 +81,9 @@ const statusOf = (error: unknown): number | undefined =>
 const WEBHOOK_NAME = "Kazusa";
 
 /** A message's text as people read it: mentions by name, not by number. */
-function readable(data: GatewayMessageCreateDispatchData): string {
+export function readable(
+  data: Pick<GatewayMessageCreateDispatchData, "content" | "mentions">,
+): string {
   let text = data.content;
   for (const user of data.mentions) {
     const name =
@@ -176,41 +208,80 @@ export function discordTransport(
           text: readable(data),
         });
       });
+      // An emitter's unheard error is thrown; a connection's is only told.
+      gateway.on(WebSocketShardEvents.Error, (error) => {
+        warn(`Bridge: Discord connection: ${String(error)}`);
+      });
+      let refusal: string | undefined;
       const closed = new Promise<never>((_, reject) => {
         gateway.on(WebSocketShardEvents.Closed, (code) => {
-          // 4014: the Message Content intent isn't switched on for the bot.
-          if (code === 4014 || code === 4004)
-            reject(
-              new Error(
-                code === 4014
-                  ? "Discord refused the Message Content intent: switch it on under Bot in the Developer Portal."
-                  : "Discord refused the token.",
-              ),
-            );
+          refusal = REFUSALS[code];
+          if (refusal) reject(new Error(refusal));
         });
       });
       const ready = new Promise<void>((resolve) =>
         gateway.on(WebSocketShardEvents.Ready, () => resolve()),
       );
-      await gateway.connect();
-      await Promise.race([ready, closed]);
+      const connecting = gateway.connect().then(() => ready);
+      // Whichever loses the race below still settles; a rejection nobody
+      // hears stops the whole Gateway (OpenClaw exits on one).
+      closed.catch(() => {});
+      connecting.catch(() => {});
+      try {
+        await Promise.race([connecting, closed]);
+      } catch (error) {
+        // A refused connection also fails `connect()`, with Discord's words.
+        throw refusal ? new Error(refusal) : error;
+      }
       return { name: me.global_name ?? me.username };
     },
     async post(channelId, line) {
-      const hook = await webhookFor(channelId);
-      await client.api.webhooks.execute(hook.id, hook.token, {
-        content: line.text,
-        username: line.name,
-        ...(line.avatarUrl ? { avatar_url: line.avatarUrl } : {}),
-        // A character never pings anyone, @everyone included.
-        allowed_mentions: { parse: [] },
-      });
+      const execute = async () => {
+        const hook = await webhookFor(channelId);
+        await client.api.webhooks.execute(hook.id, hook.token, {
+          content: line.text,
+          username: webhookName(line.name),
+          ...(line.avatarUrl ? { avatar_url: line.avatarUrl } : {}),
+          // A character never pings anyone, @everyone included.
+          allowed_mentions: { parse: [] },
+        });
+      };
+      try {
+        await execute();
+      } catch (error) {
+        // The webhook was deleted or reset in Discord: make it again, once.
+        const status = statusOf(error);
+        if (status !== 404 && status !== 401) throw error;
+        webhooks.delete(channelId);
+        await execute();
+      }
     },
     async typing(channelId) {
       await client.api.channels.showTyping(channelId);
     },
     async remove(channelId, messageId) {
-      await client.api.channels.deleteMessage(channelId, messageId);
+      try {
+        await client.api.channels.deleteMessage(channelId, messageId);
+      } catch (error) {
+        // Gone already: what was wanted.
+        if (statusOf(error) === 404) return;
+        throw statusOf(error) === 403 ? new MissingPermission() : error;
+      }
+    },
+    async markUndelivered(line, reason) {
+      await client.api.channels
+        .addMessageReaction(line.channelId, line.messageId, UNDELIVERED)
+        .catch((error: unknown) => {
+          warn(`Bridge: couldn't mark a message undelivered: ${String(error)}`);
+        });
+      if (!reason) return;
+      // Told to them alone; someone who allows no direct messages isn't.
+      await client.api.users
+        .createDM(line.author.id)
+        .then((dm) =>
+          client.api.channels.createMessage(dm.id, { content: reason }),
+        )
+        .catch(() => {});
     },
     async check(channelId) {
       let channel;
@@ -249,6 +320,8 @@ export function discordTransport(
           ...found,
           problem: "Only a server's text channel can be linked.",
         };
+      // Looked up afresh: a webhook deleted in Discord is made again.
+      webhooks.delete(channelId);
       try {
         await webhookFor(channelId);
       } catch (error) {

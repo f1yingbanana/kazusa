@@ -8,9 +8,10 @@ import type {
 } from "../messaging/messaging.ts";
 
 /**
- * A group chat linked to a chat on another platform: whoever is in the group
- * hears what people write there, and they read what the group says. One link
- * per group, one group per channel.
+ * A group or direct chat linked to a channel on another platform: what the chat
+ * says shows there, and what people write there comes in (as guests in a group;
+ * only linked accounts in a direct chat). One link per chat, one chat per
+ * channel.
  */
 export const BridgeLinkSchema = z.object({
   platform: z.literal("discord"),
@@ -58,8 +59,16 @@ export interface BridgeTransport {
   start(handlers: TransportHandlers): Promise<{ readonly name: string }>;
   /** Shows a line in a channel as its speaker. */
   post(channelId: string, line: OutgoingLine): Promise<void>;
-  /** Takes a message down, once it has been said again as a character. */
+  /**
+   * Takes a message down, once it has been said again as a character; one
+   * already gone is fine. Throws `MissingPermission` when the bot may not.
+   */
   remove(channelId: string, messageId: string): Promise<void>;
+  /**
+   * Marks a message nobody in the world heard, and tells its writer why, when
+   * there is something to tell them; best effort.
+   */
+  markUndelivered(line: IncomingLine, reason?: string): Promise<void>;
   /** Shows the bot typing in a channel for a few seconds (Discord: ten). */
   typing(channelId: string): Promise<void>;
   /** What the bot finds of a channel: its names, and what stops it working. */
@@ -80,6 +89,33 @@ export interface ChannelCheck {
   readonly problem?: string;
 }
 
+/** The platform refused for want of a permission the owner can give. */
+export class MissingPermission extends Error {
+  constructor() {
+    super("Missing permission");
+    this.name = "MissingPermission";
+  }
+}
+
+/**
+ * A linked person's line that couldn't be said, with why, in words for them (it
+ * is told to them on the platform).
+ */
+export class NotDelivered extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "NotDelivered";
+  }
+}
+
+/** What a linked person is told when they write while only watching. */
+export const WATCHING =
+  "You're only watching in Kazusa, so nobody said that. Play as someone there to speak here.";
+
+/** What a link says when the bot can't take a linked person's message down. */
+export const NO_MANAGE_MESSAGES =
+  "The bot can't take your own messages down after saying them as your character. In Discord, allow it Manage Messages in the channel's permissions.";
+
 /** A person who linked their account, and the character they play now. */
 export interface LinkedPerson {
   readonly person: string;
@@ -97,8 +133,9 @@ export interface BridgeDeps {
   /** The person who linked this Discord account, if anyone did. */
   readonly personOf: (accountId: string) => Promise<LinkedPerson | undefined>;
   /**
-   * Says a linked person's line in the group as the character they play,
-   * joining it first when it is open and they aren't in it.
+   * Says a linked person's line in the chat as the character they play, joining
+   * a group first when it is open and they aren't in it. Throws `NotDelivered`
+   * with why when it can't be said.
    */
   readonly postAsCharacter: (input: {
     readonly chatId: string;
@@ -198,16 +235,28 @@ export function lineOf(
 export class Bridge {
   private transport: BridgeTransport | undefined;
   private links = new Map<string, BridgeLink>();
+  /**
+   * Every live registration's dependencies, oldest first: the oldest is used. A
+   * registration made for one turn goes away with it; the Gateway's stays.
+   */
+  private readonly attached: BridgeDeps[];
+  /** Connects and disconnects, one after another: never two connections. */
+  private lifecycle: Promise<void> = Promise.resolve();
   /** Link codes not yet used, by code: whose, and until when. */
   private readonly codes = new Map<
     string,
     { readonly person: string; readonly until: number }
   >();
-  /** Who is typing in each linked channel's group, and the timer that shows it. */
+  /**
+   * Who is typing in each linked chat (until when, for a person's signal that
+   * lapses without a stop), the channel it shows in, and the timer that shows
+   * it.
+   */
   private readonly typists = new Map<
     string,
     {
-      readonly who: Set<string>;
+      readonly channelId: string;
+      readonly who: Map<string, number | undefined>;
       readonly timer: ReturnType<typeof setInterval>;
     }
   >();
@@ -216,28 +265,54 @@ export class Bridge {
   /** Each channel's posts in order. */
   private readonly queues = new Map<string, Promise<void>>();
   private current: BridgeStatus = { state: "off" };
-  /** What the bot found of each link's channel, by group id, and when. */
+  /** What the bot found of each link's channel, by chat id, and when. */
   private readonly checks = new Map<
     string,
     ChannelCheck & { readonly at: number }
   >();
+  /**
+   * What went wrong carrying a link's lines that a channel check can't see
+   * (Manage Messages), by chat id, until it works again.
+   */
+  private readonly notes = new Map<string, string>();
 
-  constructor(private deps: BridgeDeps) {}
+  constructor(deps: BridgeDeps) {
+    this.attached = [deps];
+  }
 
-  /** The newest registration's dependencies; the older one may be gone. */
-  attach(deps: BridgeDeps): void {
-    this.deps = deps;
+  private get deps(): BridgeDeps {
+    // Never empty: the last one stays until another comes.
+    return this.attached[0];
+  }
+
+  /**
+   * Another registration's dependencies, used once those before it are gone;
+   * the returned function lets them go when it is disposed.
+   */
+  attach(deps: BridgeDeps): () => void {
+    this.attached.push(deps);
+    return () => {
+      const at = this.attached.indexOf(deps);
+      if (at >= 0 && this.attached.length > 1) this.attached.splice(at, 1);
+    };
   }
 
   get status(): BridgeStatus {
     return this.current;
   }
 
-  /** The links as stored, keyed by group id. */
+  /** The links as stored, keyed by chat id. */
   setLinks(links: ReadonlyMap<string, BridgeLink>): void {
     this.links = new Map(links);
-    for (const chatId of this.checks.keys())
-      if (!links.has(chatId)) this.checks.delete(chatId);
+    for (const chatId of [...this.checks.keys(), ...this.notes.keys()])
+      if (!links.has(chatId)) {
+        this.checks.delete(chatId);
+        this.notes.delete(chatId);
+      }
+    // Typing shown in a channel no longer this chat's stops.
+    for (const [chatId, typing] of this.typists)
+      if (links.get(chatId)?.channelId !== typing.channelId)
+        this.stopTyping(chatId);
   }
 
   /**
@@ -249,7 +324,8 @@ export class Bridge {
     const found = this.checks.get(chatId);
     if (!found) return undefined;
     const { at: _at, ...check } = found;
-    return check;
+    const note = this.notes.get(chatId);
+    return check.problem || !note ? check : { ...check, problem: note };
   }
 
   /**
@@ -304,46 +380,58 @@ export class Bridge {
     return this.links;
   }
 
+  /** Runs after every connect and disconnect handed over before it. */
+  private serially(work: () => Promise<void>): Promise<void> {
+    const run = this.lifecycle.then(work);
+    this.lifecycle = run.catch(() => {});
+    return run;
+  }
+
   /** Connects with `transport`, replacing any connection there was. */
   async connect(transport: BridgeTransport): Promise<void> {
-    await this.disconnect();
-    this.transport = transport;
-    this.current = { state: "connecting" };
-    try {
-      const { name } = await transport.start({
-        line: (line) => {
-          void this.incoming(line).catch((error: unknown) => {
-            this.deps.warn(`Bridge: couldn't take in a line: ${String(error)}`);
-          });
-        },
-        link: (code, account) => this.redeem(code, account),
-      });
-      if (this.transport === transport) {
+    await this.serially(async () => {
+      await this.stopNow();
+      this.transport = transport;
+      this.current = { state: "connecting" };
+      try {
+        const { name } = await transport.start({
+          line: (line) => {
+            void this.incoming(line).catch((error: unknown) => {
+              this.deps.warn(
+                `Bridge: couldn't take in a line: ${String(error)}`,
+              );
+            });
+          },
+          link: (code, account) => this.redeem(code, account),
+        });
         this.current = { state: "connected", name };
-        await this.checkLinks();
-      }
-    } catch (error) {
-      if (this.transport === transport) {
+      } catch (error) {
         this.transport = undefined;
         this.current = { state: "failed", error: String(error) };
+        await transport.stop().catch(() => {});
+        return;
       }
-      await transport.stop().catch(() => {});
-    }
+      await this.checkLinks();
+    });
   }
 
   async disconnect(): Promise<void> {
+    await this.serially(() => this.stopNow());
+  }
+
+  private async stopNow(): Promise<void> {
     const transport = this.transport;
     this.transport = undefined;
     this.current = { state: "off" };
     this.checks.clear();
-    for (const { timer } of this.typists.values()) clearInterval(timer);
-    this.typists.clear();
+    this.notes.clear();
+    for (const chatId of [...this.typists.keys()]) this.stopTyping(chatId);
     await transport?.stop().catch((error: unknown) => {
       this.deps.warn(`Bridge: couldn't disconnect: ${String(error)}`);
     });
   }
 
-  /** A line from the platform, into the group its channel is linked to. */
+  /** A line from the platform, into the chat its channel is linked to. */
   async incoming(line: IncomingLine): Promise<void> {
     const chatId = [...this.links].find(
       ([, link]) => link.channelId === line.channelId,
@@ -358,12 +446,17 @@ export class Bridge {
       return;
     }
     // A direct chat is two people's: only a linked account speaks into it.
-    if (!chatId.startsWith("group:")) return;
+    if (!chatId.startsWith("group:")) {
+      await this.transport?.markUndelivered(line);
+      return;
+    }
     await this.deps.postAsGuest({
       chatId,
       guest: guestId("discord", line.author.id),
       name: guestName(line.author.name),
-      text,
+      // One line: a guest's own line break could start what reads as someone
+      // else's record (`[kazusa 10:31] …`) in every character's memory.
+      text: text.replace(/\s*\n\s*/g, " "),
       requestId: `discord:${line.messageId}`,
     });
   }
@@ -371,7 +464,7 @@ export class Bridge {
   /**
    * A linked person's line, said as the character they play. Their own message
    * then comes down, since the character's copy is posted in its place, as
-   * PluralKit does. Watching, they play nobody, so it isn't said.
+   * PluralKit does. One that can't be said is marked, and they are told why.
    */
   private async asCharacter(
     chatId: string,
@@ -380,27 +473,30 @@ export class Bridge {
     text: string,
   ): Promise<void> {
     if (!linked.actor) {
-      this.deps.warn(
-        `Bridge: ${linked.person} wrote in ${line.channelId} while watching; not said.`,
-      );
+      await this.transport?.markUndelivered(line, WATCHING);
       return;
     }
-    await this.deps.postAsCharacter({
-      chatId,
-      actor: linked.actor,
-      text,
-      requestId: `discord:${line.messageId}`,
-    });
-    await this.transport
-      ?.remove(line.channelId, line.messageId)
-      .catch((error: unknown) => {
-        const problem =
-          "The bot can't take your own messages down after saying them as your character. In Discord, allow it Manage Messages in the channel's permissions.";
-        const last = this.checks.get(chatId);
-        if (last?.problem !== problem)
-          this.deps.warn(`Bridge: ${problem} (${String(error)})`);
-        this.checks.set(chatId, { ...last, at: Date.now(), problem });
+    try {
+      await this.deps.postAsCharacter({
+        chatId,
+        actor: linked.actor,
+        text,
+        requestId: `discord:${line.messageId}`,
       });
+    } catch (error) {
+      if (!(error instanceof NotDelivered)) throw error;
+      await this.transport?.markUndelivered(line, error.message);
+      return;
+    }
+    try {
+      await this.transport?.remove(line.channelId, line.messageId);
+      this.notes.delete(chatId);
+    } catch (error) {
+      if (!(error instanceof MissingPermission)) throw error;
+      if (this.notes.get(chatId) !== NO_MANAGE_MESSAGES)
+        this.deps.warn(`Bridge: ${chatId}: ${NO_MANAGE_MESSAGES}`);
+      this.notes.set(chatId, NO_MANAGE_MESSAGES);
+    }
   }
 
   /**
@@ -439,7 +535,9 @@ export class Bridge {
 
   /**
    * A message from Messaging, any instance's: shown on the platform when its
-   * group is linked, unless a guest wrote it there.
+   * chat is linked, unless a guest wrote it there. Called inside Messaging's
+   * queue, so the line is worked out (pictures read, the world's repository
+   * asked) only once its turn to post comes.
    */
   outgoing(event: MessagingEvent): void {
     if (event.type === "typing") {
@@ -452,14 +550,18 @@ export class Bridge {
     const transport = this.transport;
     if (!link || !transport || isGuest(delivery.sender)) return;
     if (this.posted.has(delivery.id)) return;
-    const line = lineOf(delivery, this.deps);
-    if (!line) return;
     this.posted.add(delivery.id);
     if (this.posted.size > 5_000)
-      this.posted.delete(this.posted.values().next().value as string);
+      for (const oldest of this.posted) {
+        this.posted.delete(oldest);
+        break;
+      }
     const previous = this.queues.get(link.channelId) ?? Promise.resolve();
     const next = previous
-      .then(() => transport.post(link.channelId, line))
+      .then(async () => {
+        const line = lineOf(delivery, this.deps);
+        if (line) await transport.post(link.channelId, line);
+      })
       .catch((error: unknown) => {
         this.deps.warn(
           `Bridge: couldn't post to Discord channel ${link.channelId}: ${String(error)}`,
@@ -469,37 +571,53 @@ export class Bridge {
   }
 
   /**
-   * Someone in a linked group started or stopped typing: the channel shows the
+   * Someone in a linked chat started or stopped typing: the channel shows the
    * bot typing, again every few seconds while anyone still is. Discord can't
    * show a webhook's name typing, nor stop it early: it lapses ten seconds
    * after the last time it was shown. Lines said aloud aren't typed.
    */
   private typed(typing: TypingStreamEvent): void {
+    // A stop counts whatever became of the link since it started.
+    if (!typing.isTyping) {
+      const current = this.typists.get(typing.chatId);
+      current?.who.delete(typing.senderId);
+      if (current?.who.size === 0) this.stopTyping(typing.chatId);
+      return;
+    }
     const link = this.links.get(typing.chatId);
     if (!link || isGuest(typing.senderId) || typing.mode !== "typing") return;
-    const channelId = link.channelId;
-    const current = this.typists.get(channelId);
-    if (!typing.isTyping) {
-      current?.who.delete(typing.senderId);
-      if (current && current.who.size === 0) {
-        clearInterval(current.timer);
-        this.typists.delete(channelId);
-      }
-      return;
-    }
+    const current = this.typists.get(typing.chatId);
     if (current) {
-      current.who.add(typing.senderId);
+      current.who.set(typing.senderId, typing.expiresAt);
       return;
     }
+    const chatId = typing.chatId;
+    const channelId = link.channelId;
+    const who = new Map([[typing.senderId, typing.expiresAt]]);
     const show = () => {
+      // A person's signal that lapsed sent no stop: it ends here.
+      const now = Date.now();
+      for (const [sender, until] of who)
+        if (until !== undefined && until <= now) who.delete(sender);
+      if (who.size === 0) {
+        this.stopTyping(chatId);
+        return;
+      }
       void this.transport?.typing(channelId).catch(() => {
         // Only a hint; a refusal changes nothing that matters.
       });
     };
-    show();
     const timer = setInterval(show, TYPING_EVERY_MS);
     timer.unref?.();
-    this.typists.set(channelId, { who: new Set([typing.senderId]), timer });
+    this.typists.set(chatId, { channelId, who, timer });
+    show();
+  }
+
+  private stopTyping(chatId: string): void {
+    const current = this.typists.get(chatId);
+    if (!current) return;
+    clearInterval(current.timer);
+    this.typists.delete(chatId);
   }
 
   /** Waits for every post handed over so far: for tests and shutdown. */

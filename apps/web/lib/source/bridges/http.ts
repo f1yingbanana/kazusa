@@ -28,7 +28,7 @@ export async function saveBridgeToken(
   );
 }
 
-/** Links a group to a Discord channel, or unlinks it. */
+/** Links a group or direct chat to a Discord channel, or unlinks it. */
 export async function linkBridge(
   payload: BridgeLinkPayload,
 ): Promise<BridgesResponse> {
