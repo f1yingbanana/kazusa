@@ -397,9 +397,9 @@ function BotSetup() {
           </li>
           <li>Add the token here.</li>
           <li>
-            Link a group from its chat sidebar, with the channel&apos;s ID: in
-            Discord with Developer Mode on, right-click the channel, then Copy
-            Channel ID.
+            Link a group or direct chat from its sidebar, with the
+            channel&apos;s ID: in Discord with Developer Mode on, right-click
+            the channel, then Copy Channel ID.
           </li>
         </ol>
       </CollapsibleContent>

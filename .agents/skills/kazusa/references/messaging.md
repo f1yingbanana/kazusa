@@ -243,11 +243,14 @@ transaction.
 
 ## Guests and linked channels (`guest:`, `src/bridges/`)
 
-A group can be linked to a Discord channel
+A group or a direct chat can be linked to a Discord channel
 (`POST /kazusa/bridges/link { chatId, channelId }`, owner only, from the chat
-sidebar). People writing in that channel are **guests**: `guest:discord-` and
-ten letters and digits (`guestId`, a hash of the account, the same every time;
-an 18-digit Discord id cost tokens and got miscopied), outsiders like `user:`
+sidebar; not a conversation in person, which ends and has nobody on Discord in
+it). A direct chat is two people's: only a linked account speaks into it, as
+whoever its person plays, and everyone else in the channel is ignored. In a
+group, people writing in the channel are **guests**: `guest:discord-` and ten
+letters and digits (`guestId`, a hash of the account, the same every time; an
+18-digit Discord id cost tokens and got miscopied), outsiders like `user:`
 (`isOutsider`), with no brain, no ledger, no place and no membership. Their
 lines come in through `Messaging.postAsGuest`, into the group whatever its
 members, so whoever is in it now hears them and nobody else; with nobody in it,

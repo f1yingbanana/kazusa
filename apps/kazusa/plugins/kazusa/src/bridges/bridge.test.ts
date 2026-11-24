@@ -5,7 +5,7 @@ import {
   Bridge,
   guestId,
   guestName,
-  MISSING_GROUP,
+  MISSING_CHAT,
   type BridgeDeps,
   type BridgeTransport,
   type ChannelCheck,
@@ -355,7 +355,7 @@ describe("Bridge", () => {
     expect(h.bridge.checkOf("group:office")).toEqual({
       name: "schale-office",
       server: "Kivotos",
-      problem: MISSING_GROUP,
+      problem: MISSING_CHAT,
     });
     discord.write({
       channelId: "111",

@@ -629,10 +629,18 @@ export function OpenToJoin({
 }
 
 /**
- * The owner links a group to a Discord channel by the channel's ID: people
- * writing there are guests in the group, and the group's lines show there.
+ * The owner links a group or a direct chat to a Discord channel by the
+ * channel's ID: the chat's lines show there, linked accounts speak there as
+ * whoever they play, and in a group anyone else is a guest.
  */
-export function DiscordChannel({ id }: { id: string }) {
+export function DiscordChannel({
+  id,
+  direct = false,
+}: {
+  id: string;
+  /** A direct chat: two people's, so nobody else is a guest in it. */
+  direct?: boolean;
+}) {
   const { data, link } = useBridges();
   const entry = data?.links.find((link) => link.chatId === id);
   const linked = entry?.channelId;
@@ -699,7 +707,9 @@ export function DiscordChannel({ id }: { id: string }) {
       ) : (
         <span className="text-xs text-muted-foreground">
           {data.discord.status.state === "connected"
-            ? "People writing there are guests here; this group's lines show there."
+            ? direct
+              ? "This chat's lines show there; your linked account speaks there as whoever you play."
+              : "People writing there are guests here; this group's lines show there."
             : "Connect a bot under Settings, Chat apps, first."}
         </span>
       )}

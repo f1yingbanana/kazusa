@@ -156,9 +156,9 @@ export function guestName(name: string): string {
   return plain || "Someone";
 }
 
-/** What a link says when its group isn't in this world. */
-export const MISSING_GROUP =
-  "This group isn't in this world, so nothing written in the channel goes anywhere. Link the channel from another group, or unlink it.";
+/** What a link says when its chat isn't in this world. */
+export const MISSING_CHAT =
+  "This chat isn't in this world, so nothing written in the channel goes anywhere. Link the channel from another chat, or unlink it.";
 
 /**
  * How often to show typing again while someone still types: Discord's lasts ten
@@ -286,7 +286,7 @@ export class Bridge {
           }));
         const check: ChannelCheck = exists
           ? found
-          : { ...found, problem: MISSING_GROUP };
+          : { ...found, problem: MISSING_CHAT };
         this.checks.set(chatId, { ...check, at: now });
         if (check.problem && check.problem !== last?.problem)
           this.deps.warn(
@@ -350,13 +350,15 @@ export class Bridge {
     )?.[0];
     const text = line.text.trim();
     if (!chatId || !text) return;
-    // A group from another game: its link already says so.
+    // A chat from another game: its link already says so.
     if (!(await this.deps.chatExists(chatId))) return;
     const linked = await this.deps.personOf(line.author.id);
     if (linked) {
       await this.asCharacter(chatId, line, linked, text);
       return;
     }
+    // A direct chat is two people's: only a linked account speaks into it.
+    if (!chatId.startsWith("group:")) return;
     await this.deps.postAsGuest({
       chatId,
       guest: guestId("discord", line.author.id),

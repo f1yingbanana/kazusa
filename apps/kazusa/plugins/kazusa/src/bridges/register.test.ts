@@ -233,13 +233,17 @@ describe("registerBridges", () => {
     });
     expect(gone).toEqual({
       status: 400,
-      body: { error: "That group isn't in this world." },
+      body: { error: "That chat isn't in this world." },
     });
-    const direct = await h.call("/kazusa/bridges/link", {
-      chatId: "direct:abc",
+    // A conversation in person ends, and nobody on Discord is there.
+    const huddle = await h.call("/kazusa/bridges/link", {
+      chatId: "huddle:abc",
       channelId: "222",
     });
-    expect(direct.status).toBeGreaterThanOrEqual(400);
+    expect(huddle).toEqual({
+      status: 400,
+      body: { error: "Only a group or a direct chat can be linked." },
+    });
 
     const moved = await h.call("/kazusa/bridges/link", {
       chatId: "group:office",
@@ -337,5 +341,52 @@ describe("registerBridges", () => {
         expect.objectContaining({ requestId: "discord:901" }),
       ),
     );
+  });
+
+  it("links a direct chat: only a linked account speaks into it", async () => {
+    const h = setup();
+    h.tokens.set("discord", "good");
+    h.links.set("direct:dm", { platform: "discord", channelId: "555" });
+    h.members.set("direct:dm", ["hina", "sensei"]);
+    for (const start of h.starts) start({}, {});
+    await vi.waitFor(async () =>
+      expect((await h.call("/kazusa/bridges/account")).body).toMatchObject({
+        bot: "Office Bot",
+      }),
+    );
+    const { code } = BridgeLinkCodeResponseSchema.parse(
+      (await h.call("/kazusa/bridges/account/code", {})).body,
+    );
+    await h.link(code, { id: "42", name: "Flying_Banana" });
+
+    // Someone else in the channel: a direct chat is two people's.
+    h.write({
+      channelId: "555",
+      messageId: "1",
+      author: { id: "77", name: "Stranger" },
+      text: "Hi?",
+    });
+    h.write({
+      channelId: "555",
+      messageId: "2",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Hina, are you free?",
+    });
+    await vi.waitFor(() =>
+      expect(h.messaging.send).toHaveBeenCalledWith(
+        "sensei",
+        "Sensei",
+        {
+          sessionKey: "chat:direct:hina",
+          text: "Hina, are you free?",
+          requestId: "discord:2",
+        },
+        undefined,
+        new Set(["sensei", "hina"]),
+        true,
+      ),
+    );
+    expect(h.messaging.postAsGuest).not.toHaveBeenCalled();
+    expect(h.messaging.manageChat).not.toHaveBeenCalled();
   });
 });

@@ -126,15 +126,25 @@ export function registerBridges(
       return { person, ...(actor ? { actor } : {}) };
     },
     postAsCharacter: async ({ chatId, actor, text, requestId }) => {
-      const sessionKey = `chat:group:${chatId.slice("group:".length)}`;
-      // Writing in an open group's channel is joining it, as on Discord.
-      if (!(await messaging.membersOf(chatId)).includes(actor.id))
-        await messaging.manageChat(
-          actor.id,
-          { action: "join", sessionKey },
-          undefined,
-          roster(),
-        );
+      const members = await messaging.membersOf(chatId);
+      let sessionKey: string;
+      if (chatId.startsWith("direct:")) {
+        // A direct chat is addressed by the other person in it.
+        const peer = members.find((member) => member !== actor.id);
+        if (!peer || !members.includes(actor.id))
+          throw new Error(`${actor.name} isn't in this direct chat.`);
+        sessionKey = `chat:direct:${peer}`;
+      } else {
+        sessionKey = `chat:group:${chatId.slice("group:".length)}`;
+        // Writing in an open group's channel is joining it, as on Discord.
+        if (!members.includes(actor.id))
+          await messaging.manageChat(
+            actor.id,
+            { action: "join", sessionKey },
+            undefined,
+            roster(),
+          );
+      }
       return await messaging.send(
         actor.id,
         actor.name,
@@ -229,10 +239,11 @@ export function registerBridges(
     const { chatId, channelId } = BridgeLinkPayloadSchema.parse(
       await readJsonBody(req),
     );
-    if (!chatId.startsWith("group:"))
-      throw new Error("Only a group chat can be linked.");
+    // Not a conversation in person: it ends, and nobody on Discord is there.
+    if (!chatId.startsWith("group:") && !chatId.startsWith("direct:"))
+      throw new Error("Only a group or a direct chat can be linked.");
     if (channelId && !(await messaging.hasChat(chatId)))
-      throw new Error("That group isn't in this world.");
+      throw new Error("That chat isn't in this world.");
     if (channelId) {
       const taken = [...bridge.allLinks()].find(
         ([other, link]) => other !== chatId && link.channelId === channelId,
