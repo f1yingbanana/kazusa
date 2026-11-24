@@ -29,7 +29,7 @@ import { Toolbar, type ToolbarAction } from "@/components/inspector/toolbar";
 import {
   CastDialog,
   type CastRequest,
-} from "@/components/views/world/cast-dialog";
+} from "@/components/views/characters/cast-dialog";
 import { useStage } from "@/hooks/use-stage";
 import { useCharacter, useCharacterStatus } from "@/hooks/use-characters";
 import { useAccess } from "@/hooks/use-access";
@@ -272,7 +272,7 @@ export function CharacterHeaderSection({ entity }: { entity: EntityRef }) {
           {
             id: "stage",
             group: "cast",
-            label: offstage ? "Enable" : "Disable",
+            label: offstage ? "Bring onstage" : "Send offstage",
             icon: PowerIcon,
             onSelect: () =>
               setCast({

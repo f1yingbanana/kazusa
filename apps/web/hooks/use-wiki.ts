@@ -47,10 +47,9 @@ export function useWikiPage(id: string | undefined, agent?: string) {
   );
 }
 
-export function useWikiLint(agent?: string) {
-  return useSWR<WikiLintResponse>(useWikiKey(["lint", agent ?? ""]), () =>
-    fetchWikiLint(agent),
-  );
+/** Every wiki's problems, the characters' own included. */
+export function useWikiLint() {
+  return useSWR<WikiLintResponse>(useWikiKey(["lint"]), () => fetchWikiLint());
 }
 
 export function useMemoryRuns(agent: string | undefined) {

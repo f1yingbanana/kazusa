@@ -1,313 +1,122 @@
 "use client";
-import { useLiveStore } from "@/lib/live/state";
-import { useShallow } from "zustand/react/shallow";
 
-import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
-import { useQueryStates, parseAsString } from "nuqs";
-import { worldParsers } from "./search-params";
+import { parseAsString, useQueryStates } from "nuqs";
 import { useCallback, useMemo, useState } from "react";
 import type { CharacterSummary } from "@kazusa/client";
-import {
-  BrainIcon,
-  CircleDashedIcon,
-  EllipsisIcon,
-  FolderIcon,
-  FootprintsIcon,
-  ListFilterIcon,
-  MapIcon,
-  MapPinIcon,
-  MoonIcon,
-  PowerIcon,
-  PowerOffIcon,
-  StarIcon,
-  UserCheckIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { UsersIcon } from "lucide-react";
 import { CharacterRow } from "@/components/entities/character-row";
-import { taskIcon } from "@/components/entities/task-icon";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
+import {
+  CastDialog,
+  type CastRequest,
+} from "@/components/views/characters/cast-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useStage } from "@/hooks/use-stage";
+import { useCast } from "@/hooks/use-characters";
 import { useSelection } from "@/hooks/use-selection";
-import { filterCharacters, type KindFilter } from "@/lib/state/grouping";
-import { markQuietSelection } from "@/lib/state/ui-store";
+import { useStage } from "@/hooks/use-stage";
+import { useClockStore } from "@/lib/live/clock-state";
+import { useLiveStore } from "@/lib/live/state";
 import type { SectionSidebarProps } from "@/lib/registry/types";
+import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
+import { matchesQuery } from "@/lib/state/grouping";
 import { useWatchlist } from "@/lib/state/preferences-store";
+import { markQuietSelection } from "@/lib/state/ui-store";
+import { bucket, formatSimDuration, MINUTE } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
-import {
-  ALL_FOLDER,
-  KIND_LABELS,
-  OFFSTAGE_FOLDER,
-  TRANSIT_FOLDER,
-  UNPLACED_FOLDER,
-  WATCH_FOLDER,
-  busySummary,
-  useDimensions,
-  useWorldFolders,
-  useWorldParams,
-  type Dimension,
-  type Folder,
-} from "./world-state";
-import { CastDialog, type CastIntent, type CastRequest } from "./cast-dialog";
+import { worldParsers } from "./search-params";
+import { PLACE_PREFIX, useWorldNow, type Room } from "./world-state";
 
-function FolderRow({
-  icon: Icon,
-  label,
-  count,
-  hint,
+function Heading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="px-2.5 pt-4 pb-1 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase first:pt-1">
+      {children}
+    </h3>
+  );
+}
+
+/** A place with people in it, heading them: opens it on the map. */
+function RoomHeading({
+  room,
   active,
   onOpen,
-  depth = 0,
-  compact = false,
-  onstage,
-  menu,
 }: {
-  icon: LucideIcon;
-  label: string;
-  count: number;
-  hint?: string | null;
+  room: Room;
   active: boolean;
-  onOpen: () => void;
-  /** Place tree depth; each level indents one step. */
-  depth?: number;
-  /** One line (hint beside the label), for long trees. */
-  compact?: boolean;
-  /** How many of the group are onstage; the count then reads "4/11". */
-  onstage?: number;
-  /** Group actions, beside the row rather than inside its button. */
-  menu?: React.ReactNode;
+  onOpen: (placeId: string) => void;
 }) {
   return (
-    <div
-      className={cn(
-        "group/folder flex items-center rounded-md transition-colors hover:bg-sidebar-accent/70",
-        active && "bg-sidebar-accent text-sidebar-accent-foreground",
-      )}
-    >
+    <h3 className="pt-3 first:pt-0">
       <button
         type="button"
         aria-current={active ? "true" : undefined}
-        onClick={onOpen}
-        style={
-          depth ? { paddingLeft: `${0.625 + depth * 0.875}rem` } : undefined
-        }
+        title="Show on map"
+        onClick={() => onOpen(room.placeId)}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:outline-2 focus-visible:outline-ring",
-          compact ? "h-9" : "h-11",
-          menu ? "pr-1" : undefined,
+          "flex w-full min-w-0 items-baseline gap-1.5 rounded-md px-2.5 py-1 text-left text-xs outline-none hover:bg-sidebar-accent/70 focus-visible:outline-2 focus-visible:outline-ring",
+          active && "bg-sidebar-accent text-sidebar-accent-foreground",
         )}
       >
-        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span
-          className={cn(
-            "flex min-w-0 flex-1",
-            compact ? "items-baseline gap-2" : "flex-col",
-          )}
-        >
-          <span
-            className={cn(
-              "truncate text-sm leading-tight",
-              compact && "max-w-full shrink-0",
-              count === 0 && "text-muted-foreground",
-            )}
-          >
-            {label}
-          </span>
-          {hint ? (
-            <span className="truncate font-mono text-[11px] leading-tight text-primary">
-              {hint}
-            </span>
-          ) : null}
-        </span>
-        <span
-          className={cn(
-            "font-mono text-xs tabular-nums",
-            count === 0 ? "text-muted-foreground/50" : "text-muted-foreground",
-          )}
-        >
-          {onstage === undefined ? count : `${onstage}/${count}`}
-        </span>
+        <span className="truncate font-medium">{room.label}</span>
+        {room.area ? (
+          <span className="truncate text-muted-foreground">{room.area}</span>
+        ) : null}
       </button>
-      {menu}
-    </div>
+    </h3>
   );
 }
 
 /**
- * A group's onstage controls. Each item opens the cast dialog, which explains
- * the change before anything happens.
+ * World's sidebar: who is where right now, one row each, under the place
+ * they're in. Only places with someone in them are listed; the map shows the
+ * rest. Search finds anyone in the cast, offstage too.
  */
-function CastMenu({
-  label,
-  cast,
-  onstage,
-  onChoose,
-}: {
-  label: string;
-  cast: readonly CharacterSummary[];
-  onstage: number;
-  onChoose: (request: CastRequest) => void;
-}) {
-  const open = (intent: CastIntent) => onChoose({ label, cast, intent });
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="mr-1 shrink-0 opacity-0 group-hover/folder:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
-          />
-        }
-      >
-        <EllipsisIcon />
-        <span className="sr-only">{`Who's onstage in ${label}`}</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{`${onstage} of ${cast.length} onstage`}</DropdownMenuLabel>
-          {onstage < cast.length ? (
-            <DropdownMenuItem onClick={() => open("onstage")}>
-              <PowerIcon />
-              Bring all onstage
-            </DropdownMenuItem>
-          ) : null}
-          {onstage > 0 ? (
-            <DropdownMenuItem onClick={() => open("offstage")}>
-              <PowerOffIcon />
-              Send all offstage
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem onClick={() => open("choose")}>
-            <UserCheckIcon />
-            Choose who…
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function groupIcon(by: Dimension, folder: Folder): LucideIcon {
-  if (by === "activity")
-    return taskIcon(folder.key === "__none" ? undefined : folder.key);
-  if (by === "brain") return BrainIcon;
-  if (by === "place") {
-    if (folder.key === TRANSIT_FOLDER) return FootprintsIcon;
-    if (folder.key === UNPLACED_FOLDER) return CircleDashedIcon;
-    if (folder.key === OFFSTAGE_FOLDER) return MoonIcon;
-    return folder.isArea ? MapIcon : MapPinIcon;
-  }
-  return FolderIcon;
-}
-
-/**
- * World's sidebar: folders of characters. Watchlist and Everyone are fixed; the
- * rest come from the chosen dimension. Typing searches characters directly, so
- * jumping to someone never needs a folder.
- */
-export function WorldSidebar({
-  onNavigated,
-  asFirstScreen = false,
-}: SectionSidebarProps & {
-  /** Rendered as the narrow-screen first screen, where nothing is open yet. */
-  asFirstScreen?: boolean;
-}) {
-  const [, setParams] = useQueryStates({
+export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
+  const [{ "world.in": focus }, setParams] = useQueryStates({
     sel: entityRefParser,
     view: parseAsString,
     "world.in": worldParsers["world.in"],
-    "world.by": worldParsers["world.by"],
-    "world.kind": worldParsers["world.kind"],
+    "world.plane": worldParsers["world.plane"],
   });
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
+  const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
   const {
-    by,
-    defaultBy,
-    kind,
-    folder: openFolder,
-    folderParam,
-  } = useWorldParams();
-  const dimensions = useDimensions();
-  const folder = asFirstScreen && folderParam === null ? null : openFolder;
-  const {
-    characters,
-    groups,
+    onstage,
+    cast,
+    rooms,
+    travelers,
+    unplaced,
     watched,
-    everyone,
-    castOf,
-    offstage,
+    places,
     isLoading,
     error,
-  } = useWorldFolders(by, kind);
-  const [query, setQuery] = useState("");
+  } = useWorldNow();
   const { apply: canStage } = useStage();
-  const [castRequest, setCastRequest] = useState<CastRequest | null>(null);
-
-  /** Count and menu for a folder that is a group worth switching. */
-  function stageProps(key: string, label: string) {
-    const cast = canStage ? castOf(key) : undefined;
-    if (!cast?.length) return {};
-    const onstage = cast.filter((c) => !offstage.has(c.id)).length;
-    return {
-      onstage,
-      count: cast.length,
-      menu: (
-        <CastMenu
-          label={label}
-          cast={cast}
-          onstage={onstage}
-          onChoose={setCastRequest}
-        />
-      ),
-    };
-  }
-
-  const matches = useMemo(
-    () => (query.trim() ? filterCharacters(characters, "everyone", query) : []),
-    [characters, query],
+  const [query, setQuery] = useState("");
+  const now = useClockStore((state) =>
+    travelers.length ? bucket(state.simNow, MINUTE) : 0,
   );
-  const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
-  const busyHints = useLiveStore(
-    useShallow(
-      (state) =>
-        new Map([
-          [WATCH_FOLDER, busySummary(watched, state.statuses)],
-          [ALL_FOLDER, busySummary(everyone, state.statuses)],
-          ...groups.map(
-            (group) =>
-              [group.key, busySummary(group.members, state.statuses)] as const,
-          ),
-        ]),
-    ),
+  const locations = useLiveStore((state) =>
+    travelers.length ? state.locations : null,
   );
+
   const selectedId = selection?.kind === "character" ? selection.id : null;
-  const customized = kind !== "characters" || by !== defaultBy;
-
-  /**
-   * Opening a place also shows its details, without covering the list on narrow
-   * screens.
-   */
-  function open(key: string, placeId?: string) {
-    const sel = placeId ? ({ kind: "place", id: placeId } as const) : undefined;
-    if (sel) markQuietSelection(serializeEntityRef(sel));
-    void setParams({ view: "world", "world.in": key, ...(sel ? { sel } : {}) });
-    onNavigated?.();
-  }
+  const everyone = useCast();
+  const matches = useMemo(
+    () =>
+      query.trim()
+        ? everyone.filter((c) => matchesQuery(c, query)).slice(0, 60)
+        : [],
+    [everyone, query],
+  );
 
   const onSelect = useCallback(
     (id: string) => {
@@ -317,26 +126,44 @@ export function WorldSidebar({
     [select, onNavigated],
   );
 
-  // A group key only means something within its dimension; switching drops it.
-  const groupOpen =
-    folderParam !== null &&
-    folderParam !== ALL_FOLDER &&
-    folderParam !== WATCH_FOLDER;
-  function setBy(next: Dimension) {
-    void setParams(
-      {
-        "world.by": next === defaultBy ? null : next,
-        ...(groupOpen ? { "world.in": null } : {}),
-      },
-      { history: "replace" },
-    );
+  /** The map flies there and its details open, without covering the list. */
+  function openPlace(placeId: string) {
+    const sel = { kind: "place", id: placeId } as const;
+    markQuietSelection(serializeEntityRef(sel));
+    void setParams({
+      view: "world",
+      "world.in": `${PLACE_PREFIX}${placeId}`,
+      // The place picks its map; a plane left from before would win.
+      "world.plane": null,
+      sel,
+    });
+    onNavigated?.();
   }
-  function setKind(next: KindFilter) {
-    void setParams(
-      { "world.kind": next === "characters" ? null : next },
-      { history: "replace" },
-    );
+
+  const [castRequest, setCastRequest] = useState<CastRequest | null>(null);
+  function changeCast() {
+    setCastRequest({ label: "Everyone", cast: everyone, intent: "choose" });
   }
+
+  const arrival = (id: string) => {
+    const arriveAt = locations?.get(id)?.trip?.arriveAt;
+    if (!arriveAt || now === 0) return undefined;
+    return arriveAt > now
+      ? `in ${formatSimDuration(arriveAt - now)}`
+      : "arriving";
+  };
+
+  const rows = (people: readonly CharacterSummary[], transit = false) =>
+    people.map((character) => (
+      <CharacterRow
+        key={character.id}
+        character={character}
+        selected={selectedId === character.id}
+        starred={watchSet.has(character.id)}
+        onSelect={onSelect}
+        trailing={transit ? arrival(character.id) : undefined}
+      />
+    ));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -344,89 +171,29 @@ export function WorldSidebar({
         query={query}
         onQueryChange={setQuery}
         placeholder={
-          characters.length
-            ? `Search ${characters.length} characters`
+          everyone.length
+            ? `Search ${everyone.length} characters`
             : "Search characters"
         }
         label="Search characters"
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" className="relative" />
-            }
-          >
-            <ListFilterIcon />
-            {customized ? (
-              <span
-                aria-hidden
-                className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary"
-              />
-            ) : null}
-            <span className="sr-only">
-              {customized
-                ? "Folders and filters (changed)"
-                : "Folders and filters"}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Folders by</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={by}
-                onValueChange={(value) => setBy(value as Dimension)}
-              >
-                {dimensions.map((d) => (
-                  <DropdownMenuRadioItem key={d.id} value={d.id}>
-                    {d.label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Show</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={kind}
-                onValueChange={(value) => setKind(value as KindFilter)}
-              >
-                {(Object.keys(KIND_LABELS) as KindFilter[]).map((value) => (
-                  <DropdownMenuRadioItem key={value} value={value}>
-                    {KIND_LABELS[value]}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </PanelToolbar>
+      />
 
       {query.trim() ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-2">
-          <h3 className="px-3 py-1 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {matches.length === 1 ? "1 match" : `${matches.length} matches`}
-          </h3>
+        <section
+          aria-label="Search results"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-2"
+        >
           {matches.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">
               No characters match that search.
             </p>
           ) : (
-            matches
-              .slice(0, 60)
-              .map((character) => (
-                <CharacterRow
-                  key={character.id}
-                  character={character}
-                  selected={selectedId === character.id}
-                  starred={watchSet.has(character.id)}
-                  onSelect={onSelect}
-                />
-              ))
+            rows(matches)
           )}
-        </div>
+        </section>
       ) : isLoading ? (
         <div className="flex flex-col gap-1 px-3 py-1" aria-hidden>
-          {Array.from({ length: 8 }).map((_, index) => (
+          {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-9" />
           ))}
         </div>
@@ -434,54 +201,80 @@ export function WorldSidebar({
         <p className="px-4 py-6 text-sm text-muted-foreground">
           {error.message}
         </p>
+      ) : onstage.length === 0 ? (
+        <Empty className="border-none">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UsersIcon />
+            </EmptyMedia>
+            <EmptyTitle>Nobody is onstage</EmptyTitle>
+            <EmptyDescription>
+              Bring characters onstage to see them live in the world.
+            </EmptyDescription>
+          </EmptyHeader>
+          {canStage ? (
+            <Button variant="outline" size="sm" onClick={changeCast}>
+              Choose who's onstage
+            </Button>
+          ) : null}
+        </Empty>
       ) : (
         <nav
-          aria-label="Folders"
+          aria-label="Where everyone is"
           className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 pb-2"
         >
-          <FolderRow
-            icon={StarIcon}
-            label="Watchlist"
-            count={watched.length}
-            hint={busyHints.get(WATCH_FOLDER)}
-            active={folder === WATCH_FOLDER}
-            onOpen={() => open(WATCH_FOLDER)}
-          />
-          <FolderRow
-            icon={UsersIcon}
-            label="Everyone"
-            count={everyone.length}
-            hint={busyHints.get(ALL_FOLDER)}
-            active={folder === ALL_FOLDER}
-            onOpen={() => open(ALL_FOLDER)}
-            {...stageProps(ALL_FOLDER, "Everyone")}
-          />
-          <div className="flex items-center justify-between gap-2 px-2.5 pt-4 pb-1">
-            <h3 className="font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              {dimensions.find((d) => d.id === by)?.label}
-            </h3>
-          </div>
-          {groups.map((group) => (
-            <FolderRow
-              key={group.key}
-              icon={groupIcon(by, group)}
-              label={group.label}
-              count={group.members.length}
-              hint={busyHints.get(group.key)}
-              active={folder === group.key}
-              onOpen={() => open(group.key, group.placeId)}
-              depth={group.depth}
-              compact={by === "place"}
-              {...stageProps(group.key, group.label)}
-            />
-          ))}
-          {by === "place" && groups.length === 0 ? (
-            <p className="px-2.5 py-2 text-sm text-muted-foreground">
-              This world has no places yet.
-            </p>
+          {watched.length ? (
+            <section aria-label="Watching">
+              <Heading>Watching</Heading>
+              {rows(watched)}
+            </section>
           ) : null}
+          {places ? (
+            <>
+              {rooms.map((room) => (
+                <section key={room.placeId} aria-label={room.label}>
+                  <RoomHeading
+                    room={room}
+                    active={focus === `${PLACE_PREFIX}${room.placeId}`}
+                    onOpen={openPlace}
+                  />
+                  {rows(room.members)}
+                </section>
+              ))}
+              {travelers.length ? (
+                <section aria-label="On the way">
+                  <Heading>On the way</Heading>
+                  {rows(travelers, true)}
+                </section>
+              ) : null}
+              {unplaced.length ? (
+                <section aria-label="Not on the map">
+                  <Heading>Not on the map</Heading>
+                  {rows(unplaced)}
+                </section>
+              ) : null}
+            </>
+          ) : (
+            <section aria-label="Onstage">
+              <Heading>Onstage</Heading>
+              {rows(onstage)}
+            </section>
+          )}
         </nav>
       )}
+
+      {cast.total > 0 ? (
+        <footer className="flex h-10 shrink-0 items-center gap-2 border-t px-3 text-xs text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate tabular-nums">
+            {`${cast.onstage} of ${cast.total} onstage`}
+          </span>
+          {canStage ? (
+            <Button variant="ghost" size="xs" onClick={changeCast}>
+              Change
+            </Button>
+          ) : null}
+        </footer>
+      ) : null}
       <CastDialog
         request={castRequest}
         onOpenChange={(next) => (next ? null : setCastRequest(null))}

@@ -380,9 +380,7 @@ function CharacterActions({
           onSelect={() =>
             go({
               view: "world",
-              "world.by": "place",
               "world.in": `${PLACE_PREFIX}${placeId}`,
-              "world.as": "map",
               // The place picks its map; a plane left from before would win.
               "world.plane": null,
               sel: { kind: "character", id: character.id },
@@ -577,9 +575,7 @@ function usePaletteEntries(go: Go, close: () => void): PaletteEntry[] {
         select: () =>
           go({
             view: "world",
-            "world.by": "place",
             "world.in": `${PLACE_PREFIX}${place.id}`,
-            "world.as": "map",
             // The place picks its map; a plane left from before would win.
             "world.plane": null,
             sel: { kind: "place", id: place.id },

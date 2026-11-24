@@ -11,7 +11,6 @@ import { entityRefParser } from "../lib/state/entity-ref";
 import { openChatPatch } from "../lib/source/chats/display";
 import { chatsParsers } from "../components/views/chats/search-params";
 import { timelineParsers } from "../components/views/timeline/search-params";
-import { worldParsers } from "../components/views/world/search-params";
 import { wikiParsers } from "../components/views/wiki/search-params";
 
 afterEach(cleanup);
@@ -118,24 +117,20 @@ describe("feature-owned query state", () => {
     expect(search?.get("view")).toBe("timeline");
   });
 
-  it("rejects invalid selection, world, and wiki values at the query boundary", () => {
+  it("rejects invalid selection and wiki values at the query boundary", () => {
     const { result } = renderHook(
       () => ({
         selection: useSelection()[0],
-        world: useQueryStates(worldParsers)[0],
         wiki: useQueryStates(wikiParsers)[0],
       }),
       {
         wrapper: withNuqsTestingAdapter({
           searchParams:
-            "?sel=unknown:alice&world.by=invalid&world.kind=toString&world.as=invalid&wiki.kind=invalid&wiki.edit=invalid&wiki.tab=invalid",
+            "?sel=unknown:alice&wiki.kind=invalid&wiki.edit=invalid&wiki.tab=invalid",
         }),
       },
     );
     expect(result.current.selection).toBeNull();
-    expect(result.current.world["world.by"]).toBeNull();
-    expect(result.current.world["world.kind"]).toBeNull();
-    expect(result.current.world["world.as"]).toBeNull();
     expect(result.current.wiki["wiki.kind"]).toBeNull();
     expect(result.current.wiki["wiki.edit"]).toBeNull();
     expect(result.current.wiki["wiki.tab"]).toBeNull();

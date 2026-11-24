@@ -34,8 +34,8 @@ export async function fetchWikiPage(
   return WikiPageResponseSchema.parse(data);
 }
 
-export async function fetchWikiLint(agent?: string): Promise<WikiLintResponse> {
-  const data = await request<unknown>(buildUrl("/kazusa/wiki/lint", { agent }));
+export async function fetchWikiLint(): Promise<WikiLintResponse> {
+  const data = await request<unknown>(buildUrl("/kazusa/wiki/lint"));
   return WikiLintResponseSchema.parse(data);
 }
 

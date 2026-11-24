@@ -617,10 +617,13 @@ session, nothing to schedule, interrupt or resume.
 
 ### 7.6 Read models
 
-`GET /kazusa/wiki` (both wikis, per character), `GET /kazusa/wiki/lint`,
-`GET /kazusa/memory/runs?agent=`; SSE `memory` on every write. The client Wiki
-view shows the world page next to each character's page, notes with sources,
-depth with its reason, per-sleep diffs, day pages as a Diary, and lint.
+`GET /kazusa/wiki` (both wikis, per character), `GET /kazusa/wiki/lint` (every
+wiki at once: the World Wiki's findings, then each cast member's own tagged
+`agent`), `GET /kazusa/memory/runs?agent=`; SSE `memory` on every write. The
+client Wiki view shows the world page next to each character's page, notes with
+sources, depth with its reason, per-sleep diffs and day pages as a Diary; the
+status bar counts the problems and opens them. The `wiki_lint` tool still takes
+one wiki at a time.
 
 ### 7.7 How long-term memory reaches a turn
 

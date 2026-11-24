@@ -43,17 +43,23 @@ import {
   serializeEntityRef,
   type EntityKind,
 } from "@/lib/state/entity-ref";
-import { markQuietSelection, requestSidebar } from "@/lib/state/ui-store";
+import {
+  closeInspectorTab,
+  markQuietSelection,
+  requestSidebar,
+  useUiStore,
+} from "@/lib/state/ui-store";
 import { formatSimTime } from "@/lib/time/sim";
 import { changedOnly, diffLines } from "@/lib/wiki/diff";
 import { cn } from "@/lib/utils";
 import { PlaceBackdrop } from "./backdrop-editor";
 import { LooksTab } from "./looks-tab";
 import { MemoryTab } from "./memory-tab";
-import { PageMenu, ShowOnMapButton } from "./page-actions";
+import { ShowOnMapButton } from "@/components/views/world/show-on-map";
+import { PageMenu } from "./page-actions";
 import { PageEditor } from "./page-editor";
 import { PageForm } from "./page-form";
-import { RichText, WikiLink, usePlainText } from "./page-link";
+import { RichText, WikiLink, usePageName, usePlainText } from "./page-link";
 import { PageLayers, Prose } from "./page-layers";
 import type { WikiSide } from "./page-roles";
 import { failureText, usePicturePicker } from "./parts";
@@ -447,6 +453,8 @@ export function WorldPage({ id }: { id: string }) {
                 onDeleted={() => {
                   // Gone: neither page nor inspector points at them.
                   void setSelection(null);
+                  if (useUiStore.getState().inspectorTabs.character === id)
+                    closeInspectorTab("character");
                   if (cast) void setCharacter(null);
                   open(null);
                 }}
@@ -727,36 +735,106 @@ function NightsPane({ agent }: { agent: string }) {
   );
 }
 
-function LintPane({ agent }: { agent?: string }) {
-  const { data, isLoading } = useWikiLint(agent);
+/**
+ * What's wrong in every wiki: the World Wiki's first, then each character's
+ * own. Each problem opens its page: one of the cast in Characters, a page in a
+ * character's wiki in their view, any other here.
+ */
+function LintPane() {
+  const { data, isLoading } = useWikiLint();
+  const nameOf = usePageName();
+  const { byId } = useCharacters();
+  const [, setParams] = useQueryStates({
+    ...wikiParsers,
+    view: parseAsString,
+    character: parseAsString,
+  });
   if (isLoading)
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (!data?.findings.length)
     return <p className="p-6 text-sm text-muted-foreground">No problems.</p>;
+  const open = (id: string, agent: string | undefined) =>
+    void setParams(
+      agent
+        ? {
+            "wiki.agent": agent,
+            "wiki.page": id,
+            "wiki.tab": null,
+            "wiki.part": null,
+          }
+        : isCast(byId.get(id))
+          ? {
+              view: "characters",
+              character: id,
+              "wiki.tab": null,
+              "wiki.part": null,
+            }
+          : { "wiki.page": id, "wiki.tab": null, "wiki.part": null },
+    );
+  const wikis = Map.groupBy(data.findings, (finding) => finding.agent ?? "");
+  const order = [...wikis.keys()].sort((a, b) =>
+    !a
+      ? -1
+      : !b
+        ? 1
+        : (byId.get(a)?.name ?? a).localeCompare(byId.get(b)?.name ?? b),
+  );
   return (
-    <ul className="mx-auto w-full max-w-3xl divide-y p-4 lg:p-6">
-      {[...data.findings]
-        .sort((a, b) => a.level.localeCompare(b.level))
-        .map((finding) => (
-          <li
-            key={`${finding.page}${finding.message}`}
-            className="py-2 text-sm"
-          >
-            <span
-              className={cn(
-                "font-mono text-xs",
-                finding.level === "error"
-                  ? "text-destructive"
-                  : "text-muted-foreground",
-              )}
-            >
-              {finding.level}
-            </span>{" "}
-            <span className="font-mono text-xs">{finding.page}</span>
-            <span className="block">{finding.message}</span>
-          </li>
-        ))}
-    </ul>
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-4 lg:p-6">
+      {order.map((agent) => {
+        const findings = (wikis.get(agent) ?? []).toSorted((a, b) =>
+          a.level.localeCompare(b.level),
+        );
+        return (
+          <section key={agent} className="space-y-1">
+            <h2 className="px-2 text-sm font-medium">
+              {agent
+                ? `${byId.get(agent)?.name ?? agent}'s wiki`
+                : "World Wiki"}
+              <span className="sr-only">, </span>
+              <span className="ml-2 font-normal text-muted-foreground tabular-nums">
+                {findings.length}
+              </span>
+            </h2>
+            <ul className="divide-y">
+              {findings.map((finding) => {
+                // `world/<id>`, `<agent>/<id>`, or the whole world.
+                const id = finding.page.split("/").slice(1).join("/");
+                return (
+                  <li key={`${finding.page}${finding.message}`}>
+                    <button
+                      type="button"
+                      disabled={!id}
+                      onClick={() => open(id, finding.agent)}
+                      className="flex w-full flex-col items-start gap-0.5 rounded-md p-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50 enabled:hover:bg-accent/60"
+                    >
+                      <span className="flex items-baseline gap-2">
+                        <span
+                          className={cn(
+                            "text-xs",
+                            finding.level === "error"
+                              ? "text-destructive"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {finding.level === "error" ? "Error" : "Warning"}
+                        </span>
+                        <span className="font-medium">
+                          {id ? nameOf(id) : "The world"}
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        {finding.message}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -784,7 +862,7 @@ export function WikiView() {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "lint" ? (
-          <LintPane {...(agent ? { agent } : {})} />
+          <LintPane />
         ) : tab === "nights" && agent ? (
           <NightsPane agent={agent} />
         ) : page && agent ? (

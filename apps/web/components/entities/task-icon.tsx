@@ -27,6 +27,9 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   miscellaneous: CircleDotIcon,
 };
 
+/** The default categories, in the order lists show them. */
+export const TASK_ORDER: readonly string[] = Object.keys(TASK_ICONS);
+
 export function taskIcon(type: string | undefined): LucideIcon {
   return (type && TASK_ICONS[type]) || CircleDotIcon;
 }

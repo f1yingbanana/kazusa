@@ -42,8 +42,8 @@ the picture behind them. A checkpoint's `scene.json`
 1. **We build the scene ourselves and adopt no visual novel engine** (§1).
 2. **The prototype is DOM only**: one `<img>` for the backdrop, one per figure,
    a dialogue box. No canvas, no WebGL, no new dependency.
-3. **The scene is a renderer of a huddle**, chosen like the World view's
-   `world.as=map|list`: `chats.as=scene|list`. Same chat, same messages, same
+3. **The scene is a renderer of a huddle**, chosen with
+   `chats.as=scene|list`. Same chat, same messages, same
    composer. The transcript is the scene's backlog.
 4. **The server keeps pacing.** The floor already makes speech take time, one
    speaker at a time ([floor](../../kazusa/references/floor.md)). The client

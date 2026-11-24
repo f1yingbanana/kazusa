@@ -1,26 +1,45 @@
 "use client";
 
-import { useShallow } from "zustand/react/shallow";
+import { parseAsString, useQueryStates } from "nuqs";
+import { useCast } from "@/hooks/use-characters";
 import { useLiveStore } from "@/lib/live/state";
+import { statusOf, type Status } from "@/lib/state/grouping";
 
+const SHOWN: readonly Status[] = ["thinking", "composing", "waiting"];
+
+/**
+ * How many of the cast are thinking, composing, or have messages waiting: the
+ * same counts as Characters grouped by status, which it opens.
+ */
 export function ActivitySummaryItem() {
-  const counts = useLiveStore(
-    useShallow((state) => {
-      let thinking = 0;
-      let composing = 0;
-      let queued = 0;
-      for (const status of state.statuses.values()) {
-        if (status.brain === "thinking") thinking += 1;
-        if (status.composingIn.length > 0) composing += 1;
-        queued += status.queued;
-      }
-      return { thinking, composing, queued };
-    }),
-  );
+  const [{ "chars.show": show }, setParams] = useQueryStates({
+    view: parseAsString,
+    "chars.by": parseAsString,
+    "chars.show": parseAsString,
+  });
+  const cast = useCast();
+  const statuses = useLiveStore((state) => state.statuses);
+  const counts = new Map<Status, number>();
+  for (const character of cast) {
+    const status = statusOf(statuses.get(character.id));
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
 
   return (
-    <span className="tabular-nums">
-      {`${counts.thinking} thinking · ${counts.composing} composing · ${counts.queued} queued`}
-    </span>
+    <button
+      type="button"
+      title="Characters by status"
+      className="rounded-sm px-1 tabular-nums hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      onClick={() =>
+        void setParams({
+          view: "characters",
+          "chars.by": "status",
+          // The busy are onstage: a list of the offstage would hide them all.
+          "chars.show": show === "offstage" ? null : show,
+        })
+      }
+    >
+      {SHOWN.map((shown) => `${counts.get(shown) ?? 0} ${shown}`).join(" · ")}
+    </button>
   );
 }

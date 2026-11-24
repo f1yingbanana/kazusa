@@ -78,7 +78,8 @@ export function VisitorWelcome() {
               : "You're watching a live world"}
           </DialogTitle>
           <DialogDescription>
-            You are watching a live world sandbox. Observe the characters as they get on with their life. To interact, make your own world.
+            You are watching a live world sandbox. Observe the characters as
+            they get on with their life. To interact, make your own world.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

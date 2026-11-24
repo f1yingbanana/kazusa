@@ -13,7 +13,8 @@ interface UiState {
   /** The tab shown: one of those, or You, the character played. */
   readonly inspectorTab: "you" | EntityKind;
   /** The Play as dialog. */
-  readonly playDialog: { readonly open: boolean };
+  /** `pick`: who the dialog starts on, instead of whoever is played now. */
+  readonly playDialog: { readonly open: boolean; readonly pick?: string };
   /** What a visitor is told on arriving, and can open again. */
   readonly visitorWelcome: { readonly open: boolean };
   readonly quietKey: string | null;
@@ -75,8 +76,10 @@ export function closeInspectorTab(kind: EntityKind): void {
   });
 }
 
-export function openPlayDialog(): void {
-  useUiStore.setState({ playDialog: { open: true } });
+export function openPlayDialog(pick?: string): void {
+  useUiStore.setState({
+    playDialog: pick ? { open: true, pick } : { open: true },
+  });
 }
 
 export function closePlayDialog(): void {

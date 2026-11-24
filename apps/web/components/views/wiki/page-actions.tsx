@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CopyIcon, EllipsisIcon, MapIcon, Trash2Icon } from "lucide-react";
-import { parseAsString, useQueryStates } from "nuqs";
+import {
+  ArrowLeftRightIcon,
+  CopyIcon,
+  EllipsisIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { WikiEditResult, WikiKind } from "@kazusa/client";
 import {
@@ -23,13 +27,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { worldParsers } from "@/components/views/world/search-params";
-import { PLACE_PREFIX } from "@/components/views/world/world-state";
+import { useAccess } from "@/hooks/use-access";
 import { useCastChange } from "@/hooks/use-characters";
+import { useSources } from "@/lib/source/provider";
+import { openPlayDialog } from "@/lib/state/ui-store";
 import { useDeleteWikiPage, useWikiSource } from "@/hooks/use-wiki";
 import { deleteCharacter } from "@/lib/source/characters/http";
 import { fetchWikiSource } from "@/lib/source/wiki/http";
-import { entityRefParser } from "@/lib/state/entity-ref";
 
 /** "Moved Airi to School · rewrote 3 pages", or nothing worth saying. */
 function describeResult(result: WikiEditResult): string | undefined {
@@ -42,38 +46,6 @@ function describeResult(result: WikiEditResult): string | undefined {
       : []),
   ];
   return parts.length ? parts.join(" · ") : undefined;
-}
-
-/** Opens a place on the World map, with the place picked. */
-export function ShowOnMapButton({ id }: { id: string }) {
-  const [, setParams] = useQueryStates({
-    view: parseAsString,
-    "world.by": worldParsers["world.by"],
-    "world.in": worldParsers["world.in"],
-    "world.as": worldParsers["world.as"],
-    "world.plane": worldParsers["world.plane"],
-    sel: entityRefParser,
-  });
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() =>
-        void setParams({
-          view: "world",
-          "world.by": "place",
-          "world.in": `${PLACE_PREFIX}${id}`,
-          "world.as": "map",
-          // The place picks its map; a plane left from before would win.
-          "world.plane": null,
-          sel: { kind: "place", id },
-        })
-      }
-    >
-      <MapIcon />
-      Show on map
-    </Button>
-  );
 }
 
 /**
@@ -107,6 +79,10 @@ export function PageMenu({
 }) {
   const remove = useDeleteWikiPage();
   const castChange = useCastChange();
+  const { canPlay } = useAccess();
+  const { player, watching } = useSources();
+  // A simulated character, and not already the one played.
+  const playable = character && canPlay && (watching || player.id !== id);
   const [open, setOpen] = useState(false);
   // Read with the page, so the text is at hand when the click comes.
   const source = useWikiSource(id, agent, kind);
@@ -182,10 +158,16 @@ export function PageMenu({
           <EllipsisIcon />
           <span className="sr-only">{`More for ${name}`}</span>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-auto max-w-64">
+          {playable ? (
+            <DropdownMenuItem onClick={() => openPlayDialog(id)}>
+              <ArrowLeftRightIcon />
+              Play as character
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onClick={() => void copy()}>
             <CopyIcon />
-            Copy Markdown
+            Copy markdown
           </DropdownMenuItem>
           {canDelete ? (
             <>
@@ -207,10 +189,10 @@ export function PageMenu({
             <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
             <AlertDialogDescription>
               {character
-                ? "They leave the cast: they stop, go offstage and come out of the world's setup. Their page and workspace, with their memories and own wiki, are deleted. This can't be undone. Other pages that mention them stay as they are."
+                ? "Their page and workspace, with their memories and own wiki, are deleted. Other pages that mention them stay as they are. This can't be undone."
                 : place
-                  ? "It comes off the map. Places inside it move up to the area it was in, connections to it go, and anyone there, or whose home it was, ends up in that area. Characters' own pages about it stay: they remember it. This can't be undone."
-                  : "The page is deleted. This can't be undone."}
+                  ? "It is deleted from the map. Places inside it move up. Characters that still mention it stay as they are. This can't be undone."
+                  : "The page is deleted. Other pages that mention them stay as they are. This can't be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
