@@ -437,7 +437,7 @@ html[data-halo] body { font-family: var(--font-sans); }
   font-weight: 700;
 }
 
-/* ---------- Faces and halos ---------- */
+/* ---------- Faces and presence rings ---------- */
 .halo-face {
   --fs: 2.5rem;
   position: relative;
@@ -459,23 +459,28 @@ html[data-halo] body { font-family: var(--font-sans); }
   box-shadow: 0 0 0 2px var(--halo-surface);
 }
 .halo-face-initials { display: grid; place-items: center; font-weight: 800; font-size: calc(var(--fs) * 0.36); color: var(--halo-primary); }
-.halo-ring {
+.halo-presence {
   position: absolute;
-  top: calc(var(--fs) * -0.2);
-  left: 22%;
-  width: 56%;
-  height: calc(var(--fs) * 0.17);
-  border: max(1.5px, calc(var(--fs) * 0.05)) solid var(--halo-accent);
-  border-radius: 50%;
-  z-index: 1;
+  inset: -3px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  pointer-events: none;
 }
-.halo-face[data-state="thinking"] .halo-ring { border-color: var(--halo-primary); animation: halo-float 1.6s ease-in-out infinite; }
-.halo-face[data-state="composing"] .halo-ring { border-style: dashed; animation: halo-float 0.8s ease-in-out infinite; }
-.halo-face[data-state="offstage"] .halo-ring { border-color: var(--halo-line); }
+.halo-face[data-state="thinking"] .halo-presence {
+  border-color: var(--halo-primary);
+  animation: halo-pulse 1.6s ease-in-out infinite;
+}
+.halo-face[data-state="composing"] .halo-presence {
+  border-color: var(--halo-accent);
+  border-style: dashed;
+  animation: halo-spin 6s linear infinite;
+}
 .halo-face[data-state="offstage"] .halo-face-img { filter: grayscale(1); opacity: 0.6; }
-.halo-face[data-state="unknown"] .halo-ring { display: none; }
-@keyframes halo-float {
-  50% { transform: translateY(calc(var(--fs) * -0.06)); }
+@keyframes halo-pulse {
+  50% { opacity: 0.35; }
+}
+@keyframes halo-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ---------- Gallery ---------- */
@@ -744,7 +749,7 @@ html[data-halo] body { font-family: var(--font-sans); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .halo-ring,
+  .halo-presence,
   .halo-dot { animation: none !important; }
   .halo-card,
   .halo-seg [data-slot="segmented-control-indicator"],
