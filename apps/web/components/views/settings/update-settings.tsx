@@ -24,6 +24,7 @@ import { formatBytes } from "@/lib/format";
 import { DownloadProgress } from "@/components/setup/download-progress";
 import type { UpdateChannel, UpdateTarget } from "@/lib/update/update";
 import { useSources } from "@/lib/source/provider";
+import { openUpdateSaveDialog } from "@/lib/state/ui-store";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -202,7 +203,7 @@ export function UpdateSettings() {
  */
 function WorldVersion() {
   const { world, worldResource } = useSources();
-  const { update, admin, canAsk, asking, ask } = useWorldUpdate();
+  const { update, admin, canAsk, asking } = useWorldUpdate();
   const checker = useWorldCheck();
   const [starting, setStarting] = useState(false);
   const credit = world?.package;
@@ -235,16 +236,6 @@ function WorldVersion() {
       });
     } finally {
       setStarting(false);
-    }
-  }
-
-  async function handleAsk() {
-    try {
-      await ask();
-    } catch (failure) {
-      toast.error(`Couldn't message ${admin}`, {
-        description: failure instanceof Error ? failure.message : undefined,
-      });
     }
   }
 
@@ -354,7 +345,8 @@ function WorldVersion() {
                   size="sm"
                   className="shrink-0"
                   disabled={asking}
-                  onClick={() => void handleAsk()}
+                  // Whether to save first is asked, then the system agent.
+                  onClick={openUpdateSaveDialog}
                 >
                   {asking ? <Spinner /> : null}
                   Ask {admin}

@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import {
   Field,
   FieldContent,
@@ -158,7 +158,7 @@ export function NewPageDialog({
         if (!next) reset();
       }}
     >
-      <DialogContent>
+      <ResponsiveDialogContent>
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -241,7 +241,7 @@ export function NewPageDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

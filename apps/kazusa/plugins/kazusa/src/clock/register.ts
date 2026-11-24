@@ -49,6 +49,8 @@ export function registerClock(api: OpenClawPluginApi): Clock {
     cell: sharedClockCell(),
     initialTime: startAt,
     defaultSpeed: speed,
+    // Set by the Gateway's owner after loading a save (`scripts/dev.mjs`).
+    startPaused: process.env.KAZUSA_START_PAUSED === "1",
   });
 
   api.registerTool({

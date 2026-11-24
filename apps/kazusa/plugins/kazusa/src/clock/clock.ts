@@ -21,6 +21,8 @@ export interface ClockOptions {
   readonly store: ClockStore;
   readonly initialTime?: string | number;
   readonly defaultSpeed?: number;
+  /** Starts paused whatever speed was kept, as after loading a save. */
+  readonly startPaused?: boolean;
   /** Shared state; when it is already initialized, the other options are unused. */
   readonly cell?: ClockCell;
 }
@@ -44,6 +46,7 @@ const SNAPSHOT_FORMAT = new Intl.DateTimeFormat("en-US", {
 export class Clock {
   private readonly store: ClockStore;
   private readonly cell: ClockCell;
+  private readonly startPaused: boolean;
 
   constructor(options: ClockOptions) {
     if (options.defaultSpeed !== undefined && options.defaultSpeed < 0) {
@@ -53,6 +56,7 @@ export class Clock {
     }
 
     this.store = options.store;
+    this.startPaused = options.startPaused ?? false;
     this.cell = options.cell ?? {
       simTime: 0,
       anchorTime: 0,
@@ -80,9 +84,10 @@ export class Clock {
             cell.simTime = loaded.simTime;
             cell.speed = loaded.speed;
             cell.anchorTime = Date.now();
-            return;
           }
-          await this.persist();
+          if (this.startPaused) cell.speed = 0;
+          if (!loaded || (this.startPaused && loaded.speed !== 0))
+            await this.persist();
         } catch (error) {
           cell.initPromise = undefined;
           throw error;

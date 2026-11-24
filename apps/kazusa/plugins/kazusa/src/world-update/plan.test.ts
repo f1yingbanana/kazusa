@@ -130,7 +130,6 @@ const apply = (
     from: "v1",
     to: "v2",
     version: "2.0.0",
-    save: "refs/saves/before-update-2.0.0",
   });
   applyUpdate(live, folderTree(v2), planned);
 };

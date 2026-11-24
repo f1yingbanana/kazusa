@@ -26,6 +26,7 @@ import {
   formatSimTime,
   simPhase,
 } from "@/lib/time/sim";
+import { SavesButton } from "./saves-dialog";
 import { SocialLinks } from "./social-links";
 import { cn } from "@/lib/utils";
 
@@ -164,6 +165,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="flex flex-1 items-center justify-center gap-3">
         <SimClock />
         <SpeedControls />
+        <SavesButton />
         {items.map((item) => (
           <item.component key={item.id} />
         ))}

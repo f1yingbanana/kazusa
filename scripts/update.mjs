@@ -123,6 +123,15 @@ export function refOf(version) {
   return /-g([0-9a-f]{7,40})$/.exec(version)?.[1] ?? version;
 }
 
+/** This copy's version: `git describe`, or the installer's `VERSION`. */
+export function kazusaVersion(root) {
+  try {
+    return current(root, installKind(root)).version;
+  } catch {
+    return null;
+  }
+}
+
 function current(root, kind) {
   if (kind === "git")
     return {

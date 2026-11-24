@@ -5,12 +5,12 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { useAccess } from "@/hooks/use-access";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,7 @@ export function VisitorWelcome() {
 
   return (
     <Dialog open={open && visitor} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="sm:max-w-md">
+      <ResponsiveDialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {world?.title
@@ -97,7 +97,7 @@ export function VisitorWelcome() {
           ))}
           <DialogClose render={<Button />}>Close</DialogClose>
         </DialogFooter>
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }

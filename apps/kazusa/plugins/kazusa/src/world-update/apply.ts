@@ -28,8 +28,6 @@ export interface Report {
   readonly from: string;
   readonly to: string;
   readonly version: string;
-  /** The save of the world as it was before (`saveRef`). */
-  readonly save: string;
   readonly layout: MergePolicy["layout"];
   readonly counts: Readonly<Record<string, number>>;
   readonly conflicts: readonly {
@@ -59,7 +57,7 @@ export function openReport(
   live: string,
   plan: Plan,
   layout: MergePolicy["layout"],
-  release: Pick<Report, "from" | "to" | "version" | "save">,
+  release: Pick<Report, "from" | "to" | "version">,
 ): Report {
   const counts: Record<string, number> = {};
   for (const { outcome } of plan.changes)
@@ -99,7 +97,7 @@ export function openReport(
 
 /**
  * Writes the plan into the world's files: every new file first, then what goes,
- * so nothing is ever only in the save.
+ * so a run cut short has lost nothing, and running the plan again finishes it.
  */
 export function applyUpdate(live: string, template: Tree, plan: Plan): void {
   const kept = new Set(

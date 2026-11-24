@@ -13,6 +13,11 @@
  * in with the Gateway token is the owner, who can also set up and update this
  * Kazusa from there. The Gateway itself stays on loopback and only ever hears
  * from the frontend.
+ *
+ * Saves and loads are this process's too, because both need the Gateway stopped
+ * (the kazusa skill's `references/worlds.md` §4.6): the frontend stages a
+ * request, and this stops the Gateway, saves or loads, and starts it again,
+ * leaving the frontend running. Every clean stop autosaves.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -35,9 +40,27 @@ import {
   skipUnusedStartupWork,
   startProviderPlugins,
 } from "./plugin-startup.mjs";
-import { isClone } from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
+import {
+  isClone,
+  worldGit,
+} from "../apps/kazusa/plugins/kazusa/src/world/repo.ts";
+import {
+  AUTOSAVE,
+  autosaveStart,
+  isRunning,
+  loadGame,
+  newSaveRef,
+  readRequest,
+  saveGame,
+  writeRequest,
+} from "../apps/kazusa/plugins/kazusa/src/world/saves.ts";
 import { syncSystemAgent, syncSystemAgentSkills } from "./system-agent.mjs";
-import { applyPending, clearTrash, updatePaths } from "./update.mjs";
+import {
+  applyPending,
+  clearTrash,
+  kazusaVersion,
+  updatePaths,
+} from "./update.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORLD = path.join(ROOT, "apps/kazusa/world");
@@ -204,7 +227,9 @@ function stop(exitCode, { fromConsole = false } = {}) {
 // It waits a poll first, so the page that asked for it hears back.
 let updateSeen = false;
 const updateWatch = setInterval(() => {
-  if (stopping || !existsSync(UPDATE.pending)) return;
+  if (!stopping && !saving && readRequest(WORLD)?.phase === "waiting")
+    void carryOut(readRequest(WORLD));
+  if (stopping || saving || !existsSync(UPDATE.pending)) return;
   if (!updateSeen) {
     updateSeen = true;
     return;
@@ -216,6 +241,189 @@ const updateWatch = setInterval(() => {
   stop(0);
   if (children.size === 0) void updateAndRestart();
 }, POLL_MS);
+
+// ------------------------------------------------------------ saves
+
+let saving = false;
+/** Set while a save or load has the Gateway stopped: its exit isn't the end. */
+let gatewayStopped;
+
+/** The Gateway's own routes, as the frontend's proxy calls them. */
+async function gatewayRoute(route, init = {}) {
+  const response = await fetch(
+    `http://127.0.0.1:${GATEWAY_PORT}/kazusa/${route}`,
+    {
+      ...init,
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+  return body;
+}
+
+const setSpeed = (speed) =>
+  gatewayRoute("clock", {
+    method: "POST",
+    body: JSON.stringify({ action: "set_speed", speed }),
+  });
+
+/** Stops only the Gateway, as a full stop would, and resolves its exit code. */
+function stopGateway() {
+  const gateway = children.get("gateway");
+  if (!gateway) return Promise.resolve(0);
+  return new Promise((resolve) => {
+    gatewayStopped = (code) => {
+      gatewayStopped = undefined;
+      resolve(code);
+    };
+    gateway.stdin.end();
+  });
+}
+
+/** The one autosave, as the Gateway's clean stop left the world. */
+function autosave() {
+  const git = isClone(WORLD) ? worldGit(WORLD) : undefined;
+  if (!git) return;
+  try {
+    saveGame(git, WORLD, AUTOSAVE, {
+      kind: "autosave",
+      name: "Last stop",
+      kazusaVersion: kazusaVersion(ROOT),
+    });
+    console.log("Autosaved the world.");
+  } catch (error) {
+    console.warn(`Couldn't autosave the world: ${error.message}`);
+  }
+}
+
+/**
+ * The save or load itself, on a stopped Gateway: the save made, or what a load
+ * couldn't keep of this machine.
+ */
+function saveOrLoad(request) {
+  const git = worldGit(WORLD);
+  if (!git)
+    throw new Error(
+      "Git isn't available, so the world can't be saved or loaded.",
+    );
+  if (request.op === "load")
+    return { warnings: loadGame(git, WORLD, request.ref) };
+  const ref = request.ref ?? newSaveRef(git);
+  saveGame(git, WORLD, ref, {
+    kind: request.kind ?? "save",
+    name: request.name,
+    kazusaVersion: kazusaVersion(ROOT),
+  });
+  return { ref };
+}
+
+/**
+ * Carries out the frontend's save or load: pauses the world (a save), stops the
+ * Gateway, which lets running turns finish, saves or loads, and starts it
+ * again, paused after a load. Each phase is written back for the frontend.
+ */
+async function carryOut(request) {
+  saving = true;
+  const set = (phase, extra = {}) => {
+    request = { ...request, ...extra, phase };
+    writeRequest(WORLD, request);
+  };
+  let error;
+  let stopped = false;
+  try {
+    if (request.op === "save") {
+      set("pausing");
+      let speed;
+      try {
+        const { clock } = await gatewayRoute("world");
+        speed = clock?.speed ?? 0;
+        await setSpeed(0);
+      } catch {
+        throw new Error(
+          "The world isn't running yet, so it can't be saved. Try again once it has started.",
+        );
+      }
+      set("pausing", { speed });
+    }
+    set("stopping");
+    console.log(
+      `\n${request.op === "save" ? "Saving" : "Loading"} the world. The Gateway stops first, letting running turns finish.`,
+    );
+    const code = await stopGateway();
+    stopped = true;
+    if (code !== 0)
+      throw new Error(
+        `The Gateway didn't stop cleanly (exit code ${code}), so nothing was ${request.op === "save" ? "saved" : "loaded"}.`,
+      );
+    set(request.op === "save" ? "saving" : "loading");
+    const { ref, warnings } = saveOrLoad(request);
+    if (ref) set("saving", { ref });
+    if (warnings?.length) {
+      for (const warning of warnings) console.warn(warning);
+      set("loading", { warnings });
+    }
+  } catch (caught) {
+    error = caught instanceof Error ? caught.message : String(caught);
+    console.warn(`Couldn't ${request.op} the world: ${error}`);
+  }
+  if (stopped && !stopping) {
+    set("starting");
+    startGateway({ paused: request.op === "load" });
+    // Up once Kazusa's own routes answer, not just the port: the page that
+    // asked reloads or refetches then. A few minutes at most.
+    const resume =
+      !error && request.op === "save" && request.speed
+        ? () => setSpeed(request.speed)
+        : () => gatewayRoute("world");
+    for (let tries = 0; tries < 600 && !stopping; tries++) {
+      try {
+        // The world runs on as it did before the save.
+        await resume();
+        break;
+      } catch {
+        await sleep(POLL_MS);
+      }
+    }
+  }
+  if (stopping && stopped && !error) set("starting");
+  else set(error ? "failed" : "done", error ? { error } : {});
+  if (!error)
+    console.log(
+      request.op === "save" ? "Saved the world." : "Loaded the save.",
+    );
+  saving = false;
+}
+
+/**
+ * A save or load that Kazusa stopped in the middle of: a load cut short is done
+ * again, since the world may be half one game and half the other.
+ */
+function finishCutShort() {
+  const request = readRequest(WORLD);
+  if (!isRunning(request)) return false;
+  const loading = request.op === "load";
+  try {
+    if (request.phase === "saving" || request.phase === "loading") {
+      saveOrLoad(request);
+    } else if (request.phase !== "starting") {
+      writeRequest(WORLD, {
+        ...request,
+        phase: "failed",
+        error: `Kazusa stopped before it could ${request.op} the world.`,
+      });
+      return false;
+    }
+    writeRequest(WORLD, { ...request, phase: "done" });
+  } catch (error) {
+    writeRequest(WORLD, { ...request, phase: "failed", error: error.message });
+  }
+  return loading;
+}
 
 function start(name, command, args, options) {
   const child = spawn(command, args, {
@@ -241,6 +449,11 @@ function start(name, command, args, options) {
   });
   child.once("exit", (code) => {
     children.delete(name);
+    if (name === "gateway" && gatewayStopped) {
+      gatewayStopped(code);
+      return;
+    }
+    if (name === "gateway" && stopping && code === 0) autosave();
     if (updating) {
       if (children.size === 0) void updateAndRestart();
       return;
@@ -321,10 +534,11 @@ if (existsSync(CONFIG) && !isClone(WORLD))
   );
 while (!stopping && !(existsSync(CONFIG) && isClone(WORLD)))
   await sleep(POLL_MS);
-if (!stopping) {
-  // Starting over sets the old world's `.state/` aside, the token with it; the
-  // frontend already has this one.
-  gatewayToken(token);
+/**
+ * Brings this world's config up to this Kazusa and starts the Gateway: at
+ * start, and again after a save or load (a save's config is from then).
+ */
+function startGateway({ paused = false } = {}) {
   try {
     syncSystemAgent(ROOT);
   } catch (error) {
@@ -370,6 +584,23 @@ if (!stopping) {
       OPENCLAW_CONFIG_PATH: "./openclaw.json",
       OPENCLAW_STATE_DIR: "./.state",
       OPENCLAW_GATEWAY_HOST_LIFELINE: "stdin",
+      ...(paused ? { KAZUSA_START_PAUSED: "1" } : {}),
     },
   });
+}
+
+if (!stopping) {
+  // Starting over sets the old world's `.state/` aside, the token with it; the
+  // frontend already has this one.
+  gatewayToken(token);
+  const paused = finishCutShort();
+  // A world that never ran: its beginning fills the autosave slot.
+  try {
+    const git = worldGit(WORLD);
+    if (git && autosaveStart(git, WORLD, kazusaVersion(ROOT)))
+      console.log("Autosaved the world's start.");
+  } catch (error) {
+    console.warn(`Couldn't autosave the world's start: ${error.message}`);
+  }
+  startGateway({ paused });
 }

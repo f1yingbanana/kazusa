@@ -8,19 +8,16 @@ import { currentConfig } from "../current-config.ts";
 import type { KazusaRealtimeBroadcaster } from "../realtime.ts";
 import type { LocationService } from "../location/register.ts";
 import { lintMap, loadWorld } from "../location/world.ts";
-import { readWorldPackage } from "../world/package.ts";
 import { text, type Git } from "../world/git.ts";
 import {
   commitOf,
   downloadedRelease,
   PLAY,
-  restoreWorld,
-  saveRef,
-  saveWorld,
   standOn,
   versionOf,
   worldGit,
 } from "../world/repo.ts";
+import { saveBeforeUpdate } from "../world/saves.ts";
 import {
   applyUpdate,
   finishUpdate,
@@ -31,14 +28,7 @@ import {
 import { planUpdate, type Plan } from "./plan.ts";
 import { blobId, commitTree } from "./tree.ts";
 
-const ACTIONS = [
-  "check",
-  "apply",
-  "conflicts",
-  "show",
-  "restore",
-  "finish",
-] as const;
+const ACTIONS = ["check", "apply", "conflicts", "show", "finish"] as const;
 
 const PARAMS = z.object({
   action: z.enum(ACTIONS),
@@ -243,7 +233,7 @@ export function registerWorldUpdate(
     name: "world_update",
     label: "World Update",
     description:
-      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) saves the world as it is, then merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it, as the world's old version had it (a page since moved to a new folder is found where it was), or as `apply` would write it, play's changes and all (`version`: new, old or update); `restore` (clock paused) puts the world back exactly as that save kept it and closes the update, for an `apply` cut short or an update the user wants abandoned; `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. Once finished there is no undo. `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home.",
+      "Bring this world up to the newer release of its world the user downloaded (Settings → Updates → World). Read the world-update skill (skills_read) before `apply`, every update: it says what to ask the user and when to stop. `check` shows what the release would change (`areas` says what kind of files, `ask` which choices the user must make, `next` what to do; `version.notes` is the creator's release notes); `apply` (clock paused) merges the release in, keeping what play wrote; `conflicts` lists what both sides changed; `show` reads a file as the new release has it, as the world's old version had it (a page since moved to a new folder is found where it was), or as `apply` would write it, play's changes and all (`version`: new, old or update); `finish` checks the map, moves anyone left somewhere that no longer exists and closes the update. There is no undo here: the way back, before or after `finish`, is the user loading the save they made before the update (`check` and `apply` say whether there is one; Saves, beside the clock). `layout`: keep the user's arranged map positions or reset to the creator's. `rehome`: move only stranded characters, or everyone home.",
     parameters: {
       type: "object",
       properties: {
@@ -264,8 +254,11 @@ export function registerWorldUpdate(
       const open = readReport(world);
       // `apply` moves `play` last: short of that, it was cut off part way.
       const cutShort = open && commitOf(git, PLAY) !== open.to;
-      const restoreFirst =
-        "The last `apply` was cut short, so the world is half updated. `restore` it, then `check` and `apply` again.";
+      const before = saveBeforeUpdate(git);
+      const backWay = before
+        ? `Ask the user to load “${before.name}” (Saves, beside the clock): it puts everything back as it was before the update.`
+        : "The user made no save before the update, so there is no way back.";
+      const halfDone = `The last \`apply\` was cut short, so the world is half updated. ${before ? backWay + " Or `apply` again, which merges what's left." : "`apply` again: it merges what's left."}`;
       const release = downloadedRelease(git);
       if (action === "show") {
         if (!params.path) throw new Error("`show` needs a `path`.");
@@ -341,34 +334,13 @@ export function registerWorldUpdate(
       }
       if (action === "conflicts") {
         if (!open) return textResult({ note: "No update is open." });
-        if (cutShort) throw new Error(restoreFirst);
+        if (cutShort) throw new Error(halfDone);
         return textResult(conflictView(world, open));
-      }
-      if (action === "restore") {
-        await paused();
-        if (!open) throw new Error("No update is open to restore.");
-        const back = Object.fromEntries(
-          Object.entries(open.renames).map(([from, to]) => [to, from]),
-        );
-        const cancel = deps.location.expectRenames(back);
-        try {
-          restoreWorld(git, open.save, open.to);
-        } catch (error) {
-          cancel();
-          throw error;
-        }
-        finishUpdate(world);
-        deps.broadcaster?.broadcast({ type: "world" });
-        return textResult({
-          restored: true,
-          version: label(git, open.from, versionOf(git)),
-          next: "The world is exactly as it was before this update. If the user still wants it, `check` and `apply` again.",
-        });
       }
       if (action === "finish") {
         await paused();
         if (!open) throw new Error("No update is open to finish.");
-        if (cutShort) throw new Error(restoreFirst);
+        if (cutShort) throw new Error(halfDone);
         const problems = lintMap(path.join(world, "shared", "wiki"));
         if (problems.length) return textResult({ finished: false, problems });
         const positions = await repairPositions(rehome);
@@ -378,18 +350,20 @@ export function registerWorldUpdate(
         return textResult({
           finished: true,
           version: report.version,
-          saved: report.save,
-          note: "The update is closed and there's no restore from here. The save stays in the world's history for good; nothing ever closes it.",
+          note: `The update is closed. ${backWay}`,
           ...positions,
           unregistered: report.newCharacters.filter(
             (who) => !registered.has(who),
           ),
         });
       }
-      if (cutShort) throw new Error(restoreFirst);
-      if (open)
+      // Cut short, `apply` runs again over what it wrote: a part both sides
+      // now agree on merges as it is.
+      if (open && !(cutShort && action === "apply"))
         throw new Error(
-          "An update is open: resolve what `conflicts` lists, then `finish` it (or `restore` to abandon it).",
+          cutShort
+            ? halfDone
+            : `An update is open: resolve what \`conflicts\` lists, then \`finish\` it. To abandon it: ${backWay}`,
         );
       const base = commitOf(git, PLAY);
       if (!base)
@@ -409,22 +383,21 @@ export function registerWorldUpdate(
       const plan = planUpdate(world, template, commitTree(git, base), {
         layout,
       });
-      if (action === "check") return textResult(summary(plan, versions));
+      // Whether the user can go back if it goes wrong.
+      const saved = before
+        ? { saved: { name: before.name, at: before.savedAt } }
+        : {
+            saved: null,
+            note: "The user made no save before this update, so there will be no way back. If they want one, they save first (Saves, beside the clock).",
+          };
+      if (action === "check")
+        return textResult({ ...summary(plan, versions), ...saved });
       await paused();
       const planned = summary(plan, versions);
-      const pkg = readWorldPackage(world);
-      const save = saveRef(release.version);
-      saveWorld(
-        git,
-        world,
-        save,
-        `${pkg?.displayName ?? pkg?.name ?? "World"} before updating to ${release.version}`,
-      );
       openReport(world, plan, layout, {
         from: base,
         to: release.commit,
         version: release.version,
-        save,
       });
       // Files moving under a renamed id are a rename, not a place removed:
       // whoever is there follows it.
@@ -439,8 +412,8 @@ export function registerWorldUpdate(
       deps.broadcaster?.broadcast({ type: "world" });
       return textResult({
         ...planned,
-        saved: save,
-        next: "Resolve every conflict and orphan (`conflicts` lists them) before `finish`, then check the result and tell the user what changed. If anything went wrong, `restore` puts the world back as it was.",
+        ...saved,
+        next: `Resolve every conflict and orphan (\`conflicts\` lists them) before \`finish\`, then check the result and tell the user what changed. If anything goes wrong: ${backWay}`,
       });
     },
   });

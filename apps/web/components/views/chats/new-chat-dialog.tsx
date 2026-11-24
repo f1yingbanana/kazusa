@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { CastPickList, useCastPicks } from "./cast-pick-list";
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveDialogContent } from "@/components/ui/responsive-dialog";
 import { useChatActions } from "@/hooks/use-chats";
 import { listNames } from "@/lib/source/chats/display";
 import { useSources } from "@/lib/source/provider";
@@ -34,7 +34,7 @@ export function NewChatDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <ResponsiveDialogContent className="sm:max-w-md">
         {open ? (
           <NewChatForm
             onDirect={(id) => {
@@ -48,7 +48,7 @@ export function NewChatDialog({
             onCancel={() => onOpenChange(false)}
           />
         ) : null}
-      </DialogContent>
+      </ResponsiveDialogContent>
     </Dialog>
   );
 }
