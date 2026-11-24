@@ -633,6 +633,7 @@ export class Messaging {
     if (
       !previous ||
       previous.title !== chat.title ||
+      previous.joinable !== chat.joinable ||
       JSON.stringify(previous.members) !== JSON.stringify(chat.members)
     ) {
       for (const member of previous?.members ?? [])
@@ -961,7 +962,8 @@ export class Messaging {
       )
       .flatMap((chat) => {
         const latest = this.deps.store.latest(chat.id)?.value;
-        const ended = chat.members.length === 0;
+        // A joinable group with nobody in it is still open.
+        const ended = chat.members.length === 0 && !chat.joinable;
         if (ended && !latest) return [];
         return [
           {
@@ -982,10 +984,27 @@ export class Messaging {
   }
 
   /**
-   * Let any current member edit a group's title or membership. Changes affect
-   * future sends only: retained deliveries keep their acceptance-time audience,
-   * and joining never copies earlier private history into the new member's
-   * view.
+   * Open a group to anyone who has its address, or close it again: the owner's
+   * setting, not a member's. Closing it keeps everyone already in.
+   */
+  async setJoinable(chatId: string, joinable: boolean): Promise<void> {
+    await this.serial.enqueue("messages", async () => {
+      await this.init();
+      this.assertCurrent();
+      const chat = this.chats.get(chatId);
+      if (chat?.kind !== "group") throw new Error("No such group chat.");
+      if (Boolean(chat.joinable) === joinable) return;
+      const { joinable: _was, ...rest } = chat;
+      await this.saveChat(joinable ? { ...rest, joinable: true } : rest);
+    });
+    this.notify();
+  }
+
+  /**
+   * Let any current member edit a group's title or membership, or anyone join a
+   * joinable group by its address. Changes affect future sends only: retained
+   * deliveries keep their acceptance-time audience, and joining never copies
+   * earlier private history into the new member's view.
    */
   async manageChat(
     agentId: string,
@@ -998,6 +1017,28 @@ export class Messaging {
     const result = await this.serial.enqueue("messages", async () => {
       await this.init();
       assertInvocationCurrent?.();
+      if (params.action === "join") {
+        const chat = this.chats.get(conversationId(agentId, params.sessionKey));
+        if (chat?.kind !== "group" || !chat.joinable)
+          throw new Error(this.refusal("chat-not-joinable", agentId));
+        if (chat.members.includes(agentId)) return chatSummary(chat, agentId);
+        const updated: ChatConversation = {
+          ...chat,
+          members: [...chat.members, agentId].sort(),
+          needsProjection: true,
+        };
+        this.validateMembers(updated.members, configuredAgents);
+        await this.saveChat(updated, assertInvocationCurrent);
+        await this.announce(
+          updated,
+          agentId,
+          [chat.id, agentId, "join", String(this.deps.clock.time())],
+          "joins the chat",
+        );
+        await this.projectChats();
+        await this.flushLedgers();
+        return chatSummary(updated, agentId);
+      }
       const chat = this.requireChat(agentId, params.sessionKey);
       if (chat.kind === "huddle") {
         if (params.action !== "leave")

@@ -296,6 +296,12 @@ export const MANAGE_CHAT = z.discriminatedUnion("action", [
     title: z.unknown().optional(),
     members: z.unknown().optional(),
   }),
+  z.strictObject({
+    action: z.literal("join"),
+    sessionKey: CHAT_SESSION,
+    title: z.unknown().optional(),
+    members: z.unknown().optional(),
+  }),
 ]);
 export type ManageChatParams = z.infer<typeof MANAGE_CHAT>;
 
@@ -322,6 +328,11 @@ export interface ChatConversation {
    * back.
    */
   readonly joinedAt?: Readonly<Record<string, number>>;
+  /**
+   * A group anyone can join by its address (`manage_chat` `join`), like a
+   * server channel; the owner sets it. Empty, it is still open.
+   */
+  readonly joinable?: true;
   readonly needsProjection: boolean;
 }
 
@@ -334,6 +345,8 @@ export interface ChatSummary {
   readonly members: readonly string[];
   /** A huddle's place. */
   readonly placeId?: string;
+  /** A group anyone can join by its address. */
+  readonly joinable?: true;
 }
 
 /** Stable identities scope send retries and canonical direct conversations. */
@@ -432,5 +445,6 @@ export function chatSummary(
     title: chat.title ?? (chat.kind === "group" ? null : (peer ?? null)),
     members: [...chat.members],
     ...(chat.placeId ? { placeId: chat.placeId } : {}),
+    ...(chat.joinable ? { joinable: true as const } : {}),
   };
 }

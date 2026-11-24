@@ -83,6 +83,8 @@ export function useChatTitle(id: string): {
   members: readonly string[];
   ended?: boolean;
   placeId?: string;
+  /** A group anyone can join by its address. */
+  joinable?: boolean;
   /** Not sent yet: it starts with the player's first message. */
   draft?: boolean;
 } {
@@ -100,6 +102,7 @@ export function useChatTitle(id: string): {
       readable: true,
       members: mine.members,
       placeId: mine.placeId,
+      joinable: mine.joinable,
       draft: mine.draft,
     };
   }
@@ -112,6 +115,7 @@ export function useChatTitle(id: string): {
       members: observed.members,
       ended: observed.ended,
       placeId: observed.placeId,
+      joinable: observed.joinable,
     };
   }
   return {

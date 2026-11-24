@@ -1062,7 +1062,7 @@ describe("send_message SDK integration", () => {
 
   it("refuses visitor messages, typing and membership changes before touching the world", async () => {
     const h = await setup();
-    for (const path of ["send", "typing", "chats/manage"]) {
+    for (const path of ["send", "typing", "chats/manage", "chats/settings"]) {
       const route = h.routes.get(`/kazusa/${path}`);
       if (!route) throw new Error(`Missing route: ${path}`);
       const req = Object.assign(Readable.from([Buffer.from("not json")]), {
@@ -1249,6 +1249,17 @@ describe("send_message SDK integration", () => {
     expect(managed.statusCode).toBe(200);
     expect(managed.body).toMatchObject({
       chat: { name: "Renamed Study Group" },
+    });
+
+    // The owner opens it to anyone with its address.
+    const opened = await invoke("/kazusa/chats/settings", {
+      chatId,
+      joinable: true,
+    });
+    expect(opened.statusCode).toBe(200);
+    const reopened = await invoke("/kazusa/chats");
+    expect(reopened.body).toMatchObject({
+      chats: [{ id: chatId, joinable: true }],
     });
   });
 });

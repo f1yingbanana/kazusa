@@ -752,6 +752,73 @@ describe("conversation routing and management", () => {
     expect(direct.recipients).toEqual(["bob"]);
   });
 
+  it("lets anyone join an open group by its address, and only an open one", async () => {
+    const h = setup();
+    const group = await h.send({
+      members: ["bob", "carol"],
+      title: "Office Line",
+    });
+    const id = group.chatId;
+    const address = `chat:group:${id.slice("group:".length)}`;
+    await expect(
+      h.messaging.manageChat("dave", { action: "join", sessionKey: address }),
+    ).rejects.toThrow("isn't open to join");
+    await expect(
+      h.messaging.setJoinable("direct:missing", true),
+    ).rejects.toThrow("No such group");
+
+    await h.messaging.setJoinable(id, true);
+    const joined = await h.messaging.manageChat("dave", {
+      action: "join",
+      sessionKey: address,
+    });
+    expect(joined).toMatchObject({
+      sessionKey: `agent:dave:${address}`,
+      members: ["alice", "bob", "carol", "dave"],
+      joinable: true,
+    });
+    // Joining twice changes nothing and tells nobody again.
+    await h.messaging.manageChat("dave", {
+      action: "join",
+      sessionKey: address,
+    });
+    const told = [...h.retained.values()].filter(
+      (message) => message.params.type === "action",
+    );
+    expect(
+      told.map((message) => [message.sender, message.params.text]),
+    ).toEqual([["dave", "joins the chat"]]);
+    expect([...told[0].audience].sort()).toEqual([
+      "alice",
+      "bob",
+      "carol",
+      "dave",
+    ]);
+
+    // Empty, it is still open, not ended.
+    for (const who of ["alice", "bob", "carol", "dave"])
+      await h.messaging.manageChat(who, {
+        action: "leave",
+        sessionKey: address,
+      });
+    const [observed] = await h.messaging.observeChats([]);
+    expect(observed).toMatchObject({ ended: false, members: [] });
+    expect(observed.chat.joinable).toBe(true);
+
+    // Closed again: whoever is in stays, nobody else gets in.
+    await h.messaging.manageChat("dave", {
+      action: "join",
+      sessionKey: address,
+    });
+    await h.messaging.setJoinable(id, false);
+    await expect(
+      h.messaging.manageChat("erin", { action: "join", sessionKey: address }),
+    ).rejects.toThrow("isn't open to join");
+    expect((await h.messaging.listChats("dave"))[0]).not.toHaveProperty(
+      "joinable",
+    );
+  });
+
   it("freezes pending recipients across membership edits, removal of the sender and restart", async () => {
     const h = setup();
     const append = h.append.getMockImplementation();

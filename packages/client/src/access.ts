@@ -93,6 +93,7 @@ export const KAZUSA_ROUTES: ReadonlyMap<string, RoutePolicy> = new Map([
   ["events", policy("GET", "observe")],
   ["send", policy("POST", "play")],
   ["chats/manage", policy("POST", "play")],
+  ["chats/settings", policy("POST", "manage")],
   ["typing", policy("POST", "play")],
   ["timeline", policy("GET", "observe")],
   ["desires", policy("GET", "observe")],

@@ -161,15 +161,16 @@ Title, member ID or session key; omit to list all your chats.
 
 ## manage_chat
 
-Rename a group chat, add or remove members, or leave it. Use title for rename,
-members for add_members or remove_members, neither for leave. Direct chats have
-fixed membership; a conversation in person can only be left, which steps back
-from it without leaving the place. Changes affect only later messages; joining
-grants no earlier history.
+Rename a group chat, add or remove members, or leave it; or join an open group
+you aren't in. Use title for rename, members for add_members or remove_members,
+neither for leave or join. Direct chats have fixed membership; a conversation in
+person can only be left, which steps back from it without leaving the place.
+Changes affect only later messages; joining grants no earlier history.
 
 ## manage_chat.sessionKey
 
-The address of your group chat, or of your conversation in person to leave it.
+The address of your group chat, of an open group to join, or of your
+conversation in person to leave it.
 
 ## recall
 

@@ -16,6 +16,7 @@ import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { usePlace } from "@/hooks/use-location";
 import { useAccess } from "@/hooks/use-access";
+import { useSources } from "@/lib/source/provider";
 import { useSelection } from "@/hooks/use-selection";
 import { listNames } from "@/lib/source/chats/display";
 import { useSelfIn } from "@/hooks/use-self";
@@ -24,7 +25,9 @@ import type { EntityRef } from "@/lib/state/entity-ref";
 import {
   AddPeople,
   ChatTitle,
+  JoinChat,
   LeaveChat,
+  OpenToJoin,
   RemoveButton,
   RemoveConfirm,
 } from "./chat-controls";
@@ -64,6 +67,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
     ended,
     draft,
     placeId,
+    joinable,
     members: everyone,
   } = useChatTitle(entity.id);
   const place = usePlace(placeId);
@@ -72,10 +76,14 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
   const Icon = chatIcon(type);
 
   // Only a sent chat the player is in can be changed.
-  const { canPlay } = useAccess();
+  const { canPlay, canManage } = useAccess();
+  const { watching } = useSources();
   const own = chats.find((chat) => chat.id === entity.id);
   const runsGroup = canPlay && own?.type === "group";
   const canLeave = canPlay && (own?.type === "group" || own?.type === "huddle");
+  // An open group the player isn't in: theirs to join, if they play someone.
+  const canJoin =
+    canPlay && !watching && !own && readable && type === "group" && !!joinable;
   const showOpen = readable && !isOpen;
   const showPlace = () => {
     if (placeId) void select({ kind: "place", id: placeId });
@@ -140,7 +148,7 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
             <NeedsLine requires={["observe"]}>
               Reading this chat isn&apos;t available.
             </NeedsLine>
-          ) : showOpen || (own && canLeave) ? (
+          ) : showOpen || (own && canLeave) || canJoin ? (
             <div className="mt-1.5 -ml-1.5 flex flex-wrap items-center gap-1.5">
               {showOpen ? (
                 <Button
@@ -161,6 +169,12 @@ export function ChatSummarySection({ entity }: { entity: EntityRef }) {
               {own && canLeave ? (
                 <LeaveChat chat={own} title={title} placeName={place?.name} />
               ) : null}
+              {canJoin ? <JoinChat id={entity.id} title={title} /> : null}
+            </div>
+          ) : null}
+          {canManage && type === "group" && readable && !draft ? (
+            <div className="mt-2">
+              <OpenToJoin id={entity.id} joinable={!!joinable} />
             </div>
           ) : null}
         </div>
