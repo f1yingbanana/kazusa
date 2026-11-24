@@ -73,12 +73,14 @@ export const guestId = (platform: string, id: string): string =>
   `guest:${platform}-${id}`;
 
 /**
- * A platform display name as characters read it: one line, no markup that could
- * pass for an id or a stamp, at most 32 characters.
+ * A platform display name as characters read it: one line, at most 32
+ * characters, without what could pass for an id (``…``) or a stamp or marker
+ * (`[…]`, `<…>`). Everything else stays as the person wrote it, underscores
+ * included.
  */
 export function guestName(name: string): string {
   const plain = name
-    .replace(/[`[\]<>*_~|\\]/g, "")
+    .replace(/[`[\]<>]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 32)

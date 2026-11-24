@@ -228,6 +228,7 @@ describe("Bridge", () => {
 describe("guestName", () => {
   it("keeps a name to one plain line of at most 32 characters", () => {
     expect(guestName("  Nice\n\nname  ")).toBe("Nice name");
+    expect(guestName("Flying_Banana*~|")).toBe("Flying_Banana*~|");
     expect(guestName("```")).toBe("Someone");
     expect(guestName("x".repeat(40))).toHaveLength(32);
   });
