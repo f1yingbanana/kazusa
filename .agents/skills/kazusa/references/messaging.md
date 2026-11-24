@@ -268,9 +268,14 @@ the channel sees who signs in.
 One connection per process (`kazusa.bridges` cell), made at `gateway_start` and
 whenever the owner saves the bot token (`POST /kazusa/bridges/token`, an auth
 profile `discord:manual` beside the provider keys; never sent back). Links are
-the retained `"bridges"` store; a load keeps both (saves' `MACHINE`). Not yet:
-lines said while the bot was disconnected are not posted later; linking a
-person's own Discord account to who they play.
+the retained `"bridges"` store; a load keeps both (saves' `MACHINE`). Each link
+is checked when the bot connects, when it is linked, and at most every 15 s
+while Settings or the sidebar asks (`checkLinks`): a channel the bot can't see
+(Discord then delivers nothing from it, though webhook posts still work), one
+that isn't a text channel, or no Manage Webhooks comes back as the link's
+`problem`, in plain words, and in the Gateway log. Not yet: lines said while the
+bot was disconnected are not posted later; linking a person's own Discord
+account to who they play.
 
 ## People at the keyboard (`user:`)
 

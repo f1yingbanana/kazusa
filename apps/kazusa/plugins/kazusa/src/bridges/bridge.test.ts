@@ -9,7 +9,9 @@ import {
   type OutgoingLine,
 } from "./bridge.ts";
 
-function fakeTransport(options: { fail?: string } = {}) {
+function fakeTransport(
+  options: { fail?: string; problems?: Map<string, string> } = {},
+) {
   let onLine: ((line: IncomingLine) => void) | undefined;
   const posts: [string, OutgoingLine][] = [];
   const transport: BridgeTransport = {
@@ -22,6 +24,7 @@ function fakeTransport(options: { fail?: string } = {}) {
       posts.push([channelId, line]);
     }),
     stop: vi.fn(async () => {}),
+    check: vi.fn(async (channelId: string) => options.problems?.get(channelId)),
   };
   return { transport, posts, write: (line: IncomingLine) => onLine?.(line) };
 }
@@ -184,6 +187,29 @@ describe("Bridge", () => {
     h.bridge.outgoing({ type: "message", delivery: delivery({ id: "m9" }) });
     await h.bridge.settled();
     expect(broken.posts).toEqual([]);
+  });
+
+  it("says what stops a link working, and when it works again", async () => {
+    const h = setup();
+    const blind =
+      "The bot can't see this channel, so nothing written there reaches the group.";
+    const problems = new Map([["111", blind]]);
+    const discord = fakeTransport({ problems });
+    // Nothing connected: nothing to tell.
+    expect(h.bridge.problemOf("group:office")).toBeUndefined();
+    await h.bridge.connect(discord.transport);
+    expect(h.bridge.problemOf("group:office")).toBe(blind);
+    expect(h.warn).toHaveBeenCalledWith(expect.stringContaining(blind));
+
+    // Fixed in Discord: a recent answer stands until it's old enough.
+    problems.clear();
+    await h.bridge.checkLinks(60_000);
+    expect(h.bridge.problemOf("group:office")).toBe(blind);
+    await h.bridge.checkLinks(0);
+    expect(h.bridge.problemOf("group:office")).toBeUndefined();
+
+    await h.bridge.disconnect();
+    expect(h.bridge.problemOf("group:office")).toBeUndefined();
   });
 
   it("keeps a failed post from stopping the ones after it", async () => {

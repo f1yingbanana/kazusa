@@ -634,7 +634,8 @@ export function OpenToJoin({
  */
 export function DiscordChannel({ id }: { id: string }) {
   const { data, link } = useBridges();
-  const linked = data?.links.find((entry) => entry.chatId === id)?.channelId;
+  const entry = data?.links.find((link) => link.chatId === id);
+  const linked = entry?.channelId;
   const [edit, setEdit] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const value = edit ?? linked ?? "";
@@ -684,11 +685,17 @@ export function DiscordChannel({ id }: { id: string }) {
           {next ? "Link" : "Unlink"}
         </Button>
       </div>
-      <span className="text-xs text-muted-foreground">
-        {data.discord.status.state === "connected"
-          ? "People writing there are guests here; this group's lines show there."
-          : "Connect a bot under Settings, Discord, first."}
-      </span>
+      {entry?.problem ? (
+        <span role="alert" className="text-xs text-pretty text-destructive">
+          {entry.problem}
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          {data.discord.status.state === "connected"
+            ? "People writing there are guests here; this group's lines show there."
+            : "Connect a bot under Settings, Discord, first."}
+        </span>
+      )}
     </form>
   );
 }

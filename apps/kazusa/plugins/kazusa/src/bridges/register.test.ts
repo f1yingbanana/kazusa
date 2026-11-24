@@ -53,6 +53,8 @@ function setup() {
     },
     post: async () => {},
     stop: async () => {},
+    check: async (channelId) =>
+      channelId === "333" ? "The bot can't see this channel." : undefined,
   }));
   registerBridges(
     {
@@ -186,6 +188,19 @@ describe("registerBridges", () => {
     });
     expect(moved.body).toMatchObject({
       links: [{ chatId: "group:office", channelId: "222" }],
+    });
+    const hidden = await h.call("/kazusa/bridges/link", {
+      chatId: "group:office",
+      channelId: "333",
+    });
+    expect(hidden.body).toMatchObject({
+      links: [
+        {
+          chatId: "group:office",
+          channelId: "333",
+          problem: "The bot can't see this channel.",
+        },
+      ],
     });
     const unlinked = await h.call("/kazusa/bridges/link", {
       chatId: "group:office",

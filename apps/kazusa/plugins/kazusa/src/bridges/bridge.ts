@@ -43,6 +43,11 @@ export interface BridgeTransport {
   ): Promise<{ readonly name: string }>;
   /** Shows a line in a channel as its speaker. */
   post(channelId: string, line: OutgoingLine): Promise<void>;
+  /**
+   * Why the bot can't carry a channel's lines both ways, in plain words for the
+   * owner; undefined when it can.
+   */
+  check(channelId: string): Promise<string | undefined>;
   stop(): Promise<void>;
 }
 
@@ -118,6 +123,11 @@ export class Bridge {
   /** Each channel's posts in order. */
   private readonly queues = new Map<string, Promise<void>>();
   private current: BridgeStatus = { state: "off" };
+  /** What stops each link working, by group id, and when it was looked at. */
+  private readonly problems = new Map<
+    string,
+    { readonly at: number; readonly problem?: string }
+  >();
 
   constructor(private deps: BridgeDeps) {}
 
@@ -133,6 +143,39 @@ export class Bridge {
   /** The links as stored, keyed by group id. */
   setLinks(links: ReadonlyMap<string, BridgeLink>): void {
     this.links = new Map(links);
+    for (const chatId of this.problems.keys())
+      if (!links.has(chatId)) this.problems.delete(chatId);
+  }
+
+  /**
+   * What stops a link working (the bot can't see the channel, say), as last
+   * looked at; undefined when it works or nothing is connected to ask.
+   */
+  problemOf(chatId: string): string | undefined {
+    return this.transport ? this.problems.get(chatId)?.problem : undefined;
+  }
+
+  /**
+   * Asks the platform about every link last looked at more than `maxAgeMs` ago
+   * (all of them with 0), so a fixed permission shows as fixed. Discord changes
+   * take effect without a reconnect, so this is only for telling.
+   */
+  async checkLinks(maxAgeMs = 0): Promise<void> {
+    const transport = this.transport;
+    if (!transport || this.current.state !== "connected") return;
+    const now = Date.now();
+    await Promise.all(
+      [...this.links].map(async ([chatId, link]) => {
+        const last = this.problems.get(chatId);
+        if (last && now - last.at < maxAgeMs) return;
+        const problem = await transport
+          .check(link.channelId)
+          .catch((error: unknown) => `Couldn't ask Discord: ${String(error)}`);
+        this.problems.set(chatId, { at: now, ...(problem ? { problem } : {}) });
+        if (problem && problem !== last?.problem)
+          this.deps.warn(`Bridge: ${chatId} ↔ ${link.channelId}: ${problem}`);
+      }),
+    );
   }
 
   linkOf(chatId: string): BridgeLink | undefined {
@@ -154,8 +197,10 @@ export class Bridge {
           this.deps.warn(`Bridge: couldn't take in a line: ${String(error)}`);
         });
       });
-      if (this.transport === transport)
+      if (this.transport === transport) {
         this.current = { state: "connected", name };
+        await this.checkLinks();
+      }
     } catch (error) {
       if (this.transport === transport) {
         this.transport = undefined;
@@ -169,6 +214,7 @@ export class Bridge {
     const transport = this.transport;
     this.transport = undefined;
     this.current = { state: "off" };
+    this.problems.clear();
     await transport?.stop().catch((error: unknown) => {
       this.deps.warn(`Bridge: couldn't disconnect: ${String(error)}`);
     });

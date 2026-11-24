@@ -142,14 +142,16 @@ export function registerBridges(
 
   const respond = (): BridgesResponse => ({
     discord: { hasToken: keys.has(TOKEN), status: bridge.status },
-    links: [...bridge.allLinks()].map(([chatId, link]): BridgeLinkEntry => ({
-      chatId,
-      ...link,
-    })),
+    links: [...bridge.allLinks()].map(([chatId, link]): BridgeLinkEntry => {
+      const problem = bridge.problemOf(chatId);
+      return { chatId, ...link, ...(problem ? { problem } : {}) };
+    }),
   });
 
   const route = createRouteRegistrar(api);
   route("bridges", "GET", async (_req, res) => {
+    // Looked at again now and then, so a permission fixed in Discord shows.
+    await bridge.checkLinks(15_000);
     sendJson(res, 200, respond());
   });
   route("bridges/token", "POST", async (req, res) => {
@@ -174,6 +176,7 @@ export function registerBridges(
       await store.register(chatId, { platform: "discord", channelId });
     } else await store.delete(chatId);
     await loadLinks();
+    await bridge.checkLinks();
     sendJson(res, 200, respond());
   });
 

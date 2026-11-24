@@ -254,6 +254,8 @@ export const BridgeLinkEntrySchema = z.object({
   chatId: z.string(),
   platform: z.literal("discord"),
   channelId: z.string(),
+  /** What stops it working (the bot can't see the channel, say), in plain words. */
+  problem: z.string().optional(),
 });
 export type BridgeLinkEntry = z.infer<typeof BridgeLinkEntrySchema>;
 

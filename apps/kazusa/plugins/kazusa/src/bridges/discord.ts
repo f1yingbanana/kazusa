@@ -1,4 +1,5 @@
 import {
+  ChannelType,
   Client,
   GatewayDispatchEvents,
   GatewayIntentBits,
@@ -13,6 +14,12 @@ const INTENTS =
   GatewayIntentBits.Guilds |
   GatewayIntentBits.GuildMessages |
   GatewayIntentBits.MessageContent;
+
+/** Discord's answer to a request it refused: 403 forbidden, 404 not found. */
+const statusOf = (error: unknown): number | undefined =>
+  typeof error === "object" && error && "status" in error
+    ? Number(error.status)
+    : undefined;
 
 /** The webhook the bot keeps in each linked channel to post as characters. */
 const WEBHOOK_NAME = "Kazusa";
@@ -119,6 +126,30 @@ export function discordTransport(token: string): BridgeTransport {
         // A character never pings anyone, @everyone included.
         allowed_mentions: { parse: [] },
       });
+    },
+    async check(channelId) {
+      let type: ChannelType;
+      try {
+        ({ type } = await client.api.channels.get(channelId));
+      } catch (error) {
+        const status = statusOf(error);
+        if (status === 403 || status === 404)
+          return "The bot can't see this channel, so nothing written there reaches the group. In Discord, allow it View Channel and Read Message History in the channel's permissions.";
+        throw error;
+      }
+      if (
+        type !== ChannelType.GuildText &&
+        type !== ChannelType.GuildAnnouncement
+      )
+        return "Only a server's text channel can be linked.";
+      try {
+        await webhookFor(channelId);
+      } catch (error) {
+        if (statusOf(error) === 403)
+          return "The bot can't post as characters here. In Discord, allow it Manage Webhooks in the channel's permissions.";
+        throw error;
+      }
+      return undefined;
     },
     async stop() {
       client.removeAllListeners();

@@ -162,6 +162,14 @@ export function DiscordSettings() {
                   ↔ channel{" "}
                   <code className="font-mono text-xs">{link.channelId}</code>
                 </span>
+                {link.problem ? (
+                  <span
+                    role="alert"
+                    className="basis-full text-xs text-pretty text-destructive"
+                  >
+                    {link.problem}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
