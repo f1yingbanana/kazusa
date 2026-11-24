@@ -254,9 +254,10 @@ export function registerWorldUpdate(
       const open = readReport(world);
       // `apply` moves `play` last: short of that, it was cut off part way.
       const cutShort = open && commitOf(git, PLAY) !== open.to;
-      const before = saveBeforeUpdate(git);
+      // An open update has moved `play`: its save stands where it started.
+      const before = saveBeforeUpdate(git, open?.from);
       const backWay = before
-        ? `Ask the user to load “${before.name}” (Saves, beside the clock): it puts everything back as it was before the update.`
+        ? `Ask the user to load “${before.name}”, saved ${before.savedAt} (Saves, beside the clock): it puts everything back as it was then.`
         : "The user made no save before the update, so there is no way back.";
       const halfDone = `The last \`apply\` was cut short, so the world is half updated. ${before ? backWay + " Or `apply` again, which merges what's left." : "`apply` again: it merges what's left."}`;
       const release = downloadedRelease(git);

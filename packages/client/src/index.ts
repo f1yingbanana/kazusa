@@ -7,6 +7,7 @@ import {
   WikiIdSchema,
   WikiKindSchema,
 } from "./wiki-editor.ts";
+export * from "./saves.ts";
 export * from "./speech.ts";
 export * from "./stats.ts";
 

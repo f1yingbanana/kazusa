@@ -5,6 +5,9 @@ import { runScript } from "../../lib/run-script";
 /** Saves and loads stop and start the Gateway, which `scripts/dev.mjs` owns. */
 const SUPERVISED = process.env.KAZUSA_SUPERVISED === "1";
 
+/** The commands this server has run on the saves, in order. */
+let queue: Promise<unknown> = Promise.resolve();
+
 const ActionSchema = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("save"),
@@ -58,18 +61,20 @@ export async function POST(request: Request): Promise<Response> {
       },
       { status: 409 },
     );
-  const result =
+  const args =
     action.op === "save"
-      ? await runScript(
-          "world.mjs",
-          action.beforeUpdate
-            ? ["save-before-update"]
-            : ["save", ...(action.name?.trim() ? [action.name] : [])],
-          30_000,
-        )
+      ? action.beforeUpdate
+        ? ["save-before-update"]
+        : ["save", ...(action.name?.trim() ? [action.name] : [])]
       : action.op === "load"
-        ? await runScript("world.mjs", ["load", action.ref], 30_000)
-        : await runScript("world.mjs", ["delete-save", action.ref], 0);
+        ? ["load", action.ref]
+        : ["delete-save", action.ref];
+  // One at a time: two tabs asking at once can't both pass "nothing running".
+  const run = queue.then(() =>
+    runScript("world.mjs", args, action.op === "delete" ? 0 : 30_000),
+  );
+  queue = run;
+  const result = await run;
   return result.ok
     ? Response.json(result.value)
     : Response.json({ error: result.error }, { status: 409 });

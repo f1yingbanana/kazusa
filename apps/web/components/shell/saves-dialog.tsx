@@ -10,6 +10,13 @@ import {
   SaveIcon,
   Trash2Icon,
 } from "lucide-react";
+import {
+  isRunning,
+  type GameSave,
+  type RunningVersions,
+  type SavePhase,
+  type SaveRequest,
+} from "@kazusa/client";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,16 +35,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  isRunning,
-  mismatchOf,
-  releaseOf,
-  useSaves,
-  type GameSave,
-  type RunningVersions,
-  type SavePhase,
-  type SaveRequest,
-} from "@/hooks/use-saves";
+import { mismatchOf, releaseOf, useSaves } from "@/hooks/use-saves";
 import { formatSimDate, formatSimTime } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 

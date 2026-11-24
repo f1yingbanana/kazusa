@@ -140,8 +140,9 @@ them that way: a plain Node script can't import a package's TypeScript.
   `apply`, `conflicts`, `show`, `finish`). The release and the base (`play`'s
   commit) are read straight from git (`commitTree`, text in one
   `cat-file --batch`). `check` and `apply` say whether the player saved first
-  (`saved`: the before-update save standing on `play`, `saveBeforeUpdate`), the
-  only way back (§4.6). `apply`, clock paused, in this order:
+  (`saved`: the before-update save standing where the update starts, `play` or
+  an open update's `from`, with when it was made: `saveBeforeUpdate`), the only
+  way back (§4.6). `apply`, clock paused, in this order:
   1. Writes `.state/kazusa/world-update/report.json` (conflicts, orphans, the
      commits from and to): the update is open from here on.
   2. Writes the page-by-page merge into the files (pictures with
@@ -416,13 +417,13 @@ in a chat updates without one. That save is the only undo of an update (§4.7):
   `shared/`, `workspaces/`, added by name so nothing else of the folder, such as
   `.state/.env`, can get in whatever git ignores), `openclaw.json`, and the
   databases (every `.state/**/*.sqlite` outside `cache/`, `logs/`, `media/`,
-  `tmp/` and `worktree-projections/`, and the memory search's cache), the last
-  two added with `git add --force`. Built with a temporary index (`saveGame`),
-  so `play`, the real index and the files are untouched. What the save is lives
-  in trailers of its message: `Kind: save|autosave`, `Name` (only when the
-  player gave one), `Sim-Time: <ms>` (the clock as the Gateway kept it),
-  `World-Version`, `Branch` (the line of the creator's history followed: `main`
-  until checkpoints, §4.7) and `Kazusa-Version` (`git describe` or the
+  `tmp/` and `worktree-projections/`, but not the memory search's cache), the
+  last two added with `git add --force`. Built with a temporary index
+  (`saveGame`), so `play`, the real index and the files are untouched. What the
+  save is lives in trailers of its message: `Kind: save|autosave`, `Name` (only
+  when the player gave one), `Sim-Time: <ms>` (the clock as the Gateway kept
+  it), `World-Version`, `Branch` (the line of the creator's history followed:
+  `main` until checkpoints, §4.7) and `Kazusa-Version` (`git describe` or the
   installer's `VERSION`); the subject is only for `git log`. A ref without
   `Kind` isn't a save and isn't listed. The dialog shows both versions and warns
   before a load when they differ from what runs: a save from another Kazusa
@@ -441,10 +442,13 @@ in a chat updates without one. That save is the only undo of an update (§4.7):
   since a loaded save's config is from then) and puts the old speed back. A load
   starts it paused (`KAZUSA_START_PAUSED`, read by the clock). Done means
   Kazusa's routes answer, not just the port: about 20 s on a small world. The
-  frontend stays up throughout. A request that Kazusa stopped in the middle of
-  is finished at the next start (a load or save done again) or marked failed.
-  Never copy a database from outside a running Gateway: its own checkpoints
-  write the main file while the copy reads it.
+  frontend stays up throughout. Requests are picked up once the Gateway has
+  started; one that Kazusa stopped in the middle of is finished at the next
+  start (a load or save done again) or marked failed. A load that fails after it
+  began replacing files stops Kazusa rather than run half one game and half
+  another; the next start loads it again. Done only once the world answers;
+  otherwise failed. Never copy a database from outside a running Gateway: its
+  own checkpoints write the main file while the copy reads it.
 - **Before committing**: the Gateway exited with code 0 (otherwise nothing is
   saved or loaded); every leftover `-wal` is checkpointed
   (`PRAGMA wal_checkpoint(TRUNCATE)` through `node:sqlite`). `-wal`, `-shm` and
@@ -473,14 +477,17 @@ in a chat updates without one. That save is the only undo of an update (§4.7):
   "Undo the update", before or after `finish`, is then "load that save",
   databases included (positions, chats); loading also drops an open update's
   report. Saving waits while an update is open; loading doesn't.
-- **Deleting a save** deletes its ref and runs `git gc --prune=now`: database
-  versions no other save holds are freed (about 7 s on a 1 GB repository; the
-  Gateway may run). **When**: the autosave slot holds the world's start until
-  its first clean stop (`autosaveStart`, from `dev.mjs` before the first Gateway
-  start of a world that never ran: the release, the config, and the shared
-  database holding only the keys setup saved), then every clean stop writes over
-  it (a Windows Ctrl+C may not exit 0); and "Save now". A world that ran before
-  this was built has no start save.
+- **Deleting a save** deletes its ref and runs `git gc --prune=1.hour.ago`:
+  database versions no other save holds are freed (about 7 s on a 1 GB
+  repository; the Gateway may run); an hour's grace keeps a save being written
+  or a download under way whole, and what it spares goes at a later delete.
+  Requests from two tabs at once are queued by the frontend's route; git's own
+  locks keep its refs and index safe. **When**: the autosave slot holds the
+  world's start until its first clean stop (`autosaveStart`, from `dev.mjs`
+  before the first Gateway start of a world that never ran: the release, the
+  config, and the shared database holding only the keys setup saved), then every
+  clean stop writes over it (a Windows Ctrl+C may not exit 0); and "Save now". A
+  world that ran before this was built has no start save.
 - **The dialog** (top bar, beside the clock, the owner only): one click opens
   it; Save takes an optional name. Autosaves come first, titled Autosave with
   which one beside it (World start, Last stop, Before update to <version>), and

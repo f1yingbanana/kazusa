@@ -1,32 +1,22 @@
-"use client";
-
 import type { ComponentProps } from "react";
 import { cn } from "cn";
 import { DialogContent } from "@/components/ui/dialog";
-import { SheetContent } from "@/components/ui/sheet";
-import { useMediaQuery } from "@/hooks/use-media-query";
-
-/** Below Tailwind's `sm`: a phone. */
-const PHONE = "(max-width: 639px)";
 
 /**
- * A dialog's content: centred on wider screens, a sheet from the bottom on a
- * phone, where a centred box leaves little room beside the keyboard and the
- * thumb. Use it inside `Dialog` with the dialog's own header, title,
- * description and footer: a sheet is the same primitive. Sizes meant for the
- * centred box take an `sm:` prefix.
+ * A dialog's content: centred from `sm` up, a sheet from the bottom on a phone,
+ * where a centred box leaves little room beside the keyboard and the thumb. One
+ * element at every width, so rotating a phone keeps what's typed or picked. Use
+ * it inside `Dialog` with the dialog's own header, title, description and
+ * footer. Sizes meant for the centred box take an `sm:` prefix.
  */
 export function ResponsiveDialogContent({
   className,
   ...props
 }: ComponentProps<typeof DialogContent>) {
-  const phone = useMediaQuery(PHONE);
-  if (!phone) return <DialogContent className={className} {...props} />;
   return (
-    <SheetContent
-      side="bottom"
+    <DialogContent
       className={cn(
-        "max-h-[85dvh] rounded-t-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]",
+        "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[85dvh] max-sm:max-w-none max-sm:translate-0 max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]",
         className,
       )}
       {...props}

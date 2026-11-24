@@ -1,37 +1,13 @@
 "use client";
 
 import useSWR from "swr";
+import {
+  isRunning,
+  type GameSave,
+  type RunningVersions,
+  type SaveRequest,
+} from "@kazusa/client";
 import { useAccess } from "@/hooks/use-access";
-
-/**
- * A game save (`src/world/saves.ts` in the plugin): a commit of the whole
- * world, databases included, on its own ref.
- */
-export interface GameSave {
-  readonly ref: string;
-  readonly commit: string;
-  /** The creator's commit the world stood on. */
-  readonly base: string;
-  /** The player's name for it; null when they gave none. */
-  readonly name: string | null;
-  readonly kind: "save" | "autosave";
-  /** When it was made, ISO. */
-  readonly savedAt: string;
-  /** The world's clock then; null when unknown. */
-  readonly simTime: number | null;
-  /** The world's release then. */
-  readonly version: string | null;
-  /** The line of the creator's history it follows (`main`). */
-  readonly branch: string | null;
-  /** The Kazusa that made it. */
-  readonly kazusaVersion: string | null;
-}
-
-/** What runs now, which a save made with other versions may not suit. */
-export interface RunningVersions {
-  readonly version: string | null;
-  readonly kazusaVersion: string | null;
-}
 
 /**
  * A Kazusa version without its commits past the release: `0.7.0-7-g5a32cac` is
@@ -61,30 +37,6 @@ export function mismatchOf(
   };
 }
 
-export type SavePhase =
-  | "waiting"
-  | "pausing"
-  | "stopping"
-  | "saving"
-  | "loading"
-  | "starting"
-  | "done"
-  | "failed";
-
-/** A save or load the owner asked for, as `scripts/dev.mjs` carries it out. */
-export interface SaveRequest {
-  readonly id: string;
-  readonly op: "save" | "load";
-  readonly name?: string;
-  readonly ref?: string;
-  readonly kind?: "save" | "autosave";
-  readonly phase: SavePhase;
-  readonly at: number;
-  readonly error?: string;
-  /** A load that worked but kept less of this machine than it should have. */
-  readonly warnings?: readonly string[];
-}
-
 interface SavesResponse {
   readonly saves?: readonly GameSave[];
   readonly request?: SaveRequest | null;
@@ -93,9 +45,6 @@ interface SavesResponse {
   readonly supervised?: boolean;
   readonly error?: string;
 }
-
-export const isRunning = (request: SaveRequest | null | undefined): boolean =>
-  Boolean(request && request.phase !== "done" && request.phase !== "failed");
 
 const SAVES_KEY = "saves";
 const RUNNING_POLL_MS = 1_000;

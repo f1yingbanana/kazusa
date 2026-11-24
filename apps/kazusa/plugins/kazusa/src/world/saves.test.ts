@@ -293,6 +293,42 @@ describe("saves", () => {
       name: request.name,
     });
     expect(saveBeforeUpdate(git)?.name).toBe("Before update to 2.0.0");
+    // Once the update has moved `play`, it's found where the update started.
+    const base = commitOf(git, PLAY);
+    run("update-ref", "refs/heads/play", next);
+    expect(saveBeforeUpdate(git)).toBeUndefined();
+    expect(saveBeforeUpdate(git, base)?.name).toBe("Before update to 2.0.0");
+  });
+
+  it("folds a log still holding committed rows into the saved database", () => {
+    // A database whose last write is only in its log, as a Gateway killed
+    // mid-run leaves it: copied while its writer still has it open.
+    const scratch = path.join(root, "scratch.sqlite");
+    const writer = new DatabaseSync(scratch);
+    writer.exec(`PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0;
+      CREATE TABLE notes (text TEXT); INSERT INTO notes VALUES ('in the log');`);
+    const file = path.join(live, ".state/kazusa/messages.sqlite");
+    mkdirSync(path.dirname(file), { recursive: true });
+    for (const suffix of ["", "-wal"])
+      writeFileSync(`${file}${suffix}`, readFileSync(`${scratch}${suffix}`));
+    writer.close();
+    saveGame(git, live, AUTOSAVE, { kind: "autosave" });
+    const saved = path.join(root, "saved.sqlite");
+    writeFileSync(
+      saved,
+      execFileSync(
+        "git",
+        ["show", `${AUTOSAVE}:.state/kazusa/messages.sqlite`],
+        {
+          cwd: live,
+        },
+      ),
+    );
+    const db = new DatabaseSync(saved, { readOnly: true });
+    expect(db.prepare("SELECT text FROM notes").get()).toEqual({
+      text: "in the log",
+    });
+    db.close();
   });
 
   it("stages one request at a time", () => {
@@ -308,6 +344,6 @@ describe("saves", () => {
     ).toThrow(/already/);
     expect(() =>
       stageRequest(git, live, { op: "load", ref: "refs/saves/none" }),
-    ).toThrow();
+    ).toThrow(/already/);
   });
 });

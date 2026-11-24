@@ -222,7 +222,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           void mutate(CHARACTERS_KEY);
           break;
         case "world":
-          // An update applied, restored or finished: the version and what's
+          // An update applied or finished: the version and what's
           // offered changed.
           void mutate(WORLD_KEY);
           recheckWorld({ cache, mutate });

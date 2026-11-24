@@ -227,8 +227,9 @@ function stop(exitCode, { fromConsole = false } = {}) {
 // It waits a poll first, so the page that asked for it hears back.
 let updateSeen = false;
 const updateWatch = setInterval(() => {
-  if (!stopping && !saving && readRequest(WORLD)?.phase === "waiting")
-    void carryOut(readRequest(WORLD));
+  // Once the Gateway has started: a request older than that is settled first.
+  const request = gatewayStarted && !stopping && !saving && readRequest(WORLD);
+  if (request?.phase === "waiting") void carryOut(request);
   if (stopping || saving || !existsSync(UPDATE.pending)) return;
   if (!updateSeen) {
     updateSeen = true;
@@ -245,6 +246,7 @@ const updateWatch = setInterval(() => {
 // ------------------------------------------------------------ saves
 
 let saving = false;
+let gatewayStarted = false;
 /** Set while a save or load has the Gateway stopped: its exit isn't the end. */
 let gatewayStopped;
 
@@ -370,6 +372,12 @@ async function carryOut(request) {
   } catch (caught) {
     error = caught instanceof Error ? caught.message : String(caught);
     console.warn(`Couldn't ${request.op} the world: ${error}`);
+    // Half one game and half the other: never run it. The next start redoes it.
+    if (request.phase === "loading") {
+      console.error("Start Kazusa again to finish loading the save.");
+      saving = false;
+      return stop(1);
+    }
   }
   if (stopped && !stopping) {
     set("starting");
@@ -380,15 +388,14 @@ async function carryOut(request) {
       !error && request.op === "save" && request.speed
         ? () => setSpeed(request.speed)
         : () => gatewayRoute("world");
-    for (let tries = 0; tries < 600 && !stopping; tries++) {
-      try {
-        // The world runs on as it did before the save.
-        await resume();
-        break;
-      } catch {
-        await sleep(POLL_MS);
-      }
-    }
+    let up = false;
+    for (let tries = 0; tries < 600 && !stopping && !up; tries++)
+      // The world runs on as it did before the save.
+      up = await resume().then(
+        () => true,
+        () => sleep(POLL_MS).then(() => false),
+      );
+    if (!up && !stopping) error ??= "The world didn't come back up.";
   }
   if (stopping && stopped && !error) set("starting");
   else set(error ? "failed" : "done", error ? { error } : {});
@@ -539,6 +546,7 @@ while (!stopping && !(existsSync(CONFIG) && isClone(WORLD)))
  * start, and again after a save or load (a save's config is from then).
  */
 function startGateway({ paused = false } = {}) {
+  gatewayStarted = true;
   try {
     syncSystemAgent(ROOT);
   } catch (error) {

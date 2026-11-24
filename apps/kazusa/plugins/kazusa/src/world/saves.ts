@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { GameSave, SaveKind, SaveRequest } from "@kazusa/client";
 import { text, type Git } from "./git.ts";
 import {
   commitOf,
@@ -28,7 +29,8 @@ import {
  * config and the databases included. Made and loaded only with the Gateway
  * stopped, by whoever owns it (`scripts/dev.mjs`), never on a timer.
  *
- * Imports only Node's own modules, like `repo.ts`, so the scripts use it as is.
+ * Imports only Node's own modules at run time, like `repo.ts`, so the scripts
+ * use it as is; its types are the wire contract's (`@kazusa/client`).
  */
 
 /** The autosave of the last clean stop: one slot, overwritten each time. */
@@ -46,28 +48,6 @@ const SIM_TIME = "Sim-Time";
 /** What made the save, to warn when it's loaded into something else. */
 const KAZUSA_VERSION = "Kazusa-Version";
 const WORLD_VERSION = "World-Version";
-
-export type SaveKind = "save" | "autosave";
-
-export interface GameSave {
-  readonly ref: string;
-  readonly commit: string;
-  /** The creator's commit the world stood on. */
-  readonly base: string;
-  /** The player's name for it; null when they gave none. */
-  readonly name: string | null;
-  readonly kind: SaveKind;
-  /** When it was made, ISO. */
-  readonly savedAt: string;
-  /** The world's clock then, ms; null when it couldn't be read. */
-  readonly simTime: number | null;
-  /** The world's release then, when it stood on one. */
-  readonly version: string | null;
-  /** The line of the creator's history it follows (`main`). */
-  readonly branch: string | null;
-  /** The Kazusa that made it (`git describe` or the installer's version). */
-  readonly kazusaVersion: string | null;
-}
 
 // ------------------------------------------------------------- the files
 
@@ -120,13 +100,16 @@ export function stateDatabases(world: string): string[] {
  * Folds every leftover write-ahead log into its database, so the file alone is
  * the database. Only with the Gateway stopped: it holds them open otherwise.
  */
-export function settleDatabases(world: string): void {
+function settleDatabases(world: string): void {
   for (const db of stateDatabases(world)) {
     const file = path.join(world, db);
     if (!existsSync(`${file}-wal`)) continue;
     const handle = new DatabaseSync(file);
     try {
-      handle.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      const { busy } = handle
+        .prepare("PRAGMA wal_checkpoint(TRUNCATE)")
+        .get() as { busy: number };
+      if (busy) throw new Error(`${db} is still open elsewhere.`);
     } finally {
       handle.close();
     }
@@ -209,8 +192,11 @@ const MACHINE: readonly {
 
 type Rows = readonly Record<string, unknown>[];
 
-/** This machine's rows, table by table; undefined without a database. */
-function readMachine(world: string): Rows[] | undefined {
+/**
+ * This machine's rows, table by table (undefined for one that can't be read);
+ * undefined without a database.
+ */
+function readMachine(world: string): (Rows | undefined)[] | undefined {
   const file = path.join(world, SHARED_DB);
   if (!existsSync(file)) return undefined;
   const handle = new DatabaseSync(file, { readOnly: true });
@@ -219,7 +205,7 @@ function readMachine(world: string): Rows[] | undefined {
       try {
         return handle.prepare(`SELECT * FROM ${table} WHERE ${where}`).all();
       } catch {
-        return [];
+        return undefined;
       }
     });
   } finally {
@@ -228,7 +214,10 @@ function readMachine(world: string): Rows[] | undefined {
 }
 
 /** Puts this machine's rows back over the save's; what couldn't be, said. */
-function writeMachine(world: string, carried: Rows[] | undefined): string[] {
+function writeMachine(
+  world: string,
+  carried: (Rows | undefined)[] | undefined,
+): string[] {
   const file = path.join(world, SHARED_DB);
   // A load cut short and run again finds no database: the save's stay.
   if (!carried || !existsSync(file)) return [];
@@ -236,10 +225,17 @@ function writeMachine(world: string, carried: Rows[] | undefined): string[] {
   const handle = new DatabaseSync(file);
   try {
     MACHINE.forEach(({ what, table, where }, index) => {
+      const rows = carried[index];
+      if (!rows) {
+        warnings.push(
+          `This machine's ${what} couldn't be read, so the save's are back.`,
+        );
+        return;
+      }
       try {
         handle.exec("BEGIN");
         handle.exec(`DELETE FROM ${table} WHERE ${where}`);
-        for (const row of carried[index] ?? []) {
+        for (const row of rows) {
           const columns = Object.keys(row);
           handle
             .prepare(
@@ -323,7 +319,9 @@ export function saveGame(
     ...(save.kazusaVersion ? [`${KAZUSA_VERSION}: ${save.kazusaVersion}`] : []),
   ];
   const index = path.join(world, ".git", "kazusa-save-index");
-  rmSync(index, { force: true });
+  // Only one save runs at a time: a lock left here is a killed git's.
+  for (const leftover of [index, `${index}.lock`])
+    rmSync(leftover, { force: true });
   let tree: string;
   try {
     git(["read-tree", head], { index });
@@ -451,7 +449,7 @@ function releaseVersions(git: Git): Map<string, string> {
 }
 
 /** The save `ref` names, if it's a game save. */
-export function findSave(git: Git, ref: string): GameSave | undefined {
+function findSave(git: Git, ref: string): GameSave | undefined {
   return listSaves(git).find((save) => save.ref === ref);
 }
 
@@ -464,16 +462,14 @@ export function findSave(git: Git, ref: string): GameSave | undefined {
 export function loadGame(git: Git, world: string, ref: string): string[] {
   const save = findSave(git, ref);
   if (!save) throw new Error(`There's no save ${ref}.`);
-  const parent = text(git, ["rev-parse", `${save.commit}^`]);
   const head = commitOf(git, PLAY);
   if (!head) throw new Error("This world isn't standing on a release.");
   const machine = readMachine(world);
-  // Every database of the game being left goes, with its logs: an old log over
+  // Every database of the game being left goes, logs first: an old log over
   // another database corrupts it, and one the save lacks isn't the save's.
   for (const db of stateDatabases(world))
-    for (const suffix of ["", ...SQLITE_LOGS])
+    for (const suffix of [...SQLITE_LOGS, ""])
       rmSync(path.join(world, `${db}${suffix}`), { force: true });
-  rmSync(path.join(world, UPDATE_REPORT), { force: true });
   // From the commit the world stands on to the save: world files written since
   // go (git's exclude rules keep the rest), then the save's are written over.
   git(["read-tree", head]);
@@ -482,57 +478,37 @@ export function loadGame(git: Git, world: string, ref: string): string[] {
   );
   if (parts.length) git(["clean", "-d", "--force", "--quiet", "--", ...parts]);
   git(["read-tree", "-u", "--reset", save.commit]);
-  standOn(git, parent);
+  standOn(git, save.base);
+  // No save holds an open update: the world is back from before it.
+  rmSync(path.join(world, UPDATE_REPORT), { force: true });
   return writeMachine(world, machine);
 }
 
 /**
  * Deletes a save and frees what only it held: database versions no other save
- * keeps. Refs only, so the Gateway may be running.
+ * keeps. Refs only, so the Gateway may be running. Objects from the last hour
+ * stay, so a save being written or a download under way loses nothing; they go
+ * at a later delete.
  */
 export function deleteSave(git: Git, ref: string): void {
   if (!findSave(git, ref)) throw new Error(`There's no save ${ref}.`);
   git(["update-ref", "-d", ref]);
-  git(["gc", "--prune=now", "--quiet"]);
+  try {
+    git(["gc", "--prune=1.hour.ago", "--quiet"]);
+  } catch {
+    // Deleted all the same; the space comes back at the next delete.
+  }
 }
 
 // ------------------------------------------------------------ the request
 
 /**
- * A save or load the frontend asked for and how it's going: written by the
- * frontend's command (`scripts/world.mjs`), carried out by the Gateway's owner
- * (`scripts/dev.mjs`), which moves it through its phases, like
+ * Where the save or load the frontend asked for is kept, with how it's going:
+ * written by the frontend's command (`scripts/world.mjs`), carried out by the
+ * Gateway's owner (`scripts/dev.mjs`), which moves it through its phases, like
  * `.update/pending.json` for Kazusa's own updates. One at a time.
  */
-export type SavePhase =
-  | "waiting"
-  | "pausing"
-  | "stopping"
-  | "saving"
-  | "loading"
-  | "starting"
-  | "done"
-  | "failed";
-
-export interface SaveRequest {
-  readonly id: string;
-  readonly op: "save" | "load";
-  /** A save's name, or that of the save being loaded; none when it has none. */
-  readonly name?: string;
-  /** The save being loaded, or the one made. */
-  readonly ref?: string;
-  /** A save's kind: the slot before an update is an autosave. */
-  readonly kind?: SaveKind;
-  readonly phase: SavePhase;
-  readonly at: number;
-  readonly error?: string;
-  /** A load that worked, but kept less of this machine than it should have. */
-  readonly warnings?: readonly string[];
-  /** The clock's speed before it was paused for a save, to put back after. */
-  readonly speed?: number;
-}
-
-export const requestPath = (world: string): string =>
+const requestPath = (world: string): string =>
   path.join(world, ".state", "kazusa", "save-request.json");
 
 export const isRunning = (request: SaveRequest | undefined): boolean =>
@@ -611,9 +587,13 @@ export function stageRequest(
 
 /**
  * The save made for this update, if the player made one: the slot before an
- * update, standing on the commit the world stands on now.
+ * update, standing on `base`, the commit the update starts from (`play` until
+ * it moves).
  */
-export function saveBeforeUpdate(git: Git): GameSave | undefined {
+export function saveBeforeUpdate(
+  git: Git,
+  base = commitOf(git, PLAY),
+): GameSave | undefined {
   const save = findSave(git, BEFORE_UPDATE);
-  return save && save.base === commitOf(git, PLAY) ? save : undefined;
+  return save && save.base === base ? save : undefined;
 }
