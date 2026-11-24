@@ -110,49 +110,52 @@ Each column narrows the one before it: **rail** (where) → **section sidebar**
   no sidebar tabs, and a sidebar never shows another section's content. Sidebars
   share one toolbar shape: search (the count lives in the placeholder) and a
   single trailing action. A dot marks non-default filters.
-- **Below `lg`** the sidebar isn't docked. World and Chats show it as the
-  section's first screen until something is opened (with a back button on the
-  stage). Timeline opens it as a sheet from a Filters button.
+- **Below `lg`** the sidebar isn't docked. Chats shows it as the section's
+  first screen until a chat is opened (with a back button on the stage). World
+  opens on the map, and "Who's where" opens its sidebar as a sheet. Timeline
+  opens it as a sheet from a Filters button.
 
 **Chats sidebar:** rows show a presence avatar for DMs (so you see who is
 thinking about a reply), last message or a typing shimmer, time, unread.
 Trailing action: New chat. Observed chats will appear below as a section (needs
 `observe`).
 
-**World sidebar (who is where):** only the onstage cast, since offstage
-characters aren't anywhere and the system agent directs rather than lives there.
+**World sidebar (who is where):** one row per person, never folded.
 
-- **Watching:** starred characters who are onstage, as character rows.
-- **Now:** only places with someone in them, in map order: the place, its
-  outermost area, and its people's faces (presence rings show who's thinking).
-  Empty places are left to the map and to ⌘K. Clicking flies the map there and
-  opens the place.
-- **On the way** (travelers, time to arrival) and **Not on the map**, only when
-  someone is.
-- **Footer:** "N of M onstage" and "Change", which opens the cast dialog.
-- **Search** lists matching characters directly. Selecting a row sets
-  `sel=character:<id>`.
-- No folder dimensions: the presence ring and the status bar already say who is
-  thinking, and each row says what someone is doing. Groups are who someone is,
-  so they live in Characters.
+- **Watching:** starred characters who are onstage.
+- **Each occupied place** as a heading (name, outermost area), in map order,
+  with its people under it. The heading flies the map there and opens the
+  place. Empty places are left to the map and ⌘K.
+- **On the way** (time to arrival) and **Not on the map** (onstage, no
+  position), only when someone is.
+- **Search** covers the whole cast, offstage too.
+- **Footer:** "N of M onstage · Change" opens the cast list.
 
-**Characters sidebar (the cast):** like a contact list, headings sticky while
-their people scroll. A filter menu left of the search shows Everyone, Onstage or
-Offstage and groups by Group (each character's nearest, named from its page; "No
-group" last) or Name (first letter). Rows say what someone is doing when
-onstage, else who they are; offstage avatars are greyed. A group heading's menu
-(always shown) brings the group on or sends it off, after a confirm that says
-what happens and what it costs. "⋯" right of the search: New character, and
-Who's onstage… (a fixed-height list: a lit face is onstage, rows that would
-change are tagged, and the summary under it is one line). Only the cast is
-listed: not the system agent, and not a person who is just a page (they stay in
-the Wiki, and links to them open there).
+**Characters sidebar (the cast):** a contact list with sticky headings.
 
-**New character and New page:** Name, then Id, filled from the name until edited
-("Links use the id. It can't be changed later."). Ids are `a-z0-9_-` (OpenClaw's
-agent ids are, and they're file names); a name with no Latin letters gets a
-short hashed id (`lib/wiki/page-id.ts`). Creating a character answers once the
-Gateway has reloaded the cast, so the roster read next shows them.
+- **Show:** Everyone, Onstage, Offstage.
+- **Group by:** Group (nearest, named from its page; "No group" last), Name
+  (`nameInitial`: base letter, Korean consonant, kana row, Chinese reading from
+  `pinyin-pro` loaded on demand; "#" last), Activity (task category, then none,
+  then Offstage) or Status (Thinking, Composing, Waiting, Idle, Offstage; one
+  each, `statusOf`).
+- **Rows:** greyed avatar offstage; a You badge on the character you play
+  (Played on someone else's).
+- **"⋯":** New character, Who's onstage…, Play as character….
+- **Group headings** (Group only): Bring all onstage / Send all offstage, for
+  the whole group whatever the search hides. Both open the cast list prefilled.
+- **Cast list** (`cast-dialog.tsx`): fixed height, search, All/None, a lit face
+  is onstage, a tag only on rows that would change, cost and paused-clock
+  notes, one Apply. A played character stays lit and locked.
+- Only the cast: not the system agent, not a person who is just a page.
+
+**New page / New character** (one dialog, `new-page-dialog.tsx`): Name, Id
+(from the name, `lib/wiki/page-id.ts`; Customize to type one; "It can't be
+changed later"), Concept or Character, and in the World Wiki **Simulate**: on,
+the character joins the cast offstage and opens in Characters; off, a page only,
+opened in the Wiki. A page is saved at once, so an empty one can be found and
+deleted. Creating or deleting a character waits for the Gateway to reload the
+cast (up to 20 s; past that it answers anyway and the roster catches up).
 
 **Timeline sidebar (filters):** Following (Everyone / Watchlist, plus any
 specific characters from "Open in Timeline" as removable chips) and Show (one
@@ -176,8 +179,9 @@ The map, always; the sidebar says who is where.
   `map`, and each plane is its own map; roads to another plane aren't drawn.
   Arrange is explicit, so a stray drag while panning can't move anything, and it
   only changes the picture.
-- Narrow screens show the map with a "Who's where" button that opens the sidebar
-  as a sheet. A world without places shows "No map yet".
+- The map shows everyone onstage who has a position. Narrow screens show the
+  map with a "Who's where" button that opens the sidebar as a sheet. A world
+  without places shows "No map yet".
 
 ## 6. Stage: Chats
 
@@ -456,15 +460,16 @@ their pin.
 A slot registry for small global signals. It never holds controls that change
 simulation state.
 
-First-draft items:
+Each item links to the tab that holds the detail:
 
-| Side  | Item             | Content                                                         |
-| ----- | ---------------- | --------------------------------------------------------------- |
-| start | Connection       | `● Live` / `◌ Reconnecting…` / `✕ Offline` with last-event time |
-| start | Data sources     | `12 live`; click shows the domain matrix (live / unavailable)   |
-| end   | Wiki problems    | `⊗ 43 ⚠ 1` (managers; hidden at 0), opens the Wiki's Problems list; counts the open character's wiki while in their view |
-| end   | Failures         | `2 failed`: whose latest turn failed, each opening that character |
-| end   | Activity summary | `3 thinking · 1 composing · 5 waiting`: characters, one status each (`statusOf`), so they match Characters grouped by Status, which it opens |
+| Side  | Item       | Content                                                                                    |
+| ----- | ---------- | ------------------------------------------------------------------------------------------ |
+| start | Connection | `● Live` / `◌ Reconnecting…` / `✕ Offline` with last-event time                            |
+| end   | Update     | A new Kazusa release, for whoever maintains this machine: Settings → Updates                |
+| end   | Problems   | `⊗ 43 ⚠ 1` for every wiki, the characters' own included (managers; hidden at 0): Problems  |
+| end   | Failures   | `2 failed`: whose latest turn failed, each opening that character                          |
+| end   | You        | "You are <name> at <place>" or "an observer": Play as, and the place                       |
+| end   | Status     | `0 thinking · 1 composing · 5 waiting`, always: Characters by Status (an Offstage filter is dropped) |
 
 Reserved for later: storyteller ticker (salient journal kinds), next scheduled
 wakes, token/cost meter (Observer debug), notifications and mentions.

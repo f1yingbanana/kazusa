@@ -24,6 +24,7 @@ import { useClockAnchor } from "@/hooks/use-clock";
 import { useOffstage, useStage } from "@/hooks/use-stage";
 import { initials } from "@/lib/format";
 import { useLiveStore } from "@/lib/live/state";
+import { useSources } from "@/lib/source/provider";
 import { matchesQuery } from "@/lib/state/grouping";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,23 @@ function useApply() {
   return { run, busy };
 }
 
+/** Who is being played, as their tag: "You" for the viewer's own. */
+function usePlayed(): ReadonlyMap<string, string> {
+  const { player, watching } = useSources();
+  const statuses = useLiveStore((state) => state.statuses);
+  return useMemo(
+    () =>
+      new Map(
+        [...statuses].flatMap(([id, status]) =>
+          status.playedBy
+            ? [[id, !watching && id === player.id ? "You" : "Played"] as const]
+            : [],
+        ),
+      ),
+    [statuses, player.id, watching],
+  );
+}
+
 function useWaiting(ids: readonly string[]): number {
   return useLiveStore((state) =>
     ids.reduce((sum, id) => sum + (state.statuses.get(id)?.queued ?? 0), 0),
@@ -120,10 +138,13 @@ function ChooseForm({
 }) {
   const { label, cast, intent } = request;
   const offstage = useOffstage();
+  const played = usePlayed();
   const { run, busy } = useApply();
+  // Someone being played stays on: the person playing them decides.
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => {
     if (intent === "onstage") return new Set(cast.map((c) => c.id));
-    if (intent === "offstage") return new Set();
+    if (intent === "offstage")
+      return new Set(cast.filter((c) => played.has(c.id)).map((c) => c.id));
     return new Set(cast.filter((c) => !offstage.has(c.id)).map((c) => c.id));
   });
   const [query, setQuery] = useState("");
@@ -145,18 +166,21 @@ function ChooseForm({
     setSelected((current) => {
       const next = new Set(current);
       for (const c of shown) {
+        if (played.has(c.id)) continue;
         if (on) next.add(c.id);
         else next.delete(c.id);
       }
       return next;
     });
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    if (played.has(id)) return;
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   const summary = [
     comingOn.length ? `${comingOn.length} to bring on` : null,
@@ -209,6 +233,7 @@ function ChooseForm({
         cast={shown}
         selected={selected}
         offstage={offstage}
+        played={played}
         onToggle={toggle}
       />
 
@@ -245,6 +270,7 @@ function CastList({
   cast,
   selected,
   offstage,
+  played,
   onToggle,
 }: {
   /** The whole list's length: the height is set by it, not by the search. */
@@ -252,6 +278,8 @@ function CastList({
   cast: readonly CharacterSummary[];
   selected: ReadonlySet<string>;
   offstage: ReadonlySet<string>;
+  /** Who plays whom: they can't be sent off from here. */
+  played: ReadonlyMap<string, string>;
   onToggle: (id: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -282,6 +310,7 @@ function CastList({
             const character = cast[virtual.index];
             const on = selected.has(character.id);
             const changing = on === offstage.has(character.id);
+            const playedBy = played.get(character.id);
             return (
               <li
                 key={virtual.key}
@@ -295,8 +324,9 @@ function CastList({
                   type="button"
                   role="switch"
                   aria-checked={on}
+                  aria-disabled={playedBy ? true : undefined}
                   onClick={() => onToggle(character.id)}
-                  className="flex size-full items-center gap-3 rounded-md px-2 text-left outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="flex size-full items-center gap-3 rounded-md px-2 text-left outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50 aria-disabled:cursor-default aria-disabled:hover:bg-transparent"
                 >
                   <Avatar
                     className={cn(
@@ -319,7 +349,11 @@ function CastList({
                   >
                     {character.name}
                   </span>
-                  {changing ? (
+                  {playedBy ? (
+                    <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                      {playedBy}
+                    </span>
+                  ) : changing ? (
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",

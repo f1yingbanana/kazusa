@@ -1,8 +1,7 @@
 "use client";
 
-import { useQueryStates, parseAsString } from "nuqs";
-import { worldParsers } from "@/components/views/world/search-params";
-import { MapIcon, MapPinCheckIcon, MapPinIcon } from "lucide-react";
+import { ShowOnMapButton } from "@/components/views/world/show-on-map";
+import { MapPinCheckIcon, MapPinIcon } from "lucide-react";
 import { PlaceChip } from "@/components/entities/chips";
 import { Button } from "@/components/ui/button";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
@@ -13,10 +12,6 @@ import { RichText } from "@/components/views/wiki/page-link";
 /** Frontmatter as facts, the description verbatim and never mined (D4). */
 export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
   const places = usePlaces();
-  const [, setParams] = useQueryStates({
-    view: parseAsString,
-    "world.in": worldParsers["world.in"],
-  });
   const player = usePlayer();
   const place = places?.byId.get(entity.id);
   if (!places)
@@ -93,19 +88,7 @@ export function PlaceHeaderSection({ entity }: { entity: EntityRef }) {
             Go here
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            void setParams({
-              view: "world",
-              "world.in": `place:${place.id}`,
-            })
-          }
-        >
-          <MapIcon data-icon="inline-start" />
-          Show on map
-        </Button>
+        <ShowOnMapButton id={place.id} />
       </div>
     </div>
   );

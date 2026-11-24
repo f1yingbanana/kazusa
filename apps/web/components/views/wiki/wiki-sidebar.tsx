@@ -161,8 +161,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
       <NewPageDialog
         open={creating}
         onOpenChange={setCreating}
-        whose={viewer ? `${viewer.name}'s wiki` : "the World Wiki"}
-        personal={Boolean(viewer)}
+        whose={agent ? `${viewer?.name ?? agent}'s wiki` : "the World Wiki"}
+        personal={Boolean(agent)}
         {...(agent ? { agent } : {})}
         existing={existing}
         onCreate={(page) =>
@@ -176,7 +176,7 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
           })
         }
         onCharacter={
-          viewer
+          agent
             ? undefined
             : (id) => {
                 // Simulated, they are the cast's: their page opens there.
@@ -206,7 +206,11 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
               // One of the cast opens where the cast lives.
               isCast(byId.get(id)) && !agent
                 ? (void setView({ view: "characters", character: id }),
-                  void setParams({ ...CLOSED, "wiki.page": null }),
+                  void setParams({
+                    ...CLOSED,
+                    "wiki.page": null,
+                    "wiki.part": null,
+                  }),
                   onNavigated?.())
                 : go({
                     "wiki.page": id,

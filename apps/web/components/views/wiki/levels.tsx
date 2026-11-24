@@ -15,11 +15,6 @@ export type Audience = "heard" | "knows" | "close" | "self";
 /** The group every character is in. */
 export const EVERYONE = "everyone";
 
-/** A part's audience from its `Known by:` line. */
-export function audienceOf(knownBy: readonly string[]): Audience {
-  return knownBy.length ? "self" : "close";
-}
-
 /** "Anyone who's heard of Yuuka", "Only Yuuka". */
 export function audienceLabel(audience: Audience, subject: string): string {
   switch (audience) {

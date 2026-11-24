@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { CharacterSummary } from "@kazusa/client";
 import { toast } from "sonner";
 import {
@@ -54,12 +54,14 @@ import {
 } from "@/hooks/use-characters";
 import { useOffstage, useStage } from "@/hooks/use-stage";
 import { useLiveStore } from "@/lib/live/state";
+import { needsHan, type HanInitial } from "@/lib/state/name-index";
 import {
   groupByActivity,
   groupByLetter,
   groupByStatus,
   groupByNearest,
   matchesQuery,
+  nearestGroup,
   NO_GROUP,
 } from "@/lib/state/grouping";
 import { CastDialog, type CastRequest } from "./cast-dialog";
@@ -84,6 +86,33 @@ const rosterParsers = {
   "chars.show": parseAsStringLiteral(["onstage", "offstage"]),
   "chars.by": parseAsStringLiteral(["name", "activity", "status"]),
 };
+
+/**
+ * Chinese characters' readings, for headings by name: the dictionary loads only
+ * once a name needs it.
+ */
+function useHanInitial(
+  cast: readonly CharacterSummary[],
+  wanted: boolean,
+): HanInitial | undefined {
+  const needed = wanted && needsHan(cast.map(({ name }) => name));
+  const [han, setHan] = useState<HanInitial>();
+  useEffect(() => {
+    if (!needed || han) return;
+    let live = true;
+    void import("pinyin-pro").then(({ pinyin }) => {
+      if (live)
+        setHan(
+          () => (character: string) =>
+            pinyin(character, { pattern: "first", toneType: "none" }),
+        );
+    });
+    return () => {
+      live = false;
+    };
+  }, [needed, han]);
+  return han;
+}
 
 /**
  * The cast like a contact list: by group (each heading stays in view while its
@@ -121,6 +150,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
   );
   const plain = usePlainText();
 
+  const han = useHanInitial(cast, by === "name");
   const needle = query.trim().toLowerCase();
   const pool = cast.filter(
     (one) =>
@@ -136,7 +166,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
   );
   const groups =
     by === "name"
-      ? groupByLetter(pool)
+      ? groupByLetter(pool, han)
       : by === "activity"
         ? groupByActivity(pool, (id) => statuses.get(id), TASK_ORDER, taskLabel)
         : by === "status"
@@ -313,8 +343,12 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {groups.map((group) => {
-          const someOff = group.members.some((one) => offstage.has(one.id));
-          const someOn = group.members.some((one) => !offstage.has(one.id));
+          // The whole group, whatever the search or filter leaves showing.
+          const everyone = by
+            ? group.members
+            : cast.filter((one) => nearestGroup(one) === group.key);
+          const someOff = everyone.some((one) => offstage.has(one.id));
+          const someOn = everyone.some((one) => !offstage.has(one.id));
           return (
             <section key={group.key} aria-label={group.label}>
               <GroupHeading
@@ -329,7 +363,7 @@ export function CharactersSidebar({ onNavigated }: SectionSidebarProps) {
                             group.key === NO_GROUP
                               ? "everyone without a group"
                               : group.label,
-                          cast: group.members,
+                          cast: everyone,
                           intent,
                         })
                     : undefined
@@ -442,7 +476,7 @@ const RosterRow = memo(function RosterRow({
 }) {
   const plain = usePlainText();
   const status = useCharacterStatus(character.id);
-  const { player } = useSources();
+  const { player, watching } = useSources();
   const task = status?.onstage === false ? undefined : status?.task;
   const line =
     task?.description ?? (character.summary ? plain(character.summary) : null);
@@ -468,7 +502,7 @@ const RosterRow = memo(function RosterRow({
           <span className="truncate text-sm font-medium">{character.name}</span>
           {status?.playedBy ? (
             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] leading-4 font-medium text-primary">
-              {player.id === character.id ? "You" : "Played"}
+              {!watching && player.id === character.id ? "You" : "Played"}
             </span>
           ) : null}
         </span>

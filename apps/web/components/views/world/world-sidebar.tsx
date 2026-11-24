@@ -5,7 +5,6 @@ import { useCallback, useMemo, useState } from "react";
 import type { CharacterSummary } from "@kazusa/client";
 import { UsersIcon } from "lucide-react";
 import { CharacterRow } from "@/components/entities/character-row";
-import { PresenceAvatar } from "@/components/entities/presence-avatar";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
 import {
   CastDialog,
@@ -35,9 +34,6 @@ import { cn } from "@/lib/utils";
 import { worldParsers } from "./search-params";
 import { PLACE_PREFIX, useWorldNow, type Room } from "./world-state";
 
-/** Faces shown on a place before the rest become "+N". */
-const STACK = 4;
-
 function Heading({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="px-2.5 pt-4 pb-1 font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase first:pt-1">
@@ -46,8 +42,8 @@ function Heading({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A place with people in it: its name, where it is, and their faces. */
-function RoomRow({
+/** A place with people in it, heading them: opens it on the map. */
+function RoomHeading({
   room,
   active,
   onOpen,
@@ -56,67 +52,43 @@ function RoomRow({
   active: boolean;
   onOpen: (placeId: string) => void;
 }) {
-  const shown = room.members.slice(0, STACK);
-  const more = room.members.length - shown.length;
   return (
-    <button
-      type="button"
-      aria-current={active ? "true" : undefined}
-      onClick={() => onOpen(room.placeId)}
-      className={cn(
-        "flex h-11 w-full min-w-0 items-center gap-2.5 rounded-md px-2.5 text-left outline-none hover:bg-sidebar-accent/70 focus-visible:outline-2 focus-visible:outline-ring",
-        active && "bg-sidebar-accent text-sidebar-accent-foreground",
-      )}
-    >
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm leading-tight">{room.label}</span>
-        {room.area ? (
-          <span className="truncate text-xs leading-tight text-muted-foreground">
-            {room.area}
-          </span>
-        ) : null}
-      </span>
-      <span
-        className="flex shrink-0 items-center"
-        aria-label={room.members.map((c) => c.name).join(", ")}
+    <h3 className="pt-3 first:pt-0">
+      <button
+        type="button"
+        aria-current={active ? "true" : undefined}
+        title="Show on map"
+        onClick={() => onOpen(room.placeId)}
+        className={cn(
+          "flex w-full min-w-0 items-baseline gap-1.5 rounded-md px-2.5 py-1 text-left text-xs outline-none hover:bg-sidebar-accent/70 focus-visible:outline-2 focus-visible:outline-ring",
+          active && "bg-sidebar-accent text-sidebar-accent-foreground",
+        )}
       >
-        {shown.map((character) => (
-          <PresenceAvatar
-            key={character.id}
-            id={character.id}
-            name={character.name}
-            avatarUrl={character.avatarUrl}
-            kind={character.kind}
-            size="xs"
-            className="-ml-1.5 ring-2 ring-sidebar first:ml-0"
-          />
-        ))}
-        {more > 0 ? (
-          <span className="ml-1 font-mono text-[11px] text-muted-foreground tabular-nums">
-            {`+${more}`}
-          </span>
+        <span className="truncate font-medium">{room.label}</span>
+        {room.area ? (
+          <span className="truncate text-muted-foreground">{room.area}</span>
         ) : null}
-      </span>
-    </button>
+      </button>
+    </h3>
   );
 }
 
 /**
- * World's sidebar: who is where right now. Only places with someone in them are
- * listed; the map shows the rest. Offstage characters aren't anywhere, so they
- * live in Characters.
+ * World's sidebar: who is where right now, one row each, under the place
+ * they're in. Only places with someone in them are listed; the map shows the
+ * rest. Search finds anyone in the cast, offstage too.
  */
 export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
   const [{ "world.in": focus }, setParams] = useQueryStates({
     sel: entityRefParser,
     view: parseAsString,
     "world.in": worldParsers["world.in"],
+    "world.plane": worldParsers["world.plane"],
   });
   const [selection, select] = useSelection();
   const watchlist = useWatchlist();
   const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
   const {
-    characters,
     onstage,
     cast,
     rooms,
@@ -137,12 +109,13 @@ export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
   );
 
   const selectedId = selection?.kind === "character" ? selection.id : null;
+  const everyone = useCast();
   const matches = useMemo(
     () =>
       query.trim()
-        ? characters.filter((c) => matchesQuery(c, query)).slice(0, 60)
+        ? everyone.filter((c) => matchesQuery(c, query)).slice(0, 60)
         : [],
-    [characters, query],
+    [everyone, query],
   );
 
   const onSelect = useCallback(
@@ -160,12 +133,13 @@ export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
     void setParams({
       view: "world",
       "world.in": `${PLACE_PREFIX}${placeId}`,
+      // The place picks its map; a plane left from before would win.
+      "world.plane": null,
       sel,
     });
     onNavigated?.();
   }
 
-  const everyone = useCast();
   const [castRequest, setCastRequest] = useState<CastRequest | null>(null);
   function changeCast() {
     setCastRequest({ label: "Everyone", cast: everyone, intent: "choose" });
@@ -197,8 +171,8 @@ export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
         query={query}
         onQueryChange={setQuery}
         placeholder={
-          characters.length
-            ? `Search ${characters.length} characters`
+          everyone.length
+            ? `Search ${everyone.length} characters`
             : "Search characters"
         }
         label="Search characters"
@@ -257,19 +231,16 @@ export function WorldSidebar({ onNavigated }: SectionSidebarProps) {
           ) : null}
           {places ? (
             <>
-              {rooms.length ? (
-                <section aria-label="Now">
-                  <Heading>Now</Heading>
-                  {rooms.map((room) => (
-                    <RoomRow
-                      key={room.placeId}
-                      room={room}
-                      active={focus === `${PLACE_PREFIX}${room.placeId}`}
-                      onOpen={openPlace}
-                    />
-                  ))}
+              {rooms.map((room) => (
+                <section key={room.placeId} aria-label={room.label}>
+                  <RoomHeading
+                    room={room}
+                    active={focus === `${PLACE_PREFIX}${room.placeId}`}
+                    onOpen={openPlace}
+                  />
+                  {rows(room.members)}
                 </section>
-              ) : null}
+              ))}
               {travelers.length ? (
                 <section aria-label="On the way">
                   <Heading>On the way</Heading>

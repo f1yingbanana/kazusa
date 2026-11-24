@@ -1423,10 +1423,19 @@ export function registerMemory(
       })),
     } satisfies MemoryRunsResponse);
   });
-  route("wiki/lint", "GET", async (req, res) => {
-    const agent = params(req).get("agent") ?? undefined;
+  // Characters are part of the wiki: one list, so the count is the whole.
+  route("wiki/lint", "GET", async (_req, res) => {
+    const config = currentConfig(api);
+    const systemAgent = config.agents?.defaults?.systemAgent?.agentId;
     sendJson(res, 200, {
-      findings: [...service.lint(agent)],
+      findings: [
+        ...service.lint(),
+        ...listAgentIds(config)
+          .filter((agent) => agent !== systemAgent)
+          .flatMap((agent) =>
+            service.lint(agent).map((finding) => ({ ...finding, agent })),
+          ),
+      ],
     } satisfies WikiLintResponse);
   });
 

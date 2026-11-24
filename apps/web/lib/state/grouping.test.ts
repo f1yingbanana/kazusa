@@ -8,6 +8,7 @@ import {
   groupByNearest,
   matchesQuery,
 } from "./grouping";
+import { nameInitial } from "./name-index";
 
 const people: CharacterSummary[] = [
   {
@@ -60,6 +61,23 @@ describe("roster search and grouping", () => {
     );
     expect(groups.map((g) => g.label)).toEqual(["A", "O", "过", "#"]);
     expect(groups[1].members.map((c) => c.name)).toEqual(["Olga", "Ōta"]);
+    // With a reading for Chinese, it heads under its letter.
+    expect(
+      groupByLetter([named("过热")], (character) =>
+        character === "过" ? "g" : undefined,
+      ).map((g) => g.label),
+    ).toEqual(["G"]);
+  });
+
+  it("heads every script the way a contact list does", () => {
+    expect(nameInitial("Łucja")).toBe("L");
+    expect(nameInitial("한나")).toBe("ㅎ");
+    expect(nameInitial("까치")).toBe("ㄱ");
+    expect(nameInitial("カズサ")).toBe("か");
+    expect(nameInitial("がっこう")).toBe("か");
+    expect(nameInitial("ゆうか")).toBe("や");
+    expect(nameInitial("Юлия")).toBe("Ю");
+    expect(nameInitial("  ")).toBe("#");
   });
 });
 

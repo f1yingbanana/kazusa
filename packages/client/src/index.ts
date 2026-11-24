@@ -2083,12 +2083,18 @@ export const WikiEditResultSchema = z.object({
 });
 export type WikiEditResult = z.infer<typeof WikiEditResultSchema>;
 
+/**
+ * Every wiki's problems: the World Wiki's, then each character's own, whose
+ * findings name the character (`agent`). `page` is `world/<id>` or
+ * `<agent>/<id>`.
+ */
 export const WikiLintResponseSchema = z.object({
   findings: z.array(
     z.object({
       level: z.enum(["error", "warning"]),
       page: z.string(),
       message: z.string(),
+      agent: z.string().optional(),
     }),
   ),
 });
