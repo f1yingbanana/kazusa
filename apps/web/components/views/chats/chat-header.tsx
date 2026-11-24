@@ -270,7 +270,7 @@ export function ChatSubtitle({
       ) : (
         <span className="truncate">
           {listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
-            "Just you"}
+            (chat.members.includes(userId) ? "Just you" : "No one here")}
         </span>
       )}
     </p>

@@ -25,6 +25,7 @@ import { listNames } from "@/lib/source/chats/display";
 import { setChatSettings } from "@/lib/source/chats/http";
 import { useSources } from "@/lib/source/provider";
 import { useWatchlist } from "@/lib/state/preferences-store";
+import { HaloTip } from "./halo-tip";
 
 const TYPE_LABEL = {
   direct: "Direct message",
@@ -116,14 +117,16 @@ export function HaloChatSheet({ id, onClose }: { id: string; onClose?: () => voi
           </p>
         </div>
         {onClose ? (
-          <button
-            type="button"
-            className="halo-icon-button halo-sheet-close"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <XIcon aria-hidden className="size-4" />
-          </button>
+          <HaloTip tip="Close" type="label">
+            <button
+              type="button"
+              className="halo-icon-button halo-sheet-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <XIcon aria-hidden className="size-4" />
+            </button>
+          </HaloTip>
         ) : null}
       </header>
 
@@ -198,8 +201,24 @@ export function HaloChatSheet({ id, onClose }: { id: string; onClose?: () => voi
               <CharacterChip key={m} id={m} className="mx-2 self-start" />
             );
           })}
-          {runsGroup && members.length === 0 ? (
-            <p className="halo-panel-empty">Just you. Add people to talk to.</p>
+          {type !== "direct" && members.length === 0 && !draft ? (
+            <div className="halo-alone" data-slim="" data-bare="">
+              <span className="halo-alone-seats" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              <div className="halo-alone-copy">
+                <p className="halo-alone-title">
+                  {mine ? "It's just you" : "No one's here"}
+                </p>
+                <p className="halo-alone-body text-pretty">
+                  {own && canPlay && (runsGroup || own.type === "huddle")
+                    ? "Add people to get the conversation going."
+                    : "Everyone has left this chat."}
+                </p>
+              </div>
+            </div>
           ) : null}
         </div>
       </section>

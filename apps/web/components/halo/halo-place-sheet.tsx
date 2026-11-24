@@ -18,6 +18,7 @@ import { PLACE_PREFIX } from "@/components/views/world/world-state";
 import { usePlaces, usePlayer } from "@/hooks/use-location";
 import { ancestors, connectionsOf } from "@/lib/location/places";
 import { entityRefParser } from "@/lib/state/entity-ref";
+import { HaloTip } from "./halo-tip";
 
 /**
  * A place, laid out like a person: what it is and where it sits, what you can
@@ -58,21 +59,22 @@ export function HaloPlaceSheet({ id, onClose }: { id: string; onClose?: () => vo
             <nav aria-label="Inside" className="halo-crumbs">
               {path.length > 2 ? (
                 <span className="halo-crumb">
-                  <span
-                    className="halo-crumb-more"
-                    title={path
+                  <HaloTip
+                    tip={path
                       .slice(0, -1)
                       .map((pid) => places.byId.get(pid)?.name ?? pid)
                       .join(" › ")}
                   >
-                    <span aria-hidden="true">…</span>
-                    <span className="sr-only">
-                      {path
-                        .slice(0, -1)
-                        .map((pid) => places.byId.get(pid)?.name ?? pid)
-                        .join(", ")}
+                    <span className="halo-crumb-more" tabIndex={0}>
+                      <span aria-hidden="true">…</span>
+                      <span className="sr-only">
+                        {path
+                          .slice(0, -1)
+                          .map((pid) => places.byId.get(pid)?.name ?? pid)
+                          .join(", ")}
+                      </span>
                     </span>
-                  </span>
+                  </HaloTip>
                 </span>
               ) : null}
               {(path.length > 2 ? path.slice(-1) : path).map((pid, index) => (
@@ -86,14 +88,16 @@ export function HaloPlaceSheet({ id, onClose }: { id: string; onClose?: () => vo
           <h2 className="halo-sheet-name text-balance">{place.name}</h2>
         </div>
         {onClose ? (
-          <button
-            type="button"
-            className="halo-icon-button halo-sheet-close"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <XIcon aria-hidden className="size-4" />
-          </button>
+          <HaloTip tip="Close" type="label">
+            <button
+              type="button"
+              className="halo-icon-button halo-sheet-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <XIcon aria-hidden className="size-4" />
+            </button>
+          </HaloTip>
         ) : null}
       </header>
 

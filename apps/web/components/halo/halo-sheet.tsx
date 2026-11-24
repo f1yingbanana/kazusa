@@ -41,7 +41,6 @@ import {
   CharacterContextSection,
   CharacterContextSummary,
 } from "@/components/inspector/sections/character-context";
-import { CharacterDesiresSection } from "@/components/inspector/sections/character-desires";
 import { CharacterMemorySheet } from "@/components/inspector/sections/character-memory";
 import {
   CharacterModelSection,
@@ -73,7 +72,9 @@ import { useDraftChat } from "@/lib/state/chat-draft";
 import { entityRefParser, type EntityRef } from "@/lib/state/entity-ref";
 import { toggleWatch, useWatchlist } from "@/lib/state/preferences-store";
 import { useSources } from "@/lib/source/provider";
+import { HaloDesires } from "./halo-desires";
 import { HaloFace } from "./halo-face";
+import { HaloTip } from "./halo-tip";
 
 const STATE_TEXT = {
   idle: "Awake",
@@ -218,14 +219,16 @@ export function HaloSheet({ id, onClose }: { id: string; onClose?: () => void })
           </p>
         </div>
         {onClose ? (
-          <button
-            type="button"
-            className="halo-icon-button halo-sheet-close"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <XIcon aria-hidden className="size-4" />
-          </button>
+          <HaloTip tip="Close" type="label">
+            <button
+              type="button"
+              className="halo-icon-button halo-sheet-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <XIcon aria-hidden className="size-4" />
+            </button>
+          </HaloTip>
         ) : null}
       </header>
 
@@ -288,13 +291,14 @@ export function HaloSheet({ id, onClose }: { id: string; onClose?: () => void })
             </IconAction>
           ) : null}
           <Menu>
-            <MenuTrigger
-              className="halo-action halo-action-icon"
-              aria-label={`More for ${character.name}`}
-              title="More"
-            >
-              <EllipsisIcon aria-hidden className="size-4" />
-            </MenuTrigger>
+            <HaloTip tip="More" type="label">
+              <MenuTrigger
+                className="halo-action halo-action-icon"
+                aria-label={`More for ${character.name}`}
+              >
+                <EllipsisIcon aria-hidden className="size-4" />
+              </MenuTrigger>
+            </HaloTip>
             <MenuContent className="halo-pop halo-menu">
                 <MenuItem className="halo-menu-item" onSelect={() => toggleWatch(id)}>
                   <MenuItemIcon>
@@ -374,26 +378,24 @@ export function HaloSheet({ id, onClose }: { id: string; onClose?: () => void })
           <ul className="halo-company-list" aria-label="With them">
             {company.map((m) => (
               <li key={m.id}>
-                <button
-                  type="button"
-                  className="halo-company-person"
-                  title={m.name}
-                  onClick={() => void setParams({ sel: { kind: "character", id: m.id } })}
-                >
-                  <HaloFace id={m.id} name={m.name} avatarUrl={m.avatarUrl} kind={m.kind} size="sm" />
-                  <span>{m.name.split(/\s+/)[0]}</span>
-                </button>
+                <HaloTip tip={m.name} type="label">
+                  <button
+                    type="button"
+                    className="halo-company-person"
+                    aria-label={m.name}
+                    onClick={() => void setParams({ sel: { kind: "character", id: m.id } })}
+                  >
+                    <HaloFace id={m.id} name={m.name} avatarUrl={m.avatarUrl} kind={m.kind} size="sm" />
+                    <span>{m.name.split(/\s+/)[0]}</span>
+                  </button>
+                </HaloTip>
               </li>
             ))}
           </ul>
         ) : null}
       </section>
 
-      {isAgent ? (
-        <section className="halo-desires" aria-label="Desires">
-          <CharacterDesiresSection entity={entity} />
-        </section>
-      ) : null}
+      {isAgent ? <HaloDesires id={id} /> : null}
 
       {character.summary ? (
         <p className="halo-about text-pretty">{character.summary}</p>
@@ -473,17 +475,20 @@ function TextAction({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      className="halo-action halo-action-squeeze"
-      title={title ?? label}
-      aria-label={title ?? label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-      <span className="halo-action-label truncate">{label}</span>
-    </button>
+    <HaloTip tip={title ?? label} type="label">
+      <button
+        type="button"
+        className="halo-action halo-action-squeeze"
+        aria-label={title ?? label}
+        aria-disabled={disabled || undefined}
+        onClick={() => {
+          if (!disabled) onClick();
+        }}
+      >
+        {children}
+        <span className="halo-action-label truncate">{label}</span>
+      </button>
+    </HaloTip>
   );
 }
 
@@ -497,14 +502,15 @@ function IconAction({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      className="halo-action halo-action-icon"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      {children}
-    </button>
+    <HaloTip tip={label} type="label">
+      <button
+        type="button"
+        className="halo-action halo-action-icon"
+        aria-label={label}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    </HaloTip>
   );
 }

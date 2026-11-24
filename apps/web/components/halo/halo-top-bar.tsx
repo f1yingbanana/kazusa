@@ -13,6 +13,7 @@ import {
 } from "@ui-sdk/react/segmented-control";
 import { PauseIcon, PlayIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { HaloTip } from "./halo-tip";
 import { useClockActions, useClockAnchor, useSimNow } from "@/hooks/use-clock";
 import {
   formatSimDate,
@@ -60,14 +61,16 @@ export function HaloTopBar({
           <kbd className="halo-kbd">⌘K</kbd>
         </button>
         <PalettePicker palette={palette} onPaletteChange={onPaletteChange} />
-        <button
-          type="button"
-          className="halo-icon-button halo-phone-only"
-          aria-label="Settings"
-          onClick={onOpenSettings}
-        >
-          <SettingsIcon aria-hidden className="size-4" />
-        </button>
+        <HaloTip tip="Settings" type="label" side="bottom">
+          <button
+            type="button"
+            className="halo-icon-button halo-phone-only"
+            aria-label="Settings"
+            onClick={onOpenSettings}
+          >
+            <SettingsIcon aria-hidden className="size-4" />
+          </button>
+        </HaloTip>
       </div>
     </header>
   );
@@ -95,22 +98,33 @@ function HaloClock() {
 
   return (
     <div className="halo-clock-group">
-      <button
-        type="button"
-        className="halo-play"
-        aria-label={paused ? "Resume time" : "Pause time"}
-        title={enabled ? undefined : "Only the world's owner can change the clock"}
-        disabled={!enabled}
-        onClick={() =>
-          apply({ action: "set_speed", speed: paused ? lastSpeed.current : 0 })
+      <HaloTip
+        tip={
+          enabled
+            ? paused
+              ? "Resume time"
+              : "Pause time"
+            : "Only the world's owner can change the clock"
         }
+        type={enabled ? "label" : "description"}
+        side="bottom"
       >
-        {paused ? (
-          <PlayIcon aria-hidden className="size-4" />
-        ) : (
-          <PauseIcon aria-hidden className="size-4" />
-        )}
-      </button>
+        <button
+          type="button"
+          className="halo-play"
+          aria-label={paused ? "Resume time" : "Pause time"}
+          aria-disabled={!enabled || undefined}
+          onClick={() => {
+            if (enabled) apply({ action: "set_speed", speed: paused ? lastSpeed.current : 0 });
+          }}
+        >
+          {paused ? (
+            <PlayIcon aria-hidden className="size-4" />
+          ) : (
+            <PauseIcon aria-hidden className="size-4" />
+          )}
+        </button>
+      </HaloTip>
       <Popover>
         <PopoverTrigger className="halo-clock" aria-label={`${formatSimDateLong(now)}, clock options`}>
           <time className="halo-clock-time" dateTime={new Date(now).toISOString()}>
@@ -179,9 +193,11 @@ function PalettePicker({
 }) {
   return (
     <Popover>
-      <PopoverTrigger className="halo-icon-button" aria-label="Palette">
-        <span className="halo-duo" data-swatch={palette} aria-hidden="true" />
-      </PopoverTrigger>
+      <HaloTip tip="Palette" type="label" side="bottom">
+        <PopoverTrigger className="halo-icon-button" aria-label="Palette">
+          <span className="halo-duo" data-swatch={palette} aria-hidden="true" />
+        </PopoverTrigger>
+      </HaloTip>
       <PopoverContent className="halo-pop">
         <PopoverTitle className="halo-pop-title">Palette</PopoverTitle>
         <div className="halo-palettes" role="radiogroup" aria-label="Palette">

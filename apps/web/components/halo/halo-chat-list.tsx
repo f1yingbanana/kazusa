@@ -19,6 +19,7 @@ import { setDraftChat } from "@/lib/state/chat-draft";
 import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/ui-store";
 import { HaloFace } from "./halo-face";
+import { HaloTip } from "./halo-tip";
 
 export function HaloChatList({ onNavigated }: { onNavigated?: () => void }) {
   const { player } = useSources();
@@ -81,28 +82,36 @@ export function HaloChatList({ onNavigated }: { onNavigated?: () => void }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button
-          type="button"
-          className="halo-icon-button"
-          aria-label="New chat"
-          title={canAct ? "New chat" : "Play as someone to start a chat"}
-          disabled={!canAct}
-          onClick={() => setNewChatOpen(true)}
+        <HaloTip
+          tip={canAct ? "New chat" : "Play as someone to start a chat"}
+          type={canAct ? "label" : "description"}
         >
-          <SquarePenIcon aria-hidden className="size-4" />
-        </button>
+          <button
+            type="button"
+            className="halo-icon-button"
+            aria-label="New chat"
+            aria-disabled={!canAct || undefined}
+            onClick={() => {
+              if (canAct) setNewChatOpen(true);
+            }}
+          >
+            <SquarePenIcon aria-hidden className="size-4" />
+          </button>
+        </HaloTip>
       </div>
 
       {member ? (
         <div className="halo-filter-chip">
           <span>{`${byId.get(member)?.name ?? member}'s chats`}</span>
-          <button
-            type="button"
-            aria-label="Show everyone's chats"
-            onClick={() => void setParams({ "chats.member": null })}
-          >
-            <XIcon aria-hidden className="size-3.5" />
-          </button>
+          <HaloTip tip="Show everyone's chats" type="label">
+            <button
+              type="button"
+              aria-label="Show everyone's chats"
+              onClick={() => void setParams({ "chats.member": null })}
+            >
+              <XIcon aria-hidden className="size-3.5" />
+            </button>
+          </HaloTip>
         </div>
       ) : null}
 
