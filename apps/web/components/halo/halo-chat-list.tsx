@@ -15,6 +15,7 @@ import { useRealtimeStore } from "@/lib/live/realtime-state";
 import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { useSources } from "@/lib/source/provider";
+import { setDraftChat } from "@/lib/state/chat-draft";
 import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/ui-store";
 import { HaloFace } from "./halo-face";
@@ -161,7 +162,12 @@ export function HaloChatList({ onNavigated }: { onNavigated?: () => void }) {
         onDirect={(id) =>
           void setParams({ view: "chats", "chats.id": null, "chats.member": id })
         }
-        onGroup={(chat) => openById(chat.id)}
+        // A new group is a draft until its first message, so it isn't in the
+        // lists yet; the conversation reads it from the draft store.
+        onGroup={(chat) => {
+          setDraftChat(chat);
+          open(chat);
+        }}
       />
     </div>
   );
