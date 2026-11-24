@@ -254,6 +254,10 @@ export const BridgeLinkEntrySchema = z.object({
   chatId: z.string(),
   platform: z.literal("discord"),
   channelId: z.string(),
+  /** The channel's name, without the `#`, as the bot last found it. */
+  channelName: z.string().optional(),
+  /** The server it is in. */
+  server: z.string().optional(),
   /** What stops it working (the bot can't see the channel, say), in plain words. */
   problem: z.string().optional(),
 });

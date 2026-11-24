@@ -685,6 +685,13 @@ export function DiscordChannel({ id }: { id: string }) {
           {next ? "Link" : "Unlink"}
         </Button>
       </div>
+      {entry?.channelName && edit === null ? (
+        // The channel as Discord names it, so a pasted ID can be told apart.
+        <span className="text-xs text-pretty">
+          Linked to <span className="font-medium">#{entry.channelName}</span>
+          {entry.server ? ` in ${entry.server}` : null}
+        </span>
+      ) : null}
       {entry?.problem ? (
         <span role="alert" className="text-xs text-pretty text-destructive">
           {entry.problem}

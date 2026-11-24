@@ -159,8 +159,22 @@ export function DiscordSettings() {
               >
                 <ChatChip id={link.chatId} />
                 <span className="text-muted-foreground">
-                  ↔ channel{" "}
-                  <code className="font-mono text-xs">{link.channelId}</code>
+                  ↔{" "}
+                  {link.channelName ? (
+                    <>
+                      <span className="font-medium text-foreground">
+                        #{link.channelName}
+                      </span>
+                      {link.server ? ` in ${link.server}` : null}
+                    </>
+                  ) : (
+                    <>
+                      channel{" "}
+                      <code className="font-mono text-xs">
+                        {link.channelId}
+                      </code>
+                    </>
+                  )}
                 </span>
                 {link.problem ? (
                   <span

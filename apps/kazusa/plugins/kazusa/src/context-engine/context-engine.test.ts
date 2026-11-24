@@ -318,7 +318,7 @@ describe("Context assembly", () => {
       estimateTokens({ role: "user", content: records.text, timestamp: NOW });
 
     it("names a guest beside their id, and nobody else by display name", () => {
-      const guest = incoming("Anyone on duty?", "guest:21iy4g9bqg");
+      const guest = incoming("Anyone on duty?", "guest:discord-21iy4g9bqg");
       const records = renderLedgerRecords({
         sessionsContext: {
           "agent:alice:chat:group:office": [
@@ -332,7 +332,9 @@ describe("Context assembly", () => {
         trimTo: 0.75,
         text,
       });
-      expect(records.text).toContain("Flying_Banana `guest:21iy4g9bqg`");
+      expect(records.text).toContain(
+        "Flying_Banana `guest:discord-21iy4g9bqg`",
+      );
       expect(records.text).toContain("bob");
       expect(records.text).not.toContain("Display name");
     });

@@ -44,12 +44,22 @@ export interface BridgeTransport {
   ): Promise<{ readonly name: string }>;
   /** Shows a line in a channel as its speaker. */
   post(channelId: string, line: OutgoingLine): Promise<void>;
-  /**
-   * Why the bot can't carry a channel's lines both ways, in plain words for the
-   * owner; undefined when it can.
-   */
-  check(channelId: string): Promise<string | undefined>;
+  /** What the bot finds of a channel: its names, and what stops it working. */
+  check(channelId: string): Promise<ChannelCheck>;
   stop(): Promise<void>;
+}
+
+/** A channel as the bot finds it. */
+export interface ChannelCheck {
+  /** The channel's name, without the `#`; none when the bot can't see it. */
+  readonly name?: string;
+  /** The server it is in. */
+  readonly server?: string;
+  /**
+   * Why the bot can't carry its lines both ways, in plain words for the owner;
+   * none when it can.
+   */
+  readonly problem?: string;
 }
 
 /** What the bridge needs of a group's messages and its speakers' pictures. */
@@ -70,14 +80,15 @@ export interface BridgeDeps {
 }
 
 /**
- * A guest's id: `guest:` and ten letters and digits, the same for one platform
- * account every time, as short as a group's id. Characters copy it to address
- * and remember someone; Discord's 18-digit ids cost tokens and get miscopied.
+ * A guest's id: `guest:`, the platform, and ten letters and digits, the same
+ * for one account every time (`guest:discord-169ftalq9j`). Characters copy it
+ * to address and remember someone; Discord's 18-digit ids cost tokens and get
+ * miscopied.
  */
 export function guestId(platform: string, id: string): string {
   const digest = createHash("sha256").update(`${platform}:${id}`).digest("hex");
   // 48 bits, at most ten base-36 digits.
-  return `guest:${BigInt(`0x${digest.slice(0, 12)}`)
+  return `guest:${platform}-${BigInt(`0x${digest.slice(0, 12)}`)
     .toString(36)
     .padStart(10, "0")}`;
 }
@@ -135,10 +146,10 @@ export class Bridge {
   /** Each channel's posts in order. */
   private readonly queues = new Map<string, Promise<void>>();
   private current: BridgeStatus = { state: "off" };
-  /** What stops each link working, by group id, and when it was looked at. */
-  private readonly problems = new Map<
+  /** What the bot found of each link's channel, by group id, and when. */
+  private readonly checks = new Map<
     string,
-    { readonly at: number; readonly problem?: string }
+    ChannelCheck & { readonly at: number }
   >();
 
   constructor(private deps: BridgeDeps) {}
@@ -155,16 +166,31 @@ export class Bridge {
   /** The links as stored, keyed by group id. */
   setLinks(links: ReadonlyMap<string, BridgeLink>): void {
     this.links = new Map(links);
-    for (const chatId of this.problems.keys())
-      if (!links.has(chatId)) this.problems.delete(chatId);
+    for (const chatId of this.checks.keys())
+      if (!links.has(chatId)) this.checks.delete(chatId);
   }
 
   /**
-   * What stops a link working (the bot can't see the channel, say), as last
-   * looked at; undefined when it works or nothing is connected to ask.
+   * A link's channel as last looked at: its names, and what stops it working
+   * (the bot can't see it, say); undefined while nothing is connected to ask.
    */
-  problemOf(chatId: string): string | undefined {
-    return this.transport ? this.problems.get(chatId)?.problem : undefined;
+  checkOf(chatId: string): ChannelCheck | undefined {
+    if (!this.transport) return undefined;
+    const found = this.checks.get(chatId);
+    if (!found) return undefined;
+    const { at: _at, ...check } = found;
+    return check;
+  }
+
+  /**
+   * A channel as the bot finds it now, before it is linked; refused while no
+   * bot is connected to ask.
+   */
+  async checkChannel(channelId: string): Promise<ChannelCheck> {
+    const transport = this.transport;
+    if (!transport || this.current.state !== "connected")
+      throw new Error("Connect a bot under Settings, Discord, first.");
+    return await transport.check(channelId);
   }
 
   /**
@@ -178,14 +204,20 @@ export class Bridge {
     const now = Date.now();
     await Promise.all(
       [...this.links].map(async ([chatId, link]) => {
-        const last = this.problems.get(chatId);
+        const last = this.checks.get(chatId);
         if (last && now - last.at < maxAgeMs) return;
-        const problem = await transport
+        const check = await transport
           .check(link.channelId)
-          .catch((error: unknown) => `Couldn't ask Discord: ${String(error)}`);
-        this.problems.set(chatId, { at: now, ...(problem ? { problem } : {}) });
-        if (problem && problem !== last?.problem)
-          this.deps.warn(`Bridge: ${chatId} ↔ ${link.channelId}: ${problem}`);
+          .catch((error: unknown): ChannelCheck => ({
+            ...(last?.name ? { name: last.name } : {}),
+            ...(last?.server ? { server: last.server } : {}),
+            problem: `Couldn't ask Discord: ${String(error)}`,
+          }));
+        this.checks.set(chatId, { ...check, at: now });
+        if (check.problem && check.problem !== last?.problem)
+          this.deps.warn(
+            `Bridge: ${chatId} ↔ ${link.channelId}: ${check.problem}`,
+          );
       }),
     );
   }
@@ -226,7 +258,7 @@ export class Bridge {
     const transport = this.transport;
     this.transport = undefined;
     this.current = { state: "off" };
-    this.problems.clear();
+    this.checks.clear();
     await transport?.stop().catch((error: unknown) => {
       this.deps.warn(`Bridge: couldn't disconnect: ${String(error)}`);
     });

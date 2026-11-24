@@ -245,21 +245,20 @@ transaction.
 
 A group can be linked to a Discord channel
 (`POST /kazusa/bridges/link { chatId, channelId }`, owner only, from the chat
-sidebar). People writing in that channel are **guests**: `guest:` and ten
-letters and digits (`guestId`, a hash of the platform and account, the same
-every time and as short as a group id; an 18-digit Discord id cost tokens and
-got miscopied), outsiders like `user:` (`isOutsider`), with no brain, no ledger,
-no place and no membership. Their lines come in through `Messaging.postAsGuest`,
-into the group whatever its members, so whoever is in it now hears them and
-nobody else; with nobody in it, nobody does. The audience is the members plus
-the guest; only characters get copies. The Discord message id is the request id,
-so a line received twice is taken in once. Names are kept as written on one line
-of at most 32 characters, without backticks or brackets (`guestName`).
-Characters read a guest as "Name `guest:…`" everywhere: deliveries, "Chats
-awaiting your reply", and their records, which otherwise name people by id alone
-(a guest has no page to look the id up in; the name is the transcript's
-`sender.label`). They grow familiar with guests by id like anyone else. The
-client shows a guest by name only.
+sidebar). People writing in that channel are **guests**: `guest:discord-` and
+ten letters and digits (`guestId`, a hash of the account, the same every time;
+an 18-digit Discord id cost tokens and got miscopied), outsiders like `user:`
+(`isOutsider`), with no brain, no ledger, no place and no membership. Their
+lines come in through `Messaging.postAsGuest`, into the group whatever its
+members, so whoever is in it now hears them and nobody else; with nobody in it,
+nobody does. The audience is the members plus the guest; only characters get
+copies. The Discord message id is the request id, so a line received twice is
+taken in once. Names are kept as written on one line of at most 32 characters,
+without backticks or brackets (`guestName`). Characters read a guest as "Name
+`guest:…`" everywhere: deliveries, "Chats awaiting your reply", and their
+records, which otherwise name people by id alone (a guest has no page to look
+the id up in; the name is the transcript's `sender.label`). They grow familiar
+with guests by id like anyone else. The client shows a guest by name only.
 
 Everything said in a linked group goes the other way, from any instance
 (`onAnyEvent`): one webhook per channel posts it under the speaker's name, with
@@ -273,14 +272,16 @@ the channel sees who signs in.
 One connection per process (`kazusa.bridges` cell), made at `gateway_start` and
 whenever the owner saves the bot token (`POST /kazusa/bridges/token`, an auth
 profile `discord:manual` beside the provider keys; never sent back). Links are
-the retained `"bridges"` store; a load keeps both (saves' `MACHINE`). Each link
-is checked when the bot connects, when it is linked, and at most every 15 s
-while Settings or the sidebar asks (`checkLinks`): a channel the bot can't see
-(Discord then delivers nothing from it, though webhook posts still work), one
-that isn't a text channel, or no Manage Webhooks comes back as the link's
-`problem`, in plain words, and in the Gateway log. Not yet: lines said while the
-bot was disconnected are not posted later; linking a person's own Discord
-account to who they play.
+the retained `"bridges"` store; a load keeps both (saves' `MACHINE`). Linking
+checks the channel first and refuses one the bot can't use, saying why
+(`checkChannel`). Each link is checked when the bot connects, when it is linked,
+and at most every 15 s while Settings or the sidebar asks (`checkLinks`): a
+channel the bot can't see (Discord then delivers nothing from it, though webhook
+posts still work), one that isn't a text channel, or no Manage Webhooks comes
+back as the link's `problem`, in plain words, and in the Gateway log; the
+channel's and server's names come back too (`channelName`, `server`), shown as
+"#name in Server". Not yet: lines said while the bot was disconnected are not
+posted later; linking a person's own Discord account to who they play.
 
 ## People at the keyboard (`user:`)
 

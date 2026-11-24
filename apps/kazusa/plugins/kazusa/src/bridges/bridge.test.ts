@@ -7,6 +7,7 @@ import {
   guestName,
   type BridgeDeps,
   type BridgeTransport,
+  type ChannelCheck,
   type IncomingLine,
   type OutgoingLine,
 } from "./bridge.ts";
@@ -26,7 +27,14 @@ function fakeTransport(
       posts.push([channelId, line]);
     }),
     stop: vi.fn(async () => {}),
-    check: vi.fn(async (channelId: string) => options.problems?.get(channelId)),
+    check: vi.fn(async (channelId: string): Promise<ChannelCheck> => {
+      const problem = options.problems?.get(channelId);
+      return {
+        name: "schale-office",
+        server: "Kivotos",
+        ...(problem ? { problem } : {}),
+      };
+    }),
   };
   return { transport, posts, write: (line: IncomingLine) => onLine?.(line) };
 }
@@ -102,7 +110,7 @@ describe("Bridge", () => {
       [
         {
           chatId: "group:office",
-          guest: "guest:21iy4g9bqg",
+          guest: "guest:discord-21iy4g9bqg",
           name: "Sensei bot fan",
           text: "Is anyone on duty?",
           requestId: "discord:900",
@@ -141,7 +149,7 @@ describe("Bridge", () => {
     // A guest's own line is already in the channel; an unlinked chat isn't shown.
     h.bridge.outgoing({
       type: "message",
-      delivery: delivery({ id: "m4", sender: "guest:21iy4g9bqg" }),
+      delivery: delivery({ id: "m4", sender: "guest:discord-21iy4g9bqg" }),
     });
     h.bridge.outgoing({
       type: "message",
@@ -198,20 +206,28 @@ describe("Bridge", () => {
     const problems = new Map([["111", blind]]);
     const discord = fakeTransport({ problems });
     // Nothing connected: nothing to tell.
-    expect(h.bridge.problemOf("group:office")).toBeUndefined();
+    expect(h.bridge.checkOf("group:office")).toBeUndefined();
     await h.bridge.connect(discord.transport);
-    expect(h.bridge.problemOf("group:office")).toBe(blind);
+    expect(h.bridge.checkOf("group:office")).toEqual({
+      name: "schale-office",
+      server: "Kivotos",
+      problem: blind,
+    });
     expect(h.warn).toHaveBeenCalledWith(expect.stringContaining(blind));
 
     // Fixed in Discord: a recent answer stands until it's old enough.
     problems.clear();
     await h.bridge.checkLinks(60_000);
-    expect(h.bridge.problemOf("group:office")).toBe(blind);
+    expect(h.bridge.checkOf("group:office")?.problem).toBe(blind);
     await h.bridge.checkLinks(0);
-    expect(h.bridge.problemOf("group:office")).toBeUndefined();
+    expect(h.bridge.checkOf("group:office")).toEqual({
+      name: "schale-office",
+      server: "Kivotos",
+    });
 
     await h.bridge.disconnect();
-    expect(h.bridge.problemOf("group:office")).toBeUndefined();
+    expect(h.bridge.checkOf("group:office")).toBeUndefined();
+    await expect(h.bridge.checkChannel("111")).rejects.toThrow("Connect a bot");
   });
 
   it("keeps a failed post from stopping the ones after it", async () => {
@@ -229,12 +245,12 @@ describe("Bridge", () => {
 
 describe("guestId", () => {
   it("is short, the same for one account every time, and a valid participant", () => {
-    expect(guestId("discord", "42")).toBe("guest:21iy4g9bqg");
+    expect(guestId("discord", "42")).toBe("guest:discord-21iy4g9bqg");
     expect(guestId("discord", "42")).toBe(guestId("discord", "42"));
     expect(guestId("discord", "43")).not.toBe(guestId("discord", "42"));
     expect(
       PARTICIPANT_ID.parse(guestId("discord", "212557115179532288")),
-    ).toMatch(/^guest:[0-9a-z]{10}$/);
+    ).toMatch(/^guest:discord-[0-9a-z]{10}$/);
   });
 });
 

@@ -54,7 +54,9 @@ function setup() {
     post: async () => {},
     stop: async () => {},
     check: async (channelId) =>
-      channelId === "333" ? "The bot can't see this channel." : undefined,
+      channelId === "333"
+        ? { problem: "The bot can't see this channel." }
+        : { name: `channel-${channelId}`, server: "Kivotos" },
   }));
   registerBridges(
     {
@@ -166,7 +168,7 @@ describe("registerBridges", () => {
       expect(h.messaging.postAsGuest).toHaveBeenCalledWith(
         expect.objectContaining({
           chatId: "group:office",
-          guest: "guest:21iy4g9bqg",
+          guest: "guest:discord-21iy4g9bqg",
         }),
       ),
     );
@@ -189,16 +191,22 @@ describe("registerBridges", () => {
     expect(moved.body).toMatchObject({
       links: [{ chatId: "group:office", channelId: "222" }],
     });
+    // A channel the bot can't see is refused with why, and the link stays.
     const hidden = await h.call("/kazusa/bridges/link", {
       chatId: "group:office",
       channelId: "333",
     });
-    expect(hidden.body).toMatchObject({
+    expect(hidden).toEqual({
+      status: 400,
+      body: { error: "The bot can't see this channel." },
+    });
+    expect((await h.call("/kazusa/bridges")).body).toMatchObject({
       links: [
         {
           chatId: "group:office",
-          channelId: "333",
-          problem: "The bot can't see this channel.",
+          channelId: "222",
+          channelName: "channel-222",
+          server: "Kivotos",
         },
       ],
     });

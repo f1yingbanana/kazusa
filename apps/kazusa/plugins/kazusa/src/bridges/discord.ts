@@ -128,28 +128,54 @@ export function discordTransport(token: string): BridgeTransport {
       });
     },
     async check(channelId) {
-      let type: ChannelType;
+      let channel;
       try {
-        ({ type } = await client.api.channels.get(channelId));
+        channel = await client.api.channels.get(channelId);
       } catch (error) {
         const status = statusOf(error);
-        if (status === 403 || status === 404)
-          return "The bot can't see this channel, so nothing written there reaches the group. In Discord, allow it View Channel and Read Message History in the channel's permissions.";
+        if (status === 404)
+          return {
+            problem:
+              "There's no channel with this ID, or the bot isn't in its server.",
+          };
+        if (status === 403)
+          return {
+            problem:
+              "The bot can't see this channel, so nothing written there reaches the group. In Discord, allow it View Channel and Read Message History in the channel's permissions.",
+          };
         throw error;
       }
+      const guildId = "guild_id" in channel ? channel.guild_id : undefined;
+      const server = guildId
+        ? await client.api.guilds
+            .get(guildId)
+            .then((guild) => guild.name)
+            .catch(() => undefined)
+        : undefined;
+      const found = {
+        ...(channel.name ? { name: channel.name } : {}),
+        ...(server ? { server } : {}),
+      };
       if (
-        type !== ChannelType.GuildText &&
-        type !== ChannelType.GuildAnnouncement
+        channel.type !== ChannelType.GuildText &&
+        channel.type !== ChannelType.GuildAnnouncement
       )
-        return "Only a server's text channel can be linked.";
+        return {
+          ...found,
+          problem: "Only a server's text channel can be linked.",
+        };
       try {
         await webhookFor(channelId);
       } catch (error) {
         if (statusOf(error) === 403)
-          return "The bot can't post as characters here. In Discord, allow it Manage Webhooks in the channel's permissions.";
+          return {
+            ...found,
+            problem:
+              "The bot can't post as characters here. In Discord, allow it Manage Webhooks in the channel's permissions.",
+          };
         throw error;
       }
-      return undefined;
+      return found;
     },
     async stop() {
       client.removeAllListeners();

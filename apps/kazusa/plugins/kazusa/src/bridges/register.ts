@@ -143,8 +143,14 @@ export function registerBridges(
   const respond = (): BridgesResponse => ({
     discord: { hasToken: keys.has(TOKEN), status: bridge.status },
     links: [...bridge.allLinks()].map(([chatId, link]): BridgeLinkEntry => {
-      const problem = bridge.problemOf(chatId);
-      return { chatId, ...link, ...(problem ? { problem } : {}) };
+      const check = bridge.checkOf(chatId);
+      return {
+        chatId,
+        ...link,
+        ...(check?.name ? { channelName: check.name } : {}),
+        ...(check?.server ? { server: check.server } : {}),
+        ...(check?.problem ? { problem: check.problem } : {}),
+      };
     }),
   });
 
@@ -173,6 +179,9 @@ export function registerBridges(
       );
       if (taken)
         throw new Error("That channel is already linked to another group.");
+      // A channel the bot can't use is refused, with why, before it is kept.
+      const { problem } = await bridge.checkChannel(channelId);
+      if (problem) throw new Error(problem);
       await store.register(chatId, { platform: "discord", channelId });
     } else await store.delete(chatId);
     await loadLinks();
