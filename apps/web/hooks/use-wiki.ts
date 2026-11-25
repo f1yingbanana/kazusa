@@ -7,11 +7,12 @@ import type {
   WikiDeletePayload,
   WikiEditResult,
   WikiKind,
-  WikiSavePayload,
-  WikiSourceResponse,
   WikiLintResponse,
+  WikiListItem,
   WikiListResponse,
   WikiPageResponse,
+  WikiSavePayload,
+  WikiSourceResponse,
 } from "@kazusa/client";
 import {
   deleteWikiPage,
@@ -40,6 +41,26 @@ export function useWikiList(agent?: string) {
   );
 }
 
+/** Indexes World Wiki pages by alias, name, and id (ids win on collision). */
+export function usePageLookup(): (ref: string) => WikiListItem | undefined {
+  const { data: list } = useWikiList();
+  const index = useMemo(() => {
+    const byRef = new Map<string, WikiListItem>();
+    const pages = list?.pages ?? [];
+    for (const page of pages) {
+      for (const ref of [page.name, ...page.aliases])
+        byRef.set(ref.toLowerCase(), page);
+    }
+    // Ids last, so an id always means its own page, as the server reads it.
+    for (const page of pages) byRef.set(page.id.toLowerCase(), page);
+    return byRef;
+  }, [list]);
+  return useCallback(
+    (ref: string) => index.get(ref.toLowerCase()),
+    [index],
+  );
+}
+
 /**
  * A page's name from how something refers to it: its id, name or an alias, as a
  * character's groups are written ("after_school_sweets_club" reads
@@ -47,26 +68,15 @@ export function useWikiList(agent?: string) {
  * separators as spaces.
  */
 export function usePageName(): (ref: string) => string {
-  const { data: list } = useWikiList();
-  const names = useMemo(() => {
-    const byRef = new Map<string, string>();
-    const pages = list?.pages ?? [];
-    for (const page of pages) {
-      for (const ref of [page.name, ...page.aliases])
-        byRef.set(ref.toLowerCase(), page.name);
-    }
-    // Ids last, so an id always means its own page, as the server reads it.
-    for (const page of pages) byRef.set(page.id.toLowerCase(), page.name);
-    return byRef;
-  }, [list]);
+  const lookup = usePageLookup();
   return useCallback(
     (ref: string) => {
-      const name = names.get(ref.toLowerCase());
-      if (name) return name;
+      const page = lookup(ref);
+      if (page) return page.name;
       const words = ref.replace(/[_-]+/g, " ").trim();
       return words.charAt(0).toUpperCase() + words.slice(1);
     },
-    [names],
+    [lookup],
   );
 }
 

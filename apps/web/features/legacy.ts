@@ -26,18 +26,13 @@ export {
 export { useStopBrain } from "@/components/inspector/sections/character-stop";
 export { PlacePeopleSection } from "@/components/inspector/sections/place-people";
 export { PlaceWaysSection } from "@/components/inspector/sections/place-ways";
-export { PlayAsDialog } from "@/components/play/play-as-dialog";
 export { Stage } from "@/components/shell/stage";
 export { StatusBar } from "@/components/shell/status-bar";
 export { VisitorWelcome } from "@/components/shell/visitor-welcome";
 export { WorldUpdateNotice } from "@/components/shell/world-update-notice";
-export {
-  CastDialog,
-  type CastRequest,
-} from "@/components/views/characters/cast-dialog";
 export { NewChatDialog } from "@/components/views/chats/new-chat-dialog";
 export { chatsParsers } from "@/components/views/chats/search-params";
-export { RichText } from "@/components/views/wiki/page-link";
+export { RichText, usePlainText } from "@/components/views/wiki/page-link";
 export { wikiParsers } from "@/components/views/wiki/search-params";
 export { worldParsers } from "@/components/views/world/search-params";
 export {

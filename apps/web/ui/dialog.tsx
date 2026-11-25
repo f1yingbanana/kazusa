@@ -30,6 +30,7 @@ const SURFACE =
 const WIDTH = {
   sm: "sm:w-[min(24rem,calc(100vw-2rem))]",
   md: "sm:w-[min(28rem,calc(100vw-2rem))]",
+  lg: "sm:w-[min(42rem,calc(100vw-2rem))]",
 } as const;
 
 const TITLE = "text-lg leading-tight font-extrabold";
@@ -97,24 +98,21 @@ const ANSWER =
   "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-bold transition-[scale,background-color] duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary data-[disabled]:opacity-50";
 
 /**
- * A question that needs an answer before going on. `confirm` is the agreeing
- * answer; `danger` draws it as something that can't be taken back lightly.
+ * A question that needs an answer before going on, answered Cancel or Confirm:
+ * the title and description say what confirming does. `danger` draws Confirm as
+ * something that can't be taken back lightly.
  */
 export function AlertPanel({
   title,
   description,
-  cancel = "Cancel",
-  confirm,
   danger = false,
   agentConfirm,
   onConfirm,
 }: {
   title: string;
   description: ReactNode;
-  cancel?: string;
-  confirm: string;
   danger?: boolean;
-  /** What an agent is told before it may press `confirm`. */
+  /** What an agent is told before it may press Confirm. */
   agentConfirm?: string;
   onConfirm: () => void;
 }) {
@@ -135,7 +133,7 @@ export function AlertPanel({
               "bg-ui-tint text-ui-ink hover:bg-[color-mix(in_oklch,var(--ui-tint),var(--ui-ink)_8%)]",
             )}
           >
-            {cancel}
+            Cancel
           </AlertDialogClose>
           <AlertDialogClose
             value="confirm"
@@ -148,7 +146,7 @@ export function AlertPanel({
                 : "bg-ui-primary text-ui-on-primary hover:bg-[color-mix(in_oklch,var(--ui-primary),black_10%)]",
             )}
           >
-            {confirm}
+            Confirm
           </AlertDialogClose>
         </DialogFoot>
       </AlertDialogContent>

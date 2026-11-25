@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WikiIdSchema } from "@kazusa/client";
-import { pageId } from "./page-id";
+import { idProblem, pageId } from "./page-id";
 
 const none = new Set<string>();
 
@@ -32,5 +32,25 @@ describe("pageId", () => {
   it("always makes a valid id", () => {
     for (const name of ["过热the", "  ", "---", "Ü", "x".repeat(200), "🍰"])
       expect(WikiIdSchema.safeParse(pageId(name, none)).success).toBe(true);
+  });
+});
+
+describe("idProblem", () => {
+  it("asks for an id, a free one, in the id alphabet", () => {
+    expect(idProblem("", none)).toBe("Enter an id.");
+    expect(idProblem("airi", new Set(["airi"]))).toMatch(/already uses/);
+    expect(idProblem("Airi", none)).toMatch(/lowercase/);
+    expect(idProblem("airi-kurimura", none)).toBeUndefined();
+  });
+
+  it("keeps a character's id short enough for an agent", () => {
+    const long = "a".repeat(65);
+    expect(idProblem(long, none)).toBeUndefined();
+    expect(idProblem(long, none, { character: true })).toMatch(/64/);
+  });
+
+  it("reports the 128-character limit on long page ids", () => {
+    expect(idProblem("a".repeat(128), none)).toBeUndefined();
+    expect(idProblem("a".repeat(129), none)).toMatch(/128/);
   });
 });

@@ -1,3 +1,5 @@
+import { WikiIdSchema } from "@kazusa/client";
+
 /**
  * A page's id, made from its name and never shown. Ids are file names and, for
  * characters, OpenClaw agent ids, so they stay `a-z0-9_-` and at most 64 long;
@@ -52,4 +54,23 @@ export function pageId(
   let id = stem;
   for (let n = 2; taken.has(id); n += 1) id = `${stem}${separator}${n}`;
   return id;
+}
+
+/** OpenClaw agent ids stop at 64; pages may run to 128. */
+const CHARACTER_MAX = 64;
+const PAGE_MAX = 128;
+
+/** Why `id` can't be used, or undefined when it can. */
+export function idProblem(
+  id: string,
+  taken: ReadonlySet<string>,
+  { character = false }: { character?: boolean } = {},
+): string | undefined {
+  if (!id) return "Enter an id.";
+  if (taken.has(id)) return "Another page already uses this id.";
+  const max = character ? CHARACTER_MAX : PAGE_MAX;
+  if (id.length > max) return `Keep it to ${max} characters.`;
+  if (!WikiIdSchema.safeParse(id).success)
+    return "Use lowercase a–z, digits, - or _, starting with a letter or digit.";
+  return undefined;
 }

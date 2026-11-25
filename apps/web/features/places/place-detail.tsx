@@ -58,6 +58,7 @@ import { PlacePeople } from "../world/place-people";
 import { askToShowOnMap } from "../world/map/show-on-map";
 import { useTalks } from "../world/talks";
 import { conversationParsers } from "../chats/open";
+import { wikiPatch } from "../wiki/open";
 
 /**
  * Laid out like a person: what it is and where it sits, what you can do (go,
@@ -80,11 +81,7 @@ export function PlaceDetail({
     sel: entityRefParser,
     "world.talk": conversationParsers["world.talk"],
     "world.as": conversationParsers["world.as"],
-    "wiki.page": wikiParsers["wiki.page"],
-    "wiki.agent": wikiParsers["wiki.agent"],
-    "wiki.part": wikiParsers["wiki.part"],
-    "wiki.edit": wikiParsers["wiki.edit"],
-    "wiki.raw": wikiParsers["wiki.raw"],
+    ...wikiParsers,
   });
   const { resolved } = useSources();
   const place = places?.byId.get(id);
@@ -209,16 +206,7 @@ export function PlaceDetail({
               <MenuContent>
                 <MenuItem
                   icon={<BookOpenIcon aria-hidden />}
-                  onSelect={() =>
-                    void setParams({
-                      view: "wiki",
-                      "wiki.page": place.id,
-                      "wiki.agent": null,
-                      "wiki.part": null,
-                      "wiki.edit": null,
-                      "wiki.raw": null,
-                    })
-                  }
+                  onSelect={() => void setParams(wikiPatch(place.id))}
                 >
                   Wiki page
                 </MenuItem>

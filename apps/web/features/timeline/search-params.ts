@@ -24,3 +24,16 @@ export const timelineFilterParsers = {
   ...timelineParsers,
   "tl.q": parseAsString.withDefault(""),
 };
+
+/** Opens Timeline filtered to `actors`. */
+export function timelinePatch(actors: readonly string[]): {
+  view: "timeline";
+  "tl.actors": string[];
+  "tl.watch": null;
+} {
+  return {
+    view: "timeline",
+    "tl.actors": [...actors],
+    "tl.watch": null,
+  };
+}

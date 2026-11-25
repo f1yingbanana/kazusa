@@ -212,3 +212,112 @@ The new UI splits conversations by how they're held:
   quiet background lines vs. elevated story cards (`variant="card"`), expandable
   details and italicized action message previews, and `conversationPatch` routing
   so huddles open in World and texts open in Chats.
+
+## Characters (2026-11-25)
+
+- **No list sidebar.** World's column says where people are, Chats' what is
+  being said, Timeline's whose story to follow. Characters adds no fourth list:
+  the cast is the stage and a profile is a page in it (`SIDEBARS.characters`
+  is `null`). The details panel stays on the right with the person's live
+  state, as in every tab; the profile never repeats or moves it. (Tried and
+  dropped: the panel moved into a left column under a portrait, which was
+  motion without arrival, and a full-height cropped figure, which cut people
+  off and assumed every world has standing portraits.)
+- **The cast is a yearbook of display pictures** (`features/characters/gallery.tsx`):
+  square tiles, each the character's display picture (`avatarUrl`) filling it,
+  else their initials (`ui/portrait.tsx` with `face`). Tried and dropped:
+  faces cut from standing portraits by their placement (`portraits.json`
+  `centre`/`eyes`); most lined up, but the placement's centre is the body's,
+  not the head's, so leaning heads still missed. The Looks tab still cuts its
+  expression tiles that way (`usePortraits`, `placedFrame`), where every tile
+  is the same figure. Thinking rings a tile, offstage greys it; no You or
+  Played label.
+- **One grid** (`ui/packed-grid.tsx`): groups are subgrids on shared columns
+  (`columnsFor` from a ResizeObserver), each as wide as its tiles, packed dense,
+  headings on a row ending on one line so tiles start together. A heading is
+  two lines at most: the name first (a long one gets a second column,
+  `headingSpan`, rather than three lines), the group's summary (two members
+  or more) only on a line the name leaves free, clipped away otherwise. For
+  whoever runs the world a ⋯ follows the name on hover, in the line's flow, so
+  it takes no width (a chevron there read as collapsing the group). Arranged by Groups or A–Z (`chars.by`), with Show
+  (`chars.show`) and Find (`chars.q`, also group names). A tile does one thing,
+  open the profile: no hover card (the map's exists because a marker is only a
+  face), and no You or Played label. Back puts focus on the tile you came
+  from.
+- **Arrangements not carried over from the old roster**, on purpose: by
+  Activity and by Status. They answer "what is happening now", which World
+  (who's where, doing what) and the status bar's counts already answer; the
+  Characters tab is about who people are. Onstage and offstage (casting) stay
+  here.
+- **A profile is the World Wiki page on a character, plus what only a
+  character has**, laid out as a wiki page: Back (to the cast) and the cast
+  position, the title alone (name, and a line of what they're doing now, which
+  below `xl` opens the details drawer), tabs, then the text with an infobox on
+  its right (above it when narrow). `ui/infobox.tsx` is the box every wiki page
+  will share: the page's picture whole and never cropped, whatever its shape
+  (standing portrait, display picture, a place's backdrop), its caption, then
+  facts as term and value; nothing at all without either. Tried and dropped:
+  the picture in the title block (it pushed the text down and assumed a
+  standing portrait). `features/wiki/page-body.tsx` (`WikiPageBody`) is the
+  body every wiki page shares: the summary in bold, the rest of the opening,
+  sections ("Only <name>" on those only the subject knows), history. When the
+  Wiki tab moves here, a place, group or thing is a title, `WikiPageBody` and
+  an `Infobox`; a character's page link already opens Characters. The
+  profile's infobox (`profile-header.tsx`): a look tried on, else the resting
+  portrait, else the display picture; Also known as; Groups with membership,
+  each opening the cast found by it. Tabs (`ui/tabs.tsx`, `chars.tab`): About,
+  Story, People (their own wiki's people in their words; opening one shows both
+  sides and what each guesses the other thinks; who knows them), Looks
+  (expressions cropped by each portrait's placement via `usePortraits`;
+  pressing one tries it on in the infobox, `chars.look`), Memory. ← and → turn
+  through the cast's filtered order keeping the tab. Opening a profile selects
+  the person quietly.
+- **Status line** (`StatusLine` in `character-actions.tsx`, the details panel's
+  header and the profile title): never "Awake", the ordinary case, which the
+  dot says; Thinking, Typing, Offstage or Not simulated when so, then their
+  nearest group, or on the profile what they're doing now.
+- **Who's onstage** (`features/characters/stage-dialog.tsx`, `StageDialog`):
+  one character gets a plain question (`AlertPanel`: bring on or send off, and
+  what that does); a group or the whole cast a list of faces by group, each
+  group a `CheckList` whose parent row ticks it whole or in part (`CheckRow`
+  has a `media` slot for the face), lit when on, greyed when off, "Steps on" or
+  "Steps off" on rows that would change, the played locked on. Search, All,
+  None; the footer says what happens ("2 step on. They all start thinking
+  right away, reading 3 waiting messages first.") and the button how many
+  changes. The old `CastDialog` stays only for the old UI.
+- **Play as character** (`features/characters/play-as-dialog.tsx`, opened
+  from anywhere by `openPlayDialog`): `ui/choose-list.tsx` (one answer on
+  ui-sdk Listbox, found by typing; `PickList`'s sibling) with Watch (Observer)
+  then the cast, someone played elsewhere disabled; beside it who that is and
+  what the switch does to whoever is left; the button names the act ("Play as
+  Yuuka", "Watch as observer").
+- **New character** (`features/characters/new-character-dialog.tsx`): Name,
+  the Id that follows it until Customize (`ui/field.tsx` `TextField` on ui-sdk
+  Field, its error in place of its description; `idProblem` and `pageId` in
+  `lib/wiki/page-id.ts`), and Simulated (on: joins the cast offstage and the
+  profile opens; off: only a person's page, opened in the Wiki to write). The
+  button says what it makes. The old `NewPageDialog` stays for the old Wiki.
+- The profile's scroll area sits a pixel inside the stage card: the card's
+  outline is an inset ring, painted under its children, so the stuck tabs
+  would otherwise cover it.
+- Editing still goes through the old UI: About and Looks open the Wiki tab,
+  Memory the old memory sheet. `PHASE_ICON` is exported from the Timeline stage
+  for the Story tab. Pure helpers: `lib/characters/cast-book.ts` (tested).
+
+## Dialog actions and waiting (2026-11-25)
+
+- **Every confirming dialog answers Cancel and Confirm**, nothing longer: the
+  title, description and body say what confirming does (who steps on, what
+  playing someone does to whoever is left, what the switch makes). No counts,
+  names or verbs on the button ("Apply 3 changes", "Play as Yuuka", "Add
+  Hina"). `AlertPanel` has no labels to pass; a `DialogPanel` footer is
+  `DialogClose` Cancel and a primary Confirm, disabled until there's something
+  to confirm. A dialog that only shows a result (the screenshot's Save image,
+  Copy, Share) has no Confirm. Inline actions outside dialogs (Link / Unlink in
+  the chat panel, Save layout on the map) keep their own word.
+- **Waiting is a spinner, never a new word.** `ui/button.tsx`: an `onClick`
+  that returns a Promise keeps the button pending (ui-sdk's own state, which
+  also announces it after a second); `pending` does the same for what the
+  button can't see, like a form it submits. Pending, a turning
+  `LoaderCircle` takes the icon's place and the label stays as it is ("Adding…"
+  made the button jump and read as a new button).

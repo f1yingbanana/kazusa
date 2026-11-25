@@ -13,12 +13,12 @@ import { syncPreferences } from "@/lib/state/preferences-store";
 import { Drawer, DrawerPanel } from "@/ui/drawer";
 import type { Palette } from "@/ui/palettes";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
-import { Gallery } from "../characters/gallery";
+import { CharactersStage } from "../characters/characters-stage";
+import { PlayAsDialog } from "../characters/play-as-dialog";
 import { ChatList } from "../chats/chat-list";
 import { ChatsStage } from "../chats/chats-stage";
 import {
   chatsParsers,
-  PlayAsDialog,
   Stage,
   StatusBar,
   VisitorWelcome,
@@ -36,14 +36,16 @@ import { usePalette } from "./use-palette";
 import { useDetailsSheet } from "./use-sheet";
 
 /** Sections rebuilt here; the rest still come from the registry's old views. */
-const SIDEBARS: Record<string, ComponentType<SectionSidebarProps>> = {
+const SIDEBARS: Record<string, ComponentType<SectionSidebarProps> | null> = {
+  // The cast is the stage, and a profile is a page in it: no list beside them.
+  characters: null,
   chats: ChatList,
   timeline: TimelineSidebar,
   world: WhosWhere,
 };
 
 const STAGES: Record<string, ComponentType> = {
-  characters: Gallery,
+  characters: CharactersStage,
   chats: ChatsStage,
   timeline: TimelineStage,
   world: WorldStage,
@@ -53,7 +55,6 @@ const PANE_LABELS: Record<string, [string, string]> = {
   chats: ["Conversations", "Thread"],
   timeline: ["People", "Timeline"],
   world: ["Who's where", "Map"],
-  characters: ["List", "Faces"],
 };
 
 type Pane = "list" | "stage";
@@ -87,7 +88,7 @@ function Frame({
   const docked = useMediaQuery("(min-width: 1024px)");
   const wide = useMediaQuery("(min-width: 1280px)");
   const tablet = useMediaQuery("(min-width: 768px)");
-  const Sidebar = SIDEBARS[active.id] ?? active.sidebar;
+  const Sidebar = active.id in SIDEBARS ? SIDEBARS[active.id] : active.sidebar;
   const OwnStage = STAGES[active.id];
   const [pane, setPane] = useState<Pane>("stage");
   const [sheetOpen, setSheetOpen] = useDetailsSheet(selection, active.id);
