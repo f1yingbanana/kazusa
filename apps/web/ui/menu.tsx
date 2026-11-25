@@ -45,7 +45,7 @@ export function MenuItem({
     <Item
       {...props}
       data-danger={danger || undefined}
-      className="flex h-8.5 cursor-default items-center gap-2.5 rounded-[0.625rem] px-2.5 text-sm font-semibold outline-none data-highlighted:bg-ui-tint data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:text-ui-soft [&_svg[data-on]]:fill-current [&_svg[data-on]]:text-ui-primary data-[danger]:text-ui-danger data-[danger]:[&_svg]:text-ui-danger"
+      className="flex h-8.5 cursor-default items-center gap-2.5 rounded-[0.625rem] px-2.5 text-sm font-semibold outline-none data-danger:text-ui-danger data-highlighted:bg-ui-tint data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:text-ui-soft data-danger:[&_svg]:text-ui-danger [&_svg[data-on]]:fill-current [&_svg[data-on]]:text-ui-primary"
     >
       {icon ? <MenuItemIcon>{icon}</MenuItemIcon> : null}
       {children}

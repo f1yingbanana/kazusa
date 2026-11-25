@@ -106,7 +106,7 @@ export function PickList({
           ref={chips}
           aria-label="Picked"
           onScroll={(event) => edges(event.currentTarget)}
-          className="-mx-1 flex flex-none gap-1.5 overflow-x-auto motion-safe:scroll-smooth px-1 py-0.5 [scrollbar-width:none] transition-[--ui-fade-start,--ui-fade-end] duration-200 [mask-image:linear-gradient(to_right,transparent,black_var(--ui-fade-start),black_calc(100%-var(--ui-fade-end)),transparent)] data-[more-end]:[--ui-fade-end:1.5rem] data-[more-start]:[--ui-fade-start:1.5rem] motion-reduce:transition-none rtl:[mask-image:linear-gradient(to_left,transparent,black_var(--ui-fade-start),black_calc(100%-var(--ui-fade-end)),transparent)]"
+          className="-mx-1 flex flex-none scrollbar-none gap-1.5 overflow-x-auto mask-[linear-gradient(to_right,transparent,black_var(--ui-fade-start),black_calc(100%-var(--ui-fade-end)),transparent)] px-1 py-0.5 transition-[--ui-fade-start,--ui-fade-end] duration-200 data-more-end:[--ui-fade-end:1.5rem] data-more-start:[--ui-fade-start:1.5rem] motion-safe:scroll-smooth motion-reduce:transition-none rtl:mask-[linear-gradient(to_left,transparent,black_var(--ui-fade-start),black_calc(100%-var(--ui-fade-end)),transparent)]"
         >
           {picked.map((item) => (
             <li
@@ -153,7 +153,7 @@ export function PickList({
                   value={item.value}
                   label={item.label}
                   disabled={item.disabled}
-                  className="group/pick flex min-h-12 cursor-default items-center gap-3 rounded-[0.875rem] px-2 py-1.5 outline-none data-[disabled]:opacity-55 data-[highlighted]:bg-ui-tint data-[selected]:bg-ui-accent-tint"
+                  className="group/pick flex min-h-12 cursor-default items-center gap-3 rounded-[0.875rem] px-2 py-1.5 outline-none data-highlighted:bg-ui-tint data-selected:bg-ui-accent-tint data-disabled:opacity-55"
                 >
                   {item.media}
                   <span className="flex min-w-0 flex-1 flex-col">
@@ -171,7 +171,7 @@ export function PickList({
                       </span>
                     ) : null}
                   </span>
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full inset-ring-2 inset-ring-ui-line group-data-[selected]/pick:bg-ui-primary group-data-[selected]/pick:inset-ring-0">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full inset-ring-2 inset-ring-ui-line group-data-selected/pick:bg-ui-primary group-data-selected/pick:inset-ring-0">
                     <ListboxItemIndicator className="grid place-items-center text-ui-on-primary motion-safe:animate-ui-pop">
                       <CheckIcon
                         aria-hidden

@@ -3,7 +3,7 @@ import { createElement, type ReactNode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { afterEach, expect, it, vi } from "vitest";
-import { useRecentEvents } from "./use-timeline";
+import { useRecentEvents, useTimeline } from "./use-timeline";
 import { mergeJournal, useLiveStore } from "../lib/live/state";
 import { fetchTimeline } from "../lib/source/timeline/http";
 
@@ -55,4 +55,48 @@ it("includes live events when recent events has no kind filter", async () => {
     ]),
   );
   expect(result.current.events.map((event) => event.seq)).toEqual([1]);
+});
+
+it("keeps previous events visible without re-entering skeleton loading when filters change", async () => {
+  const firstEvent = {
+    seq: 10,
+    simTime: 1000,
+    kind: "task.started" as const,
+    actors: ["alice"],
+    payload: {
+      taskId: "t1",
+      type: "work",
+      description: "First",
+      duration: 15,
+      endAt: 1015,
+    },
+  };
+  let resolveSecond!: (value: { events: []; hasMore: false }) => void;
+  vi.mocked(fetchTimeline)
+    .mockResolvedValueOnce({ events: [firstEvent], hasMore: false })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+    );
+
+  const { result, rerender } = renderHook(
+    ({ actors }: { actors: string[] }) => useTimeline({ actors }),
+    { initialProps: { actors: ["alice"] }, wrapper },
+  );
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  expect(result.current.events.map((e) => e.seq)).toEqual([10]);
+
+  rerender({ actors: ["bob"] });
+  expect(result.current.isLoading).toBe(false);
+  expect(result.current.isSwitching).toBe(true);
+  expect(result.current.events.map((e) => e.seq)).toEqual([10]);
+
+  await act(async () => {
+    resolveSecond({ events: [], hasMore: false });
+  });
+  await waitFor(() => expect(result.current.isSwitching).toBe(false));
+  expect(result.current.events).toEqual([]);
 });

@@ -64,7 +64,11 @@ export function useTimeline(filters: TimelineFilters) {
           before: typeof before === "number" ? before : undefined,
           limit: TIMELINE_PAGE_SIZE,
         }),
-      { revalidateOnFocus: false, revalidateFirstPage: false },
+      {
+        revalidateOnFocus: false,
+        revalidateFirstPage: false,
+        keepPreviousData: true,
+      },
     );
 
   const tail = useTail(query);
@@ -81,11 +85,14 @@ export function useTimeline(filters: TimelineFilters) {
     lastPage?.hasMore && lastPage.nextCursor !== undefined,
   );
   const isLoadingMore = isValidating && size > (data?.length ?? 0);
+  const initialLoading = isLoading && data === undefined;
+  const isSwitching = isLoading && data !== undefined;
 
   return {
     events,
     error,
-    isLoading,
+    isLoading: initialLoading,
+    isSwitching,
     hasMore,
     isLoadingMore,
     loadMore: () => setSize(size + 1),

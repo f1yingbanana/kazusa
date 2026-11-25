@@ -1027,6 +1027,7 @@ export function WorldMap({
       y: number;
       dx: number;
       dy: number;
+      layer: number;
       count: number;
       plus: boolean;
     }[] = [];
@@ -1052,7 +1053,7 @@ export function WorldMap({
           y: node.y,
           dx: seat(i),
           dy,
-          layer: slots - i + 1,
+          layer: i + 2,
         }),
       );
       if (extra > 0) {
@@ -1062,6 +1063,7 @@ export function WorldMap({
           y: node.y,
           dx: seat(slots - 1),
           dy,
+          layer: slots + 2,
           count: extra,
           plus: seated.length > 0,
         });

@@ -8,6 +8,7 @@ export type Presence =
   "idle" | "thinking" | "composing" | "offstage" | "unknown";
 
 const SIZE = {
+  xs: "size-5 [--size:1.25rem]",
   sm: "size-7 [--size:1.75rem]",
   md: "size-10 [--size:2.5rem]",
   lg: "size-17 [--size:4.25rem]",
@@ -99,7 +100,59 @@ export function Avatar({
   );
 }
 
-/** Faces overlapping, for a conversation with more than one person. */
-export function AvatarStack({ children }: { children: ReactNode }) {
-  return <span className="flex shrink-0 *:not-first:-ms-3.5">{children}</span>;
+const COUNT_SIZE = {
+  xs: "h-5 min-w-5 px-1 text-[0.6875rem]",
+  sm: "h-7 min-w-7 px-1.5 text-[11px]",
+} as const;
+
+/** Shared style for "+N" overflow badges beside an avatar or on the map. */
+export function avatarCountClass(size: keyof typeof COUNT_SIZE = "sm") {
+  return cx(
+    "inline-grid shrink-0 place-items-center rounded-full bg-ui-surface font-extrabold text-ui-ink tabular-nums shadow-[0_0_0_2px_var(--ui-surface)] inset-ring inset-ring-ui-line",
+    COUNT_SIZE[size],
+  );
+}
+
+/** Overflow count ("+2") sized cleanly as a circle for short counts and a pill for long ones. */
+export function AvatarCount({
+  count,
+  plus = false,
+  size = "sm",
+  className,
+}: {
+  count: number;
+  plus?: boolean;
+  size?: keyof typeof COUNT_SIZE;
+  className?: string;
+}) {
+  return (
+    <span aria-hidden="true" className={cx(avatarCountClass(size), className)}>
+      {plus ? "+" : ""}
+      {count}
+    </span>
+  );
+}
+
+/** Faces overlapping, for a conversation or group with more than one person. */
+export function AvatarStack({
+  size = "md",
+  children,
+}: {
+  size?: "xs" | "sm" | "md";
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={cx(
+        "flex shrink-0",
+        size === "xs"
+          ? "*:not-first:-ms-1.5"
+          : size === "sm"
+            ? "*:not-first:-ms-2.5"
+            : "*:not-first:-ms-3.5",
+      )}
+    >
+      {children}
+    </span>
+  );
 }

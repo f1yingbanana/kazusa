@@ -1,6 +1,13 @@
 {
   "version": 2,
   "skills": {
+    "design-council": {
+      "source": "seevali/claude-skills",
+      "commit": "438507efdb380c9d74e4eeb4eb3f5841989686e7",
+      "sourceType": "github",
+      "skillPath": "design-council/SKILL.md",
+      "computedHash": "ebf275c80202dde6b4fced748176e11a662f0e0eaf7d2afa22d59da69e87ebea"
+    },
     "skill-creator": {
       "source": "anthropics/skills",
       "sourceType": "github",

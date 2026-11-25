@@ -18,7 +18,7 @@ export const CharacterAvatar = memo(function CharacterAvatar({
   name: string;
   avatarUrl?: string;
   kind?: CharacterKind;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   /** Inside a control that already names them. */
   decorative?: boolean;
 }) {
