@@ -219,12 +219,93 @@ export const ManageChatResponseSchema = z.object({
 });
 export type ManageChatResponse = z.infer<typeof ManageChatResponseSchema>;
 
+/**
+ * POST /kazusa/chats/open: anyone who plays makes an open group nobody is in
+ * yet.
+ */
+export const OpenGroupPayloadSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+});
+export type OpenGroupPayload = z.infer<typeof OpenGroupPayloadSchema>;
+export const OpenGroupResponseSchema = z.object({ chatId: z.string() });
+export type OpenGroupResponse = z.infer<typeof OpenGroupResponseSchema>;
+
 /** POST /kazusa/chats/settings: the owner's settings for a group. */
 export const ChatSettingsPayloadSchema = z.object({
   chatId: z.string().min(1),
   joinable: z.boolean(),
 });
 export type ChatSettingsPayload = z.infer<typeof ChatSettingsPayloadSchema>;
+
+/* -------------------------------------------------------------- bridges */
+
+/** Where a platform connection stands. */
+export const BridgeStatusSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("off") }),
+  z.object({ state: z.literal("connecting") }),
+  /** `name`: the bot's, as Discord shows it. */
+  z.object({ state: z.literal("connected"), name: z.string() }),
+  z.object({ state: z.literal("failed"), error: z.string() }),
+]);
+export type BridgeStatus = z.infer<typeof BridgeStatusSchema>;
+
+/** A group linked to a channel on another platform. */
+export const BridgeLinkEntrySchema = z.object({
+  chatId: z.string(),
+  platform: z.literal("discord"),
+  channelId: z.string(),
+  /** The channel's name, without the `#`, as the bot last found it. */
+  channelName: z.string().optional(),
+  /** The server it is in. */
+  server: z.string().optional(),
+  /** What stops it working (the bot can't see the channel, say), in plain words. */
+  problem: z.string().optional(),
+});
+export type BridgeLinkEntry = z.infer<typeof BridgeLinkEntrySchema>;
+
+/** GET /kazusa/bridges: owner only. The token itself is never sent back. */
+export const BridgesResponseSchema = z.object({
+  discord: z.object({ hasToken: z.boolean(), status: BridgeStatusSchema }),
+  links: z.array(BridgeLinkEntrySchema),
+});
+export type BridgesResponse = z.infer<typeof BridgesResponseSchema>;
+
+/**
+ * GET /kazusa/bridges/account: the person's own Discord account, for anyone who
+ * plays. What they write in a linked channel is said by whoever they play.
+ */
+export const BridgeAccountResponseSchema = z.object({
+  account: z.object({ name: z.string(), linkedAt: z.number() }).nullable(),
+  /** The connected bot's name, to send a code to; null with none connected. */
+  bot: z.string().nullable(),
+});
+export type BridgeAccountResponse = z.infer<typeof BridgeAccountResponseSchema>;
+
+/** POST /kazusa/bridges/account/code: a code to link with, for ten minutes. */
+export const BridgeLinkCodeResponseSchema = z.object({
+  code: z.string(),
+  until: z.number(),
+});
+export type BridgeLinkCodeResponse = z.infer<
+  typeof BridgeLinkCodeResponseSchema
+>;
+
+/** POST /kazusa/bridges/token: the bot's token, or null to disconnect. */
+export const BridgeTokenPayloadSchema = z.object({
+  token: z.string().trim().min(1).max(200).nullable(),
+});
+export type BridgeTokenPayload = z.infer<typeof BridgeTokenPayloadSchema>;
+
+/** POST /kazusa/bridges/link: a group's Discord channel, or null to unlink. */
+export const BridgeLinkPayloadSchema = z.object({
+  chatId: z.string().min(1),
+  channelId: z
+    .string()
+    .trim()
+    .regex(/^\d{1,24}$/, "A Discord channel id is a number.")
+    .nullable(),
+});
+export type BridgeLinkPayload = z.infer<typeof BridgeLinkPayloadSchema>;
 
 /** POST /kazusa/typing */
 export const TypingPayloadSchema = z.object({

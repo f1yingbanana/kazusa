@@ -3,6 +3,7 @@ import {
   MessagesResponseSchema,
   SendResponseSchema,
   ManageChatResponseSchema,
+  OpenGroupResponseSchema,
   type ChatsResponse,
   type ChatSettingsPayload,
   type ManageChatPayload,
@@ -48,6 +49,13 @@ export async function manageChat(
     payload,
   );
   return ManageChatResponseSchema.parse(data);
+}
+
+/** The owner makes an open group nobody is in yet; returns its id. */
+export async function createOpenGroup(title: string): Promise<string> {
+  return OpenGroupResponseSchema.parse(
+    await postJson<unknown>(buildUrl("/kazusa/chats/open"), { title }),
+  ).chatId;
 }
 
 /** The owner opens a group to anyone with its address, or closes it. */

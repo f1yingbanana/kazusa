@@ -1,4 +1,4 @@
-import { isUser } from "../identity.ts";
+import { isOutsider } from "../identity.ts";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/core";
 import { cachedStore, type StateStore } from "../state.ts";
 import type { Page } from "./page.ts";
@@ -63,7 +63,7 @@ export function usesOfMessage(
   return [
     ...others.map((id) => [id, [sender]] as const),
     ...(others.length <= FAMILIAR_CHAT_SIZE ? [[sender, others] as const] : []),
-  ].filter(([agentId]) => !isUser(agentId));
+  ].filter(([agentId]) => !isOutsider(agentId));
 }
 
 /**

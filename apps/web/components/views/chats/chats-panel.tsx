@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { usePlay } from "@/hooks/use-play";
+import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useObservedChats } from "@/hooks/use-observed-chats";
@@ -42,6 +43,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
   const selfOf = useSelfIn();
   // Watching, there is nobody of yours to start a chat as.
   const { canAct } = usePlay();
+  const { canPlay } = useAccess();
   const { chats: allMine, error, isLoading, reload } = useChats();
   const observed = useObservedChats();
   const { byId } = useCharacters();
@@ -133,7 +135,8 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                disabled={!canAct}
+                // An open group can be made while only watching.
+                disabled={!canAct && !canPlay}
                 onClick={() => setNewChatOpen(true)}
               />
             }
@@ -235,6 +238,7 @@ export function ChatsPanel({ onNavigated: onOpened }: SectionSidebarProps) {
           setDraftChat(chat);
           openChat(chat);
         }}
+        onOpenGroup={(id) => void setParams({ view: "chats", "chats.id": id })}
       />
     </div>
   );

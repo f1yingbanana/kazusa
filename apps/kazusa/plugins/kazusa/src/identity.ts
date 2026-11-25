@@ -39,6 +39,20 @@ export function isUser(id: string): boolean {
 }
 
 /**
+ * Whether an id is a guest: someone writing in from a linked chat on another
+ * platform (`guest:discord-<ten letters and digits>`), with no brain, ledger or
+ * place in the world.
+ */
+export function isGuest(id: string): boolean {
+  return id.startsWith("guest:");
+}
+
+/** A person, not a character: nobody whose model plays them, no ledger. */
+export function isOutsider(id: string): boolean {
+  return isUser(id) || isGuest(id);
+}
+
+/**
  * Whether a journal event shows what a person outside the world said or was
  * told: they are among its actors, or a line it quotes is theirs. Such an event
  * is the operator's own, never for someone who only watches.

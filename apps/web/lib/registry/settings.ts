@@ -3,12 +3,14 @@ import {
   ChartColumnIcon,
   CircleArrowUpIcon,
   HistoryIcon,
+  MessagesSquareIcon,
   PlugIcon,
   SlidersHorizontalIcon,
   UserIcon,
 } from "lucide-react";
 import { ConnectionSettings } from "@/components/views/settings/connection-settings";
 import { ContextSettings } from "@/components/views/settings/context-settings";
+import { ChatAppsSettings } from "@/components/views/settings/chat-apps-settings";
 import { ModelSettings } from "@/components/views/settings/model-settings";
 import { ProfileSettings } from "@/components/views/settings/profile-settings";
 import { StateSettings } from "@/components/views/settings/state-settings";
@@ -37,7 +39,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "models",
     label: "Models",
-    description: "Chat, decision and memory search models",
+    description: "AI models that power the simulation",
     icon: BoxesIcon,
     order: 10,
     requiresPermission: "manage",
@@ -46,7 +48,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "context",
     label: "Context",
-    description: "How much characters remember each turn",
+    description: "Character memory and token usage",
     icon: HistoryIcon,
     order: 15,
     requiresPermission: "manage",
@@ -55,11 +57,20 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "states",
     label: "States",
-    description: "Values your world keeps for its characters",
+    description: "Variables on characters and the world",
     icon: SlidersHorizontalIcon,
     order: 17,
     requiresPermission: "manage",
     component: StateSettings,
+  },
+  {
+    id: "chat-apps",
+    label: "Chat apps",
+    description: "Chat directly in connected apps",
+    icon: MessagesSquareIcon,
+    order: 18,
+    requiresPermission: "play",
+    component: ChatAppsSettings,
   },
   {
     id: "usage",
@@ -73,7 +84,7 @@ const CATEGORIES: readonly SettingsCategory[] = [
   {
     id: "updates",
     label: "Updates",
-    description: "Kazusa's version and your world's, and updating them",
+    description: "System and world updates",
     icon: CircleArrowUpIcon,
     order: 30,
     requiresPermission: "manage",

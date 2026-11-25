@@ -1,6 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
-import { isUser } from "../identity.ts";
+import { isOutsider } from "../identity.ts";
 import { PICTURE_NAME } from "../pictures.ts";
 
 export const AGENT_ID = z
@@ -10,7 +10,7 @@ export const AGENT_ID = z
 
 export const PARTICIPANT_ID = z
   .string()
-  .regex(/^(?:user:)?[a-z0-9][a-z0-9_-]*$/)
+  .regex(/^(?:user:|guest:)?[a-z0-9][a-z0-9_-]*$/)
   .max(128);
 
 export const CHAT_SESSION = z
@@ -394,7 +394,7 @@ export function ownChatSession(
   const parsed = parseChatSession(sessionKey);
   if (parsed.owner && parsed.owner !== participantId)
     throw new Error("Use your own chat session key.");
-  return isUser(participantId)
+  return isOutsider(participantId)
     ? `chat:${parsed.kind}:${parsed.peerOrGroupId}`
     : `agent:${participantId}:chat:${parsed.kind}:${parsed.peerOrGroupId}`;
 }
@@ -438,7 +438,7 @@ export function chatSummary(
     chat.kind === "direct" ? peer : chat.id.slice(`${chat.kind}:`.length);
   if (!suffix) throw new Error("Direct chat is missing its peer.");
   return {
-    sessionKey: isUser(participantId)
+    sessionKey: isOutsider(participantId)
       ? `chat:${chat.kind}:${suffix}`
       : `agent:${participantId}:chat:${chat.kind}:${suffix}`,
     kind: chat.kind,

@@ -1,4 +1,4 @@
-import { isUser } from "../identity.ts";
+import { isOutsider } from "../identity.ts";
 import { currentConfig } from "../current-config.ts";
 import { inBackground } from "../background.ts";
 import path from "node:path";
@@ -304,7 +304,7 @@ export function registerMessaging(
               id: delivery.sender,
               pluginId: "kazusa",
               accountId: null,
-              senderKind: isUser(delivery.sender) ? "human" : "bot",
+              senderKind: isOutsider(delivery.sender) ? "human" : "bot",
             },
           },
         },

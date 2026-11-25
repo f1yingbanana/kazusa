@@ -215,7 +215,10 @@ the chat sidebar's Open to join switch, whoever the owner plays or none) can be
 joined by anyone who has its address, as people join a server channel: there is
 no listing of joinable groups, so a skill names the address. Closing it again
 keeps everyone in it. An empty joinable group is still open, not ended, in the
-observer list. Anything else refuses `join` with
+observer list. Anyone who plays (owner or collaborator, playing someone or only
+watching) can make one with nobody in it yet, titled
+(`POST /kazusa/chats/open { title }`, permission `play`; New chat → open group
+in the client), for people to join. Anything else refuses `join` with
 `kazusa-results#chat-not-joinable`. Each change is announced in the group as a
 message from the actor (`*adds Natsu to the chat*`, `*removes …*`,
 `*leaves the chat*`, `*joins the chat*`, `*renames the chat to "…"*`): for those
@@ -237,6 +240,76 @@ creation whose first delivery acceptance fails may leave discoverable empty
 routing metadata; an internal retry with the retained request ID reuses it.
 Re-executing the tool starts a new send. There is no cross-store atomic
 transaction.
+
+## Guests and linked channels (`guest:`, `src/bridges/`)
+
+A group or a direct chat can be linked to a Discord channel
+(`POST /kazusa/bridges/link { chatId, channelId }`, owner only, from the chat
+sidebar; not a conversation in person, which ends and has nobody on Discord in
+it). A direct chat is two people's: only a linked account speaks into it, as
+whoever its person plays, and everyone else in the channel is ignored. In a
+group, people writing in the channel are **guests**: `guest:discord-` and ten
+letters and digits (`guestId`, a hash of the account, the same every time; an
+18-digit Discord id cost tokens and got miscopied), outsiders like `user:`
+(`isOutsider`), with no brain, no ledger, no place and no membership. Their
+lines come in through `Messaging.postAsGuest`, into the group whatever its
+members, so whoever is in it now hears them and nobody else; with nobody in it,
+nobody does. The audience is the members plus the guest; only characters get
+copies. The Discord message id is the request id, so a line received twice is
+taken in once. Names are kept as written on one line of at most 32 characters,
+without backticks or brackets (`guestName`). Characters read a guest as "Name
+`guest:…`" everywhere: deliveries, "Chats awaiting your reply", and their
+records, which otherwise name people by id alone (a guest has no page to look
+the id up in; the name is the transcript's `sender.label`). They grow familiar
+with guests by id like anyone else. The client shows a guest by name only.
+
+Everything said in a linked group goes the other way, from any instance
+(`onAnyEvent`): one webhook per channel posts it under the speaker's name, with
+their sticker for the line's face (or their resting one) as the avatar, as a
+GitHub raw link to the world's repository at the commit `play` names
+(`bridges/pictures.ts`): only committed art shows. Actions are italic, a sticker
+is its picture's link, nobody is ever pinged. A guest's own line is never posted
+back. An open group posts `*joins the chat*` even when nobody else is in it, so
+the channel sees who signs in.
+
+One connection per process (`kazusa.bridges` cell), made at `gateway_start` and
+whenever the owner saves the bot token (`POST /kazusa/bridges/token`, an auth
+profile `discord:manual` beside the provider keys; never sent back). Links are
+the retained `"bridges"` store; a load keeps both (saves' `MACHINE`). Linking
+checks the channel first and refuses one the bot can't use, saying why
+(`checkChannel`). Each link is checked when the bot connects, when it is linked,
+and at most every 15 s while Settings or the sidebar asks (`checkLinks`): a
+channel the bot can't see (Discord then delivers nothing from it, though webhook
+posts still work), one that isn't a text channel, or no Manage Webhooks comes
+back as the link's `problem`, in plain words, and in the Gateway log; the
+channel's and server's names come back too (`channelName`, `server`), shown as
+"#name in Server". A link whose group isn't in this world (kept on a load from
+another game) says so (`MISSING_CHAT`); nothing written in its channel is taken
+in, and linking a group that isn't here is refused.
+
+**Typing.** While anyone in a linked group types (not a guest, not aloud), the
+channel shows the bot typing, again every 8 s while anyone still is. Discord
+can't show a webhook's name typing nor stop it early, so it lapses up to ten
+seconds after the line is posted; naming the bot after the place ("SCHALE
+Office") reads best.
+
+**A person's own account.** Anyone who plays links their Discord account in
+Settings → Chat apps: Kazusa makes a code (`POST /kazusa/bridges/account/code`,
+six letters and digits, ten minutes, once) and they send it from Discord, with
+the bot's `/link` command (an ephemeral reply) or alone in a direct message. The
+account is kept in their own settings (`src/user-settings.ts`, retained store
+`"userSettings"`, one record per person by `user:` id, kept on a load like the
+links); an account is one person's, so linking it moves it. What a linked person
+writes in a linked channel is said by the character they play (`byPlayer`),
+joining an open group first, and their own Discord message is taken down, since
+the character's copy is posted in its place (Manage Messages; without it the
+link reports it). A line that can't be said (watching, or a character who isn't
+in the chat and can't join it) gets a 🚫 reaction, and its writer a direct
+message saying why (Add Reactions); so does a stranger's line in a linked direct
+chat's channel, without the message. A guest's line comes in as one line: their
+own line break could start what reads as someone else's record. Unlinked, they
+are a guest again. Only the operator has settings until collaborators come. Not
+yet: lines said while the bot was disconnected are not posted later.
 
 ## People at the keyboard (`user:`)
 

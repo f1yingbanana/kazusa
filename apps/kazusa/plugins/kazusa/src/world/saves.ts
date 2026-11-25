@@ -188,6 +188,12 @@ const MACHINE: readonly {
     where:
       "plugin_id = 'kazusa' AND namespace IN ('@retained.models', '@retained.embedding', '@retained.contextSettings')",
   },
+  {
+    what: "Discord links and each person's own settings",
+    table: "plugin_state_entries",
+    where:
+      "plugin_id = 'kazusa' AND namespace IN ('@retained.bridges', '@retained.userSettings')",
+  },
 ];
 
 type Rows = readonly Record<string, unknown>[];

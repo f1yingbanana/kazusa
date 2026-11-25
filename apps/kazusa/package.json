@@ -12,6 +12,9 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@discordjs/core": "2.7.0",
+    "@discordjs/rest": "2.6.3",
+    "@discordjs/ws": "2.0.4",
     "@openclaw/byteplus-provider": "2026.10.5",
     "@openclaw/cerebras-provider": "2026.10.5",
     "@openclaw/chutes-provider": "2026.10.5",
@@ -29,6 +32,6 @@
     "@openclaw/volcengine-provider": "2026.10.5",
     "@openclaw/zai-provider": "2026.10.5",
     "@openrp-ai/openclaw-provider": "0.1.0",
-    "openclaw": "https://github.com/f1yingbanana/nakedclaw/releases/download/v2026.10.5-naked-0.2.1/openclaw-2026.10.5-naked-0.2.1.tgz"
+    "openclaw": "https://github.com/f1yingbanana/nakedclaw/releases/download/v2026.10.5-naked-0.2.2/openclaw-2026.10.5-naked-0.2.2.tgz"
   }
 }

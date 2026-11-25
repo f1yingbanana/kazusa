@@ -317,6 +317,28 @@ describe("Context assembly", () => {
     const used = (records: { text: string }): number =>
       estimateTokens({ role: "user", content: records.text, timestamp: NOW });
 
+    it("names a guest beside their id, and nobody else by display name", () => {
+      const guest = incoming("Anyone on duty?", "guest:discord-21iy4g9bqg");
+      const records = renderLedgerRecords({
+        sessionsContext: {
+          "agent:alice:chat:group:office": [
+            { ...guest, sender: { ...guest.sender!, label: "Flying_Banana" } },
+            incoming("I am.", "bob", NOW + 60_000),
+          ],
+        },
+        simTime: NOW + 120_000,
+        cutoff: NOW - 86_400_000,
+        tokenBudget: 10_000,
+        trimTo: 0.75,
+        text,
+      });
+      expect(records.text).toContain(
+        "Flying_Banana `guest:discord-21iy4g9bqg`",
+      );
+      expect(records.text).toContain("bob");
+      expect(records.text).not.toContain("Display name");
+    });
+
     it("shows everything since the cutoff when it fits, whatever was kept", () => {
       const all = render(10, NOW);
       expect(all.text).toContain("step 0");
