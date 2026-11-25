@@ -2,9 +2,8 @@
 
 import { CheckCheckIcon, CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatTime, isSameDay } from "@/lib/format";
-import type { ChatMessage } from "@kazusa/client";
-import type { BrainActivity } from "@/lib/source/brain/activity";
+import { formatTime } from "@/lib/format";
+import type { DisplayMessage } from "@/lib/source/chats/runs";
 import {
   actionLine,
   messageReceipt,
@@ -15,71 +14,14 @@ import { cn } from "@/lib/utils";
 
 /*
  * The pieces of a transcript shared by the live chat and the screenshot it
- * makes: runs of one sender's messages, narrated actions and stickers.
+ * makes: narrated actions and stickers.
  */
 
-const RUN_GAP_MS = 5 * 60 * 1000;
-
-export type DisplayMessage =
-  (ChatMessage & { status?: never }) | PendingMessage;
-
-export type Run = {
-  key: string;
-  /** Actions are narrated, never bubbled, so they never share a run with speech. */
-  isAction: boolean;
-  senderId: string;
-  senderName: string;
-  messages: DisplayMessage[];
-  dayLabel: string | null;
-  /** Right after the same sender's action, which already named them. */
-  introduced: boolean;
-};
-
-export function buildRuns(
-  messages: DisplayMessage[],
-  /** What a day's first message is headed with. */
-  dayLabel: (timestamp: number) => string,
-  /** Messages with something shown just before them start a new run. */
-  startsRun: ReadonlyMap<number, BrainActivity>,
-) {
-  const runs: Run[] = [];
-  let previous: DisplayMessage | null = null;
-
-  for (const message of messages) {
-    const isAction = message.type === "action";
-    const newDay =
-      !previous || !isSameDay(previous.timestamp, message.timestamp);
-    const current = runs[runs.length - 1];
-    const continues =
-      current &&
-      !newDay &&
-      previous &&
-      current.isAction === isAction &&
-      previous.senderId === message.senderId &&
-      message.timestamp - previous.timestamp < RUN_GAP_MS &&
-      !previous.status === !message.status &&
-      !("sequence" in message && startsRun.has(message.sequence));
-
-    if (continues) {
-      current.messages.push(message);
-    } else {
-      runs.push({
-        key: message.id,
-        isAction,
-        senderId: message.senderId,
-        senderName: message.senderName,
-        messages: [message],
-        dayLabel: newDay ? dayLabel(message.timestamp) : null,
-        introduced:
-          !newDay &&
-          Boolean(current?.isAction) &&
-          current?.senderId === message.senderId,
-      });
-    }
-    previous = message;
-  }
-  return runs;
-}
+export {
+  buildRuns,
+  type DisplayMessage,
+  type Run,
+} from "@/lib/source/chats/runs";
 
 /**
  * Something done rather than said, narrated in third person ("Kazusa leans

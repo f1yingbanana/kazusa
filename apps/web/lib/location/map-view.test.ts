@@ -1,6 +1,10 @@
 import type { LocationRecord, Place } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
-import { computeMapGeometry } from "./map-layout";
+import {
+  computeMapGeometry,
+  type MapGeometry,
+  type MapNode,
+} from "./map-layout";
 import {
   computeRegions,
   computeReveal,
@@ -10,6 +14,7 @@ import {
   planLabels,
   pointOnCurve,
   revealAt,
+  REVEAL_STEP,
   roadPath,
   routeStops,
   travelerPoint,
@@ -93,6 +98,46 @@ describe("revealAt", () => {
   it("keeps a place out when its whole name has no room", () => {
     const tight = shownAt(1, { nameWidth: () => 10_000 });
     expect(tight.has("square") && tight.has("market")).toBe(false);
+  });
+
+  it("never takes back a place as you zoom in", () => {
+    // "quiet" shows once the west opens; later the east opens and its busier
+    // "busy" would claim the same spot, before both fit further in.
+    const node = (
+      id: string,
+      x: number,
+      radius: number,
+      parent?: string,
+    ): MapNode => ({
+      id,
+      x,
+      y: 0,
+      radius,
+      isArea: radius > 100,
+      depth: parent ? (parent === "city" ? 1 : 2) : 0,
+      ...(parent ? { parent } : {}),
+    });
+    const nodes = [
+      node("city", -9000, 3000),
+      node("west", -2000, 600, "city"),
+      node("east", 2000, 200, "city"),
+      node("quiet", 0, 40, "west"),
+      node("busy", 50, 40, "east"),
+    ];
+    const crowded: MapGeometry = {
+      nodes: new Map(nodes.map((n) => [n.id, n])),
+      order: nodes.map((n) => n.id),
+      coordinates: {},
+      edges: [],
+    };
+    const weight = (id: string) => (id === "busy" ? 9 : 0);
+    const shown = (zoom: number) =>
+      revealAt(crowded, { zoom, weight }).get("quiet") === 0;
+    const steps = Array.from({ length: 30 }, (_, k) => REVEAL_STEP ** (k - 20));
+    const first = steps.findIndex(shown);
+    expect(first).toBeGreaterThan(-1);
+    for (const zoom of steps.slice(first))
+      expect(shown(zoom), `at ${zoom}`).toBe(true);
   });
 
   it("shows a pinned place and the areas around it, whatever the room", () => {

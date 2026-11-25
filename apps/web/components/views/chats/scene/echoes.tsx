@@ -6,7 +6,7 @@ import { ECHO_MS } from "@/lib/scene/director";
 import type { SceneLine } from "@/lib/scene/state";
 import { actionLine } from "@/lib/source/chats/display";
 import { cn } from "@/lib/utils";
-import { lineKey, useRevealed } from "./said-text";
+import { lineKey, useRevealed } from "@/hooks/use-said-text";
 
 /** How long an echo takes to fade out, at the end of its `ECHO_MS`. */
 const FADE_MS = 1_000;

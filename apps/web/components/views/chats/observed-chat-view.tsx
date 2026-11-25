@@ -16,8 +16,8 @@ import { Backlog } from "./scene/backlog";
 import { FullscreenControls } from "./scene/fullscreen-controls";
 import { SceneView } from "./scene/scene-view";
 import { useChatRendering } from "./scene/use-chat-rendering";
-import { useReadingMode } from "./scene/use-reading-mode";
-import { useSceneFullscreen } from "./scene/use-scene-fullscreen";
+import { useReadingMode } from "@/hooks/use-reading-mode";
+import { useSceneFullscreen } from "@/hooks/use-scene-fullscreen";
 import { cn } from "@/lib/utils";
 
 const NO_PENDING: never[] = [];

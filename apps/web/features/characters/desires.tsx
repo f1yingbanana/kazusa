@@ -21,6 +21,7 @@ import {
 import { formatSimDuration, formatSimTime } from "@/lib/time/sim";
 import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
+import { DetailSection } from "@/ui/detail";
 import { Gauge } from "@/ui/meter";
 import { Tooltip } from "@/ui/tooltip";
 import { usePresence } from "./presence";
@@ -44,16 +45,17 @@ export function Desires({ id }: { id: string }) {
 
   if (!config || now <= 0) {
     return (
-      <section aria-label="How they feel" aria-busy="true">
-        <ul className={GRID} aria-hidden="true">
+      <DetailSection title="How they feel">
+        <ul className={GRID} aria-busy="true">
           {[0, 1].map((n) => (
             <li
               key={n}
+              aria-hidden="true"
               className="h-13 rounded-[0.875rem] bg-ui-tint motion-safe:animate-ui-pulse"
             />
           ))}
         </ul>
-      </section>
+      </DetailSection>
     );
   }
 
@@ -77,40 +79,34 @@ export function Desires({ id }: { id: string }) {
   const hidden = config.catalog.length - lead.length;
 
   return (
-    <section
-      className="flex flex-col gap-2.5 text-sm"
-      aria-labelledby={`desires-${id}`}
-    >
-      <div className="flex items-center gap-2">
-        <h3
-          id={`desires-${id}`}
-          className="text-[0.8125rem] font-extrabold text-ui-soft"
-        >
-          How they feel
-        </h3>
-        {offstage ? (
+    <DetailSection
+      title="How they feel"
+      meta={
+        offstage ? (
           <Tooltip label="Desires stop changing while a character is offstage.">
             <span
               tabIndex={0}
-              className="inline-flex items-center gap-1 rounded-full bg-ui-tint px-2 py-px text-xs font-bold text-ui-soft outline-none focus-visible:outline-2 focus-visible:outline-ui-primary"
+              className="inline-flex items-center gap-1 rounded-full bg-ui-tint px-2 py-px font-bold outline-none focus-visible:outline-2 focus-visible:outline-ui-primary"
             >
               <PauseIcon aria-hidden className="size-3" />
               Paused
             </span>
           </Tooltip>
-        ) : null}
-        {hidden > 0 ? (
+        ) : undefined
+      }
+      action={
+        hidden > 0 ? (
           <Button
             tone="link"
             size="sm"
-            className="ms-auto"
             aria-expanded={showAll}
             onClick={() => setSectionOpen(SHOW_ALL, !showAll)}
           >
             {showAll ? "Fewer" : `All ${config.catalog.length}`}
           </Button>
-        ) : null}
-      </div>
+        ) : undefined
+      }
+    >
       <ul className={GRID}>
         {shown.map((desire, index) => (
           <DesireTile
@@ -124,7 +120,7 @@ export function Desires({ id }: { id: string }) {
           />
         ))}
       </ul>
-    </section>
+    </DetailSection>
   );
 }
 

@@ -5,7 +5,7 @@ import { useSceneFigures, useSceneLit } from "@/lib/live/scene-state";
 import { NARROW_SLOTS, type Framing, type SlotCount } from "@/lib/scene/layout";
 import { Backdrop } from "./backdrop";
 import { DialogueBox } from "./dialogue-box";
-import type { ReadingStatus } from "./use-reading-mode";
+import type { ReadingStatus } from "@/hooks/use-reading-mode";
 import { SceneFigure } from "./figure";
 
 /**

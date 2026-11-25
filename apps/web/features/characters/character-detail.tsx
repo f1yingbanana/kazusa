@@ -48,7 +48,6 @@ import {
   MenuTrigger,
 } from "@/ui/menu";
 import { Note } from "@/ui/note";
-import { Tooltip } from "@/ui/tooltip";
 import {
   CastDialog,
   type CastRequest,
@@ -58,7 +57,6 @@ import {
   CharacterMemorySheet,
   CharacterModelSection,
   CharacterModelSummary,
-  CharacterNowSection,
   CharacterRecentSection,
   CharacterRecentSummary,
   CharacterStatesSection,
@@ -69,9 +67,11 @@ import {
   useWorldNow,
   wikiParsers,
 } from "../legacy";
+import { conversationParsers } from "../chats/open";
 import { CharacterAvatar } from "./character-avatar";
 import { Desires } from "./desires";
 import { PRESENCE_TEXT, usePresence } from "./presence";
+import { RightNow } from "./right-now";
 
 type FoldSpec = {
   value: string;
@@ -120,7 +120,8 @@ export function CharacterDetail({
     sel: entityRefParser,
     "chats.id": chatsParsers["chats.id"],
     "chats.dm": chatsParsers["chats.dm"],
-    "chats.talk": chatsParsers["chats.talk"],
+    "world.talk": conversationParsers["world.talk"],
+    "world.with": conversationParsers["world.with"],
     "chats.member": chatsParsers["chats.member"],
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
@@ -143,11 +144,16 @@ export function CharacterDetail({
   const failure = status?.brain === "thinking" ? undefined : status?.failure;
   const starred = watchlist.includes(id);
 
-  const open =
+  const openId =
     params.view === "chats"
-      ? (chats.find((c) => c.id === params["chats.id"]) ??
-        (draft?.id === params["chats.id"] ? draft : undefined))
-      : undefined;
+      ? params["chats.id"]
+      : params.view === "world"
+        ? params["world.talk"]
+        : null;
+  const open = openId
+    ? (chats.find((c) => c.id === openId) ??
+      (draft?.id === openId ? draft : undefined))
+    : undefined;
   const inTheirDm =
     open?.type === "direct" &&
     open.members.includes(id) &&
@@ -259,7 +265,7 @@ export function CharacterDetail({
             title="Talk in person"
             icon={<SpeechIcon aria-hidden />}
             disabled={!canPlay}
-            onClick={() => void setParams({ view: "chats", "chats.talk": id })}
+            onClick={() => void setParams({ view: "world", "world.with": id })}
           >
             Talk in person
           </Button>
@@ -337,7 +343,7 @@ export function CharacterDetail({
                 }
                 onSelect={() => toggleWatch(id)}
               >
-                {starred ? "Unwatch" : "Watch"}
+                {starred ? "Unfavorite" : "Favorite"}
               </MenuItem>
               <MenuItem
                 icon={<BookOpenIcon aria-hidden />}
@@ -402,42 +408,13 @@ export function CharacterDetail({
         </DetailActionsEnd>
       </DetailActions>
 
-      <section className="flex flex-col gap-2.5" aria-label="Right now">
-        <CharacterNowSection entity={entity} />
-        {company.length > 0 ? (
-          <ul className="flex flex-wrap gap-1" aria-label="With them">
-            {company.map((m) => (
-              <li key={m.id}>
-                <Tooltip label={m.name} names>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-ui-tint py-0.75 ps-0.75 pe-2.5 text-[0.8125rem] font-bold hover:inset-ring-2 hover:inset-ring-ui-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary"
-                    onClick={() =>
-                      void setParams({ sel: { kind: "character", id: m.id } })
-                    }
-                  >
-                    <CharacterAvatar
-                      id={m.id}
-                      name={m.name}
-                      avatarUrl={m.avatarUrl}
-                      kind={m.kind}
-                      size="sm"
-                      decorative
-                    />
-                    <span>{firstName(m.name)}</span>
-                  </button>
-                </Tooltip>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      {isAgent ? <Desires id={id} /> : null}
-
       {character.summary ? (
         <DetailAbout>{character.summary}</DetailAbout>
       ) : null}
+
+      <RightNow character={character} company={company} />
+
+      {isAgent ? <Desires id={id} /> : null}
 
       <Folds>
         {folds.map(({ value, title, Section, Summary }) => (

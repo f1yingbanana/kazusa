@@ -22,6 +22,7 @@ import {
   usePlayer,
 } from "@/hooks/use-location";
 import { useSelection } from "@/hooks/use-selection";
+import { useShowOnMapAsks } from "./show-on-map";
 import { useLiveStore } from "@/lib/live/state";
 import {
   MAP_SCALE,
@@ -41,6 +42,7 @@ import {
   opensAt,
   planLabels,
   revealAt,
+  revealBand,
   roadPath,
   routeStops,
   travelerPoint,
@@ -95,6 +97,7 @@ import {
 } from "./map-marker";
 import { useNameWidth } from "./measure";
 import { useLingering } from "./use-lingering";
+import { useTalks } from "../talks";
 
 const zoomMessage = (zoom: number) => `Map at ${Math.round(zoom * 100)}%`;
 
@@ -162,6 +165,13 @@ export function WorldMap({
 
   const { byId } = useCharacters();
   const { mutate } = useSWRConfig();
+  const talks = useTalks();
+  // Keyed by the places alone: a typing event changes the talks, not where.
+  const talkingKey = [...talks.keys()].sort().join("\n");
+  const talking = useMemo(
+    () => new Set(talkingKey ? talkingKey.split("\n") : []),
+    [talkingKey],
+  );
   const [planeParam, setPlane] = useQueryState(
     "world.plane",
     worldParsers["world.plane"],
@@ -280,16 +290,17 @@ export function WorldMap({
       ? (positionAt(pickedRecord, now) as { placeId: string }).placeId
       : undefined;
 
-  // What shows at this zoom, by room on screen.
+  // What shows at this zoom, by room on screen, settled a whole band at once.
+  const band = revealBand(zoom);
   const reveal = useMemo(
     () =>
       revealAt(geometry, {
-        zoom,
+        zoom: band,
         weight: (id) => peopleWithin.get(id) ?? 0,
         nameWidth,
         pinned: [selectedPlace, pickedPlace].filter((id): id is string => !!id),
       }),
-    [geometry, zoom, peopleWithin, nameWidth, selectedPlace, pickedPlace],
+    [geometry, band, peopleWithin, nameWidth, selectedPlace, pickedPlace],
   );
   const edges = useMemo(
     () => edgesAt(geometry, reveal, zoom),
@@ -521,10 +532,13 @@ export function WorldMap({
   }, [plane, fitAll]);
 
   // Each place asked for gets one flight, once its plane is showing and it's
-  // on the map; asking for none shows the whole plane.
+  // on the map, and another each time "On the map" is pressed for it; asking
+  // for none shows the whole plane.
+  const asks = useShowOnMapAsks();
   const handled = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!ready || handled.current === focusPlaceId) return;
+    const ask = focusPlaceId ? `${focusPlaceId}#${asks}` : undefined;
+    if (!ready || handled.current === ask) return;
     if (!focusPlaceId) {
       handled.current = undefined;
       fitAll();
@@ -537,9 +551,19 @@ export function WorldMap({
       return;
     }
     if (!geometry.nodes.has(focusPlaceId)) return;
-    handled.current = focusPlaceId;
+    handled.current = ask;
     flyTo(focusPlaceId);
-  }, [ready, focusPlaceId, planes, plane, geometry, flyTo, fitAll, setPlane]);
+  }, [
+    ready,
+    focusPlaceId,
+    asks,
+    planes,
+    plane,
+    geometry,
+    flyTo,
+    fitAll,
+    setPlane,
+  ]);
 
   /*
    * Picking someone, on the map or in the list beside it, shows where they are:
@@ -962,7 +986,7 @@ export function WorldMap({
       [geometry, shown, inView],
     ),
     (id) => id,
-    450,
+    250,
   );
   const areaLabels = useLingering(
     regions.flatMap((region) => {
@@ -1196,28 +1220,20 @@ export function WorldMap({
             ((id === hovered || id === selectedPlace) &&
               !plan.areaNames.has(id)));
         const playerHere = people.some((person) => person.id === player.id);
-        const parent = node.parent
-          ? geometry.nodes.get(node.parent)
-          : undefined;
-        // On the way out a place folds back into whatever now stands for it.
-        const into = leaving
-          ? geometry.nodes.get(markerFor(geometry, reveal, id, zoom))
-          : undefined;
         return (
           <PlaceMarker
             key={id}
             id={id}
             name={nameOf(id)}
-            x={(into ?? node).x}
-            y={(into ?? node).y}
-            fromX={parent && !arranging ? parent.x : undefined}
-            fromY={parent && !arranging ? parent.y : undefined}
+            x={node.x}
+            y={node.y}
             leaving={leaving}
             isArea={node.isArea}
             labeled={labeled}
             count={people.length}
             occupied={people.length > 0}
             playerHere={playerHere}
+            talking={talking.has(id)}
             selected={selectedPlace === id}
             arranging={arranging}
             dragging={dragging === id}

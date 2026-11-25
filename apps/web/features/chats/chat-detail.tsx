@@ -1,51 +1,52 @@
 "use client";
 
-import { EyeIcon, LogInIcon, MessagesSquareIcon } from "lucide-react";
-import { parseAsString, useQueryStates } from "nuqs";
+import type { CharacterSummary } from "@kazusa/client";
+import {
+  EllipsisIcon,
+  EyeIcon,
+  LogOutIcon,
+  MessagesSquareIcon,
+  SpeechIcon,
+} from "lucide-react";
+import { useQueryStates } from "nuqs";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useAccess } from "@/hooks/use-access";
+import { useBridges } from "@/hooks/use-bridges";
 import { useCharacters } from "@/hooks/use-characters";
-import { useChatActions, useChats } from "@/hooks/use-chats";
+import { useChats } from "@/hooks/use-chats";
 import { usePlace } from "@/hooks/use-location";
-import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useSelection } from "@/hooks/use-selection";
 import { useSelfIn } from "@/hooks/use-self";
 import { listNames } from "@/lib/source/chats/display";
-import { setChatSettings } from "@/lib/source/chats/http";
 import { useSources } from "@/lib/source/provider";
-import { useWatchlist } from "@/lib/state/preferences-store";
-import { Button } from "@/ui/button";
-import { cx } from "@/ui/cx";
+import { Button, IconButton } from "@/ui/button";
 import {
   Detail,
   DetailActions,
   DetailActionsEnd,
   DetailHeader,
   DetailMark,
-  DetailSubhead,
+  DetailSection,
 } from "@/ui/detail";
 import { EmptySeats } from "@/ui/empty-seats";
+import { Fold, Folds } from "@/ui/fold";
+import { ListRow } from "@/ui/list";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Note } from "@/ui/note";
-import { SwitchRow } from "@/ui/switch";
+import { CharacterAvatar } from "../characters/character-avatar";
+import { usePresence, PRESENCE_TEXT } from "../characters/presence";
+import { chatIcon, useChatTitle } from "../legacy";
 import {
   AddPeople,
-  CharacterChip,
-  CharacterRow,
-  ChatTitle,
-  chatIcon,
-  chatsParsers,
+  aloneCopy,
+  DiscordChannel,
+  JoinGroup,
   LeaveChat,
-  RemoveButton,
-  RemoveConfirm,
-  useChatTitle,
-} from "../legacy";
-
-/* The old leave, add and rename controls, in this panel's button voice. */
-const LEGACY =
-  "[&_[data-slot=button]]:h-9 [&_[data-slot=button]]:rounded-full [&_[data-slot=button]]:border-0 [&_[data-slot=button]]:bg-ui-tint [&_[data-slot=button]]:px-3.5 [&_[data-slot=button]]:text-sm [&_[data-slot=button]]:font-bold [&_[data-slot=button]]:text-ui-ink [&_[data-slot=button]]:shadow-none [&_[data-slot=button]:hover]:bg-[color-mix(in_oklch,var(--ui-tint),var(--ui-ink)_8%)]";
-const LEGACY_SMALL =
-  "[&_[data-slot=button]]:h-7.5 [&_[data-slot=button]]:rounded-full [&_[data-slot=button]]:border-0 [&_[data-slot=button]]:bg-ui-tint [&_[data-slot=button]]:px-3 [&_[data-slot=button]]:text-[0.8125rem] [&_[data-slot=button]]:font-bold [&_[data-slot=button]]:text-ui-ink [&_[data-slot=button]]:shadow-none [&_[data-slot=button]:hover]:bg-[color-mix(in_oklch,var(--ui-tint),var(--ui-ink)_8%)]";
+  OpenToJoin,
+  RemoveMember,
+  RenameTitle,
+} from "./chat-controls";
+import { conversationParsers } from "./open";
 
 const TYPE_LABEL = {
   direct: "Direct message",
@@ -53,10 +54,12 @@ const TYPE_LABEL = {
   huddle: "In person",
 } as const;
 
+const TITLE = "text-[1.0625rem] leading-tight font-extrabold text-balance";
+
 /**
- * Laid out like a person or a place: what it is, what you can do with it (open
- * it, join or leave), who is in it. A group the player runs is renamed from its
- * title and grows or shrinks from its people list.
+ * Laid out like a person or a place: what it is and what you can do with it
+ * (leaving under More), who is in it, then the owner's sharing settings folded
+ * away.
  */
 export function ChatDetail({
   id,
@@ -65,16 +68,11 @@ export function ChatDetail({
   id: string;
   onClose?: () => void;
 }) {
-  const [query, setParams] = useQueryStates({
-    view: parseAsString,
-    "chats.id": chatsParsers["chats.id"],
-  });
+  const [query, setParams] = useQueryStates(conversationParsers);
   const [, select] = useSelection();
   const { byId } = useCharacters();
   const { chats } = useChats();
   const selfOf = useSelfIn();
-  const watchSet = new Set(useWatchlist());
-  const [removing, setRemoving] = useState<string | null>(null);
   const {
     title,
     type,
@@ -89,24 +87,27 @@ export function ChatDetail({
   const place = usePlace(placeId);
   const { canPlay, canManage } = useAccess();
   const { watching } = useSources();
+  const bridges = useBridges();
+  const [leaving, setLeaving] = useState(false);
 
   const self = selfOf({ members: everyone });
   const members = everyone.filter((m) => m !== self);
   const Icon = chatIcon(type);
   const own = chats.find((chat) => chat.id === id);
   const runsGroup = canPlay && own?.type === "group";
+  const canAdd =
+    Boolean(own) && canPlay && (runsGroup || own?.type === "huddle");
   const canLeave = canPlay && (own?.type === "group" || own?.type === "huddle");
   const canJoin =
     canPlay && !watching && !own && readable && type === "group" && !!joinable;
-  const isOpen = query.view === "chats" && query["chats.id"] === id;
+  const huddle = type === "huddle";
+  const isOpen = huddle
+    ? query.view === "world" && query["world.talk"] === id
+    : query.view === "chats" && query["chats.id"] === id;
+  const sharing =
+    readable && !draft && type !== "huddle" && (canManage || bridges.enabled);
 
   const names = members.map((m) => byId.get(m)?.name ?? m);
-  const who =
-    names.length === 0
-      ? "just you"
-      : names.length <= 2
-        ? `you and ${listNames(names)}`
-        : `you and ${names.length} others`;
   const meta = [
     TYPE_LABEL[type],
     draft
@@ -114,13 +115,16 @@ export function ChatDetail({
       : !mine
         ? ended
           ? "ended"
-          : "observed"
+          : "you're watching"
         : type !== "direct"
-          ? who
+          ? names.length === 0
+            ? "just you"
+            : `you and ${names.length <= 2 ? listNames(names) : `${names.length} others`}`
           : null,
   ]
     .filter(Boolean)
     .join(" · ");
+  const alone = aloneCopy({ type }, canAdd);
 
   return (
     <Detail label={title}>
@@ -130,24 +134,16 @@ export function ChatDetail({
             <Icon />
           </DetailMark>
         }
-        title={
-          runsGroup && own ? (
-            <span className={LEGACY}>
-              <ChatTitle chat={own} title={title} />
-            </span>
-          ) : (
-            title
-          )
-        }
+        title={<RenameTitle chat={own} title={title} className={TITLE} />}
         subtitle={
           <>
             {meta}
-            {type === "huddle" && place ? (
+            {huddle && place ? (
               <>
                 {" · "}
                 <button
                   type="button"
-                  className="font-semibold text-ui-primary hover:underline hover:underline-offset-3"
+                  className="font-bold text-ui-primary hover:underline hover:underline-offset-3"
                   onClick={() => void select({ kind: "place", id: place.id })}
                 >
                   {place.name}
@@ -161,160 +157,185 @@ export function ChatDetail({
 
       {!readable ? (
         <Note inset="panel">{"Reading this chat isn't available."}</Note>
-      ) : (
+      ) : canJoin || !isOpen || (own && canLeave) ? (
         <DetailActions label={`Actions for ${title}`}>
-          {canJoin ? <JoinButton id={id} title={title} /> : null}
+          {canJoin ? <JoinGroup id={id} title={title} /> : null}
           {!isOpen ? (
             <Button
               tone={canJoin ? "soft" : "primary"}
               icon={
                 mine ? (
-                  <MessagesSquareIcon aria-hidden />
+                  huddle ? (
+                    <SpeechIcon aria-hidden />
+                  ) : (
+                    <MessagesSquareIcon aria-hidden />
+                  )
                 ) : (
                   <EyeIcon aria-hidden />
                 )
               }
-              onClick={() => void setParams({ view: "chats", "chats.id": id })}
+              onClick={() =>
+                void setParams({
+                  view: huddle ? "world" : "chats",
+                  "chats.id": huddle ? null : id,
+                  "world.talk": huddle ? id : null,
+                })
+              }
             >
-              {mine ? "Open chat" : "Peek in"}
+              {huddle
+                ? mine
+                  ? "Join the talk"
+                  : "Listen in"
+                : mine
+                  ? "Open chat"
+                  : "Read along"}
             </Button>
           ) : null}
           {own && canLeave ? (
             <DetailActionsEnd>
-              <span className={LEGACY}>
-                <LeaveChat chat={own} title={title} placeName={place?.name} />
-              </span>
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <IconButton
+                      label={`More for ${title}`}
+                      title="More"
+                      tone="soft"
+                      size="md"
+                    />
+                  }
+                >
+                  <EllipsisIcon aria-hidden />
+                </MenuTrigger>
+                <MenuContent>
+                  <MenuItem
+                    danger
+                    icon={<LogOutIcon aria-hidden />}
+                    onSelect={() => setLeaving(true)}
+                  >
+                    Leave
+                  </MenuItem>
+                </MenuContent>
+              </Menu>
+              <LeaveChat
+                chat={own}
+                title={title}
+                placeName={place?.name}
+                open={leaving}
+                onOpenChange={setLeaving}
+              />
             </DetailActionsEnd>
           ) : null}
         </DetailActions>
-      )}
-
-      {canManage && type === "group" && readable && !draft ? (
-        <OpenToJoin id={id} joinable={!!joinable} />
       ) : null}
 
-      <section aria-label="People">
-        {type !== "direct" ? (
-          <div className={LEGACY_SMALL}>
-            <DetailSubhead
-              title={
-                members.length > 0 ? `People · ${members.length}` : "People"
-              }
-              action={
-                own && canPlay && (runsGroup || own.type === "huddle") ? (
-                  <AddPeople chat={own} placeName={place?.name} />
-                ) : undefined
-              }
-            />
-          </div>
-        ) : null}
-        <div className={cx(LEGACY, "-mx-2 flex flex-col")}>
-          {members.map((m) => {
-            const character = byId.get(m);
-            const name = character?.name ?? m;
-            if (runsGroup && own && removing === m) {
-              return (
-                <RemoveConfirm
-                  key={m}
-                  chat={own}
-                  id={m}
-                  name={name}
-                  onDone={() => setRemoving(null)}
-                />
-              );
-            }
-            return character ? (
-              <CharacterRow
-                key={m}
-                character={character}
-                selected={false}
-                starred={watchSet.has(m)}
-                onSelect={(next) =>
-                  void select({ kind: "character", id: next })
-                }
-                action={
-                  runsGroup ? (
-                    <RemoveButton name={name} onClick={() => setRemoving(m)} />
-                  ) : undefined
-                }
-              />
-            ) : (
-              <CharacterChip key={m} id={m} className="mx-2 self-start" />
-            );
-          })}
-          {type !== "direct" && members.length === 0 && !draft ? (
-            <EmptySeats slim title={mine ? "It's just you" : "No one's here"}>
-              {own && canPlay && (runsGroup || own.type === "huddle")
-                ? "Add people to get the conversation going."
-                : "Everyone has left this chat."}
+      {type !== "direct" ? (
+        <DetailSection
+          title="People"
+          meta={members.length || undefined}
+          action={
+            own && canAdd ? (
+              <AddPeople chat={own} placeName={place?.name} />
+            ) : undefined
+          }
+        >
+          {members.length === 0 && !draft ? (
+            <EmptySeats slim title={mine ? alone.title : "No one's here"}>
+              {mine ? alone.body : "Everyone has left."}
             </EmptySeats>
-          ) : null}
-        </div>
-      </section>
+          ) : (
+            <ul className="-mx-2 flex flex-col">
+              {members.map((m) => {
+                const character = byId.get(m);
+                return (
+                  <li
+                    key={m}
+                    className="group/member flex items-center gap-1 pe-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      {character ? (
+                        <MemberRow
+                          character={character}
+                          onPick={() =>
+                            void select({ kind: "character", id: character.id })
+                          }
+                        />
+                      ) : (
+                        <ListRow
+                          onClick={() => {}}
+                          title={m.startsWith("guest:") ? "Guest" : m}
+                        />
+                      )}
+                    </div>
+                    {runsGroup && own ? (
+                      <RemoveMember
+                        chat={own}
+                        id={m}
+                        name={character?.name ?? m}
+                      />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </DetailSection>
+      ) : null}
+
+      {sharing ? (
+        <Folds>
+          <Fold
+            value="sharing"
+            title="Sharing"
+            summary={
+              [
+                joinable ? "Open to join" : null,
+                bridges.data?.links.some((l) => l.chatId === id)
+                  ? "On Discord"
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Private"
+            }
+          >
+            <div className="flex flex-col gap-2">
+              {canManage && type === "group" ? (
+                <OpenToJoin id={id} joinable={!!joinable} />
+              ) : null}
+              <DiscordChannel id={id} direct={type === "direct"} />
+            </div>
+          </Fold>
+        </Folds>
+      ) : null}
     </Detail>
   );
 }
 
-function JoinButton({ id, title }: { id: string; title: string }) {
-  const { manage } = useChatActions();
-
-  async function join() {
-    try {
-      await manage({
-        // Anyone's address for a group: the shorthand, from its id.
-        sessionKey: `chat:group:${id.slice("group:".length)}`,
-        action: "join",
-      });
-      toast.success(`You joined ${title}`);
-    } catch (error) {
-      toast.error("Couldn't join the group", {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    }
-  }
-
+/** Someone in the chat: their face and what they're up to. */
+function MemberRow({
+  character,
+  onPick,
+}: {
+  character: CharacterSummary;
+  onPick: () => void;
+}) {
+  const { status, presence } = usePresence(character);
+  const sub =
+    status?.task?.description ?? (PRESENCE_TEXT[presence] || undefined);
   return (
-    <Button
-      tone="primary"
-      icon={<LogInIcon aria-hidden />}
-      pendingAnnouncement="Joining"
-      onClick={join}
-    >
-      Join group
-    </Button>
-  );
-}
-
-/**
- * The owner opens a group so anyone with its address can join; those in it
- * stay.
- */
-function OpenToJoin({ id, joinable }: { id: string; joinable: boolean }) {
-  const { refreshChats } = useChatActions();
-  const { reload } = useObservedChats();
-  const [saving, setSaving] = useState(false);
-
-  async function change(next: boolean) {
-    setSaving(true);
-    try {
-      await setChatSettings({ chatId: id, joinable: next });
-      await Promise.all([refreshChats(), reload()]);
-    } catch (error) {
-      toast.error("Couldn't change who can join", {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <SwitchRow
-      label="Open to join"
-      hint="Anyone with its address can join it themselves."
-      checked={joinable}
-      disabled={saving}
-      onCheckedChange={(next) => void change(next)}
+    <ListRow
+      onClick={onPick}
+      leading={
+        <CharacterAvatar
+          id={character.id}
+          name={character.name}
+          avatarUrl={character.avatarUrl}
+          kind={character.kind}
+          size="sm"
+          decorative
+        />
+      }
+      title={character.name}
+      sub={sub}
     />
   );
 }

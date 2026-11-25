@@ -84,7 +84,36 @@ type CanvasState = {
   hovered: string | null;
 };
 
-type CanvasSlot = "root" | "backdrop" | "ground" | "world" | "item";
+/** Screen pixels between the grid's main marks at the start of each level. */
+const GRID = 100;
+/** Each level of the grid splits its spacing into this many. */
+const SPLIT = 5;
+
+/**
+ * The backdrop grid at a camera. Main marks are `size` pixels apart, `size`
+ * growing from GRID to SPLIT times it across each level of zoom (each SPLIT-
+ * fold); minor marks split that spacing into SPLIT and come in as it grows
+ * (`minor`, 0 to 1: they fade and swell from nothing to whole). At the next
+ * level the minor marks, now whole, are the main ones: the grid subdivides and
+ * never jumps. Each kind is one repeating tile with its mark in the middle,
+ * placed (`x`, `y`) within one tile of the screen's corner, so the numbers stay
+ * small (a position in the hundreds of thousands of pixels loses precision).
+ */
+export function gridAt(x: number, y: number, zoom: number) {
+  const level = Math.floor(Math.log(zoom) / Math.log(SPLIT) + 1e-9);
+  const size = (GRID * zoom) / SPLIT ** level;
+  const tile = (step: number) => {
+    const wrap = (v: number) => ((v % step) + step) % step;
+    return { x: wrap(x) - step / 2, y: wrap(y) - step / 2, size: step };
+  };
+  return {
+    main: tile(size),
+    fine: tile(size / SPLIT),
+    minor: Math.min(1, Math.max(0, (size / GRID - 1) / (SPLIT - 1))),
+  };
+}
+
+type CanvasSlot = "root" | "backdrop" | "fine" | "ground" | "world" | "item";
 
 function buildApi(
   ctx: PrimitiveContext<CanvasOptions, CanvasState, CanvasSlot>,
@@ -448,16 +477,30 @@ export const canvas = definePrimitive({
       },
     }),
     backdrop: slot({
-      attrs: () => ({ "aria-hidden": "true" }),
       live: live((state: CanvasState) => {
         const { x, y, zoom } = state.viewport;
-        // The grid keeps roughly one size, doubling and halving as you zoom.
-        const cell = 40 * (zoom / 2 ** Math.round(Math.log2(zoom)));
+        const { main } = gridAt(x, y, zoom);
         return {
+          x: `${main.x}`,
+          y: `${main.y}`,
+          width: `${main.size}`,
+          height: `${main.size}`,
+          style: css({ "--ui-grid-c": `${main.size / 2}px` }),
+        };
+      }),
+    }),
+    fine: slot({
+      live: live((state: CanvasState) => {
+        const { x, y, zoom } = state.viewport;
+        const { fine, minor } = gridAt(x, y, zoom);
+        return {
+          x: `${fine.x}`,
+          y: `${fine.y}`,
+          width: `${fine.size}`,
+          height: `${fine.size}`,
           style: css({
-            "--canvas-x": `${x}px`,
-            "--canvas-y": `${y}px`,
-            "--canvas-cell": `${cell}px`,
+            "--ui-grid-c": `${fine.size / 2}px`,
+            "--ui-grid-minor": `${minor}`,
           }),
         };
       }),

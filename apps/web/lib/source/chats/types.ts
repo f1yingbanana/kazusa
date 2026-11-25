@@ -11,7 +11,8 @@ import type { Chat as ServerChat, ChatMessage } from "@kazusa/client";
  * A conversation in the UI. New/draft conversations stay local until their
  * first message is sent.
  */
-export type Chat = ServerChat & { draft?: boolean };
+/** `title`: a draft group's chosen name, sent with its first message. */
+export type Chat = ServerChat & { draft?: boolean; title?: string };
 
 /** What any chat shows, including one read from outside, which has no address. */
 export type ChatInfo = Omit<Chat, "sessionKey"> & { ended?: boolean };
