@@ -2,7 +2,7 @@
 
 import type { CharacterSummary } from "@kazusa/client";
 import { memo, type CSSProperties, type ReactNode } from "react";
-import { AvatarStack } from "@/ui/avatar";
+import { AvatarStack, avatarCountClass } from "@/ui/avatar";
 import { CanvasItem, CanvasSpot } from "@/ui/canvas";
 import { cx } from "@/ui/cx";
 import { Picture } from "@/ui/picture";
@@ -227,6 +227,7 @@ export const CountBubble = memo(function CountBubble({
   y,
   dx,
   dy,
+  layer = 2,
   count,
   plus,
   placeId,
@@ -237,6 +238,7 @@ export const CountBubble = memo(function CountBubble({
   y: number;
   dx: number;
   dy: number;
+  layer?: number;
   count: number;
   /** Shown beside faces, so it reads "+3" rather than "3". */
   plus: boolean;
@@ -245,7 +247,7 @@ export const CountBubble = memo(function CountBubble({
   onReach: (placeId: string, reaching: boolean) => void;
 }) {
   return (
-    <CanvasSpot x={x} y={y} anchor="-50%, 0px" layer={0}>
+    <CanvasSpot x={x} y={y} anchor="-50%, 0px" layer={layer}>
       <button
         type="button"
         tabIndex={-1}
@@ -253,7 +255,10 @@ export const CountBubble = memo(function CountBubble({
         onPointerEnter={() => onReach(placeId, true)}
         onPointerLeave={() => onReach(placeId, false)}
         style={{ translate: `${dx}px ${dy}px` }}
-        className="pointer-events-auto grid h-7 min-w-7 place-items-center rounded-full bg-ui-surface px-1.5 text-[11px] font-extrabold text-ui-ink tabular-nums shadow-[0_0_0_2px_var(--ui-surface)] inset-ring inset-ring-ui-line transition-opacity duration-250 hover:bg-ui-tint motion-reduce:transition-none starting:opacity-0"
+        className={cx(
+          "pointer-events-auto transition-opacity duration-250 hover:bg-ui-tint motion-reduce:transition-none starting:opacity-0",
+          avatarCountClass("sm"),
+        )}
       >
         {plus ? "+" : ""}
         {count}

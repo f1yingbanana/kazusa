@@ -21,6 +21,7 @@ export interface TimelineFilters {
   readonly actors?: readonly string[];
   readonly kinds?: readonly JournalKind[];
   readonly chats?: readonly string[];
+  readonly enabled?: boolean;
 }
 
 function toQuery(filters: TimelineFilters): TimelineQuery {
@@ -31,11 +32,12 @@ function toQuery(filters: TimelineFilters): TimelineQuery {
   };
 }
 
-function useTail(query: TimelineQuery) {
+function useTail(query: TimelineQuery, enabled = true) {
   const tail = useLiveStore((state) => state.journalTail);
   return useMemo(
-    () => tail.filter((event) => matchesTimelineQuery(event, query)),
-    [tail, query],
+    () =>
+      enabled ? tail.filter((event) => matchesTimelineQuery(event, query)) : [],
+    [enabled, tail, query],
   );
 }
 
@@ -43,12 +45,13 @@ function useTail(query: TimelineQuery) {
 export function useTimeline(filters: TimelineFilters) {
   const { resolved } = useSources();
   const source = resolved.timeline;
+  const enabled = filters.enabled ?? true;
   const query = useMemo(() => toQuery(filters), [filters]);
 
   const { data, error, isLoading, size, setSize, isValidating } =
     useSWRInfinite<TimelineResponse, Error>(
       (index: number, previous: TimelineResponse | null) => {
-        if (source === "unavailable") return null;
+        if (source === "unavailable" || !enabled) return null;
         if (index === 0) return ["kazusa/timeline", query, null] as const;
         if (!previous?.hasMore || previous.nextCursor === undefined)
           return null;
@@ -64,28 +67,34 @@ export function useTimeline(filters: TimelineFilters) {
           before: typeof before === "number" ? before : undefined,
           limit: TIMELINE_PAGE_SIZE,
         }),
-      { revalidateOnFocus: false, revalidateFirstPage: false },
+      {
+        revalidateOnFocus: false,
+        revalidateFirstPage: false,
+        keepPreviousData: true,
+      },
     );
 
-  const tail = useTail(query);
+  const tail = useTail(query, enabled);
   const history = useMemo(
-    () => data?.flatMap((page) => page.events) ?? [],
-    [data],
+    () => (enabled ? (data?.flatMap((page) => page.events) ?? []) : []),
+    [enabled, data],
   );
   const events = useMemo(
-    () => mergeNewestFirst(tail, history),
-    [tail, history],
+    () => (enabled ? mergeNewestFirst(tail, history) : []),
+    [enabled, tail, history],
   );
   const lastPage = data?.[data.length - 1];
-  const hasMore = Boolean(
-    lastPage?.hasMore && lastPage.nextCursor !== undefined,
-  );
-  const isLoadingMore = isValidating && size > (data?.length ?? 0);
+  const hasMore =
+    enabled && Boolean(lastPage?.hasMore && lastPage.nextCursor !== undefined);
+  const isLoadingMore = enabled && isValidating && size > (data?.length ?? 0);
+  const initialLoading = enabled && isLoading && data === undefined;
+  const isSwitching = enabled && isLoading && data !== undefined;
 
   return {
     events,
     error,
-    isLoading,
+    isLoading: initialLoading,
+    isSwitching,
     hasMore,
     isLoadingMore,
     loadMore: () => setSize(size + 1),

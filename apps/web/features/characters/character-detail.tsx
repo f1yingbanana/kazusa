@@ -62,12 +62,12 @@ import {
   CharacterStatesSection,
   CharacterStatesSummary,
   chatsParsers,
-  timelineParsers,
   useStopBrain,
   useWorldNow,
   wikiParsers,
 } from "../legacy";
 import { conversationParsers } from "../chats/open";
+import { timelineParsers } from "../timeline/search-params";
 import { CharacterAvatar } from "./character-avatar";
 import { Desires } from "./desires";
 import { PRESENCE_TEXT, usePresence } from "./presence";

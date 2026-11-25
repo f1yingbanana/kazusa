@@ -129,7 +129,7 @@ export function ComposerBox({
         type="submit"
         disabled={!canSend}
         aria-label={sendLabel}
-        className="grid size-9 shrink-0 place-items-center rounded-full bg-ui-primary text-ui-on-primary transition-[scale,opacity,background-color] duration-250 ease-[cubic-bezier(0.3,1.5,0.5,1)] hover:bg-[color-mix(in_oklch,var(--ui-primary),black_10%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary active:scale-85 data-[disabled]:scale-75 data-[disabled]:bg-ui-tint data-[disabled]:text-ui-soft motion-reduce:transition-none [&_svg]:size-4.5 [&_svg]:transition-transform [&_svg]:duration-200 hover:[&_svg]:-translate-y-0.5"
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-ui-primary text-ui-on-primary transition-[scale,opacity,background-color] duration-250 ease-[cubic-bezier(0.3,1.5,0.5,1)] hover:bg-[color-mix(in_oklch,var(--ui-primary),black_10%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary active:scale-85 motion-reduce:transition-none data-disabled:scale-75 data-disabled:bg-ui-tint data-disabled:text-ui-soft [&_svg]:size-4.5 [&_svg]:transition-transform [&_svg]:duration-200 hover:[&_svg]:-translate-y-0.5"
       >
         <ArrowUpIcon aria-hidden strokeWidth={2.5} />
       </Button>

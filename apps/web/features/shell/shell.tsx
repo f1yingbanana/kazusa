@@ -24,6 +24,8 @@ import {
   VisitorWelcome,
   WorldUpdateNotice,
 } from "../legacy";
+import { TimelineSidebar } from "../timeline/timeline-sidebar";
+import { TimelineStage } from "../timeline/timeline-stage";
 import { WhosWhere } from "../world/whos-where";
 import { WorldStage } from "../world/world-stage";
 import { CommandPalette } from "./command-palette";
@@ -36,17 +38,20 @@ import { useDetailsSheet } from "./use-sheet";
 /** Sections rebuilt here; the rest still come from the registry's old views. */
 const SIDEBARS: Record<string, ComponentType<SectionSidebarProps>> = {
   chats: ChatList,
+  timeline: TimelineSidebar,
   world: WhosWhere,
 };
 
 const STAGES: Record<string, ComponentType> = {
   characters: Gallery,
   chats: ChatsStage,
+  timeline: TimelineStage,
   world: WorldStage,
 };
 
 const PANE_LABELS: Record<string, [string, string]> = {
   chats: ["Conversations", "Thread"],
+  timeline: ["People", "Timeline"],
   world: ["Who's where", "Map"],
   characters: ["List", "Faces"],
 };

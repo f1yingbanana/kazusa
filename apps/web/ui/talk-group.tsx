@@ -34,7 +34,7 @@ export function TalkGroup({
       role="group"
       aria-label={label}
       data-current={current || undefined}
-      className="flex flex-col rounded-[1.25rem] bg-ui-accent-tint p-1 transition-shadow duration-200 data-[current]:inset-ring-2 data-[current]:inset-ring-ui-accent motion-safe:animate-ui-enter"
+      className="flex flex-col rounded-[1.25rem] bg-ui-accent-tint p-1 transition-shadow duration-200 data-current:inset-ring-2 data-current:inset-ring-ui-accent motion-safe:animate-ui-enter"
     >
       <ul className="flex flex-col">{children}</ul>
       <button

@@ -47,13 +47,13 @@ import { Tooltip } from "@/ui/tooltip";
 import { VisuallyHidden } from "@/ui/visually-hidden";
 import {
   PLACE_PREFIX,
-  PlaceChip,
   PlaceWaysSection,
   RichText,
   wikiParsers,
   worldParsers,
 } from "../legacy";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { PlaceChip } from "../entities/chips";
 import { PlacePeople } from "../world/place-people";
 import { askToShowOnMap } from "../world/map/show-on-map";
 import { useTalks } from "../world/talks";

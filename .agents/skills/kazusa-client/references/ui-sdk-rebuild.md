@@ -178,5 +178,37 @@ The new UI splits conversations by how they're held:
   offset is kept within one tile: a CSS background positioned at the map's raw
   screen offset (hundreds of thousands of px when zoomed in) lost precision
   and jittered.
-- Still borrowed: `PlaceChip`, `chatIcon`, `useChatTitle` and the old Stage for
-  sections not yet ported.
+- Shared entity primitives migrated out of `legacy.ts`: `CharacterChip`,
+  `PlaceChip`, `ChatChip`, `chatIcon`, and `useChatTitle` now live in
+  `features/entities/{chat-meta.ts,chips.tsx}` and are shared by World, Chats,
+  Places, and Timeline; `AvatarCount` in `ui/avatar.tsx` is shared with the
+  world map clusters. Still borrowed: old Stage for sections not yet ported.
+
+## Timeline (2026-11-25)
+
+- **Built on ui-sdk**: `ui/timeline.tsx` (`Chronicle` wrapping `Timeline feed`,
+  `ChronicleEntry` with `quiet` vs `card` variants, `ChronicleMilestone`,
+  `ChronicleDay`, `ChroniclePhase`, `ChronicleThought`, `ChronicleMore` wrapping
+  `ui/collapsible.tsx`), `ui/collapsible.tsx`, `ui/checkbox.tsx` (`CheckList` /
+  `CheckRow` with `parent` checkboxes), `ui/avatar.tsx` (`"xs"` size and unified
+  `AvatarCount`), and `ScrollFeed` in `ui/scroll-log.tsx` (top-anchored
+  `ScrollArea` with edge fades, `createScrollAreaController`, and floating
+  `overlay` new-events pill).
+- **Pure logic in `lib/timeline/chronicle.ts`**: presets (`Highlights`,
+  `Activity` using `DEFAULT_TIMELINE_KINDS`, `Everything`), facet definitions
+  (`Encounters`, `Sleep & dreams`, `Chats`, `Activities`, `Clock`), day +
+  day-phase grouping and lossless collapsing of consecutive quiet task/message
+  bursts (`buildChronicle`), and search matching (`matchesEventQuery`).
+- **Sidebar (`features/timeline/timeline-sidebar.tsx`)**: owns **who** to
+  follow — `Search people` filters the roster, `Everyone` / `Favorites` switches
+  the list, Clubs & Circles cards expand with FLIP avatar transitions and
+  aligned co-follow toggles, fixed-height `h-10` active strip avoids jumps, and
+  `onNavigated` switches panes on mobile.
+- **Stage & data (`features/timeline/timeline-stage.tsx`, `event-row.tsx`,
+  `hooks/use-timeline.ts`)**: owns **what** to see — `Search events` (`tl.q`),
+  `Detail level` (`Highlights` | `Activity` | `Everything`) + filter popover
+  (`tl.kinds`), `keepPreviousData` smooth switching without skeleton flashes,
+  `Chronicle` feed with hold-back when scrolled (`1 new event` / `N new events`),
+  quiet background lines vs. elevated story cards (`variant="card"`), expandable
+  details and italicized action message previews, and `conversationPatch` routing
+  so huddles open in World and texts open in Chats.

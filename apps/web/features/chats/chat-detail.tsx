@@ -35,7 +35,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Note } from "@/ui/note";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { usePresence, PRESENCE_TEXT } from "../characters/presence";
-import { chatIcon, useChatTitle } from "../legacy";
+import { chatIcon, useChatTitle } from "../entities/chat-meta";
 import {
   AddPeople,
   aloneCopy,

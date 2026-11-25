@@ -70,15 +70,15 @@ export function TraceFold({
 }) {
   return (
     <Collapsible defaultOpen={defaultOpen} className="flex min-w-0 flex-col">
-      <CollapsibleTrigger className="group/trace flex w-fit max-w-full min-w-0 items-center gap-1 rounded-[0.5rem] text-start hover:[&>span]:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary">
+      <CollapsibleTrigger className="group/trace flex w-fit max-w-full min-w-0 items-center gap-1 rounded-[0.5rem] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary hover:[&>span]:text-ui-ink">
         {line}
         <ChevronRightIcon
           aria-hidden
-          className="size-3.5 shrink-0 text-ui-soft transition-transform duration-200 group-data-[open]/trace:rotate-90"
+          className="size-3.5 shrink-0 text-ui-soft transition-transform duration-200 group-data-open/trace:rotate-90"
         />
       </CollapsibleTrigger>
-      <CollapsiblePanel className="h-(--collapsible-panel-height) min-w-0 overflow-hidden transition-[height] duration-200 data-[ending-style]:h-0 data-[starting-style]:h-0 motion-reduce:transition-none">
-        <div className="mt-1.5 mb-1 ms-2 min-w-0 border-s border-ui-line ps-4 text-[0.8125rem] leading-relaxed wrap-break-word text-ui-soft">
+      <CollapsiblePanel className="h-(--collapsible-panel-height) min-w-0 overflow-hidden transition-[height] duration-200 data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
+        <div className="ms-2 mt-1.5 mb-1 min-w-0 border-s border-ui-line ps-4 text-[0.8125rem] leading-relaxed wrap-break-word text-ui-soft">
           {children}
         </div>
       </CollapsiblePanel>
