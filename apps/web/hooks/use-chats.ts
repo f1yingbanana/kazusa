@@ -156,6 +156,7 @@ export function useChatActions() {
             requestId,
             text,
             members: chat.members.filter((id) => id !== player.id),
+            ...(chat.title ? { title: chat.title } : {}),
 
             // Face to face: it joins or starts a huddle where you stand.
             ...(chat.type === "huddle"
@@ -191,6 +192,7 @@ export function useChatActions() {
       name: string;
       members: string[];
       placeId?: string;
+      title?: string;
     },
     self: string = player.id,
   ): Chat {

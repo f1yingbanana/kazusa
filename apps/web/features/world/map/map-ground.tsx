@@ -69,11 +69,14 @@ const RegionShape = memo(function RegionShape({
   onDragStart: (id: string, event: React.PointerEvent<Element>) => void;
 }) {
   return (
+    // Faded by fill and stroke opacity, never the group's: a group's opacity
+    // paints it offscreen whole, and zoomed in an island is far bigger than
+    // the screen, past what the GPU holds, so the screen flashes blank.
     <g
       className={
         leaving
-          ? "pointer-events-none opacity-0 transition-opacity duration-300"
-          : "motion-safe:animate-ui-fade-in"
+          ? "pointer-events-none transition-[fill-opacity,stroke-opacity] duration-300 [fill-opacity:0] [stroke-opacity:0]"
+          : "motion-safe:animate-ui-ink-in"
       }
     >
       <path
@@ -166,8 +169,9 @@ export interface Highlight {
 
 /**
  * Roads called out from a hovered or picked place, or a picked traveller's
- * route: each draws itself in from where it starts, and ridden ones keep
- * moving, so a route reads as a way to go rather than a line.
+ * route: each inks in whole (a dash drawn along the road would be measured on
+ * screen, not along the road, since strokes keep their width, and stop short),
+ * and ridden ones keep moving, so a route reads as a way to go.
  */
 export function MapHighlight({
   roads,
@@ -188,13 +192,11 @@ export function MapHighlight({
           />
           <path
             d={road.path}
-            pathLength={1}
-            strokeDasharray="1 1"
             className={cx(
               tone === "pick"
                 ? "stroke-ui-primary"
                 : "stroke-[color-mix(in_oklch,var(--ui-primary)_70%,transparent)]",
-              "motion-safe:animate-ui-draw",
+              "motion-safe:animate-ui-ink-in",
               HAIRLINE,
             )}
             strokeWidth={tone === "pick" ? 2.5 : 2}

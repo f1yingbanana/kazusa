@@ -7,20 +7,20 @@ import {
   PauseIcon,
   PlayIcon,
 } from "lucide-react";
-import { parseAsString, useQueryStates } from "nuqs";
+import { useQueryStates } from "nuqs";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useClockActions, useClockAnchor } from "@/hooks/use-clock";
 import { useObservedChats } from "@/hooks/use-observed-chats";
 import { useSelfIn } from "@/hooks/use-self";
-import { openChatPatch } from "@/lib/source/chats/display";
 import type { ChatInfo } from "@/lib/source/chats/types";
-import { entityRefParser, serializeEntityRef } from "@/lib/state/entity-ref";
+import { serializeEntityRef } from "@/lib/state/entity-ref";
 import { markQuietSelection } from "@/lib/state/ui-store";
 import { CommandDialog, CommandGroup, CommandItem } from "@/ui/command";
 import { PaletteSwatch } from "@/ui/palette-swatch";
 import { PALETTES, type Palette } from "@/ui/palettes";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { conversationParsers, conversationPatch } from "../chats/open";
 import { chatsParsers } from "../legacy";
 import { useSections } from "./sections";
 
@@ -50,10 +50,8 @@ export function CommandPalette({
   const anchor = useClockAnchor();
   const { apply, enabled } = useClockActions();
   const [, setParams] = useQueryStates({
-    view: parseAsString,
-    "chats.id": chatsParsers["chats.id"],
+    ...conversationParsers,
     "chats.member": chatsParsers["chats.member"],
-    sel: entityRefParser,
   });
 
   const run = (action: () => void) => () => {
@@ -70,7 +68,7 @@ export function CommandPalette({
   const paused = anchor?.clock.speed === 0;
 
   const openChat = (chat: ChatInfo) => {
-    const patch = openChatPatch(chat, selfOf(chat));
+    const patch = conversationPatch(chat, selfOf(chat));
     if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     void setParams(patch);
     onOpenedChat?.();

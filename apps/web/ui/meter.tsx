@@ -63,7 +63,7 @@ export function Gauge({
           <span
             aria-hidden="true"
             className={cx(
-              "absolute inset-y-0 rounded-full bg-[repeating-linear-gradient(-45deg,color-mix(in_oklch,var(--tone),transparent_55%)_0_3px,transparent_3px_6px)]",
+              "absolute inset-y-0 rounded-full [--stripe:color-mix(in_oklch,var(--tone),transparent_55%)] bg-[linear-gradient(45deg,var(--stripe)_25%,transparent_25%_50%,var(--stripe)_50%_75%,transparent_75%)] bg-size-[8px_8px]",
               heading?.rising && "motion-safe:animate-ui-drift",
             )}
             style={{

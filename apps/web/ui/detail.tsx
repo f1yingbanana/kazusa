@@ -9,7 +9,8 @@ import { Picture } from "./picture";
 /**
  * A panel about one thing, read top to bottom: who or what it is, what you can
  * do with it, then the rest. It scrolls on its own and is a size container, so
- * buttons with `collapse` drop their labels when it's narrow.
+ * buttons with `collapse` drop their labels when it's narrow. Its parts never
+ * shrink: a clamped one would otherwise be squeezed when the panel scrolls.
  */
 export function Detail({
   label,
@@ -23,7 +24,7 @@ export function Detail({
   return (
     <article
       className={cx(
-        "@container flex min-h-0 flex-col gap-4 overflow-y-auto p-4",
+        "@container flex min-h-0 flex-col gap-4 overflow-y-auto p-4 *:shrink-0",
         className,
       )}
       aria-label={label}
@@ -143,17 +144,39 @@ export function DetailAbout({ children }: { children: ReactNode }) {
   );
 }
 
-export function DetailSubhead({
+/**
+ * One part of the panel, under a hairline and a bold title: the same band as a
+ * fold's, so every section reads at one level. `meta` is a count or a fact
+ * beside the title; `action` sits at the end.
+ */
+export function DetailSection({
   title,
+  meta,
   action,
+  children,
 }: {
   title: string;
+  meta?: ReactNode;
   action?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-8 items-center justify-between gap-2">
-      <h3 className="text-xs font-bold text-ui-soft">{title}</h3>
-      {action}
-    </div>
+    <section
+      aria-label={title}
+      className="flex flex-col border-t border-ui-line"
+    >
+      <div className="flex min-h-11 items-center gap-2">
+        <h3 className="shrink-0 text-sm font-extrabold">{title}</h3>
+        {meta !== undefined ? (
+          <span className="min-w-0 truncate text-xs font-semibold text-ui-soft tabular-nums">
+            {meta}
+          </span>
+        ) : null}
+        {action ? (
+          <span className="ms-auto flex shrink-0">{action}</span>
+        ) : null}
+      </div>
+      <div className="flex flex-col gap-2 pb-1">{children}</div>
+    </section>
   );
 }

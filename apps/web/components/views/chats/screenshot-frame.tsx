@@ -162,7 +162,7 @@ export function ScreenshotFrame({
   function startDrag(edge: "start" | "end", event: React.PointerEvent) {
     const parent = content();
     const viewport = parent?.closest<HTMLElement>(
-      '[data-slot="message-scroller-viewport"]',
+      '[data-slot="message-scroller-viewport"], [data-slot="scroll-area-viewport"]',
     );
     if (!parent || !viewport) return;
     event.preventDefault();
@@ -355,7 +355,7 @@ export function ScreenshotReach({
 
   useEffect(() => {
     const viewport = anchor.current?.parentElement?.querySelector<HTMLElement>(
-      '[data-slot="message-scroller-viewport"]',
+      '[data-slot="message-scroller-viewport"], [data-slot="scroll-area-viewport"]',
     );
     if (!viewport) return;
     const index = new Map(ids.map((id, at) => [id, at]));

@@ -16,8 +16,8 @@ import { actionLine } from "@/lib/source/chats/display";
 import { useSources } from "@/lib/source/provider";
 import { cn } from "@/lib/utils";
 import { Echoes } from "./echoes";
-import { lineKey, useRevealed } from "./said-text";
-import type { ReadingStatus } from "./use-reading-mode";
+import { lineKey, useRevealed } from "@/hooks/use-said-text";
+import type { ReadingStatus } from "@/hooks/use-reading-mode";
 import { SCRIM } from "./scrim";
 
 /** A line arrives whole (M0): quickly, never slower than it can be read. */

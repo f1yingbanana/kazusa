@@ -22,6 +22,8 @@ import { useBridgeAccount } from "@/hooks/use-bridge-account";
 import { useBridges } from "@/hooks/use-bridges";
 import { useChatTitle } from "@/components/entities/chips";
 import { makeLinkCode, unlinkAccount } from "@/lib/source/bridges/http";
+import { createOpenGroup } from "@/lib/source/chats/http";
+import { useObservedChats } from "@/hooks/use-observed-chats";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -378,6 +380,76 @@ function ChannelRow({
   );
 }
 
+/**
+ * A group made for a channel: open to join and empty, linked at once, so
+ * whoever comes in from Discord or the world fills it.
+ */
+function NewChannelGroup({
+  link,
+}: {
+  link: (chatId: string, channelId: string | null) => Promise<void>;
+}) {
+  const { reload } = useObservedChats();
+  const [title, setTitle] = useState("");
+  const [channel, setChannel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const named = title.trim();
+  const channelId = channel.trim();
+
+  async function create(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!named || !channelId) return;
+    setSaving(true);
+    try {
+      const chatId = await createOpenGroup(named);
+      await link(chatId, channelId);
+      await reload();
+      setTitle("");
+      setChannel("");
+      toast.success(`Made ${named} for that channel`);
+    } catch (error) {
+      failed("Couldn't make the group", error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={create} className="flex flex-col gap-2" noValidate>
+      <p className="text-sm text-muted-foreground">
+        A new group for a channel: open to join, so characters and guests come
+        in by themselves.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          aria-label="Group name"
+          placeholder="Group name"
+          value={title}
+          maxLength={160}
+          onChange={(event) => setTitle(event.target.value)}
+          className="h-8 min-w-40 flex-1"
+        />
+        <Input
+          aria-label="Channel ID"
+          placeholder="Channel ID"
+          inputMode="numeric"
+          value={channel}
+          onChange={(event) => setChannel(event.target.value)}
+          className="h-8 min-w-40 flex-1 font-mono text-xs"
+        />
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!named || !channelId || saving}
+        >
+          {saving ? <Spinner data-icon="inline-start" /> : null}
+          Make group
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 /** How to make a bot, in order: only needed once, so folded away. */
 function BotSetup() {
   return (
@@ -476,9 +548,11 @@ export function ChatAppsSettings() {
               </ul>
             ) : (
               <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                No channel yet. Link one from a chat sidebar.
+                No channel yet. Link one from a chat sidebar, or make a group
+                for one below.
               </p>
             )}
+            {bot ? <NewChannelGroup link={bridges.link} /> : null}
           </div>
         ) : null}
         {canManage ? <BotSetup /> : null}

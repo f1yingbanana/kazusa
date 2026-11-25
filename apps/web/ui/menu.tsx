@@ -27,19 +27,25 @@ export function MenuContent(
   );
 }
 
-/** An icon with `data-on` is drawn filled, for an item that is switched on. */
+/**
+ * An icon with `data-on` is drawn filled, for an item that is switched on.
+ * `danger` is for one that can't be taken back lightly, like leaving.
+ */
 export function MenuItem({
   icon,
+  danger = false,
   children,
   ...props
 }: Omit<ComponentProps<typeof Item>, "className" | "children"> & {
   icon?: ReactNode;
+  danger?: boolean;
   children: ReactNode;
 }) {
   return (
     <Item
       {...props}
-      className="flex h-8.5 cursor-default items-center gap-2.5 rounded-[0.625rem] px-2.5 text-sm font-semibold outline-none data-highlighted:bg-ui-tint data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:text-ui-soft [&_svg[data-on]]:fill-current [&_svg[data-on]]:text-ui-primary"
+      data-danger={danger || undefined}
+      className="flex h-8.5 cursor-default items-center gap-2.5 rounded-[0.625rem] px-2.5 text-sm font-semibold outline-none data-highlighted:bg-ui-tint data-disabled:opacity-50 [&_svg]:size-4 [&_svg]:text-ui-soft [&_svg[data-on]]:fill-current [&_svg[data-on]]:text-ui-primary data-[danger]:text-ui-danger data-[danger]:[&_svg]:text-ui-danger"
     >
       {icon ? <MenuItemIcon>{icon}</MenuItemIcon> : null}
       {children}

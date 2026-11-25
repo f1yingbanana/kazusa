@@ -2,6 +2,7 @@
 
 import { createParts } from "@ui-sdk/react/primitive";
 import {
+  useId,
   useState,
   type ComponentProps,
   type CSSProperties,
@@ -11,7 +12,6 @@ import {
   canvas,
   createCanvasCamera,
   type CanvasOptions,
-  type CanvasPoint,
 } from "./canvas-primitive";
 import { cx } from "./cx";
 
@@ -27,12 +27,15 @@ export type {
 
 const parts = createParts(canvas, {
   root: "div",
-  backdrop: "div",
+  backdrop: "pattern",
+  fine: "pattern",
   ground: "g",
   world: "div",
   item: "button",
 });
 
+/** A plus, centred on its origin: the backdrop grid's mark. */
+const PLUS = "M-3.5 0h7M0-3.5v7";
 /** A camera to move the canvas from outside it, like a "show on map" button. */
 export function useCanvasCamera() {
   const [camera] = useState(createCanvasCamera);
@@ -61,6 +64,8 @@ export function Canvas({
     className?: string;
     children?: ReactNode;
   }) {
+  // A plain name: useId's characters don't all survive `url(#…)`.
+  const grid = `ui-grid-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <parts.Root
       {...props}
@@ -70,11 +75,28 @@ export function Canvas({
         className,
       )}
     >
-      <parts.Backdrop className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle,var(--ui-line)_1.1px,transparent_1.5px)] bg-size-[var(--canvas-cell)_var(--canvas-cell)] bg-position-[var(--canvas-x)_var(--canvas-y)]" />
       <svg
         aria-hidden="true"
         className="absolute inset-0 size-full overflow-visible"
       >
+        <defs>
+          <parts.Fine id={`${grid}-fine`} patternUnits="userSpaceOnUse">
+            <path
+              d={PLUS}
+              strokeWidth={1.25}
+              className="transform-[translate(var(--ui-grid-c),var(--ui-grid-c))_scale(var(--ui-grid-minor))] fill-none stroke-ui-line opacity-(--ui-grid-minor)"
+            />
+          </parts.Fine>
+          <parts.Backdrop id={grid} patternUnits="userSpaceOnUse">
+            <path
+              d={PLUS}
+              strokeWidth={1.25}
+              className="transform-[translate(var(--ui-grid-c),var(--ui-grid-c))] fill-none stroke-ui-line"
+            />
+          </parts.Backdrop>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${grid}-fine)`} />
+        <rect width="100%" height="100%" fill={`url(#${grid})`} />
         <parts.Ground>{ground}</parts.Ground>
       </svg>
       <parts.World className="pointer-events-none absolute top-0 left-0 origin-top-left">
@@ -91,9 +113,11 @@ type Motion = {
    * landing, `"steady"` keeps pace, for things moved by a clock.
    */
   glide?: "settle" | "steady";
-  /** Where it grows from when it appears, like the area it opens out of. */
-  from?: CanvasPoint;
-  /** Fades it out where it stands, for something on its way out. */
+  /**
+   * Fades it out where it stands, for something on its way out. Everything
+   * fades in where it stands: a map's markers come and go in place, as on a
+   * street map, and only things with somewhere to be (`glide`) travel.
+   */
   leaving?: boolean;
   /** Stacking among its neighbours: higher draws on top. */
   layer?: number;
@@ -116,7 +140,6 @@ function Placed({
   x,
   y,
   glide,
-  from,
   leaving,
   layer,
   children,
@@ -124,12 +147,8 @@ function Placed({
   return (
     <div
       className={cx(
-        // A class, not an inline style, sets the point: inline would outrank
-        // the starting style that makes it grow out of `from`.
-        "pointer-events-none absolute top-0 left-0 origin-top-left transition-opacity duration-300 [--ui-canvas-inv:inherit] [scale:var(--ui-canvas-inv)] [translate:var(--at-x)_var(--at-y)] motion-reduce:transition-none",
+        "pointer-events-none absolute top-0 left-0 origin-top-left transition-opacity duration-250 starting:opacity-0 [--ui-canvas-inv:inherit] [scale:var(--ui-canvas-inv)] [translate:var(--at-x)_var(--at-y)] motion-reduce:transition-none",
         glide && GLIDE[glide],
-        from &&
-          "transition-[translate,opacity] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] starting:[translate:var(--from-x)_var(--from-y)] starting:opacity-0 motion-reduce:transition-none",
         leaving && "opacity-0",
       )}
       style={
@@ -137,9 +156,6 @@ function Placed({
           "--at-x": `${x}px`,
           "--at-y": `${y}px`,
           zIndex: layer,
-          ...(from
-            ? { "--from-x": `${from.x}px`, "--from-y": `${from.y}px` }
-            : {}),
         } as CSSProperties
       }
     >
@@ -163,7 +179,6 @@ export function CanvasItem({
   y,
   anchor = "-50%, -50%",
   glide,
-  from,
   leaving,
   layer,
   className,
@@ -179,14 +194,7 @@ export function CanvasItem({
     style?: CSSProperties;
   }) {
   return (
-    <Placed
-      x={x}
-      y={y}
-      glide={glide}
-      from={from}
-      leaving={leaving}
-      layer={layer}
-    >
+    <Placed x={x} y={y} glide={glide} leaving={leaving} layer={layer}>
       <parts.Item
         {...props}
         value={value}
@@ -207,7 +215,6 @@ export function CanvasSpot({
   y,
   anchor = "-50%, -50%",
   glide,
-  from,
   leaving,
   layer,
   className,
@@ -222,14 +229,7 @@ export function CanvasSpot({
     style?: CSSProperties;
   }) {
   return (
-    <Placed
-      x={x}
-      y={y}
-      glide={glide}
-      from={from}
-      leaving={leaving}
-      layer={layer}
-    >
+    <Placed x={x} y={y} glide={glide} leaving={leaving} layer={layer}>
       <div
         {...props}
         className={cx(

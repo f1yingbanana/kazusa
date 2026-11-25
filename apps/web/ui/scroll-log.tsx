@@ -1,0 +1,80 @@
+"use client";
+
+import {
+  ScrollArea,
+  ScrollAreaContent,
+  ScrollAreaScrollbar,
+  ScrollAreaScrollToEnd,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from "@ui-sdk/react/scroll-area";
+import { ArrowDownIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { cx } from "./cx";
+
+const FADE =
+  "pointer-events-none absolute inset-x-0 z-10 from-ui-surface to-transparent";
+
+/**
+ * A conversation's scroller: it opens at the newest line and keeps it in view
+ * as lines arrive, lets go when you scroll up, and offers a way back down. The
+ * top edge fades while there's more above.
+ */
+export function ScrollLog({
+  label,
+  jumpLabel = "Jump to latest",
+  className,
+  contentClassName,
+  overlay,
+  children,
+}: {
+  label: string;
+  jumpLabel?: string;
+  className?: string;
+  contentClassName?: string;
+  /** Laid over the log and fixed while it scrolls, in place of Jump to latest. */
+  overlay?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <ScrollArea
+      stickToEnd
+      type="hover"
+      className={cx("relative flex min-h-0 flex-1 flex-col", className)}
+    >
+      <ScrollAreaViewport
+        role="log"
+        aria-label={label}
+        className="size-full min-h-0 flex-1 overscroll-contain outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary"
+      >
+        <ScrollAreaContent
+          className={cx("flex min-h-full flex-col", contentClassName)}
+        >
+          {children}
+        </ScrollAreaContent>
+      </ScrollAreaViewport>
+      <div
+        aria-hidden="true"
+        className={cx(
+          FADE,
+          "top-0 h-[min(1.5rem,var(--scroll-area-overflow-y-start))] bg-linear-to-b [--scroll-area-overflow-y-start:inherit]",
+        )}
+      />
+      <ScrollAreaScrollbar className="absolute inset-y-1 inset-e-0.5 z-20 flex w-2 touch-none opacity-0 transition-opacity duration-200 data-[visible]:opacity-100">
+        <ScrollAreaThumb className="w-full rounded-full bg-[color-mix(in_oklch,var(--ui-soft),transparent_55%)]" />
+      </ScrollAreaScrollbar>
+      {overlay ?? (
+        <ScrollAreaScrollToEnd
+          aria-label={jumpLabel}
+          className="absolute inset-s-1/2 bottom-3 z-20 inline-flex h-8 -translate-x-1/2 translate-y-3 scale-90 items-center gap-1.5 rounded-full ui-raised ps-2.5 pe-3.5 text-[0.8125rem] font-bold text-ui-ink opacity-0 transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.3,1.3,0.5,1)] hover:bg-ui-tint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary data-[visible]:translate-y-0 data-[visible]:scale-100 data-[visible]:opacity-100 motion-reduce:transition-none rtl:translate-x-1/2 [&:not([data-visible])]:pointer-events-none"
+        >
+          <ArrowDownIcon
+            aria-hidden
+            className="size-4 motion-safe:animate-ui-bob"
+          />
+          {jumpLabel}
+        </ScrollAreaScrollToEnd>
+      )}
+    </ScrollArea>
+  );
+}

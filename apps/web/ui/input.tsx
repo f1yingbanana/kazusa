@@ -22,3 +22,19 @@ export function SearchInput({
     />
   );
 }
+
+/** A one-line text field; name it with `aria-label` or a label's `htmlFor`. */
+export function TextInput({
+  className,
+  ...props
+}: Omit<ComponentProps<typeof Input>, "className"> & { className?: string }) {
+  return (
+    <Input
+      {...props}
+      className={cx(
+        "h-10 min-w-0 rounded-[0.875rem] bg-ui-ground px-3.5 text-sm text-ui-ink inset-ring inset-ring-ui-line outline-none placeholder:text-ui-soft focus-visible:inset-ring-2 focus-visible:inset-ring-ui-primary data-[disabled]:opacity-50",
+        className,
+      )}
+    />
+  );
+}

@@ -57,11 +57,22 @@ export function computeReveal(geometry: MapGeometry): Reveal {
 }
 
 /** Screen pixels a marker needs to itself. */
-const MARKER_ROOM = 34;
+const MARKER_ROOM = 28;
 /** Clear space kept either side of a name, so names don't run together. */
-const NAME_ROOM = 14;
+const NAME_ROOM = 8;
 /** An area shows places inside once it's this wide on screen. */
-const AREA_ROOM = 150;
+const AREA_ROOM = 120;
+
+/**
+ * What shows changes in whole bands of zoom, each twice the last, like a
+ * street map's zoom levels: zooming in slowly, places arrive (and faces move
+ * to them) together at each band rather than a few at every step.
+ */
+export const REVEAL_STEP = 2;
+
+/** The band a zoom falls in: the reveal is worked out at its lower edge. */
+export const revealBand = (zoom: number) =>
+  REVEAL_STEP ** Math.floor(Math.log(zoom) / Math.log(REVEAL_STEP) + 1e-9);
 
 /**
  * What shows at one zoom, decided by room on screen rather than one zoom per
@@ -69,6 +80,12 @@ const AREA_ROOM = 150;
  * and biggest first, wherever a marker and its whole name fit. A crowded
  * district shows its main places early instead of all or nothing. `pinned`
  * places show whatever the room, with the areas around them.
+ *
+ * Once a place shows it keeps showing as you zoom in, as on a street map: the
+ * zoom bands (`REVEAL_STEP`) are settled from the widest up to this one, each
+ * keeping what the one before showed before anything new claims room. Points
+ * spread apart as the zoom grows while markers keep their size, so whatever fit
+ * still fits. Zooming out walks the same steps back.
  *
  * The result reads like `computeReveal`'s: 0 for what shows and Infinity for
  * what doesn't, at any zoom, so `markerFor`, `edgesAt` and `planLabels` take it
@@ -90,29 +107,6 @@ export function revealAt(
     readonly pinned?: readonly string[];
   },
 ): Reveal {
-  const shown = new Set<string>();
-  const occupied = new Occupied();
-  const markerRect = (node: MapNode) => ({
-    x0: node.x * zoom - MARKER_ROOM / 2,
-    y0: node.y * zoom - MARKER_ROOM / 2,
-    x1: node.x * zoom + MARKER_ROOM / 2,
-    y1: node.y * zoom + MARKER_ROOM / 2,
-  });
-  const nameRect = (node: MapNode) => {
-    const width = nameWidth!(node.id) + NAME_ROOM * 2;
-    return {
-      x0: node.x * zoom - width / 2,
-      y0: node.y * zoom + LABEL_GAP,
-      x1: node.x * zoom + width / 2,
-      y1: node.y * zoom + LABEL_GAP + LABEL_HEIGHT + NAME_ROOM / 2,
-    };
-  };
-  const take = (node: MapNode) => {
-    shown.add(node.id);
-    occupied.add(markerRect(node));
-    if (nameWidth && !node.isArea) occupied.add(nameRect(node));
-  };
-
   const must = new Set<string>();
   for (const id of pinned) {
     for (
@@ -123,12 +117,8 @@ export function revealAt(
       must.add(at);
   }
   const nodes = geometry.order.map((id) => geometry.nodes.get(id)!);
-  // The top of the map, and whatever was asked for, always show.
-  for (const node of nodes) {
-    if (!node.parent || must.has(node.id)) take(node);
-  }
-  const rest = nodes
-    .filter((node) => !shown.has(node.id))
+  const ranked = nodes
+    .filter((node) => node.parent && !must.has(node.id))
     .sort(
       (a, b) =>
         a.depth - b.depth ||
@@ -136,20 +126,64 @@ export function revealAt(
         b.radius - a.radius ||
         a.id.localeCompare(b.id),
     );
-  for (const node of rest) {
-    const parent = geometry.nodes.get(node.parent!);
-    if (
-      !parent ||
-      !shown.has(parent.id) ||
-      parent.radius * 2 * zoom < AREA_ROOM
-    )
-      continue;
-    const rects = [
-      markerRect(node),
-      ...(nameWidth && !node.isArea ? [nameRect(node)] : []),
-    ];
-    if (!rects.every((rect) => occupied.free(rect))) continue;
-    take(node);
+
+  // Below this nothing opens: only the top of the map and what's pinned show.
+  const widest = Math.max(0, ...nodes.map((node) => node.radius));
+  const opens = widest > 0 ? AREA_ROOM / (2 * widest) : zoom;
+  const steps: number[] = [];
+  for (
+    let k = Math.floor(Math.log(opens) / Math.log(REVEAL_STEP));
+    REVEAL_STEP ** k < zoom * 0.999;
+    k += 1
+  )
+    steps.push(REVEAL_STEP ** k);
+  steps.push(zoom);
+
+  let shown = new Set<string>();
+  for (const at of steps) {
+    const before = shown;
+    shown = new Set<string>();
+    const occupied = new Occupied();
+    const markerRect = (node: MapNode) => ({
+      x0: node.x * at - MARKER_ROOM / 2,
+      y0: node.y * at - MARKER_ROOM / 2,
+      x1: node.x * at + MARKER_ROOM / 2,
+      y1: node.y * at + MARKER_ROOM / 2,
+    });
+    const nameRect = (node: MapNode) => {
+      const width = nameWidth!(node.id) + NAME_ROOM * 2;
+      return {
+        x0: node.x * at - width / 2,
+        y0: node.y * at + LABEL_GAP,
+        x1: node.x * at + width / 2,
+        y1: node.y * at + LABEL_GAP + LABEL_HEIGHT + NAME_ROOM / 2,
+      };
+    };
+    const take = (node: MapNode) => {
+      shown.add(node.id);
+      occupied.add(markerRect(node));
+      if (nameWidth && !node.isArea) occupied.add(nameRect(node));
+    };
+    const fits = (node: MapNode) => {
+      const parent = geometry.nodes.get(node.parent!);
+      if (
+        !parent ||
+        !shown.has(parent.id) ||
+        parent.radius * 2 * at < AREA_ROOM
+      )
+        return false;
+      return [
+        markerRect(node),
+        ...(nameWidth && !node.isArea ? [nameRect(node)] : []),
+      ].every((rect) => occupied.free(rect));
+    };
+    // The top of the map, and whatever was asked for, always show; then what
+    // showed a step out; then anything new that finds room.
+    for (const node of nodes) if (!node.parent || must.has(node.id)) take(node);
+    for (const node of ranked)
+      if (before.has(node.id) && fits(node)) take(node);
+    for (const node of ranked)
+      if (!shown.has(node.id) && fits(node)) take(node);
   }
 
   const reveal = new Map<string, number>();

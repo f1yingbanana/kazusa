@@ -18,7 +18,7 @@ import {
 import { NARROW_SLOTS, slotCount, type SlotCount } from "@/lib/scene/layout";
 import type { ChatInfo } from "@/lib/source/chats/types";
 import { cn } from "@/lib/utils";
-import type { ReadingStatus } from "./use-reading-mode";
+import type { ReadingStatus } from "@/hooks/use-reading-mode";
 import { DomRenderer } from "./dom-renderer";
 
 /** A timer set for a line's turn fires at or after it, never just before. */

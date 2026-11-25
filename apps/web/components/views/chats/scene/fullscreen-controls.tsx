@@ -10,7 +10,7 @@ import { useClockActions, useSimNow } from "@/hooks/use-clock";
 import { formatSimTime } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 import { SCRIM } from "./scrim";
-import { EXIT_ATTRIBUTE } from "./use-scene-fullscreen";
+import { EXIT_ATTRIBUTE } from "@/hooks/use-scene-fullscreen";
 
 /** The flat chip both corners sit on, over the art. */
 const CHIP =

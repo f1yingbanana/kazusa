@@ -4,13 +4,7 @@
   its line here. When this file is empty, components/ can go.
 */
 
-export { CharacterRow } from "@/components/entities/character-row";
-export {
-  CharacterChip,
-  PlaceChip,
-  chatIcon,
-  useChatTitle,
-} from "@/components/entities/chips";
+export { PlaceChip, chatIcon, useChatTitle } from "@/components/entities/chips";
 export { CharacterBrainSheet } from "@/components/inspector/sections/character-brain";
 export {
   CharacterContextSection,
@@ -31,13 +25,6 @@ export {
   CharacterStatesSummary,
 } from "@/components/inspector/sections/character-states";
 export { useStopBrain } from "@/components/inspector/sections/character-stop";
-export {
-  AddPeople,
-  ChatTitle,
-  LeaveChat,
-  RemoveButton,
-  RemoveConfirm,
-} from "@/components/inspector/sections/chat-controls";
 export { PlacePeopleSection } from "@/components/inspector/sections/place-people";
 export { PlaceWaysSection } from "@/components/inspector/sections/place-ways";
 export { PlayAsDialog } from "@/components/play/play-as-dialog";

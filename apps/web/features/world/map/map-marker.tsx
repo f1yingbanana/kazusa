@@ -41,6 +41,7 @@ export const PlaceMarker = memo(function PlaceMarker({
   count,
   occupied,
   playerHere,
+  talking = false,
   selected,
   arranging,
   dragging,
@@ -48,24 +49,21 @@ export const PlaceMarker = memo(function PlaceMarker({
   onOpen,
   onDragStart,
   onNudge,
-  fromX,
-  fromY,
   leaving = false,
 }: {
   id: string;
   name: string;
   x: number;
   y: number;
-  /** The area it opens out of, for its entrance: numbers, so memo holds. */
-  fromX?: number;
-  fromY?: number;
-  /** Folding back into its area on the way out. */
+  /** Fading out where it stands, on its way out. */
   leaving?: boolean;
   isArea: boolean;
   labeled: boolean;
   count: number;
   occupied: boolean;
   playerHere: boolean;
+  /** People are talking there face to face. */
+  talking?: boolean;
   selected: boolean;
   arranging: boolean;
   dragging: boolean;
@@ -79,19 +77,13 @@ export const PlaceMarker = memo(function PlaceMarker({
       value={id}
       x={x}
       y={y}
-      from={
-        fromX !== undefined && fromY !== undefined
-          ? { x: fromX, y: fromY }
-          : undefined
-      }
       leaving={leaving}
-      glide={leaving ? "settle" : undefined}
       aria-hidden={leaving || undefined}
       anchor="-50%, -8px"
       aria-label={
         arranging
           ? `Move ${name}`
-          : `${name}${playerHere ? ", you're here" : ""}${count ? `, ${count} here` : ""}`
+          : `${name}${playerHere ? ", you're here" : ""}${count ? `, ${count} here` : ""}${talking ? ", people talking" : ""}`
       }
       aria-current={selected ? "true" : undefined}
       data-canvas-hold={arranging ? "" : undefined}
@@ -139,6 +131,11 @@ export const PlaceMarker = memo(function PlaceMarker({
             <span className="absolute inset-0 rounded-full bg-ui-accent motion-safe:animate-ui-ping" />
           ) : null}
           {selected ? <Found /> : null}
+          {talking ? (
+            <span className="absolute -top-3 -right-3.5 grid size-4 origin-bottom-left place-items-center rounded-full rounded-bl-[3px] bg-ui-accent text-ui-on-accent shadow-ui motion-safe:animate-ui-pop [&_svg]:size-2.5">
+              <SpeechDots />
+            </span>
+          ) : null}
           <span
             className={cx(
               "relative block size-3.5 border-2 border-ui-soft bg-ui-surface shadow-[0_1px_3px_color-mix(in_oklch,var(--ui-ink)_25%,transparent)] transition-colors duration-200",
@@ -216,7 +213,7 @@ export const PersonFace = memo(function PersonFace({
         }}
         style={{ translate: `${dx}px ${dy}px` }}
         className={cx(
-          "pointer-events-auto transition-[translate,opacity,scale] duration-300 ease-[cubic-bezier(0.3,1.25,0.5,1)] starting:scale-50 starting:opacity-0 hover:scale-112 motion-reduce:transition-none",
+          "pointer-events-auto transition-[translate,opacity,scale] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] starting:scale-90 starting:opacity-0 hover:scale-112 motion-reduce:transition-none",
           isPlayer && !selected && "outline-2 outline-ui-accent",
         )}
       />
@@ -248,7 +245,7 @@ export const CountBubble = memo(function CountBubble({
   onReach: (placeId: string, reaching: boolean) => void;
 }) {
   return (
-    <CanvasSpot x={x} y={y} anchor="-50%, 0px" glide="settle" layer={0}>
+    <CanvasSpot x={x} y={y} anchor="-50%, 0px" layer={0}>
       <button
         type="button"
         tabIndex={-1}
@@ -256,7 +253,7 @@ export const CountBubble = memo(function CountBubble({
         onPointerEnter={() => onReach(placeId, true)}
         onPointerLeave={() => onReach(placeId, false)}
         style={{ translate: `${dx}px ${dy}px` }}
-        className="pointer-events-auto grid h-7 min-w-7 place-items-center rounded-full bg-ui-surface px-1.5 text-[11px] font-extrabold text-ui-ink tabular-nums shadow-[0_0_0_2px_var(--ui-surface)] inset-ring inset-ring-ui-line transition-[translate,opacity,scale] duration-300 ease-[cubic-bezier(0.3,1.25,0.5,1)] hover:bg-ui-tint motion-reduce:transition-none starting:scale-50 starting:opacity-0"
+        className="pointer-events-auto grid h-7 min-w-7 place-items-center rounded-full bg-ui-surface px-1.5 text-[11px] font-extrabold text-ui-ink tabular-nums shadow-[0_0_0_2px_var(--ui-surface)] inset-ring inset-ring-ui-line transition-opacity duration-250 hover:bg-ui-tint motion-reduce:transition-none starting:opacity-0"
       >
         {plus ? "+" : ""}
         {count}
@@ -476,6 +473,27 @@ function MapPeek({
         {children}
       </div>
     </CanvasSpot>
+  );
+}
+
+/** Three dots in a speech bubble's tail, rising in turn. */
+function SpeechDots() {
+  return (
+    <span className="flex gap-[1.5px]">
+      {[
+        "[animation-delay:0ms]",
+        "[animation-delay:160ms]",
+        "[animation-delay:320ms]",
+      ].map((delay) => (
+        <span
+          key={delay}
+          className={cx(
+            "size-[2.5px] rounded-full bg-current motion-safe:animate-ui-dot",
+            delay,
+          )}
+        />
+      ))}
+    </span>
   );
 }
 

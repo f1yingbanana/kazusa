@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Canvas, CanvasItem } from "./canvas";
-import { createCanvasCamera } from "./canvas-primitive";
+import { createCanvasCamera, gridAt } from "./canvas-primitive";
 
 beforeAll(() => {
   HTMLElement.prototype.showPopover = function () {};
@@ -122,5 +122,39 @@ describe("Canvas", () => {
     expect(camera.current).not.toBeNull();
     cleanup();
     expect(camera.current).toBeNull();
+  });
+});
+
+describe("gridAt", () => {
+  // Where the marks fall within a stretch of screen; fine ones once whole.
+  const marks = (x: number, zoom: number) => {
+    const grid = gridAt(x, 0, zoom);
+    const out = new Set<number>();
+    const lay = (tile: { x: number; size: number }) => {
+      for (let n = 0; n < 200; n += 1) {
+        const at = tile.x + tile.size / 2 + n * tile.size;
+        if (at >= 100 && at <= 900) out.add(Math.round(at));
+      }
+    };
+    lay(grid.main);
+    if (grid.minor > 0.99) lay(grid.fine);
+    return { at: [...out].sort((a, b) => a - b), grid };
+  };
+
+  it("subdivides at each level: the fine marks become the main ones", () => {
+    const before = marks(12_345.6, 5 ** 2 * 0.999999);
+    const after = marks(12_345.6, 5 ** 2);
+    expect(before.grid.minor).toBeGreaterThan(0.99);
+    expect(after.grid.minor).toBe(0);
+    expect(after.at.length).toBeGreaterThan(5);
+    expect(after.at).toEqual(before.at);
+  });
+
+  it("keeps its numbers small however far the map has moved", () => {
+    const { main, fine } = gridAt(-987_654_321.5, 123_456_789.25, 37.2);
+    for (const tile of [main, fine]) {
+      expect(Math.abs(tile.x)).toBeLessThan(tile.size);
+      expect(Math.abs(tile.y)).toBeLessThan(tile.size);
+    }
   });
 });

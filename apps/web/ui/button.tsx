@@ -15,6 +15,8 @@ const TONE = {
   accent: "bg-ui-accent text-ui-on-accent",
   ghost: "text-ui-soft hover:bg-ui-tint hover:text-ui-ink",
   link: "h-auto px-0 text-ui-primary active:scale-100",
+  danger:
+    "text-ui-danger hover:bg-[color-mix(in_oklch,var(--ui-danger),transparent_90%)]",
 } as const;
 
 const SIZE = { sm: "h-7.5 px-3 text-[0.8125rem]", md: "", lg: "h-10" } as const;
@@ -22,6 +24,15 @@ const ICON_SIZE = { sm: "w-7.5", md: "w-9", lg: "w-10" } as const;
 
 type Tone = keyof typeof TONE;
 type Size = keyof typeof SIZE;
+
+/** A button's look, for a trigger that renders its own element. */
+export function buttonClass({
+  tone = "soft",
+  size = "md",
+  className,
+}: { tone?: Tone; size?: Size; className?: string } = {}): string {
+  return cx(BASE, SIZE[size], TONE[tone], className);
+}
 type BaseProps = Omit<ComponentProps<typeof Base>, "className" | "children">;
 
 export function Button({

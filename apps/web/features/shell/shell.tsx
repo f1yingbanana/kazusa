@@ -15,6 +15,7 @@ import type { Palette } from "@/ui/palettes";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
 import { Gallery } from "../characters/gallery";
 import { ChatList } from "../chats/chat-list";
+import { ChatsStage } from "../chats/chats-stage";
 import {
   chatsParsers,
   PlayAsDialog,
@@ -30,6 +31,7 @@ import { DetailsPanel } from "./details-panel";
 import { SectionNav } from "./section-nav";
 import { TopBar } from "./top-bar";
 import { usePalette } from "./use-palette";
+import { useDetailsSheet } from "./use-sheet";
 
 /** Sections rebuilt here; the rest still come from the registry's old views. */
 const SIDEBARS: Record<string, ComponentType<SectionSidebarProps>> = {
@@ -39,12 +41,13 @@ const SIDEBARS: Record<string, ComponentType<SectionSidebarProps>> = {
 
 const STAGES: Record<string, ComponentType> = {
   characters: Gallery,
+  chats: ChatsStage,
   world: WorldStage,
 };
 
 const PANE_LABELS: Record<string, [string, string]> = {
   chats: ["Conversations", "Thread"],
-  world: ["People", "Map"],
+  world: ["Who's where", "Map"],
   characters: ["List", "Faces"],
 };
 
@@ -82,6 +85,7 @@ function Frame({
   const Sidebar = SIDEBARS[active.id] ?? active.sidebar;
   const OwnStage = STAGES[active.id];
   const [pane, setPane] = useState<Pane>("stage");
+  const [sheetOpen, setSheetOpen] = useDetailsSheet(selection, active.id);
 
   // On a phone, a section opens on its list unless something in it is already open.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the section changes
@@ -160,8 +164,9 @@ function Frame({
 
       {wide ? null : (
         <Drawer
-          open={Boolean(selection)}
+          open={sheetOpen}
           onOpenChange={(open) => {
+            setSheetOpen(open);
             if (!open) void select(null);
           }}
           side={tablet ? "right" : "bottom"}
