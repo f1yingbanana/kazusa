@@ -158,6 +158,11 @@ export function ScreenshotFrame({
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [box]);
 
+  // Ends the drag in hand: on release, and if the frame goes mid-drag (Escape),
+  // which takes its handle and so its pointer events with it.
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDrag.current?.(), []);
+
   function startDrag(edge: "start" | "end", event: React.PointerEvent) {
     const parent = content();
     const viewport = parent?.closest<HTMLElement>(
@@ -204,12 +209,16 @@ export function ScreenshotFrame({
       update();
     };
     const end = () => {
+      if (stopDrag.current !== end) return;
+      stopDrag.current = null;
       cancelAnimationFrame(frameRequest);
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", end);
       handle.removeEventListener("pointercancel", end);
       setDragging(false);
     };
+    stopDrag.current?.();
+    stopDrag.current = end;
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", end);
     handle.addEventListener("pointercancel", end);

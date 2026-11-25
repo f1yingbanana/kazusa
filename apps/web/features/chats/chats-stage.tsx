@@ -35,7 +35,7 @@ export function ChatsStage() {
     playing.current = player.id;
   }, [player.id]);
   const { canPlay, isLoading: accessLoading } = useAccess();
-  const { chats } = useChats();
+  const { chats, isLoading: chatsLoading } = useChats();
   const { byId } = useCharacters();
   const { createChat } = useChatActions();
   const [params, setParams] = useQueryStates({
@@ -45,6 +45,11 @@ export function ChatsStage() {
     "chats.member": chatsParsers["chats.member"],
   });
   const chatId = params["chats.id"];
+  // What's open now, for a send that lands after the view has moved on.
+  const showing = useRef(chatId);
+  useEffect(() => {
+    showing.current = chatId;
+  }, [chatId]);
   const dmTarget = params["chats.dm"];
   const talkTarget = params["chats.talk"];
   const draft = useDraftChat();
@@ -100,7 +105,9 @@ export function ChatsStage() {
       handledDm.current = null;
       return;
     }
-    if (accessLoading || handledDm.current === dmTarget) return;
+    // With the chat list still loading, an existing DM looks like none: wait.
+    if (accessLoading || chatsLoading || handledDm.current === dmTarget)
+      return;
     handledDm.current = dmTarget;
     // You and them: the one you play, or you yourself while playing nobody (to
     // the system agent: your console).
@@ -146,6 +153,7 @@ export function ChatsStage() {
     setParams,
     canPlay,
     accessLoading,
+    chatsLoading,
   ]);
 
   const everyone = useObservedChats();
@@ -189,12 +197,16 @@ export function ChatsStage() {
     // Who sends here is part of the view: switching starts it afresh, so a
     // failed line kept for retry never goes out as the next character.
     const sentAs = player.id;
+    const sentFrom = selected.id;
     return (
       <Conversation
         key={`${selected.id}:${selfOf(selected)}`}
         chat={selected}
         onSent={(chat) => {
-          if (playing.current !== sentAs) return;
+          // Moved on (another chat, another draft): leave that be; the list
+          // picks the sent chat up on its own.
+          if (playing.current !== sentAs || showing.current !== sentFrom)
+            return;
           setDraftChat(chat);
           void setParams({ "chats.id": chat.id });
         }}

@@ -78,10 +78,11 @@ export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
 
   const ranked = rankRooms(rooms, talks, player.placeId, speaking).map(
     (room): Place => {
-      const placeMatch =
-        Boolean(q) && !favorites && room.label.toLowerCase().includes(q);
-      const here = (talks.get(room.placeId) ?? []).filter(
-        (t) => placeMatch || keepTalk(t),
+      const placeMatch = Boolean(q) && room.label.toLowerCase().includes(q);
+      const here = (talks.get(room.placeId) ?? []).filter((t) =>
+        placeMatch
+          ? !favorites || t.chat.members.some((m) => favorite.has(m))
+          : keepTalk(t),
       );
       // A talk that's kept keeps all its people (a favorite's company too);
       // the rest are kept on their own.
@@ -93,7 +94,9 @@ export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
         here: room.placeId === player.placeId,
         talks: here,
         people: room.members.filter(
-          (c) => placeMatch || inKept.has(c.id) || keepPerson(c),
+          (c) =>
+            inKept.has(c.id) ||
+            (placeMatch ? !favorites || favorite.has(c.id) : keepPerson(c)),
         ),
       };
     },

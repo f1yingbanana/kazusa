@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronRightIcon,
   HashIcon,
@@ -393,6 +393,7 @@ function NewChannelGroup({
   const [title, setTitle] = useState("");
   const [channel, setChannel] = useState("");
   const [saving, setSaving] = useState(false);
+  const created = useRef<{ title: string; chatId: string } | null>(null);
   const named = title.trim();
   const channelId = channel.trim();
 
@@ -401,9 +402,14 @@ function NewChannelGroup({
     if (!named || !channelId) return;
     setSaving(true);
     try {
-      const chatId = await createOpenGroup(named);
+      const chatId =
+        created.current?.title === named
+          ? created.current.chatId
+          : await createOpenGroup(named);
+      created.current = { title: named, chatId };
       await link(chatId, channelId);
       await reload();
+      created.current = null;
       setTitle("");
       setChannel("");
       toast.success(`Made ${named} for that channel`);

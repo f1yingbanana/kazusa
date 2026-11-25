@@ -113,12 +113,15 @@ export function useConversation(
   };
 
   const retry = (message: PendingMessage) => {
-    if (!canPlay) return;
+    // Never sent as someone else: a line written as another character stays
+    // theirs, even when the talk stays open across the switch.
+    if (!canPlay || message.senderId !== self) return;
     const retried: PendingMessage = { ...message, status: "sending" };
     setPending((current) =>
       current.map((m) => (m.id === message.id ? retried : m)),
     );
-    void deliver(retried);
+    const landed = beforeSend?.();
+    void deliver(retried).finally(landed);
   };
 
   const onTyping = useCallback(
@@ -130,8 +133,10 @@ export function useConversation(
   );
 
   // The server may echo our own message over SSE before the POST resolves.
+  // A line written as a character played before isn't this one's to retry.
   const visiblePending = pending.filter(
     (candidate) =>
+      candidate.senderId === self &&
       !history.messages.some(
         (m) =>
           m.senderId === candidate.senderId &&

@@ -64,9 +64,16 @@ export function WorldStage() {
   useTalkWith();
   useFollowTalk(talk);
 
-  const [leaving, setLeaving] = useState(false);
+  // Both name a talk, so they hold only for it: a talk closed or swapped some
+  // other way (the browser's back, "On the map") leaves nothing behind.
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   // The talk that has finished opening over the map, which then hides.
   const [coveredBy, setCoveredBy] = useState(openOnArrival);
+  if (talkId === null && (coveredBy !== null || leavingId !== null)) {
+    setCoveredBy(null);
+    setLeavingId(null);
+  }
+  const leaving = talk !== null && talk.id === leavingId;
   const shown = talk && !leaving ? talk.id : null;
   const covered = shown !== null && coveredBy === shown;
   const close = () => void setParams({ "world.talk": null, "world.as": null });
@@ -76,7 +83,7 @@ export function WorldStage() {
       return;
     }
     setCoveredBy(null);
-    setLeaving(true);
+    setLeavingId(talk?.id ?? null);
   };
 
   const map =
@@ -104,7 +111,7 @@ export function WorldStage() {
           leaving={leaving}
           onEntered={() => setCoveredBy(talk.id)}
           onLeft={() => {
-            setLeaving(false);
+            setLeavingId(null);
             close();
           }}
         >

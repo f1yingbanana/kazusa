@@ -24,6 +24,8 @@ export function useLongPress(onLongPress: (id: string) => void) {
   return (id: string) => ({
     onPointerDown: (event: React.PointerEvent) => {
       if (event.pointerType !== "touch") return;
+      // A second finger down before the first lifts: one hold at a time.
+      cancel();
       origin.current = { x: event.clientX, y: event.clientY };
       timer.current = window.setTimeout(() => {
         origin.current = null;

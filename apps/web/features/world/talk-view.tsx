@@ -286,6 +286,7 @@ export function OwnTalk({
         typists={typists}
         leading={<BackToMap onBack={onBack} />}
         tools={stage.tools}
+        inert={stage.fullscreen.mode === "window"}
       />
       <StageBox stage={stage} transcript={transcript}>
         {stage.scene ? (
@@ -377,6 +378,7 @@ export function WatchedTalk({
         typists={typists}
         leading={<BackToMap onBack={onBack} />}
         tools={stage.tools}
+        inert={stage.fullscreen.mode === "window"}
       />
       <StageBox stage={stage} transcript={transcript}>
         {stage.scene ? (

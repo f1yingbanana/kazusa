@@ -56,7 +56,6 @@ export function Backdrop({ placeId }: { placeId: string | undefined }) {
         alt=""
         draggable={false}
         onLoad={arrived}
-        onError={arrived}
         onAnimationEnd={() => setUnder(undefined)}
         style={{ objectPosition: BACKDROP_POSITION }}
         className={cx(

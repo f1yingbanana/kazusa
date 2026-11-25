@@ -89,8 +89,8 @@ function Echo({
   const [faded, setFaded] = useState(false);
   const gone = useEffectEvent(onFaded);
   useEffect(() => {
-    if (faded && line.messageId) gone();
-  }, [faded, line.messageId]);
+    if (fading && faded && line.messageId) gone();
+  }, [fading, faded, line.messageId]);
   const delay = Math.max(
     0,
     (line.leftAt ?? mountedAt) + ECHO_MS - FADE_MS - mountedAt,

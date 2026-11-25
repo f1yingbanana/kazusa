@@ -85,7 +85,7 @@ The new UI splits conversations by how they're held:
 - Never animate a transform on, or around, a Scroll Area while it opens: it
   measures its end by geometry and lets go of `stickToEnd`. Entrances there are
   opacity or `clip-path` only (`animate-ui-thread-in`, `animate-ui-iris-in`).
-- Chats lists texts newest first under one filter: Yours / Everyone
+- Chats lists texts newest first under one filter: Yours / Everyone / Favorites
   (`chats.show`) while playing, everyone's while watching. Search also matches
   the people in a chat, so there is no person button; a character's "Their
   chats" sets `chats.member`, shown as a chip. Others' rows carry an eye; there

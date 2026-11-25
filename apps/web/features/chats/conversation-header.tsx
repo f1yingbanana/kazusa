@@ -35,6 +35,7 @@ export function ConversationHeader({
   typists,
   leading,
   tools,
+  inert,
   onTalkInPerson,
 }: {
   chat: ChatInfo;
@@ -43,6 +44,7 @@ export function ConversationHeader({
   /** Before the faces: a way back. */
   leading?: ReactNode;
   tools?: ReactNode;
+  inert?: boolean;
   /** A DM partner standing where you are: talk face to face instead. */
   onTalkInPerson?: (id: string) => void;
 }) {
@@ -64,7 +66,10 @@ export function ConversationHeader({
   const title = chat.type === "huddle" && place ? place.name : chat.name;
 
   return (
-    <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-ui-line ps-4 pe-2.5">
+    <header
+      inert={inert}
+      className="flex min-h-16 shrink-0 items-center gap-3 border-b border-ui-line ps-4 pe-2.5"
+    >
       {leading}
       {faces.length > 0 ? (
         <button

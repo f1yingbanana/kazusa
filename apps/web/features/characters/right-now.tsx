@@ -178,7 +178,8 @@ function Task({ task, now }: { task: TaskSummary; now: number }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Line
-        icon={<Icon aria-label={taskLabel(task.type)} />}
+        icon={<Icon />}
+        label={taskLabel(task.type)}
         trailing={
           now > 0 && task.endAt > now
             ? `${formatSimDuration(task.endAt - now)} left`
