@@ -175,6 +175,7 @@ function DesireTile({
       >
         <div
           tabIndex={0}
+          aria-label={`${desireLabel(desire.name)}: ${trend ? `${state}, moving to ${trend.targetState}` : state}`}
           className={cx(
             "block rounded-[0.875rem] px-2.5 pt-2 pb-2.5 inset-ring inset-ring-ui-line outline-none transition-shadow duration-150 focus-visible:outline-2 focus-visible:outline-ui-primary",
             tone === "pressing"

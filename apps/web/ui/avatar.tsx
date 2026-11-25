@@ -17,10 +17,12 @@ const SIZE = {
 const FACE =
   "[grid-area:1/1] size-full rounded-full bg-ui-tint object-cover shadow-[0_0_0_2px_var(--ui-surface)]";
 
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((part) => part[0])
+/** Up to two initials for a fallback portrait or avatar; "?" when blank. */
+export function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .map((part) => [...part][0] ?? "")
     .join("")
     .slice(0, 2)
     .toUpperCase();

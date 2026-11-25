@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { createAgent } from "@ui-sdk/react/agent";
 import { createElement, useState } from "react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PickList } from "./pick-list";
+import { filterPickGroups, PickList } from "./pick-list";
 
 beforeAll(() => {
   HTMLElement.prototype.showPopover = function () {};
@@ -61,5 +61,27 @@ describe("PickList", () => {
     expect(picked.textContent).toContain("Airi");
     expect(picked.textContent).toContain("Yuuka");
     expect(screen.getByRole("button", { name: "Remove Airi" })).toBeDefined();
+  });
+
+  it("filters grouped items by label or keyword and drops empty groups", () => {
+    const groups = [
+      {
+        label: "Onstage",
+        items: [
+          { value: "airi", label: "Airi Kurimura", keywords: ["Mint"] },
+          { value: "noa", label: "Noa Ushio" },
+        ],
+      },
+      {
+        label: "Offstage",
+        items: [{ value: "yuuka", label: "Yuuka Hayase" }],
+      },
+    ];
+    expect(filterPickGroups(groups, "mint")).toEqual([
+      {
+        label: "Onstage",
+        items: [{ value: "airi", label: "Airi Kurimura", keywords: ["Mint"] }],
+      },
+    ]);
   });
 });

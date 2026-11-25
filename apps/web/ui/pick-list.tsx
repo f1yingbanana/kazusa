@@ -36,6 +36,20 @@ const matches = (item: PickItem, q: string) =>
   item.label.toLowerCase().includes(q) ||
   (item.keywords ?? []).some((word) => word.toLowerCase().includes(q));
 
+/** Filters grouped picker items by label or keyword, dropping empty groups. */
+export function filterPickGroups(
+  groups: readonly PickGroup[],
+  query: string,
+): PickGroup[] {
+  const q = query.trim().toLowerCase();
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => matches(item, q)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 /**
  * Pick any number from a list that stays in view, found by typing: what's
  * picked shows as one row of chips above, each removable, scrolling sideways to
@@ -62,13 +76,7 @@ export function PickList({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const shown = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => matches(item, q)),
-    }))
-    .filter((group) => group.items.length > 0);
+  const shown = filterPickGroups(groups, query);
   const byValue = new Map(
     groups.flatMap((group) => group.items.map((item) => [item.value, item])),
   );

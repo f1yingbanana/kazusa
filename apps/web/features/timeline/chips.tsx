@@ -10,6 +10,7 @@ import { useDraftChat } from "@/lib/state/chat-draft";
 import { Button } from "@/ui/button";
 import { conversationParsers, conversationPatch } from "../chats/open";
 import { wikiParsers } from "../legacy";
+import { wikiPatch } from "../wiki/open";
 
 export function WikiPageChip({
   id,
@@ -31,16 +32,7 @@ export function WikiPageChip({
     <button
       type="button"
       className="inline-flex max-w-48 min-w-0 items-center gap-1 rounded-full bg-ui-surface px-2 py-0.5 text-xs font-bold text-ui-ink inset-ring inset-ring-ui-line transition-colors duration-150 hover:text-ui-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ui-primary"
-      onClick={() =>
-        void setParams({
-          view: "wiki",
-          "wiki.page": id,
-          "wiki.agent": null,
-          "wiki.part": null,
-          "wiki.edit": null,
-          "wiki.raw": null,
-        })
-      }
+      onClick={() => void setParams(wikiPatch(id))}
     >
       <BookOpenIcon aria-hidden className="size-3 shrink-0 text-ui-soft" />
       <span className="truncate">{pageName(id)}</span>

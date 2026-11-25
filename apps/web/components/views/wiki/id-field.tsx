@@ -1,6 +1,5 @@
 "use client";
 
-import { WikiIdSchema } from "@kazusa/client";
 import {
   Field,
   FieldDescription,
@@ -10,23 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/** OpenClaw agent ids stop at 64; pages may run to 128. */
-const CHARACTER_MAX = 64;
-
-/** Why `id` can't be used, or undefined when it can. */
-export function idProblem(
-  id: string,
-  taken: ReadonlySet<string>,
-  { character = false }: { character?: boolean } = {},
-): string | undefined {
-  if (!id) return "Enter an id.";
-  if (taken.has(id)) return "Another page already uses this id.";
-  if (character && id.length > CHARACTER_MAX)
-    return `Keep it to ${CHARACTER_MAX} characters.`;
-  if (!WikiIdSchema.safeParse(id).success)
-    return "Use lowercase a–z, digits, - or _, starting with a letter or digit.";
-  return undefined;
-}
+export { idProblem } from "@/lib/wiki/page-id";
 
 /**
  * The id under the name: made from it and locked until Customize, since links

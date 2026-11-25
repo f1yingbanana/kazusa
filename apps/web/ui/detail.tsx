@@ -1,7 +1,7 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { IconButton } from "./button";
 import { cx } from "./cx";
 import { Picture } from "./picture";
@@ -110,15 +110,18 @@ export function DetailMark({ children }: { children: ReactNode }) {
 
 /** One primary action takes the row; the rest sit at its end. */
 export function DetailActions({
+  ref,
   label,
   children,
 }: {
+  ref?: Ref<HTMLDivElement>;
   label: string;
   children: ReactNode;
 }) {
   return (
     <div
-      className="flex gap-1.5 *:data-[tone=primary]:flex-[1_0_auto]"
+      ref={ref}
+      className="flex min-w-0 gap-1.5 *:data-[tone=primary]:flex-[1_0_auto]"
       role="group"
       aria-label={label}
     >

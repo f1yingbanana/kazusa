@@ -157,11 +157,7 @@ function NewChatForm({
         <div className="flex shrink-0 justify-end gap-2 max-sm:flex-col-reverse max-sm:*:w-full">
           <DialogClose render={<Button tone="ghost" />}>Cancel</DialogClose>
           <Button type="submit" tone="primary" disabled={!only}>
-            {!only
-              ? "Pick someone"
-              : group
-                ? `Start a group of ${chosen.length + 1}`
-                : `Message ${only.name}`}
+            Confirm
           </Button>
         </div>
       </form>

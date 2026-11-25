@@ -68,7 +68,7 @@ import { NO_FAVORITES } from "../characters/favorites";
 import { BurstRow, EventRow } from "./event-row";
 import { timelineFilterParsers } from "./search-params";
 
-const PHASE_ICON: Record<DayPhase, ReactNode> = {
+export const PHASE_ICON: Record<DayPhase, ReactNode> = {
   Night: <MoonIcon aria-hidden />,
   Morning: <SunriseIcon aria-hidden />,
   Afternoon: <SunIcon aria-hidden />,

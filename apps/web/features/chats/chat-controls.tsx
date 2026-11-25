@@ -291,7 +291,6 @@ export function AddPeople({
     }
   }
 
-  const verb = inPerson ? "Call over" : "Add";
   return (
     <Popover
       open={open}
@@ -336,10 +335,11 @@ export function AddPeople({
               <Button
                 tone="primary"
                 size="sm"
-                disabled={chosen.length === 0 || adding}
+                disabled={chosen.length === 0}
+                pending={adding}
                 onClick={() => void add()}
               >
-                {chosen.length > 1 ? `${verb} ${chosen.length}` : verb}
+                Confirm
               </Button>
             </div>
           </>
@@ -376,7 +376,6 @@ export function RemoveMember({
       <AlertPanel
         title={`Remove ${name}?`}
         description="Everyone in the chat sees it, and they stop getting its messages."
-        confirm="Remove"
         danger
         agentConfirm={`Removes ${name} from the group`}
         onConfirm={() =>
@@ -421,8 +420,6 @@ export function LeaveChat({
               ? "Everyone in it sees that you left. It's open, so you can join again."
               : "Everyone in it sees that you left. You can still read it, but you can't write in it unless someone adds you back."
         }
-        cancel="Stay"
-        confirm={inPerson ? "Leave" : "Leave group"}
         danger
         agentConfirm={`Leaves ${title}`}
         onConfirm={() =>
@@ -572,7 +569,8 @@ export function DiscordChannel({
           type="submit"
           size="sm"
           tone={unlinking ? "danger" : "primary"}
-          disabled={saving || (!unlinking && next === (linked ?? null))}
+          disabled={!unlinking && next === (linked ?? null)}
+          pending={saving}
         >
           {unlinking ? "Unlink" : "Link"}
         </Button>

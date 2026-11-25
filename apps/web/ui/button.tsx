@@ -1,12 +1,13 @@
 "use client";
 
 import { Button as Base } from "@ui-sdk/react/button";
+import { LoaderCircleIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cx } from "./cx";
 import { Tooltip } from "./tooltip";
 
 const BASE =
-  "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-bold whitespace-nowrap transition-[transform,background-color,color] duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[disabled]:active:scale-100 [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex h-9 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-bold whitespace-nowrap transition-[transform,background-color,color] duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[disabled]:active:scale-100 data-[pending]:cursor-wait data-[pending]:data-[disabled]:opacity-100 [&_svg]:size-4 [&_svg]:shrink-0";
 
 const TONE = {
   soft: "bg-ui-tint text-ui-ink hover:bg-[color-mix(in_oklch,var(--ui-tint),var(--ui-ink)_8%)]",
@@ -35,10 +36,15 @@ export function buttonClass({
 }
 type BaseProps = Omit<ComponentProps<typeof Base>, "className" | "children">;
 
+/* While it waits a spinner takes the icon's place; the label never changes. */
+const SPINNER =
+  "hidden in-data-[pending]:block motion-safe:in-data-[pending]:animate-ui-spin";
+
 export function Button({
   tone = "soft",
   size = "md",
   icon,
+  pending = false,
   collapse,
   title,
   className,
@@ -48,6 +54,11 @@ export function Button({
   tone?: Tone;
   size?: Size;
   icon?: ReactNode;
+  /**
+   * Waiting on something the button can't see, like the form it submits. An
+   * `onClick` that returns a Promise needs nothing: the button waits for it.
+   */
+  pending?: boolean;
   /**
    * Hide the label in a narrow container. `title` stays as the tooltip and the
    * name.
@@ -61,7 +72,11 @@ export function Button({
   const button = (
     <Base
       {...props}
-      focusableWhenDisabled={title ? true : props.focusableWhenDisabled}
+      disabled={pending || props.disabled}
+      data-pending={pending || undefined}
+      focusableWhenDisabled={
+        title || pending ? true : props.focusableWhenDisabled
+      }
       aria-label={
         collapse ? (props["aria-label"] ?? title) : props["aria-label"]
       }
@@ -74,7 +89,10 @@ export function Button({
         className,
       )}
     >
-      {icon}
+      {icon ? (
+        <span className="contents in-data-pending:hidden">{icon}</span>
+      ) : null}
+      <LoaderCircleIcon aria-hidden className={SPINNER} />
       {children != null ? (
         <span
           className={cx("min-w-0 truncate", collapse && "@max-[22rem]:hidden")}

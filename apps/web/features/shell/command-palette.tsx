@@ -8,7 +8,8 @@ import {
   PlayIcon,
 } from "lucide-react";
 import { useQueryStates } from "nuqs";
-import { useCharacters } from "@/hooks/use-characters";
+import { useActiveView } from "@/hooks/use-active-view";
+import { isCast, useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useClockActions, useClockAnchor } from "@/hooks/use-clock";
 import { useObservedChats } from "@/hooks/use-observed-chats";
@@ -20,6 +21,7 @@ import { CommandDialog, CommandGroup, CommandItem } from "@/ui/command";
 import { PaletteSwatch } from "@/ui/palette-swatch";
 import { PALETTES, type Palette } from "@/ui/palettes";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { charactersParsers, profilePatch } from "../characters/search-params";
 import { conversationParsers, conversationPatch } from "../chats/open";
 import { chatsParsers } from "../legacy";
 import { useSections } from "./sections";
@@ -49,8 +51,10 @@ export function CommandPalette({
   const selfOf = useSelfIn();
   const anchor = useClockAnchor();
   const { apply, enabled } = useClockActions();
+  const active = useActiveView();
   const [, setParams] = useQueryStates({
     ...conversationParsers,
+    ...charactersParsers,
     "chats.member": chatsParsers["chats.member"],
   });
 
@@ -175,8 +179,11 @@ export function CommandPalette({
               />
             }
             hint={c.groups?.[0]}
-            onSelect={run(
-              () => void setParams({ sel: { kind: "character", id: c.id } }),
+            onSelect={run(() =>
+              // In Characters, someone picked is someone to read about.
+              active.id === "characters" && isCast(c)
+                ? void setParams(profilePatch(c.id))
+                : void setParams({ sel: { kind: "character", id: c.id } }),
             )}
           >
             {c.name}

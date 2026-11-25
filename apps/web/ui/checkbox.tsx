@@ -40,6 +40,7 @@ export function CheckRow({
   onCheckedChange,
   disabled,
   icon,
+  media,
   label,
   hint,
   className,
@@ -51,6 +52,8 @@ export function CheckRow({
   onCheckedChange?: ComponentProps<typeof Checkbox>["onCheckedChange"];
   disabled?: boolean;
   icon?: ReactNode;
+  /** A picture beside the label, like a face, at its own size. */
+  media?: ReactNode;
   label: ReactNode;
   hint?: ReactNode;
   className?: string;
@@ -89,6 +92,7 @@ export function CheckRow({
           {icon}
         </span>
       ) : null}
+      {media}
       <span className="min-w-0 flex-1 truncate font-semibold text-ui-ink">
         {label}
       </span>
