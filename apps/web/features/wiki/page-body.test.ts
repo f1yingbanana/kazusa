@@ -46,6 +46,9 @@ describe("wikiPatch", () => {
       "wiki.part": null,
       "wiki.edit": null,
       "wiki.raw": null,
+      "wiki.tab": null,
+      "wiki.kind": null,
+      "wiki.name": null,
     });
   });
 

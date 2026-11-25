@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { useCharacters } from "@/hooks/use-characters";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePortraits } from "@/hooks/use-scene";
+import { useSelection } from "@/hooks/use-selection";
 import { usePageName, useWikiPage } from "@/hooks/use-wiki";
 import { placeInCast } from "@/lib/characters/cast-book";
 import { entityRefParser } from "@/lib/state/entity-ref";
@@ -141,6 +142,7 @@ export function CastNav({ id }: { id: string }) {
 export function ProfileTitle({ character }: { character: CharacterSummary }) {
   const { presence } = usePresence(character);
   const panelDocked = useMediaQuery(PANEL_DOCKED);
+  const [, select] = useSelection();
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <h1 className="text-[1.75rem] leading-tight font-extrabold text-balance">
@@ -153,7 +155,10 @@ export function ProfileTitle({ character }: { character: CharacterSummary }) {
       ) : (
         <button
           type="button"
-          onClick={requestInspector}
+          onClick={() => {
+            void select({ kind: "character", id: character.id });
+            requestInspector();
+          }}
           className="-ms-2 flex max-w-full min-w-0 items-center gap-2 self-start rounded-full px-2 py-0.5 text-[0.875rem] text-ui-soft transition-colors hover:bg-ui-tint hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary [&>svg]:size-4 [&>svg]:shrink-0"
         >
           <StatusLine character={character} presence={presence} doing />

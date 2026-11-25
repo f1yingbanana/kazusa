@@ -22,11 +22,7 @@ export function WikiPageChip({
   const pageName = usePageName();
   const [, setParams] = useQueryStates({
     view: parseAsString,
-    "wiki.page": wikiParsers["wiki.page"],
-    "wiki.agent": wikiParsers["wiki.agent"],
-    "wiki.part": wikiParsers["wiki.part"],
-    "wiki.edit": wikiParsers["wiki.edit"],
-    "wiki.raw": wikiParsers["wiki.raw"],
+    ...wikiParsers,
   });
   return (
     <button

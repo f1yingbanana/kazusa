@@ -48,4 +48,9 @@ describe("idProblem", () => {
     expect(idProblem(long, none)).toBeUndefined();
     expect(idProblem(long, none, { character: true })).toMatch(/64/);
   });
+
+  it("reports the 128-character limit on long page ids", () => {
+    expect(idProblem("a".repeat(128), none)).toBeUndefined();
+    expect(idProblem("a".repeat(129), none)).toMatch(/128/);
+  });
 });

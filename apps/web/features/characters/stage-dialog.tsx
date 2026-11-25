@@ -187,7 +187,9 @@ function StageMany({
     .filter((c) => selected.has(c.id) && offstage.has(c.id))
     .map((c) => c.id);
   const goingOff = cast
-    .filter((c) => !selected.has(c.id) && !offstage.has(c.id))
+    .filter(
+      (c) => !selected.has(c.id) && !offstage.has(c.id) && !played.has(c.id),
+    )
     .map((c) => c.id);
   const waiting = useWaiting(comingOn);
   const onNote = useOnNote(comingOn.length, waiting);
@@ -254,7 +256,7 @@ function StageMany({
         key={key}
         label={title}
         allValues={free}
-        value={free.filter((id) => selected.has(id))}
+        value={members.filter((c) => selected.has(c.id)).map((c) => c.id)}
         onValueChange={(next) => setFor(members, new Set(next))}
         className="gap-0"
       >

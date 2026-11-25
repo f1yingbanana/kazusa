@@ -81,11 +81,7 @@ export function PlaceDetail({
     sel: entityRefParser,
     "world.talk": conversationParsers["world.talk"],
     "world.as": conversationParsers["world.as"],
-    "wiki.page": wikiParsers["wiki.page"],
-    "wiki.agent": wikiParsers["wiki.agent"],
-    "wiki.part": wikiParsers["wiki.part"],
-    "wiki.edit": wikiParsers["wiki.edit"],
-    "wiki.raw": wikiParsers["wiki.raw"],
+    ...wikiParsers,
   });
   const { resolved } = useSources();
   const place = places?.byId.get(id);

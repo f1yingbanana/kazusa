@@ -12,6 +12,7 @@ import {
 import { parseAsString, useQueryStates } from "nuqs";
 import {
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -92,7 +93,8 @@ export function Gallery() {
   const plain = usePlainText();
   const [creating, setCreating] = useState(false);
   const [castRequest, setStageRequest] = useState<StageRequest | null>(null);
-  const [restoreId] = useState(() => peekGalleryFocus());
+  const [restoreId, setRestoreId] = useState(() => peekGalleryFocus());
+  const clearRestore = useCallback(() => setRestoreId(null), []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const modeRef = useRef({ by, show });
 
@@ -136,12 +138,13 @@ export function Gallery() {
           aria-label="Find a character or group"
           placeholder="Find by name or group"
           value={query}
-          onChange={(e) =>
+          onChange={(e) => {
+            clearRestore();
             void setParams(
               { "chars.q": e.target.value || null },
               { history: "replace" },
-            )
-          }
+            );
+          }}
         />
         <Segmented<Show>
           aria-label="Show"
@@ -300,6 +303,7 @@ export function Gallery() {
                         character={c}
                         showGroup={by === "name"}
                         restoreFocus={restoreId === c.id}
+                        onRestored={clearRestore}
                         onOpen={open}
                       />
                     </PackedTile>
@@ -426,11 +430,13 @@ const Card = memo(function Card({
   character,
   showGroup,
   restoreFocus,
+  onRestored,
   onOpen,
 }: {
   character: CharacterSummary;
   showGroup: boolean;
   restoreFocus: boolean;
+  onRestored: () => void;
   onOpen: (id: string) => void;
 }) {
   const { presence } = usePresence(character);
@@ -442,7 +448,8 @@ const Card = memo(function Card({
     if (!restoreFocus) return;
     button.current?.focus({ preventScroll: true });
     button.current?.scrollIntoView({ block: "center" });
-  }, [restoreFocus]);
+    onRestored();
+  }, [restoreFocus, onRestored]);
 
   const state = presence === "idle" ? "" : PRESENCE_TEXT[presence];
   const group =

@@ -20,7 +20,7 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
-import { RichText } from "../legacy";
+import { RichText, usePlainText } from "../legacy";
 import { Prose } from "../entities/prose";
 import { CharacterAvatar } from "./character-avatar";
 import { charactersParsers, profilePatch } from "./search-params";
@@ -164,6 +164,7 @@ function Acquaintance({
   onToggle: () => void;
 }) {
   const words = towardWords(stats, one.toward);
+  const plain = usePlainText();
   return (
     <div
       className={cx(
@@ -203,7 +204,7 @@ function Acquaintance({
               !open && "line-clamp-3",
             )}
           >
-            “<RichText text={one.take} />”
+            {`“${plain(one.take)}”`}
           </span>
         ) : (
           <span className="text-[0.8125rem] text-ui-soft">
@@ -239,6 +240,7 @@ function Mirror({
           about={otherName}
           page={mine.data?.personal}
           loading={mine.isLoading}
+          error={Boolean(mine.error)}
           empty={`${selfName} has no more written on ${otherName}.`}
           face={<Face id={self.id} name={self.name} other={self} size="sm" />}
         />
@@ -247,6 +249,7 @@ function Mirror({
           about={selfName}
           page={theirs.data?.personal}
           loading={one.simulated && theirs.isLoading}
+          error={one.simulated && Boolean(theirs.error)}
           empty={
             one.simulated
               ? `${otherName} keeps no page on ${selfName}.`
@@ -275,6 +278,7 @@ function View({
   about,
   page,
   loading,
+  error,
   empty,
   face,
 }: {
@@ -282,6 +286,7 @@ function View({
   about: string;
   page: WikiPage | undefined;
   loading: boolean;
+  error: boolean;
   empty: string;
   face: React.ReactNode;
 }) {
@@ -300,6 +305,8 @@ function View({
       </figcaption>
       {loading ? (
         <Note>Reading…</Note>
+      ) : error ? (
+        <Note>{`Couldn't read ${by}'s notes.`}</Note>
       ) : !page ? (
         <Note>{empty}</Note>
       ) : (

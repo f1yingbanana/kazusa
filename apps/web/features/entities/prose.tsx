@@ -23,12 +23,17 @@ export function Prose({
     >
       {blocks.map((block, index) => {
         const lines = block.split(/\n/);
-        if (/^\s*#{1,6}\s/.test(lines[0] ?? ""))
+        if (/^\s*#{1,6}\s/.test(lines[0] ?? "")) {
+          const rest = lines.slice(1).join("\n").trim();
           return (
-            <h4 key={index} className="pt-1 text-sm font-extrabold">
-              <RichText text={lines[0].replace(/^\s*#{1,6}\s+/, "")} />
-            </h4>
+            <div key={index} className="flex flex-col gap-3">
+              <h4 className="pt-1 text-sm font-extrabold">
+                <RichText text={lines[0].replace(/^\s*#{1,6}\s+/, "")} />
+              </h4>
+              {rest ? <Prose text={rest} className={className} /> : null}
+            </div>
           );
+        }
         if (/^\s*[-*] /.test(lines[0] ?? "")) {
           const items: string[] = [];
           for (const line of lines) {

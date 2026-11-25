@@ -98,11 +98,7 @@ export function CharacterActions({
     "chats.member": chatsParsers["chats.member"],
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
-    "wiki.page": wikiParsers["wiki.page"],
-    "wiki.agent": wikiParsers["wiki.agent"],
-    "wiki.part": wikiParsers["wiki.part"],
-    "wiki.edit": wikiParsers["wiki.edit"],
-    "wiki.raw": wikiParsers["wiki.raw"],
+    ...wikiParsers,
   });
 
   const called = firstName(character.name);

@@ -7,9 +7,9 @@ export interface WikiPatch {
   readonly "wiki.part": "page" | "memory" | "looks" | "stickers" | "backdrop" | null;
   readonly "wiki.edit": "world" | "own" | null;
   readonly "wiki.raw": "1" | null;
-  readonly "wiki.tab"?: null;
-  readonly "wiki.kind"?: WikiKind | null;
-  readonly "wiki.name"?: string | null;
+  readonly "wiki.tab": null;
+  readonly "wiki.kind": WikiKind | null;
+  readonly "wiki.name": string | null;
 }
 
 /** Opens a Wiki page (or an agent's own wiki when `page` is null), clearing stale editor params. */
@@ -30,12 +30,8 @@ export function wikiPatch(
     "wiki.part": options.part ?? null,
     "wiki.edit": options.edit ?? null,
     "wiki.raw": null,
-    ...(options.kind !== undefined || options.name !== undefined
-      ? {
-          "wiki.tab": null,
-          "wiki.kind": options.kind ?? null,
-          "wiki.name": options.name ?? null,
-        }
-      : {}),
+    "wiki.tab": null,
+    "wiki.kind": options.kind ?? null,
+    "wiki.name": options.name ?? null,
   };
 }
