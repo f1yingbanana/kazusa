@@ -22,7 +22,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useQueryStates } from "nuqs";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useCharacters } from "@/hooks/use-characters";
 import { useChats } from "@/hooks/use-chats";
 import { useClockAnchor, useSimNow } from "@/hooks/use-clock";
@@ -102,9 +109,13 @@ export function TimelineStage() {
   const running = Boolean(anchor && anchor.clock.speed > 0);
 
   const actors = watchOnly ? watchlist : actorParam;
+  const emptyWatchlist = watchOnly && watchlist.length === 0;
   const kinds = effectiveTimelineKinds(kindParam);
   const preset = presetOfKinds(kinds);
-  const filters = useMemo(() => ({ actors, kinds }), [actors, kinds]);
+  const filters = useMemo(
+    () => ({ actors, kinds, enabled: !emptyWatchlist }),
+    [actors, kinds, emptyWatchlist],
+  );
   const timeline = useTimeline(filters);
 
   const hasFilters =
@@ -113,9 +124,24 @@ export function TimelineStage() {
     watchOnly ||
     query.trim().length > 0;
 
+  const filterKey = `${watchOnly ? "1" : "0"}:${actors.join(",")}|${kinds.join(",")}`;
   const [scrollController] = useState(createScrollAreaController);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   const [atTop, setAtTop] = useState(true);
   const [seenSeq, setSeenSeq] = useState(0);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setAtTop(true);
+    setSeenSeq(0);
+  }
+  const firstFilterRef = useRef(true);
+  useEffect(() => {
+    if (firstFilterRef.current) {
+      firstFilterRef.current = false;
+      return;
+    }
+    scrollController.scrollToStart();
+  }, [filterKey, scrollController]);
 
   const openedSeqRef = useRef<number | null>(null);
   if (openedSeqRef.current === null && !timeline.isLoading) {
@@ -277,7 +303,25 @@ export function TimelineStage() {
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {timeline.isLoading ? (
+        {emptyWatchlist ? (
+          <EmptyChronicle
+            hasFilters={hasFilters}
+            query={query}
+            watchOnly={watchOnly}
+            watchlistCount={watchlist.length}
+            hasMore={false}
+            isLoadingMore={false}
+            onLoadMore={() => {}}
+            onReset={() =>
+              void setParams({
+                "tl.actors": null,
+                "tl.kinds": null,
+                "tl.watch": null,
+                "tl.q": null,
+              })
+            }
+          />
+        ) : timeline.isLoading ? (
           <TimelineSkeleton />
         ) : timeline.error ? (
           <div className="m-auto max-w-96 p-6">

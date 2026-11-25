@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import type { CharacterSummary, JournalEvent, Place } from "@kazusa/client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { withNuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +20,9 @@ declare global {
 }
 
 const loadMore = vi.fn();
+let mockWatchlist = ["airi"];
+let mockTimelineEvents: JournalEvent[] = [];
+const lastTimelineFilters = vi.fn();
 
 const airi: CharacterSummary = {
   id: "airi",
@@ -131,15 +141,20 @@ const sampleEvents: JournalEvent[] = [
 ];
 
 vi.mock("@/hooks/use-timeline", () => ({
-  useTimeline: () => ({
-    events: sampleEvents,
-    error: undefined,
-    isLoading: false,
-    hasMore: true,
-    isLoadingMore: false,
-    loadMore,
-    source: "live",
-  }),
+  useTimeline: (filters: { enabled?: boolean }) => {
+    lastTimelineFilters(filters);
+    const events = filters.enabled === false ? [] : mockTimelineEvents;
+    return {
+      events,
+      error: undefined,
+      isLoading: false,
+      isSwitching: false,
+      hasMore: true,
+      isLoadingMore: false,
+      loadMore,
+      source: "live",
+    };
+  },
 }));
 
 vi.mock("@/hooks/use-characters", () => ({
@@ -214,7 +229,7 @@ vi.mock("@/lib/source/provider", () => ({
 }));
 
 vi.mock("@/lib/state/preferences-store", () => ({
-  useWatchlist: () => ["airi"],
+  useWatchlist: () => mockWatchlist,
 }));
 
 vi.mock("../legacy", () => ({
@@ -244,6 +259,7 @@ beforeAll(() => {
   HTMLElement.prototype.hidePopover = function () {};
   Element.prototype.getAnimations = () => [];
   Element.prototype.scrollIntoView = function () {};
+  Element.prototype.scrollTo ??= function () {};
   Element.prototype.checkVisibility = () => true;
   Element.prototype.getClientRects = () => [] as unknown as DOMRectList;
   document.elementFromPoint = () => null;
@@ -261,7 +277,10 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  mockWatchlist = ["airi"];
+  mockTimelineEvents = sampleEvents;
   loadMore.mockClear();
+  lastTimelineFilters.mockClear();
 });
 
 afterEach(cleanup);
@@ -401,5 +420,97 @@ describe("Timeline feature", () => {
     expect(loadRes.error?.message).toBeUndefined();
     expect(loadRes.ok).toBe(true);
     expect(loadMore).toHaveBeenCalledOnce();
+  });
+
+  it("keeps existing favorites when co-following someone else from Favorites", async () => {
+    const onUrlUpdate = vi.fn<(event: UrlUpdateEvent) => void>();
+    render(
+      createElement(TimelineHarness, {
+        searchParams: "?view=timeline&tl.watch=1",
+        onUrlUpdate,
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Show people in After-School Sweets Club",
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Stop following Airi Kurimura" }),
+    ).toBeDefined();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Also follow Natsu Yutori" }),
+    );
+    await waitFor(() => {
+      const last = onUrlUpdate.mock.calls.at(-1)?.[0].searchParams;
+      expect(last?.get("tl.actors")).toBe("airi,natsu");
+      expect(last?.get("tl.watch")).toBeNull();
+    });
+  });
+
+  it("shows empty favorites and disables timeline fetching when watchlist is empty", () => {
+    mockWatchlist = [];
+    render(
+      createElement(TimelineHarness, {
+        searchParams: "?view=timeline&tl.watch=1",
+      }),
+    );
+
+    expect(screen.getByText("No favorites yet")).toBeDefined();
+    expect(screen.queryByText(/Having parfaits/)).toBeNull();
+    expect(lastTimelineFilters).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("resets viewport hold-back when actor or kind filters change", async () => {
+    render(createElement(TimelineHarness, { searchParams: "?view=timeline" }));
+
+    const viewport = document.querySelector(
+      '[role="region"][aria-label="Events"]',
+    );
+    expect(viewport).toBeTruthy();
+    Object.defineProperty(viewport, "scrollTop", {
+      value: 160,
+      writable: true,
+      configurable: true,
+    });
+    fireEvent.scroll(viewport!);
+
+    // Simulate a newer event arriving for a newly selected character after scroll hold-back (seenSeq=5).
+    mockTimelineEvents = [
+      {
+        seq: 12,
+        simTime: DAY_1 + 15 * 60 * 60_000,
+        kind: "task.started",
+        actors: ["natsu"],
+        payload: {
+          taskId: "t12",
+          type: "studying",
+          description: "Fresh event after filter switch",
+          duration: 20,
+          endAt: DAY_1 + 15 * 60 * 60_000 + 20 * 60_000,
+          where: "cafe",
+        },
+      },
+    ];
+
+    const clubs = screen.getByRole("list", { name: "Clubs and groups" });
+    fireEvent.click(
+      within(clubs).getByRole("button", {
+        name: "Show people in After-School Sweets Club",
+      }),
+    );
+    fireEvent.click(
+      within(clubs).getByRole("button", { name: "Natsu Yutori" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Fresh event after filter switch"),
+      ).toBeDefined();
+    });
   });
 });

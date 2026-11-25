@@ -100,3 +100,32 @@ it("keeps previous events visible without re-entering skeleton loading when filt
   await waitFor(() => expect(result.current.isSwitching).toBe(false));
   expect(result.current.events).toEqual([]);
 });
+
+it("skips fetching and returns no events when disabled", async () => {
+  vi.mocked(fetchTimeline).mockClear();
+  mergeJournal([
+    {
+      seq: 20,
+      simTime: 2000,
+      kind: "task.started",
+      actors: ["alice"],
+      payload: {
+        taskId: "t2",
+        type: "work",
+        description: "Hidden",
+        duration: 15,
+        endAt: 2015,
+      },
+    },
+  ]);
+
+  const { result } = renderHook(
+    () => useTimeline({ actors: [], enabled: false }),
+    { wrapper },
+  );
+
+  expect(fetchTimeline).not.toHaveBeenCalled();
+  expect(result.current.events).toEqual([]);
+  expect(result.current.isLoading).toBe(false);
+  expect(result.current.hasMore).toBe(false);
+});

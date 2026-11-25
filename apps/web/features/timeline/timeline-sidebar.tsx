@@ -124,9 +124,10 @@ export function TimelineSidebar({
   }
 
   function togglePersonAdd(id: string) {
-    const next = actorSet.has(id)
-      ? actors.filter((a) => a !== id)
-      : [...actors, id];
+    const base = watchOnly ? watchlist : actors;
+    const next = base.includes(id)
+      ? base.filter((a) => a !== id)
+      : [...base, id];
     void setParams({
       "tl.actors": next.length ? next : null,
       "tl.watch": null,
@@ -666,18 +667,18 @@ function ClubItem({
                     size="sm"
                     tone="ghost"
                     className={
-                      actorSet.has(character.id)
+                      active
                         ? "bg-ui-primary/14 text-ui-primary hover:bg-ui-primary/22"
                         : undefined
                     }
                     label={
-                      actorSet.has(character.id)
+                      active
                         ? `Stop following ${character.name}`
                         : `Also follow ${character.name}`
                     }
                     onClick={() => onTogglePersonAdd(character.id)}
                   >
-                    {actorSet.has(character.id) ? (
+                    {active ? (
                       <MinusIcon aria-hidden />
                     ) : (
                       <PlusIcon aria-hidden />
