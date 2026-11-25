@@ -12,7 +12,7 @@ import {
 import type { CharacterSummary } from "@kazusa/client";
 import { AddPeople } from "@/components/inspector/sections/chat-controls";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
-import { taskIcon } from "@/components/entities/task-icon";
+import { taskIcon } from "@/lib/state/task-icon";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -270,7 +270,7 @@ export function ChatSubtitle({
       ) : (
         <span className="truncate">
           {listNames(others.map((id) => byId.get(id)?.name ?? id)) ||
-            "Just you"}
+            (chat.members.includes(userId) ? "Just you" : "No one here")}
         </span>
       )}
     </p>

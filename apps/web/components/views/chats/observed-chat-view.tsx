@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { EyeIcon } from "lucide-react";
+import { ChatEmptyRoom } from "./chat-alone";
 import { useAccess } from "@/hooks/use-access";
 import { useObservedMessages } from "@/hooks/use-observed-chats";
 import { useParticipantResolver } from "@/hooks/use-participants";
@@ -59,6 +60,11 @@ export function ObservedChatView({
   const readOnly = chat.ended
     ? "Observing a conversation that has ended."
     : "Observing, read-only. Nobody here can tell.";
+  // A group or in-person room everyone has left.
+  const empty =
+    !chat.ended &&
+    (chat.type === "group" || chat.type === "huddle") &&
+    chat.members.length === 0;
 
   // The transcript, as the view or as the scene's backlog.
   const transcript = (
@@ -117,6 +123,7 @@ export function ObservedChatView({
           <SceneView
             chat={chat}
             loading={messages.isLoading}
+            notice={empty ? <ChatEmptyRoom slim /> : undefined}
             footer={
               <p className="flex shrink-0 items-center gap-1.5 px-5 pb-2.5 text-xs text-muted-foreground">
                 <EyeIcon aria-hidden className="size-3.5 shrink-0" />
@@ -130,7 +137,19 @@ export function ObservedChatView({
           />
         ) : (
           <>
-            {transcript}
+            {empty &&
+            !messages.isLoading &&
+            !messages.error &&
+            messages.messages.length === 0 ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <ChatEmptyRoom />
+              </div>
+            ) : (
+              <>
+                {transcript}
+                {empty ? <ChatEmptyRoom /> : null}
+              </>
+            )}
             <footer className="flex shrink-0 items-center justify-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
               <EyeIcon aria-hidden className="size-3.5 shrink-0" />
               <span>{readOnly}</span>

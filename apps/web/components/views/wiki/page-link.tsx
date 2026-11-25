@@ -1,7 +1,7 @@
 "use client";
 
 import { parseAsString, useQueryStates } from "nuqs";
-import { useCallback, useMemo } from "react";
+
 import { isCast, useCharacters } from "@/hooks/use-characters";
 import { useWikiList } from "@/hooks/use-wiki";
 import { wikiParsers } from "./search-params";
@@ -122,28 +122,6 @@ export function usePlainText(): (text: string) => string {
         );
       },
     );
-}
-
-/**
- * A page's name from its id, for an id shown on its own (a character's group):
- * "after_school_sweets_club" reads "After-School Sweets Club". Without the
- * page, the id with its separators as spaces.
- */
-export function usePageName(): (id: string) => string {
-  const { data: list } = useWikiList();
-  const names = useMemo(
-    () => new Map((list?.pages ?? []).map((page) => [page.id, page.name])),
-    [list],
-  );
-  return useCallback(
-    (id: string) => {
-      const name = names.get(id);
-      if (name) return name;
-      const words = id.replace(/[_-]+/g, " ").trim();
-      return words.charAt(0).toUpperCase() + words.slice(1);
-    },
-    [names],
-  );
 }
 
 /** A few people as links, then how many more. */

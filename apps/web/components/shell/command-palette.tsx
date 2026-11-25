@@ -441,8 +441,8 @@ function PlaceActions({ id, go }: { id: string; go: Go }) {
 }
 
 /**
- * A subtitle only when it says something the name doesn't: "Trinity Street"
- * needs no "Trinity District" beside it, "Noa's Room" does need its dorm.
+ * A subtitle only when it says something the name doesn't: "Harbor Street"
+ * needs no "Harbor District" beside it, "Mia's Room" does need its dorm.
  */
 function newWords(name: string, detail: string | undefined) {
   if (!detail) return undefined;

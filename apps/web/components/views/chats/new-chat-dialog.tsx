@@ -154,7 +154,7 @@ function OpenGroupForm({
         <FieldLabel htmlFor="open-group-title">Title</FieldLabel>
         <Input
           id="open-group-title"
-          placeholder="SCHALE Office Line"
+          placeholder="Office line"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           maxLength={160}

@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
-import { TASK_ORDER, taskLabel } from "@/components/entities/task-icon";
+import { TASK_ORDER, taskLabel } from "@/lib/state/task-icon";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -41,7 +41,8 @@ import {
 } from "@/components/ui/empty";
 import { Unavailable } from "@/components/entities/source-state";
 import { PanelToolbar } from "@/components/shell/panel-toolbar";
-import { usePageName, usePlainText } from "@/components/views/wiki/page-link";
+import { usePlainText } from "@/components/views/wiki/page-link";
+import { usePageName } from "@/hooks/use-wiki";
 import { useAccess } from "@/hooks/use-access";
 import { useWikiList } from "@/hooks/use-wiki";
 import { NewPageDialog } from "@/components/views/wiki/new-page-dialog";

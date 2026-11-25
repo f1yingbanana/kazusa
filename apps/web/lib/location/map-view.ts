@@ -56,6 +56,113 @@ export function computeReveal(geometry: MapGeometry): Reveal {
   return marker;
 }
 
+/** Screen pixels a marker needs to itself. */
+const MARKER_ROOM = 34;
+/** Clear space kept either side of a name, so names don't run together. */
+const NAME_ROOM = 14;
+/** An area shows places inside once it's this wide on screen. */
+const AREA_ROOM = 150;
+
+/**
+ * What shows at one zoom, decided by room on screen rather than one zoom per
+ * area: inside any area wide enough, places appear one at a time, the busiest
+ * and biggest first, wherever a marker and its whole name fit. A crowded
+ * district shows its main places early instead of all or nothing. `pinned`
+ * places show whatever the room, with the areas around them.
+ *
+ * The result reads like `computeReveal`'s: 0 for what shows and Infinity for
+ * what doesn't, at any zoom, so `markerFor`, `edgesAt` and `planLabels` take it
+ * as they are.
+ */
+export function revealAt(
+  geometry: MapGeometry,
+  {
+    zoom,
+    weight = () => 0,
+    nameWidth,
+    pinned = [],
+  }: {
+    readonly zoom: number;
+    /** How much a place matters, like how many people are in it. */
+    readonly weight?: (id: string) => number;
+    /** A place's name on screen, in pixels; a place shows only with room for it. */
+    readonly nameWidth?: (id: string) => number;
+    readonly pinned?: readonly string[];
+  },
+): Reveal {
+  const shown = new Set<string>();
+  const occupied = new Occupied();
+  const markerRect = (node: MapNode) => ({
+    x0: node.x * zoom - MARKER_ROOM / 2,
+    y0: node.y * zoom - MARKER_ROOM / 2,
+    x1: node.x * zoom + MARKER_ROOM / 2,
+    y1: node.y * zoom + MARKER_ROOM / 2,
+  });
+  const nameRect = (node: MapNode) => {
+    const width = nameWidth!(node.id) + NAME_ROOM * 2;
+    return {
+      x0: node.x * zoom - width / 2,
+      y0: node.y * zoom + LABEL_GAP,
+      x1: node.x * zoom + width / 2,
+      y1: node.y * zoom + LABEL_GAP + LABEL_HEIGHT + NAME_ROOM / 2,
+    };
+  };
+  const take = (node: MapNode) => {
+    shown.add(node.id);
+    occupied.add(markerRect(node));
+    if (nameWidth && !node.isArea) occupied.add(nameRect(node));
+  };
+
+  const must = new Set<string>();
+  for (const id of pinned) {
+    for (
+      let at: string | undefined = id;
+      at;
+      at = geometry.nodes.get(at)?.parent
+    )
+      must.add(at);
+  }
+  const nodes = geometry.order.map((id) => geometry.nodes.get(id)!);
+  // The top of the map, and whatever was asked for, always show.
+  for (const node of nodes) {
+    if (!node.parent || must.has(node.id)) take(node);
+  }
+  const rest = nodes
+    .filter((node) => !shown.has(node.id))
+    .sort(
+      (a, b) =>
+        a.depth - b.depth ||
+        weight(b.id) - weight(a.id) ||
+        b.radius - a.radius ||
+        a.id.localeCompare(b.id),
+    );
+  for (const node of rest) {
+    const parent = geometry.nodes.get(node.parent!);
+    if (
+      !parent ||
+      !shown.has(parent.id) ||
+      parent.radius * 2 * zoom < AREA_ROOM
+    )
+      continue;
+    const rects = [
+      markerRect(node),
+      ...(nameWidth && !node.isArea ? [nameRect(node)] : []),
+    ];
+    if (!rects.every((rect) => occupied.free(rect))) continue;
+    take(node);
+  }
+
+  const reveal = new Map<string, number>();
+  for (const node of nodes) {
+    reveal.set(node.id, shown.has(node.id) ? 0 : Infinity);
+    if (node.parent && shown.has(node.id)) reveal.set(`open:${node.parent}`, 0);
+  }
+  for (const node of nodes) {
+    if (!reveal.has(`open:${node.id}`)) reveal.set(`open:${node.id}`, Infinity);
+  }
+  return reveal;
+}
+
 /** The zoom at which an area's inside shows. */
 export const opensAt = (reveal: Reveal, id: string) =>
   reveal.get(`open:${id}`) ?? 0;
@@ -152,6 +259,17 @@ export function curveBetween(
 
 export const curvePath = ({ from, control, to }: Curve) =>
   `M${from.x.toFixed(1)} ${from.y.toFixed(1)}Q${control.x.toFixed(1)} ${control.y.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+
+/** A road's curve drawn from `from` to `to`, so it can draw itself outward. */
+export function roadPath(
+  from: Point & { readonly id: string },
+  to: Point & { readonly id: string },
+): string {
+  const curve = curveBetween(from, to);
+  return curve.from === from
+    ? curvePath(curve)
+    : curvePath({ from: curve.to, control: curve.control, to: curve.from });
+}
 
 export function pointOnCurve({ from, control, to }: Curve, t: number): Point {
   const u = 1 - t;
@@ -377,6 +495,8 @@ export function planLabels({
   nameOf,
   peopleAt,
   maxAvatars,
+  nameWidth = (id) => textWidth(nameOf(id), LABEL_MAX_WIDTH),
+  areaNameWidth = (id) => textWidth(nameOf(id), AREA_LABEL_MAX_WIDTH) * 1.15,
 }: {
   readonly geometry: MapGeometry;
   readonly regions: readonly Region[];
@@ -387,6 +507,10 @@ export function planLabels({
   /** How many people are drawn at each place. */
   readonly peopleAt: (id: string) => number;
   readonly maxAvatars: number;
+  /** A place's name on screen, in pixels, when the page can measure it. */
+  readonly nameWidth?: (id: string) => number;
+  /** An area's name on screen, in pixels, when the page can measure it. */
+  readonly areaNameWidth?: (id: string) => number;
 }): LabelPlan {
   const occupied = new Occupied();
   const shown = geometry.order
@@ -438,12 +562,7 @@ export function planLabels({
     const nameRect =
       name === undefined
         ? undefined
-        : below(
-            node,
-            textWidth(name, LABEL_MAX_WIDTH),
-            LABEL_GAP,
-            LABEL_HEIGHT,
-          );
+        : below(node, nameWidth(node.id), LABEL_GAP, LABEL_HEIGHT);
     const under = nameRect ? LABEL_GAP + LABEL_HEIGHT + 2 : LABEL_GAP;
     const faces = below(node, width, under, AVATAR_SIZE);
     if ((!nameRect || occupied.free(nameRect)) && occupied.free(faces)) {
@@ -473,7 +592,7 @@ export function planLabels({
   );
   for (const region of byImportance) {
     if ((reveal.get(region.id) ?? 0) > zoom) continue;
-    const width = textWidth(nameOf(region.id), AREA_LABEL_MAX_WIDTH) * 1.15;
+    const width = areaNameWidth(region.id);
     for (const spot of [region.top, region.bottom]) {
       const rect = {
         x0: spot.x * zoom - width / 2,
@@ -495,12 +614,7 @@ export function planLabels({
     )
     .sort((a, b) => a.depth - b.depth);
   for (const node of quiet) {
-    const rect = below(
-      node,
-      textWidth(nameOf(node.id), LABEL_MAX_WIDTH),
-      LABEL_GAP,
-      LABEL_HEIGHT,
-    );
+    const rect = below(node, nameWidth(node.id), LABEL_GAP, LABEL_HEIGHT);
     if (!occupied.free(rect)) continue;
     occupied.add(rect);
     names.add(node.id);

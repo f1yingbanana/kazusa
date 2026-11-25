@@ -30,7 +30,7 @@ export function usePlacesAvailable() {
 export interface Room {
   readonly placeId: string;
   readonly label: string;
-  /** The outermost area it sits in, as the map labels it ("Trinity"). */
+  /** The outermost area it sits in, as the map labels it ("Harbor"). */
   readonly area: string;
   readonly members: readonly CharacterSummary[];
 }

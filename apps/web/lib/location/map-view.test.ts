@@ -9,6 +9,8 @@ import {
   markerFor,
   planLabels,
   pointOnCurve,
+  revealAt,
+  roadPath,
   routeStops,
   travelerPoint,
 } from "./map-view";
@@ -56,6 +58,47 @@ describe("reveal", () => {
   it("stands a hidden place in for its area", () => {
     expect(markerFor(geometry, reveal, "square", 0.001)).toBe("town");
     expect(markerFor(geometry, reveal, "square", 5)).toBe("square");
+  });
+});
+
+describe("revealAt", () => {
+  const shownAt = (zoom: number, options = {}) => {
+    const at = revealAt(geometry, { zoom, ...options });
+    return new Set([...geometry.nodes.keys()].filter((id) => at.get(id) === 0));
+  };
+
+  it("always shows the top of the map, and an area's inside once it has room", () => {
+    expect(shownAt(0.0001)).toEqual(new Set(["town", "port"]));
+    expect(shownAt(5)).toEqual(new Set(geometry.nodes.keys()));
+  });
+
+  it("opens an area as soon as one place inside it fits", () => {
+    const opened = [0.02, 0.05, 0.1, 0.2, 0.5, 1].map((zoom) => {
+      const at = revealAt(geometry, { zoom });
+      return at.get("open:town") === 0;
+    });
+    expect(opened).toContain(true);
+    expect(opened[0]).toBe(false);
+  });
+
+  it("lets the busiest place in first when only one fits", () => {
+    const first = [0.02, 0.05, 0.1, 0.2, 0.5]
+      .map((zoom) =>
+        shownAt(zoom, { weight: (id: string) => (id === "market" ? 9 : 0) }),
+      )
+      .find((busy) => busy.has("square") || busy.has("market"));
+    expect(first?.has("market")).toBe(true);
+  });
+
+  it("keeps a place out when its whole name has no room", () => {
+    const tight = shownAt(1, { nameWidth: () => 10_000 });
+    expect(tight.has("square") && tight.has("market")).toBe(false);
+  });
+
+  it("shows a pinned place and the areas around it, whatever the room", () => {
+    expect(shownAt(0.0001, { pinned: ["dock"] })).toEqual(
+      new Set(["town", "port", "dock"]),
+    );
   });
 });
 
@@ -141,5 +184,16 @@ describe("travelers", () => {
     expect(mid.y).toBeCloseTo(expected.y);
     expect(travelerPoint(record, 50, geometry)).toBeUndefined();
     expect(travelerPoint(record, 400, geometry)).toBeUndefined();
+  });
+});
+
+describe("roadPath", () => {
+  it("draws the same curve from whichever end it starts", () => {
+    const a = { id: "a", x: 0, y: 0 };
+    const b = { id: "b", x: 100, y: 0 };
+    expect(roadPath(a, b)).toMatch(/^M0\.0 0\.0Q.* 100\.0 0\.0$/);
+    expect(roadPath(b, a)).toMatch(/^M100\.0 0\.0Q.* 0\.0 0\.0$/);
+    const control = (path: string) => path.split("Q")[1].split(" ").slice(0, 2);
+    expect(control(roadPath(a, b))).toEqual(control(roadPath(b, a)));
   });
 });

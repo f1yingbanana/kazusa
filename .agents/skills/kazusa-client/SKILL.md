@@ -535,6 +535,14 @@ created yet (§1.1).
 Pure modules under `lib/` use **relative imports**. The root Vitest config also
 resolves `@/` to `apps/web` for hook and component integration tests.
 
+### 6.1 The rebuild on ui-sdk (in progress)
+
+The UI is being rebuilt on ui-sdk at `/halo`, in `ui/` (a generic component
+library) and `features/` (the app), apart from the old `components/`. Read
+`references/ui-sdk-rebuild.md` before working in any of them: the layering rules
+ESLint enforces, how to style with Tailwind so the old UI can be deleted, and
+how to finish the move.
+
 ## 7. Visual language (summary)
 
 - The look is a neutral, dense, legible "instrument panel". This app is readable
@@ -597,6 +605,9 @@ resolves `@/` to `apps/web` for hook and component integration tests.
 - `references/roadmap.md`: read before building any deferred feature (map,
   social, wiki, needs, beliefs, attention log, Player lens, replay). It lists
   which slot each feature plugs into and what it depends on.
+- `references/ui-sdk-rebuild.md`: read before working in `apps/web/ui/`,
+  `apps/web/features/` or `app/halo/`. The layers and their import rules, the
+  Tailwind rules that keep the old UI deletable, and the steps to finish.
 - `references/visual-novel.md`: design, built except outfits (§6.4) and rigs and
   3D (§9). The Scene view: a huddle drawn as a backdrop, figures and a dialogue
   box (`chats.as=scene`), why we build it ourselves, its Zustand state and

@@ -15,6 +15,8 @@
     "@kazusa/client": "*",
     "@shadcn/react": "^0.3.1",
     "@tanstack/react-virtual": "^3.14.23",
+    "@ui-sdk/core": "^0.1.0-beta.17",
+    "@ui-sdk/react": "^0.1.0-beta.17",
     "@vercel/analytics": "1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

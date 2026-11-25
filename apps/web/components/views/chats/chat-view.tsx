@@ -17,6 +17,7 @@ import type {
   MessageType,
   PendingMessage,
 } from "@/lib/source/chats/types";
+import { ChatAlone } from "./chat-alone";
 import { ChatFailure } from "./chat-failure";
 import { ChatHeader } from "./chat-header";
 import { Composer, ReplyRow } from "./composer";
@@ -216,6 +217,12 @@ export function ChatView({
     />
   );
 
+  // A group or in-person chat with nobody else in it yet.
+  const alone =
+    !chat.draft &&
+    (chat.type === "group" || chat.type === "huddle") &&
+    others.length === 0;
+
   return (
     <section
       aria-label={chat.name}
@@ -256,7 +263,13 @@ export function ChatView({
           <SceneView
             chat={chat}
             loading={messagesState.isLoading}
-            notice={<ChatFailure members={others} slim />}
+            notice={
+              alone ? (
+                <ChatAlone chat={chat} canAdd={canPlay} slim />
+              ) : (
+                <ChatFailure members={others} slim />
+              )
+            }
             footer={<ReplyRow {...reply} />}
             reading={mode.on ? mode.status : undefined}
             onAdvance={mode.on && !backlog ? mode.advance : undefined}
@@ -266,7 +279,11 @@ export function ChatView({
         ) : (
           <>
             {transcript}
-            <ChatFailure members={others} />
+            {alone ? (
+              <ChatAlone chat={chat} canAdd={canPlay} />
+            ) : (
+              <ChatFailure members={others} />
+            )}
             <Composer {...reply} placeholder={`Message ${chat.name}`} />
           </>
         )}

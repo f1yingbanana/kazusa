@@ -25,6 +25,8 @@ export default defineConfig({
       "apps/web/lib/**/*.test.ts",
       "apps/web/hooks/**/*.test.ts",
       "apps/web/components/**/*.test.ts",
+      "apps/web/ui/**/*.test.ts",
+      "apps/web/features/**/*.test.ts",
       "packages/*/src/**/*.test.ts",
       "scripts/**/*.test.mjs",
     ],

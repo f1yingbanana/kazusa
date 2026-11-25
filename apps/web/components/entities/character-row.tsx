@@ -10,7 +10,7 @@ import { formatSimDuration } from "@/lib/time/sim";
 import { cn } from "@/lib/utils";
 import { PresenceAvatar } from "./presence-avatar";
 import { Badge } from "@/components/ui/badge";
-import { taskIcon } from "./task-icon";
+import { taskIcon } from "@/lib/state/task-icon";
 import { usePlainText } from "@/components/views/wiki/page-link";
 
 const KIND_LABEL = {

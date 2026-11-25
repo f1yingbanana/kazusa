@@ -8,6 +8,27 @@ import typescript from "typescript-eslint";
 
 const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx"];
 
+/**
+ * Class names in ui/ and features/ that only work, or only look right, while
+ * app/shadcn.css is loaded: its colours, fonts, named radii, tw-animate and
+ * utilities, and the bare state variants it redefines. Use the ui-* colours,
+ * rounded-full or an exact rounded-[…], and data-[…] variants instead.
+ */
+const SHADCN_CLASS =
+  "(^|\\s|:)(" +
+  [
+    "(bg|text|border|ring|inset-ring|outline|fill|stroke|from|via|to|divide|shadow|decoration|caret|accent|placeholder)-(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|online|chart-\\d|sidebar)(-[a-z]+)*(\\x2F\\d+)?",
+    "font-(sans|mono)",
+    "rounded(-[a-z]{1,2})?(-(xs|sm|md|lg|xl|[234]xl))?",
+    "data-(open|closed|checked|unchecked|selected|disabled|active|horizontal|vertical):",
+    "(animate|fade|zoom|slide|spin)-(in|out)",
+    "(no-scrollbar|scroll-fade|shimmer|wiki-checker)",
+  ].join("|") +
+  ")(?=\\s|$|:)";
+
+const SHADCN_CLASS_MESSAGE =
+  "This class depends on app/shadcn.css, which goes away with the old UI. Use ui-* colours, rounded-full or rounded-[…], and data-[…] variants.";
+
 /** The Next.js client: browser code, Tailwind classes, vitest unit tests. */
 export default defineConfig([
   globalIgnores([
@@ -56,6 +77,86 @@ export default defineConfig([
       tailwindcss: {
         cssConfigPath: `${import.meta.dirname}/app/globals.css`,
       },
+    },
+  },
+
+  // The rebuild keeps three layers apart so the old UI can be deleted in one go:
+  // ui/ is a generic component library on ui-sdk, features/ builds the app from
+  // it, and features/legacy.ts is the only door back into components/. Neither
+  // may use a class that only app/shadcn.css defines.
+  {
+    files: ["ui/**", "features/**"],
+    rules: {
+      // Its fix rewrites leading-[1.4] as leading-1.4, a spacing multiple in v4.
+      "tailwindcss/no-unnecessary-arbitrary-value": "off",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: `Literal[value=/${SHADCN_CLASS}/]`,
+          message: SHADCN_CLASS_MESSAGE,
+        },
+        {
+          selector: `TemplateElement[value.raw=/${SHADCN_CLASS}/]`,
+          message: SHADCN_CLASS_MESSAGE,
+        },
+      ],
+    },
+  },
+  {
+    files: ["ui/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "@kazusa/*", "nuqs", "swr", "zustand", "sonner"],
+              message:
+                "ui/ is a generic component library: it knows nothing about Kazusa or its data.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["features/**"],
+    ignores: ["features/legacy.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/components/*"],
+              message:
+                "Borrow old components through features/legacy.ts, so what is left to port stays in one place.",
+            },
+            {
+              group: ["@ui-sdk/*"],
+              message: "Build from ui/, which wraps ui-sdk in our look.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["components/**", "app/**", "lib/**", "hooks/**"],
+    ignores: ["app/halo/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/ui/*", "@/features/*"],
+              message:
+                "The old UI doesn't use the new one; that keeps components/ deletable.",
+            },
+          ],
+        },
+      ],
     },
   },
 
