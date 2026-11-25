@@ -1,10 +1,11 @@
 import { Suspense } from "react";
-import { HaloShell } from "@/components/halo/halo-shell";
+import { Shell } from "@/features/shell/shell";
 
-export default function HaloPage() {
+/** The new client, built here until it replaces the root page. */
+export default function NewClientPage() {
   return (
     <Suspense>
-      <HaloShell />
+      <Shell />
     </Suspense>
   );
 }

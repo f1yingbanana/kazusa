@@ -18,7 +18,7 @@ import {
   useChatTitle,
 } from "@/components/entities/chips";
 import { PresenceAvatar } from "@/components/entities/presence-avatar";
-import { taskIcon, taskLabel } from "@/components/entities/task-icon";
+import { taskIcon, taskLabel } from "@/lib/state/task-icon";
 import {
   useCharacter,
   useCharacterStatus,

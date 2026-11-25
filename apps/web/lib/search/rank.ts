@@ -13,11 +13,11 @@ export type ResultKind =
  * Within one tier of match: the cast first (the world is about them, and people
  * who have a page but aren't simulated read as characters too), then your own
  * conversations, then groups (the factions a world is organised around: few,
- * and what "trinity" usually means), then places (hundreds, and often named
- * after the group they belong to), then the app's own sections and settings,
- * then lore, and others' conversations last: there are hundreds, and every name
- * is in some. Someone only watching has no conversations of their own, so for
- * them others' take that place (`weights`).
+ * and what a bare faction name usually means), then places (hundreds, and often
+ * named after the group they belong to), then the app's own sections and
+ * settings, then lore, and others' conversations last: there are hundreds, and
+ * every name is in some. Someone only watching has no conversations of their
+ * own, so for them others' take that place (`weights`).
  */
 export const KIND_WEIGHT: Readonly<Record<ResultKind, number>> = {
   character: 9,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import type {
   MemoryRunsResponse,
@@ -37,6 +37,33 @@ function useWikiKey(parts: readonly unknown[], ready = true) {
 export function useWikiList(agent?: string) {
   return useSWR<WikiListResponse>(useWikiKey(["list", agent ?? ""]), () =>
     fetchWikiList(agent),
+  );
+}
+
+/**
+ * A page's name from how something refers to it: its id, name or an alias, as a
+ * character's groups are written ("after_school_sweets_club" reads
+ * "After-School Sweets Club"). Without the page, the words with their
+ * separators as spaces.
+ */
+export function usePageName(): (ref: string) => string {
+  const { data: list } = useWikiList();
+  const names = useMemo(() => {
+    const byRef = new Map<string, string>();
+    for (const page of list?.pages ?? []) {
+      for (const ref of [page.id, page.name, ...page.aliases])
+        byRef.set(ref.toLowerCase(), page.name);
+    }
+    return byRef;
+  }, [list]);
+  return useCallback(
+    (ref: string) => {
+      const name = names.get(ref.toLowerCase());
+      if (name) return name;
+      const words = ref.replace(/[_-]+/g, " ").trim();
+      return words.charAt(0).toUpperCase() + words.slice(1);
+    },
+    [names],
   );
 }
 

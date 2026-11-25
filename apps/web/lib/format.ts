@@ -65,6 +65,11 @@ export function isSameDay(a: number, b: number) {
   return startOfDay(a) === startOfDay(b);
 }
 
+/** "Noa Ushio" → "Noa": how someone is named in passing. */
+export function firstName(name: string) {
+  return name.split(/\s+/)[0];
+}
+
 export function initials(name: string) {
   const parts = name
     .trim()

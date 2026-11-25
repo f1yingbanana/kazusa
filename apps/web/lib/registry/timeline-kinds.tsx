@@ -20,7 +20,7 @@ import {
   ChatChip,
   PlaceChip,
 } from "@/components/entities/chips";
-import { taskLabel } from "@/components/entities/task-icon";
+import { taskLabel } from "@/lib/state/task-icon";
 import {
   formatSimDuration,
   formatSimTime,
