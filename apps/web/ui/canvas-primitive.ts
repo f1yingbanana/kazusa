@@ -110,13 +110,11 @@ function buildApi(
       rect: (el, key) => {
         const point = ctx.options().positionOf?.(key);
         if (!point) {
+          // In canvas units too, so every item compares in one space.
           const box = el.getBoundingClientRect();
-          return {
-            left: box.left,
-            right: box.right,
-            top: box.top,
-            bottom: box.bottom,
-          };
+          const from = viewport.toCanvas(box.left, box.top);
+          const to = viewport.toCanvas(box.right, box.bottom);
+          return { left: from.x, right: to.x, top: from.y, bottom: to.y };
         }
         return { left: point.x, right: point.x, top: point.y, bottom: point.y };
       },

@@ -137,7 +137,10 @@ export function ObservedChatView({
           />
         ) : (
           <>
-            {empty && !messages.isLoading && messages.messages.length === 0 ? (
+            {empty &&
+            !messages.isLoading &&
+            !messages.error &&
+            messages.messages.length === 0 ? (
               <div className="flex min-h-0 flex-1 items-center justify-center">
                 <ChatEmptyRoom />
               </div>

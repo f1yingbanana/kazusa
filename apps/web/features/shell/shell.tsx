@@ -180,6 +180,7 @@ function Frame({
         open={commandOpen}
         onOpenChange={setCommandOpen}
         onPaletteChange={onPaletteChange}
+        onOpenedChat={() => setPane("stage")}
       />
       <WorldUpdateNotice />
       <PlayAsDialog />

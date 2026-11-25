@@ -90,13 +90,13 @@ export function PlanePicker({
       aria-label="Map plane"
       value={plane}
       onValueChange={(value) => value !== null && onPlaneChange(value)}
-      className="ui-raised"
+      className="max-w-full shrink overflow-x-auto ui-raised"
     >
       {planes.map((option) => (
         <SegmentedItem
           key={option}
           value={option}
-          className="flex items-center gap-1.5 capitalize"
+          className="flex shrink-0 items-center gap-1.5 capitalize"
         >
           {option || "Elsewhere"}
           {people.get(option) ? (

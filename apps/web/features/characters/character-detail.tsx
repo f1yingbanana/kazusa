@@ -118,13 +118,14 @@ export function CharacterDetail({
   const [params, setParams] = useQueryStates({
     view: parseAsString,
     sel: entityRefParser,
-    character: parseAsString,
     "chats.id": chatsParsers["chats.id"],
     "chats.dm": chatsParsers["chats.dm"],
     "chats.talk": chatsParsers["chats.talk"],
     "chats.member": chatsParsers["chats.member"],
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
+    "wiki.page": wikiParsers["wiki.page"],
+    "wiki.agent": wikiParsers["wiki.agent"],
     "wiki.part": wikiParsers["wiki.part"],
     "wiki.edit": wikiParsers["wiki.edit"],
     "wiki.raw": wikiParsers["wiki.raw"],
@@ -342,8 +343,9 @@ export function CharacterDetail({
                 icon={<BookOpenIcon aria-hidden />}
                 onSelect={() =>
                   void setParams({
-                    view: "characters",
-                    character: id,
+                    view: "wiki",
+                    "wiki.page": id,
+                    "wiki.agent": null,
                     "wiki.part": null,
                     "wiki.edit": null,
                     "wiki.raw": null,

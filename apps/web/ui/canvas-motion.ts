@@ -47,8 +47,9 @@ export function flight(from: Camera, to: Camera, screenWidth: number): Motion {
     const d1 = Math.sqrt(d2);
     const b0 = (w1 * w1 - w0 * w0 + RHO ** 4 * d2) / (2 * w0 * RHO ** 2 * d1);
     const b1 = (w1 * w1 - w0 * w0 - RHO ** 4 * d2) / (2 * w1 * RHO ** 2 * d1);
-    const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
-    const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+    // log(√(b²+1) − b), as −asinh(b): no cancellation when b is large.
+    const r0 = -Math.asinh(b0);
+    const r1 = -Math.asinh(b1);
     span = (r1 - r0) / RHO;
     path = (t) => {
       const s = t * span;

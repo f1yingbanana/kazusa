@@ -43,6 +43,7 @@ export function ChatList({ onNavigated }: { onNavigated?: () => void }) {
   const [params, setParams] = useQueryStates({
     "chats.id": chatsParsers["chats.id"],
     "chats.member": chatsParsers["chats.member"],
+    "chats.dm": chatsParsers["chats.dm"],
     view: parseAsString,
     sel: entityRefParser,
   });
@@ -166,13 +167,11 @@ export function ChatList({ onNavigated }: { onNavigated?: () => void }) {
       <NewChatDialog
         open={newChatOpen}
         onOpenChange={setNewChatOpen}
-        onDirect={(id) =>
-          void setParams({
-            view: "chats",
-            "chats.id": null,
-            "chats.member": id,
-          })
-        }
+        // The conversation opens their direct chat, or starts one.
+        onDirect={(id) => {
+          void setParams({ view: "chats", "chats.id": null, "chats.dm": id });
+          onNavigated?.();
+        }}
         // A new group is a draft until its first message, so it isn't in the
         // lists yet; the conversation reads it from the draft store.
         onGroup={(chat) => {

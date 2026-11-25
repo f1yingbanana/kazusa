@@ -37,6 +37,21 @@ describe("flight", () => {
   });
 });
 
+describe("flight, far out from nearly the same centre", () => {
+  it("stays finite all the way", () => {
+    const motion = flight(
+      { cx: 0, cy: 0, zoom: 4 },
+      { cx: 1e-4, cy: 0, zoom: 0.001 },
+      1000,
+    );
+    expect(Number.isFinite(motion.duration)).toBe(true);
+    for (const t of [0, motion.duration / 2, motion.duration - 1]) {
+      const at = motion.at(t);
+      expect(Number.isFinite(at.cx) && Number.isFinite(at.zoom)).toBe(true);
+    }
+  });
+});
+
 describe("glide", () => {
   it("settles on the target without overshooting", () => {
     const to = { cx: 100, cy: -50, zoom: 2 };

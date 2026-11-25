@@ -34,10 +34,13 @@ export function CommandPalette({
   open,
   onOpenChange,
   onPaletteChange,
+  onOpenedChat,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPaletteChange: (palette: Palette) => void;
+  /** A chat opened: on a phone, show the thread rather than the list. */
+  onOpenedChat?: () => void;
 }) {
   const sections = useSections();
   const { byId } = useCharacters();
@@ -70,6 +73,7 @@ export function CommandPalette({
     const patch = openChatPatch(chat, selfOf(chat));
     if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
     void setParams(patch);
+    onOpenedChat?.();
   };
 
   return (

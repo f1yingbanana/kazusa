@@ -1,8 +1,15 @@
 "use client";
 
-import type { CharacterSummary, PlacesResponse } from "@kazusa/client";
+import type { CharacterSummary, Place, PlacesResponse } from "@kazusa/client";
 import { useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { useAccess } from "@/hooks/use-access";
@@ -126,10 +133,10 @@ const stepOf = (zoom: number) =>
   ZOOM_STEP ** Math.round(Math.log(zoom) / Math.log(ZOOM_STEP));
 
 function withPositions(
-  world: PlaceIndex,
+  places: readonly Place[],
   positions: Readonly<Record<string, Point>>,
 ) {
-  return world.places.map((place) => {
+  return places.map((place) => {
     const at = positions[place.id];
     return at ? { ...place, map: { ...place.map, ...at } } : place;
   });
@@ -376,7 +383,11 @@ export function WorldMap({
         last &&
         last.zoom === step &&
         Math.abs(last.cx - cx) < width / 3 &&
-        Math.abs(last.cy - cy) < height / 3
+        Math.abs(last.cy - cy) < height / 3 &&
+        seen.left >= last.minX &&
+        seen.right <= last.maxX &&
+        seen.top >= last.minY &&
+        seen.bottom <= last.maxY
       ) {
         return;
       }
@@ -623,7 +634,13 @@ export function WorldMap({
    * along, and neighbours lean out of its way. Dropping keeps where they ended up.
    */
   const latest = useRef({ geometry, coordinates: draft ?? stored });
-  latest.current = { geometry, coordinates: draft ?? stored };
+  // After commit, so a drag starts from the markers on screen.
+  useLayoutEffect(() => {
+    latest.current = { geometry, coordinates: draft ?? stored };
+  });
+  // The drag under way, so a second finger can't start another and Cancel can
+  // end it.
+  const drag = useRef<{ readonly stop: () => void } | null>(null);
   const settle = useCallback(
     (id: string, current: Record<string, Point>) =>
       computeMapGeometry(places, current, id).coordinates,
@@ -631,9 +648,10 @@ export function WorldMap({
   );
   const onDragStart = useCallback(
     (id: string, event: React.PointerEvent<Element>) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || drag.current) return;
       event.stopPropagation();
       const target = event.currentTarget;
+      const pointerId = event.pointerId;
       const start = latest.current.geometry;
       const origin = start.coordinates;
       const pointer = { x: event.clientX, y: event.clientY };
@@ -641,6 +659,7 @@ export function WorldMap({
       target.setPointerCapture(event.pointerId);
       setDragging(id);
       const move = (moved: PointerEvent) => {
+        if (moved.pointerId !== pointerId) return;
         setDraft(
           shiftPlace(
             start,
@@ -651,16 +670,22 @@ export function WorldMap({
           ),
         );
       };
-      const end = () => {
+      const stop = () => {
         target.removeEventListener("pointermove", move as EventListener);
-        target.removeEventListener("pointerup", end);
-        target.removeEventListener("pointercancel", end);
+        target.removeEventListener("pointerup", end as EventListener);
+        target.removeEventListener("pointercancel", end as EventListener);
+        drag.current = null;
         setDragging(null);
+      };
+      const end = (ended: PointerEvent) => {
+        if (ended.pointerId !== pointerId) return;
+        stop();
         setDraft((current) => (current ? settle(id, current) : current));
       };
+      drag.current = { stop };
       target.addEventListener("pointermove", move as EventListener);
-      target.addEventListener("pointerup", end);
-      target.addEventListener("pointercancel", end);
+      target.addEventListener("pointerup", end as EventListener);
+      target.addEventListener("pointercancel", end as EventListener);
     },
     [camera, settle],
   );
@@ -707,16 +732,21 @@ export function WorldMap({
       setDraft(null);
       return;
     }
+    const sent = draft;
     try {
       await savePlacePositions(positions);
       // Show it now; the wiki watcher's `places` event confirms it shortly.
       await mutate<PlacesResponse>(
         [PLACES_KEY],
         (current) =>
-          current && { ...current, places: withPositions(world, positions) },
+          current && {
+            ...current,
+            places: withPositions(current.places, positions),
+          },
         { revalidate: false },
       );
-      setDraft(null);
+      // Edits made while it saved stay a draft.
+      setDraft((current) => (current === sent ? null : current));
       toast.success("Layout saved");
     } catch (error) {
       toast.error("Couldn't save the layout", {
@@ -768,15 +798,20 @@ export function WorldMap({
         const a = geometry.nodes.get(stops[i - 1]);
         const b = geometry.nodes.get(stops[i]);
         if (!a || !b) continue;
+        const road = edges.find(
+          (edge) =>
+            (edge.from === a.id && edge.to === b.id) ||
+            (edge.from === b.id && edge.to === a.id),
+        );
         roads.push({
           key: `route:${a.id}:${b.id}`,
           path: roadPath(a, b),
-          ride: true,
+          ride: road ? road.by !== "walk" : true,
         });
       }
     }
     return roads;
-  }, [roadsFrom, selectedPlace, pickedRecord, now, geometry]);
+  }, [roadsFrom, selectedPlace, pickedRecord, now, geometry, edges]);
   const hoverRoads = useMemo(
     () =>
       hovered && hovered !== selectedPlace && !arranging
@@ -1015,13 +1050,13 @@ export function WorldMap({
   const personPeek = (() => {
     if (!hoveredPerson || arranging || dragging) return undefined;
     const record = locations.get(hoveredPerson);
-    const trip =
-      record?.trip && now < record.trip.arriveAt ? record.trip : undefined;
-    const where = trip
-      ? `On the way to ${nameOf(trip.to)} · ${formatSimDuration(trip.arriveAt - now)}`
-      : record
-        ? `At ${nameOf(record.placeId)}`
-        : "";
+    const position = record ? positionAt(record, now) : undefined;
+    const where =
+      position?.kind === "traveling"
+        ? `On the way to ${nameOf(position.trip.to)} · ${formatSimDuration(position.trip.arriveAt - now)}`
+        : position
+          ? `At ${nameOf(position.placeId)}`
+          : "";
     const face = stacks.faces.find(({ person }) => person.id === hoveredPerson);
     if (face) {
       return {
@@ -1088,7 +1123,10 @@ export function WorldMap({
               <ArrangeBar
                 replacedAll={replacedAll}
                 onAutoArrange={autoArrange}
-                onCancel={() => setDraft(null)}
+                onCancel={() => {
+                  drag.current?.stop();
+                  setDraft(null);
+                }}
                 onSave={saveLayout}
               />
             ) : (
@@ -1281,7 +1319,8 @@ const FACE_REACH = 14 + 8;
 /**
  * Where a peek sits against a point (shifted by `dx`, `dy` screen pixels, as a
  * face is from its place's dot): `gap` to the right, or to the left when that
- * would run off the screen; level with it, slid up or down to stay on screen.
+ * would run off the screen, or over the point when neither fits; level with it,
+ * slid up or down to stay on screen.
  */
 function peekAnchor(
   at: Point,
@@ -1294,10 +1333,14 @@ function peekAnchor(
   const height = ((view.maxY - view.minY) / 2) * view.zoom;
   const left = (at.x - view.cx) * view.zoom + width / 2 + dx;
   const top = (at.y - view.cy) * view.zoom + height / 2;
+  // Right if it fits, else left; on a map too narrow for either, as far over
+  // as it fits.
   const x =
-    left + gap + PEEK_WIDTH + PEEK_MARGIN > width
-      ? `calc(${dx - gap}px - 100%)`
-      : `${dx + gap}px`;
+    left + gap + PEEK_WIDTH + PEEK_MARGIN <= width
+      ? `${dx + gap}px`
+      : left - gap - PEEK_WIDTH - PEEK_MARGIN >= 0
+        ? `calc(${dx - gap}px - 100%)`
+        : `${Math.max(PEEK_MARGIN, Math.min(left - PEEK_WIDTH / 2, width - PEEK_MARGIN - PEEK_WIDTH)) - (left - dx)}px`;
   const y = `clamp(${PEEK_MARGIN - top}px, calc(${dy}px - 50%), calc(${height - PEEK_MARGIN - top}px - 100%))`;
   return `${x}, ${y}`;
 }

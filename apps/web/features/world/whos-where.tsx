@@ -20,7 +20,7 @@ import { useWorldNow } from "../legacy";
 
 /** Everyone onstage, grouped by the room they're in. */
 export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
-  const { rooms, travelers, unplaced, cast } = useWorldNow();
+  const { rooms, travelers, unplaced, cast, isLoading, error } = useWorldNow();
   const [selection, select] = useSelection();
   const [query, setQuery] = useState("");
   const match = (c: CharacterSummary) => matchesQuery(c, query);
@@ -67,9 +67,13 @@ export function WhosWhere({ onNavigated }: { onNavigated?: () => void }) {
       <ListPaneScroll>
         {groups.length === 0 ? (
           <Note inset="list">
-            {query.trim()
-              ? `Nobody onstage matches “${query}”.`
-              : "Nobody is onstage yet."}
+            {error
+              ? "Couldn't load who's here."
+              : isLoading
+                ? "Loading who's here…"
+                : query.trim()
+                  ? `Nobody onstage matches “${query}”.`
+                  : "Nobody is onstage yet."}
           </Note>
         ) : (
           groups.map((g) => (

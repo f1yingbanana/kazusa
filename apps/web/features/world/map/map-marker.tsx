@@ -342,11 +342,17 @@ export const AreaLabel = memo(function AreaLabel({
   onSelect: (id: string) => void;
 }) {
   return (
-    <CanvasSpot x={x} y={y} leaving={leaving} className="pointer-events-auto">
+    <CanvasSpot
+      x={x}
+      y={y}
+      leaving={leaving}
+      className={leaving ? undefined : "pointer-events-auto"}
+    >
       <button
         type="button"
         tabIndex={-1}
         aria-hidden={leaving || undefined}
+        disabled={leaving}
         onClick={() => onSelect(id)}
         className={cx(
           "block rounded-[0.375rem] px-1.5 whitespace-nowrap uppercase outline-none hover:text-ui-primary",

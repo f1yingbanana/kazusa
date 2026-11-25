@@ -80,6 +80,8 @@ export function Avatar({
       </span>
       {src ? (
         <img
+          // A new picture gets a new element: one that failed stays hidden.
+          key={src}
           src={src}
           alt=""
           decoding="async"

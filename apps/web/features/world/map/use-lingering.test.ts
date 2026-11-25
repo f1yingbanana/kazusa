@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useLingering } from "./use-lingering";
 
@@ -41,5 +41,20 @@ describe("useLingering", () => {
     view.rerender({ items: ["a"] });
     view.rerender({ items: ["a", "b"] });
     expect(shape(view.result.current)).toEqual(["a", "b"]);
+  });
+
+  it("drops it on its own once its time is up", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+    try {
+      const view = run(["a", "b"]);
+      view.rerender({ items: ["a"] });
+      expect(shape(view.result.current)).toEqual(["a", "b…"]);
+      void act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(shape(view.result.current)).toEqual(["a"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

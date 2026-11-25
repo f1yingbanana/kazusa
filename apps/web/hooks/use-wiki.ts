@@ -50,10 +50,13 @@ export function usePageName(): (ref: string) => string {
   const { data: list } = useWikiList();
   const names = useMemo(() => {
     const byRef = new Map<string, string>();
-    for (const page of list?.pages ?? []) {
-      for (const ref of [page.id, page.name, ...page.aliases])
+    const pages = list?.pages ?? [];
+    for (const page of pages) {
+      for (const ref of [page.name, ...page.aliases])
         byRef.set(ref.toLowerCase(), page.name);
     }
+    // Ids last, so an id always means its own page, as the server reads it.
+    for (const page of pages) byRef.set(page.id.toLowerCase(), page.name);
     return byRef;
   }, [list]);
   return useCallback(

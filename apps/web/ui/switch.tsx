@@ -21,9 +21,9 @@ export function SwitchRow({
   return (
     <div className="flex items-center justify-between gap-4 rounded-[1rem] bg-ui-tint px-3.5 py-3">
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-bold" id={`${id}-label`}>
+        <label className="text-sm font-bold" id={`${id}-label`} htmlFor={id}>
           {label}
-        </span>
+        </label>
         {hint ? (
           <span
             className="text-xs leading-[1.4] text-ui-soft"
@@ -35,6 +35,7 @@ export function SwitchRow({
       </span>
       <Root
         className="relative h-6.5 w-11 shrink-0 rounded-full bg-[color-mix(in_oklch,var(--ui-soft)_40%,transparent)] transition-colors duration-180 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary motion-reduce:transition-none data-checked:bg-ui-primary data-disabled:opacity-60"
+        id={id}
         aria-labelledby={`${id}-label`}
         aria-describedby={hint ? `${id}-hint` : undefined}
         checked={checked}
