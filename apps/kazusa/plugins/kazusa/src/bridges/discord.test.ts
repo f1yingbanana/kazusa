@@ -7,6 +7,8 @@ interface Fake {
   executeFailures: number;
   webhooks: { id: string; token: string; application_id: string }[];
   made: number;
+  /** Ends the fake connection with a close code. */
+  close: (code: number) => void;
 }
 
 /** How the fake gateway behaves, and what the fake API did. */
@@ -16,6 +18,7 @@ const fake = vi.hoisted((): Fake => ({
   executeFailures: 0,
   webhooks: [],
   made: 0,
+  close: () => {},
 }));
 
 vi.mock("@discordjs/ws", async (importOriginal) => {
@@ -23,6 +26,11 @@ vi.mock("@discordjs/ws", async (importOriginal) => {
   const { EventEmitter } = await import("node:events");
   const { WebSocketShardEvents } = actual;
   class FakeManager extends EventEmitter {
+    constructor() {
+      super();
+      fake.close = (code: number) =>
+        this.emit(WebSocketShardEvents.Closed, code, 0);
+    }
     async connect(): Promise<void> {
       if (fake.connect === "ready") {
         queueMicrotask(() => this.emit(WebSocketShardEvents.Ready, {}, 0));
@@ -51,9 +59,15 @@ vi.mock("@discordjs/core", async (importOriginal) => {
         getCurrent: async () => ({ username: "office", global_name: null }),
       },
       applications: { getCurrent: async () => ({ id: "app" }) },
+      guilds: { get: async () => ({ name: "MomoChat" }) },
       applicationCommands: { createGlobalCommand: async () => ({}) },
       channels: {
-        getWebhooks: async () => fake.webhooks,
+        get: async () => ({ type: 0, name: "office", guild_id: "g" }),
+        // Slow enough that a second lookup can overlap the first.
+        getWebhooks: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return fake.webhooks;
+        },
         createWebhook: async () => {
           fake.made += 1;
           const hook = {
@@ -88,7 +102,7 @@ vi.mock("@discordjs/core", async (importOriginal) => {
 const { discordTransport, LINK_CODE, readable, webhookName } =
   await import("./discord.ts");
 
-const handlers = { line: () => {}, link: async () => "" };
+const handlers = { line: () => {}, link: async () => "", lost: () => {} };
 
 beforeEach(() => {
   fake.connect = "ready";
@@ -125,6 +139,35 @@ describe("discordTransport", () => {
   });
 });
 
+describe("discordTransport, later", () => {
+  it("says so when Discord ends a working connection for good", async () => {
+    const lost = vi.fn();
+    await discordTransport("token").start({ ...handlers, lost });
+    fake.close(4014);
+    expect(lost).toHaveBeenCalledWith(
+      expect.stringContaining("Message Content intent"),
+    );
+    // An ordinary close (Discord asking to reconnect) isn't the end.
+    fake.close(4000);
+    expect(lost).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes one webhook when a check and a post look at once", async () => {
+    const discord = discordTransport("token");
+    await discord.start(handlers);
+    await Promise.all([
+      discord.post("111", { name: "Hina", text: "Hello" }),
+      discord.check("111"),
+    ]);
+    expect(fake.made).toBe(1);
+    expect(await discord.check("111")).toEqual({
+      name: "office",
+      server: "MomoChat",
+    });
+    expect(fake.made).toBe(1);
+  });
+});
+
 describe("webhookName", () => {
   it("is a name Discord takes", () => {
     expect(webhookName("Hina")).toBe("Hina");
@@ -153,6 +196,15 @@ describe("readable", () => {
         ] as Parameters<typeof readable>[0]["mentions"],
       }),
     ).toBe("hi @Ann and @Bee");
+    // A name that looks like a replacement pattern is kept as written.
+    expect(
+      readable({
+        content: "hi <@1>",
+        mentions: [{ id: "1", username: "a", global_name: "$&" }] as Parameters<
+          typeof readable
+        >[0]["mentions"],
+      }),
+    ).toBe("hi @$&");
   });
 });
 

@@ -88,8 +88,9 @@ export function readable(
   for (const user of data.mentions) {
     const name =
       user.member?.nick ?? user.global_name ?? user.username ?? "someone";
-    text = text.replaceAll(`<@${user.id}>`, `@${name}`);
-    text = text.replaceAll(`<@!${user.id}>`, `@${name}`);
+    // A function, so a name like `$&` is put in as written, not as a pattern.
+    text = text.replaceAll(`<@${user.id}>`, () => `@${name}`);
+    text = text.replaceAll(`<@!${user.id}>`, () => `@${name}`);
   }
   return text;
 }
@@ -112,6 +113,17 @@ export function discordTransport(
   let applicationId: string | undefined;
 
   /** The bot's own webhook in a channel, made the first time it's needed. */
+  /** Webhooks found or made, as opposed to still being looked up. */
+  const found = new WeakSet<Promise<{ id: string; token: string }>>();
+  /**
+   * Forgets a channel's webhook so the next use looks it up again (deleted in
+   * Discord), unless it is still being looked up or made: two lookups at once
+   * would each make one.
+   */
+  const forgetWebhook = (channelId: string) => {
+    const hook = webhooks.get(channelId);
+    if (hook && found.has(hook)) webhooks.delete(channelId);
+  };
   const webhookFor = (channelId: string) => {
     let hook = webhooks.get(channelId);
     if (!hook) {
@@ -130,9 +142,16 @@ export function discordTransport(
         if (!made.token) throw new Error("Discord gave the webhook no token.");
         return { id: made.id, token: made.token };
       })();
-      // A failure is tried again with the next line, not kept.
-      hook.catch(() => webhooks.delete(channelId));
-      webhooks.set(channelId, hook);
+      const pending = hook;
+      // A failure is tried again with the next line, not kept, unless a newer
+      // lookup has taken its place.
+      pending.then(
+        () => found.add(pending),
+        () => {
+          if (webhooks.get(channelId) === pending) webhooks.delete(channelId);
+        },
+      );
+      webhooks.set(channelId, pending);
     }
     return hook;
   };
@@ -213,10 +232,14 @@ export function discordTransport(
         warn(`Bridge: Discord connection: ${String(error)}`);
       });
       let refusal: string | undefined;
+      let started = false;
       const closed = new Promise<never>((_, reject) => {
         gateway.on(WebSocketShardEvents.Closed, (code) => {
           refusal = REFUSALS[code];
-          if (refusal) reject(new Error(refusal));
+          if (!refusal) return;
+          // After start-up the connection was working: it ends now.
+          if (started) handlers.lost(refusal);
+          else reject(new Error(refusal));
         });
       });
       const ready = new Promise<void>((resolve) =>
@@ -229,6 +252,7 @@ export function discordTransport(
       connecting.catch(() => {});
       try {
         await Promise.race([connecting, closed]);
+        started = true;
       } catch (error) {
         // A refused connection also fails `connect()`, with Discord's words.
         throw refusal ? new Error(refusal) : error;
@@ -239,6 +263,9 @@ export function discordTransport(
       const execute = async () => {
         const hook = await webhookFor(channelId);
         await client.api.webhooks.execute(hook.id, hook.token, {
+          // Answered once Discord has kept the message, so a line it didn't
+          // keep fails here rather than passing for posted.
+          wait: true,
           content: line.text,
           username: webhookName(line.name),
           ...(line.avatarUrl ? { avatar_url: line.avatarUrl } : {}),
@@ -252,7 +279,7 @@ export function discordTransport(
         // The webhook was deleted or reset in Discord: make it again, once.
         const status = statusOf(error);
         if (status !== 404 && status !== 401) throw error;
-        webhooks.delete(channelId);
+        forgetWebhook(channelId);
         await execute();
       }
     },
@@ -321,7 +348,7 @@ export function discordTransport(
           problem: "Only a server's text channel can be linked.",
         };
       // Looked up afresh: a webhook deleted in Discord is made again.
-      webhooks.delete(channelId);
+      forgetWebhook(channelId);
       try {
         await webhookFor(channelId);
       } catch (error) {

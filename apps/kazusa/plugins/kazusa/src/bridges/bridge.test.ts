@@ -53,13 +53,29 @@ function fakeTransport(
     write: (line: IncomingLine) => handlers?.line(line),
     link: (code: string, account: PlatformAccount) =>
       handlers?.link(code, account) ?? Promise.resolve(""),
+    lose: (reason: string) => handlers?.lost(reason),
   };
 }
 
 function setup() {
   const postAsGuest = vi.fn<BridgeDeps["postAsGuest"]>(async () => "id");
+  // As Messaging does: the line said is a message event, then its id.
+  const sayer: { bridge?: Bridge } = {};
   const postAsCharacter = vi.fn<BridgeDeps["postAsCharacter"]>(
-    async () => "id",
+    async (input) => {
+      const id = `said-${input.requestId}`;
+      sayer.bridge?.outgoing({
+        type: "message",
+        delivery: delivery({
+          id,
+          chatId: input.chatId,
+          sender: input.actor.id,
+          senderName: input.actor.name,
+          params: { text: input.text },
+        }),
+      });
+      return id;
+    },
   );
   const linkAccount = vi.fn<BridgeDeps["linkAccount"]>(async () => {});
   const people = new Map<string, LinkedPerson>();
@@ -76,6 +92,7 @@ function setup() {
     warn,
   };
   const bridge = new Bridge(deps);
+  sayer.bridge = bridge;
   bridge.setLinks(
     new Map([["group:office", { platform: "discord", channelId: "111" }]]),
   );
@@ -398,6 +415,19 @@ describe("Bridge", () => {
     expect(first.transport.stop).toHaveBeenCalled();
     expect(second.transport.stop).not.toHaveBeenCalled();
     expect(h.bridge.status).toEqual({ state: "connected", name: "Kazusa Bot" });
+
+    // A new connection starts only once the old one has stopped.
+    let stopped!: () => void;
+    vi.mocked(second.transport.stop).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (stopped = resolve)),
+    );
+    const third = fakeTransport();
+    const connecting = h.bridge.connect(third.transport);
+    await vi.waitFor(() => expect(second.transport.stop).toHaveBeenCalled());
+    expect(third.transport.start).not.toHaveBeenCalled();
+    stopped();
+    await connecting;
+    expect(third.transport.start).toHaveBeenCalled();
   });
 
   it("uses the oldest live registration's dependencies", async () => {
@@ -418,11 +448,15 @@ describe("Bridge", () => {
     discord.write(line("1"));
     await vi.waitFor(() => expect(h.postAsGuest).toHaveBeenCalledTimes(1));
     expect(later).not.toHaveBeenCalled();
-    // A later registration let go changes nothing; the last one is never let go.
-    detachLater();
+    // The first let go: the next oldest takes over.
+    h.bridge.release(h.deps);
     discord.write(line("2"));
-    await vi.waitFor(() => expect(h.postAsGuest).toHaveBeenCalledTimes(2));
-    expect(later).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(later).toHaveBeenCalledTimes(1));
+    // The last one is never let go.
+    detachLater();
+    discord.write(line("3"));
+    await vi.waitFor(() => expect(later).toHaveBeenCalledTimes(2));
+    expect(h.postAsGuest).toHaveBeenCalledTimes(1);
   });
 
   it("links an account with a fresh code, once, and nothing else", async () => {
@@ -557,6 +591,118 @@ describe("Bridge", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("leaves their own message up when the character's copy wasn't posted", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    h.people.set("42", {
+      person: "user:sensei",
+      actor: { id: "sensei", name: "Sensei" },
+    });
+    vi.mocked(discord.transport.post).mockRejectedValueOnce(new Error("500"));
+    discord.write({
+      channelId: "111",
+      messageId: "900",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "I'm here.",
+    });
+    await vi.waitFor(() => expect(discord.transport.post).toHaveBeenCalled());
+    await h.bridge.settled();
+    expect(discord.transport.remove).not.toHaveBeenCalled();
+  });
+
+  it("drops what a relink or unlink overtook, and forgets the old channel", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    await h.bridge.connect(discord.transport);
+    // A note about channel 111 doesn't carry over to 222.
+    h.people.set("42", {
+      person: "user:sensei",
+      actor: { id: "sensei", name: "Sensei" },
+    });
+    vi.mocked(discord.transport.remove).mockRejectedValueOnce(
+      new MissingPermission(),
+    );
+    discord.write({
+      channelId: "111",
+      messageId: "1",
+      author: { id: "42", name: "Flying_Banana" },
+      text: "Hi",
+    });
+    await vi.waitFor(() =>
+      expect(h.bridge.checkOf("group:office")?.problem).toBe(
+        NO_MANAGE_MESSAGES,
+      ),
+    );
+    h.bridge.setLinks(
+      new Map([["group:office", { platform: "discord", channelId: "222" }]]),
+    );
+    expect(h.bridge.checkOf("group:office")).toBeUndefined();
+
+    // A post waiting its turn when the chat is unlinked is never sent.
+    let release!: () => void;
+    vi.mocked(discord.transport.post).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    h.bridge.outgoing({ type: "message", delivery: delivery({ id: "a" }) });
+    h.bridge.outgoing({ type: "message", delivery: delivery({ id: "b" }) });
+    await vi.waitFor(() => expect(discord.transport.post).toHaveBeenCalled());
+    h.bridge.setLinks(new Map());
+    release();
+    await h.bridge.settled();
+    expect(discord.transport.post).toHaveBeenCalledTimes(2);
+
+    // A line whose channel was unlinked while its writer was looked up.
+    let found!: (person: LinkedPerson | undefined) => void;
+    h.bridge.setLinks(
+      new Map([["group:office", { platform: "discord", channelId: "111" }]]),
+    );
+    const personOf = vi.spyOn(h.deps, "personOf");
+    personOf.mockImplementationOnce(
+      () => new Promise((resolve) => (found = resolve)),
+    );
+    const line = discord.write({
+      channelId: "111",
+      messageId: "9",
+      author: { id: "77", name: "Fan" },
+      text: "Late",
+    });
+    void line;
+    await vi.waitFor(() => expect(personOf).toHaveBeenCalled());
+    h.bridge.setLinks(new Map());
+    found(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(h.postAsGuest).not.toHaveBeenCalled();
+  });
+
+  it("shows no typing before it connects, and says when Discord ends the connection", async () => {
+    const h = setup();
+    const discord = fakeTransport();
+    h.bridge.outgoing({
+      type: "typing",
+      audience: [],
+      typing: {
+        type: "typing",
+        chatId: "group:office",
+        senderId: "hina",
+        senderName: "Hina",
+        isTyping: true,
+        mode: "typing",
+      },
+    });
+    await h.bridge.connect(discord.transport);
+    expect(discord.transport.typing).not.toHaveBeenCalled();
+
+    discord.lose("Discord refused the Message Content intent.");
+    await vi.waitFor(() =>
+      expect(h.bridge.status).toEqual({
+        state: "failed",
+        error: "Discord refused the Message Content intent.",
+      }),
+    );
+    expect(discord.transport.stop).toHaveBeenCalled();
   });
 
   it("keeps a failed post from stopping the ones after it", async () => {

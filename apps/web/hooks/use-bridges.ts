@@ -20,8 +20,14 @@ export function useBridges() {
     {
       revalidateOnFocus: false,
       // Connecting settles on its own; look again until it has.
+      // Connecting settles on its own; connected, a permission fixed in
+      // Discord shows on the server's next check (it asks every 15 s at most).
       refreshInterval: (data) =>
-        data?.discord.status.state === "connecting" ? 2_000 : 0,
+        data?.discord.status.state === "connecting"
+          ? 2_000
+          : data?.discord.status.state === "connected"
+            ? 15_000
+            : 0,
     },
   );
   const { mutate } = resource;

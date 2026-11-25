@@ -53,11 +53,11 @@ function sharedBridge(
 ): Bridge {
   const scope = globalThis as { [CELL]?: BridgeCell };
   const cell = (scope[CELL] ??= {});
-  if (cell.bridge) {
-    const detach = cell.bridge.attach(deps);
-    api.lifecycle?.onDispose?.(detach);
-  } else cell.bridge = new Bridge(deps);
+  if (cell.bridge) cell.bridge.attach(deps);
+  else cell.bridge = new Bridge(deps);
   const bridge = cell.bridge;
+  // The first registration too: the next oldest takes over when it goes.
+  api.lifecycle?.onDispose?.(() => bridge.release(deps));
   cell.unsubscribe ??= messaging.onAnyEvent((event) => bridge.outgoing(event));
   return bridge;
 }
@@ -170,7 +170,7 @@ export function registerBridges(
                 );
               });
         }
-        return await messaging.send(
+        const { messageId } = await messaging.send(
           actor.id,
           actor.name,
           { sessionKey, text, requestId },
@@ -178,6 +178,7 @@ export function registerBridges(
           roster(),
           true,
         );
+        return messageId;
       },
       linkAccount: async (person, account) => {
         // One account is one person's: whoever had it before loses it.
@@ -239,6 +240,8 @@ export function registerBridges(
   api.on("gateway_start", (_event, ctx) => {
     void (async () => {
       await loadLinks();
+      // Stopped while the links loaded: this start connects nothing.
+      if (ctx.abortSignal?.aborted) return;
       await connect();
     })().catch((error: unknown) => warn(`Bridge: ${String(error)}`));
     ctx.abortSignal?.addEventListener("abort", () => {
@@ -282,18 +285,22 @@ export function registerBridges(
       throw new Error("Only a group or a direct chat can be linked.");
     if (channelId && !(await messaging.hasChat(chatId)))
       throw new Error("That chat isn't in this world.");
-    if (channelId) {
-      const taken = [...bridge.allLinks()].find(
-        ([other, link]) => other !== chatId && link.channelId === channelId,
-      );
-      if (taken)
-        throw new Error("That channel is already linked to another chat.");
-      // A channel the bot can't use is refused, with why, before it is kept.
-      const { problem } = await bridge.checkChannel(channelId);
-      if (problem) throw new Error(problem);
-      await store.register(chatId, { platform: "discord", channelId });
-    } else await store.delete(chatId);
-    await loadLinks();
+    // One link change at a time, so two can't claim one channel while Discord
+    // is asked about it.
+    await bridge.linking(async () => {
+      if (channelId) {
+        const taken = [...bridge.allLinks()].find(
+          ([other, link]) => other !== chatId && link.channelId === channelId,
+        );
+        if (taken)
+          throw new Error("That channel is already linked to another chat.");
+        // A channel the bot can't use is refused, with why, before it is kept.
+        const { problem } = await bridge.checkChannel(channelId);
+        if (problem) throw new Error(problem);
+        await store.register(chatId, { platform: "discord", channelId });
+      } else await store.delete(chatId);
+      await loadLinks();
+    });
     await bridge.checkLinks();
     sendJson(res, 200, respond());
   });

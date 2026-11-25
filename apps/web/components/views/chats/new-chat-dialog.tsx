@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronRightIcon,
   DoorOpenIcon,
@@ -113,6 +113,15 @@ function OpenGroupForm({
   const [saving, setSaving] = useState(false);
   const named = title.trim();
 
+  // Whether this form is still the one on screen (StrictMode mounts twice).
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!named) return;
@@ -121,7 +130,8 @@ function OpenGroupForm({
       const chatId = await createOpenGroup(named);
       await reload();
       toast.success(`Made ${named}`);
-      onCreated(chatId);
+      // Closed meanwhile (another dialog may be open now): made, not opened.
+      if (alive.current) onCreated(chatId);
     } catch (error) {
       toast.error("Couldn't make the group", {
         description: error instanceof Error ? error.message : String(error),

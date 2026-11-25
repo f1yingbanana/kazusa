@@ -74,7 +74,38 @@ function setup() {
         return {};
       },
     ),
-    send: vi.fn(async () => ({})),
+    // As Messaging does: the line is a message event, then its id.
+    send: vi.fn(
+      async (
+        sender: string,
+        senderName: string,
+        input: { sessionKey: string; text: string; requestId: string },
+      ) => {
+        const kind = input.sessionKey.startsWith("chat:direct:")
+          ? "direct"
+          : "group";
+        const chatId =
+          kind === "direct"
+            ? "direct:dm"
+            : `group:${input.sessionKey.split(":").at(-1)}`;
+        const messageId = `said-${input.requestId}`;
+        listener?.({
+          type: "message",
+          delivery: {
+            id: messageId,
+            sequence: 1,
+            sender,
+            senderName,
+            chatId,
+            audience: [sender],
+            timestamp: 0,
+            copies: [],
+            params: { ...input, title: null },
+          },
+        });
+        return { messageId };
+      },
+    ),
     onAnyEvent: (next: (event: MessagingEvent) => void) => {
       listener = next;
       return () => (listener = undefined);
@@ -426,5 +457,36 @@ describe("registerBridges", () => {
     );
     expect(h.messaging.send).not.toHaveBeenCalled();
     expect(h.removed).toEqual([]);
+  });
+
+  it("lets only one of two link requests claim a channel", async () => {
+    const h = setup();
+    h.tokens.set("discord", "good");
+    for (const start of h.starts) start({}, {});
+    await vi.waitFor(async () =>
+      expect((await h.call("/kazusa/bridges/account")).body).toMatchObject({
+        bot: "Office Bot",
+      }),
+    );
+    const [first, second] = await Promise.all([
+      h.call("/kazusa/bridges/link", { chatId: "group:a", channelId: "777" }),
+      h.call("/kazusa/bridges/link", { chatId: "group:b", channelId: "777" }),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 400]);
+    expect(
+      [...h.links.values()].filter((link) => link.channelId === "777"),
+    ).toHaveLength(1);
+  });
+
+  it("connects nothing for a start that was stopped while links loaded", async () => {
+    const h = setup();
+    h.tokens.set("discord", "good");
+    const stopped = new AbortController();
+    stopped.abort();
+    for (const start of h.starts) start({}, { abortSignal: stopped.signal });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect((await h.call("/kazusa/bridges")).body).toMatchObject({
+      discord: { status: { state: "off" } },
+    });
   });
 });

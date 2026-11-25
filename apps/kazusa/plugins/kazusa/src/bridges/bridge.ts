@@ -48,6 +48,11 @@ export interface TransportHandlers {
   /** Every line people write in a server channel the bot can read. */
   line(line: IncomingLine): void;
   /**
+   * Discord ended a working connection for good (the token reset, the intent
+   * switched off); `reason` says so in plain words.
+   */
+  lost(reason: string): void;
+  /**
    * Someone sent a link code (Discord's `/link`, or the code alone in a direct
    * message); what comes back is the reply for them alone.
    */
@@ -57,7 +62,10 @@ export interface TransportHandlers {
 /** One platform's connection: what the bridge needs of Discord, or a fake. */
 export interface BridgeTransport {
   start(handlers: TransportHandlers): Promise<{ readonly name: string }>;
-  /** Shows a line in a channel as its speaker. */
+  /**
+   * Shows a line in a channel as its speaker, resolving once the platform has
+   * kept it; throws when it didn't.
+   */
   post(channelId: string, line: OutgoingLine): Promise<void>;
   /**
    * Takes a message down, once it has been said again as a character; one
@@ -142,7 +150,7 @@ export interface BridgeDeps {
     readonly actor: { readonly id: string; readonly name: string };
     readonly text: string;
     readonly requestId: string;
-  }) => Promise<unknown>;
+  }) => Promise<string>;
   /** Keeps an account as this person's: no one else's any more. */
   readonly linkAccount: (
     person: string,
@@ -260,6 +268,11 @@ export class Bridge {
       readonly timer: ReturnType<typeof setInterval>;
     }
   >();
+  /**
+   * Each line handed to the platform until it is posted, by message id: whether
+   * the platform kept it.
+   */
+  private readonly postings = new Map<string, Promise<boolean>>();
   /** Lines already handed to the platform, so no instance posts one twice. */
   private readonly posted = new Set<string>();
   /** Each channel's posts in order. */
@@ -291,10 +304,16 @@ export class Bridge {
    */
   attach(deps: BridgeDeps): () => void {
     this.attached.push(deps);
-    return () => {
-      const at = this.attached.indexOf(deps);
-      if (at >= 0 && this.attached.length > 1) this.attached.splice(at, 1);
-    };
+    return () => this.release(deps);
+  }
+
+  /**
+   * A disposed registration's dependencies: the next oldest are used from now.
+   * The last ones stay until another registration comes.
+   */
+  release(deps: BridgeDeps): void {
+    const at = this.attached.indexOf(deps);
+    if (at >= 0 && this.attached.length > 1) this.attached.splice(at, 1);
   }
 
   get status(): BridgeStatus {
@@ -303,9 +322,11 @@ export class Bridge {
 
   /** The links as stored, keyed by chat id. */
   setLinks(links: ReadonlyMap<string, BridgeLink>): void {
+    const before = this.links;
     this.links = new Map(links);
+    // What was found of a channel the chat no longer uses goes with it.
     for (const chatId of [...this.checks.keys(), ...this.notes.keys()])
-      if (!links.has(chatId)) {
+      if (links.get(chatId)?.channelId !== before.get(chatId)?.channelId) {
         this.checks.delete(chatId);
         this.notes.delete(chatId);
       }
@@ -363,6 +384,12 @@ export class Bridge {
         const check: ChannelCheck = exists
           ? found
           : { ...found, problem: MISSING_CHAT };
+        // Relinked, unlinked or disconnected meanwhile: this answer is old.
+        if (
+          this.transport !== transport ||
+          this.links.get(chatId)?.channelId !== link.channelId
+        )
+          return;
         this.checks.set(chatId, { ...check, at: now });
         if (check.problem && check.problem !== last?.problem)
           this.deps.warn(
@@ -378,6 +405,22 @@ export class Bridge {
 
   allLinks(): ReadonlyMap<string, BridgeLink> {
     return this.links;
+  }
+
+  /** Link changes, one after another. */
+  private linkChanges: Promise<void> = Promise.resolve();
+
+  /**
+   * Runs a change to the links after every one before it, so a check and the
+   * write it allows can't interleave with another.
+   */
+  linking<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.linkChanges.then(work);
+    this.linkChanges = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
   }
 
   /** Runs after every connect and disconnect handed over before it. */
@@ -403,6 +446,15 @@ export class Bridge {
             });
           },
           link: (code, account) => this.redeem(code, account),
+          lost: (reason) => {
+            void this.serially(async () => {
+              // Only this connection's end: a newer one is left alone.
+              if (this.transport !== transport) return;
+              await this.stopNow();
+              this.current = { state: "failed", error: reason };
+              this.deps.warn(`Bridge: ${reason}`);
+            });
+          },
         });
         this.current = { state: "connected", name };
       } catch (error) {
@@ -438,9 +490,16 @@ export class Bridge {
     )?.[0];
     const text = line.text.trim();
     if (!chatId || !text) return;
+    const transport = this.transport;
+    // Unlinked, relinked or disconnected while looking things up: dropped,
+    // never carried into the chat the channel used to be.
+    const routed = () =>
+      this.transport === transport &&
+      this.links.get(chatId)?.channelId === line.channelId;
     // A chat from another game: its link already says so.
     if (!(await this.deps.chatExists(chatId))) return;
     const linked = await this.deps.personOf(line.author.id);
+    if (!routed()) return;
     if (linked) {
       await this.asCharacter(chatId, line, linked, text);
       return;
@@ -476,8 +535,9 @@ export class Bridge {
       await this.transport?.markUndelivered(line, WATCHING);
       return;
     }
+    let messageId: string;
     try {
-      await this.deps.postAsCharacter({
+      messageId = await this.deps.postAsCharacter({
         chatId,
         actor: linked.actor,
         text,
@@ -488,6 +548,9 @@ export class Bridge {
       await this.transport?.markUndelivered(line, error.message);
       return;
     }
+    // Theirs comes down only once the character's copy is up in its place:
+    // a failed post leaves their own words showing.
+    if (!(await this.postings.get(messageId))) return;
     try {
       await this.transport?.remove(line.channelId, line.messageId);
       this.notes.delete(chatId);
@@ -557,16 +620,30 @@ export class Bridge {
         break;
       }
     const previous = this.queues.get(link.channelId) ?? Promise.resolve();
-    const next = previous
-      .then(async () => {
+    const posting = previous.then(async (): Promise<boolean> => {
+      // Unlinked, relinked or disconnected while waiting its turn: dropped,
+      // never sent to the channel the chat used to have.
+      if (
+        this.transport !== transport ||
+        this.links.get(delivery.chatId)?.channelId !== link.channelId
+      )
+        return false;
+      try {
         const line = lineOf(delivery, this.deps);
-        if (line) await transport.post(link.channelId, line);
-      })
-      .catch((error: unknown) => {
+        if (!line) return false;
+        await transport.post(link.channelId, line);
+        return true;
+      } catch (error) {
         this.deps.warn(
           `Bridge: couldn't post to Discord channel ${link.channelId}: ${String(error)}`,
         );
-      });
+        return false;
+      }
+    });
+    this.postings.set(delivery.id, posting);
+    const next = posting.then(() => {
+      this.postings.delete(delivery.id);
+    });
     this.queues.set(link.channelId, next);
   }
 
@@ -584,6 +661,8 @@ export class Bridge {
       if (current?.who.size === 0) this.stopTyping(typing.chatId);
       return;
     }
+    // Nothing to show it with until connected (a stop above still counts).
+    if (this.current.state !== "connected") return;
     const link = this.links.get(typing.chatId);
     if (!link || isGuest(typing.senderId) || typing.mode !== "typing") return;
     const current = this.typists.get(typing.chatId);
