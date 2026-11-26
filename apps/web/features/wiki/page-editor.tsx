@@ -126,8 +126,16 @@ export function PageEditor({
       raw={raw}
       onSave={save}
       onReload={reload}
-      onSwitch={() => (dirty ? setLeaving("switch") : onRaw(!raw))}
-      onClose={() => (dirty ? setLeaving("close") : onDone())}
+      onSwitch={() => {
+        if (saving) return;
+        if (dirty) setLeaving("switch");
+        else onRaw(!raw);
+      }}
+      onClose={() => {
+        if (saving) return;
+        if (dirty) setLeaving("close");
+        else onDone();
+      }}
     />
   );
 
@@ -209,12 +217,23 @@ function EditorBar({
       <Segmented<"form" | "raw">
         aria-label="Edit with"
         value={raw ? "raw" : "form"}
-        onValueChange={(next) => next && (next === "raw") !== raw && onSwitch()}
+        disabled={saving}
+        onValueChange={(next) =>
+          !saving && next && (next === "raw") !== raw && onSwitch()
+        }
       >
-        <SegmentedItem value="form" className="h-7 px-3 text-[0.8125rem]">
+        <SegmentedItem
+          value="form"
+          disabled={saving}
+          className="h-7 px-3 text-[0.8125rem]"
+        >
           Form
         </SegmentedItem>
-        <SegmentedItem value="raw" className="h-7 px-3 text-[0.8125rem]">
+        <SegmentedItem
+          value="raw"
+          disabled={saving}
+          className="h-7 px-3 text-[0.8125rem]"
+        >
           Markdown
         </SegmentedItem>
       </Segmented>
@@ -314,9 +333,25 @@ function FormEditor({
     moveOther ||
     !opened.exists ||
     JSON.stringify(current) !== JSON.stringify(initial);
-  const set = (patch: Partial<Draft>) => setDraft({ ...current, ...patch });
-  const setField = (patch: Partial<WikiPageFormFields>) =>
-    set({ fields: { ...fields, ...patch } });
+  const set = (patch: Partial<Draft> | ((cur: Draft) => Partial<Draft>)) =>
+    setDraft((cur) => {
+      const base = cur ?? initial;
+      return {
+        ...base,
+        ...(typeof patch === "function" ? patch(base) : patch),
+      };
+    });
+  const setField = (
+    patch:
+      | Partial<WikiPageFormFields>
+      | ((cur: WikiPageFormFields) => Partial<WikiPageFormFields>),
+  ) =>
+    set((cur) => ({
+      fields: {
+        ...cur.fields,
+        ...(typeof patch === "function" ? patch(cur.fields) : patch),
+      },
+    }));
   const upgraded = list?.upgraded !== false;
   const person = pageKind === "person";
   const isPlace = pageKind === "concept" && !personal && fields.place === true;
@@ -466,7 +501,7 @@ function FormEditor({
       className={cx("flex min-w-0 flex-col", compact ? "gap-5" : "gap-6")}
       onSubmit={(event) => {
         event.preventDefault();
-        if (dirty) void save();
+        if (dirty && !saving) void save();
       }}
       onKeyDown={(event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === "s") {
@@ -475,318 +510,334 @@ function FormEditor({
         }
       }}
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <TextInput
-            aria-label="Name"
-            value={fields.name ?? ""}
-            style={TITLE_TRANSITION}
-            placeholder={name}
-            onChange={(event) => setField({ name: event.target.value })}
-            className={cx(
-              "h-auto w-full px-3.5 py-2 leading-tight font-extrabold",
-              compact ? "text-xl" : "text-[1.75rem]",
-            )}
-          />
-          <p
-            title="Page id (linked to filename; can't change)"
-            className="px-1 font-[ui-monospace,monospace] text-xs text-ui-soft"
-          >
-            {id}
-          </p>
-        </div>
-        <TextInput
-          aria-label="Also called"
-          value={current.aliases}
-          placeholder="Also called…"
-          className="h-9 w-full"
-          onChange={(event) => set({ aliases: event.target.value })}
-        />
-        {pageKind === "concept" && !personal ? (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {(
-              [
-                [
-                  "place",
-                  <MapPinIcon key="p" aria-hidden />,
-                  "A place",
-                  "On the map: somewhere to be",
-                ],
-                [
-                  "group",
-                  <UsersRoundIcon key="g" aria-hidden />,
-                  "A group",
-                  "Something people are in",
-                ],
-              ] as const
-            ).map(([key, icon, label, title]) => (
-              <ToggleChip
-                key={key}
-                title={title}
-                pressed={fields[key] === true}
-                onPressedChange={(pressed) => setField({ [key]: pressed })}
-              >
-                {icon}
-                {label}
-              </ToggleChip>
-            ))}
-            {opened.fields.place && !fields.place ? (
-              <p className="basis-full pt-1 text-xs font-semibold text-ui-danger">
-                Saving takes it off the map: places in it move to its area, and
-                anyone there goes too.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {personal ? (
-          <div className="flex flex-col gap-1.5 pt-1">
-            <label htmlFor={`${formId}-relation`} className="text-sm font-bold">
-              {`Who ${subject} is to ${owner ?? "them"}`}
-            </label>
+      <fieldset
+        disabled={saving}
+        className={cx(
+          "m-0 flex min-w-0 flex-col border-0 p-0",
+          compact ? "gap-5" : "gap-6",
+        )}
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <TextInput
-              id={`${formId}-relation`}
-              value={fields.relation ?? ""}
-              placeholder="little sister, rival, mentor"
-              className="h-9"
-              onChange={(event) =>
-                setField({ relation: event.target.value || undefined })
-              }
+              aria-label="Name"
+              value={fields.name ?? ""}
+              style={TITLE_TRANSITION}
+              placeholder={name}
+              onChange={(event) => setField({ name: event.target.value })}
+              className={cx(
+                "h-auto w-full px-3.5 py-2 leading-tight font-extrabold",
+                compact ? "text-xl" : "text-[1.75rem]",
+              )}
             />
+            <p
+              title="Page id (linked to filename; can't change)"
+              className="px-1 font-[ui-monospace,monospace] text-xs text-ui-soft"
+            >
+              {id}
+            </p>
           </div>
-        ) : null}
-      </div>
-
-      {isPlace ? (
-        <WhereItIs id={id} fields={fields} onChange={setField} />
-      ) : null}
-
-      {person && !personal ? (
-        <EditorSection title="Home">
-          <OnePicker
-            label="Home"
-            placeholder="No home"
-            options={places}
-            value={fields.home}
-            onChange={(home) => setField({ home })}
+          <TextInput
+            aria-label="Also called"
+            value={current.aliases}
+            placeholder="Also called…"
+            className="h-9 w-full"
+            onChange={(event) => set({ aliases: event.target.value })}
           />
-        </EditorSection>
-      ) : null}
+          {pageKind === "concept" && !personal ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {(
+                [
+                  [
+                    "place",
+                    <MapPinIcon key="p" aria-hidden />,
+                    "A place",
+                    "On the map: somewhere to be",
+                  ],
+                  [
+                    "group",
+                    <UsersRoundIcon key="g" aria-hidden />,
+                    "A group",
+                    "Something people are in",
+                  ],
+                ] as const
+              ).map(([key, icon, label, title]) => (
+                <ToggleChip
+                  key={key}
+                  title={title}
+                  pressed={fields[key] === true}
+                  onPressedChange={(pressed) => setField({ [key]: pressed })}
+                >
+                  {icon}
+                  {label}
+                </ToggleChip>
+              ))}
+              {opened.fields.place && !fields.place ? (
+                <p className="basis-full pt-1 text-xs font-semibold text-ui-danger">
+                  Saving takes it off the map: places in it move to its area,
+                  and anyone there goes too.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {personal ? (
+            <div className="flex flex-col gap-1.5 pt-1">
+              <label
+                htmlFor={`${formId}-relation`}
+                className="text-sm font-bold"
+              >
+                {`Who ${subject} is to ${owner ?? "them"}`}
+              </label>
+              <TextInput
+                id={`${formId}-relation`}
+                value={fields.relation ?? ""}
+                placeholder="little sister, rival, mentor"
+                className="h-9"
+                onChange={(event) =>
+                  setField({ relation: event.target.value || undefined })
+                }
+              />
+            </div>
+          ) : null}
+        </div>
 
-      {!personal && upgraded ? (
-        <EditorSection title={person ? "Who knows them" : "Who knows it"}>
-          {person ? (
+        {isPlace ? (
+          <WhereItIs id={id} fields={fields} onChange={setField} />
+        ) : null}
+
+        {person && !personal ? (
+          <EditorSection title="Home">
+            <OnePicker
+              label="Home"
+              placeholder="No home"
+              options={places}
+              value={fields.home}
+              onChange={(home) => setField({ home })}
+            />
+          </EditorSection>
+        ) : null}
+
+        {!personal && upgraded ? (
+          <EditorSection title={person ? "Who knows them" : "Who knows it"}>
+            {person ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-ui-soft">{`${subject} is in`}</span>
+                <LevelRows
+                  rows={fields.in ?? []}
+                  keyOf={(row) => row.ref}
+                  nameOf={(row) => nameOf(row.ref)}
+                  mediaOf={() => groupMedia}
+                  levels={MEMBER_LEVELS}
+                  levelLabel={(row) =>
+                    `How involved ${subject} is in ${nameOf(row.ref)}`
+                  }
+                  onChange={(rows) => setField({ in: rows })}
+                  add={{
+                    label: "Add a group they're in",
+                    placeholder: "Add a group they're in",
+                    options: groupOptions.filter(
+                      (g) => !(fields.in ?? []).some((r) => r.ref === g.value),
+                    ),
+                    onAdd: (ref) =>
+                      setField({
+                        in: [...(fields.in ?? []), { ref, level: "knows" }],
+                      }),
+                    onCreate: async (groupName) => {
+                      const ref = await newGroup(groupName);
+                      setField((cur) => ({
+                        in: [...(cur.in ?? []), { ref, level: "knows" }],
+                      }));
+                    },
+                  }}
+                />
+              </div>
+            ) : null}
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-ui-soft">{`${subject} is in`}</span>
+              {person ? (
+                <span className="text-xs font-bold text-ui-soft">
+                  Also known by
+                </span>
+              ) : null}
               <LevelRows
-                rows={fields.in ?? []}
+                rows={fields.groups}
                 keyOf={(row) => row.ref}
                 nameOf={(row) => nameOf(row.ref)}
-                mediaOf={() => groupMedia}
-                levels={MEMBER_LEVELS}
+                mediaOf={(row) => audienceMedia(row.ref)}
+                levels={KNOWING_LEVELS}
                 levelLabel={(row) =>
-                  `How involved ${subject} is in ${nameOf(row.ref)}`
+                  `How well ${nameOf(row.ref)} knows ${subject}`
                 }
-                onChange={(rows) => setField({ in: rows })}
+                onChange={(rows) => setField({ groups: everyoneFirst(rows) })}
                 add={{
-                  label: "Add a group they're in",
-                  placeholder: "Add a group they're in",
-                  options: groupOptions.filter(
-                    (g) => !(fields.in ?? []).some((r) => r.ref === g.value),
+                  label: "Add who knows it",
+                  placeholder: fields.groups.length
+                    ? "Add group or someone"
+                    : "Everyone, a group, or someone",
+                  options: [
+                    {
+                      value: EVERYONE,
+                      label: "Everyone",
+                      media: audienceMedia(EVERYONE),
+                    },
+                    ...groupOptions,
+                    ...people.map((p) => ({ ...p, hint: "Person" })),
+                  ].filter(
+                    (option) =>
+                      !fields.groups.some(
+                        (r) =>
+                          r.ref.toLowerCase() === option.value.toLowerCase(),
+                      ),
                   ),
                   onAdd: (ref) =>
                     setField({
-                      in: [...(fields.in ?? []), { ref, level: "knows" }],
+                      groups: everyoneFirst([
+                        ...fields.groups,
+                        { ref, level: ref === EVERYONE ? "heard of" : "knows" },
+                      ]),
                     }),
                   onCreate: async (groupName) => {
                     const ref = await newGroup(groupName);
-                    setField({
-                      in: [...(fields.in ?? []), { ref, level: "knows" }],
-                    });
+                    setField((cur) => ({
+                      groups: everyoneFirst([
+                        ...cur.groups,
+                        { ref, level: "knows" },
+                      ]),
+                    }));
                   },
                 }}
               />
             </div>
-          ) : null}
-          <div className="flex flex-col gap-1.5">
-            {person ? (
-              <span className="text-xs font-bold text-ui-soft">
-                Also known by
-              </span>
-            ) : null}
-            <LevelRows
-              rows={fields.groups}
-              keyOf={(row) => row.ref}
-              nameOf={(row) => nameOf(row.ref)}
-              mediaOf={(row) => audienceMedia(row.ref)}
-              levels={KNOWING_LEVELS}
-              levelLabel={(row) =>
-                `How well ${nameOf(row.ref)} knows ${subject}`
-              }
-              onChange={(rows) => setField({ groups: everyoneFirst(rows) })}
-              add={{
-                label: "Add who knows it",
-                placeholder: fields.groups.length
-                  ? "Add group or someone"
-                  : "Everyone, a group, or someone",
-                options: [
-                  {
-                    value: EVERYONE,
-                    label: "Everyone",
-                    media: audienceMedia(EVERYONE),
-                  },
-                  ...groupOptions,
-                  ...people.map((p) => ({ ...p, hint: "Person" })),
-                ].filter(
-                  (option) =>
-                    !fields.groups.some(
-                      (r) => r.ref.toLowerCase() === option.value.toLowerCase(),
+            {isGroup ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-ui-soft">{`In ${subject}`}</span>
+                <LevelRows
+                  rows={current.members}
+                  keyOf={(row) => row.id}
+                  nameOf={(row) => row.name}
+                  mediaOf={(row) => audienceMedia(row.id)}
+                  levels={MEMBER_LEVELS}
+                  levelLabel={(row) => `How involved ${row.name} is`}
+                  onChange={(members) => set({ members })}
+                  add={{
+                    label: "Add a member",
+                    placeholder: "Add someone",
+                    options: people.filter(
+                      (p) => !current.members.some((m) => m.id === p.value),
                     ),
-                ),
-                onAdd: (ref) =>
-                  setField({
-                    groups: everyoneFirst([
-                      ...fields.groups,
-                      { ref, level: ref === EVERYONE ? "heard of" : "knows" },
-                    ]),
-                  }),
-                onCreate: async (groupName) => {
-                  const ref = await newGroup(groupName);
-                  setField({
-                    groups: everyoneFirst([
-                      ...fields.groups,
-                      { ref, level: "knows" },
-                    ]),
-                  });
-                },
-              }}
-            />
-          </div>
-          {isGroup ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-ui-soft">{`In ${subject}`}</span>
-              <LevelRows
-                rows={current.members}
-                keyOf={(row) => row.id}
-                nameOf={(row) => row.name}
-                mediaOf={(row) => audienceMedia(row.id)}
-                levels={MEMBER_LEVELS}
-                levelLabel={(row) => `How involved ${row.name} is`}
-                onChange={(members) => set({ members })}
-                add={{
-                  label: "Add a member",
-                  placeholder: "Add someone",
-                  options: people.filter(
-                    (p) => !current.members.some((m) => m.id === p.value),
-                  ),
-                  onAdd: (who) =>
-                    set({
-                      members: [
-                        ...current.members,
-                        { id: who, name: nameOf(who), level: "knows" as const },
-                      ].sort((a, b) => a.name.localeCompare(b.name)),
-                    }),
-                }}
-              />
-            </div>
-          ) : null}
-        </EditorSection>
-      ) : !personal ? (
-        <Callout title="Who knows it is set in Markdown">
-          This world is in an older format.
-        </Callout>
-      ) : null}
+                    onAdd: (who) =>
+                      set({
+                        members: [
+                          ...current.members,
+                          {
+                            id: who,
+                            name: nameOf(who),
+                            level: "knows" as const,
+                          },
+                        ].sort((a, b) => a.name.localeCompare(b.name)),
+                      }),
+                  }}
+                />
+              </div>
+            ) : null}
+          </EditorSection>
+        ) : !personal ? (
+          <Callout title="Who knows it is set in Markdown">
+            This world is in an older format.
+          </Callout>
+        ) : null}
 
-      <EditorSection
-        title={
-          personal
-            ? `What ${owner ?? "they"} make${owner ? "s" : ""} of it`
-            : "The page"
-        }
-      >
-        <div className="flex flex-col gap-5">
-          <LayerField
-            layer={personal ? "self" : "summary"}
-            name={personal ? "In a line" : undefined}
-            htmlFor={`${formId}-summary`}
-            readers={personal ? undefined : readers("summary")}
-          >
-            <TextInput
-              id={`${formId}-summary`}
-              value={fields.summary ?? ""}
-              placeholder={
-                current.lead.trim()
-                  ? `From the opening: ${firstSentence(current.lead)}`
-                  : "One line"
-              }
-              onChange={(event) => setField({ summary: event.target.value })}
-            />
-          </LayerField>
-          <LayerField
-            layer={personal ? "self" : "opening"}
-            name={personal ? "Their impression" : undefined}
-            htmlFor={`${formId}-lead`}
-            readers={personal ? undefined : readers("opening")}
-          >
-            {text(
-              "lead",
-              "Opening",
-              personal
-                ? "What they think of it, plainly."
-                : `Who or what ${subject} is, plainly.`,
-              4,
-            )}
-          </LayerField>
-          <LayerField
-            layer={personal ? "self" : "close"}
-            name={personal ? "The rest" : undefined}
-            htmlFor={`${formId}-close`}
-            readers={personal ? undefined : readers("close")}
-            hint="## starts a topic."
-          >
-            {text(
-              "close",
-              personal ? "The rest" : LAYER_NAME.close,
-              "## Habits\n\nWhat only those close would know.",
-              5,
-            )}
-          </LayerField>
-          {ownVoice ? (
+        <EditorSection
+          title={
+            personal
+              ? `What ${owner ?? "they"} make${owner ? "s" : ""} of it`
+              : "The page"
+          }
+        >
+          <div className="flex flex-col gap-5">
             <LayerField
-              layer="self"
-              htmlFor={`${formId}-only`}
-              readers={`Only ${subject}`}
+              layer={personal ? "self" : "summary"}
+              name={personal ? "In a line" : undefined}
+              htmlFor={`${formId}-summary`}
+              readers={personal ? undefined : readers("summary")}
+            >
+              <TextInput
+                id={`${formId}-summary`}
+                value={fields.summary ?? ""}
+                placeholder={
+                  current.lead.trim()
+                    ? `From the opening: ${firstSentence(current.lead)}`
+                    : "One line"
+                }
+                onChange={(event) => setField({ summary: event.target.value })}
+              />
+            </LayerField>
+            <LayerField
+              layer={personal ? "self" : "opening"}
+              name={personal ? "Their impression" : undefined}
+              htmlFor={`${formId}-lead`}
+              readers={personal ? undefined : readers("opening")}
             >
               {text(
-                "only",
-                "Inner voice",
-                "How they think and speak, what they want, what they hide.",
+                "lead",
+                "Opening",
+                personal
+                  ? "What they think of it, plainly."
+                  : `Who or what ${subject} is, plainly.`,
+                4,
+              )}
+            </LayerField>
+            <LayerField
+              layer={personal ? "self" : "close"}
+              name={personal ? "The rest" : undefined}
+              htmlFor={`${formId}-close`}
+              readers={personal ? undefined : readers("close")}
+              hint="## starts a topic."
+            >
+              {text(
+                "close",
+                personal ? "The rest" : LAYER_NAME.close,
+                "## Habits\n\nWhat only those close would know.",
                 5,
               )}
             </LayerField>
-          ) : null}
-        </div>
-      </EditorSection>
-
-      {opened.other.length ? (
-        <EditorSection title="Unread fields">
-          <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-1 text-[0.8125rem]">
-            {opened.other.map(({ key, value }) => (
-              <div key={key} className="contents">
-                <dt className="font-[ui-monospace,monospace] text-ui-soft">
-                  {key}
-                </dt>
-                <dd className="min-w-0 truncate">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <CheckRow
-            checked={moveOther}
-            onCheckedChange={(checked) => setMoveOther(checked === true)}
-            label="Move into the text on save"
-            className="-mx-2.5"
-          />
+            {ownVoice ? (
+              <LayerField
+                layer="self"
+                htmlFor={`${formId}-only`}
+                readers={`Only ${subject}`}
+              >
+                {text(
+                  "only",
+                  "Inner voice",
+                  "How they think and speak, what they want, what they hide.",
+                  5,
+                )}
+              </LayerField>
+            ) : null}
+          </div>
         </EditorSection>
-      ) : null}
+
+        {opened.other.length ? (
+          <EditorSection title="Unread fields">
+            <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-1 text-[0.8125rem]">
+              {opened.other.map(({ key, value }) => (
+                <div key={key} className="contents">
+                  <dt className="font-[ui-monospace,monospace] text-ui-soft">
+                    {key}
+                  </dt>
+                  <dd className="min-w-0 truncate">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <CheckRow
+              checked={moveOther}
+              onCheckedChange={(checked) => setMoveOther(checked === true)}
+              label="Move into the text on save"
+              className="-mx-2.5"
+            />
+          </EditorSection>
+        ) : null}
+      </fieldset>
 
       {bar({
         dirty,

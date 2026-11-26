@@ -6,7 +6,7 @@ import type {
   WikiPage,
   WikiReachResponse,
 } from "@kazusa/client";
-import { useMemo } from "react";
+import { useMemo, type MouseEvent } from "react";
 import { BookUserIcon, HistoryIcon, MapIcon } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { isCast, useCharacters } from "@/hooks/use-characters";
@@ -71,7 +71,7 @@ export function PageFacts({
   const places = usePlaces();
   const { data: placesData } = usePlacesResource();
   const { byId } = useCharacters();
-  const [, setParams] = useQueryStates({
+  const [params, setParams] = useQueryStates({
     ...wikiParsers,
     "tl.actors": timelineParsers["tl.actors"],
     "tl.watch": timelineParsers["tl.watch"],
@@ -81,6 +81,22 @@ export function PageFacts({
     sel: entityRefParser,
     view: parseAsString,
   });
+  const jumpTo = (event: MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    if (!params["wiki.part"] || params["wiki.part"] === "page") return;
+    event.preventDefault();
+    void setParams({ "wiki.part": null }, { history: "replace" });
+    let tries = 0;
+    const scrollWhenMounted = () => {
+      const target = document.getElementById(sectionId);
+      if (target) {
+        window.history.replaceState(null, "", `#${sectionId}`);
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (++tries < 20) requestAnimationFrame(scrollWhenMounted);
+    };
+    requestAnimationFrame(scrollWhenMounted);
+  };
   const id = page?.id ?? fallback?.id ?? "";
   const name = page?.name ?? fallback?.name ?? "";
   const kind = page?.kind ?? fallback?.kind;
@@ -204,14 +220,22 @@ export function PageFacts({
       ) : null}
       {inside.length ? (
         <InfoboxRow term="Places inside">
-          <a href="#places-inside" className={ANCHOR_LINK}>
+          <a
+            href="#places-inside"
+            onClick={(event) => jumpTo(event, "places-inside")}
+            className={ANCHOR_LINK}
+          >
             {countWord(inside.length, "place", "places")}
           </a>
         </InfoboxRow>
       ) : null}
       {routes.length ? (
         <InfoboxRow term="Ways to">
-          <a href="#ways-to" className={ANCHOR_LINK}>
+          <a
+            href="#ways-to"
+            onClick={(event) => jumpTo(event, "ways-to")}
+            className={ANCHOR_LINK}
+          >
             {countWord(routes.length, "route", "routes")}
           </a>
         </InfoboxRow>
@@ -234,7 +258,11 @@ export function PageFacts({
       ) : null}
       {members.length ? (
         <InfoboxRow term="Members">
-          <a href="#members" className={ANCHOR_LINK}>
+          <a
+            href="#members"
+            onClick={(event) => jumpTo(event, "members")}
+            className={ANCHOR_LINK}
+          >
             {countWord(members.length, "member", "members")}
           </a>
         </InfoboxRow>

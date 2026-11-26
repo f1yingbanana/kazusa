@@ -178,4 +178,45 @@ describe("ContextMenu", () => {
     expect(copy).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("runs a sheet action on first tap when hold release emits no synthetic click", () => {
+    vi.useFakeTimers();
+    coarse = true;
+    const copy = vi.fn();
+
+    render(
+      createElement(
+        ContextMenu,
+        {
+          title: "Prefect HQ",
+          actions: [{ key: "copy", label: "Copy as Markdown", run: copy }],
+        },
+        createElement("button", { type: "button" }, "Prefect HQ"),
+      ),
+    );
+
+    const row = screen.getByRole("button", { name: "Prefect HQ" });
+    fireEvent.pointerDown(row, {
+      pointerType: "touch",
+      clientX: 10,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(450);
+    });
+    fireEvent.pointerUp(row, { pointerType: "touch" });
+
+    // Within 400ms of release, with no synthetic click before tapping the sheet:
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    const action = screen.getByRole("button", { name: "Copy as Markdown" });
+    fireEvent.pointerDown(action, {
+      pointerType: "touch",
+      clientX: 20,
+      clientY: 20,
+    });
+    fireEvent.click(action);
+    expect(copy).toHaveBeenCalledTimes(1);
+  });
 });

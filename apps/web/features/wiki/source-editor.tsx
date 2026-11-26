@@ -145,8 +145,9 @@ export function SourceEditor({
         mono
         minRows={18}
         autoFocus
+        disabled={saving}
         onChange={setDraft}
-        onSubmit={() => dirty && void submit()}
+        onSubmit={() => dirty && !saving && void submit()}
       />
       <p className="text-xs leading-normal text-ui-soft">
         {savingWords(side, owner)}

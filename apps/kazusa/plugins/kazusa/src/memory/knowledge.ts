@@ -225,9 +225,12 @@ export class WorldModel {
       around &&
       this.chain(pageId).has(around) &&
       (!this.homes().has(pageId) ||
-        [...page.known.map(({ level }) => level), page.everyone].some(
-          (level) => level === "knows" || level === "close",
-        ))
+        [
+          ...page.known
+            .filter(({ ref }) => Boolean(this.group(ref)))
+            .map(({ level }) => level),
+          page.everyone,
+        ].some((level) => level === "knows" || level === "close"))
     )
       best = atLeast(best, { depth: "intimate", why: "around their home" });
     return best;

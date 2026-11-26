@@ -46,20 +46,26 @@ function SavedOnLeave({
   className?: string;
 }) {
   const [text, setText] = useState(value);
+  const [saving, setSaving] = useState(false);
   return (
     <TextInput
       value={text}
       aria-label={label}
       placeholder={placeholder}
+      disabled={saving}
       className={className}
       onChange={(event) => setText(event.target.value)}
       onBlur={() => {
+        if (saving) return;
         const next = text.trim();
         if (next === value) return;
-        void onSave(next).catch((failure: unknown) => {
-          setText(value);
-          toast.error(failureText(failure));
-        });
+        setSaving(true);
+        void onSave(next)
+          .catch((failure: unknown) => {
+            setText(value);
+            toast.error(failureText(failure));
+          })
+          .finally(() => setSaving(false));
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();

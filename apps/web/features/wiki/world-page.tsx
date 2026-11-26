@@ -275,7 +275,11 @@ export function WorldPage({
           )
         }
       >
-        <TabsList label={`Parts of ${name}`} end={actions}>
+        <TabsList
+          label={`Parts of ${name}`}
+          end={actions}
+          className="sticky top-0 z-10 -mx-8 bg-ui-surface px-8 pt-2 max-lg:-mx-6 max-lg:px-6 max-md:-mx-4 max-md:px-4"
+        >
           {parts.map((one) => (
             <TabsTab key={one} value={one}>
               {one === "people" && cast ? "Relationships" : PART_LABEL[one]}
@@ -325,7 +329,7 @@ export function WorldPage({
               page={page}
               fallback={{ id, name, kind }}
               reach={reach}
-              className="@max-[34rem]:max-w-80 @min-[34rem]:sticky @min-[34rem]:top-4"
+              className="@max-[34rem]:max-w-80 @min-[34rem]:sticky @min-[34rem]:top-16"
             />
           ) : null}
         </div>

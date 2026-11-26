@@ -25,6 +25,7 @@ import { cx } from "@/ui/cx";
 import { Fold, Folds } from "@/ui/fold";
 import { Note } from "@/ui/note";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { failureText } from "./failure";
 import { usePageTarget } from "./links";
 import { PageHead, Sheet } from "./page-header";
 import { wikiPatch } from "./open";
@@ -194,14 +195,14 @@ function FrontPage({ agent }: { agent: string | undefined }) {
  * own; each problem opens its page.
  */
 function Problems() {
-  const { data, isLoading } = useWikiLint();
+  const lint = useWikiLint();
   const nameOf = usePageName();
   const { byId } = useCharacters();
   const target = usePageTarget();
   const [, setParams] = useQueryStates(wikiParsers);
   const groups = useMemo(() => {
     const byWiki = Map.groupBy(
-      data?.findings ?? [],
+      lint.data?.findings ?? [],
       (finding) => finding.agent ?? "",
     );
     return [...byWiki.entries()].sort(([a], [b]) =>
@@ -211,8 +212,8 @@ function Problems() {
           ? 1
           : (byId.get(a)?.name ?? a).localeCompare(byId.get(b)?.name ?? b),
     );
-  }, [data, byId]);
-  const count = data?.findings.length ?? 0;
+  }, [lint.data, byId]);
+  const count = lint.data?.findings.length ?? 0;
   return (
     <Sheet label="Problems">
       <PageHead
@@ -225,10 +226,17 @@ function Problems() {
         title="Problems"
         under={
           <p className="text-[0.9375rem] text-ui-soft">
-            {isLoading ? "" : count ? `${count} found` : "None"}
+            {lint.isLoading
+              ? ""
+              : lint.error && !lint.data
+                ? "Couldn't read problems"
+                : count
+                  ? `${count} found`
+                  : "None"}
           </p>
         }
       />
+      {lint.error && !lint.data ? <Note>{failureText(lint.error)}</Note> : null}
       {groups.map(([agent, findings]) => (
         <section
           key={agent}
@@ -339,7 +347,7 @@ function FileChange({ file }: { file: Run["files"][number] }) {
 
 /** Each night's sleep in a character's wiki, newest first, file by file. */
 function Nights({ agent }: { agent: string }) {
-  const { data, isLoading } = useMemoryRuns(agent);
+  const runs = useMemoryRuns(agent);
   const { byId } = useCharacters();
   const called = firstName(byId.get(agent)?.name ?? agent);
   return (
@@ -355,10 +363,12 @@ function Nights({ agent }: { agent: string }) {
           </p>
         }
       />
-      {isLoading ? null : !data?.runs.length ? (
+      {runs.isLoading ? null : runs.error && !runs.data ? (
+        <Note>{failureText(runs.error)}</Note>
+      ) : !runs.data?.runs.length ? (
         <Note>{`${called} hasn't slept on anything yet.`}</Note>
       ) : (
-        data.runs.map((run, at) => (
+        runs.data.runs.map((run, at) => (
           <section
             key={run.id}
             aria-label={formatSimTime(run.at)}

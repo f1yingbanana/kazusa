@@ -287,6 +287,7 @@ const WikiReachNoteSchema = z.object({
   lead: z.string(),
   relation: z.string().optional(),
   openThreads: z.array(z.string()).optional(),
+  notes: z.array(z.object({ date: z.string(), text: z.string() })).optional(),
 });
 export type WikiReachNote = z.infer<typeof WikiReachNoteSchema>;
 export type WikiReachPerson = z.infer<typeof WikiReachPersonSchema>;

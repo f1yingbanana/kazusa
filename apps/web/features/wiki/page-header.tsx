@@ -2,7 +2,7 @@
 
 import type { WikiListItem } from "@kazusa/client";
 import { ChevronRightIcon } from "lucide-react";
-import { useQueryStates } from "nuqs";
+import { parseAsString, useQueryStates } from "nuqs";
 import { Fragment, type ReactNode } from "react";
 import { usePlaces } from "@/hooks/use-location";
 import { useWikiLint } from "@/hooks/use-wiki";
@@ -144,7 +144,7 @@ export function Sheet({
  */
 export function PageProblems({ pages }: { pages: readonly string[] }) {
   const { data } = useWikiLint();
-  const [, setParams] = useQueryStates(wikiParsers);
+  const [, setParams] = useQueryStates({ ...wikiParsers, view: parseAsString });
   const hits = (data?.findings ?? []).filter((f) => pages.includes(f.page));
   if (!hits.length) return null;
   return (

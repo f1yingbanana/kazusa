@@ -32,7 +32,8 @@ export function unwrap(text: string): string {
       last.trim() !== "" &&
       line.trim() !== "" &&
       !starts &&
-      !/^\s*(`{3,}|~{3,})/.test(last)
+      !/^\s*(`{3,}|~{3,})/.test(last) &&
+      !/^\s*#{1,6}(\s|$)/.test(last)
     )
       out[out.length - 1] = `${last} ${line.trim()}`;
     else out.push(line);
@@ -79,7 +80,7 @@ export function duplicateSource(
   const lines: string[] = [];
   let inAliases = false;
   for (const line of front ? front.split(/\r?\n/) : []) {
-    if (inAliases && /^\s+(-|\S)/.test(line)) continue;
+    if (inAliases && (/^\s*-/.test(line) || /^\s+\S/.test(line))) continue;
     inAliases = false;
     if (/^aliases:/.test(line)) {
       inAliases = /^aliases:\s*$/.test(line);

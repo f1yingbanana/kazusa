@@ -55,9 +55,10 @@ export function MemoryEditor({
         rows={14}
         spellCheck
         autoFocus
+        disabled={saving}
         onChange={(event) =>
           setDraft({
-            base: draft?.base ?? memory.hash,
+            base: draft ? draft.base : memory.hash,
             text: event.target.value,
           })
         }

@@ -20,6 +20,7 @@ import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
 import { RichText, usePlainText } from "../wiki/links";
+import { wikiParsers } from "../wiki/search-params";
 import { WhoKnows } from "../wiki/who-knows";
 import { Prose } from "../entities/prose";
 import { CharacterAvatar } from "./character-avatar";
@@ -227,7 +228,12 @@ function Mirror({
   one: Acquaintance;
   other: CharacterSummary | undefined;
 }) {
-  const [, setParams] = useQueryStates(charactersParsers);
+  const [, setParams] = useQueryStates({
+    ...charactersParsers,
+    "wiki.part": wikiParsers["wiki.part"],
+    "wiki.edit": wikiParsers["wiki.edit"],
+    "wiki.raw": wikiParsers["wiki.raw"],
+  });
   const mine = useWikiPage(one.id, self.id);
   const theirs = useWikiPage(one.simulated ? self.id : undefined, one.id);
   const selfName = firstName(self.name);

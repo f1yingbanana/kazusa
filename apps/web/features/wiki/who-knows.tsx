@@ -477,6 +477,20 @@ export function CastNotes({ id }: { id: string }) {
                         </ul>
                       </div>
                     ) : null}
+                    {note.notes?.length ? (
+                      <ul className="mt-2.5 flex flex-col gap-1.5 text-[0.8125rem] leading-snug">
+                        {note.notes.map((entry, at) => (
+                          <li key={`${entry.date}-${at}`}>
+                            {entry.date ? (
+                              <span className="pe-1.5 text-xs font-bold text-ui-soft tabular-nums">
+                                {entry.date}
+                              </span>
+                            ) : null}
+                            <RichText text={entry.text} />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                   <Button
                     tone="ghost"

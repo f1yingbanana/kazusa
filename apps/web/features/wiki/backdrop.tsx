@@ -228,10 +228,17 @@ export function BackdropPanel({
 
   const save = async () => {
     const opened = form.data;
-    if (!opened || !shown) return;
+    const pictureEdits =
+      Object.keys(draft.puts).length > 0 || draft.removes.length > 0;
+    if (
+      !opened ||
+      (draft.set === undefined && !pictureEdits) ||
+      (pictureEdits && !shown)
+    )
+      return;
     setSaving(true);
     try {
-      if (draft.set !== undefined)
+      if (draft.set !== undefined) {
         await saveWikiForm({
           id,
           kind: opened.kind,
@@ -241,11 +248,15 @@ export function BackdropPanel({
           close: opened.close,
           only: opened.only,
         });
-      for (const [name, file] of Object.entries(draft.puts))
-        await uploadPicture({ kind: "backdrop", set: shown, name }, file);
-      for (const name of draft.removes)
-        await removePicture({ kind: "backdrop", set: shown, name });
-      await Promise.all([form.mutate(), mutate(), refresh()]);
+        await form.mutate();
+      }
+      if (shown) {
+        for (const [name, file] of Object.entries(draft.puts))
+          await uploadPicture({ kind: "backdrop", set: shown, name }, file);
+        for (const name of draft.removes)
+          await removePicture({ kind: "backdrop", set: shown, name });
+      }
+      await Promise.all([mutate(), refresh()]);
       setDraft(NONE);
       toast.success("Saved the backdrop");
       onDone();
@@ -317,7 +328,7 @@ export function BackdropPanel({
           name={shown}
           at={id}
           draft={editing ? draft : undefined}
-          onDraft={editing ? setDraft : undefined}
+          onDraft={editing && !saving ? setDraft : undefined}
         />
       ) : (
         <Note>No backdrop.</Note>

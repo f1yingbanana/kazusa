@@ -75,6 +75,7 @@ export function SuggestTextarea({
           onChange(event.target.value)
         }
         onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+          if (event.nativeEvent.isComposing) return;
           if (
             onSubmit &&
             (event.metaKey || event.ctrlKey) &&

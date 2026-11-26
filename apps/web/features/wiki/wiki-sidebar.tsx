@@ -12,7 +12,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useQueryStates } from "nuqs";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSelection } from "@/hooks/use-selection";
@@ -82,6 +82,9 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const list = useWikiList(agent);
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState<NewPagePreset>();
+  useEffect(() => {
+    setCreating(undefined);
+  }, [agent]);
   const { byId } = useCharacters();
   const pageName = usePageName();
   const viewer = agent ? byId.get(agent) : undefined;
@@ -166,6 +169,7 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
       ) : null}
 
       <NewPageDialog
+        key={agent ?? ""}
         open={creating !== undefined}
         onOpenChange={(open) => !open && setCreating(undefined)}
         agent={agent}
@@ -366,6 +370,18 @@ function IndexTree({
       : []),
     ...pathTo(index.items, current),
   ]);
+  const shelfKey = index.items.map((item) => item.value).join("\0");
+  const [searchKey, setSearchKey] = useState(searching ? shelfKey : "");
+  if (searching) {
+    if (shelfKey !== searchKey) {
+      setSearchKey(shelfKey);
+      const next = index.items.map((item) => item.value);
+      if (next.some((value) => !expanded.includes(value)))
+        setExpanded([...new Set([...expanded, ...next])]);
+    }
+  } else if (searchKey) {
+    setSearchKey("");
+  }
   // Opening a page from elsewhere (a link, the palette) unfolds the way to it.
   const [shownFor, setShownFor] = useState(current);
   if (shownFor !== current) {

@@ -213,6 +213,7 @@ function Frame() {
         open={commandOpen}
         onOpenChange={setCommandOpen}
         onOpenedChat={() => setPane("stage")}
+        onOpenedWiki={() => setPane("stage")}
       />
       <WorldUpdateNotice />
       <UpdateSaveDialog />

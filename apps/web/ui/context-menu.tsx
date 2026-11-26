@@ -122,6 +122,11 @@ export function ContextMenu({
         className,
       )}
       onPointerDownCapture={(event) => {
+        if (swallow.current) {
+          swallow.current = false;
+          if (swallowReset.current) window.clearTimeout(swallowReset.current);
+          swallowReset.current = undefined;
+        }
         lastPointer.current = event.pointerType;
         if (event.pointerType !== "touch") return;
         const hit = resolveTarget(event.target);

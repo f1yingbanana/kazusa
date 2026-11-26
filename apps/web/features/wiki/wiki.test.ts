@@ -46,6 +46,7 @@ describe("a page's text in the form", () => {
     expect(unwrap("One\ntwo.\n\n- a\n- b\n## Topic\n```\nx\ny\n```")).toBe(
       "One two.\n\n- a\n- b\n## Topic\n```\nx\ny\n```",
     );
+    expect(unwrap("# Topic\nA paragraph.")).toBe("# Topic\nA paragraph.");
   });
 
   it("offers the opening's first sentence as a summary", () => {
@@ -137,6 +138,14 @@ describe("a page duplicated", () => {
   it("gives a page with no title or front matter both", () => {
     expect(duplicateSource("Just words.", { name: "Copy", id: "copy" })).toBe(
       '---\nname: "Copy"\n---\n\n# Copy\n\nJust words.',
+    );
+  });
+
+  it("drops unindented alias sequence items without eating subsequent fields", () => {
+    const raw =
+      '---\nname: "Bench"\naliases:\n- Old alias\nparent: district\n---\n\n# Bench\n\nQuiet.';
+    expect(duplicateSource(raw, { name: "Copy", id: "copy" })).toBe(
+      '---\nname: "Copy"\nparent: district\n---\n\n# Copy\n\nQuiet.',
     );
   });
 });

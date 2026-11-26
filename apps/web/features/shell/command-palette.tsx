@@ -58,6 +58,7 @@ import { wikiParsers } from "../wiki/search-params";
 import { settingsParsers } from "../settings/search-params";
 import { useAllowedSettingsCategories } from "../settings/settings-sidebar";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";
+import { confirmLeave } from "../wiki/leave-guard";
 import { wikiPatch } from "../wiki/open";
 import { useSections } from "./sections";
 
@@ -117,11 +118,14 @@ export function CommandPalette({
   open,
   onOpenChange,
   onOpenedChat,
+  onOpenedWiki,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** A chat opened: on a phone, show the thread rather than the list. */
   onOpenedChat?: () => void;
+  /** A wiki page opened: on a phone, show the page rather than the sidebar. */
+  onOpenedWiki?: () => void;
 }) {
   const [query, setQuery] = useState("");
   // The top result is highlighted for each new search, so Enter opens the
@@ -167,6 +171,7 @@ export function CommandPalette({
           onTop={setTop}
           close={() => onOpenChange(false)}
           onOpenedChat={onOpenedChat}
+          onOpenedWiki={onOpenedWiki}
         />
       ) : null}
     </CommandDialog>
@@ -178,21 +183,29 @@ function PaletteBody({
   onTop,
   close,
   onOpenedChat,
+  onOpenedWiki,
 }: {
   query: string;
   onTop: (top: { query: string; key: string } | undefined) => void;
   close: () => void;
   onOpenedChat?: () => void;
+  onOpenedWiki?: () => void;
 }) {
   const deferred = useDeferredValue(query);
   const [, setParams] = useQueryStates(PARSERS);
   const go: Go = (patch) => {
-    // Only silence the drawer when opening a destination alongside selection.
-    if (patch.sel && Object.keys(patch).length > 1) {
-      markQuietSelection(serializeEntityRef(patch.sel));
-    }
-    void setParams(patch);
+    const opensWiki =
+      patch.view === "wiki" ||
+      Boolean(patch["wiki.page"] || patch["wiki.agent"] || patch["wiki.tab"]);
     close();
+    confirmLeave(() => {
+      // Only silence the drawer when opening a destination alongside selection.
+      if (patch.sel && Object.keys(patch).length > 1) {
+        markQuietSelection(serializeEntityRef(patch.sel));
+      }
+      void setParams(patch);
+      if (opensWiki) onOpenedWiki?.();
+    });
   };
   const entries = usePaletteEntries({
     go,

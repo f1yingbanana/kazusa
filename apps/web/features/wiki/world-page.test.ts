@@ -15,7 +15,15 @@ import type {
   WikiReachResponse,
 } from "@kazusa/client";
 import { createElement, useState } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { buildPlaceIndex } from "@/lib/location/places";
 import { createAgent } from "@/ui/agent";
 import { PageDetails, PageFacts } from "./page-facts";
@@ -350,6 +358,13 @@ beforeAll(() => {
     disconnect() {}
   };
   window.matchMedia ??= () => ({ matches: false }) as MediaQueryList;
+});
+
+beforeEach(() => {
+  mocks.pageData = undefined;
+  mocks.reachData = undefined;
+  mocks.lintFindings = [];
+  mocks.characters = [];
 });
 
 afterEach(() => {
@@ -709,6 +724,18 @@ describe("WorldPage tabs", () => {
   });
 
   it("shows only lint problems for this page inline", () => {
+    mocks.pageData = {
+      id: "hina",
+      kind: "person",
+      name: "Hina",
+      aliases: ["Head Prefect"],
+      summary: "Chairwoman.",
+      lead: "Leads the Prefect Team.",
+      sections: [],
+      notes: [],
+      history: [],
+      openThreads: [],
+    };
     mocks.lintFindings = [
       {
         level: "error",
@@ -722,6 +749,7 @@ describe("WorldPage tabs", () => {
       },
     ];
     render(createElement(WorldPage, { id: "hina" }));
+    expect(screen.getByText("Leads the Prefect Team.")).toBeTruthy();
     expect(screen.getByText('link to unknown page "ghost"')).toBeTruthy();
     expect(screen.queryByText("unrelated warning")).toBeNull();
   });

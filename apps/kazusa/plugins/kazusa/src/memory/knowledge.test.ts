@@ -294,6 +294,18 @@ describe("rules a review found loose", () => {
     expect(lintWorld(w).filter((f) => f.level === "error")).toEqual([]);
   });
 
+  it("does not leak a private home to neighbours via direct-person known entries", () => {
+    const w = of([
+      place("dorm", ""),
+      place("room_natsu", "parent: dorm\nknown: { natsu: close }"),
+      place("room_hina", "parent: dorm"),
+      person("natsu", "home: room_natsu"),
+      person("hina", "home: room_hina"),
+    ]);
+    expect(w.depth("hina", "room_natsu").depth).toBe("none");
+    expect(w.depth("natsu", "room_natsu").depth).toBe("intimate");
+  });
+
   it("rejects non-group concepts in `known`, and people in `in`", () => {
     const w = of([
       concept("note_a", ""),

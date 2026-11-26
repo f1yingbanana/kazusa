@@ -14,6 +14,35 @@ const LEAVES =
 const LAYERS =
   '[role="listbox"], [role="dialog"], [role="alertdialog"], [role="menu"], [data-slot$="-content"], [popover]';
 
+const isModifiedLeave = (event: Event, leave: HTMLElement): boolean => {
+  if (!(leave instanceof HTMLAnchorElement)) return false;
+  if (leave.target && leave.target !== "_self") return true;
+  if (event instanceof MouseEvent)
+    return (
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    );
+  if (event instanceof KeyboardEvent)
+    return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  return false;
+};
+
+type LeaveConfirmHandler = (run: () => void) => void;
+const activeLeaveHandlers = new Set<LeaveConfirmHandler>();
+
+/**
+ * Runs `action` immediately unless a mounted editor has unsaved changes, in
+ * which case its discard dialog asks first.
+ */
+export function confirmLeave(action: () => void): void {
+  const handler = [...activeLeaveHandlers].at(-1);
+  if (handler) handler(action);
+  else action();
+}
+
 /**
  * Holds what would take someone away from unsaved changes: a press outside
  * `scope` on a link, a button or a row asks first, and goes on if they agree.
@@ -25,11 +54,18 @@ export function useLeaveGuard(dirty: boolean): {
 } {
   const area = useRef<HTMLElement | null>(null);
   const held = useRef<HTMLElement | null>(null);
+  const heldAction = useRef<(() => void) | null>(null);
   const letGo = useRef(false);
   const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     if (!dirty) return;
+    const handleConfirm: LeaveConfirmHandler = (action) => {
+      held.current = null;
+      heldAction.current = action;
+      setAsking(true);
+    };
+    activeLeaveHandlers.add(handleConfirm);
     const onUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
@@ -39,6 +75,7 @@ export function useLeaveGuard(dirty: boolean): {
       const leave = target?.closest<HTMLElement>(LEAVES);
       if (
         !leave ||
+        isModifiedLeave(event, leave) ||
         area.current?.contains(leave) ||
         leave.closest(LAYERS) ||
         (event instanceof KeyboardEvent &&
@@ -48,6 +85,7 @@ export function useLeaveGuard(dirty: boolean): {
         return;
       event.preventDefault();
       event.stopPropagation();
+      heldAction.current = null;
       held.current = leave;
       setAsking(true);
     };
@@ -55,6 +93,7 @@ export function useLeaveGuard(dirty: boolean): {
     document.addEventListener("click", stop, true);
     document.addEventListener("keydown", stop, true);
     return () => {
+      activeLeaveHandlers.delete(handleConfirm);
       window.removeEventListener("beforeunload", onUnload);
       document.removeEventListener("click", stop, true);
       document.removeEventListener("keydown", stop, true);
@@ -66,18 +105,30 @@ export function useLeaveGuard(dirty: boolean): {
       area.current = element;
     },
     dialog: (
-      <AlertDialog open={asking} onOpenChange={setAsking}>
+      <AlertDialog
+        open={asking}
+        onOpenChange={(open) => {
+          setAsking(open);
+          if (!open) {
+            held.current = null;
+            heldAction.current = null;
+          }
+        }}
+      >
         <AlertPanel
           danger
           title="Discard your changes?"
           description="They won't be saved."
           onConfirm={() => {
             const leave = held.current;
+            const action = heldAction.current;
             held.current = null;
+            heldAction.current = null;
             letGo.current = true;
             // After the dialog has closed and given focus back.
             requestAnimationFrame(() => {
-              leave?.click();
+              if (action) action();
+              else leave?.click();
               letGo.current = false;
             });
           }}

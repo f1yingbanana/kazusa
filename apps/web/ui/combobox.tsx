@@ -11,7 +11,12 @@ import {
   ComboboxList,
 } from "@ui-sdk/react/combobox";
 import { LoaderCircleIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { cx } from "./cx";
 import { POPUP } from "./popup";
 
@@ -208,8 +213,12 @@ export function OnePicker({
   className?: string;
 }) {
   const chosen = options.find((option) => option.value === value);
-  const [query, setQuery] = useState(chosen?.label ?? value ?? "");
+  const labelForValue = chosen?.label ?? value ?? "";
+  const [query, setQuery] = useState(labelForValue);
   const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!typing) setQuery(labelForValue);
+  }, [labelForValue, typing]);
   const shown = filterTop(30)(options, typing ? query : "");
   return (
     <Combobox<string>

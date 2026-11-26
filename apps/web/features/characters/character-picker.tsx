@@ -3,7 +3,7 @@
 import type { CharacterSummary } from "@kazusa/client";
 import { useMemo, type ReactNode } from "react";
 import type { CastPick } from "@/hooks/use-cast-picks";
-import { isCast, useCharacters } from "@/hooks/use-characters";
+import { useCharacters } from "@/hooks/use-characters";
 import { Avatar } from "@/ui/avatar";
 import type { PickOption } from "@/ui/combobox";
 import type { PickItem } from "@/ui/pick-list";
@@ -95,7 +95,9 @@ export function useCharacterOptions({
     return characters
       .filter(
         (c) =>
-          isCast(c) && !skip.has(c.id) && (!agentOnly || c.kind === "agent"),
+          !c.isSystemAgent &&
+          !skip.has(c.id) &&
+          (!agentOnly || c.kind === "agent"),
       )
       .toSorted((a, b) => a.name.localeCompare(b.name))
       .map(personPickOption);

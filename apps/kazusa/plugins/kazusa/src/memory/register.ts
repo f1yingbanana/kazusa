@@ -1162,7 +1162,8 @@ export function registerMemory(
         (personalPage.summary.trim() ||
           personalPage.lead.trim() ||
           personalPage.relation?.trim() ||
-          personalPage.openThreads.length)
+          personalPage.openThreads.length ||
+          personalPage.notes.length)
       ) {
         reach.notes?.push({
           id: agent,
@@ -1172,6 +1173,14 @@ export function registerMemory(
           ...(personalPage.relation ? { relation: personalPage.relation } : {}),
           ...(personalPage.openThreads.length
             ? { openThreads: [...personalPage.openThreads] }
+            : {}),
+          ...(personalPage.notes.length
+            ? {
+                notes: personalPage.notes.map(({ date, text }) => ({
+                  date,
+                  text,
+                })),
+              }
             : {}),
         });
       }
