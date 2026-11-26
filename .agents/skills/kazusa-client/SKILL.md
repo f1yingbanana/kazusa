@@ -543,6 +543,18 @@ library) and `features/` (the app), apart from the old `components/`. Read
 ESLint enforces, how to style with Tailwind so the old UI can be deleted, and
 how to finish the move.
 
+- **Dialog buttons (`Confirm` / `Cancel`)**: Confirming dialogs (`AlertPanel`,
+  `DialogPanel`) use `Cancel` and `Confirm`, relying on the dialog's title,
+  description, and body to explain what confirming does rather than bespoke
+  confirm labels ("Add to the cast", "Make set", "Save changes"). Only
+  multi-choice dialogs with genuinely distinct actions or read-only result
+  dialogs use custom action labels.
+- **Loading / pending buttons**: Keep the button's label constant while loading
+  and show a spinning `LoaderCircle` (`animate-ui-spin` inside `ui/`, built into
+  `Button` and `IconButton` via `pending` or an `onClick` Promise;
+  `animate-spin` in legacy/setup buttons) instead of changing the label text to
+  `"Loading…"`, `"Stopping"`, or `"Starting…"`.
+
 ## 7. Visual language (summary)
 
 - The look is a neutral, dense, legible "instrument panel". This app is readable

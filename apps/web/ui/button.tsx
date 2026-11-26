@@ -125,6 +125,7 @@ export function IconButton({
   title,
   tone = "ghost",
   size = "lg",
+  pending = false,
   tooltipSide,
   className,
   children,
@@ -134,6 +135,7 @@ export function IconButton({
   title?: string;
   tone?: Tone;
   size?: Size;
+  pending?: boolean;
   tooltipSide?: "top" | "bottom" | "left" | "right";
   className?: string;
   children?: ReactNode;
@@ -142,6 +144,8 @@ export function IconButton({
     <Tooltip label={title ?? label} names={!title} side={tooltipSide}>
       <Base
         {...props}
+        disabled={pending || props.disabled}
+        data-pending={pending || undefined}
         focusableWhenDisabled
         aria-label={label}
         data-tone={tone}
@@ -154,7 +158,10 @@ export function IconButton({
           className,
         )}
       >
-        {children}
+        {children ? (
+          <span className="contents in-data-pending:hidden">{children}</span>
+        ) : null}
+        <LoaderCircleIcon aria-hidden className={SPINNER} />
       </Base>
     </Tooltip>
   );

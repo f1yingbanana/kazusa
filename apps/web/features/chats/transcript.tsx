@@ -236,10 +236,10 @@ export function Transcript({
               <Button
                 tone="ghost"
                 size="sm"
-                disabled={isLoadingOlder}
+                pending={isLoadingOlder}
                 onClick={onLoadOlder}
               >
-                {isLoadingOlder ? "Loading…" : "Load earlier messages"}
+                Load earlier messages
               </Button>
             </div>
           ) : null}

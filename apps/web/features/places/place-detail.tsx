@@ -165,7 +165,7 @@ export function PlaceDetail({
             tone="primary"
             icon={<MapPinIcon aria-hidden />}
             disabled={!player.moveTo}
-            onClick={() => void player.moveTo?.(place.id)}
+            onClick={() => player.moveTo?.(place.id)}
           >
             Go here
           </Button>

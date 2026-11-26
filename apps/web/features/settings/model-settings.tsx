@@ -47,7 +47,7 @@ function ConfigFiles() {
           tone="soft"
           size="sm"
           icon={<FolderOpenIcon aria-hidden />}
-          onClick={() => void reveal()}
+          onClick={() => reveal()}
         >
           Show file
         </Button>

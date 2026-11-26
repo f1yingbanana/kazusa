@@ -813,7 +813,7 @@ describe("settings a character overrides", () => {
       steps: [
         { ref: "Use world default (20 people)", action: "press" },
         { ref: "Places", action: "setValue", args: [12] },
-        { ref: "Save changes", action: "press" },
+        { ref: "Confirm", action: "press" },
       ],
     });
     expect(result.error).toBeUndefined();

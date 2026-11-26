@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Button } from "./button";
+import { Button, IconButton } from "./button";
 
 afterEach(cleanup);
 
@@ -48,5 +48,19 @@ describe("Button", () => {
     expect(button.hasAttribute("data-pending")).toBe(true);
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.textContent).toBe("Confirm");
+  });
+
+  it("shows a spinner on `IconButton` while `pending`", () => {
+    render(
+      createElement(
+        IconButton,
+        { label: "Save name", pending: true },
+        createElement("span", null, "✓"),
+      ),
+    );
+    const button = screen.getByRole("button", { name: "Save name" });
+    expect(button.hasAttribute("data-pending")).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(spinner(button)).toBeTruthy();
   });
 });

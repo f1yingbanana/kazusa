@@ -95,10 +95,10 @@ export function StoryTab({ character }: { character: CharacterSummary }) {
               <Button
                 tone="soft"
                 size="sm"
-                disabled={timeline.isLoadingMore}
+                pending={timeline.isLoadingMore}
                 onClick={() => void timeline.loadMore()}
               >
-                {timeline.isLoadingMore ? "Reading further back…" : "Earlier"}
+                Earlier
               </Button>
             ) : (
               <p className="text-xs font-semibold text-ui-soft">

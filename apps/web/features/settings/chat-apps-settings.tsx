@@ -189,11 +189,11 @@ function BotRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [token, setToken] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState<"save" | "remove" | null>(null);
   const [error, setError] = useState<string>();
 
   async function save(next: string | null) {
-    setSaving(true);
+    setBusy(next === null ? "remove" : "save");
     setError(undefined);
     try {
       await onSave(next);
@@ -203,7 +203,7 @@ function BotRow({
       setError(failure instanceof Error ? failure.message : String(failure));
       failed("Couldn't save the token", failure);
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   }
 
@@ -253,7 +253,7 @@ function BotRow({
             autoFocus
             placeholder="Paste the bot's token"
             value={token}
-            disabled={saving}
+            disabled={busy !== null}
             error={error}
             onValueChange={(next) => {
               setToken(next);
@@ -266,8 +266,8 @@ function BotRow({
               type="submit"
               tone="primary"
               size="sm"
-              pending={saving}
-              disabled={!token.trim()}
+              pending={busy === "save"}
+              disabled={!token.trim() || busy === "remove"}
             >
               Connect
             </Button>
@@ -275,7 +275,7 @@ function BotRow({
               type="button"
               tone="ghost"
               size="sm"
-              disabled={saving}
+              disabled={busy !== null}
               onClick={() => {
                 setToken("");
                 setError(undefined);
@@ -290,7 +290,8 @@ function BotRow({
                 tone="danger"
                 size="sm"
                 className="ms-auto"
-                disabled={saving}
+                pending={busy === "remove"}
+                disabled={busy === "save"}
                 onClick={() => void save(null)}
               >
                 Remove token

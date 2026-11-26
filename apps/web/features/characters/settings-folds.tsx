@@ -152,7 +152,7 @@ function ContextDialog({
             pending={draft.saving}
             disabled={!draft.dirty}
           >
-            Save changes
+            Confirm
           </Button>
         </>
       }
