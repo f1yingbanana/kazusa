@@ -17,8 +17,8 @@ import type { WikiSide } from "./search-params";
 /** What saving does, under the text. */
 export function savingWords(side: WikiSide, owner?: string): string {
   return side === "world"
-    ? "Edits change what was always true. For something that happens on a date, add it under ## History."
-    : `${owner ?? "They"} read this as their own memory, and may rewrite it in their sleep.`;
+    ? "Dated events go under ## History."
+    : `${owner ?? "They"} may rewrite this in their sleep.`;
 }
 
 /**
@@ -65,11 +65,7 @@ export function SourceEditor({
   const [conflict, setConflict] = useState(false);
 
   if (!opened)
-    return source.error ? (
-      <Note>{failureText(source.error)}</Note>
-    ) : (
-      <Note>Opening the Markdown…</Note>
-    );
+    return source.error ? <Note>{failureText(source.error)}</Note> : null;
 
   const initial = opened.exists ? opened.text : firstDraft(name);
   const text = draft ?? initial;
@@ -106,7 +102,7 @@ export function SourceEditor({
       {conflict ? (
         <Callout
           tone="danger"
-          title="This page changed since you opened it"
+          title="Changed since you opened it"
           action={
             <Button
               tone="soft"

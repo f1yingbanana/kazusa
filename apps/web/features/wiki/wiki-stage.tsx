@@ -65,7 +65,6 @@ function FrontPage({ agent }: { agent: string | undefined }) {
   const target = usePageTarget();
   const [, setParams] = useQueryStates(wikiParsers);
   const index = useMemo(() => buildIndex(data?.pages ?? []), [data]);
-  const total = data?.pages.length ?? 0;
   const recent = useMemo(
     () =>
       (data?.pages ?? [])
@@ -99,13 +98,6 @@ function FrontPage({ agent }: { agent: string | undefined }) {
           )
         }
         title={called ? `${called}'s wiki` : "World Wiki"}
-        under={
-          <p className="max-w-prose text-[0.9375rem] leading-relaxed text-pretty text-ui-soft">
-            {called
-              ? `What ${called} makes of the people, places and things they know: ${total} pages. Opening one sets it beside the world's.`
-              : `Everything true in this world, ${total} pages of it. Characters read as much of each page as they know.`}
-          </p>
-        }
       />
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
         {shelves.map((shelf: Shelf, at) => (
@@ -163,9 +155,6 @@ function FrontPage({ agent }: { agent: string | undefined }) {
           </ul>
         </section>
       ) : null}
-      <p className="text-[0.8125rem] text-ui-soft">
-        Find a page in the index, or press ⌘K to search everything.
-      </p>
     </Sheet>
   );
 }
@@ -206,11 +195,7 @@ function Problems() {
         title="Problems"
         under={
           <p className="text-[0.9375rem] text-ui-soft">
-            {isLoading
-              ? "Reading every page…"
-              : count
-                ? `${count} found: links to nowhere, fields that don't fit, pages that clash.`
-                : "Nothing wrong anywhere."}
+            {isLoading ? "" : count ? `${count} found` : "None"}
           </p>
         }
       />
@@ -333,16 +318,14 @@ function Nights({ agent }: { agent: string }) {
         eyebrow={
           <span className="text-[0.8125rem] font-bold text-ui-accent-ink">{`${called}'s wiki`}</span>
         }
-        title="What each night changed"
+        title="Nights"
         under={
           <p className="max-w-prose text-[0.9375rem] text-ui-soft">
-            {`Sleep turns ${called}'s day into memory: it rewrites their notes and pages. Here is each night's work.`}
+            What each night's sleep rewrote.
           </p>
         }
       />
-      {isLoading ? (
-        <Note>Reading their nights…</Note>
-      ) : !data?.runs.length ? (
+      {isLoading ? null : !data?.runs.length ? (
         <Note>{`${called} hasn't slept on anything yet.`}</Note>
       ) : (
         data.runs.map((run, at) => (

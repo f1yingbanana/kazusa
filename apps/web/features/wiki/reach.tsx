@@ -92,10 +92,10 @@ export function ReachLine({
     },
   ];
   const line = knowing
-    ? `${knowing} know ${them}${heard ? ` · ${heard} more have heard of ${them}` : ""}`
+    ? `${knowing} know ${them}${heard ? ` · ${heard} heard of ${them}` : ""}`
     : heard
       ? `${heard} ${heard === 1 ? "has" : "have"} heard of ${them}`
-      : `Nobody in the cast knows of ${them} yet`;
+      : `Nobody knows ${them}`;
   const layers: Layer[] = [
     "summary",
     "opening",
@@ -141,7 +141,7 @@ export function ReachLine({
         align="start"
         className="w-[min(24rem,calc(100vw-2rem))] gap-4"
       >
-        <PopoverTitle>{`Who reads what of ${page.name}`}</PopoverTitle>
+        <PopoverTitle>Who reads what</PopoverTitle>
         <ul className="flex flex-col gap-2.5">
           {layers.map((layer) => {
             const readers = readersOf(layer, reach);
@@ -160,15 +160,11 @@ export function ReachLine({
                     {readerWords(layer, readers.length, person, page.name)}
                   </span>
                 </span>
-                <span className="text-[0.8125rem] leading-normal text-ui-soft">
-                  {layer === "self" ? (
-                    "Their own thoughts, read by no one else."
-                  ) : readers.length ? (
+                {layer !== "self" && readers.length ? (
+                  <span className="text-[0.8125rem] leading-normal text-ui-soft">
                     <Names people={readers} max={layer === "close" ? 8 : 5} />
-                  ) : (
-                    "No one yet."
-                  )}
-                </span>
+                  </span>
+                ) : null}
               </li>
             );
           })}

@@ -10,7 +10,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@ui-sdk/react/combobox";
-import { LoaderCircleIcon, PlusIcon, XIcon } from "lucide-react";
+import { LoaderCircleIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { cx } from "./cx";
 import { POPUP } from "./popup";
@@ -131,7 +131,7 @@ export function AddPicker({
         />
       </div>
       <ComboboxContent sideOffset={6} className={COMBOBOX_LIST}>
-        <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft">
+        <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft not-data-empty:hidden">
           {onCreate ? "Nothing by that name yet." : "Nothing by that name."}
         </ComboboxEmpty>
         <ComboboxList className="flex flex-col gap-0.5">
@@ -248,7 +248,7 @@ export function OnePicker({
         </ComboboxClear>
       </div>
       <ComboboxContent sideOffset={6} className={COMBOBOX_LIST}>
-        <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft">
+        <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft not-data-empty:hidden">
           Nothing by that name.
         </ComboboxEmpty>
         <ComboboxList className="flex flex-col gap-0.5">
@@ -272,11 +272,14 @@ export function OnePicker({
 export function ComboboxPopup({
   className,
   emptyText,
+  search,
   children,
   ...props
 }: Omit<ComponentProps<typeof ComboboxContent>, "className" | "children"> & {
   className?: string;
   emptyText: string;
+  /** A search field at the top, for a combobox opened by a button. */
+  search?: string;
   children: ComponentProps<typeof ComboboxList>["children"];
 }) {
   return (
@@ -285,7 +288,23 @@ export function ComboboxPopup({
       {...props}
       className={cx(COMBOBOX_LIST, className)}
     >
-      <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft">
+      {search ? (
+        <div className="sticky top-0 z-1 -mx-1 -mt-1 mb-1 border-b border-ui-line bg-ui-surface p-1">
+          <div className="relative">
+            <SearchIcon
+              aria-hidden
+              className="pointer-events-none absolute inset-s-3 top-1/2 size-4 -translate-y-1/2 text-ui-soft"
+            />
+            <ComboboxInput
+              autoFocus
+              aria-label={search}
+              placeholder={search}
+              className={cx(INPUT, "ps-9 inset-ring-0 bg-transparent")}
+            />
+          </div>
+        </div>
+      ) : null}
+      <ComboboxEmpty className="px-2.5 py-2 text-sm text-ui-soft not-data-empty:hidden">
         {emptyText}
       </ComboboxEmpty>
       <ComboboxList className="flex flex-col gap-0.5">{children}</ComboboxList>

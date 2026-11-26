@@ -12,27 +12,31 @@ import { wikiParsers } from "./search-params";
 const LINK = /\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g;
 
 /**
- * Where a page opens: one of the cast in their profile, any other page in the
- * Wiki, as a URL and as the state to set.
+ * Where a page opens. In the Wiki, every page stays in the Wiki, read as the
+ * same character; anywhere else, one of the cast opens in their profile.
  */
 export function usePageTarget() {
   const { byId } = useCharacters();
-  const [, setParams] = useQueryStates({
+  const [params, setParams] = useQueryStates({
     ...wikiParsers,
     ...charactersParsers,
     view: parseAsString,
   });
+  const inWiki = params.view === "wiki";
+  const agent = inWiki ? params["wiki.agent"] : null;
   return (page: Pick<WikiListItem, "id" | "kind">) => {
-    const cast = page.kind === "person" && isCast(byId.get(page.id));
+    const profile =
+      !inWiki && page.kind === "person" && isCast(byId.get(page.id));
+    const id = encodeURIComponent(page.id);
     return {
-      href: cast
-        ? `?view=characters&character=${encodeURIComponent(page.id)}`
-        : `?view=wiki&wiki.page=${encodeURIComponent(page.id)}`,
+      href: profile
+        ? `?view=characters&character=${id}`
+        : `?view=wiki${agent ? `&wiki.agent=${encodeURIComponent(agent)}` : ""}&wiki.page=${id}`,
       open: () =>
         void setParams(
-          cast
+          profile
             ? { ...wikiPatch(null), ...profilePatch(page.id) }
-            : wikiPatch(page.id),
+            : wikiPatch(page.id, { agent }),
         ),
     };
   };

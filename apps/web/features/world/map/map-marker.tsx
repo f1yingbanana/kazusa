@@ -13,6 +13,7 @@ import { taskIcon, taskLabel } from "@/lib/state/task-icon";
 import { BACKDROP_POSITION } from "@/lib/scene/layout";
 import { firstName } from "@/lib/format";
 import { formatSimDuration } from "@/lib/time/sim";
+import { usePlainText } from "../../wiki/links";
 
 /**
  * Words on the map stay readable over roads and regions without a box: an
@@ -539,6 +540,7 @@ export function PlacePeek({
   extra: number;
   hint: string | undefined;
 }) {
+  const plain = usePlainText();
   const here = people.length + extra;
   return (
     <MapPeek x={x} y={y} anchor={anchor}>
@@ -557,7 +559,9 @@ export function PlacePeek({
         ) : null}
         <span className="text-sm leading-tight font-extrabold">{name}</span>
         {summary ? (
-          <span className="text-xs leading-snug text-ui-ink/80">{summary}</span>
+          <span className="text-xs leading-snug text-ui-ink/80">
+            {plain(summary)}
+          </span>
         ) : null}
 
         <span className="mt-0.5 flex items-center gap-2">
@@ -644,6 +648,7 @@ export function PersonPeek({
   const { status, presence } = usePresence(person);
   const task = status?.task;
   const groupName = usePageName();
+  const plain = usePlainText();
   // Only the nearest group, so it never outweighs the name.
   const group = person.groups?.[0] ? groupName(person.groups[0]) : undefined;
   const TaskIcon = taskIcon(task?.type);
@@ -700,7 +705,7 @@ export function PersonPeek({
         ) : null}
         {person.summary ? (
           <span className="text-xs leading-snug text-ui-ink/80">
-            {person.summary}
+            {plain(person.summary)}
           </span>
         ) : null}
         <span className="border-t border-ui-line pt-1.5 text-[11px] text-ui-soft">

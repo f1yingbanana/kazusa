@@ -351,9 +351,7 @@ function AddPictureForm({
               ? `${name} is there already: replace it from its own tile.`
               : undefined
           }
-          description={
-            name ? `Saved as ${name}` : "A word or two: what the face shows."
-          }
+          description={name ? `Saved as ${name}` : undefined}
           onChange={(event) => setMood(event.target.value)}
         />
         <PictureDrop onFile={setFile}>

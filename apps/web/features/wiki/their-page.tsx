@@ -11,7 +11,7 @@ import { useQueryStates } from "nuqs";
 import type { ReactNode } from "react";
 import { useAccess } from "@/hooks/use-access";
 import { useCharacters } from "@/hooks/use-characters";
-import { usePageName, useWikiPage } from "@/hooks/use-wiki";
+import { usePageLookup, usePageName, useWikiPage } from "@/hooks/use-wiki";
 import { firstName } from "@/lib/format";
 import { Button, IconButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
@@ -26,7 +26,7 @@ import { Eyebrow, PageHead, Sheet } from "./page-header";
 import { PageMenu } from "./page-menu";
 import { wikiPatch } from "./open";
 import { wikiParsers, type WikiSide } from "./search-params";
-import { useRefreshWiki } from "./world-page";
+import { useRefreshWiki } from "./refresh";
 
 const DEPTH_WORD: Readonly<Record<Knowledge["depth"], string>> = {
   none: "Never heard of",
@@ -192,11 +192,14 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
   const refresh = useRefreshWiki();
   const viewer = byId.get(agent);
   const pageName = usePageName();
+  const lookup = usePageLookup();
   const called = firstName(viewer?.name ?? pageName(agent));
   const world = read.data?.world;
   const own = read.data?.personal;
   const knowledge = read.data?.knowledge;
-  const title = world?.name ?? own?.name ?? params["wiki.name"] ?? id;
+  const listed = lookup(id);
+  const title =
+    world?.name ?? own?.name ?? listed?.name ?? params["wiki.name"] ?? id;
   const about = firstName(title);
   const kind: WikiKind | undefined =
     params["wiki.kind"] ?? world?.kind ?? own?.kind;
@@ -220,10 +223,6 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
       void setParams(wikiPatch(saved.id, { agent }));
     else edit(null);
   };
-
-  if (read.isLoading) return <Note inset="panel">Opening the page…</Note>;
-  if (read.error)
-    return <Note inset="panel">{"Couldn't read this page."}</Note>;
 
   const editor = (side: WikiSide) => (
     <PageEditor
@@ -278,7 +277,7 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
           reader={reader}
         />
       ) : (
-        <Note>{`Only in ${called}'s wiki: the world has no page on it.`}</Note>
+        <Note>Not in the World Wiki.</Note>
       )}
     </Column>
   );
@@ -339,7 +338,7 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
                 icon={<PlusIcon aria-hidden />}
                 onClick={() => edit("own")}
               >
-                {`Write what ${called} makes of it`}
+                Write notes
               </Button>
             ) : undefined
           }
@@ -355,40 +354,44 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
       <PageHead
         eyebrow={
           <Eyebrow
-            page={world ?? own ?? { id, kind: kind ?? "concept" }}
+            page={world ?? own ?? listed ?? { id, kind: kind ?? "concept" }}
             lead={
-              viewer ? (
-                <span className="inline-flex items-center gap-1.5 text-ui-accent-ink">
-                  {`In ${called}'s wiki`}
-                  <span aria-hidden>·</span>
-                </span>
-              ) : null
+              <span className="inline-flex items-center gap-1.5 text-ui-accent-ink">
+                {`In ${called}'s wiki`}
+                <span aria-hidden>·</span>
+              </span>
             }
           />
         }
         title={title}
         under={
-          knowledge ? (
-            <KnowledgeLine knowledge={knowledge} called={called} />
-          ) : null
+          <div className="min-h-7">
+            {knowledge ? (
+              <KnowledgeLine knowledge={knowledge} called={called} />
+            ) : null}
+          </div>
         }
       />
-      <div
-        style={BODY_TRANSITION}
-        className={cx(
-          "grid items-start gap-6",
-          editing === "own"
-            ? "@min-[52rem]:grid-cols-2"
-            : "@min-[52rem]:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]",
-        )}
-      >
-        <div className="order-2 min-w-0 @min-[52rem]:order-1">
-          {worldColumn}
+      {read.error ? (
+        <Note>{"Couldn't read this page."}</Note>
+      ) : read.isLoading ? null : (
+        <div
+          style={BODY_TRANSITION}
+          className={cx(
+            "grid items-start gap-6",
+            editing === "own"
+              ? "@min-[52rem]:grid-cols-2"
+              : "@min-[52rem]:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]",
+          )}
+        >
+          <div className="order-2 min-w-0 @min-[52rem]:order-1">
+            {worldColumn}
+          </div>
+          <div className="order-1 min-w-0 @min-[52rem]:sticky @min-[52rem]:top-4 @min-[52rem]:order-2">
+            {ownColumn}
+          </div>
         </div>
-        <div className="order-1 min-w-0 @min-[52rem]:sticky @min-[52rem]:top-4 @min-[52rem]:order-2">
-          {ownColumn}
-        </div>
-      </div>
+      )}
     </Sheet>
   );
 }

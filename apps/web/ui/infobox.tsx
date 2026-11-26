@@ -19,12 +19,15 @@ export function Infobox({
   label,
   picture,
   caption,
+  actions,
   className,
   children,
 }: {
   label: string;
   picture?: InfoboxPicture | undefined;
   caption?: ReactNode;
+  /** Buttons under the facts, like where else to see what the page is about. */
+  actions?: ReactNode;
   className?: string;
   /** `InfoboxRow`s. */
   children?: ReactNode;
@@ -36,7 +39,7 @@ export function Infobox({
   const rows = Array.isArray(children)
     ? children.some(Boolean)
     : Boolean(children);
-  if (!visiblePicture && !rows) return null;
+  if (!visiblePicture && !rows && !actions) return null;
   return (
     <aside
       aria-label={label}
@@ -71,6 +74,7 @@ export function Infobox({
       {rows ? (
         <dl className="flex flex-col gap-3 px-1 pb-1">{children}</dl>
       ) : null}
+      {actions ? <div className="flex flex-wrap gap-1.5">{actions}</div> : null}
     </aside>
   );
 }

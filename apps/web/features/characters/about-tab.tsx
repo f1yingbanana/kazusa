@@ -9,7 +9,7 @@ import { Note } from "@/ui/note";
 import { PageArticle } from "../wiki/article";
 import { BODY_TRANSITION, withTransition } from "../wiki/motion";
 import { PageEditor } from "../wiki/page-editor";
-import { useRefreshWiki } from "../wiki/world-page";
+import { useRefreshWiki } from "../wiki/refresh";
 
 /**
  * Their World Wiki page below the head, read in its layers; opened to be
@@ -49,7 +49,7 @@ export function AboutTab({
         }}
       />
     );
-  if (read.isLoading) return <Note>Reading their page…</Note>;
+  if (read.isLoading) return null;
   if (read.error) return <Note>{"Couldn't read their page."}</Note>;
   if (!page) return <Note>{`Nothing is written about ${called} yet.`}</Note>;
   return (

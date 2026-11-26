@@ -83,7 +83,7 @@ export function MemoryEditor({
             )}
           >
             {conflict
-              ? "Their sleep rewrote this meanwhile. Copy your words, then load it."
+              ? "Rewritten by their sleep meanwhile."
               : "Unsaved changes"}
           </p>
           {conflict ? (

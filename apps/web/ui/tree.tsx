@@ -30,6 +30,8 @@ export function TreeRow({
   leading,
   trailing,
   heading = false,
+  marked = false,
+  data,
   children,
 }: {
   value: string;
@@ -39,16 +41,21 @@ export function TreeRow({
   leading?: ReactNode;
   trailing?: ReactNode;
   heading?: boolean;
+  /** Drawn as current, for a second row of the current item. */
+  marked?: boolean;
+  /** `data-*` attributes for the row, like what it stands for. */
+  data?: Readonly<Record<`data-${string}`, string>>;
   /** The rows inside it, for a branch. */
   children?: ReactNode;
 }) {
   return (
-    <Item value={value} label={label} className="outline-none">
+    <Item {...data} value={value} label={label} className="outline-none">
       <TreeItemLabel
         render={render}
         className={cx(
           "group/row flex min-h-8.5 cursor-default items-center gap-2 rounded-[0.75rem] ps-[calc((var(--tree-level)-1)*0.875rem+0.25rem)] pe-2 text-[0.875rem] text-ui-ink outline-none select-none hover:bg-ui-tint data-current:bg-ui-surface data-current:font-bold data-current:inset-ring-2 data-current:inset-ring-ui-primary [[data-slot=tree-item]:focus-visible>&]:outline-2 [[data-slot=tree-item]:focus-visible>&]:-outline-offset-2 [[data-slot=tree-item]:focus-visible>&]:outline-ui-primary",
           heading ? "mt-2 min-h-9 font-extrabold" : "font-semibold",
+          marked && "bg-ui-surface inset-ring-2 inset-ring-ui-line",
         )}
       >
         {children ? (

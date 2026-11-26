@@ -14,6 +14,7 @@ import { TalkGroup } from "@/ui/talk-group";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { usePresence } from "../characters/presence";
 import { conversationParsers, conversationPatch } from "../chats/open";
+import { usePlainText } from "../wiki/links";
 import { rememberTalkOrigin } from "./talk-origin";
 import type { Talk } from "./talks";
 
@@ -158,8 +159,9 @@ function PersonRow({
  */
 function Activity({ character }: { character: CharacterSummary }) {
   const { status } = usePresence(character);
+  const plain = usePlainText();
   const task = status?.onstage === false ? undefined : status?.task;
-  if (!task) return character.summary ?? null;
+  if (!task) return character.summary ? plain(character.summary) : null;
   const Icon = taskIcon(task.type);
   return (
     <>

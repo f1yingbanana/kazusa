@@ -1,6 +1,6 @@
 import type { WikiListItem } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
-import { areasOf, buildIndex, shelfOf } from "./index-tree";
+import { areasOf, buildIndex, shelfOf, shelvesOf } from "./index-tree";
 
 const page = (id: string, extra: Partial<WikiListItem> = {}): WikiListItem => ({
   id,
@@ -28,7 +28,7 @@ describe("a wiki's index", () => {
     expect(shelfOf(pages[4])).toBe("places");
     expect(shelfOf(pages[3])).toBe("groups");
     expect(shelfOf(pages[5])).toBe("people");
-    expect(shelfOf(pages[6])).toBe("things");
+    expect(shelfOf(pages[6])).toBe("concepts");
     expect(shelfOf(pages[7])).toBe("days");
   });
 
@@ -38,7 +38,7 @@ describe("a wiki's index", () => {
       "§places",
       "§people",
       "§groups",
-      "§things",
+      "§concepts",
       "§days",
     ]);
     expect(counts.places).toBe(4);
@@ -47,6 +47,19 @@ describe("a wiki's index", () => {
     expect(kivotos.children?.[0].children?.map((child) => child.value)).toEqual(
       ["cafeteria", "hall"],
     );
+  });
+
+  it("puts a place that is a group on both shelves, each row its own", () => {
+    const { items, counts } = buildIndex(pages);
+    const groups = items.find((item) => item.value === "§groups");
+    expect(counts.groups).toBe(2);
+    expect(groups?.children?.map((child) => [child.value, child.page])).toEqual(
+      [
+        ["§groups:hall", "hall"],
+        ["prefects", "prefects"],
+      ],
+    );
+    expect(shelvesOf(pages[4])).toEqual(["places", "groups"]);
   });
 
   it("lists diary days newest first", () => {
@@ -61,7 +74,7 @@ describe("a wiki's index", () => {
     const { items, counts } = buildIndex(pages, "lunch");
     expect(items).toHaveLength(1);
     expect(items[0].children).toEqual([
-      { value: "cafeteria", label: "Cafeteria" },
+      { value: "cafeteria", label: "Cafeteria", page: "cafeteria" },
     ]);
     expect(counts.places).toBe(1);
     expect(buildIndex(pages, "chairwoman").items[0].value).toBe("§people");

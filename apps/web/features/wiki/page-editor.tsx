@@ -39,7 +39,7 @@ import { OnePicker } from "@/ui/combobox";
 import { ToggleChip } from "@/ui/toggle";
 import { usePlaceOptions, WhereItIs } from "./place-editor";
 import type { WikiSide } from "./search-params";
-import { savingWords, SourceEditor } from "./source-editor";
+import { SourceEditor } from "./source-editor";
 
 const EVERYONE = "everyone";
 
@@ -166,8 +166,8 @@ export function PageEditor({
           title="Discard your changes?"
           description={
             leaving === "switch"
-              ? `The ${raw ? "form" : "Markdown"} opens on the page as it was saved, without what you changed here.`
-              : "What you changed here won't be saved."
+              ? "Your changes won't carry over."
+              : "Your changes won't be saved."
           }
           onConfirm={() => {
             const next = leaving;
@@ -297,11 +297,7 @@ function FormEditor({
   const { options: places } = usePlaceOptions();
 
   if (!opened)
-    return source.error ? (
-      <Note>{failureText(source.error)}</Note>
-    ) : (
-      <Note>Opening the page…</Note>
-    );
+    return source.error ? <Note>{failureText(source.error)}</Note> : null;
 
   const initial = draftOf(opened, name);
   const current = draft ?? initial;
@@ -452,7 +448,7 @@ function FormEditor({
           <TextInput
             aria-label="Also called"
             value={current.aliases}
-            placeholder="Also called… (commas between names)"
+            placeholder="Also called…"
             className="h-9 min-w-56 flex-1"
             onChange={(event) => set({ aliases: event.target.value })}
           />
@@ -519,7 +515,7 @@ function FormEditor({
       ) : null}
 
       {person && !personal ? (
-        <EditorSection title="Home" hint="Where they live and start each day.">
+        <EditorSection title="Home">
           <OnePicker
             label="Home"
             placeholder="No home"
@@ -532,12 +528,8 @@ function FormEditor({
 
       {!personal && upgraded ? (
         <EditorSection
-          title={person ? `Who knows ${subject}` : `Who knows ${subject}`}
-          hint={
-            person
-              ? "The groups they're in, and anyone else who knows of them. Each reads as far as its level."
-              : "Each group's members read as far as its level: the summary, the opening, or everything."
-          }
+          title={person ? "Who knows them" : "Who knows it"}
+          hint={person ? undefined : undefined}
         >
           {person ? (
             <div className="flex flex-col gap-1.5">
@@ -586,13 +578,7 @@ function FormEditor({
                 `How well ${nameOf(row.ref)} knows ${subject}`
               }
               onChange={(rows) => setField({ groups: everyoneFirst(rows) })}
-              empty={
-                isPlace
-                  ? "Only those who live or have been here."
-                  : person
-                    ? undefined
-                    : "Nobody yet."
-              }
+              empty={isPlace ? undefined : person ? undefined : undefined}
               add={{
                 label: "Add who knows it",
                 placeholder: fields.groups.length
@@ -636,7 +622,6 @@ function FormEditor({
                 levels={MEMBER_LEVELS}
                 levelLabel={(row) => `How involved ${row.name} is`}
                 onChange={(members) => set({ members })}
-                empty="No one yet."
                 add={{
                   label: "Add a member",
                   placeholder: "Add someone",
@@ -656,8 +641,8 @@ function FormEditor({
           ) : null}
         </EditorSection>
       ) : !personal ? (
-        <Callout title="Who knows it is set in Markdown here">
-          {`This world is in the older format. A new release of its template brings who knows ${subject} into the form.`}
+        <Callout title="Who knows it is set in Markdown">
+          This world is in an older format.
         </Callout>
       ) : null}
 
@@ -667,11 +652,7 @@ function FormEditor({
             ? `What ${owner ?? "they"} make${owner ? "s" : ""} of it`
             : "The page"
         }
-        hint={
-          personal
-            ? undefined
-            : "Read in layers: the fewer who reach a part, the stronger its rail."
-        }
+        hint={personal ? undefined : undefined}
       >
         <div className="flex flex-col gap-5">
           <LayerField
@@ -711,7 +692,7 @@ function FormEditor({
             name={personal ? "The rest" : undefined}
             htmlFor={`${formId}-close`}
             readers={personal ? undefined : readers("close")}
-            hint="A ## heading starts each topic; it comes up when talk turns to it."
+            hint="## starts a topic."
           >
             {text(
               "close",
@@ -725,7 +706,6 @@ function FormEditor({
               layer="self"
               htmlFor={`${formId}-only`}
               readers={`Only ${subject}`}
-              hint="Read as their own thoughts, by no one else."
             >
               {text(
                 "only",
@@ -739,10 +719,7 @@ function FormEditor({
       </EditorSection>
 
       {opened.other.length ? (
-        <EditorSection
-          title="Fields characters can't read"
-          hint="Kazusa doesn't read these, so no one in the world sees them."
-        >
+        <EditorSection title="Unread fields">
           <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-1 text-[0.8125rem]">
             {opened.other.map(({ key, value }) => (
               <div key={key} className="contents">
@@ -756,13 +733,11 @@ function FormEditor({
           <CheckRow
             checked={moveOther}
             onCheckedChange={(checked) => setMoveOther(checked === true)}
-            label="Move them into the text when saving"
+            label="Move into the text on save"
             className="-mx-2.5"
           />
         </EditorSection>
       ) : null}
-
-      <p className="text-xs leading-normal text-ui-soft">{`${savingWords(side, owner)} ⌘S saves.`}</p>
 
       {bar({
         dirty,

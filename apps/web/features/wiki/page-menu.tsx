@@ -1,7 +1,13 @@
 "use client";
 
 import type { WikiEditResult, WikiKind } from "@kazusa/client";
-import { CopyIcon, EllipsisIcon, FileCodeIcon, Trash2Icon } from "lucide-react";
+import {
+  CopyIcon,
+  EllipsisIcon,
+  FileCodeIcon,
+  MapPinPlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAccess } from "@/hooks/use-access";
@@ -31,7 +37,11 @@ export function describeResult(result: WikiEditResult): string | undefined {
 }
 
 /** Puts a page's Markdown on the clipboard, even while it still loads. */
-async function copyMarkdown(id: string, agent?: string, kind?: WikiKind) {
+export async function copyMarkdown(
+  id: string,
+  agent?: string,
+  kind?: WikiKind,
+) {
   const text = fetchWikiSource(id, agent, kind).then((page) => page.text);
   try {
     // Handed over within the press: browsers only let a page write there then.
@@ -63,6 +73,7 @@ export function PageMenu({
   kind,
   place = false,
   onRaw,
+  onNewInside,
   onDeleted,
 }: {
   id: string;
@@ -72,6 +83,8 @@ export function PageMenu({
   kind?: WikiKind | undefined;
   place?: boolean;
   onRaw?: (() => void) | undefined;
+  /** For a place: make another inside it. */
+  onNewInside?: (() => void) | undefined;
   onDeleted: () => void;
 }) {
   const { canManage } = useAccess();
@@ -91,6 +104,14 @@ export function PageMenu({
           {canManage && onRaw ? (
             <MenuItem icon={<FileCodeIcon aria-hidden />} onClick={onRaw}>
               Edit as Markdown
+            </MenuItem>
+          ) : null}
+          {canManage && onNewInside ? (
+            <MenuItem
+              icon={<MapPinPlusIcon aria-hidden />}
+              onClick={onNewInside}
+            >
+              New place inside
             </MenuItem>
           ) : null}
           <MenuItem
@@ -119,8 +140,8 @@ export function PageMenu({
           title={`Delete ${name}?`}
           description={
             place
-              ? "It goes from the map too: places inside it move up to its area, and anyone there with them. This can't be undone."
-              : "Pages that mention it stay as they are. This can't be undone."
+              ? "Places inside move up to its area. This can't be undone."
+              : "This can't be undone."
           }
           agentConfirm={`Deletes ${name} for good`}
           onConfirm={() =>

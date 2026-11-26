@@ -115,7 +115,7 @@ function OutfitHead({
         <AlertPanel
           danger
           title={`Remove the ${outfit} outfit?`}
-          description="It has no pictures, so nothing else goes with it."
+          description="It has no pictures."
           onConfirm={() =>
             void saveStickers({ id, outfits: { [outfit]: null } })
               .then(onChanged)
@@ -189,9 +189,7 @@ export function LooksEditor({
               onChanged={onChanged}
             />
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-ui-soft">
-                Portraits: the figure a scene shows, one per mood
-              </span>
+              <span className="text-xs font-bold text-ui-soft">Portraits</span>
               <ul className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
                 {pictures.map((portrait) => (
                   <li key={portrait.name}>
@@ -219,9 +217,7 @@ export function LooksEditor({
               </ul>
             </div>
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-ui-soft">
-                Stickers: chosen by what they show, so say it mood first
-              </span>
+              <span className="text-xs font-bold text-ui-soft">Stickers</span>
               <ul className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
                 {sent.map((sticker) => (
                   <li key={sticker.name}>
@@ -239,7 +235,7 @@ export function LooksEditor({
                         key={sticker.look ?? ""}
                         value={sticker.look ?? ""}
                         label={`What the ${sticker.name} sticker shows`}
-                        placeholder={`${sticker.mood}, …`}
+                        placeholder={`${sticker.mood}, and what shows`}
                         className="h-8 px-2.5 text-xs"
                         onSave={async (text) => {
                           await saveStickers({

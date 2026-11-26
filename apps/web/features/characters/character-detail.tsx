@@ -19,6 +19,7 @@ import { CharacterActions, FailureLine, StatusLine } from "./character-actions";
 import { CharacterAvatar } from "./character-avatar";
 import { Desires } from "./desires";
 import { usePresence } from "./presence";
+import { RichText } from "../wiki/links";
 import { RightNow } from "./right-now";
 import {
   CharacterContextSection,
@@ -143,7 +144,9 @@ export function CharacterDetail({
       <CharacterActions character={character} />
 
       {character.summary ? (
-        <DetailAbout>{character.summary}</DetailAbout>
+        <DetailAbout>
+          <RichText text={character.summary} />
+        </DetailAbout>
       ) : null}
 
       <RightNow character={character} company={company} />

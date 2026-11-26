@@ -10,7 +10,12 @@ import type { ComponentProps, ReactNode } from "react";
 import { cx } from "./cx";
 import { POPUP } from "./popup";
 
-export { Menu, MenuTrigger } from "@ui-sdk/react/menu";
+export {
+  createMenuController,
+  Menu,
+  MenuContextTrigger,
+  MenuTrigger,
+} from "@ui-sdk/react/menu";
 
 /* Concentric corners: the menu's radius is the item's plus the menu's padding. */
 export function MenuContent(

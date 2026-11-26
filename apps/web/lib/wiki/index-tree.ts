@@ -5,7 +5,7 @@ export const SHELVES = [
   "places",
   "people",
   "groups",
-  "things",
+  "concepts",
   "days",
 ] as const;
 export type Shelf = (typeof SHELVES)[number];
@@ -14,7 +14,7 @@ export const SHELF_LABEL: Readonly<Record<Shelf, string>> = {
   places: "Places",
   people: "People",
   groups: "Groups",
-  things: "Things",
+  concepts: "Concepts",
   days: "Diary",
 };
 
@@ -22,18 +22,33 @@ export const SHELF_LABEL: Readonly<Record<Shelf, string>> = {
 export const shelfValue = (shelf: Shelf) => `§${shelf}`;
 export const isShelfValue = (value: string) => value.startsWith("§");
 
-/** The one shelf a page is on: a place that is also a group is a place. */
+/** A page's first shelf: a place that is also a group is first a place. */
 export function shelfOf(page: WikiListItem): Shelf {
-  if (page.kind === "person") return "people";
-  if (page.kind === "day") return "days";
-  if (page.place) return "places";
-  if (page.group) return "groups";
-  return "things";
+  return shelvesOf(page)[0];
 }
+
+/** Every shelf a page is on: a place can be a group too, and is on both. */
+export function shelvesOf(page: WikiListItem): Shelf[] {
+  if (page.kind === "person") return ["people"];
+  if (page.kind === "day") return ["days"];
+  const shelves: Shelf[] = [];
+  if (page.place) shelves.push("places");
+  if (page.group) shelves.push("groups");
+  return shelves.length ? shelves : ["concepts"];
+}
+
+/**
+ * A page's row on a shelf. On its first shelf, its id; on another, the shelf
+ * and the id, since a tree's rows each need their own.
+ */
+export const rowValue = (shelf: Shelf, page: WikiListItem) =>
+  shelfOf(page) === shelf ? page.id : `§${shelf}:${page.id}`;
 
 export interface IndexNode {
   readonly value: string;
   readonly label: string;
+  /** The page the row opens; none for a shelf. */
+  readonly page?: string;
   readonly children?: IndexNode[];
 }
 
@@ -70,22 +85,26 @@ export function buildIndex(
   const needle = query.trim().toLowerCase();
   const found = pages.filter((page) => matches(page, needle));
   const onShelf = new Map<Shelf, WikiListItem[]>();
-  for (const page of found) {
-    const shelf = shelfOf(page);
-    onShelf.set(shelf, [...(onShelf.get(shelf) ?? []), page]);
-  }
+  for (const page of found)
+    for (const shelf of shelvesOf(page))
+      onShelf.set(shelf, [...(onShelf.get(shelf) ?? []), page]);
   const parents = new Map<string, string>();
   const places = new Set(
-    pages.filter((page) => shelfOf(page) === "places").map((page) => page.id),
+    pages
+      .filter((page) => page.place && page.kind === "concept")
+      .map((page) => page.id),
   );
   for (const page of pages)
     if (page.parent && places.has(page.parent) && page.parent !== page.id)
       parents.set(page.id, page.parent);
 
-  const leaf = (page: WikiListItem): IndexNode => ({
-    value: page.id,
-    label: page.name,
-  });
+  const leaf =
+    (shelf: Shelf) =>
+    (page: WikiListItem): IndexNode => ({
+      value: rowValue(shelf, page),
+      label: page.name,
+      page: page.id,
+    });
 
   const nest = (list: readonly WikiListItem[]): IndexNode[] => {
     const ids = new Set(list.map((page) => page.id));
@@ -100,8 +119,8 @@ export function buildIndex(
     const grow = (page: WikiListItem): IndexNode => {
       const children = kids.get(page.id);
       return children?.length
-        ? { ...leaf(page), children: children.map(grow).sort(byName) }
-        : leaf(page);
+        ? { ...leaf("places")(page), children: children.map(grow).sort(byName) }
+        : leaf("places")(page);
     };
     return roots.map(grow).sort(byName);
   };
@@ -116,8 +135,8 @@ export function buildIndex(
       shelf === "places" && !needle
         ? nest(list)
         : shelf === "days"
-          ? list.map(leaf).sort((a, b) => b.value.localeCompare(a.value))
-          : list.map(leaf).sort(byName);
+          ? list.map(leaf(shelf)).sort((a, b) => b.value.localeCompare(a.value))
+          : list.map(leaf(shelf)).sort(byName);
     items.push({
       value: shelfValue(shelf),
       label: SHELF_LABEL[shelf],

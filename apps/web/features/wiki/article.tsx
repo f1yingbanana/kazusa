@@ -140,10 +140,7 @@ function SectionBody({ section }: { section: WikiPage["sections"][number] }) {
 
 function OwnMark({ subject }: { subject: string }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 self-start rounded-full bg-ui-accent-tint px-2 py-0.5 text-xs font-bold text-ui-accent-ink [&_svg]:size-3"
-      title={`Only ${subject} reads this, as their own thoughts.`}
-    >
+    <span className="inline-flex items-center gap-1 self-start rounded-full bg-ui-accent-tint px-2 py-0.5 text-xs font-bold text-ui-accent-ink [&_svg]:size-3">
       <LockIcon aria-hidden />
       {`Only ${subject}`}
     </span>

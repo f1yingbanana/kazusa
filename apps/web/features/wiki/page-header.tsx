@@ -5,7 +5,7 @@ import { ChevronRightIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { usePlaces } from "@/hooks/use-location";
 import { ancestors } from "@/lib/location/places";
-import { shelfOf, SHELF_LABEL } from "@/lib/wiki/index-tree";
+import { shelvesOf } from "@/lib/wiki/index-tree";
 import { cx } from "@/ui/cx";
 import { WikiLink } from "./links";
 import { TITLE_TRANSITION } from "./motion";
@@ -15,13 +15,13 @@ const KIND_WORD = {
   places: "Place",
   people: "Person",
   groups: "Group",
-  things: "Page",
+  concepts: "Concept",
   days: "Diary day",
 } as const;
 
 /**
- * Above a title, what it is: for a place, the areas it is in, outermost first,
- * each a link; for anything else, its kind. A place that is a group says both.
+ * Above a title, what it is: a place's areas, outermost first, each a link, and
+ * every other kind it also is. A place that is a group says both.
  */
 export function Eyebrow({
   page,
@@ -32,16 +32,18 @@ export function Eyebrow({
   lead?: ReactNode;
 }) {
   const places = usePlaces();
-  const shelf = shelfOf({ ...page, name: "", aliases: [], summary: "" });
+  const shelves = shelvesOf({ ...page, name: "", aliases: [], summary: "" });
   const areas =
     page.place && places ? ancestors(places, page.id).reverse() : [];
+  const kinds = shelves.filter((shelf) => shelf !== "places" || !areas.length);
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] font-bold text-ui-soft">
       {lead}
-      <span className="inline-flex items-center gap-1.5 text-ui-primary [&_svg]:size-3.5">
-        {SHELF_ICON[shelf]}
-        {areas.length ? null : KIND_WORD[shelf]}
-      </span>
+      {areas.length ? (
+        <span className="inline-flex items-center text-ui-primary [&_svg]:size-3.5">
+          {SHELF_ICON.places}
+        </span>
+      ) : null}
       {areas.map((area, at) => (
         <Fragment key={area}>
           {at ? (
@@ -53,11 +55,15 @@ export function Eyebrow({
           <WikiLink id={area} />
         </Fragment>
       ))}
-      {page.place && page.group ? (
-        <span className="rounded-full bg-ui-tint px-2 py-px text-xs text-ui-soft">
-          {SHELF_LABEL.groups.slice(0, -1)}
-        </span>
-      ) : null}
+      {kinds.map((shelf, at) => (
+        <Fragment key={shelf}>
+          {at || areas.length ? <span aria-hidden>·</span> : null}
+          <span className="inline-flex items-center gap-1.5 text-ui-primary [&_svg]:size-3.5">
+            {SHELF_ICON[shelf]}
+            {KIND_WORD[shelf]}
+          </span>
+        </Fragment>
+      ))}
     </div>
   );
 }

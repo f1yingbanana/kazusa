@@ -181,16 +181,13 @@ export function WhereItIs({
   const setRoutes = (next: Route[]) => onChange({ connections: next });
 
   return (
-    <EditorSection
-      title="Where it is"
-      hint="Where it sits on the map, and how people get to it."
-    >
+    <EditorSection title="Where it is">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-56 flex-1 flex-col gap-1.5">
           <span className="text-sm font-bold">Inside</span>
           <OnePicker
             label="Inside"
-            placeholder="Nowhere: a top-level place"
+            placeholder="Nowhere"
             options={areas}
             value={fields.parent}
             onChange={(parent) => onChange({ parent })}

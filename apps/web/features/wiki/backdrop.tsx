@@ -16,18 +16,17 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogClose, DialogFoot, DialogPanel } from "@/ui/dialog";
 import { TextField } from "@/ui/field";
 import { Note } from "@/ui/note";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-} from "@/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { failureText } from "./failure";
 import { WikiLink } from "./links";
+import { useRefreshWiki } from "./refresh";
 import { DropTile, PictureTile } from "./pictures";
 
 const AREA = "__area";
+
+/** `ruined-school-corridor` → "Ruined school corridor". */
+const setLabel = (name: string) =>
+  name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
 
 /**
  * The pictures of one backdrop set: one for each time of day, and for each
@@ -44,7 +43,8 @@ function BackdropSet({
   editable: boolean;
 }) {
   const { data, error, isLoading, mutate } = useWikiBackdrops();
-  if (isLoading) return <Note>Fetching the pictures…</Note>;
+  const refresh = useRefreshWiki();
+  if (isLoading) return null;
   if (error || !data)
     return (
       <Note>{error ? failureText(error) : "Couldn't read the backdrops."}</Note>
@@ -57,11 +57,11 @@ function BackdropSet({
     set?.files.filter((file) => !data.times.includes(file.time)) ?? [];
   const put = async (picture: string, file: File) => {
     await uploadPicture({ kind: "backdrop", set: name, name: picture }, file);
-    await mutate();
+    await Promise.all([mutate(), refresh()]);
   };
   const remove = async (picture: string) => {
     await removePicture({ kind: "backdrop", set: name, name: picture });
-    await mutate();
+    await Promise.all([mutate(), refresh()]);
   };
   const elsewhere = set?.places.filter((place) => place.id !== at) ?? [];
   return (
@@ -166,6 +166,7 @@ export function BackdropPanel({ id }: { id: string }) {
   const places = usePlaces();
   const form = useWikiForm(canManage ? id : undefined);
   const { data: library, mutate } = useWikiBackdrops();
+  const refresh = useRefreshWiki();
   const [making, setMaking] = useState(false);
   const [saving, setSaving] = useState(false);
   const place = places?.byId.get(id);
@@ -188,7 +189,7 @@ export function BackdropPanel({ id }: { id: string }) {
         close: opened.close,
         only: opened.only,
       });
-      await Promise.all([form.mutate(), mutate()]);
+      await Promise.all([form.mutate(), mutate(), refresh()]);
     } catch (failure) {
       toast.error("Couldn't change the backdrop", {
         description: failureText(failure),
@@ -197,7 +198,7 @@ export function BackdropPanel({ id }: { id: string }) {
       setSaving(false);
     }
   };
-  const areaLabel = area ? `${area.name}'s, its area` : "None";
+  const areaLabel = area ? `Same as ${area.name}` : "None";
 
   return (
     <div className="flex flex-col gap-6">
@@ -206,7 +207,7 @@ export function BackdropPanel({ id }: { id: string }) {
           <Select<string>
             items={[
               { value: AREA, label: areaLabel },
-              ...sets.map((name) => ({ value: name, label: name })),
+              ...sets.map((name) => ({ value: name, label: setLabel(name) })),
             ]}
             value={own ?? AREA}
             disabled={saving || !form.data}
@@ -220,10 +221,9 @@ export function BackdropPanel({ id }: { id: string }) {
             />
             <SelectContent>
               <SelectItem value={AREA}>{areaLabel}</SelectItem>
-              {sets.length ? <SelectSeparator /> : null}
               {sets.map((name) => (
                 <SelectItem key={name} value={name}>
-                  {name}
+                  {setLabel(name)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -248,7 +248,7 @@ export function BackdropPanel({ id }: { id: string }) {
       {shown ? (
         <BackdropSet name={shown} at={id} editable={canManage} />
       ) : (
-        <Note>No backdrop yet: a scene here is drawn on plain ground.</Note>
+        <Note>No backdrop.</Note>
       )}
       <NewSetDialog
         open={making}
@@ -281,7 +281,7 @@ function NewSetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPanel
         title="New backdrop set"
-        description="Pictures of one kind of place, one for each time of day. Places can share a set."
+        description="One picture per time of day. Places can share a set."
       >
         <form
           noValidate
@@ -299,9 +299,7 @@ function NewSetDialog({
             autoFocus
             placeholder="Rooftop garden"
             error={clash ? `There is a set called ${name} already.` : undefined}
-            description={
-              name ? `Saved as ${name}` : "Lowercase words joined by dashes."
-            }
+            description={name ? `Saved as ${name}` : undefined}
             onChange={(event) => setWords(event.target.value)}
           />
           <DialogFoot>

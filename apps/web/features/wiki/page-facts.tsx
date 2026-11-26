@@ -6,11 +6,17 @@ import type {
   WikiReachResponse,
 } from "@kazusa/client";
 import { Fragment } from "react";
-import { useCharacters } from "@/hooks/use-characters";
+import { BookUserIcon, UserRoundIcon } from "lucide-react";
+import { parseAsString, useQueryStates } from "nuqs";
+import { isCast, useCharacters } from "@/hooks/use-characters";
 import { usePlaces } from "@/hooks/use-location";
 import { connectionsOf, describeWay } from "@/lib/location/places";
 import { usePlacesResource } from "@/lib/source/provider";
+import { Button } from "@/ui/button";
 import { Infobox, InfoboxRow } from "@/ui/infobox";
+import { charactersParsers, profilePatch } from "../characters/search-params";
+import { wikiPatch } from "./open";
+import { wikiParsers } from "./search-params";
 import { WikiLink } from "./links";
 import { MEMBERSHIP_WORD, Names } from "./reach";
 
@@ -63,6 +69,11 @@ export function PageFacts({
   const places = usePlaces();
   const { data: placesData } = usePlacesResource();
   const { byId } = useCharacters();
+  const [, setParams] = useQueryStates({
+    ...wikiParsers,
+    ...charactersParsers,
+    view: parseAsString,
+  });
   const place = page.place ? places?.byId.get(page.id) : undefined;
   const person = page.kind === "person" ? byId.get(page.id) : undefined;
   const picture = place
@@ -71,12 +82,41 @@ export function PageFacts({
   const inside = place && places ? (places.children.get(page.id) ?? []) : [];
   const routes = place && places ? connectionsOf(places, page.id) : [];
   const members = page.group ? (reach?.members ?? []) : [];
+  const cast = isCast(person) ? person : undefined;
 
   return (
     <Infobox
       label={`About ${page.name}`}
       picture={picture ? { src: picture } : undefined}
       caption={place?.backdrop ? place.backdrop.replace(/-/g, " ") : undefined}
+      actions={
+        cast ? (
+          <>
+            <Button
+              tone="soft"
+              size="sm"
+              icon={<UserRoundIcon aria-hidden />}
+              onClick={() =>
+                void setParams({ ...wikiPatch(null), ...profilePatch(cast.id) })
+              }
+            >
+              Profile
+            </Button>
+            {cast.kind === "agent" ? (
+              <Button
+                tone="soft"
+                size="sm"
+                icon={<BookUserIcon aria-hidden />}
+                onClick={() =>
+                  void setParams(wikiPatch(null, { agent: cast.id }))
+                }
+              >
+                Their wiki
+              </Button>
+            ) : null}
+          </>
+        ) : undefined
+      }
       className={className}
     >
       {place?.parent ? (
