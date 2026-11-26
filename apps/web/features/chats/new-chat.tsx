@@ -11,7 +11,7 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogClose, DialogPanel } from "@/ui/dialog";
 import { TextInput } from "@/ui/input";
 import { PickList, type PickGroup } from "@/ui/pick-list";
-import { CharacterAvatar } from "../characters/character-avatar";
+import { castPickItem } from "../characters/character-picker";
 
 /**
  * Who to text: one person opens your chat with them (the one there is, or a new
@@ -67,27 +67,15 @@ function NewChatForm({
     const near = new Set(
       position.placeId ? (occupied.at.get(position.placeId) ?? []) : [],
     );
-    const item = (one: (typeof cast)[number]) => ({
-      value: one.id,
-      label: one.name,
-      keywords: one.aliases,
-      muted: one.offstage,
-      media: (
-        <CharacterAvatar
-          id={one.id}
-          name={one.name}
-          avatarUrl={one.avatarUrl}
-          kind="agent"
-          size="sm"
-          decorative
-        />
-      ),
-      ...(near.has(one.id)
-        ? { sub: "Here with you" }
-        : one.offstage
-          ? { sub: "Offstage: won't reply right away" }
-          : {}),
-    });
+    const item = (one: (typeof cast)[number]) =>
+      castPickItem(
+        one,
+        near.has(one.id)
+          ? "Here with you"
+          : one.offstage
+            ? "Offstage: won't reply right away"
+            : undefined,
+      );
     return [
       { label: "Here with you", items: cast.filter((c) => near.has(c.id)) },
       {

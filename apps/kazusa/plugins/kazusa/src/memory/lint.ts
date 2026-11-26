@@ -75,20 +75,26 @@ export function lintWorld(world: WorldModel): LintFinding[] {
           page.id,
           "`parent` is only read on a place: link to what it belongs to instead",
         );
-      for (const [field, list] of [
-        ["known", page.known],
-        ["in", page.in],
-      ] as const)
-        for (const { ref } of list) {
-          reference(field, ref);
-          const named = world.pages.get(world.resolve(ref) ?? "");
-          if (named && !named.group)
-            add(
-              "error",
-              page.id,
-              `\`${field}\` names ${named.name}, which isn't a group (\`group: true\`)`,
-            );
-        }
+      for (const { ref } of page.known) {
+        reference("known", ref);
+        const named = world.pages.get(world.resolve(ref) ?? "");
+        if (named && !named.group && named.kind !== "person")
+          add(
+            "error",
+            page.id,
+            `\`known\` names ${named.name}, which isn't a group or person`,
+          );
+      }
+      for (const { ref } of page.in) {
+        reference("in", ref);
+        const named = world.pages.get(world.resolve(ref) ?? "");
+        if (named && !named.group)
+          add(
+            "error",
+            page.id,
+            `\`in\` names ${named.name}, which isn't a group (\`group: true\`)`,
+          );
+      }
       if (page.in.length && page.kind !== "person")
         add("warning", page.id, "`in` is only read on a character's page");
       const older = page.renown

@@ -34,6 +34,7 @@ import {
 } from "@/ui/popover";
 import { SwitchRow } from "@/ui/switch";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { castPickItem } from "../characters/character-picker";
 import { conversationParsers } from "./open";
 
 function failed(what: string, error: unknown) {
@@ -182,14 +183,11 @@ function useCandidates(chat: Chat): readonly PickGroup[] {
       />
     );
     if (chat.type !== "huddle") {
-      const item = (one: (typeof cast)[number]) => ({
-        value: one.id,
-        label: one.name,
-        keywords: one.aliases,
-        media: face(one.id, one.name, one.avatarUrl),
-        muted: one.offstage,
-        ...(one.offstage ? { sub: "Offstage: won't reply right away" } : {}),
-      });
+      const item = (one: (typeof cast)[number]) =>
+        castPickItem(
+          one,
+          one.offstage ? "Offstage: won't reply right away" : undefined,
+        );
       return [
         { label: "Onstage", items: cast.filter((c) => !c.offstage).map(item) },
         { label: "Offstage", items: cast.filter((c) => c.offstage).map(item) },

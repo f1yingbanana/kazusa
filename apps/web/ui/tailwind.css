@@ -246,6 +246,19 @@
   @apply bg-ui-surface shadow-ui inset-ring inset-ring-ui-line;
 }
 
+/* Covers the gap below a bottom sheet or mobile dialog if dragged past its edge. */
+@utility ui-sheet-tail {
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    height: 8rem;
+    background: var(--ui-surface);
+    pointer-events: none;
+  }
+}
+
 /*
   A talk switching between its scene and its transcript: the dialogue panel and
   the reply box share a name. Each picture keeps its own height, pinned to the

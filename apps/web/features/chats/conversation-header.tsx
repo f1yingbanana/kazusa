@@ -20,6 +20,7 @@ import { AvatarStack } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { CharacterAvatar } from "../characters/character-avatar";
+import { usePlainText } from "../wiki/links";
 
 const MAX_FACES = 3;
 
@@ -220,10 +221,13 @@ function Activity({ character }: { character: CharacterSummary | undefined }) {
     character?.kind === "agent" ? character.id : undefined,
   );
   const now = useSimNow();
+  const plain = usePlainText();
   const task = status?.task;
   if (!task)
     return (
-      <span className="truncate">{character?.summary ?? "Direct message"}</span>
+      <span className="truncate">
+        {character?.summary ? plain(character.summary) : "Direct message"}
+      </span>
     );
   const Icon = taskIcon(task.type);
   return (

@@ -1,4 +1,4 @@
-export interface DiffLine {
+interface DiffLine {
   readonly kind: "same" | "added" | "removed";
   readonly text: string;
 }

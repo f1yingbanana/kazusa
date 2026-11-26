@@ -267,6 +267,61 @@ describe("rules a review found loose", () => {
     expect(w.depth("amy", "leftover").depth).toBe("none");
   });
 
+  it("lets an individual person know another person, place, or concept directly", () => {
+    const w = of([
+      concept("secret_tea", "known: { natsu: close, hifumi: heard of }"),
+      place("secret_bench", "known: { hifumi: knows }"),
+      person("hifumi", ""),
+      person("natsu", "known: { hifumi: knows }"),
+    ]);
+    expect(w.depth("natsu", "secret_tea")).toEqual({
+      depth: "intimate",
+      why: "known directly",
+    });
+    expect(w.depth("hifumi", "secret_tea")).toEqual({
+      depth: "heard of",
+      why: "known directly",
+    });
+    expect(w.depth("hifumi", "secret_bench")).toEqual({
+      depth: "familiar",
+      why: "known directly",
+    });
+    expect(w.depth("hifumi", "natsu")).toEqual({
+      depth: "familiar",
+      why: "known directly",
+    });
+    expect(w.depth("natsu", "hifumi").depth).toBe("none");
+    expect(lintWorld(w).filter((f) => f.level === "error")).toEqual([]);
+  });
+
+  it("does not leak a private home to neighbours via direct-person known entries", () => {
+    const w = of([
+      place("dorm", ""),
+      place("room_natsu", "parent: dorm\nknown: { natsu: close }"),
+      place("room_hina", "parent: dorm"),
+      person("natsu", "home: room_natsu"),
+      person("hina", "home: room_hina"),
+    ]);
+    expect(w.depth("hina", "room_natsu").depth).toBe("none");
+    expect(w.depth("natsu", "room_natsu").depth).toBe("intimate");
+  });
+
+  it("rejects non-group concepts in `known`, and people in `in`", () => {
+    const w = of([
+      concept("note_a", ""),
+      concept("secret", "known: { note_a: knows }"),
+      person("natsu", ""),
+      person("hifumi", "in: { natsu: close }"),
+    ]);
+    const errors = lintWorld(w)
+      .filter((f) => f.level === "error")
+      .map((f) => f.message);
+    expect(errors).toEqual([
+      "`known` names note_a, which isn't a group or person",
+      "`in` names natsu, which isn't a group (`group: true`)",
+    ]);
+  });
+
   it("keeps the closer level of a group named twice", () => {
     const w = of([
       group("trinity", "aliases: [Trinity]"),

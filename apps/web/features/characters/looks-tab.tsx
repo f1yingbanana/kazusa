@@ -10,6 +10,7 @@ import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
 import { Portrait } from "@/ui/portrait";
 import { placedFrame } from "./frame";
+import { LooksEditor } from "./looks-editor";
 import { charactersParsers } from "./search-params";
 
 const USUAL = "";
@@ -30,8 +31,15 @@ function byOutfit<T extends WikiPicture>(pictures: readonly T[]) {
  * Every way they can be drawn and the stickers they send. Pressing a portrait
  * tries it on: the figure beside the book changes until you leave.
  */
-export function LooksTab({ character }: { character: CharacterSummary }) {
-  const { data, error, isLoading } = useWikiCharacter(character.id);
+export function LooksTab({
+  character,
+  editing = false,
+}: {
+  character: CharacterSummary;
+  /** Opened to be changed, by whoever runs the world. */
+  editing?: boolean;
+}) {
+  const { data, error, isLoading, mutate } = useWikiCharacter(character.id);
   const { data: set } = usePortraits(character.id);
   const frames = new Map(
     (set?.portraits ?? []).map((p) => [
@@ -44,6 +52,8 @@ export function LooksTab({ character }: { character: CharacterSummary }) {
   const called = firstName(character.name);
   if (isLoading) return <Note>{`Fetching ${called}'s pictures…`}</Note>;
   if (error || !data) return <Note>{"Couldn't read their pictures."}</Note>;
+  if (editing)
+    return <LooksEditor character={data} onChanged={() => mutate()} />;
   if (!data.portraits.length && !data.stickers.length)
     return <Note>{`${called} has no portraits or stickers yet.`}</Note>;
 

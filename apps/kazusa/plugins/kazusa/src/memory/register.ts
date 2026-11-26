@@ -1075,6 +1075,7 @@ export function registerMemory(
     ...(page.theyThinkOfMe ? { theyThinkOfMe: page.theyThinkOfMe } : {}),
     ...(page.relation ? { relation: page.relation } : {}),
     ...whoKnows(page),
+    ...(page.home ? { home: page.home } : {}),
     place: page.place,
     group: page.group,
     ...(page.seen ? { seen: page.seen } : {}),
@@ -1122,24 +1123,75 @@ export function registerMemory(
       heard: [],
       none: 0,
       members: [],
+      notes: [],
     };
     const cast = new Set(listAgentIds(config));
-    for (const member of world.members(id))
-      if (cast.has(member) && member !== system)
-        reach.members.push({
-          id: member,
-          name: world.pages.get(member)?.name ?? member,
-        });
+    for (const member of world.members(id)) {
+      if (!cast.has(member) || member === system) continue;
+      const memberPage = world.pages.get(member);
+      const level = memberPage
+        ? world.memberships(memberPage).get(id)
+        : undefined;
+      reach.members.push({
+        id: member,
+        name: memberPage?.name ?? member,
+        ...(level ? { level } : {}),
+      });
+    }
     for (const agent of listAgentIds(config)) {
       if (agent === system || agent === id) continue;
-      const person = { id: agent, name: world.pages.get(agent)?.name ?? agent };
-      const { depth } = world.depth(agent, id, index.personal(agent).has(id));
+      const agentName = world.pages.get(agent)?.name ?? agent;
+      const personalPage = index.personal(agent).get(id);
+      const { depth, why, through } = world.depth(
+        agent,
+        id,
+        Boolean(personalPage),
+      );
+      const person = {
+        id: agent,
+        name: agentName,
+        ...(depth !== "none" ? { why } : {}),
+        ...(through ? { through } : {}),
+      };
       if (depth === "intimate") reach.well.push(person);
       else if (depth === "familiar") reach.knows.push(person);
       else if (depth === "heard of") reach.heard.push(person);
       else reach.none += 1;
+      if (
+        personalPage &&
+        (personalPage.summary.trim() ||
+          personalPage.lead.trim() ||
+          personalPage.relation?.trim() ||
+          personalPage.openThreads.length ||
+          personalPage.notes.length)
+      ) {
+        reach.notes?.push({
+          id: agent,
+          name: agentName,
+          summary: personalPage.summary,
+          lead: personalPage.lead,
+          ...(personalPage.relation ? { relation: personalPage.relation } : {}),
+          ...(personalPage.openThreads.length
+            ? { openThreads: [...personalPage.openThreads] }
+            : {}),
+          ...(personalPage.notes.length
+            ? {
+                notes: personalPage.notes.map(({ date, text }) => ({
+                  date,
+                  text,
+                })),
+              }
+            : {}),
+        });
+      }
     }
-    for (const list of [reach.well, reach.knows, reach.heard, reach.members])
+    for (const list of [
+      reach.well,
+      reach.knows,
+      reach.heard,
+      reach.members,
+      reach.notes ?? [],
+    ])
       list.sort((a, b) => a.name.localeCompare(b.name));
     sendJson(res, 200, reach);
   });

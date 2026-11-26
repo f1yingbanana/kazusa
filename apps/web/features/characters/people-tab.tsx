@@ -12,7 +12,6 @@ import { useQueryStates } from "nuqs";
 import { useMemo, useState } from "react";
 import { useCharacters } from "@/hooks/use-characters";
 import { useStats } from "@/hooks/use-stats";
-import { useWikiReach } from "@/hooks/use-wiki-editor";
 import { useWikiList, useWikiPage } from "@/hooks/use-wiki";
 import { acquaintances, type Acquaintance } from "@/lib/characters/cast-book";
 import { firstName } from "@/lib/format";
@@ -20,7 +19,9 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
-import { RichText, usePlainText } from "../legacy";
+import { RichText, usePlainText } from "../wiki/links";
+import { wikiParsers } from "../wiki/search-params";
+import { WhoKnows } from "../wiki/who-knows";
 import { Prose } from "../entities/prose";
 import { CharacterAvatar } from "./character-avatar";
 import { charactersParsers, profilePatch } from "./search-params";
@@ -95,7 +96,7 @@ export function PeopleTab({ character }: { character: CharacterSummary }) {
           )}
         </section>
       ) : null}
-      <KnownBy character={character} />
+      <WhoKnows id={character.id} />
     </div>
   );
 }
@@ -227,7 +228,12 @@ function Mirror({
   one: Acquaintance;
   other: CharacterSummary | undefined;
 }) {
-  const [, setParams] = useQueryStates(charactersParsers);
+  const [, setParams] = useQueryStates({
+    ...charactersParsers,
+    "wiki.part": wikiParsers["wiki.part"],
+    "wiki.edit": wikiParsers["wiki.edit"],
+    "wiki.raw": wikiParsers["wiki.raw"],
+  });
   const mine = useWikiPage(one.id, self.id);
   const theirs = useWikiPage(one.simulated ? self.id : undefined, one.id);
   const selfName = firstName(self.name);
@@ -292,13 +298,13 @@ function View({
 }) {
   return (
     <figure className="flex flex-col gap-3 rounded-[1rem] bg-ui-surface p-3.5 inset-ring inset-ring-ui-line">
-      <figcaption className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] font-extrabold">
+      <figcaption className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[0.8125rem] font-extrabold">
         <span className="flex min-w-0 items-center gap-2">
           {face}
           <span className="truncate">{`${by} on ${about}`}</span>
         </span>
         {page?.relation ? (
-          <span className="ms-auto max-w-full truncate rounded-full bg-ui-tint px-2 py-0.5 text-xs font-bold text-ui-soft">
+          <span className="max-w-full truncate rounded-full bg-ui-tint px-2 py-0.5 text-xs font-bold text-ui-soft">
             {page.relation}
           </span>
         ) : null}
@@ -345,70 +351,5 @@ function View({
         </>
       )}
     </figure>
-  );
-}
-
-const DEPTHS = [
-  { key: "well", label: (them: string) => `Know ${them} well` },
-  { key: "knows", label: (them: string) => `Know ${them}` },
-  { key: "heard", label: (them: string) => `Have heard of ${them}` },
-] as const;
-
-/** Who in the cast knows them, and how well, from the World Wiki's page. */
-function KnownBy({ character }: { character: CharacterSummary }) {
-  const { data, isLoading } = useWikiReach(character.id);
-  const { byId } = useCharacters();
-  const [, setParams] = useQueryStates(charactersParsers);
-  const called = firstName(character.name);
-  if (isLoading || !data) return null;
-  const known = DEPTHS.filter(({ key }) => data[key].length);
-  return (
-    <section aria-label={`Who knows ${called}`} className="flex flex-col gap-3">
-      <SectionTitle title={`Who knows ${called}`} />
-      {known.length === 0 ? (
-        <Note>{`Nobody in the cast has heard of ${called}.`}</Note>
-      ) : (
-        <dl className="flex flex-col gap-3">
-          {known.map(({ key, label }) => (
-            <div
-              key={key}
-              className="grid grid-cols-[9rem_minmax(0,1fr)] items-start gap-3 max-sm:grid-cols-1 max-sm:gap-1.5"
-            >
-              <dt className="pt-1.5 text-[0.8125rem] font-bold text-ui-soft">
-                {label("them")}
-              </dt>
-              <dd className="flex flex-wrap gap-1.5">
-                {data[key].map((person) => {
-                  const who = byId.get(person.id);
-                  return (
-                    <button
-                      key={person.id}
-                      type="button"
-                      onClick={() => void setParams(profilePatch(person.id))}
-                      className="flex h-8 items-center gap-1.5 rounded-full bg-ui-ground ps-1 pe-3 text-[0.8125rem] font-bold transition-colors hover:bg-ui-tint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary"
-                    >
-                      <Face
-                        id={person.id}
-                        name={person.name}
-                        other={who}
-                        size="xs"
-                      />
-                      {person.name}
-                    </button>
-                  );
-                })}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {data.none ? (
-        <p className="text-[0.8125rem] text-ui-soft">
-          {data.none === 1
-            ? `One other hasn't heard of ${called}.`
-            : `${data.none} others haven't heard of ${called}.`}
-        </p>
-      ) : null}
-    </section>
   );
 }

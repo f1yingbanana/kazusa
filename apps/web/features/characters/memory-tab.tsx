@@ -8,16 +8,23 @@ import { useWikiList } from "@/hooks/use-wiki";
 import { firstName } from "@/lib/format";
 import { Button } from "@/ui/button";
 import { Note } from "@/ui/note";
-import { wikiParsers } from "../legacy";
+import { wikiParsers } from "../wiki/search-params";
 import { Prose } from "../entities/prose";
 import { wikiPatch } from "../wiki/open";
+import { MemoryEditor } from "./memory-editor";
 
 /**
  * What they carry from day to day, as their sleep last wrote it, and the wiki
  * of their own that holds the rest.
  */
-export function MemoryTab({ character }: { character: CharacterSummary }) {
-  const { data, error, isLoading } = useWikiCharacter(character.id);
+export function MemoryTab({
+  character,
+  editing = false,
+}: {
+  character: CharacterSummary;
+  editing?: boolean;
+}) {
+  const { data, error, isLoading, mutate } = useWikiCharacter(character.id);
   const { data: own } = useWikiList(character.id);
   const [, setParams] = useQueryStates({
     view: parseAsString,
@@ -27,10 +34,10 @@ export function MemoryTab({ character }: { character: CharacterSummary }) {
   const pages = own?.pages ?? [];
   const people = pages.filter((p) => p.kind === "person").length;
   const days = pages.filter((p) => p.kind === "day").length;
-  const things = pages.length - people - days;
+  const concepts = pages.length - people - days;
   const counts = [
     people ? `${people} ${people === 1 ? "person" : "people"}` : null,
-    things ? `${things} ${things === 1 ? "thing" : "things"}` : null,
+    concepts ? `${concepts} ${concepts === 1 ? "concept" : "concepts"}` : null,
     days ? `${days} ${days === 1 ? "day" : "days"} in a diary` : null,
   ].filter(Boolean);
 
@@ -51,6 +58,12 @@ export function MemoryTab({ character }: { character: CharacterSummary }) {
           <Note>Reading…</Note>
         ) : error || !data ? (
           <Note>{"Couldn't read their memory."}</Note>
+        ) : editing ? (
+          <MemoryEditor
+            id={character.id}
+            memory={data.memory}
+            onSaved={() => mutate()}
+          />
         ) : data.memory.text.trim() ? (
           <Prose text={data.memory.text} />
         ) : (
@@ -67,7 +80,7 @@ export function MemoryTab({ character }: { character: CharacterSummary }) {
           <p className="text-[0.8125rem] text-ui-soft">
             {counts.length
               ? `Longer memories of ${counts.join(", ")}.`
-              : "Longer memories of people, places and things, once they have some."}
+              : "Longer memories of people, places and concepts, once they have some."}
           </p>
         </div>
         <Button
@@ -76,10 +89,7 @@ export function MemoryTab({ character }: { character: CharacterSummary }) {
           className="self-start"
           icon={<BookOpenIcon aria-hidden />}
           onClick={() =>
-            void setParams({
-              ...wikiPatch(null, { agent: character.id }),
-              "wiki.tab": null,
-            })
+            void setParams(wikiPatch(null, { agent: character.id }))
           }
         >
           {`Open ${called}'s wiki`}

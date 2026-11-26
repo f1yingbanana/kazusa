@@ -45,13 +45,9 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Note } from "@/ui/note";
 import { Tooltip } from "@/ui/tooltip";
 import { VisuallyHidden } from "@/ui/visually-hidden";
-import {
-  PLACE_PREFIX,
-  PlaceWaysSection,
-  RichText,
-  wikiParsers,
-  worldParsers,
-} from "../legacy";
+import { PLACE_PREFIX, PlaceWaysSection, worldParsers } from "../legacy";
+import { RichText } from "../wiki/links";
+import { wikiParsers } from "../wiki/search-params";
 import { CharacterAvatar } from "../characters/character-avatar";
 import { PlaceChip } from "../entities/chips";
 import { PlacePeople } from "../world/place-people";
