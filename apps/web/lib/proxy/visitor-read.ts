@@ -26,10 +26,12 @@ export async function readShared(
   "use cache";
   cacheLife({ revalidate: 1, expire: 2 });
   void changes;
-  const base = process.env.KAZUSA_GATEWAY_URL ?? "http://127.0.0.1:18789";
+  const base = (
+    process.env.KAZUSA_GATEWAY_URL ?? "http://127.0.0.1:18789"
+  ).replace(/\/+$/, "");
   const token = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
   if (!token) throw new Error("The Kazusa Gateway credential is missing.");
-  const response = await fetch(new URL(`/kazusa/${path}`, base), {
+  const response = await fetch(new URL(`${base}/kazusa/${path}`), {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

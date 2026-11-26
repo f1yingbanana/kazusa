@@ -133,7 +133,10 @@ export function CommandPalette({
   const [top, setTop] = useState<{ query: string; key: string }>();
   const [picked, setPicked] = useState<{ query: string; key: string | null }>();
   useEffect(() => {
-    if (!open) setQuery("");
+    if (!open) {
+      setQuery("");
+      setPicked(undefined);
+    }
   }, [open]);
   const highlighted =
     picked?.query === query
@@ -151,7 +154,10 @@ export function CommandPalette({
       placeholder="A name, a place, a chat, or what you want to do…"
       empty="Nothing by that name."
       query={query}
-      onQueryChange={setQuery}
+      onQueryChange={(next) => {
+        setQuery(next);
+        setPicked(undefined);
+      }}
       highlighted={highlighted}
       onHighlightedChange={(key, details) => {
         if (PICKS.has(details.reason)) setPicked({ query, key });
@@ -185,8 +191,10 @@ function PaletteBody({
   const deferred = useDeferredValue(query);
   const [, setParams] = useQueryStates(PARSERS);
   const go: Go = (patch) => {
-    // The details panel follows without covering where you went.
-    if (patch.sel) markQuietSelection(serializeEntityRef(patch.sel));
+    // Only silence the drawer when opening a destination alongside selection.
+    if (patch.sel && Object.keys(patch).length > 1) {
+      markQuietSelection(serializeEntityRef(patch.sel));
+    }
     void setParams(patch);
     close();
   };
@@ -240,6 +248,7 @@ function PaletteBody({
           entry={entry}
           expanded={entry === top}
           go={go}
+          onOpenedChat={onOpenedChat}
         />
       ))}
     </CommandGroup>
@@ -307,16 +316,22 @@ function ResultRows({
   entry,
   expanded,
   go,
+  onOpenedChat,
 }: {
   entry: PaletteEntry;
   expanded: boolean;
   go: Go;
+  onOpenedChat?: () => void;
 }) {
   return (
     <>
       <Row entry={entry} />
       {expanded && entry.character ? (
-        <CharacterActions character={entry.character} go={go} />
+        <CharacterActions
+          character={entry.character}
+          go={go}
+          onOpenedChat={onOpenedChat}
+        />
       ) : null}
       {expanded && entry.placeId ? (
         <PlaceActions id={entry.placeId} go={go} />
@@ -357,9 +372,11 @@ function ActionRow({
 function CharacterActions({
   character,
   go,
+  onOpenedChat,
 }: {
   character: CharacterSummary;
   go: Go;
+  onOpenedChat?: () => void;
 }) {
   const { resolved, watching, player } = useSources();
   const { canPlay } = useAccess();
@@ -384,7 +401,10 @@ function CharacterActions({
           value={key("message")}
           icon={<MessageCircleIcon aria-hidden />}
           label="Message"
-          onSelect={() => go({ view: "chats", "chats.dm": character.id })}
+          onSelect={() => {
+            go({ view: "chats", "chats.dm": character.id });
+            onOpenedChat?.();
+          }}
         />
       ) : null}
       {placeId && places && resolved.characters === "live" ? (

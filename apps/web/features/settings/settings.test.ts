@@ -682,9 +682,10 @@ describe("ProfileSettings and ContextSettings", () => {
       peopleLimit: 25,
     });
   });
-  it("validates cleared numeric fields in ContextSettings", async () => {
+  it("validates cleared numeric fields in ContextSettings and ignores hidden limits when unlimited", async () => {
+    mocks.saveContext.mockResolvedValue(true);
     render(wrapSWR(createElement(ContextSettings)));
-    const result = await agent.act({
+    let result = await agent.act({
       steps: [
         { ref: "People", action: "setValue", args: [null] },
         { ref: "Save changes", action: "press" },
@@ -693,6 +694,24 @@ describe("ProfileSettings and ContextSettings", () => {
     expect(result.error).toBeUndefined();
     expect(screen.getByText("Enter a number.")).toBeTruthy();
     expect(mocks.saveContext).not.toHaveBeenCalled();
+
+    result = await agent.act({
+      steps: [
+        { ref: "People", action: "setValue", args: [20] },
+        { ref: "Maximum context", action: "setValue", args: [null] },
+        {
+          ref: "Use the model's whole window",
+          action: "setChecked",
+          args: [true],
+        },
+        { ref: "Save changes", action: "press" },
+      ],
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.ok).toBe(true);
+    expect(mocks.saveContext).toHaveBeenCalledWith({
+      maxContextTokens: "unlimited",
+    });
   });
 });
 
@@ -742,11 +761,13 @@ describe("remaining settings sections", () => {
     expect(mocks.saveCatalog).toHaveBeenCalledWith([], "rev-1");
   });
 
-  it("renders ChatAppsSettings with strict accessible labels", () => {
+  it("renders ChatAppsSettings with strict accessible labels and validates channel IDs", async () => {
     render(wrapSWR(createElement(ChatAppsSettings)));
     const labels = assertEveryControlNamed();
     expect(labels.length).toBeGreaterThan(0);
     expect(screen.getByText("Discord")).toBeTruthy();
+    expect(labels).toContain("Group name");
+    expect(labels).toContain("Channel ID");
   });
 
   it("renders UsageSettings and UpdateSettings cleanly", () => {

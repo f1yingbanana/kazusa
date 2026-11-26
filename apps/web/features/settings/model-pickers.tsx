@@ -58,12 +58,8 @@ export function ModelPicker({
   const providerLabel = useProviderLabel();
   const [open, setOpen] = useState(false);
 
-  const byProvider = useMemo(
-    () => groupByProvider(data?.models ?? []),
-    [data?.models],
-  );
-
   const models = data?.models ?? (agentId ? (world.data?.models ?? []) : []);
+  const byProvider = useMemo(() => groupByProvider(models), [models]);
   const current = models.find((model) => model.ref === data?.current);
   const statusOf = new Map(
     (data?.providers ?? world.data?.providers ?? []).map((entry) => [
@@ -72,13 +68,14 @@ export function ModelPicker({
     ]),
   );
   const own = agentId === undefined || data?.overrides?.model !== undefined;
+  const canReset = own || !data;
 
   const inherit =
     agentId !== undefined
       ? world.data?.current && {
           label: "World default",
           target: refName(world.data.models, world.data.current),
-          checked: !own,
+          checked: Boolean(data) && !own,
         }
       : data?.configured &&
         data.configured !== data.current && {
@@ -89,7 +86,8 @@ export function ModelPicker({
 
   const choose = (ref: string | null) => {
     setOpen(false);
-    if (ref === null ? own : ref !== data?.current || !own) void select(ref);
+    if (ref === null ? canReset : ref !== data?.current || !own)
+      void select(ref);
   };
 
   const unavailable = Boolean(

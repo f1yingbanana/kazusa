@@ -69,8 +69,10 @@ async function forward(request: Request, context: Context): Promise<Response> {
       { status: 403 },
     );
   }
-  const base = process.env.KAZUSA_GATEWAY_URL ?? "http://127.0.0.1:18789";
-  const target = new URL(`/kazusa/${route}`, base);
+  const base = (
+    process.env.KAZUSA_GATEWAY_URL ?? "http://127.0.0.1:18789"
+  ).replace(/\/+$/, "");
+  const target = new URL(`${base}/kazusa/${route}`);
   target.search = new URL(request.url).search;
   // Credentials and delegated identity come from the server, never the URL.
   target.searchParams.delete("token");

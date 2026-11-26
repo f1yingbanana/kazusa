@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { parseEnv } from "node:util";
 
@@ -53,31 +60,51 @@ export function normalizeGatewayUrl(raw: string): string {
 
 function formatEnvValue(value: string): string {
   if (/^[A-Za-z0-9_.:/@-]+$/.test(value)) return value;
-  return JSON.stringify(value);
+  const dollarEscaped = value.replace(/\$/g, "\\$");
+  if (!value.includes('"')) {
+    return `"${dollarEscaped.replace(/\r/g, "\\r").replace(/\n/g, "\\n")}"`;
+  }
+  if (!value.includes("'") && !/[\r\n]/.test(value)) {
+    return `'${dollarEscaped}'`;
+  }
+  if (!value.includes("`") && !/[\r\n]/.test(value)) {
+    return `\`${dollarEscaped}\``;
+  }
+  return JSON.stringify(dollarEscaped);
 }
 
 /**
  * Updates keys in `.env` text in place while preserving comments and other
- * vars.
+ * vars, dropping any duplicate definitions of an updated key.
  */
 export function upsertEnvContent(
   existing: string,
   updates: Readonly<Record<string, string>>,
 ): string {
   const remaining = new Map(Object.entries(updates));
+  const updatedKeys = new Set(remaining.keys());
   const lines = existing ? existing.split(/\r?\n/) : [];
   // Drop a single trailing empty split slot so appending doesn't add a blank gap.
   if (lines.at(-1) === "") lines.pop();
 
-  const next = lines.map((line) => {
+  const next: string[] = [];
+  for (const line of lines) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
-    if (!match) return line;
+    if (!match) {
+      next.push(line);
+      continue;
+    }
     const key = match[1];
-    if (!remaining.has(key)) return line;
-    const value = remaining.get(key)!;
-    remaining.delete(key);
-    return `${key}=${formatEnvValue(value)}`;
-  });
+    if (!updatedKeys.has(key)) {
+      next.push(line);
+      continue;
+    }
+    if (remaining.has(key)) {
+      const value = remaining.get(key)!;
+      remaining.delete(key);
+      next.push(`${key}=${formatEnvValue(value)}`);
+    }
+  }
 
   for (const [key, value] of remaining) {
     next.push(`${key}=${formatEnvValue(value)}`);
@@ -170,10 +197,25 @@ export function saveGatewayConnection(
     KAZUSA_GATEWAY_URL: nextUrl,
     ...(nextToken ? { OPENCLAW_GATEWAY_TOKEN: nextToken } : {}),
   };
-  mkdirSync(path.dirname(envFile), { recursive: true });
-  writeFileSync(envFile, upsertEnvContent(existing, updates), {
-    mode: 0o600,
-  });
+  const dir = path.dirname(envFile);
+  mkdirSync(dir, { recursive: true });
+  const tempFile = path.join(
+    dir,
+    `.${path.basename(envFile)}.tmp-${process.pid}-${Date.now()}`,
+  );
+  try {
+    writeFileSync(tempFile, upsertEnvContent(existing, updates), {
+      mode: 0o600,
+    });
+    renameSync(tempFile, envFile);
+  } catch (error) {
+    try {
+      unlinkSync(tempFile);
+    } catch {
+      // Temp file may not exist if write failed before creation.
+    }
+    throw error;
+  }
 
   process.env.KAZUSA_GATEWAY_URL = nextUrl;
   if (nextToken) {

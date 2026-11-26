@@ -17,21 +17,26 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
   const { canManage } = useAccess();
   const [edit, setEdit] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
 
   const about = edit ?? profile.about;
   const dirty = about.trim() !== profile.about.trim();
+  const edited = about !== profile.about;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canManage || !dirty || saving) return;
     setSaving(true);
+    setError(undefined);
     try {
       await save(about);
       setEdit(null);
       toast.success("Description saved");
-    } catch (error) {
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
       toast.error("Couldn't save your description", {
-        description: error instanceof Error ? error.message : String(error),
+        description: message,
       });
     } finally {
       setSaving(false);
@@ -48,8 +53,12 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
         label="What the system agent knows about you"
         rows={6}
         value={about}
+        error={error}
         disabled={!canManage || saving}
-        onValueChange={(next) => setEdit(next)}
+        onValueChange={(next) => {
+          setEdit(next);
+          setError(undefined);
+        }}
         description={
           <>
             Who you are to her and how she should address you. Only the system
@@ -75,8 +84,11 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
           type="button"
           tone="ghost"
           size="sm"
-          disabled={!dirty || saving}
-          onClick={() => setEdit(null)}
+          disabled={!edited || saving}
+          onClick={() => {
+            setEdit(null);
+            setError(undefined);
+          }}
         >
           Discard
         </Button>

@@ -28,13 +28,16 @@ const whole = (min: number, max: number, unit: string) =>
     .min(min, { error: `At least ${numbers.format(min)} ${unit}.` })
     .max(max, { error: `At most ${numbers.format(max)} ${unit}.` });
 
+const maxContextSchema = whole(16_000, 10_000_000, "tokens");
+const memoryLimitSchema = whole(0, 10_000_000, "tokens");
+
 const FormSchema = z
   .object({
     contextUnlimited: z.boolean(),
-    maxContextTokens: whole(16_000, 10_000_000, "tokens"),
+    maxContextTokens: z.number().nullable(),
     shortTermHours: whole(1, 720, "hours"),
     memoryUnlimited: z.boolean(),
-    memoryLimit: whole(0, 10_000_000, "tokens"),
+    memoryLimit: z.number().nullable(),
     toolHistoryTokens: whole(0, 32_000, "tokens"),
     onYourMindTokens: whole(0, 32_000, "tokens"),
     peopleLimit: whole(0, 200, "people"),
@@ -42,16 +45,38 @@ const FormSchema = z
     ledgerGridHours: whole(1, 24, "hours"),
     ledgerTrimPercent: whole(10, 100, "percent"),
   })
-  .refine(
-    (values) =>
-      values.memoryUnlimited ||
-      values.contextUnlimited ||
-      values.memoryLimit <= values.maxContextTokens,
-    {
-      path: ["memoryLimit"],
-      error: "Keep it within the maximum context.",
-    },
-  );
+  .superRefine((values, ctx) => {
+    if (!values.contextUnlimited) {
+      const check = maxContextSchema.safeParse(values.maxContextTokens);
+      if (!check.success) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["maxContextTokens"],
+          message: check.error.issues[0]?.message ?? "Enter a number.",
+        });
+      }
+    }
+    if (!values.memoryUnlimited) {
+      const check = memoryLimitSchema.safeParse(values.memoryLimit);
+      if (!check.success) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["memoryLimit"],
+          message: check.error.issues[0]?.message ?? "Enter a number.",
+        });
+      } else if (
+        !values.contextUnlimited &&
+        values.maxContextTokens !== null &&
+        check.data > values.maxContextTokens
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["memoryLimit"],
+          message: "Keep it within the maximum context.",
+        });
+      }
+    }
+  });
 
 type FormValues = z.infer<typeof FormSchema>;
 type FieldName = keyof FormValues;
@@ -214,9 +239,11 @@ function settingsOf(values: FormValues): ContextConfig {
   return {
     maxContextTokens: values.contextUnlimited
       ? "unlimited"
-      : values.maxContextTokens,
+      : (values.maxContextTokens ?? 64_000),
     shortTermHours: values.shortTermHours,
-    ledgerMaxTokens: values.memoryUnlimited ? "unlimited" : values.memoryLimit,
+    ledgerMaxTokens: values.memoryUnlimited
+      ? "unlimited"
+      : (values.memoryLimit ?? 16_000),
     toolHistoryTokens: values.toolHistoryTokens,
     onYourMindTokens: values.onYourMindTokens,
     peopleLimit: values.peopleLimit,
@@ -354,10 +381,11 @@ export function useContextDraft({
           )
           .map((key) => [key, chosen[key]]),
       ) as ContextOverrides;
+      const submitted = edited;
       setSaving(true);
       try {
         if (!(await onSave(overrides))) return false;
-        setEdited(null);
+        setEdited((current) => (current === submitted ? null : current));
         setTried(false);
         toast.success(
           character

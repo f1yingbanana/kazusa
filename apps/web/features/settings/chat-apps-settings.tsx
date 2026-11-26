@@ -67,7 +67,7 @@ function AccountRow({ bot }: { bot: string | null }) {
   const [code, setCode] = useState<{ code: string; until: number } | null>(
     null,
   );
-  const { data, mutate } = useBridgeAccount(code !== null);
+  const { data, error, mutate } = useBridgeAccount(code !== null);
   const [busy, setBusy] = useState(false);
   const linked = data?.account;
 
@@ -126,7 +126,7 @@ function AccountRow({ bot }: { bot: string | null }) {
             : "Linking needs a connected bot."
       }
       action={
-        !data ? (
+        error && !data ? null : !data ? (
           <span className="text-xs text-ui-soft">Loading…</span>
         ) : linked ? (
           <Button
@@ -190,15 +190,18 @@ function BotRow({
   const [editing, setEditing] = useState(false);
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
 
   async function save(next: string | null) {
     setSaving(true);
+    setError(undefined);
     try {
       await onSave(next);
       setToken("");
       setEditing(false);
-    } catch (error) {
-      failed("Couldn't save the token", error);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+      failed("Couldn't save the token", failure);
     } finally {
       setSaving(false);
     }
@@ -226,7 +229,10 @@ function BotRow({
           <Button
             tone={hasToken ? "ghost" : "soft"}
             size="sm"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setError(undefined);
+              setEditing(true);
+            }}
           >
             {hasToken ? "Change token" : "Add token"}
           </Button>
@@ -248,7 +254,11 @@ function BotRow({
             placeholder="Paste the bot's token"
             value={token}
             disabled={saving}
-            onValueChange={setToken}
+            error={error}
+            onValueChange={(next) => {
+              setToken(next);
+              setError(undefined);
+            }}
             description="Kept on this computer with your provider keys, and never shown again."
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -268,6 +278,7 @@ function BotRow({
               disabled={saving}
               onClick={() => {
                 setToken("");
+                setError(undefined);
                 setEditing(false);
               }}
             >
@@ -337,13 +348,16 @@ function ChannelRow({
 }
 
 function NewChannelGroup({
+  disabled = false,
   link,
 }: {
+  disabled?: boolean;
   link: (chatId: string, channelId: string | null) => Promise<void>;
 }) {
   const { reload } = useObservedChats();
   const [title, setTitle] = useState("");
   const [channel, setChannel] = useState("");
+  const [channelError, setChannelError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const created = useRef<{ title: string; chatId: string } | null>(null);
   const named = title.trim();
@@ -351,7 +365,12 @@ function NewChannelGroup({
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!named || !channelId || saving) return;
+    if (disabled || !named || !channelId || saving) return;
+    if (!/^\d+$/.test(channelId)) {
+      setChannelError("Enter a numeric Discord channel ID.");
+      return;
+    }
+    setChannelError(undefined);
     setSaving(true);
     try {
       const chatId =
@@ -388,7 +407,7 @@ function NewChannelGroup({
           placeholder="Lounge"
           value={title}
           maxLength={160}
-          disabled={saving}
+          disabled={disabled || saving}
           onValueChange={setTitle}
         />
         <TextField
@@ -397,8 +416,12 @@ function NewChannelGroup({
           inputMode="numeric"
           mono
           value={channel}
-          disabled={saving}
-          onValueChange={setChannel}
+          error={channelError}
+          disabled={disabled || saving}
+          onValueChange={(next) => {
+            setChannel(next);
+            setChannelError(undefined);
+          }}
         />
       </div>
       <div>
@@ -407,7 +430,7 @@ function NewChannelGroup({
           tone="primary"
           size="sm"
           pending={saving}
-          disabled={!named || !channelId}
+          disabled={disabled || !named || !channelId}
         >
           Make group
         </Button>
@@ -477,7 +500,7 @@ export function ChatAppsSettings() {
                 </Note>
               </div>
             )}
-            {bot ? <NewChannelGroup link={bridges.link} /> : null}
+            <NewChannelGroup disabled={!bot} link={bridges.link} />
           </div>
         ) : null}
 

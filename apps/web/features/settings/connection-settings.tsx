@@ -93,7 +93,9 @@ function RemoteGatewaySection() {
   const url = urlDraft ?? data?.url ?? "";
   const dirty =
     data !== undefined && (url.trim() !== data.url || token.trim().length > 0);
-  const canReset = data !== undefined && (!data.isDefault || urlDraft !== null);
+  const canReset =
+    data !== undefined &&
+    (!data.isDefault || data.hasToken || urlDraft !== null);
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

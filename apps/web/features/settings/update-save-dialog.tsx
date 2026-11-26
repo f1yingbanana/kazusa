@@ -36,7 +36,7 @@ function setPendingAsk(id: string | null): void {
  */
 export function UpdateSaveDialog() {
   const open = useUiStore((state) => state.updateSaveDialog.open);
-  const { admin, ask } = useWorldUpdate();
+  const { update, admin, ask } = useWorldUpdate();
   const { enabled, supervised, request, saveBeforeUpdate } = useSaves();
   const [busy, setBusy] = useState<"save" | "ask" | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -55,6 +55,7 @@ export function UpdateSaveDialog() {
     const pending = pendingAsk();
     if (!request || !pending || request.id !== pending || isRunning(request))
       return;
+    if (request.phase === "done" && !update) return;
     setPendingAsk(null);
     if (request.phase === "done") void askNow();
     else
@@ -64,7 +65,7 @@ export function UpdateSaveDialog() {
         action: { label: `Ask ${admin} anyway`, onClick: () => void askNow() },
       });
     // Once per save: `askNow` and the name change identity, not meaning.
-  }, [request]);
+  }, [request, update]);
 
   if (!enabled) return null;
 

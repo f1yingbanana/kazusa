@@ -278,6 +278,7 @@ export function ProviderSettings() {
     .filter((row) => !connected.includes(row))
     .filter(
       ({ provider }) =>
+        editing === provider.id ||
         !needle ||
         [provider.label, provider.id].some((text) =>
           text.toLowerCase().includes(needle),
@@ -286,7 +287,7 @@ export function ProviderSettings() {
 
   const save = (provider: ProviderSummary) => async (key?: string) => {
     await providers.saveKey({ provider: provider.id, ...(key ? { key } : {}) });
-    setEditing(undefined);
+    setEditing((current) => (current === provider.id ? undefined : current));
     setFresh(provider.id);
   };
 

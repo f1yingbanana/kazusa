@@ -59,6 +59,21 @@ describe("gateway-config", () => {
     expect(updated).toContain('OPENCLAW_GATEWAY_TOKEN="new token with spaces"');
   });
 
+  it("drops duplicate definitions and escapes $ for Next env expansion", () => {
+    const initial = [
+      "OPENCLAW_GATEWAY_TOKEN=first-stale",
+      "KAZUSA_KEEP=1",
+      "OPENCLAW_GATEWAY_TOKEN=second-stale",
+      "",
+    ].join("\n");
+    const updated = upsertEnvContent(initial, {
+      OPENCLAW_GATEWAY_TOKEN: "abc$MISSING",
+    });
+    expect(updated.match(/OPENCLAW_GATEWAY_TOKEN=/g)).toHaveLength(1);
+    expect(updated).toContain('OPENCLAW_GATEWAY_TOKEN="abc\\$MISSING"');
+    expect(updated).toContain("KAZUSA_KEEP=1");
+  });
+
   it("writes .env.local, updates process.env immediately, and restores local world token on reset", () => {
     const envFile = path.join(dir, ".env.local");
     const localWorldEnvFile = path.join(dir, "world.env");
