@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { lintMap, sharedWorld } from "./world.ts";
+import { isMapFile, lintMap, sharedWorld } from "./world.ts";
 
 const place = (id: string, extra = ""): string =>
   `---\nplace_id: ${id}\nname: ${id}\nsummary: ${id}.\n${extra}---\n\n# ${id}\n`;
@@ -228,5 +228,15 @@ describe("the world on disk", () => {
     const second = sharedWorld(dir, handlers);
     expect(first()?.map.places.has("office")).toBe(true);
     expect(second()?.map.places.has("office")).toBe(true);
+  });
+});
+
+describe("the files the map is read from", () => {
+  it("are the pages of places and characters, in either layout", () => {
+    expect(isMapFile("concepts/gehenna_school.md")).toBe(true);
+    expect(isMapFile("characters/hina-sorasaki.md")).toBe(true);
+    expect(isMapFile(path.join("entities", "places", "plaza.md"))).toBe(true);
+    expect(isMapFile("days/2026-11-02.md")).toBe(false);
+    expect(isMapFile("INDEX.md")).toBe(false);
   });
 });

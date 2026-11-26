@@ -10,15 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Layered, LAYER_NAME } from "./article";
 import { AddPicker, type PickOption } from "@/ui/combobox";
 
-/** One part of the form: its name, a line on what it does, then its fields. */
+/** One part of the form: its name, then its fields. */
 export function EditorSection({
   title,
-  hint,
   className,
   children,
 }: {
   title: string;
-  hint?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -30,14 +28,7 @@ export function EditorSection({
         className,
       )}
     >
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-[0.9375rem] font-extrabold">{title}</h2>
-        {hint ? (
-          <p className="text-[0.8125rem] leading-normal text-pretty text-ui-soft">
-            {hint}
-          </p>
-        ) : null}
-      </div>
+      <h2 className="text-[0.9375rem] font-extrabold">{title}</h2>
       {children}
     </section>
   );
@@ -90,15 +81,12 @@ export interface LevelChoice {
   readonly label: string;
 }
 
-/** How well a group knows a page, as its choice reads. */
-export const knowingLevels = (person: boolean): readonly LevelChoice[] => {
-  const them = person ? "them" : "it";
-  return [
-    { value: "heard of", label: `Heard of ${them}` },
-    { value: "knows", label: `Know ${them}` },
-    { value: "close", label: `Know ${them} well` },
-  ];
-};
+/** How well a group knows a page. */
+export const KNOWING_LEVELS: readonly LevelChoice[] = [
+  { value: "heard of", label: "Heard of" },
+  { value: "knows", label: "Knows" },
+  { value: "close", label: "Knows well" },
+];
 
 /** How involved someone is in a group, and so what they get through it. */
 export const MEMBER_LEVELS: readonly LevelChoice[] = [
@@ -145,15 +133,16 @@ export function LevelRows<T extends { readonly level: WikiLevel }>({
   rows,
   keyOf,
   nameOf,
+  mediaOf,
   levels,
   levelLabel,
   onChange,
   add,
-  empty,
 }: {
   rows: readonly T[];
   keyOf: (row: T) => string;
   nameOf: (row: T) => string;
+  mediaOf?: (row: T) => ReactNode;
   levels: readonly LevelChoice[];
   levelLabel: (row: T) => string;
   onChange: (rows: T[]) => void;
@@ -163,8 +152,8 @@ export function LevelRows<T extends { readonly level: WikiLevel }>({
     options: readonly PickOption[];
     onAdd: (value: string) => void;
     onCreate?: (name: string) => Promise<void>;
+    createLabel?: (query: string) => string;
   };
-  empty?: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -173,10 +162,13 @@ export function LevelRows<T extends { readonly level: WikiLevel }>({
           {rows.map((row, index) => (
             <li
               key={keyOf(row)}
-              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-[0.875rem] bg-ui-ground py-1 ps-3.5 pe-1 motion-safe:animate-ui-rise max-sm:grid-cols-[minmax(0,1fr)_auto]"
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-[0.875rem] bg-ui-ground py-1 ps-3 pe-1 motion-safe:animate-ui-rise max-sm:grid-cols-[minmax(0,1fr)_auto]"
             >
-              <span className="min-w-0 truncate text-sm font-bold">
-                {nameOf(row)}
+              <span className="flex min-w-0 items-center gap-2.5">
+                {mediaOf?.(row)}
+                <span className="min-w-0 truncate text-sm font-bold">
+                  {nameOf(row)}
+                </span>
               </span>
               <span className="max-sm:order-3 max-sm:col-span-2 max-sm:pb-1">
                 <LevelSelect
@@ -202,10 +194,8 @@ export function LevelRows<T extends { readonly level: WikiLevel }>({
             </li>
           ))}
         </ul>
-      ) : empty ? (
-        <p className="text-[0.8125rem] text-ui-soft">{empty}</p>
       ) : null}
-      <AddPicker {...add} createLabel={(query) => `New group “${query}”`} />
+      <AddPicker createLabel={(query) => `New group “${query}”`} {...add} />
     </div>
   );
 }

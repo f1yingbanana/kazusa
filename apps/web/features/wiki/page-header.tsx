@@ -2,13 +2,17 @@
 
 import type { WikiListItem } from "@kazusa/client";
 import { ChevronRightIcon } from "lucide-react";
+import { useQueryStates } from "nuqs";
 import { Fragment, type ReactNode } from "react";
 import { usePlaces } from "@/hooks/use-location";
+import { useWikiLint } from "@/hooks/use-wiki";
 import { ancestors } from "@/lib/location/places";
 import { shelvesOf } from "@/lib/wiki/index-tree";
 import { cx } from "@/ui/cx";
 import { WikiLink } from "./links";
 import { TITLE_TRANSITION } from "./motion";
+import { wikiPatch } from "./open";
+import { wikiParsers } from "./search-params";
 import { SHELF_ICON } from "./shelf-icon";
 
 const KIND_WORD = {
@@ -69,20 +73,18 @@ export function Eyebrow({
 }
 
 /**
- * A page's head: what it is, its name, the other names it goes by, and a line
- * under them (how far it reaches). `actions` sit at the far end.
+ * A page's head: what it is, its name, and a line under it (how far it
+ * reaches). `actions` sit at the far end.
  */
 export function PageHead({
   eyebrow,
   title,
-  aliases,
   actions,
   under,
   className,
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
-  aliases?: readonly string[] | undefined;
   actions?: ReactNode;
   under?: ReactNode;
   className?: string;
@@ -98,11 +100,6 @@ export function PageHead({
           >
             {title}
           </h1>
-          {aliases?.length ? (
-            <p className="text-[0.8125rem] text-ui-soft">
-              {`Also ${aliases.join(" · ")}`}
-            </p>
-          ) : null}
         </div>
         {actions ? (
           <div className="flex shrink-0 items-center gap-1 pt-0.5">
@@ -138,5 +135,47 @@ export function Sheet({
         {children}
       </article>
     </div>
+  );
+}
+
+/**
+ * Lint problems belonging to the page in view, shown inline where they can be
+ * fixed; hidden when the page has none.
+ */
+export function PageProblems({ pages }: { pages: readonly string[] }) {
+  const { data } = useWikiLint();
+  const [, setParams] = useQueryStates(wikiParsers);
+  const hits = (data?.findings ?? []).filter((f) => pages.includes(f.page));
+  if (!hits.length) return null;
+  return (
+    <aside
+      aria-label="Problems on this page"
+      className="flex items-start gap-3 rounded-[1rem] bg-ui-ground px-3.5 py-2.5"
+    >
+      <ul className="flex min-w-0 flex-1 flex-col gap-1">
+        {hits.map((finding) => (
+          <li
+            key={`${finding.page}:${finding.message}`}
+            className="flex items-start gap-2.5 text-[0.8125rem] leading-snug"
+          >
+            <span
+              aria-label={finding.level === "error" ? "Error" : "Warning"}
+              className={cx(
+                "mt-1.5 size-2 shrink-0 rounded-full",
+                finding.level === "error" ? "bg-ui-danger" : "bg-ui-accent",
+              )}
+            />
+            <span className="min-w-0">{finding.message}</span>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => void setParams(wikiPatch(null, { tab: "lint" }))}
+        className="shrink-0 rounded-[0.375rem] text-xs font-bold text-ui-soft hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary"
+      >
+        All
+      </button>
+    </aside>
   );
 }

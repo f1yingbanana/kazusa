@@ -1,20 +1,17 @@
 "use client";
 
-import type { WikiEditResult, WikiKind } from "@kazusa/client";
+import type { WikiKind } from "@kazusa/client";
 import {
   CopyIcon,
   EllipsisIcon,
-  FileCodeIcon,
   MapPinPlusIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAccess } from "@/hooks/use-access";
-import { useDeleteWikiPage } from "@/hooks/use-wiki";
 import { fetchWikiSource } from "@/lib/source/wiki/http";
 import { IconButton } from "@/ui/button";
-import { AlertDialog, AlertPanel } from "@/ui/dialog";
 import {
   Menu,
   MenuContent,
@@ -22,19 +19,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/ui/menu";
-
-/** "Moved Airi to School · updated 3 other pages", or nothing worth saying. */
-export function describeResult(result: WikiEditResult): string | undefined {
-  const parts = [
-    ...result.relocated.map(({ id, to }) => `${id} is now at ${to}`),
-    ...(result.changed.length
-      ? [
-          `updated ${result.changed.length} other page${result.changed.length === 1 ? "" : "s"}`,
-        ]
-      : []),
-  ];
-  return parts.length ? parts.join(" · ") : undefined;
-}
+import { DeletePageDialog } from "./page-dialogs";
 
 /** Puts a page's Markdown on the clipboard, even while it still loads. */
 export async function copyMarkdown(
@@ -72,7 +57,6 @@ export function PageMenu({
   agent,
   kind,
   place = false,
-  onRaw,
   onNewInside,
   onDeleted,
 }: {
@@ -82,13 +66,11 @@ export function PageMenu({
   agent?: string | undefined;
   kind?: WikiKind | undefined;
   place?: boolean;
-  onRaw?: (() => void) | undefined;
   /** For a place: make another inside it. */
   onNewInside?: (() => void) | undefined;
   onDeleted: () => void;
 }) {
   const { canManage } = useAccess();
-  const remove = useDeleteWikiPage();
   const [asking, setAsking] = useState(false);
   return (
     <>
@@ -101,11 +83,6 @@ export function PageMenu({
           <EllipsisIcon aria-hidden />
         </MenuTrigger>
         <MenuContent align="end">
-          {canManage && onRaw ? (
-            <MenuItem icon={<FileCodeIcon aria-hidden />} onClick={onRaw}>
-              Edit as Markdown
-            </MenuItem>
-          ) : null}
           {canManage && onNewInside ? (
             <MenuItem
               icon={<MapPinPlusIcon aria-hidden />}
@@ -134,35 +111,12 @@ export function PageMenu({
           ) : null}
         </MenuContent>
       </Menu>
-      <AlertDialog open={asking} onOpenChange={setAsking}>
-        <AlertPanel
-          danger
-          title={`Delete ${name}?`}
-          description={
-            place
-              ? "Places inside move up to its area. This can't be undone."
-              : "This can't be undone."
-          }
-          agentConfirm={`Deletes ${name} for good`}
-          onConfirm={() =>
-            void remove({ id, ...(agent ? { agent } : {}) })
-              .then((result) => {
-                toast.success(`Deleted ${name}`, {
-                  description: describeResult(result),
-                });
-                onDeleted();
-              })
-              .catch((failure: unknown) =>
-                toast.error("Couldn't delete the page", {
-                  description:
-                    failure instanceof Error
-                      ? failure.message
-                      : String(failure),
-                }),
-              )
-          }
-        />
-      </AlertDialog>
+      <DeletePageDialog
+        page={asking ? { id, name, place } : undefined}
+        agent={agent}
+        onOpenChange={setAsking}
+        onDeleted={() => onDeleted()}
+      />
     </>
   );
 }

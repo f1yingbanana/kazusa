@@ -1,6 +1,7 @@
 import type { WikiListItem } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
 import {
+  duplicateSource,
   firstSentence,
   splitAliases,
   toPictureName,
@@ -92,5 +93,50 @@ describe("a link being typed", () => {
   it("finds a page by its id too, and keeps to a few", () => {
     expect(linkMatches(pages, "prefect_t")[0].name).toBe("Prefect Team");
     expect(linkMatches(pages, "", 2)).toHaveLength(2);
+  });
+});
+
+describe("a page duplicated", () => {
+  const source = [
+    "---",
+    'name: "Gehenna Station"',
+    "aliases:",
+    "  - the station",
+    "  - Gehenna stop",
+    "parent: gehenna_district",
+    "place_id: gehenna_station",
+    "---",
+    "",
+    "# Gehenna Station",
+    "",
+    "A busy stop.",
+    "",
+  ].join("\n");
+
+  it("takes its new name and id, and leaves the other names behind", () => {
+    const copy = duplicateSource(source, {
+      name: "Gehenna Station East",
+      id: "gehenna_station_east",
+    });
+    expect(copy).toBe(
+      [
+        "---",
+        'name: "Gehenna Station East"',
+        "parent: gehenna_district",
+        "place_id: gehenna_station_east",
+        "---",
+        "",
+        "# Gehenna Station East",
+        "",
+        "A busy stop.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("gives a page with no title or front matter both", () => {
+    expect(duplicateSource("Just words.", { name: "Copy", id: "copy" })).toBe(
+      '---\nname: "Copy"\n---\n\n# Copy\n\nJust words.',
+    );
   });
 });

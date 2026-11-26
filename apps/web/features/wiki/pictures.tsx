@@ -83,6 +83,7 @@ export function PictureTile({
   aspect = "aspect-square",
   fit = "whole",
   editable,
+  confirmRemove = true,
   onReplace,
   onRemove,
   children,
@@ -96,6 +97,8 @@ export function PictureTile({
   /** `face`: the top of a tall figure, where the mood shows. */
   fit?: "whole" | "face";
   editable: boolean;
+  /** Ask before removing; off where Cancel takes it back. */
+  confirmRemove?: boolean;
   onReplace: (file: File) => Promise<void>;
   onRemove: () => Promise<void>;
   children?: ReactNode;
@@ -148,7 +151,7 @@ export function PictureTile({
           <button
             type="button"
             aria-label={`Remove ${what}`}
-            onClick={() => setAsking(true)}
+            onClick={() => (confirmRemove ? setAsking(true) : run(onRemove))}
             className={buttonClass({
               tone: "soft",
               size: "sm",

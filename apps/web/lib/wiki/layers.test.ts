@@ -1,6 +1,7 @@
 import type { WikiPage, WikiReachResponse } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
 import {
+  exclusiveReadersOf,
   isOwnSection,
   leadAfterSummary,
   readerWords,
@@ -78,16 +79,26 @@ describe("who reads a layer", () => {
     expect(readersOf("self", reach)).toHaveLength(0);
   });
 
-  it("says the count in words, one or many, for a person or a thing", () => {
-    expect(readerWords("summary", 4, true, "Hina")).toBe(
-      "4 have heard of them",
-    );
-    expect(readerWords("summary", 1, false, "Gehenna")).toBe(
-      "1 has heard of it",
-    );
-    expect(readerWords("opening", 0, true, "Hina")).toBe("Nobody knows them");
-    expect(readerWords("close", 3, true, "Hina")).toBe("3 know them well");
-    expect(readerWords("self", 0, true, "Hina")).toBe("Only Hina");
+  it("lists only readers whose deepest level is that layer", () => {
+    expect(exclusiveReadersOf("summary", reach).map((p) => p.id)).toEqual([
+      "aru",
+    ]);
+    expect(exclusiveReadersOf("opening", reach).map((p) => p.id)).toEqual([
+      "ako",
+      "iori",
+    ]);
+    expect(exclusiveReadersOf("close", reach).map((p) => p.id)).toEqual([
+      "hina",
+    ]);
+    expect(exclusiveReadersOf("self", reach)).toEqual([]);
+  });
+
+  it("says the count concisely", () => {
+    expect(readerWords("summary", 4, "Hina")).toBe("4 readers");
+    expect(readerWords("summary", 1, "Gehenna")).toBe("1 reader");
+    expect(readerWords("opening", 0, "Hina")).toBe("No readers");
+    expect(readerWords("close", 3, "Hina")).toBe("3 readers");
+    expect(readerWords("self", 0, "Hina")).toBe("Only Hina");
   });
 
   it("marks a section as their own only when the subject alone knows it", () => {

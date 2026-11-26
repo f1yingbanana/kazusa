@@ -2,13 +2,16 @@
 
 import type { WikiGroup, WikiPage, WikiReachResponse } from "@kazusa/client";
 import { ChevronDownIcon } from "lucide-react";
-import { usePageName } from "@/hooks/use-wiki";
-import { readerWords, readersOf, type Layer } from "@/lib/wiki/layers";
+import {
+  exclusiveReadersOf,
+  readerWords,
+  readersOf,
+  type Layer,
+} from "@/lib/wiki/layers";
 import { cx } from "@/ui/cx";
 import {
   Popover,
   PopoverContent,
-  PopoverLabel,
   PopoverTitle,
   PopoverTrigger,
 } from "@/ui/popover";
@@ -17,8 +20,8 @@ import { WikiLink } from "./links";
 
 export const LEVEL_WORD = {
   "heard of": "Heard of",
-  knows: "Know",
-  close: "Know well",
+  knows: "Knows",
+  close: "Knows well",
 } as const;
 
 export const MEMBERSHIP_WORD = {
@@ -76,7 +79,6 @@ export function ReachLine({
   /** The page has a part only its subject reads. */
   hasOwn: boolean;
 }) {
-  const pageName = usePageName();
   const person = page.kind === "person";
   const them = person ? "them" : "it";
   const knowing = reach.well.length + reach.knows.length;
@@ -92,7 +94,7 @@ export function ReachLine({
     },
   ];
   const line = knowing
-    ? `${knowing} know ${them}${heard ? ` · ${heard} heard of ${them}` : ""}`
+    ? `${knowing} ${knowing === 1 ? "knows" : "know"} ${them}${heard ? ` · ${heard} heard of ${them}` : ""}`
     : heard
       ? `${heard} ${heard === 1 ? "has" : "have"} heard of ${them}`
       : `Nobody knows ${them}`;
@@ -102,7 +104,6 @@ export function ReachLine({
     "close",
     ...(hasOwn ? (["self"] as const) : []),
   ];
-  const groups = knownThrough(page);
 
   return (
     <Popover>
@@ -145,6 +146,7 @@ export function ReachLine({
         <ul className="flex flex-col gap-2.5">
           {layers.map((layer) => {
             const readers = readersOf(layer, reach);
+            const names = exclusiveReadersOf(layer, reach);
             return (
               <li
                 key={layer}
@@ -157,69 +159,19 @@ export function ReachLine({
                 <span className="flex items-baseline justify-between gap-3 text-sm font-bold">
                   {LAYER_NAME[layer]}
                   <span className="text-xs font-semibold text-ui-soft">
-                    {readerWords(layer, readers.length, person, page.name)}
+                    {readerWords(layer, readers.length, page.name)}
                   </span>
                 </span>
-                {layer !== "self" && readers.length ? (
+                {layer !== "self" && names.length ? (
                   <span className="text-[0.8125rem] leading-normal text-ui-soft">
-                    <Names people={readers} max={layer === "close" ? 8 : 5} />
+                    <Names people={names} max={layer === "close" ? 8 : 5} />
                   </span>
                 ) : null}
               </li>
             );
           })}
         </ul>
-        {groups.length || page.in?.length ? (
-          <div className="flex flex-col gap-1.5 border-t border-ui-line pt-3">
-            {groups.length ? (
-              <>
-                <PopoverLabel>Known through</PopoverLabel>
-                <GroupChips
-                  groups={groups}
-                  words={LEVEL_WORD}
-                  name={pageName}
-                />
-              </>
-            ) : null}
-            {page.in?.length ? (
-              <>
-                <PopoverLabel>{`${page.name} is in`}</PopoverLabel>
-                <GroupChips
-                  groups={page.in}
-                  words={MEMBERSHIP_WORD}
-                  name={pageName}
-                />
-              </>
-            ) : null}
-          </div>
-        ) : null}
       </PopoverContent>
     </Popover>
-  );
-}
-
-function GroupChips({
-  groups,
-  words,
-  name,
-}: {
-  groups: readonly WikiGroup[];
-  words: Readonly<Record<WikiGroup["level"], string>>;
-  name: (ref: string) => string;
-}) {
-  return (
-    <ul className="flex flex-wrap gap-1.5">
-      {groups.map(({ ref, level }) => (
-        <li
-          key={ref}
-          className="inline-flex items-baseline gap-1.5 rounded-full bg-ui-ground px-2.5 py-1 text-[0.8125rem] font-bold"
-        >
-          {ref.toLowerCase() === "everyone" ? "Everyone" : name(ref)}
-          <span className="text-xs font-semibold text-ui-soft">
-            {words[level]}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

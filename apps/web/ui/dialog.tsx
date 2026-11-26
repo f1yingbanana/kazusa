@@ -25,7 +25,7 @@ const FADE =
 
 /* Rises a little as it opens, and sinks as it goes; a sheet on a phone. */
 const SURFACE =
-  "fixed z-55 flex flex-col gap-4 bg-ui-surface p-5 text-ui-ink shadow-ui outline-none transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.2,0.9,0.3,1)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none sm:top-1/2 sm:left-1/2 sm:-translate-1/2 sm:rounded-[1.5rem] sm:data-[ending-style]:scale-96 sm:data-[starting-style]:scale-96 max-sm:inset-x-0 max-sm:bottom-0 max-sm:max-h-[calc(100dvh-3rem)] max-sm:rounded-t-[1.5rem] max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-sm:data-[ending-style]:translate-y-8 max-sm:data-[starting-style]:translate-y-8";
+  "fixed z-55 flex flex-col gap-4 bg-ui-surface p-5 text-ui-ink shadow-ui outline-none transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.2,0.9,0.3,1)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none sm:top-1/2 sm:left-1/2 sm:-translate-1/2 sm:rounded-[1.5rem] sm:data-[ending-style]:scale-96 sm:data-[starting-style]:scale-96 max-sm:inset-x-0 max-sm:bottom-0 max-sm:max-h-[calc(100dvh-3rem)] max-sm:rounded-t-[1.5rem] max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-sm:ui-sheet-tail max-sm:data-[ending-style]:translate-y-8 max-sm:data-[starting-style]:translate-y-8";
 
 const WIDTH = {
   sm: "sm:w-[min(24rem,calc(100vw-2rem))]",

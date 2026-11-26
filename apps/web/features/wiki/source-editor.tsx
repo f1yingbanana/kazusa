@@ -10,6 +10,7 @@ import { Button } from "@/ui/button";
 import { Note } from "@/ui/note";
 import { Callout } from "@/ui/settings";
 import { failureText } from "./failure";
+import { useLeaveGuard } from "./leave-guard";
 import { LinkField } from "./link-field";
 import { firstDraft } from "./new-page-dialog";
 import type { WikiSide } from "./search-params";
@@ -63,6 +64,12 @@ export function SourceEditor({
   const [draft, setDraft] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const guard = useLeaveGuard(
+    opened !== undefined &&
+      ((draft !== undefined &&
+        draft !== (opened.exists ? opened.text : firstDraft(name))) ||
+        !opened.exists),
+  );
 
   if (!opened)
     return source.error ? <Note>{failureText(source.error)}</Note> : null;
@@ -98,7 +105,7 @@ export function SourceEditor({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={guard.scope} className="flex flex-col gap-3">
       {conflict ? (
         <Callout
           tone="danger"
@@ -156,6 +163,7 @@ export function SourceEditor({
           void source.mutate();
         },
       })}
+      {guard.dialog}
     </div>
   );
 }

@@ -63,3 +63,36 @@ export function splitAliases(text: string): string[] {
     .map((alias) => alias.trim())
     .filter(Boolean);
 }
+
+/**
+ * A page's Markdown made into a copy: its new name in the front matter and the
+ * title, no other names (they would point at both), and a place's id the new
+ * page's own, as two places can't share one.
+ */
+export function duplicateSource(
+  text: string,
+  copy: { readonly name: string; readonly id: string },
+): string {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+  const front = match?.[1] ?? "";
+  let body = match ? text.slice(match[0].length) : text;
+  const lines: string[] = [];
+  let inAliases = false;
+  for (const line of front ? front.split(/\r?\n/) : []) {
+    if (inAliases && /^\s+(-|\S)/.test(line)) continue;
+    inAliases = false;
+    if (/^aliases:/.test(line)) {
+      inAliases = /^aliases:\s*$/.test(line);
+      continue;
+    }
+    if (/^name:/.test(line)) lines.push(`name: ${JSON.stringify(copy.name)}`);
+    else if (/^place_id:/.test(line)) lines.push(`place_id: ${copy.id}`);
+    else lines.push(line);
+  }
+  if (!lines.some((line) => line.startsWith("name:")))
+    lines.unshift(`name: ${JSON.stringify(copy.name)}`);
+  body = /^\s*# .*$/m.test(body)
+    ? body.replace(/^(\s*)# .*$/m, `$1# ${copy.name}`)
+    : `# ${copy.name}\n\n${body}`;
+  return `---\n${lines.join("\n")}\n---\n${body.startsWith("\n") ? "" : "\n"}${body}`;
+}

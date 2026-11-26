@@ -29,6 +29,7 @@ import { UpdateSaveDialog } from "../settings/update-save-dialog";
 import { TimelineSidebar } from "../timeline/timeline-sidebar";
 import { TimelineStage } from "../timeline/timeline-stage";
 import { WikiSidebar } from "../wiki/wiki-sidebar";
+import { wikiParsers } from "../wiki/search-params";
 import { WikiStage } from "../wiki/wiki-stage";
 import { WhosWhere } from "../world/whos-where";
 import { WorldStage } from "../world/world-stage";
@@ -88,6 +89,8 @@ function Frame() {
   const { player } = useSources();
   const [, setView] = useQueryState("view", parseAsString);
   const [chatId] = useQueryState("chats.id", chatsParsers["chats.id"]);
+  const [wikiPage] = useQueryState("wiki.page", wikiParsers["wiki.page"]);
+  const [wikiTab] = useQueryState("wiki.tab", wikiParsers["wiki.tab"]);
   const active = useActiveView();
   const docked = useMediaQuery("(min-width: 1024px)");
   const wide = useMediaQuery("(min-width: 1280px)");
@@ -100,7 +103,12 @@ function Frame() {
   // On a phone, a section opens on its list unless something in it is already open.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the section changes
   useEffect(() => {
-    setPane(active.id === "chats" && !chatId ? "list" : "stage");
+    setPane(
+      (active.id === "chats" && !chatId) ||
+        (active.id === "wiki" && !wikiPage && !wikiTab)
+        ? "list"
+        : "stage",
+    );
   }, [active.id]);
 
   useEffect(() => {
@@ -125,7 +133,19 @@ function Frame() {
   const showDocked = wide && (Boolean(selection) || Boolean(player.id));
 
   return (
-    <div className="grid h-dvh grid-cols-[5.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] bg-ui-ground text-ui-ink max-md:grid-cols-[minmax(0,1fr)]">
+    <div
+      className="grid h-dvh grid-cols-[5.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] bg-ui-ground text-ui-ink max-md:grid-cols-[minmax(0,1fr)]"
+      onContextMenu={(event) => {
+        if (event.defaultPrevented) return;
+        const target = event.target as HTMLElement | null;
+        if (
+          target?.closest("input, textarea, select, [contenteditable], a[href]")
+        )
+          return;
+        if (window.getSelection()?.toString().trim()) return;
+        event.preventDefault();
+      }}
+    >
       <TopBar
         className="col-span-full"
         onOpenCommand={() => setCommandOpen(true)}

@@ -34,17 +34,14 @@ export function TabsList({
 }) {
   return (
     <div
-      className={cx(
-        "flex items-end gap-3 border-b border-ui-line max-sm:overflow-x-auto",
-        className,
-      )}
+      className={cx("flex items-end gap-3 border-b border-ui-line", className)}
     >
       <List
         aria-label={label}
-        className="relative flex min-w-0 flex-1 items-end gap-5 max-sm:gap-4"
+        className="relative flex min-w-0 flex-1 scrollbar-none items-end gap-5 overflow-x-auto max-sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {children}
-        <TabsIndicator className="absolute -bottom-px left-(--active-tab-left) h-[3px] w-(--active-tab-width) rounded-full bg-ui-primary transition-[left,width] duration-280 ease-[cubic-bezier(0.3,1.3,0.5,1)] data-[activation-direction=none]:transition-none motion-reduce:transition-none" />
+        <TabsIndicator className="absolute bottom-0 left-(--active-tab-left) h-[3px] w-(--active-tab-width) rounded-full bg-ui-primary transition-[left,width] duration-280 ease-[cubic-bezier(0.3,1.3,0.5,1)] data-[activation-direction=none]:transition-none motion-reduce:transition-none" />
       </List>
       {end ? (
         <div className="flex shrink-0 items-center gap-1 pb-1.5">{end}</div>

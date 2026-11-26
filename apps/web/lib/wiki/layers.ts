@@ -1,9 +1,4 @@
-import type {
-  Knowledge,
-  WikiLevel,
-  WikiPage,
-  WikiReachResponse,
-} from "@kazusa/client";
+import type { Knowledge, WikiPage, WikiReachResponse } from "@kazusa/client";
 
 /**
  * A page read in layers, each reaching fewer people: its summary line, its
@@ -35,14 +30,6 @@ export function reads(
   return LAYERS.indexOf(layer) <= DEEPEST[depth];
 }
 
-/** The level of a group's or a member's knowing that a layer needs. */
-export const LAYER_LEVEL: Readonly<Record<Exclude<Layer, "self">, WikiLevel>> =
-  {
-    summary: "heard of",
-    opening: "knows",
-    close: "close",
-  };
-
 /** Who in the cast reads a layer, as the page now stands. */
 export function readersOf(
   layer: Layer,
@@ -53,6 +40,26 @@ export function readersOf(
       return [...reach.well, ...reach.knows, ...reach.heard];
     case "opening":
       return [...reach.well, ...reach.knows];
+    case "close":
+      return reach.well;
+    case "self":
+      return [];
+  }
+}
+
+/**
+ * Readers whose deepest level is `layer`, so higher-level readers aren't
+ * repeated.
+ */
+export function exclusiveReadersOf(
+  layer: Layer,
+  reach: WikiReachResponse,
+): WikiReachResponse["well"] {
+  switch (layer) {
+    case "summary":
+      return reach.heard;
+    case "opening":
+      return reach.knows;
     case "close":
       return reach.well;
     case "self":
@@ -86,18 +93,13 @@ export function leadAfterSummary(page: Pick<WikiPage, "summary" | "lead">) {
   return match ? lead.slice(match[0].length).trim() : lead;
 }
 
-/** How a layer's readers are counted, in words, for a person or a thing. */
+/** How a layer's readers are counted, in words. */
 export function readerWords(
   layer: Layer,
   count: number,
-  person: boolean,
   subject: string,
 ): string {
   if (layer === "self") return `Only ${subject}`;
-  const them = person ? "them" : "it";
-  const who = count === 0 ? "Nobody" : String(count);
-  const one = count <= 1;
-  if (layer === "summary")
-    return `${who} ${one ? "has" : "have"} heard of ${them}`;
-  return `${who} ${one ? "knows" : "know"} ${them}${layer === "close" ? " well" : ""}`;
+  if (count === 0) return "No readers";
+  return count === 1 ? "1 reader" : `${count} readers`;
 }

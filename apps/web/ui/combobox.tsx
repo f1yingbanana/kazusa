@@ -26,6 +26,8 @@ export interface PickOption {
   readonly label: string;
   /** A second line, like the areas a place is in. */
   readonly hint?: string | undefined;
+  /** Other words that find it when typing (aliases, ids). */
+  readonly keywords?: readonly string[] | undefined;
   readonly media?: ReactNode;
 }
 
@@ -69,8 +71,9 @@ const filterTop =
         (option) =>
           !needle ||
           option.label.toLowerCase().includes(needle) ||
-          option.value.includes(needle) ||
-          option.hint?.toLowerCase().includes(needle),
+          option.value.toLowerCase().includes(needle) ||
+          option.hint?.toLowerCase().includes(needle) ||
+          option.keywords?.some((word) => word.toLowerCase().includes(needle)),
       )
       .sort(
         (a, b) =>

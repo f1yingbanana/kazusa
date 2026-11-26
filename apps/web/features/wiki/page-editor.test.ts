@@ -61,6 +61,11 @@ vi.mock("@/hooks/use-wiki-editor", () => ({
     },
   }),
 }));
+vi.mock("@/hooks/use-characters", () => ({
+  isCast: () => false,
+  useCharacterStatus: () => undefined,
+  useCharacters: () => ({ characters: [], byId: new Map() }),
+}));
 vi.mock("@/hooks/use-wiki", () => ({
   useWikiList: () => ({ data: { pages, upgraded: true } }),
   useSaveWikiPage: () => vi.fn(),
@@ -129,7 +134,7 @@ describe("a page opened to be written", () => {
       "Also called",
       "Summary",
       "Opening",
-      "For those close",
+      "In depth",
       "Save",
       "Add a member",
     ])
@@ -179,7 +184,6 @@ describe("a page opened to be written", () => {
         onDone: vi.fn(),
       }),
     );
-    expect(await screen.findByText("1 has heard of it")).toBeTruthy();
-    expect(screen.getByText("1 knows it well")).toBeTruthy();
+    expect(await screen.findAllByText("1 reader")).toHaveLength(3);
   });
 });

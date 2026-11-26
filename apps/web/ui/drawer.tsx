@@ -28,12 +28,15 @@ export function DrawerPanel({
   handle,
   heading = false,
   size = "md",
+  fit = false,
   children,
 }: {
   title: string;
   handle?: string;
   heading?: boolean;
   size?: keyof typeof WIDTH;
+  /** As tall as what is in it, like a sheet of actions, not the screen. */
+  fit?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -41,8 +44,10 @@ export function DrawerPanel({
       <DrawerBackdrop className={BACKDROP} />
       <DrawerContent
         className={cx(
-          "fixed z-55 flex flex-col bg-ui-surface text-ui-ink shadow-ui outline-none data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-[calc(100dvh-3rem)] data-[side=bottom]:rounded-t-[1.5rem] data-[side=right]:inset-y-3 data-[side=right]:right-3 data-[side=right]:rounded-[1.5rem]",
+          "relative z-55 flex flex-col bg-ui-surface text-ui-ink shadow-ui outline-none data-[side=bottom]:mx-auto data-[side=bottom]:h-[calc(100dvh-3rem)] data-[side=bottom]:w-full data-[side=bottom]:max-w-lg data-[side=bottom]:rounded-t-[1.5rem] data-[side=bottom]:pb-[env(safe-area-inset-bottom)] data-[side=bottom]:ui-sheet-tail data-[side=right]:my-3 data-[side=right]:me-3 data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=right]:rounded-[1.5rem]",
           WIDTH[size],
+          fit &&
+            "data-[side=bottom]:h-auto data-[side=bottom]:max-h-[calc(100dvh-3rem)] data-[side=bottom]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         )}
       >
         {handle ? (

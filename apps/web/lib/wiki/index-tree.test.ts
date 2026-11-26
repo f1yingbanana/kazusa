@@ -1,6 +1,6 @@
 import type { WikiListItem } from "@kazusa/client";
 import { describe, expect, it } from "vitest";
-import { areasOf, buildIndex, shelfOf, shelvesOf } from "./index-tree";
+import { buildIndex, shelfOf, shelvesOf } from "./index-tree";
 
 const page = (id: string, extra: Partial<WikiListItem> = {}): WikiListItem => ({
   id,
@@ -86,12 +86,11 @@ describe("a wiki's index", () => {
       page("b", { place: true, parent: "a" }),
       page("c", { place: true, parent: "a" }),
     ];
-    const { items, parents } = buildIndex(loop);
+    const { items } = buildIndex(loop);
     const values = items[0].children?.map((child) => child.value);
     expect(values).toEqual(["a", "b"]);
     expect(
       items[0].children?.[0].children?.map((child) => child.value),
     ).toEqual(["c"]);
-    expect(areasOf("c", parents)).toEqual(["b", "a"]);
   });
 });

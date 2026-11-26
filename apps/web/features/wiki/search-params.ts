@@ -1,8 +1,14 @@
 import { WikiKindSchema } from "@kazusa/client";
 import { parseAsString, parseAsStringLiteral } from "nuqs";
 
-/** A place's page has its backdrop beside it; every other page is one part. */
-export const PAGE_PARTS = ["page", "backdrop"] as const;
+/** A character's page has their cast tabs; a place's page has its backdrop. */
+export const PAGE_PARTS = [
+  "page",
+  "people",
+  "looks",
+  "memory",
+  "backdrop",
+] as const;
 export type PagePart = (typeof PAGE_PARTS)[number];
 
 export const WIKI_TABS = ["lint", "nights"] as const;

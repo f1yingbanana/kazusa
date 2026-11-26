@@ -22,7 +22,7 @@ import { PageArticle } from "./article";
 import { RichText, WikiLink } from "./links";
 import { BODY_TRANSITION, withTransition } from "./motion";
 import { PageEditor } from "./page-editor";
-import { Eyebrow, PageHead, Sheet } from "./page-header";
+import { Eyebrow, PageHead, PageProblems, Sheet } from "./page-header";
 import { PageMenu } from "./page-menu";
 import { wikiPatch } from "./open";
 import { wikiParsers, type WikiSide } from "./search-params";
@@ -315,7 +315,6 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
                 name={`${called}'s page on ${title}`}
                 agent={agent}
                 kind={kind}
-                onRaw={() => edit("own", true)}
                 onDeleted={() => void read.mutate()}
               />
             </>
@@ -372,22 +371,23 @@ export function TheirPage({ id, agent }: { id: string; agent: string }) {
           </div>
         }
       />
+      <PageProblems pages={[`${agent}/${id}`, `world/${id}`]} />
       {read.error ? (
         <Note>{"Couldn't read this page."}</Note>
       ) : read.isLoading ? null : (
         <div
           style={BODY_TRANSITION}
           className={cx(
-            "grid items-start gap-6",
+            "grid items-start gap-5",
             editing === "own"
-              ? "@min-[52rem]:grid-cols-2"
-              : "@min-[52rem]:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]",
+              ? "@min-[35rem]:grid-cols-2"
+              : "@min-[35rem]:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] @min-[52rem]:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] @min-[52rem]:gap-6",
           )}
         >
-          <div className="order-2 min-w-0 @min-[52rem]:order-1">
+          <div className="order-2 min-w-0 @min-[35rem]:order-1">
             {worldColumn}
           </div>
-          <div className="order-1 min-w-0 @min-[52rem]:sticky @min-[52rem]:top-4 @min-[52rem]:order-2">
+          <div className="order-1 min-w-0 @min-[35rem]:sticky @min-[35rem]:top-4 @min-[35rem]:order-2">
             {ownColumn}
           </div>
         </div>

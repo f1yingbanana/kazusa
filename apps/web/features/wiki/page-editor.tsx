@@ -7,10 +7,12 @@ import type {
   WikiPageFormFields,
   WikiSourceResponse,
 } from "@kazusa/client";
-import { MapPinIcon, UsersRoundIcon } from "lucide-react";
+import { GlobeIcon, MapPinIcon, UsersRoundIcon } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { useCharacters } from "@/hooks/use-characters";
 import { useSaveWikiPage, useWikiList } from "@/hooks/use-wiki";
+import { PersonOptionAvatar } from "../characters/character-picker";
 import { useWikiForm, useWikiReach } from "@/hooks/use-wiki-editor";
 import { saveWikiForm } from "@/lib/source/wiki/editor";
 import { WikiConflictError } from "@/lib/source/wiki/http";
@@ -25,14 +27,16 @@ import { TextInput } from "@/ui/input";
 import { Note } from "@/ui/note";
 import { Segmented, SegmentedItem } from "@/ui/segmented";
 import { Callout } from "@/ui/settings";
+import { LAYER_NAME } from "./article";
 import {
   EditorSection,
-  knowingLevels,
+  KNOWING_LEVELS,
   LayerField,
   LevelRows,
   MEMBER_LEVELS,
 } from "./editor-parts";
 import { failureText } from "./failure";
+import { useLeaveGuard } from "./leave-guard";
 import { LinkField } from "./link-field";
 import { TITLE_TRANSITION } from "./motion";
 import { OnePicker } from "@/ui/combobox";
@@ -94,7 +98,6 @@ export function PageEditor({
   owner,
   raw,
   compact = false,
-  titled = true,
   onRaw,
   onDone,
 }: {
@@ -110,8 +113,6 @@ export function PageEditor({
   raw: boolean;
   /** In a column beside another page: one field to a row. */
   compact?: boolean;
-  /** The name as the page's title; off where a title is shown already. */
-  titled?: boolean;
   onRaw: (raw: boolean) => void;
   onDone: (saved?: WikiSourceResponse) => void;
 }) {
@@ -152,7 +153,6 @@ export function PageEditor({
           side={side}
           owner={owner}
           compact={compact}
-          titled={titled}
           bar={bar}
           onDone={onDone}
         />
@@ -237,7 +237,7 @@ function EditorBar({
         </Button>
       ) : null}
       <Button tone="ghost" size="sm" disabled={saving} onClick={onClose}>
-        {dirty ? "Discard" : "Done"}
+        Cancel
       </Button>
       <Button
         tone="primary"
@@ -265,7 +265,6 @@ function FormEditor({
   side,
   owner,
   compact,
-  titled,
   bar,
   onDone,
 }: {
@@ -276,7 +275,6 @@ function FormEditor({
   side: WikiSide;
   owner: string | undefined;
   compact: boolean;
-  titled: boolean;
   bar: (state: BarState) => ReactNode;
   onDone: (saved?: WikiSourceResponse) => void;
 }) {
@@ -288,12 +286,20 @@ function FormEditor({
   const personal = side === "own";
   const { data: reach } = useWikiReach(personal ? undefined : id);
   const { data: list } = useWikiList();
+  const { byId } = useCharacters();
   const savePage = useSaveWikiPage();
   const [draft, setDraft] = useState<Draft>();
   const [moveOther, setMoveOther] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
   const formId = useId();
+  const guard = useLeaveGuard(
+    opened !== undefined &&
+      (moveOther ||
+        !opened.exists ||
+        (draft !== undefined &&
+          JSON.stringify(draft) !== JSON.stringify(draftOf(opened, name)))),
+  );
   const { options: places } = usePlaceOptions();
 
   if (!opened)
@@ -317,19 +323,66 @@ function FormEditor({
   const isGroup = pageKind === "concept" && !personal && fields.group === true;
   const ownVoice = person && !personal;
   const pages = list?.pages ?? [];
+  const pageByRef = (ref: string) =>
+    pages.find(
+      (page) =>
+        page.id === ref || page.name.toLowerCase() === ref.toLowerCase(),
+    );
   const nameOf = (ref: string) =>
     ref.toLowerCase() === EVERYONE
       ? "Everyone"
-      : (pages.find(
-          (page) =>
-            page.id === ref || page.name.toLowerCase() === ref.toLowerCase(),
-        )?.name ?? ref);
+      : (byId.get(ref)?.name ?? pageByRef(ref)?.name ?? ref);
+  const groupMedia = (
+    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-ui-tint text-ui-soft [&_svg]:size-3.5">
+      <UsersRoundIcon aria-hidden />
+    </span>
+  );
+  const audienceMedia = (ref: string): ReactNode => {
+    if (ref.toLowerCase() === EVERYONE)
+      return (
+        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-ui-tint text-ui-primary [&_svg]:size-3.5">
+          <GlobeIcon aria-hidden />
+        </span>
+      );
+    const matched = pageByRef(ref);
+    const personEntry = byId.get(matched?.id ?? ref);
+    if (personEntry || matched?.kind === "person")
+      return (
+        <PersonOptionAvatar
+          name={personEntry?.name ?? matched?.name ?? ref}
+          person={personEntry}
+          size="xs"
+        />
+      );
+    return groupMedia;
+  };
   const groupOptions = pages
     .filter((page) => page.group && page.id !== id)
-    .map((page) => ({ value: page.id, label: page.name }));
+    .map((page) => ({
+      value: page.id,
+      label: page.name,
+      keywords: [page.id, ...page.aliases],
+      hint: "Group",
+      media: groupMedia,
+    }));
   const people = pages
-    .filter((page) => page.kind === "person")
-    .map((page) => ({ value: page.id, label: page.name }));
+    .filter((page) => page.kind === "person" && page.id !== id)
+    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .map((page) => {
+      const char = byId.get(page.id);
+      return {
+        value: page.id,
+        label: char?.name ?? page.name,
+        keywords: [page.id, ...page.aliases, ...(char?.aliases ?? [])],
+        media: (
+          <PersonOptionAvatar
+            name={char?.name ?? page.name}
+            person={char}
+            size="xs"
+          />
+        ),
+      };
+    });
 
   const newGroup = async (groupName: string): Promise<string> => {
     const groupId = pageId(groupName, new Set(pages.map((page) => page.id)), {
@@ -387,7 +440,7 @@ function FormEditor({
 
   const readers = (layer: Layer) =>
     reach
-      ? readerWords(layer, readersOf(layer, reach).length, person, subject)
+      ? readerWords(layer, readersOf(layer, reach).length, subject)
       : undefined;
   const text = (
     key: "lead" | "close" | "only",
@@ -408,6 +461,7 @@ function FormEditor({
 
   return (
     <form
+      ref={guard.scope}
       noValidate
       className={cx("flex min-w-0 flex-col", compact ? "gap-5" : "gap-6")}
       onSubmit={(event) => {
@@ -422,7 +476,7 @@ function FormEditor({
       }}
     >
       <div className="flex flex-col gap-2">
-        {titled ? (
+        <div className="flex flex-col gap-1">
           <TextInput
             aria-label="Name"
             value={fields.name ?? ""}
@@ -430,32 +484,24 @@ function FormEditor({
             placeholder={name}
             onChange={(event) => setField({ name: event.target.value })}
             className={cx(
-              "-mx-2 h-auto w-[calc(100%+1rem)] bg-transparent px-2 py-0.5 leading-tight font-extrabold inset-ring-0 hover:bg-ui-ground focus-visible:bg-ui-ground",
+              "h-auto w-full px-3.5 py-2 leading-tight font-extrabold",
               compact ? "text-xl" : "text-[1.75rem]",
             )}
           />
-        ) : null}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          {titled ? null : (
-            <TextInput
-              aria-label="Name"
-              value={fields.name ?? ""}
-              placeholder={name}
-              className="h-9 min-w-48 flex-1 font-bold"
-              onChange={(event) => setField({ name: event.target.value })}
-            />
-          )}
-          <TextInput
-            aria-label="Also called"
-            value={current.aliases}
-            placeholder="Also called…"
-            className="h-9 min-w-56 flex-1"
-            onChange={(event) => set({ aliases: event.target.value })}
-          />
-          <span className="font-[ui-monospace,monospace] text-xs text-ui-soft">
+          <p
+            title="Page id (linked to filename; can't change)"
+            className="px-1 font-[ui-monospace,monospace] text-xs text-ui-soft"
+          >
             {id}
-          </span>
+          </p>
         </div>
+        <TextInput
+          aria-label="Also called"
+          value={current.aliases}
+          placeholder="Also called…"
+          className="h-9 w-full"
+          onChange={(event) => set({ aliases: event.target.value })}
+        />
         {pageKind === "concept" && !personal ? (
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {(
@@ -527,10 +573,7 @@ function FormEditor({
       ) : null}
 
       {!personal && upgraded ? (
-        <EditorSection
-          title={person ? "Who knows them" : "Who knows it"}
-          hint={person ? undefined : undefined}
-        >
+        <EditorSection title={person ? "Who knows them" : "Who knows it"}>
           {person ? (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-ui-soft">{`${subject} is in`}</span>
@@ -538,6 +581,7 @@ function FormEditor({
                 rows={fields.in ?? []}
                 keyOf={(row) => row.ref}
                 nameOf={(row) => nameOf(row.ref)}
+                mediaOf={() => groupMedia}
                 levels={MEMBER_LEVELS}
                 levelLabel={(row) =>
                   `How involved ${subject} is in ${nameOf(row.ref)}`
@@ -573,24 +617,29 @@ function FormEditor({
               rows={fields.groups}
               keyOf={(row) => row.ref}
               nameOf={(row) => nameOf(row.ref)}
-              levels={knowingLevels(person)}
+              mediaOf={(row) => audienceMedia(row.ref)}
+              levels={KNOWING_LEVELS}
               levelLabel={(row) =>
                 `How well ${nameOf(row.ref)} knows ${subject}`
               }
               onChange={(rows) => setField({ groups: everyoneFirst(rows) })}
-              empty={isPlace ? undefined : person ? undefined : undefined}
               add={{
                 label: "Add who knows it",
                 placeholder: fields.groups.length
-                  ? "Add a group"
-                  : "Everyone, or a group",
+                  ? "Add group or someone"
+                  : "Everyone, a group, or someone",
                 options: [
-                  { value: EVERYONE, label: "Everyone" },
+                  {
+                    value: EVERYONE,
+                    label: "Everyone",
+                    media: audienceMedia(EVERYONE),
+                  },
                   ...groupOptions,
+                  ...people.map((p) => ({ ...p, hint: "Person" })),
                 ].filter(
-                  (g) =>
+                  (option) =>
                     !fields.groups.some(
-                      (r) => r.ref.toLowerCase() === g.value.toLowerCase(),
+                      (r) => r.ref.toLowerCase() === option.value.toLowerCase(),
                     ),
                 ),
                 onAdd: (ref) =>
@@ -619,6 +668,7 @@ function FormEditor({
                 rows={current.members}
                 keyOf={(row) => row.id}
                 nameOf={(row) => row.name}
+                mediaOf={(row) => audienceMedia(row.id)}
                 levels={MEMBER_LEVELS}
                 levelLabel={(row) => `How involved ${row.name} is`}
                 onChange={(members) => set({ members })}
@@ -652,7 +702,6 @@ function FormEditor({
             ? `What ${owner ?? "they"} make${owner ? "s" : ""} of it`
             : "The page"
         }
-        hint={personal ? undefined : undefined}
       >
         <div className="flex flex-col gap-5">
           <LayerField
@@ -696,7 +745,7 @@ function FormEditor({
           >
             {text(
               "close",
-              personal ? "The rest" : "For those close",
+              personal ? "The rest" : LAYER_NAME.close,
               "## Habits\n\nWhat only those close would know.",
               5,
             )}
@@ -751,6 +800,7 @@ function FormEditor({
           void source.mutate();
         },
       })}
+      {guard.dialog}
     </form>
   );
 }

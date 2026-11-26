@@ -300,7 +300,10 @@ function StageMany({
               }
               setBusy(true);
               try {
-                if ((await apply(comingOn, true)) && (await apply(goingOff, false)))
+                if (
+                  (await apply(comingOn, true)) &&
+                  (await apply(goingOff, false))
+                )
                   onDone();
               } finally {
                 setBusy(false);

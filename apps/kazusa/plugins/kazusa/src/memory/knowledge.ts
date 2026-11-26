@@ -86,7 +86,7 @@ export class WorldModel {
   }
   private isUpgraded?: boolean;
 
-  /** A group, the only kind of page that can know one, or none. */
+  /** Resolves `reference` when it names a group page (`group: true`). */
   group(reference: string | undefined): string | undefined {
     const id = this.resolve(reference);
     return id && this.pages.get(id)?.group ? id : undefined;
@@ -177,23 +177,38 @@ export class WorldModel {
     const character = this.pages.get(characterId);
     if (!character) return best;
     const mine = this.memberships(character);
-    // Through each group they're in, as far as the page lets its members and
-    // no further than they are involved: an associate gets only the summary.
-    // A character's own groups know them as closely as they are in it.
-    for (const { ref, level } of [
-      ...page.known,
-      ...(page.kind === "person" ? page.in : []),
-    ]) {
-      const id = this.group(ref);
-      const involved = id ? mine.get(id) : undefined;
-      if (!id || !involved) continue;
+    const applyGroup = (
+      groupId: string | undefined,
+      ref: string,
+      level: Level,
+    ) => {
+      const involved = groupId ? mine.get(groupId) : undefined;
+      if (!groupId || !involved) return;
       const reach =
         LEVELS.indexOf(level) < LEVELS.indexOf(involved) ? level : involved;
       best = atLeast(best, {
         depth: LEVEL_DEPTH[reach],
-        why: `in ${this.pages.get(id)?.name ?? ref}`,
-        through: id,
+        why: `in ${this.pages.get(groupId)?.name ?? ref}`,
+        through: groupId,
       });
+    };
+    // Through each entry in `known`: either an individual named directly or a
+    // group they belong to (capped by their involvement in that group).
+    for (const { ref, level } of page.known) {
+      const targetId = this.resolve(ref);
+      const target = targetId ? this.pages.get(targetId) : undefined;
+      if (targetId === characterId && target?.kind === "person") {
+        best = atLeast(best, {
+          depth: LEVEL_DEPTH[level],
+          why: "known directly",
+        });
+      }
+      if (target?.group) applyGroup(targetId, ref, level);
+    }
+    // A character's own groups know them as closely as they are in it.
+    if (page.kind === "person") {
+      for (const { ref, level } of page.in)
+        applyGroup(this.group(ref), ref, level);
     }
     // A group they're in: as close as they are in it.
     const own = mine.get(pageId);

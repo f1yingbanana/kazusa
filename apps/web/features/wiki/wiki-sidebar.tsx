@@ -4,26 +4,29 @@ import type { WikiListItem } from "@kazusa/client";
 import {
   ChevronDownIcon,
   CopyIcon,
-  ExternalLinkIcon,
+  CopyPlusIcon,
   FilePlusIcon,
   GlobeIcon,
   MapPinPlusIcon,
   MoonIcon,
-  TriangleAlertIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { useQueryStates } from "nuqs";
 import { useMemo, useState, type ReactNode } from "react";
 import { useAccess } from "@/hooks/use-access";
-import { isCast, useCharacters } from "@/hooks/use-characters";
-import { usePageName, useWikiLint, useWikiList } from "@/hooks/use-wiki";
+import { useCharacters } from "@/hooks/use-characters";
+import { useSelection } from "@/hooks/use-selection";
+import { usePageName, useWikiList } from "@/hooks/use-wiki";
 import type { SectionSidebarProps } from "@/lib/registry/types";
 import {
   buildIndex,
   isShelfValue,
+  SHELF_LABEL,
   shelvesOf,
   type IndexNode,
   type Shelf,
 } from "@/lib/wiki/index-tree";
+import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import {
   Combobox,
@@ -31,16 +34,10 @@ import {
   ComboboxPopup,
   ComboboxTrigger,
 } from "@/ui/combobox";
+import { ContextMenu, type ContextAction } from "@/ui/context-menu";
 import { cx } from "@/ui/cx";
 import { SearchInput } from "@/ui/input";
-import { Badge, ListPane, ListRow } from "@/ui/list";
-import {
-  Menu,
-  MenuContent,
-  MenuContextTrigger,
-  MenuItem,
-  MenuSeparator,
-} from "@/ui/menu";
+import { ListPane, ListRow } from "@/ui/list";
 import { Note } from "@/ui/note";
 import { Tree, TreeRow } from "@/ui/tree";
 import { CharacterAvatar } from "../characters/character-avatar";
@@ -51,6 +48,7 @@ import {
   type NewPagePreset,
 } from "./new-page-dialog";
 import { wikiPatch } from "./open";
+import { DeletePageDialog, DuplicatePageDialog } from "./page-dialogs";
 import { copyMarkdown } from "./page-menu";
 import { wikiParsers } from "./search-params";
 import { SHELF_ICON } from "./shelf-icon";
@@ -74,14 +72,14 @@ const NEW_WORD: Readonly<Record<NewKind, string>> = {
 /**
  * The index of one wiki: the World Wiki's, or one character's own while reading
  * as them. Pages stand on shelves, places inside their areas; a search lays the
- * matches out flat. Problems and each night's changes sit at the foot.
+ * matches out flat. Each night's changes sit at the foot in a character's
+ * wiki.
  */
 export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const [params, setParams] = useQueryStates(wikiParsers);
   const agent = params["wiki.agent"] ?? undefined;
   const { canManage } = useAccess();
   const list = useWikiList(agent);
-  const { data: lint } = useWikiLint();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState<NewPagePreset>();
   const { byId } = useCharacters();
@@ -90,7 +88,6 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
   const pages = useMemo(() => list.data?.pages ?? [], [list.data]);
   const index = useMemo(() => buildIndex(pages, query), [pages, query]);
   const searching = query.trim() !== "";
-  const problems = lint?.findings.length ?? 0;
 
   const go = (patch: ReturnType<typeof wikiPatch>) => {
     void setParams(patch);
@@ -123,7 +120,10 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
         agent={agent}
         onChange={(next) => {
           setQuery("");
-          go(wikiPatch(params["wiki.page"], { agent: next ?? null }));
+          void setParams(
+            wikiPatch(params["wiki.page"], { agent: next ?? null }),
+          );
+          if (params["wiki.page"]) onNavigated?.();
         }}
       />
 
@@ -150,8 +150,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
         )}
       </div>
 
-      <div className="flex flex-col border-t border-ui-line pt-2">
-        {agent ? (
+      {agent ? (
+        <div className="flex flex-col border-t border-ui-line pt-2">
           <ListRow
             current={params["wiki.tab"] === "nights"}
             leading={
@@ -162,22 +162,8 @@ export function WikiSidebar({ onNavigated }: SectionSidebarProps) {
             title="Nights"
             onClick={() => go(wikiPatch(null, { agent, tab: "nights" }))}
           />
-        ) : (
-          <ListRow
-            current={params["wiki.tab"] === "lint"}
-            leading={
-              <FootIcon>
-                <TriangleAlertIcon />
-              </FootIcon>
-            }
-            title="Problems"
-            trailing={
-              problems ? <Badge count={problems} label="problems" /> : null
-            }
-            onClick={() => go(wikiPatch(null, { tab: "lint" }))}
-          />
-        )}
-      </div>
+        </div>
+      ) : null}
 
       <NewPageDialog
         open={creating !== undefined}
@@ -337,15 +323,18 @@ function pathTo(nodes: readonly IndexNode[], page: string | null): string[] {
   return [];
 }
 
-/** What a right click landed on: a page's row, or a shelf. */
-type Pressed = { page: WikiListItem } | { shelf: Shelf } | undefined;
+/** What a right click or a long press landed on: a page's row, or a shelf. */
+type Pressed =
+  | { page: WikiListItem; shelf: Shelf | undefined }
+  | { shelf: Shelf }
+  | undefined;
 
 /**
  * The shelves as a tree: one tab stop, arrows to move, typing to jump. A shelf
- * opens and closes on a press; a page opens, and an area's chevron shows what
- * is in it. A page on two shelves (a place that is a group) stands on both,
- * with a mark for the other. A right click, or Shift+F10, offers what can be
- * made there.
+ * or an area opens on a press; a page opens. A page on two shelves (a place
+ * that is a group) stands on both, with a mark for the other. A right click
+ * (Shift+F10) opens a small menu of what can be done there; on a touch screen,
+ * a long press opens the same as a sheet.
  */
 function IndexTree({
   index,
@@ -385,7 +374,17 @@ function IndexTree({
     if (path.some((value) => !expanded.includes(value)))
       setExpanded([...new Set([...expanded, ...path])]);
   }
-  const [pressed, setPressed] = useState<Pressed>();
+  const [, select] = useSelection();
+  const [duplicating, setDuplicating] = useState<WikiListItem>();
+  const [deleting, setDeleting] = useState<WikiListItem>();
+  const pressedAt = (element: EventTarget | null): Pressed => {
+    const row = (element as HTMLElement | null)?.closest<HTMLElement>(
+      "[data-page],[data-shelf]",
+    );
+    const shelf = (row?.dataset.shelf || undefined) as Shelf | undefined;
+    const page = row?.dataset.page ? byPage.get(row.dataset.page) : undefined;
+    return page ? { page, shelf } : shelf ? { shelf } : undefined;
+  };
 
   const href = (page: WikiListItem) =>
     agent
@@ -395,6 +394,68 @@ function IndexTree({
     if (agent) void setParams(wikiPatch(page.id, { agent }));
     else target(page).open();
     onOpen?.();
+  };
+  /**
+   * What can be done from a row: copy it, make a page of its kind or a place
+   * inside it, duplicate it, delete it. On a shelf, a new page of the shelf's
+   * kind.
+   */
+  const rowActions = (at: Pressed): ContextAction[] => {
+    if (!at) return [];
+    const kind = at.shelf ? SHELF_KIND[at.shelf] : undefined;
+    const make: ContextAction[] = onCreate
+      ? [
+          {
+            key: "new",
+            group: 1,
+            label: kind ? NEW_WORD[kind] : "New page",
+            icon: <FilePlusIcon aria-hidden />,
+            run: () => onCreate(kind ? { kind } : {}),
+          },
+        ]
+      : [];
+    if (!("page" in at)) return make;
+    const { page } = at;
+    return [
+      {
+        key: "copy",
+        group: 0,
+        label: "Copy as Markdown",
+        icon: <CopyIcon aria-hidden />,
+        run: () => void copyMarkdown(page.id, agent),
+      },
+      ...make,
+      ...(onCreate && page.place && !agent
+        ? [
+            {
+              key: "inside",
+              group: 1,
+              label: "New place inside",
+              icon: <MapPinPlusIcon aria-hidden />,
+              run: () => onCreate({ kind: "place", parent: page.id }),
+            },
+          ]
+        : []),
+      ...(onCreate
+        ? [
+            {
+              key: "duplicate",
+              group: 1,
+              label: "Duplicate…",
+              icon: <CopyPlusIcon aria-hidden />,
+              run: () => setDuplicating(page),
+            },
+            {
+              key: "delete",
+              group: 2,
+              label: "Delete…",
+              icon: <Trash2Icon aria-hidden />,
+              danger: true,
+              run: () => setDeleting(page),
+            },
+          ]
+        : []),
+    ];
   };
   const pageOf = (node: IndexNode) =>
     node.page ? byPage.get(node.page) : undefined;
@@ -428,14 +489,18 @@ function IndexTree({
           marked={Boolean(
             page && page.id === current && node.value !== page.id,
           )}
-          data={page ? { "data-page": page.id } : { "data-shelf": own ?? "" }}
+          data={
+            page
+              ? { "data-page": page.id, "data-shelf": on ?? "" }
+              : { "data-shelf": own ?? "" }
+          }
           render={page ? <a href={href(page)} /> : undefined}
           leading={
             own ? (
               <span aria-hidden className="text-ui-primary [&_svg]:size-4">
                 {SHELF_ICON[own]}
               </span>
-            ) : who && isCast(who) ? (
+            ) : who ? (
               <CharacterAvatar
                 id={who.id}
                 name={who.name}
@@ -444,6 +509,8 @@ function IndexTree({
                 size="xs"
                 decorative
               />
+            ) : page?.kind === "person" ? (
+              <Avatar name={page.name} size="xs" decorative />
             ) : null
           }
           trailing={
@@ -468,26 +535,16 @@ function IndexTree({
       );
     });
 
-  const placeOf = (target: Pressed) =>
-    target && "page" in target && target.page.place ? target.page : undefined;
-
   return (
-    <Menu>
-      <MenuContextTrigger
-        render={<div />}
-        onContextMenuCapture={(event) => {
-          const element = event.target as HTMLElement;
-          const row = element.closest<HTMLElement>("[data-page],[data-shelf]");
-          const page = row?.dataset.page
-            ? byPage.get(row.dataset.page)
-            : undefined;
-          setPressed(
-            page
-              ? { page }
-              : row?.dataset.shelf
-                ? { shelf: row.dataset.shelf as Shelf }
-                : undefined,
-          );
+    <>
+      <ContextMenu
+        resolve={(element) => {
+          const hit = pressedAt(element);
+          if (!hit) return undefined;
+          return {
+            title: "page" in hit ? hit.page.name : SHELF_LABEL[hit.shelf],
+            actions: rowActions(hit),
+          };
         }}
       >
         <Tree
@@ -516,52 +573,27 @@ function IndexTree({
         >
           {rows(index.items)}
         </Tree>
-      </MenuContextTrigger>
-      <MenuContent>
-        {pressed && "page" in pressed ? (
-          <>
-            <MenuItem
-              icon={<ExternalLinkIcon aria-hidden />}
-              onClick={() => window.open(href(pressed.page), "_blank")}
-            >
-              Open in new tab
-            </MenuItem>
-            <MenuItem
-              icon={<CopyIcon aria-hidden />}
-              onClick={() => void copyMarkdown(pressed.page.id, agent)}
-            >
-              Copy as Markdown
-            </MenuItem>
-            {onCreate && !agent && placeOf(pressed) ? (
-              <>
-                <MenuSeparator />
-                <MenuItem
-                  icon={<MapPinPlusIcon aria-hidden />}
-                  onClick={() =>
-                    onCreate({ kind: "place", parent: pressed.page.id })
-                  }
-                >
-                  New place inside
-                </MenuItem>
-              </>
-            ) : null}
-          </>
-        ) : pressed && "shelf" in pressed && onCreate ? (
-          <MenuItem
-            icon={<FilePlusIcon aria-hidden />}
-            onClick={() => {
-              const kind = SHELF_KIND[pressed.shelf];
-              onCreate(kind ? { kind } : {});
-            }}
-          >
-            {SHELF_KIND[pressed.shelf]
-              ? NEW_WORD[SHELF_KIND[pressed.shelf]!]
-              : "New page"}
-          </MenuItem>
-        ) : (
-          <MenuItem disabled>Nothing here</MenuItem>
-        )}
-      </MenuContent>
-    </Menu>
+      </ContextMenu>
+      <DuplicatePageDialog
+        page={duplicating}
+        agent={agent}
+        existing={new Set(pages.map((page) => page.id))}
+        onOpenChange={(open) => !open && setDuplicating(undefined)}
+        onDuplicated={(id) => {
+          void setParams(wikiPatch(id, { agent: agent ?? null }));
+          onOpen?.();
+        }}
+      />
+      <DeletePageDialog
+        page={deleting}
+        agent={agent}
+        onOpenChange={(open) => !open && setDeleting(undefined)}
+        onDeleted={(id) => {
+          if (id !== current) return;
+          void select(null);
+          void setParams(wikiPatch(null, { agent: agent ?? null }));
+        }}
+      />
+    </>
   );
 }

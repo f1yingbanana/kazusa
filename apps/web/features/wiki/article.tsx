@@ -30,7 +30,7 @@ export const RAIL: Readonly<Record<Layer, string>> = {
 export const LAYER_NAME: Readonly<Record<Layer, string>> = {
   summary: "Summary",
   opening: "Opening",
-  close: "For those close",
+  close: "In depth",
   self: "Inner voice",
 };
 
@@ -175,7 +175,7 @@ export function PageArticle({
   const own = page.sections.filter((s) => isOwnSection(s, subject));
   const label = (layer: Layer) =>
     reach
-      ? readerWords(layer, readersOf(layer, reach).length, person, name)
+      ? readerWords(layer, readersOf(layer, reach).length, name)
       : layer === "self"
         ? `Only ${name}`
         : undefined;
@@ -192,25 +192,21 @@ export function PageArticle({
   );
 
   return (
-    <div className="flex min-w-0 flex-col gap-7">
-      {summary || lead ? (
-        <div className="flex flex-col gap-3">
-          {summary
-            ? layer(
-                "summary",
-                <p className="text-[1.0625rem] leading-[1.6] font-bold text-pretty">
-                  <RichText text={summary} />
-                </p>,
-              )
-            : null}
-          {lead ? layer("opening", <Prose text={lead} />) : null}
-        </div>
-      ) : null}
+    <div className="flex min-w-0 flex-col gap-6">
+      {summary
+        ? layer(
+            "summary",
+            <p className="text-[1.0625rem] leading-[1.6] font-bold text-pretty">
+              <RichText text={summary} />
+            </p>,
+          )
+        : null}
+      {lead ? layer("opening", <Prose text={lead} />) : null}
 
       {close.length
         ? layer(
             "close",
-            <div className="flex flex-col gap-7">
+            <div className="flex flex-col gap-6">
               {close.map((section) => (
                 <SectionBody key={section.title} section={section} />
               ))}
@@ -221,7 +217,7 @@ export function PageArticle({
       {own.length
         ? layer(
             "self",
-            <div className="flex flex-col gap-7">
+            <div className="flex flex-col gap-6">
               <OwnMark subject={name} />
               {own.map((section) => (
                 <SectionBody key={section.title} section={section} />

@@ -19,7 +19,7 @@ export const SHELF_LABEL: Readonly<Record<Shelf, string>> = {
 };
 
 /** A shelf's row in the tree; never a page's id, which has no `§`. */
-export const shelfValue = (shelf: Shelf) => `§${shelf}`;
+const shelfValue = (shelf: Shelf) => `§${shelf}`;
 export const isShelfValue = (value: string) => value.startsWith("§");
 
 /** A page's first shelf: a place that is also a group is first a place. */
@@ -41,7 +41,7 @@ export function shelvesOf(page: WikiListItem): Shelf[] {
  * A page's row on a shelf. On its first shelf, its id; on another, the shelf
  * and the id, since a tree's rows each need their own.
  */
-export const rowValue = (shelf: Shelf, page: WikiListItem) =>
+const rowValue = (shelf: Shelf, page: WikiListItem) =>
   shelfOf(page) === shelf ? page.id : `§${shelf}:${page.id}`;
 
 export interface IndexNode {
@@ -56,8 +56,6 @@ export interface WikiIndex {
   readonly items: IndexNode[];
   /** How many pages each shelf holds, matches only while searching. */
   readonly counts: Readonly<Partial<Record<Shelf, number>>>;
-  /** Each page's area, for the rows that open it. */
-  readonly parents: ReadonlyMap<string, string>;
 }
 
 /** Whether a page answers a search, by its name, other names or summary. */
@@ -143,7 +141,7 @@ export function buildIndex(
       children,
     });
   }
-  return { items, counts, parents };
+  return { items, counts };
 }
 
 /** Whether following areas up from a page comes back to it. */
@@ -155,18 +153,4 @@ function circles(id: string, parents: ReadonlyMap<string, string>): boolean {
     seen.add(at);
   }
   return false;
-}
-
-/** The areas a place is in, nearest last, as far as the index knows them. */
-export function areasOf(
-  id: string,
-  parents: ReadonlyMap<string, string>,
-): string[] {
-  const chain: string[] = [];
-  const seen = new Set([id]);
-  for (let at = parents.get(id); at && !seen.has(at); at = parents.get(at)) {
-    chain.unshift(at);
-    seen.add(at);
-  }
-  return chain;
 }

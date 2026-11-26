@@ -230,6 +230,10 @@ function refresh(cell: WorldCell, wikiDir: string): void {
     cell.handlers.onChange({ before, after: cell.world, renames });
 }
 
+/** A wiki file the map is read from: a page of a place or of a character. */
+export const isMapFile = (file: string): boolean =>
+  /^(concepts|characters|entities[\\/](places|characters))[\\/]/.test(file);
+
 /**
  * Watches the wiki's places and characters, and the backdrop library beside it,
  * from the moment that library appears if it isn't there at start (the first
@@ -287,9 +291,7 @@ function watchWiki(cell: WorldCell, wikiDir: string): void {
       );
     }
   };
-  follow(wikiDir, "map", (file) =>
-    /^entities[\\/](places|characters)[\\/]/.test(file),
-  );
+  follow(wikiDir, "map", isMapFile);
   follow(backdropsBeside(wikiDir), "backdrops", () => true);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { initialsOf } from "./avatar";
 import { cx } from "./cx";
 
 /** The picture a page is of. */
@@ -19,6 +20,7 @@ export function Infobox({
   label,
   picture,
   caption,
+  initials,
   actions,
   className,
   children,
@@ -26,6 +28,8 @@ export function Infobox({
   label: string;
   picture?: InfoboxPicture | undefined;
   caption?: ReactNode;
+  /** A name whose initials stand in for a missing picture, as an avatar's do. */
+  initials?: string | undefined;
   /** Buttons under the facts, like where else to see what the page is about. */
   actions?: ReactNode;
   className?: string;
@@ -39,7 +43,7 @@ export function Infobox({
   const rows = Array.isArray(children)
     ? children.some(Boolean)
     : Boolean(children);
-  if (!visiblePicture && !rows && !actions) return null;
+  if (!visiblePicture && !rows && !actions && !initials) return null;
   return (
     <aside
       aria-label={label}
@@ -48,6 +52,14 @@ export function Infobox({
         className,
       )}
     >
+      {!visiblePicture && initials ? (
+        <div
+          aria-hidden
+          className="grid aspect-square w-full place-items-center rounded-[0.875rem] bg-ui-tint text-[4rem] font-extrabold text-ui-primary"
+        >
+          {initialsOf(initials)}
+        </div>
+      ) : null}
       {visiblePicture ? (
         <figure className="flex flex-col gap-2">
           <div className="grid place-items-center overflow-hidden rounded-[0.875rem] bg-ui-tint">
@@ -61,7 +73,7 @@ export function Infobox({
               data-loaded={loadedOnce ? "" : undefined}
               onLoad={() => setLoadedOnce(true)}
               onError={() => setFailedSrc(visiblePicture.src)}
-              className="max-h-[min(28rem,70vh)] w-full object-contain opacity-0 transition-opacity duration-300 select-none data-loaded:opacity-100 motion-reduce:transition-none"
+              className="max-h-72 w-full object-contain opacity-0 transition-opacity duration-300 select-none data-loaded:opacity-100 motion-reduce:transition-none"
             />
           </div>
           {caption ? (

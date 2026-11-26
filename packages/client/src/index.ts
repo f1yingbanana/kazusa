@@ -2100,6 +2100,8 @@ export const WikiPageSchema = WikiListItemSchema.extend({
   known: z.array(WikiGroupSchema).optional(),
   /** On a character's page: the groups they are in, and how closely. */
   in: z.array(WikiGroupSchema).optional(),
+  /** A person's home place. */
+  home: z.string().optional(),
   /** Components: on the map, and something people are in. */
   place: z.boolean().optional(),
   group: z.boolean().optional(),

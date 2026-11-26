@@ -34,10 +34,10 @@ export function MemoryTab({
   const pages = own?.pages ?? [];
   const people = pages.filter((p) => p.kind === "person").length;
   const days = pages.filter((p) => p.kind === "day").length;
-  const things = pages.length - people - days;
+  const concepts = pages.length - people - days;
   const counts = [
     people ? `${people} ${people === 1 ? "person" : "people"}` : null,
-    things ? `${things} ${things === 1 ? "thing" : "things"}` : null,
+    concepts ? `${concepts} ${concepts === 1 ? "concept" : "concepts"}` : null,
     days ? `${days} ${days === 1 ? "day" : "days"} in a diary` : null,
   ].filter(Boolean);
 
@@ -80,7 +80,7 @@ export function MemoryTab({
           <p className="text-[0.8125rem] text-ui-soft">
             {counts.length
               ? `Longer memories of ${counts.join(", ")}.`
-              : "Longer memories of people, places and things, once they have some."}
+              : "Longer memories of people, places and concepts, once they have some."}
           </p>
         </div>
         <Button

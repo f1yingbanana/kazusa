@@ -268,20 +268,46 @@ export type WikiPageFormSavePayload = z.infer<
 
 const WikiPersonSchema = z.object({ id: z.string(), name: z.string() });
 
+const WikiReachPersonSchema = WikiPersonSchema.extend({
+  /** How they know it (e.g. `"in Sweets Club"`, `"known directly"`). */
+  why: z.string().optional(),
+  /** Group id connecting them to it, when reached through a group. */
+  through: z.string().optional(),
+});
+
+const WikiReachMemberSchema = WikiPersonSchema.extend({
+  /** How involved: an associate (`heard of`), a member, or a close member. */
+  level: WikiLevelSchema.optional(),
+});
+
+const WikiReachNoteSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  summary: z.string(),
+  lead: z.string(),
+  relation: z.string().optional(),
+  openThreads: z.array(z.string()).optional(),
+});
+export type WikiReachNote = z.infer<typeof WikiReachNoteSchema>;
+export type WikiReachPerson = z.infer<typeof WikiReachPersonSchema>;
+
 /**
  * `GET /kazusa/wiki/reach?id=`: who in the cast knows a page how well, as the
- * page now stands. A character's own page isn't counted for them.
+ * page now stands, plus each agent's own notes about it when they have one. A
+ * character's own page isn't counted for them.
  */
 export const WikiReachResponseSchema = z.object({
   /** Know it well: they get its sections when one comes up. */
-  well: z.array(WikiPersonSchema),
+  well: z.array(WikiReachPersonSchema),
   /** Know it: they get its opening. */
-  knows: z.array(WikiPersonSchema),
+  knows: z.array(WikiReachPersonSchema),
   /** Have heard of it: they get its summary line. */
-  heard: z.array(WikiPersonSchema),
+  heard: z.array(WikiReachPersonSchema),
   /** How many know nothing of it. */
   none: z.number(),
-  /** For a group: who in the cast is in it. */
-  members: z.array(WikiPersonSchema),
+  /** For a group: who in the cast is in it, and how involved. */
+  members: z.array(WikiReachMemberSchema),
+  /** What particular agents say about this page in their own personal wiki. */
+  notes: z.array(WikiReachNoteSchema).optional(),
 });
 export type WikiReachResponse = z.infer<typeof WikiReachResponseSchema>;

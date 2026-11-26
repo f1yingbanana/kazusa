@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { TextArea } from "@/ui/input";
 import { failureText, isConflict } from "../wiki/failure";
+import { useLeaveGuard } from "../wiki/leave-guard";
 
 /**
  * Their `MEMORY.md`, written in place. It saves only over the version opened,
@@ -28,6 +29,7 @@ export function MemoryEditor({
   const [conflict, setConflict] = useState(false);
   const text = draft?.text ?? memory.text;
   const dirty = draft !== undefined && draft.text !== memory.text;
+  const guard = useLeaveGuard(dirty);
 
   const save = async () => {
     if (!draft || saving) return;
@@ -46,7 +48,7 @@ export function MemoryEditor({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={guard.scope} className="flex flex-col gap-3">
       <TextArea
         aria-label="What they keep in mind"
         value={text}
@@ -120,6 +122,7 @@ export function MemoryEditor({
           )}
         </div>
       ) : null}
+      {guard.dialog}
     </div>
   );
 }

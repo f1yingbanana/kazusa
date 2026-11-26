@@ -60,6 +60,7 @@ export function WikiStage() {
  */
 function FrontPage({ agent }: { agent: string | undefined }) {
   const { data } = useWikiList(agent);
+  const { data: lint } = useWikiLint();
   const { byId } = useCharacters();
   const viewer = agent ? byId.get(agent) : undefined;
   const target = usePageTarget();
@@ -75,6 +76,17 @@ function FrontPage({ agent }: { agent: string | undefined }) {
   );
   const shelves = SHELVES.filter((shelf) => index.counts[shelf]);
   const called = viewer ? firstName(viewer.name) : undefined;
+  const findings = (lint?.findings ?? []).filter((f) =>
+    agent ? f.agent === agent : true,
+  );
+  const errors = findings.filter((f) => f.level === "error").length;
+  const warnings = findings.length - errors;
+  const summary = [
+    errors ? `${errors} ${errors === 1 ? "error" : "errors"}` : "",
+    warnings ? `${warnings} ${warnings === 1 ? "warning" : "warnings"}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Sheet label={called ? `${called}'s wiki` : "World Wiki"}>
       <PageHead
@@ -98,8 +110,26 @@ function FrontPage({ agent }: { agent: string | undefined }) {
           )
         }
         title={called ? `${called}'s wiki` : "World Wiki"}
+        under={
+          findings.length ? (
+            <button
+              type="button"
+              onClick={() => void setParams(wikiPatch(null, { tab: "lint" }))}
+              className="-ms-2 inline-flex items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-[0.8125rem] font-bold text-ui-soft transition-colors hover:bg-ui-tint hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-primary"
+            >
+              <TriangleAlertIcon
+                aria-hidden
+                className={cx(
+                  "size-3.5",
+                  errors ? "text-ui-danger" : "text-ui-accent",
+                )}
+              />
+              <span>{summary}</span>
+            </button>
+          ) : null
+        }
       />
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
         {shelves.map((shelf: Shelf, at) => (
           <li
             key={shelf}

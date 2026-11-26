@@ -88,7 +88,6 @@ export function CharacterActions({
   const [params, setParams] = useQueryStates({
     view: parseAsString,
     character: parseAsString,
-    "chars.tab": parseAsString,
     "chars.look": parseAsString,
     "chats.id": chatsParsers["chats.id"],
     "chats.dm": chatsParsers["chats.dm"],
@@ -167,10 +166,7 @@ export function CharacterActions({
       setOverflowed(0);
       return;
     }
-    if (
-      overflowed < maxOverflow &&
-      node.scrollWidth > node.clientWidth + 1
-    ) {
+    if (overflowed < maxOverflow && node.scrollWidth > node.clientWidth + 1) {
       setOverflowed((n) => Math.min(maxOverflow, n + 1));
     }
   }, [layoutKey, settledKey, overflowed, maxOverflow]);
