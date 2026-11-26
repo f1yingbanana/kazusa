@@ -1,7 +1,7 @@
 "use client";
 
 import type { CharacterSummary } from "@kazusa/client";
-import { HistoryIcon, PencilIcon } from "lucide-react";
+import { CheckIcon, HistoryIcon, PencilIcon } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/hooks/use-access";
@@ -13,9 +13,9 @@ import { markQuietSelection } from "@/lib/state/ui-store";
 import { Button } from "@/ui/button";
 import { Note } from "@/ui/note";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/ui/tabs";
-import { wikiParsers } from "../legacy";
+import { wikiParsers } from "../wiki/search-params";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";
-import { wikiPatch } from "../wiki/open";
+import { withTransition } from "../wiki/motion";
 import { AboutTab } from "./about-tab";
 import { clearGalleryFocus, rememberGalleryFocus } from "./cast";
 import { Gallery } from "./gallery";
@@ -29,7 +29,6 @@ import {
   type ProfileTab,
 } from "./search-params";
 import { StoryTab } from "./story-tab";
-import { CharacterMemorySheet } from "../legacy";
 
 const LABEL: Record<ProfileTab, string> = {
   about: "About",
@@ -65,7 +64,7 @@ export function CharactersStage() {
 function Profile({ character }: { character: CharacterSummary }) {
   const [, select] = useSelection();
   const { canManage } = useAccess();
-  const [memoryEditing, setMemoryEditing] = useState(false);
+  const [editing, setEditing] = useState<ProfileTab | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [params, setParams] = useQueryStates({
     ...charactersParsers,
@@ -91,18 +90,33 @@ function Profile({ character }: { character: CharacterSummary }) {
   );
   const asked = params["chars.tab"];
   const tab = asked && tabs.includes(asked) ? asked : tabs[0];
+  const editingNow = canManage && editing === tab;
+  const edit = (on: boolean) =>
+    withTransition(() => setEditing(on ? tab : null));
+  const editButton = editingNow ? (
+    tab === "about" ? null : (
+      <Button
+        tone="primary"
+        size="sm"
+        icon={<CheckIcon aria-hidden />}
+        onClick={() => edit(false)}
+      >
+        Done
+      </Button>
+    )
+  ) : (
+    <Button
+      tone="ghost"
+      size="sm"
+      icon={<PencilIcon aria-hidden />}
+      onClick={() => edit(true)}
+    >
+      Edit
+    </Button>
+  );
 
   const end =
-    tab === "about" && canManage ? (
-      <Button
-        tone="ghost"
-        size="sm"
-        icon={<PencilIcon aria-hidden />}
-        onClick={() => void setParams(wikiPatch(character.id, { edit: "world" }))}
-      >
-        Edit
-      </Button>
-    ) : tab === "story" ? (
+    tab === "story" ? (
       <Button
         tone="ghost"
         size="sm"
@@ -111,24 +125,8 @@ function Profile({ character }: { character: CharacterSummary }) {
       >
         In Timeline
       </Button>
-    ) : tab === "looks" && canManage ? (
-      <Button
-        tone="ghost"
-        size="sm"
-        icon={<PencilIcon aria-hidden />}
-        onClick={() => void setParams(wikiPatch(character.id, { part: "looks" }))}
-      >
-        Edit
-      </Button>
-    ) : tab === "memory" && canManage ? (
-      <Button
-        tone="ghost"
-        size="sm"
-        icon={<PencilIcon aria-hidden />}
-        onClick={() => setMemoryEditing(true)}
-      >
-        Edit
-      </Button>
+    ) : tab !== "people" && canManage ? (
+      editButton
     ) : null;
 
   return (
@@ -148,6 +146,7 @@ function Profile({ character }: { character: CharacterSummary }) {
           onValueChange={(next) => {
             if (!next) return;
             if (scrollRef.current) scrollRef.current.scrollTop = 0;
+            setEditing(null);
             void setParams(
               { "chars.tab": next === tabs[0] ? null : next },
               { history: "replace" },
@@ -168,12 +167,17 @@ function Profile({ character }: { character: CharacterSummary }) {
           <div className="@container px-8 pt-6 pb-10 max-lg:px-6 max-md:px-4 max-md:pb-6">
             <div className="flex flex-col gap-6 @min-[46rem]:flex-row-reverse @min-[46rem]:items-start @min-[46rem]:gap-8">
               <ProfileInfobox
+                hidden={editingNow && tab === "about"}
                 character={character}
                 className="@max-[46rem]:max-w-80 @min-[46rem]:sticky @min-[46rem]:top-16 @min-[46rem]:w-64 @min-[46rem]:shrink-0"
               />
               <div className="min-w-0 flex-1">
                 <TabsPanel value="about">
-                  <AboutTab character={character} />
+                  <AboutTab
+                    character={character}
+                    editing={editingNow}
+                    onDone={() => edit(false)}
+                  />
                 </TabsPanel>
                 <TabsPanel value="story">
                   <StoryTab character={character} />
@@ -182,24 +186,16 @@ function Profile({ character }: { character: CharacterSummary }) {
                   <PeopleTab character={character} />
                 </TabsPanel>
                 <TabsPanel value="looks">
-                  <LooksTab character={character} />
+                  <LooksTab character={character} editing={editingNow} />
                 </TabsPanel>
                 <TabsPanel value="memory">
-                  <MemoryTab character={character} />
+                  <MemoryTab character={character} editing={editingNow} />
                 </TabsPanel>
               </div>
             </div>
           </div>
         </Tabs>
       </div>
-      {agent && canManage ? (
-        <CharacterMemorySheet
-          id={character.id}
-          name={character.name}
-          open={memoryEditing}
-          onOpenChange={setMemoryEditing}
-        />
-      ) : null}
     </div>
   );
 }

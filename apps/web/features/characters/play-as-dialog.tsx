@@ -13,7 +13,7 @@ import { Button } from "@/ui/button";
 import { ChooseList } from "@/ui/choose-list";
 import { Dialog, DialogClose, DialogPanel } from "@/ui/dialog";
 import type { PickGroup } from "@/ui/pick-list";
-import { usePlainText } from "../legacy";
+import { usePlainText } from "../wiki/links";
 import { CharacterAvatar } from "./character-avatar";
 
 /** The observer's value; no character id starts with a colon. */

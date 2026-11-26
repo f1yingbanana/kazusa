@@ -20,7 +20,7 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Note } from "@/ui/note";
-import { RichText, usePlainText } from "../legacy";
+import { RichText, usePlainText } from "../wiki/links";
 import { Prose } from "../entities/prose";
 import { CharacterAvatar } from "./character-avatar";
 import { charactersParsers, profilePatch } from "./search-params";

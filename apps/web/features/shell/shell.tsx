@@ -28,6 +28,8 @@ import { SettingsStage } from "../settings/settings-stage";
 import { UpdateSaveDialog } from "../settings/update-save-dialog";
 import { TimelineSidebar } from "../timeline/timeline-sidebar";
 import { TimelineStage } from "../timeline/timeline-stage";
+import { WikiSidebar } from "../wiki/wiki-sidebar";
+import { WikiStage } from "../wiki/wiki-stage";
 import { WhosWhere } from "../world/whos-where";
 import { WorldStage } from "../world/world-stage";
 import { CommandPalette } from "./command-palette";
@@ -44,6 +46,7 @@ const SIDEBARS: Record<string, ComponentType<SectionSidebarProps> | null> = {
   chats: ChatList,
   settings: SettingsSidebar,
   timeline: TimelineSidebar,
+  wiki: WikiSidebar,
   world: WhosWhere,
 };
 
@@ -52,6 +55,7 @@ const STAGES: Record<string, ComponentType> = {
   chats: ChatsStage,
   settings: SettingsStage,
   timeline: TimelineStage,
+  wiki: WikiStage,
   world: WorldStage,
 };
 
@@ -59,6 +63,7 @@ const PANE_LABELS: Record<string, [string, string]> = {
   chats: ["Conversations", "Thread"],
   settings: ["Categories", "Settings"],
   timeline: ["People", "Timeline"],
+  wiki: ["Index", "Page"],
   world: ["Who's where", "Map"],
 };
 

@@ -1,5 +1,5 @@
 import { cx } from "@/ui/cx";
-import { RichText } from "../legacy";
+import { RichText } from "../wiki/links";
 
 /**
  * The little Markdown pages use: paragraphs, bulleted lists (a wrapped bullet

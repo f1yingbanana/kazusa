@@ -45,8 +45,8 @@ import {
   CharacterMemorySheet,
   chatsParsers,
   useStopBrain,
-  wikiParsers,
 } from "../legacy";
+import { wikiParsers } from "../wiki/search-params";
 import { conversationParsers } from "../chats/open";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";
 import { wikiPatch } from "../wiki/open";

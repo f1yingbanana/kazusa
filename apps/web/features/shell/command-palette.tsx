@@ -53,12 +53,8 @@ import { CharacterAvatar } from "../characters/character-avatar";
 import { charactersParsers, profilePatch } from "../characters/search-params";
 import { conversationParsers, conversationPatch } from "../chats/open";
 import { chatIcon } from "../entities/chat-meta";
-import {
-  chatsParsers,
-  PLACE_PREFIX,
-  wikiParsers,
-  worldParsers,
-} from "../legacy";
+import { chatsParsers, PLACE_PREFIX, worldParsers } from "../legacy";
+import { wikiParsers } from "../wiki/search-params";
 import { settingsParsers } from "../settings/search-params";
 import { useAllowedSettingsCategories } from "../settings/settings-sidebar";
 import { timelineParsers, timelinePatch } from "../timeline/search-params";

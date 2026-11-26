@@ -9,7 +9,7 @@ import { usePageName } from "@/hooks/use-wiki";
 import { useDraftChat } from "@/lib/state/chat-draft";
 import { Button } from "@/ui/button";
 import { conversationParsers, conversationPatch } from "../chats/open";
-import { wikiParsers } from "../legacy";
+import { wikiParsers } from "../wiki/search-params";
 import { wikiPatch } from "../wiki/open";
 
 export function WikiPageChip({

@@ -195,9 +195,12 @@ function useProfilePicture(character: CharacterSummary): {
  */
 export function ProfileInfobox({
   character,
+  hidden = false,
   className,
 }: {
   character: CharacterSummary;
+  /** Out of the way while the page beside it is written. */
+  hidden?: boolean;
   className?: string;
 }) {
   const { data: page } = useWikiPage(character.id);
@@ -208,6 +211,7 @@ export function ProfileInfobox({
     view: parseAsString,
     sel: entityRefParser,
   });
+  if (hidden) return null;
   const groups =
     page?.world?.in ??
     (character.groups ?? []).map((ref) => ({ ref, level: undefined }));
