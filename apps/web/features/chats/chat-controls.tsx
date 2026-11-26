@@ -138,7 +138,8 @@ export function RenameTitle({
         label="Save name"
         size="sm"
         type="submit"
-        disabled={saving || !next}
+        pending={saving}
+        disabled={!next}
       >
         <CheckIcon aria-hidden />
       </IconButton>

@@ -8,7 +8,6 @@ import {
   EllipsisIcon,
   HistoryIcon,
   IdCardIcon,
-  LoaderCircleIcon,
   MapPinIcon,
   MessageCircleIcon,
   MessagesSquareIcon,
@@ -209,7 +208,7 @@ export function CharacterActions({
             aria-label={`Go to ${there.name}`}
             icon={<MapPinIcon aria-hidden />}
             disabled={!player.moveTo}
-            onClick={() => void player.moveTo?.(there.id)}
+            onClick={() => player.moveTo?.(there.id)}
           >
             Go there
           </Button>
@@ -217,21 +216,12 @@ export function CharacterActions({
         {stopper.shown ? (
           <Button
             collapse
-            title={stopper.stopping ? "Stopping" : "Stop"}
-            icon={
-              stopper.stopping ? (
-                <LoaderCircleIcon
-                  aria-hidden
-                  className="motion-safe:animate-ui-spin"
-                />
-              ) : (
-                <SquareIcon aria-hidden />
-              )
-            }
-            disabled={stopper.stopping}
+            title="Stop"
+            icon={<SquareIcon aria-hidden />}
+            pending={stopper.stopping}
             onClick={stopper.stop}
           >
-            {stopper.stopping ? "Stopping" : "Stop"}
+            Stop
           </Button>
         ) : null}
 

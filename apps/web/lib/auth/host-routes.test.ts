@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  GET as connectionGet,
+  POST as connectionPost,
+} from "../../app/connection/route";
 import { POST as setupPost } from "../../app/setup/route";
 import { POST as worldPost } from "../../app/setup/world/route";
 import { POST as revealPost } from "../../app/reveal/route";
@@ -31,6 +35,8 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 const ROUTES = [
+  { path: "connection", method: "GET", handler: connectionGet },
+  { path: "connection", method: "POST", handler: connectionPost },
   { path: "setup", method: "POST", handler: setupPost },
   { path: "setup/world", method: "POST", handler: worldPost },
   { path: "reveal", method: "POST", handler: revealPost },

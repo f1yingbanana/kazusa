@@ -429,12 +429,10 @@ export function TimelineStage() {
                 <Button
                   tone="soft"
                   size="sm"
-                  disabled={timeline.isLoadingMore}
+                  pending={timeline.isLoadingMore}
                   onClick={() => void timeline.loadMore()}
                 >
-                  {timeline.isLoadingMore
-                    ? "Loading earlier events…"
-                    : "Load earlier events"}
+                  Load earlier events
                 </Button>
               ) : (
                 <p className="text-xs font-semibold text-ui-soft">
@@ -525,7 +523,8 @@ function KindFilterPopover({
                 <CheckRow
                   parent
                   disabled={
-                    inFacet.length > 0 && inFacet.length === effectiveKinds.length
+                    inFacet.length > 0 &&
+                    inFacet.length === effectiveKinds.length
                   }
                   label={facet.label}
                   className="min-h-8 py-1"
@@ -592,10 +591,10 @@ function EmptyChronicle({
                 <Button
                   tone="soft"
                   size="sm"
-                  disabled={isLoadingMore}
+                  pending={isLoadingMore}
                   onClick={onLoadMore}
                 >
-                  {isLoadingMore ? "Loading…" : "Search earlier events"}
+                  Search earlier events
                 </Button>
               ) : null}
               <Button tone="primary" size="sm" onClick={onReset}>

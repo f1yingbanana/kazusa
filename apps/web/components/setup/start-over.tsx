@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircleIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
@@ -52,7 +53,10 @@ export function StartOver() {
         </p>
         <div>
           <Button onClick={() => void startOver()} disabled={working}>
-            {working ? "Setting it aside…" : "Start a new world"}
+            {working ? (
+              <LoaderCircleIcon aria-hidden className="animate-spin" />
+            ) : null}
+            Start a new world
           </Button>
         </div>
         {error ? <FieldError>{error}</FieldError> : null}

@@ -9,7 +9,9 @@ import {
   sanitizePreferences,
   setHuddleRendering,
   setObservedCollapsed,
+  setPalette,
   setSectionOpen,
+  setThemeMode,
   syncPreferences,
   toggleWatch,
   usePreferencesStore,
@@ -78,6 +80,16 @@ describe("preferences-store actions", () => {
     setHuddleRendering("list");
     expect(usePreferencesStore.getState().huddleRendering).toBe("list");
   });
+
+  it("remembers theme mode and palette", () => {
+    expect(usePreferencesStore.getState().themeMode).toBe("system");
+    expect(usePreferencesStore.getState().palette).toBe("sky");
+
+    setThemeMode("dark");
+    setPalette("crimson");
+    expect(usePreferencesStore.getState().themeMode).toBe("dark");
+    expect(usePreferencesStore.getState().palette).toBe("crimson");
+  });
 });
 
 describe("sanitizePreferences", () => {
@@ -138,6 +150,15 @@ describe("sanitizePreferences", () => {
       sanitizePreferences({ huddleRendering: "list" }).huddleRendering,
     ).toBe("list");
   });
+
+  it("sanitizes theme mode and palette", () => {
+    expect(sanitizePreferences({ themeMode: "sepia" }).themeMode).toBe(
+      "system",
+    );
+    expect(sanitizePreferences({ themeMode: "dark" }).themeMode).toBe("dark");
+    expect(sanitizePreferences({ palette: "neon" }).palette).toBe("sky");
+    expect(sanitizePreferences({ palette: "sand" }).palette).toBe("sand");
+  });
 });
 
 describe("preferences-store persistence", () => {
@@ -167,6 +188,7 @@ describe("preferences-store persistence", () => {
     );
     await usePreferencesStore.persist.rehydrate();
     expect(usePreferencesStore.getState()).toEqual({
+      ...DEFAULT_PREFERENCES,
       watchlist: ["alice"],
       inspectorFolds: { "character.desires": false },
       observedCollapsed: true,

@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { DEFAULT_PALETTE, type Palette } from "@/ui/palettes";
+import { useEffect } from "react";
+import {
+  usePalettePreference,
+  useThemeMode,
+} from "@/lib/state/preferences-store";
 
-/** The palette lives on <html>, since dialogs and popovers portal to <body>. */
-export function usePalette() {
-  const [palette, setPalette] = useState<Palette>(DEFAULT_PALETTE);
+/** Syncs palette and light/dark mode onto <html>, since popups portal to <body>. */
+export function useAppearance(): void {
+  const palette = usePalettePreference();
+  const mode = useThemeMode();
+
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.palette = palette;
+    root.classList.toggle("dark", mode === "dark");
+    root.classList.toggle("light", mode === "light");
     return () => {
       delete root.dataset.palette;
+      root.classList.remove("dark", "light");
     };
-  }, [palette]);
-  return [palette, setPalette] as const;
+  }, [palette, mode]);
 }

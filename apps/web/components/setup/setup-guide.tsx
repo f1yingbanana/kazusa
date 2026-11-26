@@ -1,7 +1,11 @@
 "use client";
 
 import { format } from "date-fns";
-import { ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { fetchChats } from "@/lib/source/chats/http";
@@ -678,7 +682,10 @@ export function SetupGuide({ status }: { status: SetupStatus }) {
                     void submit();
                   }}
                 >
-                  {submitting ? "Starting…" : "Start"}
+                  {submitting ? (
+                    <LoaderCircleIcon aria-hidden className="animate-spin" />
+                  ) : null}
+                  Start
                 </QuestionnaireSubmit>
               </QuestionnaireActions>
             </Questionnaire>
